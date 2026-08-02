@@ -7,8 +7,7 @@
 //
 // Anti-coupling rules (enforced by review):
 //   - Do not call status/log/pull-request read modules from here.
-//     Filetree is a display read; status overlays are intentionally
-//     outside this v1 path.
+//     Filetree is a display read; status projection is a separate concern.
 //   - Do not call HTTP / route utilities here.
 //   - Do not import UI types.
 

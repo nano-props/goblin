@@ -41,11 +41,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalFilesystemTarget)
   }, [projection, runtimeMembershipIndex, selectedTerminalSessionIdByTerminalFilesystemTarget])
 
-  // Projection event wiring (singleton lifecycle, see terminal-roadmap.md P1.7).
-  // The projection is client-level; we only subscribe / unsubscribe client
-  // events on mount/unmount. We do NOT destroy the projection — the singleton
-  // outlives the Provider. StrictMode re-mounts simply re-register the same
-  // listeners against the same instance.
+  // The provider owns event subscriptions, not the client-level projection.
+  // Remounting re-registers listeners without replacing projection state.
   useEffect(() => {
     const offOutput = terminalClient.onOutput((event) => {
       projection.handleOutput(event)

@@ -7,8 +7,7 @@ import type { RepoViewResult } from '#/shared/repo-view.ts'
 // Body schema for `POST /api/repo/view`. Only the three static views
 // are addressable through `g` commands; `terminal` is intentionally
 // excluded because the terminal tab is owned by the runtime
-// (controller/takeover semantics — see docs/terminal-target-model.md)
-// and shouldn't be reachable via a CLI side-channel.
+// and should not be reachable through a CLI side-channel.
 const RepoViewBodySchema = v.object({
   tab: v.picklist(WORKSPACE_PANE_STATIC_TAB_TYPES),
 })

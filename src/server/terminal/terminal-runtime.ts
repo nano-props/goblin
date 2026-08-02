@@ -67,9 +67,7 @@ import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
 // 24 hours gives a full day for the user to reconnect before sessions are
-// forcibly cleaned up. (The previous revision also kept a 30s controller grace
-// timer here; it has been removed — controller effectiveness now derives from
-// broker presence.)
+// forcibly cleaned up. Controller effectiveness derives from broker presence.
 const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 // Realtime presence detects a disconnected page. This additional grace absorbs
 // a normal socket reconnect without retaining an expired page's memberships,

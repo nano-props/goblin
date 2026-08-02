@@ -17,11 +17,7 @@ Use these docs for app-level product and architecture decisions:
 - `terminology.md`: canonical naming reference for subsystems, components, and state classes
 - `transient-surfaces.md`: transient hover/proximity surfaces and descendant floating-surface pinning
 - `terminal.md`: terminal system design
-- `terminal-session-lifecycle.md`: terminal session lifecycle correctness (fresh-stream/recovery-frame protocol, durable close, `session-closed` broadcast, empty-state CTA)
-- `terminal-roadmap.md`: terminal refactor roadmap
-- `terminal-target-model.md`: terminal target lifecycle and control model
-- `terminal-ephemeral-xterm.md`: current inactive-terminal xterm lifetime model
 - `terminal-takeover.md`: terminal takeover — who controls the cursor (single-user, multi-device, intent-recent, user-scoped)
-- `filetree.md`: worktree-scoped file tree view (server-first, read-only v1)
+- `filetree.md`: server-first workspace filesystem tree and file actions
 - `workspace-tab-opener.md`: workspace pane tab opener model — open-after-opener vs. append, close-back-to-opener
 - `workspace-pane-command-invariants.md`: command ownership, queue/token/CAS semantics, and required concurrency cases

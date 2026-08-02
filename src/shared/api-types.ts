@@ -243,9 +243,7 @@ export interface RepoSnapshot {
   remote: RepoRemoteInfo
 }
 
-// Workspace-filesystem-scoped tree types — see docs/filetree.md. Wire and
-// domain shapes coincide in v1; if they diverge, move these into a
-// dedicated `src/shared/filetree.ts` and map at the hook boundary.
+// Workspace-filesystem-scoped tree protocol — see docs/filetree.md.
 
 export type WorkspaceFilesystemNodeStatus = 'clean' | 'modified' | 'staged' | 'untracked' | 'ignored'
 

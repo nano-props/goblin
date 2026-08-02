@@ -1,721 +1,273 @@
 # Terminal
 
-Use this doc for the terminal system design.
+Use this document for terminal product behavior, authority, lifecycle, control,
+geometry, replay, and failure semantics.
 
-## Goal
+## Goals
 
-- Provide a server-backed terminal model that works the same way across web and Electron clients.
-- Keep terminal sessions long-lived and reconnectable instead of tying them to one visible view.
-- Separate business lifecycle from PTY execution details.
-- Make terminal control, mirroring, and takeover explicit parts of the model.
-- Preserve fast interactive behavior while keeping the server as the runtime-coherent source of truth for sessions.
+- Keep shell sessions alive independently of client views.
+- Make control, viewing, takeover, reconnect, and recovery explicit.
+- Keep PTY execution behind a stable server-owned business boundary.
+- Treat client terminal presentation as a best-effort projection without
+  creating a second session or render authority.
 
 ## Core model
 
-The terminal feature is built around four different concepts:
+- **Session**: a server-owned terminal business object with stable product
+  identity, lifecycle, control state, canonical geometry, and render history.
+- **PTY binding**: the operating-system process resource for one session
+  generation. A session may exist while no PTY is bound.
+- **Attachment**: the relationship between one authenticated client and a
+  session.
+- **Controller**: the online attachment with write and resize authority.
+- **Viewer**: an attachment that can observe session metadata and request
+  takeover but does not consume the live xterm output stream.
+- **View**: one client-local xterm presentation for the selected session.
 
-- **Session**: the long-lived server business object for a terminal and
-  its lifecycle. It may temporarily have no live PTY handle, for example
-  while opening, restarting, or after a restart failure.
-- **Attachment**: one client attachment to a session.
-- **Controller**: the attachment that currently has write and resize authority.
-- **View**: one local xterm instance that renders a session in a particular UI surface.
+Multiple clients may attach to one session, but at most one attachment controls
+input and geometry. “Mirroring” means shared session visibility and explicit
+control transfer, not simultaneous live xterm rendering in every viewer.
 
-These concepts should not be collapsed into each other.
+## Authority boundaries
 
-A session may outlive any one view.
-A client may reconnect through a new attachment.
-Multiple attachments may observe the same session.
-Only one attachment may control the session at a time.
+- The server owns session existence, lifecycle, attachment presence,
+  controller intent, PTY binding, canonical geometry, output sequence, and the
+  headless render state used for recovery.
+- The selected controller view owns only mounted xterm rendering, fitted client
+  geometry, local input capture, search, and presentation feedback.
+- The PTY supervisor owns spawn, write, resize, kill, and native events. It does
+  not own session policy, control, or client protocol.
+- Shared protocol types describe the product model without exposing whether the
+  PTY runs in-process or in a worker.
+- Client caches and views never prove session liveness or authorize a server
+  mutation.
 
-## Design principles
+## Identities
 
-### Server-first runtime
+- `userId` scopes session visibility, lifecycle cleanup, and realtime fanout.
+- `clientId` identifies one loaded client and is the controller identity.
+- `terminalSessionId` is the stable product identity stored by runtime tabs.
+- `terminalRuntimeSessionId` addresses one server runtime session. It does not
+  prove that a PTY is currently bound or interactive.
+- Runtime generation prevents commands and events from crossing PTY restart or
+  replacement boundaries.
+- Filesystem target keys group presentation and selection only; execution uses
+  a validated server-owned target and runtime identity.
 
-- The server owns runtime-coherent terminal truth.
-- Clients are projections of server state plus local interaction state.
-- Terminal behavior should be described in client and attachment terms, not in window terms.
-
-### Authority boundaries
-
-The terminal has two different authority domains that should stay separate:
-
-- **Session authority** lives on the server. The server owns session lifecycle, controller/viewer state, PTY binding, canonical geometry, and the headless xterm render state used for snapshots.
-- **View authority** lives in the currently mounted client xterm. The live xterm instance owns local rendering behavior and is the only component that should report the active controller view's fitted `cols`/`rows`.
-
-Create carries no geometry and allocates no PTY. After the selected view mounts,
-its real xterm is fitted against the DOM and attach uses those exact dimensions
-to create the first bound PTY. Resize, restart, and takeover likewise report the
-mounted xterm's fitted geometry. The server validates generation and controller
-authority, applies the native PTY mutation, and only then commits canonical
-geometry and the matching headless-render size.
-
-### Stable business boundary over PTY boundary
-
-- PTY execution is an implementation detail behind a supervisor interface.
-- Session lifecycle, control, replay, and session service rules live above the PTY layer.
-- Switching between in-process PTY execution and worker-backed PTY execution must not change the terminal product model.
-
-### Reconnect over recreation
-
-- The default user expectation is that a terminal survives temporary UI loss, navigation, and reconnect.
-- New terminal creation should be explicit.
-- Existing sessions should be restored or reattached whenever possible.
-
-### Explicit control
-
-- Mirroring is a first-class mode, not an accidental side effect.
-- Input and resize authority belong to the current controller only.
-- Takeover is an explicit handoff flow, not implicit behavior triggered by random input.
-
-### Input and automatic focus
-
-- A hidden, pending terminal presentation accepts no local user intent. User
-  input is discarded rather than buffered for later delivery. Fresh live output
-  is queued without being parsed until the view is presented; snapshot-replay
-  protocol side effects are discarded.
-- Fresh streams and recovery snapshots fulfil automatic focus at the same
-  presentation boundary: the fitted xterm has rendered its full viewport and
-  the final geometry check has passed. Recovery first parses the complete
-  server-authored `snapshot`/`snapshotSeq` frame. A fresh stream has no render
-  checkpoint and may therefore reveal and focus a quiet process without waiting
-  for output. Pending focus never moves the DOM to a transition element and
-  never consumes keyboard events.
-- Automatic focus is one presentation-generation-scoped intent. A subsequent
-  pointer action or window blur retires it; programmatic popover cleanup and
-  keyboard activity do not. The client deliberately keeps no global pressed-key
-  registry or navigation-time keyboard gate; a physically held key may therefore
-  repeat into a terminal that receives focus during the hold.
-- A presented controller forwards user input through the generation-bearing
-  write operation. Xterm protocol replies from fresh output use that same path
-  after presentation. A viewer or stale generation cannot write.
-- A terminal write result has one narrow meaning: `accepted` confirms that
-  the target PTY runtime `write()` call returned normally, `rejected` means
-  the current authority/binding could not accept it, and `indeterminate`
-  means the call may have happened but its acknowledgement was lost.
-- No write result proves that the shell consumed or executed the input.
-  Indeterminate input must not be replayed automatically.
-
-### Geometry is part of correctness
-
-- Terminal size is not a cosmetic concern.
-- Prepared creation has no business geometry. Attach, resize, recovery replay,
-  restart, and takeover all depend on coherent fitted geometry.
-- Once a controller view is mounted, PTY geometry should closely follow that view's fitted xterm geometry.
-
-## Layering
-
-The terminal feature spans `shared`, `server`, and `web`, but it still behaves as one feature slice.
-
-### Shared layer
-
-- Defines protocol types, message shapes, identities, and grouping rules.
-- Gives both server and client a common language for session, control, and realtime events.
-
-### Server runtime
-
-- Owns business state for sessions, control, session service behavior, connection tracking, and realtime dispatch.
-- Exposes the terminal host boundary used by routes and realtime transport.
-- Treats PTY execution as a dependency, not as the place where product behavior lives.
-- Keeps `TerminalSessionService` as the public facade. Focused server modules own create orchestration, session ensure, prune, and workspace-tab projection details.
-
-### PTY supervisor layer
-
-- Owns spawn, write, resize, kill, and PTY event forwarding.
-- Hides whether PTYs run in-process or in a worker.
-- Does not own session service, control, or client-facing policy.
-
-### Client projection
-
-- Maintains the client-local projection of live sessions, selection, bells, and attach/replay orchestration state.
-- Coordinates create, attach, detach, select, restart, takeover, and local session lifecycle.
-- Treats the terminal client as the transport to server truth, not as the source of truth itself.
-- Admits local input only after the selected xterm has been fully presented.
-
-### Client view layer
-
-- Owns xterm instances, DOM attachment, local search UI, and rendering lifecycle.
-- Should stay focused on view concerns such as layout, input capture, and rendering behavior.
-- Should not become the home of session policy or control rules.
+There is no separate attachment identifier. One client has at most one terminal
+view for a session; cross-client control is modeled through client identity and
+explicit roles.
 
 ## Session lifecycle
 
-At a high level, the lifecycle is:
+The server exposes explicit phases:
 
-1. A client requests create or restore for a worktree terminal.
-2. The server session service validates the request and delegates create orchestration.
-3. The create path resolves whether the request means create, reuse, or restore.
-4. The session manager reserves a logical session identity without publishing
-   catalog membership or starting a PTY.
-5. The Workspace application records placement and commits Directory admission;
-   only then is the session addressable through catalog and attach.
-6. The client mounts and fits its single local xterm, then attaches with the
-   measured geometry.
-7. Attach starts a fresh PTY and streams from output sequence 1, or snapshots an
-   already-running PTY when the view has missed history.
-8. Realtime output, title, exit, and identity events keep clients up to date.
-9. Detach removes a local view without necessarily killing the session.
-10. Close or TTL cleanup ends the session and frees PTY resources.
+- `opening`: logical session exists and is preparing its first binding.
+- `restarting`: a new PTY generation is being established.
+- `open`: the session has an interactive live binding.
+- `error`: the session remains addressable, but the latest lifecycle attempt
+  failed.
+- `closed`: authoritative membership has ended.
 
-The important design rule is that **session lifecycle is independent from view lifecycle**.
+A runtime identity and phase are both required to decide whether an operation
+is valid. A failed restart keeps the same business session addressable for an
+explicit retry; it never presents a session without a PTY as healthy.
 
-Destroying a local view should not imply closing the shell.
-Closing a session should be an explicit business action or the result of server-side cleanup policy.
+### Create and attach
 
-### Workspace Pane tab lifecycle
+1. Create validates the execution target and establishes or finds a logical
+   session. It returns identity and lifecycle metadata only.
+2. The client mounts and measures its selected xterm view.
+3. Attach sends the fitted geometry and generation preconditions.
+4. If no PTY history exists, attach starts the PTY at that geometry and returns
+   a fresh stream frame.
+5. If a PTY already exists, attach returns an atomic recovery snapshot and
+   sequence boundary before later realtime output.
 
-The Workspace Pane tab is a UI lifecycle boundary above both the local xterm view and the server session.
+Create does not start a PTY with fallback geometry and does not return a render
+snapshot. First output is not a prompt-ready, focus, or lifecycle signal.
 
-It is useful to keep three lifetimes separate:
+### Restart
 
-- **Session lifetime**: server-owned terminal business state and PTY resources.
-- **View lifetime**: client-local xterm and DOM resources for rendering a session.
-- **Tab lifetime**: user-visible workspace surface that decides which feature resources must be released before the tab is considered closed.
+Restart creates a new generation from the mounted controller view's fitted
+geometry. The successful response establishes the new binding before its
+realtime output is delivered. An indeterminate restart is never replayed
+automatically; authoritative hydration or explicit user retry establishes what
+happened.
 
-A Workspace Pane tab is not the authoritative owner of a terminal session. The
-tab is a client projection of server-owned runtime membership. The terminal
-manager owns the session and `WorkspacePaneRuntimeApplication` owns the composed
-close command that joins resource cleanup with canonical tab projection. The
-client projection only applies the returned snapshot and local presentation.
+### Close and exit
 
-Closing a terminal tab is a sequential operation. The command may compute the
-close-back tab before it starts the close, but `TerminalSessionProjection` must
-keep the terminal session visible until the server/runtime close succeeds. Do
-not optimistically hide the session from the tab strip, clear selected terminal
-state, or expose a compensating `closingSessionIds` state for normal tab close.
-Those patterns make the UI render a state that is neither the old tab nor the
-planned close-back tab, and then force route reconciliation or render logic to
-repair it. On failure, the session should still be present because the close did
-not complete. On success, the close path removes the session and commits the
-planned close-back navigation.
+- Closing is an explicit server-owned business operation. Destroying a local
+  view never closes the shell.
+- A requested close remains addressable until PTY termination is acknowledged.
+  Concurrent close and cleanup paths join one idempotent retirement operation.
+- The client does not optimistically hide a session before close succeeds. On
+  ordinary failure, the session remains visible and retryable.
+- Confirmed close and natural exit publish targeted retirement events so other
+  clients can drop the exact session without inventing another close.
+- Workspace-runtime invalidation may remove addressability before native
+  cleanup completes because the entire lookup scope is already invalid. Cleanup
+  capability does not become a second session authority.
 
-Natural PTY exit and a sibling window's successful terminal close are already
-committed resource retirements, so they must not issue a second close command.
-The server captures the canonical pane tabs before removing terminal membership
-and includes that before-state in either retirement event. When the client
-accepts the event for the current runtime binding, it makes one close-back
-attempt. The passive transition reuses the current navigation generation only
-when it has no registered history-commit owner, uses `REPLACE`, and commits with
-an exact-route precondition. Missing target authority, an owned navigation, a
-changed route, or a failed navigation ends the presentation attempt without
-replay or compensation.
+### Detached clients
 
-Addressable close sources use one idempotent session-close promise. The session
-remains in the authoritative Directory until pending spawns settle and PTY
-termination is acknowledged. Direct close, prune, detached-user cleanup, and
-physical-worktree quiescence join that promise; a bounded termination failure
-leaves the session addressable in `error` state for an explicit later retry.
+Temporary loss of all views does not destroy a session. Presence determines
+whether stored controller intent is effective; offline intent grants no input
+authority. Detached retention is bounded by server cleanup policy, after which
+resources may be retired.
 
-Workspace-runtime invalidation is different because the entire lookup scope has
-already become invalid. It removes Directory authority synchronously and moves
-the detached binding into a resource-retirement registry. A bounded kill timeout
-does not recreate the session or start a retry loop: the registry follows the
-supervisor's durable native-exit completion until the PTY exits, or until process
-shutdown transfers all remaining processes to supervisor shutdown. This registry
-owns cleanup capability only; it is not a second session authority.
+## Workspace-pane integration
 
-This distinction matters for destructive worktree operations. The client sends
-one repository-removal intent; it does not close tabs first. The server
-`WorktreeRemovalApplication` admits removal by canonical repo/worktree identity
-before the command waits in the repository write queue. The admission spans
-users and workspace runtimes because the filesystem worktree is one physical
-resource. Later runtime opens and canonical tab writes for that target are
-rejected. Operations admitted before removal carry a server-issued permit and
-finish before removal begins; a later removal cannot invalidate an earlier
-application command halfway through provider/tab composition. After repository validation succeeds, the application closes and
-awaits all authoritative provider resources. Once quiescence is confirmed, the
-Git removal crosses a non-cancelable commit point. Canonical tabs are removed
-only after Git confirms worktree removal. If Git fails, runtime tabs reconcile
-against the quiesced providers while static tabs remain. Validation failures
-leave all runtime resources untouched. The admission is released when the
-repository command settles, so recreating the same path later does not inherit
-a tombstone.
+- A terminal runtime tab is a projection of a live server session, not the
+  owner of that session.
+- Runtime open composes session creation or restore with canonical tab
+  membership at one server application boundary.
+- Runtime close composes session retirement with canonical tab removal.
+- The client does not repair membership with a second tab write and does not
+  infer a tab from local xterm state.
+- Terminal session collections and workspace-pane tab collections keep
+  independent revisions.
+- Closing a tab is sequential: plan the close-back destination, await server
+  retirement, then apply canonical projection and navigation. Projection or
+  navigation failure after server commit never reopens or compensates the
+  session.
+- Whole-worktree removal admits the physical target, quiesces provider
+  resources, performs the Git removal, and finalizes projections in one
+  server-owned workflow. External interference fails directly and returns
+  recovery to the user.
 
-The repo route only delegates the composed command to the application layer;
-RepoSource and Git code remain unaware of terminal or Workspace Pane types.
-Their required pre-remove lifecycle boundary guarantees that no repository
-worktree deletion can bypass application cleanup.
-
-An ordinary runtime-close response pairs the remaining server sessions with the
-canonical tabs snapshot from the same application command. Worktree removal
-performs the corresponding whole-worktree cleanup internally before Git removal;
-there is no client-callable bulk-close command. The client projects returned
-sessions only if the snapshot revision is accepted. It never enumerates local
-sessions to infer what the server closed, and a stale close response cannot
-overwrite a newer cross-window open projection.
-Realtime/reconnect recovery uses the same rule: the server retries its read
-until the session recovery and canonical tabs snapshot share a stable revision,
-and the client rejects both together when that revision is older than its
-current projection.
-
-The aggregate-owned canonical workspace-tabs revision covers durable layout,
-the authoritative repo target projection, epoch overlay revision, and provider
-live membership. Each provider supplies an atomic scope snapshot with its own
-revision; `WorkspacePaneLayoutAggregate` combines all four dependency classes
-into one monotonic epoch clock. A target-only provider snapshot must never be
-returned as a full-scope tabs snapshot.
-
-### Terminal create and Workspace Pane navigation
-
-Terminal creation has three architecture layers:
-
-- `TerminalSessionService` and its focused domain collaborators own terminal
-  create/reuse/restore and PTY/session lifecycle.
-- `WorkspacePaneRuntimeApplication` owns composed runtime open/close commands;
-  `WorktreeRemovalApplication` owns physical removal, provider quiescence, Git
-  commit, and canonical-tab finalization.
-- `TerminalSessionProjection` and Workspace Pane commands own client admission,
-  pending/single-flight intent, startup command resolution, durable provider
-  cleanup, opener attribution, revision-gated local projection, cancellation,
-  and exact route commit for the created `terminalSessionId`.
-
-While `TerminalSessionProjection` reports `createPending` for a
-`terminalFilesystemTargetKey`, ordinary user-driven workspace-pane navigation for that
-filesystem target should fast-fail at the operation entry point:
-tab switching, terminal selection, tab closing, shortcuts, history restore,
-notification jumps, and static-tab opens should not enqueue competing
-navigation. A command-owned route commit is different: it is the committed
-result of the command that already created or joined the terminal session, so it
-must not be rejected just because another terminal create is pending.
-
-Workspace-pane terminal create commands enter the terminal projection first so
-terminal lifecycle can see duplicate or distinct requests immediately and keep
-`createPending` projection-owned. The projection sends the accepted request to
-`workspace-pane-runtime.open`; the server application operation prepares or
-restores the terminal and then commits tab membership through the generic
-workspace-pane coordinator. The response contains addressable terminal runtime
-metadata and `WorkspacePaneTabsSnapshot { revision, entries }`; it deliberately
-does not contain a render snapshot. The selected view owns the later attach.
-
-The admission-leading client command writes those returned tabs into the local
-query projection, records opener facts, and commits the exact terminal route.
-It does not send a second `workspace-pane-tabs.update`. Duplicate admission
-observers must not repeat local tab/route commit.
-
-This is an ordered application operation, not a distributed transaction that
-can safely roll back through the client. The create result must preserve
-both the client admission role (`leader` or `observer`) and the server resource
-disposition (`created`, `reused`, or `restored`); admission leadership is not
-resource ownership. Once the server has accepted create, a later tab/cache or
-route failure must not close the session. The workspace-pane server projection
-materializes every live runtime session, so tab convergence and navigation are
-recoverable projection work, while closing a reused/restored session would be a
-destructive cross-client side effect. Duplicate observers must not repeat the
-tab/route commit.
-
-That success boundary is the completed server application operation, including
-canonical runtime-tab membership. If an unexpected server-side projection
-exception occurs before that boundary, the application reconciles provider
-truth and may close only a resource newly created by that incomplete command.
-Client projection or route failures occur after the server boundary and never
-roll back the resource; command results report them as presentation status, not
-as provider-create failure.
-
-A canonical workspace-pane tab response may arrive after this client has moved
-to a replacement `workspaceRuntimeId`. Skipping that stale local cache write does not
-turn the already-successful server mutation into a failure. Likewise,
-command-owned navigation must await the router and confirm that the requested
-route became current; navigation rejection or supersession is reported without
-rolling back committed server resources.
-
-Keep these client outcomes separate: `runtimeProjectionApplied` reports local
-terminal-session hydration, snapshot application reports whether the revision
-entered this client's canonical cache, and navigation commit reports the exact
-route result. None of these client projection outcomes decides whether the
-server command succeeded or owns rollback of the server resource.
-
-The pending bit is projection state from the terminal lifecycle queue. Do not
-add client-only focus tokens, request generations, or "is the user still on
-the initiating tab" guards to decide whether a completed create may navigate.
-Those checks create a second authority for user intent and make late async
-completion order part of the product model.
-
-The clean flow is:
-
-1. The user invokes create through a command/open-tab entry point.
-2. The terminal projection admits the create request and publishes
-   `createPending` before async startup command resolution begins.
-3. The server application command prepares terminal creation, records the
-   ordered placement hint, synchronously publishes Directory membership, and
-   returns the server-allocated `terminalSessionId` plus independently
-   revisioned terminal and Workspace effects.
-4. The owning workspace-pane command applies that snapshot through the single
-   revision acceptance boundary, verifies the captured `workspaceRuntimeId`,
-   records opener facts, and navigates directly to the canonical terminal
-   route for that returned session.
-
-If a create flow needs async preparation before the PTY can be launched, such
-as resolving a file viewer command for "open file in terminal", that preparation
-must be part of the projection-owned create request. Use a create option that is
-resolved inside the terminal create queue after `createPending` is visible; do
-not `await` the preparation in a component and only then call create.
-Terminal create options describe the session being launched; they must not
-carry workspace-pane scheduling callbacks.
-
-Route reconciliation is validation, not navigation. A stale or unrenderable
-explicit pane URL renders the empty/not-found pane and remains the URL authority
-until an explicit user command chooses another route. Do not replace
-`/terminal/{missingSessionId}` or `/tab/{unrenderableTab}` in a render effect,
-and never choose a different live tab just because one exists. Workspace history
-must defer recording the invalid route rather than predict a replacement that
-the router has not committed.
-The tab model must apply the same rule before route validation runs:
-generic preferred-tab fallback is only for persisted preferences, never for an
-explicit URL route.
-
-Keep URL parsing routes and command commit targets distinct. A parsed route may
-represent URL-only states such as `invalid-static`; a command-owned commit may
-only target a valid workspace-pane route (`static`, `terminal`) or the empty
-route (`null`). Command commit APIs must require the commit boundary and must
-not silently fall back to ordinary blockable show/select navigation.
-
-URL-backed terminal routes are requested selection, not projection state. A
-route such as `/terminal/{sessionId}` may ask the tab model to render that
-materialized session, but it must not be injected into the runtime projection's
-`selectedSessionId`. The shared selection-sync path is responsible for writing
-the resolved active session back to the projection owner.
-
-The bare branch URL is the canonical empty workspace-pane route. Explicit pane
-tabs use explicit URLs such as `/tab/status` or `/terminal/{sessionId}`. Do not
-canonicalize a bare branch URL to `/tab/status`: that erases the user's empty
-pane state and reintroduces hidden preferred-tab fallback as a second route
-authority.
-
-## Identity model
-
-The terminal system relies on these identity/grouping scopes:
-
-- **userId**: the server-side terminal user derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
-- **clientId**: the logical client for one loaded browser page or Electron renderer instance. It validates and routes requests and is also the code-level controller identity (`TerminalController.clientId`).
-- **terminalSessionId**: the server-allocated persistent identity for one terminal business session. Terminal workspace-pane runtime tabs store this value as their generic `runtimeSessionId`.
-- **terminalFilesystemTargetKey**: the runtime-neutral grouping key produced by `formatTerminalFilesystemTargetKey(workspaceId, executionRootId)`. It is used for per-filesystem-target selection, tab-strip grouping, bell/activity summaries, and materialization callbacks. It does not contain `workspaceRuntimeId` and is not a terminal identity or execution authority.
-- **terminalRuntimeSessionId**: the server-owned runtime lookup id used by attach,
-  write, resize, restart, close, and realtime messages. It is not a
-  guarantee that a live OS PTY handle exists at that instant; `phase`
-  and server PTY binding state determine whether the session is
-  interactive. A restart failure keeps the same `terminalRuntimeSessionId`
-  addressable in `phase: 'error'` so the session can be retried without
-  changing `terminalSessionId`.
-- **terminal attachment**: the conceptual relationship between a `clientId` and a terminal session. There is intentionally no separate `attachmentId` field, and none is planned. One client should have at most one Terminal View for a given `terminalSessionId`; cross-client viewing/control is modeled with `clientId`, controller/viewer state, and explicit takeover.
-
-This means terminal identity is not encoded from filesystem locations. Runtime-scoped execution travels as `TerminalExecutionTarget`; `terminalFilesystemTargetKey` is used only where a runtime-neutral grouped lookup is needed.
-
-This identity model is the basis for reconnect, mirror mode, controller handoff, and multi-window coherence.
-
-Keep the naming boundary explicit:
-
-- `terminalSessionId` is the durable terminal product/session identity.
-  Workspace-pane runtime tabs carry it as `runtimeSessionId`.
-- `terminalRuntimeSessionId` is the server runtime lookup identity for terminal
-  operations and events.
-- A PTY handle is the lower-level supervisor resource. It may be absent
-  while the runtime session still exists, notably during `opening`,
-  `restarting`, or `error`.
-
-Do not infer liveness from `terminalRuntimeSessionId` alone. Use the session phase and
-server authority checks (`hasPty`, controller role, and operation-specific
-guards) to decide whether writes/resizes are allowed.
+Detailed tab-command ordering belongs to
+`workspace-pane-command-invariants.md`.
 
 ## Control and takeover
 
-Control is a business concept, not just a transport detail.
+Client roles are:
 
-### Roles
+- `controller`: may write, resize, and report fitted geometry.
+- `viewer`: may observe metadata and request takeover.
+- `unowned`: no online attachment currently controls the session.
 
-- **controller**: may write input and resize the PTY
-- **viewer**: may observe session metadata and request takeover, but does not
-  control the session or consume the live xterm output stream
-- **unowned**: no controller is currently active
+Attach may claim control only when no effective controller exists. Selection,
+focus, ordinary input, reconnect, and device type do not implicitly steal
+control. Takeover is an explicit server-authoritative handoff that validates
+attachment presence, generation, and fitted geometry before committing the new
+controller.
 
-### Rules
+Viewer input and hidden-view input are discarded rather than queued. A viewer
+that takes control paints from a fresh server-authored snapshot; viewer-local
+buffers never become render authority. See `terminal-takeover.md` for detailed
+control transitions.
 
-- Only the controller may drive PTY writes and PTY resize.
-- Attach may result in controller, viewer, or unowned state.
-- Broker presence is the source of attachment online/offline state. An
-  offline controller intent projects to no effective controller, so the next
-  online attachment may claim through the ordinary attach rule.
-- Takeover should be explicit and confirmed by server-owned control state. See `terminal-takeover.md` for the model.
-- The client keeps the takeover command result narrow: an authoritative negative
-  result is a normal failure, while a realtime request whose delivery is
-  indeterminate is reported as uncertain and is never replayed automatically.
-  Existing reconnect/catalog recovery later projects the authoritative role.
-- Only a true `viewer` receives the takeover action. `unowned` has no effective
-  controller, so ordinary attach owns auto-claim and presentation recovery.
+## Input and resize results
 
-### Why this matters
+Input and resize distinguish three outcomes:
 
-Without explicit control:
+- `accepted`: the current server binding accepted the operation.
+- `rejected`: current authority or preconditions did not allow it.
+- `indeterminate`: transport loss prevents the client from knowing whether the
+  server accepted it.
 
-- multiple views can fight over PTY size
-- input authority becomes ambiguous
-- reconnect and mirror behavior become unpredictable
+Rejected work fails fast. Indeterminate work is not replayed automatically,
+because replay can duplicate input or cross generations. The client surfaces
+uncertainty when it affects user intent and returns retry or recovery to the
+user.
 
-With explicit control:
+## View lifecycle
 
-- the server can arbitrate one source of input and resize truth
-- mirror mode becomes safe and understandable
-- takeover has a clear mental model
+- Only the selected session owns a mounted client xterm and DOM host.
+- Deselecting disposes the xterm and addons without closing the session.
+- Inactive sessions keep no parked xterm DOM, warm xterm instance, client
+  render cache, or geometry simulation.
+- Client xterm serialization is never a reattach or recovery authority.
+  Server-authored render state is the only cross-view recovery source.
+- Recreating a view may take time, but performance optimizations must not add a
+  second hidden render authority.
+- A session group with no terminal sessions presents an explicit create action;
+  the user never has to infer an invisible click target.
 
-## Geometry and layout model
+## Geometry
 
-Geometry should be treated as part of terminal correctness.
-
-### Principles
+Geometry is part of terminal correctness:
 
 - Logical creation has no PTY geometry.
-- The live controller xterm is the source for fitted view geometry.
-- The server remains the source of truth for canonical PTY geometry after it accepts a controller resize.
-- Geometry should flow from the mounted xterm through attach, resize, restart,
-  and takeover consistently.
+- The mounted controller xterm is the source of fitted client geometry.
+- Attach, resize, restart, and takeover send that fitted geometry with runtime
+  preconditions.
+- The server applies the native PTY operation before committing canonical
+  geometry and matching headless-render size.
+- An unmeasurable host waits for measurement instead of using a fallback size.
+- Inactive or viewer presentations never resize the PTY.
 
-### Implications
+Correct initial geometry matters because shells lay out prompts against the
+initial grid. Defensive redraws do not repair an incorrect authority flow.
 
-- Creating a PTY with a fallback size and fixing it later is not equivalent to
-  starting at the visible host size, so the application has no startup fallback.
-- xterm's own invisible construction default is an implementation value and
-  never crosses the attach boundary.
-- Narrow layouts are especially sensitive because shell prompt rendering reacts immediately to initial columns.
-- Extra defensive redraws are not a substitute for correct geometry flow.
+## Replay and presentation
 
-### Unmeasurable hosts at attach time
+Recovery distinguishes fresh streaming from replay:
 
-When a terminal is first opened into a host whose box is not yet measurable (e.g. a split pane that is still animating to its final width), the orchestrator must wait for the host to become measurable rather than fall back to a historical default. Spawning a PTY at a wildly wrong column count and resizing later is still observable because the shell may lay out its prompt against the initial `$COLUMNS` before the resize settles.
+- `frame: 'stream'` is valid only for the attach or restart that starts a new
+  generation with no missed history. It carries no render snapshot.
+- `frame: 'snapshot'` contains an atomic server-authored screen and sequence
+  checkpoint for a view that may have missed history.
+- Output at or before the checkpoint belongs to the snapshot; later output is
+  delivered in order after the response.
+- A sequence checkpoint is a transport boundary, not a shell redraw
+  transaction or prompt-ready signal.
+- Snapshot replay occurs while the local presentation is hidden. Replay-created
+  protocol replies are discarded and local user input remains disabled.
+- Fresh output received before presentation is queued without parsing, then
+  flushed after the fitted viewport is revealed.
 
-Before the xterm view exists, Goblin has no local geometry to report. After the
-view opens, `FitAddon.fit()` on that real xterm is the authoritative client-side
-measurement; controller attach/resize/restart/takeover sends those fitted
-dimensions to the server, and an acknowledged server mutation becomes canonical
-session geometry.
+Presentation becomes eligible for automatic focus only after the fitted view
+has rendered its viewport and passed its final geometry check. A quiet process
+does not block presentation waiting for output.
 
-### Narrow-host multi-line prompt wrap
+Presentation is best-effort, but not silent when it affects user intent. A
+stable local recovery failure offers explicit retry. Cancellation, stale work,
+viewer ownership, and superseding bindings clear the abandoned presentation
+without mutating server session truth.
 
-Multi-line shell prompts (e.g. `PS1="👾:%~\\n$ "`) clip the path line at the top of the viewport after a narrow-host resize. Root cause is upstream — see [issue #56](https://github.com/nano-props/goblin/issues/56) for full reproduction and the OSC 133 path forward.
+## Realtime and recovery
 
-## Replay and hydration
+- Continuous terminal output, title, bell, identity, and lifecycle changes use
+  realtime transport.
+- Complete session and tab collections use independently revisioned snapshots.
+- Transition responses are ordered before their buffered realtime effects so a
+  client commits new binding metadata before consuming output.
+- Reconnect restores client projection from server truth. It does not reuse
+  client render buffers, replay indeterminate mutations, or treat transport
+  reconnection as control authority.
 
-The system supports replay and snapshot hydration so users can reattach to running terminals without losing visual context.
+## Failure semantics
 
-### Purpose
+Expected failures include spawn failure, restart failure, rejected input or
+resize, lost attachment presence, presentation failure, PTY exit, and transport
+uncertainty.
 
-- restore visible content after reconnect
-- restore an existing view from a server-authored snapshot before continuing live output
-- preserve continuity across client lifecycle changes
+- Failure never leaves a pseudo-alive interactive session without a PTY.
+- Recoverable server lifecycle failure remains addressable in an explicit error
+  phase.
+- Client presentation failure preserves committed server facts and does not
+  trigger destructive rollback.
+- External or indeterminate outcomes stop automation and return repair, retry,
+  reopen, or rehydrate control to the user.
+- Server shutdown ends runtime dispatch and transfers remaining native-process
+  cleanup to the supervisor boundary.
 
-### Rules
+## Design risks
 
-- Replay is a rendering concern built on top of server-owned session state.
-- Hydration should help the user see the latest known state quickly, but authoritative session state still comes from the server.
-- Replay should not redefine control or session identity.
-- Recovery replay occurs only while the local presentation is hidden and its
-  generation-bearing writer rejects local user input and snapshot-generated
-  protocol replies.
-- Same-session active-view replay is not a generic repair mechanism.
-- Rebuilding an already-open local xterm publishes client-only
-  `presentationRecovery: 'pending' | 'failed'` feedback. It is neither PTY
-  lifecycle nor input authority and never crosses the server boundary.
-- A stable local recovery failure stops layout/font auto-admission and offers
-  one explicit attach-only retry. The retry does not resend takeover, restart
-  or recreate the PTY, mutate controller intent, or install a retry loop.
-- Terminal presentation is a best-effort projection. If attach delivery is
-  indeterminate, the client classifies the transport outcome without
-  inferring whether the server operation succeeded, then ends the local
-  presentation attempt as failed instead of waiting indefinitely for an
-  optional reconnect event. The same rule applies to an indeterminate restart:
-  it is never replayed automatically. A later authoritative hydration may start
-  the normal presentation path again; this does not restore the old focus intent
-  automatically. Without new authoritative hydration, the user can retry or
-  reopen the terminal; after presentation resumes, focus remains an explicit
-  user action.
-- Cancellation or an unmeasurable host is not a stable recovery failure; the
-  next ordinary layout signal may admit presentation again. Detach, disposal,
-  viewer ownership, stale work, and superseding bindings clear local recovery
-  feedback.
-
-### Input during presentation
-
-Presentation and automatic focus are separate client-owned boundaries. While
-presentation is pending, the xterm is hidden and every local user-input path is
-discarded. The client does not buffer or replay startup user input. Recovery
-snapshot parsing cannot write protocol side effects back to the PTY; protocol
-replies produced by fresh live output retain their normal presented,
-current-generation path. A recovery snapshot is rendered into the fitted xterm
-before reveal. A fresh stream has no replay frame: realtime output received
-while hidden is queued without parsing, the empty fitted viewport is revealed
-after a full-viewport render and final synchronous geometry check, and queued
-output is then flushed in transport order. A quiet process therefore cannot
-deadlock waiting for output before it can receive focus and stdin.
-
-Fresh streams and recovery snapshots fulfil a pending automatic focus intent
-when that presentation is revealed. The intent does not move DOM focus or
-intercept input while it waits. A later user pointer action or window blur
-retires the intent; keyboard activity and focus restoration performed by a
-popover close do not. The user may still explicitly click or focus a presented
-terminal. The client does not track the origin of repeat events, so a physically
-held key may follow focus into that terminal. First output has no lifecycle,
-presentation, focus, or shell-readiness meaning. Local user intent requires a
-presented controller; fresh-output protocol replies use the same boundary.
-
-### Fresh stream and recovery frame contract
-
-An output sequence checkpoint is not a visual-frame commit. A server headless
-xterm can serialize a sequence-consistent screen while a shell is between two
-prompt redraw chunks. Replaying that snapshot into a newly created client xterm
-turns a transient internal screen into a visible first paint.
-
-The protocol therefore distinguishes startup from recovery:
-
-- `create` prepares an addressable server session and returns runtime metadata
-  only. It does not start a fresh PTY and does not return a snapshot.
-- The client mounts its one real xterm, waits for a measurable host, fits it,
-  and sends `attach` with the exact `cols`/`rows`.
-- If the session has no PTY history, attach starts the PTY and returns
-  `frame: 'stream'`. The client does not reset or replay xterm and does not wait
-  for output before presentation.
-- If the PTY already exists, attach returns `frame: 'snapshot'` with
-  `snapshot` and `snapshotSeq`. The client replays that recovery
-  frame and then applies later realtime output.
-- Restart creates a new PTY generation with no missed history and therefore
-  returns `frame: 'stream'`, just like the first prepared attach.
-
-The realtime socket serializes attach, restart, and takeover transitions. While
-one transition is active, its realtime effects are buffered; its response is
-sent first, the effects are flushed, and only then may the next transition
-begin. A stream frame drops no buffered output, so every event is delivered
-after the client has committed the binding metadata and is queued until the view
-is presented. For a snapshot frame, buffered output at or before the snapshot
-checkpoint is dropped and only later output is flushed. A concurrent attach
-that did not initiate the fresh spawn is recovery and receives a snapshot.
-
-`snapshotSeq` is not a shell redraw transaction or prompt-ready signal. It is
-only the transport-consistent boundary of an atomic recovery snapshot.
-
-The headless render chain serializes snapshot bytes and reads `snapshotSeq` in
-one ordered step. Output queued before that step is included in both; output
-queued after it remains realtime data. If a headless write or resize fails,
-recovery for that generation fails instead of returning a screen/checkpoint
-pair that may disagree. This does not pretend that the still-running PTY has
-exited; the current stream remains open and restart creates a new recoverable
-generation.
-
-The relevant VS Code lifecycle split is similar but not identical: it constructs
-xterm before process creation, waits on a container-ready barrier, streams fresh
-process data directly, and reserves serializer replay for persistent or revived
-processes. VS Code's barrier can auto-open and its process path can still use
-last-known or default grid dimensions when a real container is unavailable.
-Goblin intentionally does not copy that geometry fallback: here the first size
-crosses a network boundary and becomes the server PTY's canonical geometry.
-Only the structural split is shared. The server-side headless xterm remains
-authoritative for recovery; Server First does not imply Snapshot First.
-
-VS Code also batches process data briefly to reduce renderer messages. That is a
-transport optimization, not a prompt-readiness contract. This implementation
-keeps the existing animation-frame client batching and does not introduce a
-fixed startup delay; server-side chunk coalescing can be added later without
-changing the frame protocol.
-
-## Realtime model
-
-The terminal feature uses realtime transport for continuous, UX-critical flows.
-
-### Streaming flows
-
-- terminal output
-- terminal bells
-- title updates
-- exit notifications
-- control changes
-
-### Non-streaming flows
-
-- session service reads
-- logical-session metadata for create and frame handshakes for attach/restart
-- explicit mutations such as resize, takeover, close, and reorder
-
-### Design rule
-
-Use realtime streaming where the user experience requires continuity.
-Use targeted request/response flows for mutations. A fresh attach or restart
-orders its metadata response before undropped realtime output; only recovery
-attach carries a server snapshot and output checkpoint. Control-only mutations
-such as takeover apply role/lifecycle state synchronously, while later view
-recreation goes through the ordinary attach frame decision.
-
-## State model
-
-The terminal feature uses all three app state classes:
-
-### Local state
-
-- transient search UI
-- DOM attachment state
-- focus state
-- local rendering details
-
-### Runtime-coherent state
-
-- session existence
-- session control
-- canonical terminal title
-- session ordering
-- canonical geometry
-- streamed output and exit state
-
-### Restorable state
-
-- preferred selected terminal per filesystem target
-
-Terminal selection is intentionally a client preference, not runtime-coherent
-terminal truth. The server owns which sessions exist and who controls them;
-each client may remember which terminal it prefers to show for a filesystem target.
-
-The server should own runtime-coherent terminal truth.
-The client may cache and project it, but should not invent parallel business truth.
-
-## Failure model
-
-The terminal system should optimize for continuity, but it still needs clear failure boundaries.
-
-### Expected failures
-
-- PTY spawn failure
-- attachment presence going offline
-- client teardown while a session remains alive
-- resize or write rejection due to lost control
-- session exit during reconnect or replay
-
-### Design expectations
-
-- Failed create or restart must not leave zombie sessions presented as healthy terminals.
-- Offline presence should not destroy the session itself: a 24h detached
-  TTL keeps the session service alive so a later attach from the same user can
-  re-enter via auto-claim. The broker may close stale realtime sockets
-  when presence times out, but offline controller intent still projects
-  to no effective controller so siblings can claim without waiting.
-- View destruction should clean up local resources without corrupting session state.
-- Server shutdown should end the runtime cleanly and stop further dispatch.
-
-## What the current design gets right
-
-- The PTY worker direction is the right architectural boundary.
-- The server-first model is appropriate for terminal state.
-- Control is modeled explicitly instead of being hidden in UI heuristics.
-- Client code already separates TerminalSessionProjection concerns from xterm view concerns.
-- The design supports mirroring, reconnect, and takeover without requiring Electron-specific assumptions.
-
-## Main risks to watch
-
-- Letting geometry drift between create, attach, and resize phases.
-- Exposing sessions to the UI before their lifecycle is truly ready.
-- Allowing client-local state to silently diverge from server truth.
-- Treating replay or redraw as a fix for lifecycle or geometry bugs.
-- Allowing PTY implementation differences to leak into product behavior.
+- Geometry drifting between create, attach, restart, takeover, and resize.
+- Client projections silently diverging from server truth.
+- Replay or redraw being used to hide lifecycle defects.
+- PTY implementation differences leaking into product behavior.
+- View or tab lifetime accidentally becoming session authority.
 
 ## Rules of thumb
 
-- Keep the server as the source of terminal business truth.
-- Keep PTY execution behind the supervisor boundary.
-- Keep client TerminalSessionProjection code as projection and orchestration, not as an alternative authority.
-- Keep xterm view code focused on rendering and local interaction.
-- Treat geometry as a correctness path, not as optional polish.
-- Prefer explicit control transitions over implicit heuristics.
-- Prefer reconnect and restore over destructive recreation.
+- Server session truth first; client presentation second.
+- Session, tab, attachment, PTY, and view lifetimes remain distinct.
+- One effective controller, explicit takeover, no input replay on uncertainty.
+- Fresh generations stream; views that may have missed history recover from a
+  server snapshot.
+- Correct geometry before convenience fallbacks.
+- Fast failure and explicit user recovery over compensation or hidden repair.

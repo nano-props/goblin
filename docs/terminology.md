@@ -213,4 +213,3 @@ Reject or rename changes that:
 - `docs/state-sync.md`
 - `docs/client-model.md`
 - `docs/terminal.md`
-- `docs/terminal-target-model.md`

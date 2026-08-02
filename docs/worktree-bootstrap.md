@@ -65,10 +65,24 @@ setup = "bun install"
 - Bootstrap failure does not roll back files already created in the new worktree.
 - `setup` runs exactly as written.
 
-## v1 bias
+## Integrity and execution
 
-- If `goblin.toml` is absent, create behaves exactly as today.
-- Keep v1 to `copy`, `symlink`, `hardlink`, `exclude`, and `setup`.
+- Submitting worktree creation also requests the bootstrap declared by the
+  repository configuration; there is no separate run/skip transaction.
+- The create request carries the configuration identity observed by the client.
+  The server verifies that the configuration still matches before execution and
+  fails directly if it changed.
+- The trust preference records acknowledgement of the exact configuration after
+  a successful bootstrap. It is not a separate permission gate for execution
+  and can be cleared without removing unrelated workspace settings.
+- `setup` is arbitrary repository-provided shell code. It never runs merely
+  because a repository was opened or inspected.
+
+## Scope
+
+- If `goblin.toml` is absent, worktree creation performs no bootstrap work.
+- The configuration surface is limited to `copy`, `symlink`, `hardlink`,
+  `exclude`, and `setup`.
 - `setup` is a single string; multi-step workflows should use shell composition (`&&`, `;`).
 - Do not infer rules from untracked files.
 - Do not turn worktree create into a general sync engine.

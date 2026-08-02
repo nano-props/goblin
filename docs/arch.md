@@ -1,157 +1,93 @@
 # Architecture
 
-Use this doc for app shell and process control rules.
+Use this document for application-level process, authority, and command rules.
+Feature-specific invariants belong to their feature specifications.
 
-- Keep one primary `BrowserWindow` by default. It is the native host's principal and default activation target. Add extra windows only when the product really needs a separate surface, and name them by product role rather than as secondary windows.
-- Put app logic in `src/server/` or `src/shared/`.
-- Keep `src/main/` focused on Electron-native host work; the architecture term is `native host`.
-- Keep overlays centralized in `src/web/hooks/useAppOverlays.ts`.
-- Route menu and UI actions through client/server intent flows when possible.
-- Use direct native-host actions only for native-only work.
-- Let the server own settings and app data.
-- Prefer server-first runtime authority. The client should send intent plus explicit preconditions, and the server should accept or reject with fast-fail semantics.
-- Keep user commands sequential. Resolve route/state supplements at the action boundary, perform the accepted write, then navigate to the precomputed result. Do not use effects, background observers, or client-only tokens to repair command state after the fact.
-- Model runtime lifecycle as server-owned state transitions, not client-synchronized snapshots. For workspace runtimes this means the server mints the live `workspaceRuntimeId` on open and invalidates it on close/reopen.
-- Do not treat a stable `workspaceId` locator as a full runtime identity when reopen/recreate can mint a new live runtime.
-- Do not add client-side freshness heuristics when the server can reject stale work directly. Push runtime validity checks into shared protocol contracts first, and let stale mutations fail instead of trying to "heal" them in the client.
-- When a server-owned runtime id already identifies the write target precisely enough, use that id directly and let the server decide. Do not add a second client-side freshness dependency "just in case" if it can only make a valid server action fail locally.
-- Server push should be the default way client projections converge after a successful write. Mutation responses describe committed effects; full read models converge through their query and invalidation boundary. Do not assemble one command from a mutation, a client read-back, cache replacement, and an invalidation race.
-- Centralize web-side settings writes in `src/web/settings-actions.ts`; `src/web/settings-client.ts` is the HTTP/native transport boundary. Components should not call raw settings write functions directly.
-- Keep query key/cache helpers separate from React hooks: use `settings-query-cache.ts` for cache keys and cache updates, and `settings-queries.ts` for React Query hooks.
-- Let the native host project native state instead of owning parallel state.
-- Use `embedded server` for the server spawned by the native host.
+## Process model
 
-## Workspace Pane Runtime Tabs
+- Keep one primary `BrowserWindow` by default. It is the native host's
+  principal and activation target. Add another window only for a distinct
+  product surface.
+- Keep Electron-native host code focused on capabilities that require Electron.
+  Application behavior belongs in the server or runtime-neutral shared layer.
+- Use `native host` for the Electron process and `embedded server` for the
+  server it starts.
+- Let the native host project native state instead of maintaining parallel
+  application authority.
+- Keep application overlays behind one client-owned composition boundary.
 
-Workspace Pane tabs have two classes:
+## Authority and commands
 
-- static tabs, identified by a fixed `tabId`
-- runtime tabs, identified by `{ type, runtimeSessionId }`
+- Prefer server-first runtime authority. Clients send intent plus explicit
+  preconditions; the server accepts or rejects at the owning boundary.
+- Model runtime lifecycle as server-owned transitions. Stable locators identify
+  durable business objects; server-issued runtime identities address a specific
+  live generation.
+- Do not add client freshness heuristics when the server can validate the
+  mutation directly. A defensive client guess is a second authority and a new
+  failure mode.
+- Keep accepted user commands sequential: resolve their business facts, perform
+  the write, apply canonical projection results, and settle planned navigation.
+  Effects and background observers do not repair command state afterward.
+- Server push is the default convergence mechanism after committed writes.
+  Mutation responses describe exact effects; complete read models converge
+  through their independently revisioned query or invalidation boundaries.
+- Client presentation is a best-effort projection. Presentation failure cannot
+  roll back or reclassify an already committed server fact.
+- Route menu and UI actions through client/server intent flows. Direct
+  native-host actions are reserved for native-only work.
+- The server owns settings and application data. Client settings actions keep
+  query projections coherent; raw transport is not a component mutation API.
 
-Runtime tabs are server-owned session tabs. Multiple runtime tabs for the same
-type may be open, closed, and restored from a
-server projection, and may surface pending/realtime/lifecycle state through
-its provider. The tab strip must treat these as generic runtime items, not as
-terminal-specific tabs.
+## Workspace-pane runtime tabs
 
-The canonical wire/storage shape for runtime tab entries is:
+Workspace-pane tabs are either static product surfaces or server-owned runtime
+sessions. A runtime entry uses the generic shape:
 
 ```ts
 { type: 'terminal', runtimeSessionId: 'session-id' }
 ```
 
-Use `runtimeSessionId` for every runtime tab type, including `terminal`.
-Do not accept or emit terminal-specific workspace tab entries such as
-`{ type: 'terminal', terminalSessionId }`.
+Every runtime provider uses `runtimeSessionId`; generic workspace-pane state
+does not encode provider-specific session fields.
 
-The ownership split is:
+The ownership model is:
 
-- `src/shared/workspace-pane.ts` owns tab entry types, identity helpers, and
-  the static/runtime tab type split.
-- `src/shared/workspace-pane-tabs.ts` and
-  `src/shared/workspace-pane-tabs-validators.ts` own the workspace tab socket
-  action/event names and their validation.
-- `src/shared/workspace-pane-runtime.ts` owns the application protocol for
-  opening a provider runtime and its canonical tab as one server result.
-- `WorkspacePaneLayoutRepository` is the sole durable static-layout representation.
-- `WorkspacePaneEpochOverlay` owns only runtime placement constraints, physical
-  reverse indexes, and its overlay revision.
-- `WorkspacePaneLayoutAggregate` owns the canonical epoch projection clock,
-  derived from durable layout, target projection, overlay revision, and provider revisions.
-- The server `WorkspacePaneTargetCatalog` owns command-time target validity and
-  worktree branch metadata by sampling the repository source. The client
-  `RepoSnapshot` owns only route and presentation facts; it never authorizes a
-  server command. The pane aggregate does not cache or mutate a second catalog.
-- `src/server/workspace-pane/*` owns aggregate layout commands, pure projection,
-  realtime invalidation, and the cross-provider runtime-open operation. Provider
-  snapshots are the sole live-membership authority; list and restore never copy
-  or write derived membership.
-- The aggregate owns the per-`workspaceId` layout queue. Restore uses a separate
-  settings transaction port that checks durable workspace membership and
-  filters invalid target keys from the transaction's current layout in one
-  atomic settings write.
-- `src/web/workspace-pane/*` owns client query/cache projection and mutation
-  orchestration for server-owned tab state.
-- `src/web/workspace-pane/tab-providers.ts` owns per-tab-type
-  labels, icons, pending state, attention state, renderability, and close
-  behavior.
-- `WorkspacePaneTabStrip` owns generic tab chrome only: selection,
-  re-selection, close, reorder, and create affordances.
+- Durable layout owns static tab membership and user order.
+- The authoritative target source validates command-time workspace and worktree
+  targets.
+- Runtime providers own live session membership and lifecycle.
+- The workspace-pane aggregate projects durable layout, valid targets, runtime
+  placement, and provider snapshots into one canonical tab view.
+- The client caches and renders that canonical view. It does not infer missing
+  runtime membership or authorize server commands from repository snapshots.
+- Generic tab chrome owns selection, reorder, close, and create affordances;
+  provider registries own labels, attention, renderability, and provider
+  actions.
 
-Terminal is currently one runtime tab provider, not the runtime tab
-architecture itself. Future session tabs such as chat should add a runtime
-type, provider, projection, panel, create action, and close/action adapters
-without changing the generic tab strip contract.
+Provider lifecycle and workspace-pane membership are composed at a server
+application boundary:
 
-Runtime creation follows three responsibility layers:
+- Opening a runtime creates or restores the provider resource and establishes
+  canonical tab membership as one accepted operation.
+- Closing a runtime joins provider retirement with canonical tab removal.
+- Clients do not issue a provider mutation followed by a second tab mutation to
+  repair membership.
+- Provider collections and workspace-pane collections keep independent
+  revisions; neither revision is a freshness proxy for the other.
+- Whole-worktree removal owns target admission, provider quiescence, the Git
+  commit, and final projection cleanup. It fails directly on external Git
+  interference and does not add compensation or a second filesystem authority.
 
-1. The provider domain service owns the resource lifecycle (terminal session,
-   chat session, and so on) and remains usable without workspace-pane UI.
-2. `WorkspacePaneRuntimeApplication` owns runtime open and single close,
-   joining provider lifecycle with canonical runtime-tab membership. The
-   separate `WorktreeRemovalApplication` owns physical worktree removal across
-   every user and workspace runtime. Its physical-target admission rejects later
-   runtime/tab writes, while explicit server operation permits let mutations
-   admitted earlier finish in queue order. After repository validation it awaits provider
-   quiescence, runs the Git removal past a non-cancelable commit point, then
-   clears the removed physical identity from every affected epoch index. An
-   exact admission lease prevents old cleanup from clearing a newer same-path
-   binding, but it does not model filesystem generation or revalidate external
-   state at execution time. Cleanup cannot authorize durable retirement;
-   invalid rows stay suppressed by the server target catalog and are removed by the
-   next membership-aware atomic repair. Branch retirement remains a direct
-   aggregate command. A Git failure returns directly; resources already
-   quiesced remain closed and the user repairs or retries. Git success followed
-   by finalize failure is reported as a committed repository change, and a
-   later authoritative read converges the projection.
-   Provider commands return the exact target lifecycle effect plus the
-   canonical tabs snapshot produced by that command. Full terminal collections
-   are query snapshots with their own terminal projection revision; clients
-   apply terminal and tabs snapshots independently, so neither model borrows
-   the other's revision as a freshness proxy.
-   Terminal close itself is a manager-owned, idempotent promise: concurrent
-   tab close, runtime cleanup, and worktree quiescence join the same PTY
-   termination acknowledgement before the session leaves authoritative state.
-3. The client command/projection owns only admission/dedupe, revision-gated
-   cache projection, opener facts, cancellation, and exact route completion.
-   It does not order server resources or infer session liveness from its cache.
+Runtime tab types are registered explicitly. Adding one extends the shared type
+and protocol, provider lifecycle adapter, canonical projection, client
+presentation, and action registry without changing generic tab chrome.
 
-UI create paths use `workspace-pane-runtime.open`. They must not call a
-provider create and then issue a second `workspace-pane-tabs.update` to repair
-membership. Provider creation is an in-process server capability, not an
-externally routable terminal realtime action; only the application command can
-compose it with canonical tab membership.
-`workspace-pane-tabs.update` only mutates static-tab membership or user order;
-runtime-tab creation and placement belong exclusively to the application
-operation.
+The stable runtime actions are `workspace-pane-runtime.open` and
+`workspace-pane-runtime.close`. Tab list/update actions may change static
+membership or order; runtime membership changes only through the composed
+runtime lifecycle boundary.
 
-Runtime tab types are intentionally registered statically. Adding a new
-server-owned session tab type should update the explicit extension points
-instead of adding fallback logic in `WorkspacePaneTabStrip` or local client
-mirrors:
-
-- `src/shared/workspace-pane.ts`: add the runtime type and its tab scope.
-- `src/server/workspace-pane/*`: keep using the generic coordinator and
-  projection helpers; the new feature contributes a
-  `WorkspacePaneRuntimeTabsProvider`.
-- `src/server/<feature>/*`: own the feature lifecycle and expose live runtime
-  sessions to the workspace-pane provider.
-- `src/shared/workspace-pane-runtime.ts` and
-  `src/server/workspace-pane/workspace-pane-runtime-application.ts`: add the
-  provider request/result variant and application adapter.
-- `src/web/workspace-pane/workspace-pane-runtime-tab-*.ts*`: add provider
-  projection, target key, create, command, close, and panel entries for the
-  new type.
-- `src/web/workspace-pane/tab-providers.ts`: add labels, icons,
-  pending/attention state, close policy, and renderability for the new type.
-
-Protocol contract: old workspace tab protocol names
-(`list-workspace-tabs`, `replace-tabs`, `update-tabs`,
-`workspace-tabs-changed`) and old terminal-specific tab entries are not part
-of the current contract. The canonical socket actions/events are
-`workspace-pane-tabs.list`, `workspace-pane-tabs.replace`,
-`workspace-pane-tabs.update`, and `workspace-pane-tabs.changed`.
-The composed runtime actions are `workspace-pane-runtime.open` and
-`workspace-pane-runtime.close`. Whole-worktree runtime cleanup is an internal
-step of the repository worktree-removal transaction, not a client-callable
-runtime action.
+Detailed workspace-pane command ordering and concurrency rules live in
+`workspace-pane-command-invariants.md`. Terminal lifecycle and control rules
+live in `terminal.md` and `terminal-takeover.md`.

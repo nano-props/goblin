@@ -96,21 +96,10 @@ type AcceptedTerminalRetirementListener = (retirement: AcceptedTerminalRetiremen
  * and coordinates pending presentation intents; it must not infer server
  * liveness from its local session map.
  *
- * **Lifetime**: client-level singleton — one instance per client
- * process, created on first access via `getTerminalSessionProjection(...)`,
- * lives until the process tears down. The class is intentionally
- * Provider-independent: `TerminalSessionProvider` is just a wiring
- * adapter that forwards client events into the singleton and exposes
- * its API via React context. A dev-mode React StrictMode re-mount of
- * the Provider must NOT recreate the projection — see
- * `terminal-roadmap.md` P1.7.
- *
- * **Why singleton**: the terminal feature owns cross-cutting state
- * (per-filesystem-target session lists, bell controller, selector snapshot
- * caches, pending creates, and close-operation single-flight) that has no
- * natural React tree boundary. The previous Provider-owned lifetime
- * required a `pendingProjectionDestroyRef + setTimeout(0)` debounce to
- * survive StrictMode; the singleton removes that dance entirely.
+ * **Lifetime**: client-level singleton — one instance per client process,
+ * independent of React provider mounts, that lives until process teardown.
+ * This matches its ownership of cross-cutting session projection, selection,
+ * notification, and command-admission state.
  *
  * **Why this remains one large owner**: catalog reconciliation, selection,
  * create admission, close single-flight, and subscriber publication all
@@ -225,9 +214,7 @@ export class TerminalSessionProjection {
    *
    * Production code does NOT call this. The projection is a client-
    * level singleton and is meant to live for the client's entire
-   * lifetime. The Provider never invokes `destroy()` on unmount; the
-   * `pendingProjectionDestroyRef + setTimeout` debounce that used to
-   * gate a Provider-unmount destroy has been removed.
+   * lifetime. Provider unmount does not destroy it.
    *
    * Tests use `destroy()` on a per-test local instance to drain
    * pending promises and clear listener maps before the test seam

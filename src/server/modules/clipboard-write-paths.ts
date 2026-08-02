@@ -5,15 +5,9 @@ import { CLIPBOARD_TEMP_FILE_MAX_AGE_MS, PASTE_FILE_MAX_BYTES } from '#/shared/c
 import { createClipboardTimestampedFileName, listDirEntries } from '#/shared/clipboard-paste-node.ts'
 
 /**
- * Web counterpart to `src/main/clipboard-ipc.ts`. Web clients reach
- * the server over HTTP via `POST /api/clipboard/files`; the route layer
- * normalises the multipart body and hands a `File[]` to this module.
- *
- * Server-written paths live on the *server* machine. In `serve.sh` /
- * LAN deployments the client and server may be on different hosts —
- * the PTY (which lives on the server) can still read these paths, but
- * the user cannot double-click them on their own machine. That tradeoff
- * is acknowledged in the design doc.
+ * Canonical persistence boundary for clipboard blobs uploaded over HTTP.
+ * Returned paths live on the server machine so the server-owned PTY can read
+ * them; they are not client-local file paths.
  */
 
 const TEMP_DIR_NAME = `clipboard-tmp-${process.pid}`

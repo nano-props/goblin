@@ -63,14 +63,14 @@ Responsibilities:
 
 The boundary deliberately tracks participation, not ownership. It does not open,
 close, position, or render child surfaces; it only reports whether descendants
-currently require the parent to remain stable.
+require the parent to remain stable.
 
 ### Shared Floating Primitives
 
 Shared floating wrappers should report to the nearest
 `FloatingSurfaceBoundary` when they have an effective open state.
 
-Current rule for `Popover`:
+`Popover` follows these rules:
 
 - controlled and uncontrolled popovers both participate;
 - one open popover contributes exactly one open unit;

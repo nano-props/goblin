@@ -11,9 +11,7 @@ The answer to that question is what this document is about.
 
 This is a principles-level document. It does not describe fields,
 methods, timers, or flags. It describes the _shape_ of the answer
-and the _constraints_ the answer has to respect. Implementation
-lives in `src/server/terminal/terminal-controller.ts` and the
-generation-bearing attach/write/resize/takeover paths in `TerminalSession`.
+and the _constraints_ the answer has to respect.
 
 ## The product premise
 
@@ -155,7 +153,7 @@ only after its last socket is gone. Stored controller intent is not erased, but
 it no longer projects to an effective controller, so the next attach can
 auto-claim the session.
 
-## Known behavior: self-reconnect mid-flight
+## Self-reconnect transition
 
 A reconnecting controller can briefly project as `unowned`: the old
 presence has gone offline, and the replacement attach has not yet
@@ -220,6 +218,3 @@ it does not create a second geometry authority or a compensating resize.
 ## Related documents
 
 - `terminal.md` — the terminal system overall.
-- `terminal-target-model.md` — target attachment shape and roles.
-- `terminal-session-lifecycle.md` — session birth, lifetime, close.
-- `terminal-roadmap.md` — where this model sits in the refactor plan.

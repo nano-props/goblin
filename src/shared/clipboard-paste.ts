@@ -3,10 +3,9 @@
  *
  * Read by:
  * - `TerminalSessionView` paste / drop handlers (client): early bail-out with
- *   `terminal.paste-file-too-large` toast before any IPC / HTTP traffic.
- *   oversized payloads before writing to disk.
- * - `src/server/modules/clipboard-write-paths.ts` (web server): same defence
- *   in depth for the HTTP path.
+ *   `terminal.paste-file-too-large` toast before HTTP traffic.
+ * - the server clipboard write boundary: the same defense in depth before
+ *   writing to disk.
  *
  * Pasting a multi-GB ISO into a shell prompt is almost never the intent;
  * if a user genuinely needs a large file at the prompt they can `scp`,
@@ -27,11 +26,8 @@ export const PASTE_FILE_MAX_BYTES = 10 * 1024 * 1024 // 10 MiB
 export const MAX_PASTE_BATCH_BYTES = PASTE_FILE_MAX_BYTES + 2 * 1024 * 1024 // 12 MiB
 
 /**
- * How long pasted blob files stay in the current process's temp dir.
- * Electron stores these under `os.tmpdir()`, which is transient and may
- * be cleared by the OS or on reboot. The web server stores them under
- * `serverDataDir()`, which persists across restarts, so the same 24 h cap
- * is more important there: it bounds durable server-side growth while
+ * How long pasted blob files stay in server-managed temporary storage. The
+ * storage may persist across restarts, so the cap bounds durable growth while
  * leaving pasted paths usable for a normal working session.
  */
 export const CLIPBOARD_TEMP_FILE_MAX_AGE_MS = 24 * 60 * 60 * 1000

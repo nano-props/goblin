@@ -51,7 +51,7 @@ Always reach for the library tool before writing one yourself:
 | Capture listener callbacks as typed mocks           | `MockInstance<T>` from `vitest`                                                                                                                                                                                                                                                             |
 | Fake timers                                         | `vi.useFakeTimers(...)` via `useFakeTimers()` in §7                                                                                                                                                                                                                                         |
 | Async waits                                         | `vi.waitFor`, RTL `waitFor`, `vi.advanceTimersByTimeAsync`                                                                                                                                                                                                                                  |
-| Single canonical `WebSocket` mock                   | `installWebSocketMock({ autoOpen })` in §5. Do **not** write `class MockWebSocket` inside a test or helper — it has lived in three different shapes already; the helper is the only one reviewers should see.                                                                               |
+| Single canonical `WebSocket` mock                   | `installWebSocketMock({ autoOpen })` in §5. Do **not** define another `MockWebSocket` in a test or helper; one harness owns that boundary.                                                                                                                                                  |
 | Drive IPC request/response over the socket          | `installGoblinTestBridge(handlers)` in §5 — wires the shared `MockWebSocket.send` to a JSON router; tests only supply `handlers`.                                                                                                                                                           |
 
 A hand-rolled helper is allowed only when none of the above fit. Put the
@@ -167,9 +167,8 @@ capabilities needed by the behavior suites.
 
 - `installWebSocketMock({ autoOpen })` — installs a `MockWebSocket` on
   `globalThis.WebSocket` with two flavors. The default (`autoOpen: true`)
-  mirrors the repo-store test's behavior (open fires on the next
-  microtask). `autoOpen: false` is used by `terminal.test.ts` style tests
-  that call `emitOpen()` themselves to control timing.
+  opens on the next microtask. Use `autoOpen: false` when the contract under
+  test requires explicit control over connection timing.
 - The returned handle also exposes the installed `MockNotification`
   constructor and notification instances for browser-notification tests.
 
@@ -191,8 +190,7 @@ capabilities needed by the behavior suites.
 ### `src/web/test-utils/host-bootstrap.ts`
 
 - `installHostBootstrap()` — sets `window.__GOBLIN_BOOTSTRAP__`,
-  `window.goblinNative`, `window.location`. Designed to replace the
-  ~30-line `beforeEach` block in web-host tests that need a fake host
+  `window.goblinNative`, and `window.location` for tests that need a fake host
   environment.
 
 ## 6. Mocks policy
@@ -270,23 +268,12 @@ Tests do not redefine these. If a test needs to bypass a shim (e.g. spy
 on `canvas.getContext`), install the spy inside the test body so it runs
 after the setup file.
 
-React 18/19 act warnings: the earlier revision of this list included
-a `console.error` patch that swallowed the "An update to `<Component>`
-inside a test was not wrapped in act(...)" warnings. That patch is no
-longer needed because the actual root cause was in
-`src/test-utils/render.tsx`, not here. `renderInJsdom` used to set
-`globalThis.IS_REACT_ACT_ENVIRONMENT = true` permanently, which left
-the worker in the "act environment is on but no `act` is currently
-running" state that React 19's `warnIfUpdatesNotWrappedWithActDEV`
-flags on every post-mount commit. The global now stays at its default
-`undefined` / `false` outside explicit `act` calls. Tests that
-genuinely need an async `act` boundary — typically those that drive fake
-timers or assert on intermediate state — should wrap the state-changing
-operation itself, with `act` imported from `@testing-library/react`. RTL's
-`render` already uses its synchronous act wrapper. RTL's `act` (see
-`node_modules/@testing-library/react/dist/act-compat.js:39-77`) sets
-the flag only for the wrapped callback and restores it on the way out,
-which is the contract we now follow.
+The act environment flag remains disabled outside explicit `act` calls. Tests
+that need an asynchronous act boundary—typically those that drive fake timers
+or assert on intermediate state—wrap the state-changing operation itself with
+`act` from `@testing-library/react`. RTL render already supplies its synchronous
+act boundary. Do not suppress act warnings or enable the global act environment
+for an entire worker.
 
 ## 10. Verification gates
 

@@ -1,90 +1,80 @@
 # Startup Architecture
 
-The client app boot path has two separate concerns: public shell hydration and authenticated workspace restore. It is shared by Electron renderer pages and plain browser tabs. Keep new startup work in the narrowest stage that owns the data it needs.
+Startup separates public shell hydration, authentication, workspace restore,
+and post-restore application behavior. Electron pages and browser tabs follow
+the same functional stages.
 
 ## Stages
 
-1. Public bootstrap
-   - Owner: `usePublicAppBootstrap`.
-   - Runs before authentication completes.
-   - Allowed work: unauthenticated-safe client state such as theme, host-independent shell defaults, and public cache priming.
-   - Must not read or write workspace session state.
+1. **Public bootstrap** hydrates unauthenticated-safe presentation state. It
+   never reads or writes workspace session state.
+2. **Authentication gate** validates or exchanges credentials, removes URL
+   credentials before navigation or further network activity, and supports
+   bounded cancellation.
+3. **Authenticated restore** owns one restore attempt, including its timeout,
+   cancellation, failure, and explicit retry. Only a completed attempt may
+   declare the authenticated shell ready.
+4. **Workspace membership restore** converges server-owned durable membership
+   into live runtime leases. The server validates identities and returns
+   addressable runtime shells even when repository enrichment is unavailable.
+5. **Lazy workspace projection** loads authoritative repository and pane data
+   when navigation needs it. Availability failure preserves membership and
+   remains retryable; client placeholders never authorize server commands.
+6. **Workspace side effects** start only after authenticated restore is ready
+   and consume the routed workspace as navigation authority.
 
-2. Token gate
-   - Owner: `TokenGate` and `useAccessTokenStatus`.
-   - Validates `/api/whoami`, exchanges URL tokens through `/api/login`, and removes URL tokens before any network hop.
-   - Uses a timeout-backed abort controller. Cleanup cancels the active auth check and must not update React state after unmount.
+Each stage has one owner, one completion boundary, and one cancellation story.
+Cancellation never commits success or opens persistence.
 
-3. Authenticated workspace restore
-   - Owner: `useAuthenticatedAppBootstrap`.
-   - A single restore run owns the settings snapshot, non-critical authenticated hydration, workspace session restore, timeout, and cleanup cancellation.
-   - The hook exposes an explicit shell state: `restoring-workspace`, `ready`, or `failed`. Failed state carries a message and the hook exposes an explicit retry command.
-   - The run returns an explicit outcome: `completed`, `cancelled`, or `failed`. Only `completed` may transition the authenticated shell to `ready`.
-   - Cleanup cancellation is not a restore failure. Timeouts and actual restore errors are failures and must leave enough state for the UI to render without opening persistence.
+## Readiness
 
-4. Workspace membership restore
-   - Owner: server `restoreServerWorkspace` and client `hydrateRestoredWorkspaceRuntime`.
-   - The server incrementally converges acquired leases against the latest durable membership. Concurrent membership changes retain unchanged leases, release removed entries, and open added entries before the result is committed.
-   - The server validates repo identity, eagerly projects the routed repo, and returns other or temporarily unavailable repos as stub leases.
-   - Produces the restored repo membership and placeholder repos. `workspaceMembershipReady` means membership has settled; repo content may still be loading.
-   - If the restore signal is aborted, this stage must return without flipping `workspaceMembershipReady`.
+Keep these readiness concepts distinct:
 
-5. Lazy repo promotion
-   - Owner: `useRestoreWorkspaceTabsOnView` and server `restoreWorkspaceTabs`.
-   - When navigation reaches a stub, the server projects that repo and asks the pane aggregate for a canonical snapshot.
-   - The client sends only the repo root and server-issued runtime identity. The server reads the canonical repo entry from current durable membership; client stub data is never command authority.
-   - Promotion validates both the requesting client's runtime lease and durable membership, atomically filters invalid durable targets from the settings transaction's current layout, and then performs a pure projection. It never initializes or copies layout into epoch state.
-   - Availability failures leave the stub and membership intact so a later navigation can retry.
-   - If the server target catalog proves persisted pane-tab targets invalid, the aggregate suppresses those targets from the response and repairs them in the same membership-aware settings transaction. The repair plans from transaction-current data, so concurrent valid tab writes are preserved.
-   - The membership-aware restore transaction is lazy promotion's successful durable-membership linearization point. A conflict reloads current membership and retries only after an ABA-style reauthorization. Startup separately retains a final full ordered-membership convergence because its response contains the complete membership and lease set.
+- **Membership ready**: durable workspace membership has converged into live
+  runtime shells. Repository content may still be loading.
+- **Persistence open**: server restore and client-local hydration both
+  completed, so later client state may be persisted safely.
+- **Restore failed**: the shell can render recovery UI, but persistence remains
+  closed until an explicit retry succeeds.
 
-6. Workspace shell side effects
-   - Owner: `AuthenticatedWorkspaceShell` and `AuthenticatedWorkspaceSideEffects`.
-   - Runs only after authenticated bootstrap is ready.
-   - Uses the routed repo id from the URL as the durable source of truth, and the hydrated repo id only for operations that require repo data.
+Consumers use a canonical readiness projection instead of recombining internal
+flags. Optional authenticated enrichment may fail without blocking readiness;
+membership and persistence failures may not.
 
-## Readiness Model
+## Routing
 
-The repos store keeps low-level fields because different UI surfaces need different boundaries:
+- Derive the requested workspace from the URL before client-store hydration.
+- While membership is restoring, a requested workspace that is not yet in the
+  client projection renders a restore state rather than not-found.
+- After membership is ready, a missing requested workspace is not-found.
+- Lazy projection validates the server-issued runtime identity and durable
+  membership before returning workspace data.
+- Route effects may project an externally arrived URL into client preferences;
+  command correctness never depends on a later route effect.
 
-- `workspaceMembershipReady`: restored repo membership has settled.
-- `sessionPersistenceReady`: server workspace restore and client-local workspace hydrate have both converged.
-- `sessionRestoreError`: restore failed in a way that must block persistence.
+## Persistence
 
-Code that needs the combined state should use `workspaceRestoreStatusFromStore` or `workspaceSessionPersistenceOpenFromStore` from `src/web/stores/workspaces/selector-state.ts` instead of recombining booleans at call sites.
+- The server persists workspace membership and restart-durable static pane
+  layout. Live runtime sessions remain projection-only.
+- The client persists only client-owned presentation and navigation state in
+  the storage appropriate to its host.
+- Client and server state never become one combined session payload or a
+  client-to-server whole-state write.
+- Client persistence stays closed until restore and local hydration complete.
+- High-frequency client writes may be debounced, with a final client-local
+  flush at page lifecycle boundaries.
 
-## Routing Rules
+## Adding startup work
 
-- Repo routes derive `RepoRouteView` directly from the URL before store hydration.
-- A routed repo may be missing from the repo store while workspace membership is restoring. Render restore skeletons until `workspaceMembershipReady` is true.
-- After membership is ready, a routed repo missing from the store is a not-found state, not an empty placeholder.
-- Client workspace persistence should prefer the routed repo id over `restoredWorkspaceId`.
+- Put public, unauthenticated work in public bootstrap.
+- Authenticated non-blocking work may run alongside restore but cannot decide
+  membership readiness.
+- Boot membership work belongs to restore; live membership changes use explicit
+  open and close commands.
+- Work required to interpret restored state completes before persistence opens.
+- Work that merely consumes hydrated workspace data belongs after readiness.
+- Every asynchronous task defines cancellation, timeout, failure, and retry
+  semantics without committing state after its owner is gone.
 
-## Persistence Rules
-
-- Explicit workspace-tab layout commands persist restart-durable static layout
-  in `ServerWorkspaceState`; live runtime tabs remain projection-only.
-- The client persists only `ClientWorkspaceState`: in native `userData` for
-  Electron, and in local storage for Web.
-- Native and Web use the shared client-workspace JSON codec. The persisted
-  payload is the state object itself: do not add a storage version or envelope.
-  A persisted UI snapshot must not become an application-update boot gate.
-- The server reads the shared `ServerWorkspaceState.openRepoEntries` membership at boot;
-  the server returns canonical entries and runtime identities.
-- Do not compose client and server workspace persistence into a whole-session payload.
-- Do not persist client workspace state until `workspaceSessionPersistenceOpenFromStore` is true.
-- High-frequency client state may be debounced; page lifecycle events initiate
-  a final client-local flush.
-
-## Adding Startup Work
-
-When adding startup behavior, choose one stage and document why it belongs there.
-
-- Public, unauthenticated work goes in public bootstrap.
-- Authenticated but non-blocking work can run as an optional task in authenticated bootstrap and must log but not block workspace restore.
-- Boot membership work belongs in server restore and client workspace hydration;
-  live membership changes belong in explicit open/close commands.
-- Work that affects boot composition must complete before `sessionPersistenceReady` opens.
-- Work that needs hydrated repo data but is not part of restore belongs in workspace shell side effects.
-
-Every async startup task needs a cleanup story: cancellation must not commit success, unblock persistence, or set React state after unmount.
+Workspace-pane repair and concurrency details are governed by
+`workspace-pane-command-invariants.md`, not by the startup lifecycle.

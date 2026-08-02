@@ -5,7 +5,11 @@ Goblin's top-level object is a directory-backed workspace. A workspace is identi
 - `goblin+file:///absolute/path`
 - `goblin+ssh://ssh-alias/absolute/path`
 
-Only `src/shared/workspace-locator.ts` parses or formats these identifiers. OS folder pickers may return native paths, but the open boundary converts them immediately. Persisted membership, procedure payloads, and runtime projections use locators; native paths exist only at filesystem, process, editor, terminal, and SSH command boundaries.
+One shared workspace-locator boundary parses and formats these identifiers. OS
+folder pickers may return native paths, but the open boundary converts them
+immediately. Persisted membership, procedure payloads, and runtime projections
+use locators; native paths exist only at filesystem, process, editor, terminal,
+and SSH command boundaries.
 
 Git is optional runtime enrichment. The server enables Git only when Git's resolved root is the resolved workspace root. A repository in a parent directory does not grant Git capabilities to the opened folder. Missing Git, malformed metadata, and failed Git enrichment do not prevent a readable directory from opening.
 

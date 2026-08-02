@@ -1,96 +1,144 @@
-# Project Notes
+# Repository Instructions
 
-## TypeScript constraints
+## TypeScript and dependencies
 
-The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these unsupported TypeScript features:
+- The project runs TypeScript in Node.js strip-only mode. Do not use enums,
+  runtime namespaces, parameter properties, or import aliases.
+- Pin new package versions exactly in `package.json`; do not add range prefixes.
+- Use repo-alias imports with explicit `.ts` or `.tsx` extensions. Import the
+  canonical module directly; do not add re-export shims.
+- Type dependencies use top-level `import type` declarations, never inline
+  `import('…').Type` or `typeof import('…')` expressions.
+- Runtime `import('…')` is reserved for a real lazy-loading or
+  optional-dependency boundary. Keep it local and explain a non-obvious use.
+  Refactor circular dependencies instead of hiding them behind dynamic imports.
 
-- Enum declarations
-- Namespaces with runtime code
-- Parameter properties (`constructor(private readonly x: T)`)
-- Import aliases (`import A = B`, `import A = require('B')`)
+## Verification and test data
 
-## Core conventions
+- Verify changes with `bun run typecheck` and `bun run test`. Use
+  `bun run test:watch` for watch mode. Never invoke `bun test` directly because
+  it bypasses the project test configuration and guards.
+- Follow `docs/testing.md` for test placement, helpers, libraries, and
+  anti-patterns.
+- Keep examples, tests, documentation, and snapshots privacy-safe. Use generic
+  placeholders instead of real users, paths, emails, tokens, or internal
+  identifiers.
+- Keep i18n keys statically traceable. Select a named `*Key` variable or a
+  typed static-key map before calling `t(key)`; do not put conditionals,
+  templates, concatenation, or fallbacks directly inside `t(...)`.
 
-- Pin new package versions exactly in `package.json`; no range prefixes.
-- Use repo-alias imports with explicit `.ts`/`.tsx` extensions. Import canonical modules directly; do not add re-export shims.
-- Do not use inline imports unless they are genuinely required. Type dependencies must use a top-level `import type`, never `import('…').Type` or `typeof import('…')`. Runtime `import('…')` is allowed only for a concrete lazy-loading or optional-dependency boundary; keep it local and document the reason when it is not self-evident. Treat circular dependencies as architectural defects by default: refactor to break the cycle, and use a runtime import only as a last resort with an explicit explanation of why immediate refactoring is not viable.
-- Verify with `bun run typecheck` and `bun run test` (`bun run test:watch` for watch mode). Never use `bun test` directly — it bypasses the project's test config and guards.
-- For detailed testing conventions (helpers, library policy, anti-patterns), follow `docs/testing.md`.
-- Keep examples, tests, docs, and snapshots privacy-safe: use generic placeholders, not real users, paths, emails, tokens, or internal identifiers.
-- Keep i18n keys traceable: do not put conditionals, template strings, concatenation, or fallback expressions directly inside `t(...)`. Choose a named `*Key` variable first, or use a typed/static key map for dynamic states, then call `t(key)`.
-- Use the project's `ScrollArea` (`src/web/components/ui/scroll-area.tsx`) for any scrollable region by default. Only fall back to native `overflow` when there's a concrete reason (e.g. terminal scrollbars need native browser behavior).
-- Hover-revealed action triggers (row action menus) must also stay visible in compact UI and while their popover is open. Collapse the show-conditions into one boolean and use `cn(base, visible && '…', !visible && '…')` — see `docs/ui-conventions.md`.
+## UI conventions and proportionality
 
-## UI correctness and proportionality
+- Use this robustness pattern for interactive workflows: let an accepted happy
+  path run directly to completion; fail fast and surface actionable errors on
+  recoverable exceptions; when authority or outcome becomes uncertain, surface
+  that uncertainty, stop automating, preserve already-established authoritative
+  facts, and return control to the user through explicit retry, repair, reopen,
+  or another deliberate recovery.
+- Treat client presentation as a **best-effort projection** of authoritative
+  state. Projection failure never rolls back, fabricates, or replaces an
+  authoritative fact. If it affects an accepted user action or leaves visible
+  state stale or uncertain, surface that condition and offer explicit recovery.
+  Later authoritative hydration may converge the view, but it must not report
+  an uncertain operation as successful or replay it automatically.
+- Use the project `ScrollArea` (`src/web/components/ui/scroll-area.tsx`) for
+  scrollable regions. Native overflow is an exception for behavior that
+  genuinely requires native browser scrolling, such as terminal scrollbars.
+- Hover-revealed action triggers remain visible in compact UI and while their
+  popover is open. Follow `docs/ui-conventions.md`.
+- Scale coordination, retries, and recovery state to evidence-backed product
+  risk: likelihood, severity, data integrity, and whether the user can retry
+  immediately. Missing frequency data does not make a reproducible defect
+  harmless.
+- Passive ordering, focus, selection, animation, or navigation effects that do
+  not complete an accepted user action may be best-effort only when
+  authoritative state is preserved and correction is immediate. Evaluate
+  interference with explicit user actions separately.
+- Proportionality never waives ownership, admission, lifecycle, authorization,
+  or data-boundary invariants. Use stronger coordination for security, data
+  integrity, resource ownership, irreversible writes, or concrete frequent
+  harm.
 
-- Treat UI behavior as interactive presentation, not as a database transaction. Define and verify the happy path, then keep failure behavior simple and recoverable. This does not make every navigation, lifecycle, or ownership defect cosmetic; trace which user action and authority boundary are affected before classifying the risk.
-- Keep corrective complexity proportional to concrete, reproducible, or evidence-backed product risk. Before adding coordination, retries, recovery state, or a broader lifecycle protocol, evaluate likelihood, severity, data integrity, and whether the user can immediately retry. Missing production-frequency data is not evidence that a reproducible defect is harmless.
-- Purely passive UI ordering, focus, selection, animation, or navigation effects may remain best-effort when failure is locally contained, preserves authoritative state, and is easy for the user to correct. Interference with an explicit user action must be evaluated explicitly; accept it only as a documented product tradeoff when its probability and impact do not justify a broader mechanism.
-- Proportionality does not waive established admission, lifecycle, ownership, authorization, or data-boundary invariants. It determines the shape of a fix and whether a newly proposed UI invariant justifies its maintenance cost. Reserve stronger coordination for data integrity, security, resource ownership, irreversible writes, or concrete frequent user harm.
+## Authoritative data and root-cause fixes
 
-## Root-cause and data-boundary fixes
+- Trace a defect to its authoritative source, violated invariant, and atomic
+  read/write boundary before changing behavior.
+- Fix the earliest responsible boundary: normalize during decoding, enforce
+  persistence invariants in repositories or transactions, and derive each
+  projection from one authoritative source or model.
+- Do not compensate for a data-model defect with application synchronization,
+  extra coordinators, fallback state, guards, casts, or broad `try/catch`.
+  Application coordination must represent a real admission, lifecycle,
+  authorization, or safety boundary.
+- Prefer one decisive owner and a simple fast-fail boundary over negotiation,
+  compensation, hidden recovery, or compatibility protocols. Do not add such
+  mechanisms merely to keep conflicting owners or obsolete paths working
+  together. When a concrete cross-authority contract genuinely requires one,
+  make the invariant explicit and bound its state, scope, and lifetime.
+- Give an object only the state and capabilities its owner requires. Prefer a
+  narrow read-only input over moving or caching a second authority.
+- Growing result unions, generic failure plumbing, optional policy flags, and
+  structural type probing usually indicate conflated domain concepts or
+  transaction boundaries. Fix the boundary before extending the protocol.
+- Reconciliation uses the complete authoritative before/after data set. Do not
+  reconstruct authority from paths, handles, sessions, or other stale or
+  already-deleted data.
+- A green test suite confirms behavior, not ownership. Review each new queue,
+  cache, guard, or synchronization mechanism by identifying the missing
+  invariant it compensates for and the layer that should own that invariant.
 
-- Trace defects to the authoritative data source, violated invariant, and atomic read/write boundary before changing application behavior.
-- Prefer fixes at the earliest responsible data boundary: validate or normalize during decoding, enforce persistence invariants in repositories and transactions, and derive state from one authoritative projection.
-- Do not patch data-model defects with application-layer synchronization, extra coordinators, fallback state, compensating guards, casts, or broad `try/catch`. Add application-layer coordination only for a genuine admission, lifecycle, authorization, or safety boundary, and make that boundary explicit in code and tests.
-- Give each object the minimum capability and state required by its owner. Do not move or cache a second authority when the correct model is an explicit read-only input or a narrower capability.
-- Treat growing result unions, generic failure plumbing, optional policy flags, and structural type probing as signs that domain concepts or transaction boundaries may still be conflated. Split the concepts or fix the boundary before extending the type protocol.
-- Model reconciliation from the complete authoritative before/after data set. Cleanup and recovery must not reconstruct authority from paths, handles, sessions, or other data that may already be deleted or stale.
-- A green test suite confirms behavior, not ownership. Review new synchronization, guards, queues, and caches by asking which missing invariant they compensate for and whether that invariant belongs at a lower data boundary.
+## Documentation
 
-## Git and safety
+- Keep `docs/README.md` as a concise index.
+- Long-lived design and spec documents describe functional behavior, durable
+  contracts, ownership boundaries, invariants, protocol shapes, failure
+  semantics, and acceptance criteria. They should survive ordinary refactors.
+- Prefer domain responsibilities over inventories of current files, functions,
+  classes, component trees, or tests. Do not cite source line numbers,
+  dependency internals, transient verification results, or completed migration
+  history.
+- Name a concrete location only when that location is itself a maintained
+  convention, such as a top-level architecture area, public protocol,
+  canonical entry point, or mandated shared primitive.
+- Keep time-bound work in an explicitly labeled roadmap or decision record.
+  Delete completed plans and stale implementation commentary once they no
+  longer guide future work.
 
-- Read-only git commands may run concurrently.
-- Keep network git commands (`fetch`, `pull`, `push`) cancellable and coalesced per repo.
-- Correctness guarantees cover Git operations initiated through the app, not concurrent mutations from terminals or other external Git processes. Treat external Git activity as out-of-band. If it invalidates a current operation, fail directly and require the user to repair, retry, or reopen; later app/background authoritative reads only need to converge the projection to the resulting Git state. Do not add locks, repeated admission checks, compensation, rollback/replay, compatibility fallbacks, hidden retries, polling/watchers, recovery jobs, or a second authority to coordinate with external Git tools.
-- Avoid destructive git features in the app. If one is introduced, design safety, cancellation, and recovery explicitly first.
+## Architecture boundaries
 
-## App-level design docs
+- Keep `bun run check:boundaries` green:
+  - `src/main/**` does not import `src/web/**` or `src/server/**`.
+  - `src/web/**` does not import `src/main/**`.
+  - `src/server/**` and `src/shared/**` do not import `electron`.
+- Prefer server-first application behavior. Add IPC only for an Electron-only
+  capability that cannot reasonably use the server/browser path, and document
+  that reason at the call site.
 
-- Application-level design guidance lives under `docs/`:
-  - `docs/README.md` for the overview
-  - `docs/ui-conventions.md` for UI conventions
-  - `docs/arch.md` for architecture
-  - `docs/layering.md` for feature layering rules
-  - `docs/state-sync.md` for state ownership and sync guidance
-  - `docs/client-model.md` for client model guidance
-  - `docs/realtime.md` for realtime guidance
-  - `docs/terminal.md` for terminal system design
-  - `docs/terminal-roadmap.md` for terminal refactor roadmap
-  - `docs/terminal-target-model.md` for terminal lifecycle and ownership target model
-- Keep the architecture guard green with `bun run check:boundaries`. The enforced boundaries are:
-  - `src/main/**` must not import `src/web/**` or `src/server/**`.
-  - `src/web/**` must not import `src/main/**`.
-  - `src/server/**` and `src/shared/**` must not import `electron`.
-- Prefer server-first implementations for app behavior. Do not add IPC unless the behavior truly requires an Electron-only capability that cannot reasonably live behind the server/browser path; document the reason at the call site when IPC is necessary.
+## Git operations and safety
 
-## HTTP request conventions
+- Read-only Git commands may run concurrently. Network Git commands are
+  cancellable and coalesced per repository.
+- The app guarantees correctness only for Git operations initiated through the
+  app. Treat terminal and external-tool mutations as out-of-band. If they
+  invalidate an operation, fail directly and require repair, retry, or reopen;
+  later authoritative reads only need to converge to the resulting Git state.
+- Do not coordinate with external Git tools through locks, repeated admission
+  checks, compensation, rollback/replay, compatibility fallbacks, hidden
+  retries, polling, watchers, recovery jobs, or a second authority.
+- Avoid destructive Git features. If one is introduced, design safety,
+  cancellation, and recovery before implementation.
 
-**POST is the default for all client→server traffic.** GET is the exception. (We don't follow REST conventions.) The embedded server runs on Node's `http.Server` via `@hono/node-server`, which inherits Node's default 16 KiB `maxHeaderSize`; past that, Node returns `431` _before_ Hono runs — URL payloads are a structural footgun.
+## HTTP requests
 
-Rules:
-
-- **New client→server endpoints use `POST` + `postServerJson(path, body)`.** Reads are fine over POST.
-- **GET is allowed only for:** WebSocket upgrade (`/ws/*`), external-infrastructure health checks (`/api/health*`), or a browser-addressable URL with a real consumer.
-- **Never put arrays, unbounded long strings (> ~200 B), or `JSON.stringify`'d objects in the URL.** Bodies are bounded by `API_BODY_LIMIT_BYTES` (1 MiB) and the clipboard cap (12 MiB).
-- **New endpoints follow the existing POST shape:** `postServerJson` client-side, `*_PROCEDURE_SCHEMAS` in `src/shared/procedure-schemas.ts`, `parseHttpBody` server-side, plus a row in `src/shared/embedded-server-ipc-routes.ts` if it needs an IPC entry.
-
-Known GET endpoints that must migrate to POST: _none — every client→server endpoint that takes a payload now lives behind a POST body. The historical offenders (the three array-bearing endpoints plus the five `cwd`-bearing `/api/repo/{probe,snapshot,status,log,patch}` reads) all moved in this branch._
-
-**Any PR that changes a GET's payload must migrate it to POST in the same PR.** Internal-only refactors (logic, comments) don't trigger migration. The only remaining GETs are the parameter-free ones the rule carves out: WebSocket upgrade (`/ws/*`), external health checks (`/api/health*`), public-infrastructure reads (`/api/i18n`, `/api/host`, `/api/settings`, `/api/settings/prefs`, `/api/settings/lan`, `/api/settings/external-apps`, `/api/remote/ssh-hosts`, `/api/auth/{whoami,access-token}`), and the SPA wildcard `app.get('*')`.
-
-#### Migration checklist
-
-- `src/web/*-client.ts` — `getServerJson(path, params, …)` → `postServerJson(path, body)`.
-- `src/server/routes/*.ts` — `app.get` → `app.post`; `parseHttpQuery(REPO_QUERY_SCHEMAS.x)` → `parseHttpBody(REPO_PROCEDURE_SCHEMAS.x)`.
-- `src/shared/procedure-schemas.ts` — add `*_PROCEDURE_SCHEMAS.x` mirroring the old query schema; remove the matching `REPO_QUERY_SCHEMAS.x` once callers have moved.
-- `src/shared/embedded-server-ipc-routes.ts` — `method: 'GET'` → `method: 'POST'` if registered.
-- Tests — route unit, IPC bridge, store/refresh, and test-utils fixtures that build query params for the endpoint.
-- Validate with `bun run typecheck && bun run test && bun run check:boundaries` before merge.
-
-When reviewing PRs, reject changes that:
-
-- add a query-string array parameter or lengthen an existing GET's parameter list;
-- `JSON.stringify` an object into a query parameter;
-- touch a GET's payload without migrating it to POST;
-- introduce a new GET where a POST would do, without one of the three concrete reasons.
+- POST is the default for all client-to-server traffic, including reads. Use
+  `postServerJson(path, body)` and bounded request bodies.
+- GET is limited to WebSocket upgrades, external health checks, and genuinely
+  browser-addressable URLs.
+- Never put arrays, unbounded strings, or serialized objects in URLs.
+- New procedures use `*_PROCEDURE_SCHEMAS`, server-side `parseHttpBody`, and an
+  embedded-server IPC route entry when IPC exposure is required.
+- If a GET payload changes, migrate that endpoint to the standard POST
+  procedure shape in the same change. Existing GET endpoints are not precedent
+  for new ones.
+- Reject query-string arrays, expanding GET payloads, serialized query objects,
+  and new GET endpoints without one of the allowed reasons.

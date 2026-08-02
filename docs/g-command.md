@@ -11,21 +11,22 @@ This document describes the architecture and the reasoning behind it. It does no
 - **Data plane** — read or modify server-owned state (repo info, settings, terminals). Goes over HTTP because that's the same transport the browser and Electron client already use, with the same auth and the same error shapes.
 - **Control plane** — push commands into the client (open this tab, focus this view, run that action). Goes over a dedicated WebSocket because rendering is not a query — the client subscribes to a stream and reacts.
 
-The server sits between `g` and the client on the control plane. It does not interpret what an intent means; it envelopes and forwards. The client has one intent router that consumes intents from any source (Electron IPC, server WS, future producers) and applies them through the same handler chain.
+The server sits between `g` and the client on the control plane. It does not interpret what an intent means; it envelopes and forwards. The client has one intent router that consumes intents from every supported source and applies them through the same handler chain.
 
 ## Why the server brokers intents
 
 In a typical desktop app, a CLI would talk to the native host directly. Goblin puts the broker in the server because:
 
 - The server is the only process that exists in both Electron mode and standalone (`serve.sh`) mode. Putting the broker in the server means `g` works the same way in either mode — the client subscribes the same way regardless of how the server was launched.
-- The client's intent router already exists. Adding a new producer means adding a subscription, not a new router.
+- The client has one shared intent router. A new producer adds a subscription,
+  not another routing model.
 - HTTP and WS share the same auth and lifecycle. Adding a separate IPC channel would mean a third transport with its own auth model and lifecycle.
 
 The cost is that the server knows about envelope shapes. The benefit is that the server doesn't — and never needs to — know what any specific intent does.
 
 ## Command registry
 
-Adding a `g <subcommand>` is one entry in a table:
+Each `g <subcommand>` is described by one registry entry:
 
 - a name
 - a one-line summary
@@ -34,22 +35,22 @@ Adding a `g <subcommand>` is one entry in a table:
 
 The CLI is reduced to `find by name → call run`. Each `run` receives a context with args, env, I/O, and a transport. The transport abstracts HTTP so command logic stays independent of the wire.
 
-This shape scales linearly: the first command and the tenth command cost the same to add. Adding a sub-domain of commands (e.g. a "branches" namespace) is one new file under `commands/` plus one registry entry — no central dispatch table needs editing.
+Dispatch remains data-driven as the command set grows. Command groups may organize the registry, but they must not introduce a second dispatch or transport model.
 
 ## Idempotency by design
 
 Most `g` commands are target-state, not actions. `g delta` means "the changes tab is the active tab", not "switch to the changes tab and increment a counter". Two `g delta` calls produce the same final state as one.
 
-This makes commands safe to retry and lets the client treat each intent as a pure assignment rather than a stateful transition. The client's existing intent plan for view-switching is already a pure assignment — `g` leans on that rather than introducing a new model.
+This makes commands safe to retry and lets the client treat each intent as a target assignment rather than an accumulated transition. Commands that cannot be idempotent must make their acceptance and retry semantics explicit.
 
 ## The error envelope
 
-`g` and the server share one response shape for view commands:
+`g` and the server share one response envelope for control-plane commands:
 
 - success: `{ ok: true }`
 - failure: `{ ok: false, code, message }`
 
-The CLI prefixes every error message it surfaces with `g:`. The server returns raw reasons; the CLI decorates. This is a one-place rule: server-side messages are facts, CLI output is presentation. The first version of the code put `g:` on both sides and produced visible double-prefix bugs in production-style failure paths.
+The server reports domain facts; the CLI owns shell-facing presentation. Error decoration therefore happens in one place and is never embedded in the server reason.
 
 The CLI exit codes are conventional: `0` success, `1` server or transport error, `2` argument error.
 
@@ -73,11 +74,9 @@ The only difference `g` can observe: when no client is listening on the control-
 The pattern for adding a new `g` command:
 
 1. Decide which plane it uses. Reads and writes that target server state go through the HTTP transport. Commands that should reach the client go through the WS broker.
-2. For control-plane commands, add a route on the server that validates the request and calls the intent publisher. The client side needs no changes — the existing intent router picks the intent up.
-3. Implement the command as a registry entry. Use the existing factory pattern if the new command shares shape with an existing one; otherwise write the `run` function inline.
+2. For control-plane commands, define and validate the intent at the broker boundary, then route it through the shared client intent path.
+3. Register the command using the smallest abstraction that expresses its arguments, transport, and result semantics.
 4. Add tests according to `testing.md`, covering the command's observable envelope and failure modes.
-
-When in doubt, look at an existing command — the view commands are the canonical example.
 
 ## Why this is the right level of abstraction
 

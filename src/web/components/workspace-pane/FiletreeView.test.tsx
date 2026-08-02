@@ -456,16 +456,14 @@ describe('FiletreeView', () => {
     expect(container?.textContent).toMatch(/filetree\.truncated/)
   })
 
-  test('does not render a status dot in v1 (git-status overlay deferred)', () => {
+  test('does not render a status dot without an authoritative status projection', () => {
     const tree: WorkspaceFilesystemTreeResult = {
       nodes: [fileNode('README.md', null, 'modified')],
       truncated: false,
     }
     renderView({ tree, loading: false, error: null })
-    // The wire union still allows non-clean status values, but v1
-    // hardcodes every node to 'clean' (docs/filetree.md) so the view
-    // must not emit a status aria-label. When a real overlay lands the
-    // assertion flips: assert each status renders its own dot.
+    // The wire union allows non-clean values, but the filesystem tree source
+    // does not own status projection and the view must not imply that it does.
     expect(container?.querySelector('[aria-label^="filetree.status."]')).toBeNull()
   })
 

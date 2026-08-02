@@ -55,10 +55,13 @@ Typical files:
 #### 3. Write layer
 
 - Owns mutation orchestration.
-- Runs writes, follow-up refresh, invalidation, and local projection/cache updates.
+- Commits writes at the authoritative boundary and reports the exact effect.
 - This is the main place for write flow.
 - Server-side write paths own invalidation publishing.
-- Web-side write paths own query cache updates after server response. Settings writes are centralized in `src/web/settings-actions.ts`; raw `settings-client.ts` writes are transport-level and should not be called from components.
+- Client write paths may apply canonical response data or invalidate the owning
+  query. They do not rebuild authority from intent payloads or confirming reads.
+- Optimistic presentation is exceptional and must remain reversible without
+  pretending that the authoritative write has committed.
 
 Typical files:
 
@@ -96,7 +99,7 @@ Typical files:
 The default flow should look like this:
 
 - read: boundary -> read layer -> UI
-- write: UI -> boundary/client -> write layer -> source layer -> invalidation/cache/projection update -> UI
+- write: UI -> boundary -> authoritative write -> exact effect + invalidation -> client projection
 
 Do not mix read and write concerns unless the feature is still trivial.
 
@@ -116,7 +119,8 @@ Rules:
 - A route file should not exceed input validation + delegating to the next layer.
 - If a feature has complex mutations, extract `src/server/modules/<feature>-write-paths.ts`.
 - If a feature has multiple read paths shared by routes or other modules, extract `src/server/modules/<feature>-read.ts`.
-- Server-side read and write layers are **not** optional for features that already have them on the web side. Keep the server side symmetric.
+- Choose server layers from server responsibilities. Do not mirror the client
+  structure merely for symmetry.
 
 ## When not to split
 
@@ -137,7 +141,8 @@ Small features should stay small.
 Split a feature into more layers when one of these becomes true:
 
 - reads are shared by multiple callers or need their own query lifecycle
-- writes need invalidation, follow-up refresh, optimistic/local projection updates, or native projection
+- writes need distinct transaction, invalidation, authorization, or external
+  side-effect coordination
 - persistence or authoritative storage rules have become distinct from write orchestration
 - UI components are starting to repeat the same mutation flow
 - route or client code is accumulating business decisions
@@ -186,51 +191,56 @@ Use `service` or `controller` only when that term is the real stable boundary an
 - Add a runtime facade **only** when the UI benefits from a stable feature-facing API that combines reads and writes.
 - Skip layers you do not need.
 
-## Current repo examples
+## Examples
 
-Use the current codebase as a guide, not as a rigid template.
+These examples describe responsibility shapes, not required file inventories.
 
 ### Settings
 
-- boundary: `src/server/routes/settings.ts`, `src/web/settings-client.ts`
-- read: `src/web/settings-queries.ts`
-- write: `src/server/modules/settings-write-paths.ts`, `src/web/settings-actions.ts`
-- source: `src/server/modules/settings-source.ts`
-- runtime facade: `src/web/runtime-settings-*.ts` (only files that combine read + write)
+- boundary: validates settings procedures and transports requests
+- read: exposes the settings snapshot and query lifecycle
+- write: commits settings and projects the committed result into the cache
+- source: owns durable settings persistence
+- runtime facade: justified only for a consumer that needs a combined read and
+  write interface
 
 This is a good example of a feature that has grown enough to justify explicit read and write layers.
 It also shows a feature where a separate source layer makes sense.
 
 ### Repos
 
-- boundary: `src/server/routes/repo.ts`, `src/web/repo-client.ts`
-- query identity: `src/web/repo-query-keys.ts`
-- cache projection: `src/web/repo-query-cache.ts`
-- read options and React bindings: `src/web/repo-query-options.ts`, `src/web/repo-queries.ts`
-- runtime read coordination: `src/web/repo-query-runtime.ts`
-- store refresh application: `src/web/stores/workspaces/refresh.ts`
-- write: `src/web/stores/workspaces/workspace-session-write-paths.ts`, `src/web/stores/workspaces/branch-actions.ts`
-- server write: `src/server/modules/repo-write-paths.ts` (to be extracted from `repo.ts`)
-- source: `src/server/modules/repo-source.ts`
-- runtime projection/facade: `src/web/stores/workspaces/store.ts`, related repo store slices
-- restorable/runtime distinction: repo store types and lifecycle modules
+- boundary: validates repository procedures and transports requests
+- query identity and cache projection: identify authoritative repository reads
+  without coupling them to React
+- read bindings: expose snapshot lifecycles to UI consumers
+- write: coordinate repository mutations and publish invalidation
+- source: owns Git and filesystem access
+- runtime projection: keeps UI intent distinct from authoritative repository
+  state and restorable workspace state
 
 This is a good example of a feature that should stay feature-first, even when its runtime projection is store-heavy instead of query-heavy.
 It also shows that not every complex feature needs a separate runtime facade layer.
 
 ### Terminal
 
-- boundary: `src/server/routes/realtime.ts`, `src/web/app-realtime.ts`, `src/web/terminal.ts`
-- read: `src/web/runtime/AppRuntimeProjectionProvider.tsx` (server recovery orchestration), `src/web/components/terminal/TerminalSessionProjection.ts` (read projection)
-- write: `src/server/terminal/terminal-runtime.ts` (factory; the authoritative source for session/session service/broker/dispatch), `src/web/components/terminal/TerminalSessionProjection.ts` (client-side write paths for `attach`/`select`/`create`)
-- source: `src/server/terminal/terminal-session-manager.ts` (in-process state for sessions, target metadata, control, render), `src/server/terminal/terminal-session-service.ts` (public session-service facade), `src/server/terminal/pty-supervisor.ts` (PtySupervisor interface), `src/server/terminal/pty-supervisor-inprocess.ts` + `pty-supervisor-worker.ts` (PTY pool impls)
-- protocol types: `src/shared/terminal-types.ts`, `src/shared/terminal-socket.ts`, `src/shared/terminal-validators.ts`, `src/shared/terminal-controller.ts`, `src/shared/terminal-filesystem-target-key.ts` (client↔server wire types, validation, controller helpers, and runtime-neutral filesystem grouping), `src/server/terminal/terminal-session-ids.ts` (server-side terminalSessionId allocation), `src/server/terminal/pty-worker-protocol.ts` (main↔PTY-worker wire types)
+- boundary: carries terminal procedures and realtime events without owning session
+  policy
+- read: projects server recovery and live session state for the client
+- write: the server runtime owns session commands; the client projection owns
+  UI-safe attach, select, and create intents
+- source: the session domain owns live state and delegates PTY execution to a
+  supervisor boundary
+- protocol: shared wire types and validators remain runtime-neutral; internal
+  PTY-worker messages are not client protocol
 
-The server-side terminal runtime is created by `createServerTerminalRuntime({ ptySupervisor })` and contributes terminal handlers to the shared app realtime host. The realtime route receives that app realtime host via dependency injection from the server factory. The TerminalSessionProvider on the client side keeps `TerminalSessionProjection` as the single source of truth for live session state and uses the terminal client only for fetches and mutations.
+The server terminal runtime contributes handlers to the shared realtime host
+through dependency injection. The client terminal projection is the sole live
+session projection and uses the transport only for requests and mutations.
 
-Workspace-pane static layout is owned by `WorkspacePaneLayoutRepository`; command-time target validity and branch metadata come from the server `WorkspacePaneTargetCatalog`, sampled from the repository source; runtime placement, physical indexes, and overlay revision are owned by `WorkspacePaneEpochOverlay`; live membership belongs to runtime providers. Client `RepoSnapshot` data is presentation-only and never authorizes these commands. `WorkspacePaneLayoutAggregate` owns the canonical epoch projection clock and purely projects those inputs, materializing live entries and filtering stale placement hints only in the returned canonical view. Reads do not write derived membership or cache a second target catalog, and restore never copies layout into runtime state. Terminal contributes one runtime provider; the client renders this projection rather than inventing fallback rules from local terminal views.
-
-**PtySupervisor exit metadata — deliberate asymmetry.** The in-process supervisor (`pty-supervisor-inprocess.ts`) reports `pty-exit` to listeners as `(code, signal) = (null, null)` because `node-pty`'s `onExit` only signals "exited" without those values, and by the time the callback fires the underlying term is already gone. The worker-backed supervisor delivers the real values carried by the IPC `pty-exit` event. The session manager does not currently branch on `code`/`signal` — `pty === null` is the canonical "session ended" signal — so the asymmetry is invisible at higher layers. A future need for `code`/`signal` (e.g. for status-bar UI) would require a more invasive change: the in-process supervisor would have to register an `onExit` listener at spawn time and persist the metadata, similar to how it currently caches the process name.
+Workspace-pane layout, target validity, runtime placement, and live provider
+membership remain separate authoritative inputs to one canonical projection.
+The client renders that projection and never invents fallback membership from
+local terminal views.
 
 ### Smaller UI interactions
 
