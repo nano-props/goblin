@@ -5,12 +5,13 @@ import path from 'node:path'
 import { app } from 'electron'
 import { failNativeHostForUnexpectedServerExit } from '#/main/embedded-server-fatal-exit.ts'
 import { readOrCreateAccessToken } from '#/shared/access-token-file.ts'
+import { formatServerUrl } from '#/shared/server-url.ts'
 import { serverNodeLog } from '#/node/logger.ts'
 import { reserveAvailablePort } from '#/system/port-allocation.ts'
 
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 32100
-const HEALTH_PATH = '/api/health'
+const HOST_INFO_PATH = '/api/host'
 const SERVER_READY_TIMEOUT_MS = 8_000
 const SERVER_STOP_TIMEOUT_MS = 5_000
 const SERVER_STDERR_TAIL_MAX_CHARS = 8_000
@@ -101,18 +102,58 @@ async function reserveEmbeddedServerPort(host: string, preferredPort: number): P
 }
 
 async function waitForServer(url: string, timeoutMs: number, record: EmbeddedServerProcessRecord): Promise<void> {
-  const startedAt = Date.now()
-  while (Date.now() - startedAt < timeoutMs) {
-    if (activeServer !== record) {
-      throw record.startupError ?? new Error('Embedded server exited before becoming ready')
+  // One deadline owns connection and response-body readiness. Child exit is
+  // observed at probe boundaries; a stalled in-flight probe ends at this
+  // deadline without adding a second exit-linked cancellation coordinator.
+  const signal = AbortSignal.timeout(timeoutMs)
+  while (!signal.aborted) {
+    assertActiveServer(record)
+    if (await probeServerProcess(url, record.proc.pid, signal)) {
+      assertActiveServer(record)
+      return
     }
-    try {
-      const response = await fetch(`${url}${HEALTH_PATH}`)
-      if (response.ok && activeServer === record) return
-    } catch {}
     await new Promise((resolve) => setTimeout(resolve, 150))
   }
   throw new Error('Timed out waiting for embedded server')
+}
+
+function assertActiveServer(record: EmbeddedServerProcessRecord): void {
+  if (activeServer !== record) {
+    throw record.startupError ?? new Error('Embedded server exited before becoming ready')
+  }
+}
+
+async function probeServerProcess(url: string, expectedPid: number | undefined, signal: AbortSignal): Promise<boolean> {
+  let response: Response
+  try {
+    response = await fetch(`${url}${HOST_INFO_PATH}`, { signal })
+  } catch {
+    return false
+  }
+  if (!response.ok) {
+    throw new Error(`Embedded server readiness probe failed with status ${response.status}`)
+  }
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    if (signal.aborted) return false
+    throw new Error('Embedded server readiness probe returned invalid JSON')
+  }
+  if (!matchesServerProcess(body, expectedPid)) {
+    throw new Error('Embedded server port is owned by an unexpected process')
+  }
+  return true
+}
+
+function matchesServerProcess(value: unknown, expectedPid: number | undefined): boolean {
+  return (
+    expectedPid !== undefined &&
+    typeof value === 'object' &&
+    value !== null &&
+    'pid' in value &&
+    value.pid === expectedPid
+  )
 }
 
 function pipeProcessLogs(proc: ServerChildProcess, onStderr: (chunk: string) => void): void {
@@ -171,8 +212,7 @@ export async function startEmbeddedServer(): Promise<EmbeddedServerRuntime | nul
     if (generation !== startGeneration) return null
     const accessToken = await readOrCreateAccessToken(app.getPath('userData'))
     if (generation !== startGeneration) return null
-    const accessHost = host === '0.0.0.0' ? '127.0.0.1' : host
-    const url = `http://${accessHost}:${port}`
+    const url = formatServerUrl(host, port)
     const command = serverCommand()
     const proc = spawn(command.bin, command.args, {
       cwd: serverWorkingDirectory(),

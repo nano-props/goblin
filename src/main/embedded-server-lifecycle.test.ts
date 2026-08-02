@@ -85,6 +85,16 @@ function createServerChild() {
   return child
 }
 
+function mockReadyServer(pid = 4242) {
+  return mockFetch(() => ({ ok: true, json: async () => ({ pid }) }))
+}
+
+function mockUnavailableServer() {
+  return mockFetch(() => {
+    throw new Error('connection refused')
+  })
+}
+
 async function reserveTestPort(): Promise<number> {
   const server = createServer()
   openServers.push(server)
@@ -129,9 +139,14 @@ describe('embedded server process lifecycle', () => {
   test('uses an ASAR-unaware Node runtime for the embedded server process', async () => {
     const child = createServerChild()
     mocks.spawn.mockReturnValue(child)
-    mockFetch(() => ({ ok: true }))
+    const fetchMock = mockReadyServer()
 
     await startEmbeddedServer()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/host$/),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    )
 
     expect(mocks.spawn).toHaveBeenCalledWith(
       process.execPath,
@@ -158,7 +173,7 @@ describe('embedded server process lifecycle', () => {
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
     const child = createServerChild()
     mocks.spawn.mockReturnValue(child)
-    mockFetch(() => ({ ok: true }))
+    mockReadyServer()
     await startEmbeddedServer()
 
     child.stderr.write('Error: test server failure\n')
@@ -177,7 +192,7 @@ describe('embedded server process lifecycle', () => {
   test('does not fail the native host when the server is stopped intentionally', async () => {
     const child = createServerChild()
     mocks.spawn.mockReturnValue(child)
-    mockFetch(() => ({ ok: true }))
+    mockReadyServer()
     await startEmbeddedServer()
 
     await stopEmbeddedServer('app-quit')
@@ -187,11 +202,70 @@ describe('embedded server process lifecycle', () => {
     expect(mocks.appExit).not.toHaveBeenCalled()
   })
 
+  test('rejects a successful probe from a different process', async () => {
+    const child = createServerChild()
+    mocks.spawn.mockReturnValue(child)
+    const fetchMock = mockReadyServer(9999)
+
+    await expect(startEmbeddedServer()).rejects.toThrow('Embedded server port is owned by an unexpected process')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(getEmbeddedServerRuntime()).toBeNull()
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+  })
+
+  test.each([
+    {
+      name: 'a non-success response',
+      response: { ok: false, status: 503 },
+      message: 'Embedded server readiness probe failed with status 503',
+    },
+    {
+      name: 'invalid JSON',
+      response: { ok: true, json: async () => Promise.reject(new Error('invalid JSON')) },
+      message: 'Embedded server readiness probe returned invalid JSON',
+    },
+    {
+      name: 'a response without a PID',
+      response: { ok: true, json: async () => ({}) },
+      message: 'Embedded server port is owned by an unexpected process',
+    },
+  ])('fails after one probe for $name', async ({ response, message }) => {
+    const child = createServerChild()
+    mocks.spawn.mockReturnValue(child)
+    const fetchMock = mockFetch(() => response)
+
+    await expect(startEmbeddedServer()).rejects.toThrow(message)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(getEmbeddedServerRuntime()).toBeNull()
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+  })
+
+  test('aborts a stalled readiness request when the startup budget expires', async () => {
+    const child = createServerChild()
+    mocks.spawn.mockReturnValue(child)
+    const timeoutController = new AbortController()
+    vi.spyOn(AbortSignal, 'timeout').mockReturnValue(timeoutController.signal)
+    const fetchMock = mockFetch(
+      (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
+        }),
+    )
+    const starting = startEmbeddedServer()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    timeoutController.abort(new DOMException('timed out', 'TimeoutError'))
+
+    await expect(starting).rejects.toThrow('Timed out waiting for embedded server')
+    expect(getEmbeddedServerRuntime()).toBeNull()
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+  })
+
   test('reports startup failure without entering the ready-server fatal boundary', async () => {
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
     const child = createServerChild()
     mocks.spawn.mockReturnValue(child)
-    mockFetch(() => ({ ok: false }))
+    mockUnavailableServer()
     const starting = startEmbeddedServer()
     await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1))
 
@@ -207,7 +281,7 @@ describe('embedded server process lifecycle', () => {
   test('fails startup without entering the fatal boundary when the process cannot spawn', async () => {
     const child = createServerChild()
     mocks.spawn.mockReturnValue(child)
-    mockFetch(() => ({ ok: false }))
+    mockUnavailableServer()
     const starting = startEmbeddedServer()
     await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1))
 
@@ -222,7 +296,7 @@ describe('embedded server process lifecycle', () => {
   test('cancels an in-flight start when an intentional stop wins the race', async () => {
     const child = createServerChild()
     mocks.spawn.mockReturnValue(child)
-    mockFetch(() => ({ ok: false }))
+    mockUnavailableServer()
     const starting = startEmbeddedServer()
     await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1))
 

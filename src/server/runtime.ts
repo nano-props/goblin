@@ -8,6 +8,7 @@ import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
+import { formatServerUrl } from '#/shared/server-url.ts'
 
 interface ServerRuntimeBaseOptions extends Omit<
   ServerAppOptions,
@@ -96,7 +97,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
       ptySupervisor: options.ptySupervisor,
       gCommand: gCommandEntry
         ? {
-            serverUrl: embeddedServerUrl(serverHost, serverPort),
+            serverUrl: formatServerUrl(serverHost, serverPort),
             accessToken: appOptions.accessToken,
             entryPath: gCommandEntry,
             binDir: gCommandBinDir,
@@ -135,12 +136,4 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
       }
     },
   }
-}
-
-function embeddedServerUrl(host: string, port: number): string {
-  let accessHost = host
-  if (accessHost === '0.0.0.0') accessHost = '127.0.0.1'
-  else if (accessHost === '::') accessHost = '[::1]'
-  else if (accessHost.includes(':') && !accessHost.startsWith('[')) accessHost = `[${accessHost}]`
-  return `http://${accessHost}:${port}`
 }

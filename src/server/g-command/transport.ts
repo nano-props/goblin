@@ -1,6 +1,7 @@
 import * as v from 'valibot'
 import type { GoblinCommandTransport } from '#/server/g-command/context.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
+import { formatServerUrl } from '#/shared/server-url.ts'
 
 const ErrorResponseSchema = v.union([
   v.strictObject({ message: v.string() }),
@@ -17,11 +18,8 @@ function readServerUrl(env: NodeJS.ProcessEnv): string {
   const explicit = env.GOBLIN_SERVER_URL?.trim()
   if (explicit) return explicit.replace(/\/$/, '')
   const port = env.GOBLIN_SERVER_PORT?.trim() || '32100'
-  let host = env.GOBLIN_SERVER_HOST?.trim() || '127.0.0.1'
-  if (host === '0.0.0.0') host = '127.0.0.1'
-  if (host === '::') host = '[::1]'
-  else if (host.includes(':') && !host.startsWith('[')) host = `[${host}]`
-  return `http://${host}:${port}`
+  const host = env.GOBLIN_SERVER_HOST?.trim() || '127.0.0.1'
+  return formatServerUrl(host, port)
 }
 
 function readAccessToken(env: NodeJS.ProcessEnv): string | null {
