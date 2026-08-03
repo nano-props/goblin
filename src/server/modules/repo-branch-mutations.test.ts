@@ -200,9 +200,9 @@ describe('repo branch mutations', () => {
         runtimeFailure,
       ),
     )
-    await expect(pushRepoBranch(repoId, 'feature/a', undefined, { workspaceRuntimeId: 'runtime-test' })).rejects.toBe(
-      runtimeFailure,
-    )
+    await expect(
+      pushRepoBranch(repoId, 'feature/a', undefined, { workspaceRuntimeId: 'runtime-test' }),
+    ).rejects.toMatchObject({ runtimeFailure })
     expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
   })
 
@@ -235,7 +235,7 @@ describe('repo branch mutations', () => {
       deleteRepoBranch(repoId, 'feature/a', { deleteUpstream: true }, undefined, {
         workspaceRuntimeId: 'runtime-test',
       }),
-    ).rejects.toBe(runtimeFailure)
+    ).rejects.toMatchObject({ runtimeFailure })
     expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
   })
 
@@ -261,6 +261,12 @@ describe('repo branch mutations', () => {
     mocks.bootstrapWorktreeAfterCreate.mockResolvedValueOnce({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
+      worktreeBootstrap: {
+        copy: { count: 1, paths: ['first.env'] },
+        symlink: { count: 0, paths: [] },
+        hardlink: { count: 0, paths: [] },
+        skippedMissing: { count: 0, paths: [] },
+      },
     })
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
@@ -270,6 +276,12 @@ describe('repo branch mutations', () => {
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
       recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+      worktreeBootstrap: {
+        copy: { count: 1, paths: ['first.env'] },
+        symlink: { count: 0, paths: [] },
+        hardlink: { count: 0, paths: [] },
+        skippedMissing: { count: 0, paths: [] },
+      },
     })
     expect(mocks.bootstrapWorktreeAfterCreate).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', {
       signal: undefined,
@@ -462,8 +474,7 @@ describe('repo branch mutations', () => {
     mocks.deleteRemoteBranch.mockResolvedValueOnce({
       ok: false,
       message: 'cancelled',
-      recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
-      branchStateMayHaveChanged: true,
+      branchEffect: 'local-delete-confirmed',
     })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
@@ -474,12 +485,15 @@ describe('repo branch mutations', () => {
       message: 'cancelled',
       recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
     })
-    expect(mocks.deleteRemoteBranch).toHaveBeenCalledWith(expect.objectContaining({ remotePath: '/srv/repo' }), {
-      branch: 'feature/a',
-      force: undefined,
-      deleteUpstream: true,
-      signal: undefined,
-    })
+    expect(mocks.deleteRemoteBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ remotePath: '/srv/repo' }),
+      expect.objectContaining({
+        branch: 'feature/a',
+        force: undefined,
+        deleteUpstream: true,
+        signal: undefined,
+      }),
+    )
     expectRepoMetadataInvalidations(
       {
         repoId,

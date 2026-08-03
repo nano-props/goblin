@@ -32,6 +32,7 @@ import {
 } from '#/web/repo-client.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
+import { isSilentBranchActionCancellation } from '#/web/stores/workspaces/branch-action-result.ts'
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
 const BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE = 'error.branch-action-wait-timeout'
@@ -139,6 +140,7 @@ function throwIfStale(get: WorkspacesGet, id: WorkspaceId, workspaceRuntimeId: s
 
 function branchActionErrorFromResult(result: ExecResult): string | null {
   if (result.ok) return null
+  if (isSilentBranchActionCancellation(result)) return null
   if (result.message !== 'cancelled') return result.message
   return result.recoveryMessageKeys?.[0] ?? null
 }
@@ -148,7 +150,7 @@ function branchActionErrorResult(message: string): ExecResult {
 }
 
 function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: RunBranchActionOptions): boolean {
-  if (result.message === 'cancelled' && !result.recoveryMessageKeys?.length) return true
+  if (isSilentBranchActionCancellation(result)) return true
   if (options?.deferResultMessages?.includes(result.message)) return true
   return false
 }

@@ -3,7 +3,7 @@ import { constants as fsConstants, promises as fs } from 'node:fs'
 import { execa, ExecaError } from 'execa'
 import { glob, isDynamicPattern } from 'tinyglobby'
 import { getRepoRoot } from '#/system/git/branches.ts'
-import type { ExecResult } from '#/shared/git-types.ts'
+import type { ExecResult, RepoMutationExecResult } from '#/shared/git-types.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
 import {
   compactWorktreeBootstrapPaths,
@@ -59,6 +59,10 @@ interface ReadyMaterialization extends PlannedMaterialization {
   stat: Awaited<ReturnType<typeof fs.lstat>>
 }
 
+type MaterializationResult =
+  | { ok: true; completedOperations: ReadyMaterialization[] }
+  | { ok: false; message: string; completedOperations: ReadyMaterialization[] }
+
 const SETUP_TIMEOUT_MS = 10 * 60_000
 const WINDOWS_ROOTED_PATH_RE = /^(?:[A-Za-z]:|[\\/])/
 
@@ -66,7 +70,7 @@ export async function bootstrapWorktreeAfterCreate(
   sourceCwd: string,
   targetWorktreePath: string,
   options?: { signal?: AbortSignal; expectedConfigHash?: string },
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   try {
     if (options?.signal?.aborted) return { ok: false, message: 'cancelled' }
     const sourceRepoRoot = await getRepoRoot(sourceCwd, { signal: options?.signal })
@@ -95,14 +99,20 @@ export async function bootstrapWorktreeAfterCreate(
       planned.excludedPaths,
       options?.signal,
     )
-    if (!materialized.ok) return bootstrapStepFailure(materialized)
+    if (!materialized.ok) {
+      const summary = bootstrapSummary(materialized.completedOperations, planned.missingSources, undefined)
+      return bootstrapStepFailure(materialized, summary)
+    }
 
     if (loaded.config.setup) {
       const setup = await runSetupCommand(targetRoot, loaded.config.setup, options?.signal)
-      if (!setup.ok) return bootstrapStepFailure(setup)
+      if (!setup.ok) {
+        const summary = bootstrapSummary(materialized.completedOperations, planned.missingSources, undefined)
+        return bootstrapStepFailure(setup, summary)
+      }
     }
 
-    const summary = bootstrapSummary(planned.operations, planned.missingSources, loaded.config.setup)
+    const summary = bootstrapSummary(materialized.completedOperations, planned.missingSources, loaded.config.setup)
     return {
       ok: true,
       message: formatWorktreeBootstrapSummary(summary),
@@ -371,13 +381,14 @@ async function materializePlan(
   operations: ReadyMaterialization[],
   excludedPaths: Set<string>,
   signal: AbortSignal | undefined,
-): Promise<ExecResult> {
+): Promise<MaterializationResult> {
+  const completedOperations: ReadyMaterialization[] = []
   for (const item of operations) {
-    if (signal?.aborted) return { ok: false, message: 'cancelled' }
+    if (signal?.aborted) return { ok: false, message: 'cancelled', completedOperations }
     try {
       await fs.mkdir(path.dirname(item.dest), { recursive: true })
       const safeDestination = await validateDestinationPathWithinRoot(targetRoot, item.rel)
-      if (!safeDestination.ok) return safeDestination
+      if (!safeDestination.ok) return { ...safeDestination, completedOperations }
       switch (item.mode) {
         case 'copy':
           await copyPath(item.abs, item.dest, {
@@ -392,13 +403,19 @@ async function materializePlan(
           await fs.link(item.abs, item.dest)
           break
       }
+      // Summaries report completed configured operations, not every path that
+      // happened to land inside a failed directory copy. Listing a partial
+      // directory as copied would turn an uncertain follow-up into false success.
+      completedOperations.push(item)
     } catch (err) {
-      if (signal?.aborted) return { ok: false, message: 'cancelled' }
-      if (hasErrorCode(err, 'EEXIST')) return { ok: false, message: `destination already exists: ${item.rel}` }
-      return { ok: false, message: `failed to ${item.mode} ${item.rel}: ${errorMessage(err)}` }
+      if (signal?.aborted) return { ok: false, message: 'cancelled', completedOperations }
+      if (hasErrorCode(err, 'EEXIST')) {
+        return { ok: false, message: `destination already exists: ${item.rel}`, completedOperations }
+      }
+      return { ok: false, message: `failed to ${item.mode} ${item.rel}: ${errorMessage(err)}`, completedOperations }
     }
   }
-  return { ok: true, message: '' }
+  return { ok: true, completedOperations }
 }
 
 async function runSetupCommand(
@@ -576,10 +593,11 @@ function bootstrapFailure(message: string): ExecResult {
   return { ok: false, message: `Worktree bootstrap failed: ${message}` }
 }
 
-function bootstrapStepFailure(result: ExecResult): ExecResult {
+function bootstrapStepFailure(result: ExecResult, summary?: WorktreeBootstrapSummary): RepoMutationExecResult {
   if (result.ok) return result
-  if (result.message === 'cancelled') return result
-  return bootstrapFailure(result.message)
+  const failure = result.message === 'cancelled' ? result : bootstrapFailure(result.message)
+  if (!hasWorktreeBootstrapSummaryDetails(summary)) return failure
+  return { ...failure, worktreeBootstrap: summary }
 }
 
 function pathsForMode(operations: ReadyMaterialization[], mode: MaterializationMode): string[] {

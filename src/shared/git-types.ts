@@ -114,6 +114,8 @@ export interface RepoRemoteInfo {
 
 export const GIT_HASH_RE = /^[0-9a-fA-F]{7,64}$/
 
+// These are presentation notices derived from domain milestones. They never
+// authorize cleanup, invalidation, retry, or client-side state inference.
 export const EXEC_RESULT_RECOVERY_MESSAGE_KEYS = [
   'error.worktree-created-followup-failed',
   'error.worktree-removed-followup-failed',
@@ -125,6 +127,10 @@ export type ExecResultRecoveryMessageKey = (typeof EXEC_RESULT_RECOVERY_MESSAGE_
 export interface ExecResult {
   ok: boolean
   message: string
+}
+
+/** Public result contract for repository mutations with partial-success guidance. */
+export interface RepoMutationExecResult extends ExecResult {
   /** Static i18n keys for recovery guidance after an authoritative partial success. */
   recoveryMessageKeys?: readonly ExecResultRecoveryMessageKey[]
   worktreeBootstrap?: WorktreeBootstrapSummary

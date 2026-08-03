@@ -1,15 +1,23 @@
 import { compact } from 'es-toolkit'
-import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
+import type { ExecResult, RepoMutationExecResult, WorktreeInfo } from '#/shared/git-types.ts'
 import { normalizeRemoteWorkspaceRef, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { formatWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export interface RepoMutationResult extends ExecResult {
+export interface RepoMutationResult extends RepoMutationExecResult {
   /** Repo projections that must be invalidated, including uncertain or partially applied failures. */
   repoIdsToInvalidate?: readonly WorkspaceId[]
   /** Checked-out filesystem projections that must be invalidated. */
   worktreePathsToInvalidate?: readonly string[]
   /** The worktree removal committed, even if a later lifecycle or branch step failed. */
   worktreeRemoved?: true
+}
+
+/** Project an internal mutation result without exposing impact or milestone authority. */
+export function publicRepoMutationResult(result: RepoMutationResult): RepoMutationExecResult {
+  const publicResult: RepoMutationExecResult = { ok: result.ok, message: result.message }
+  if (result.recoveryMessageKeys?.length) publicResult.recoveryMessageKeys = result.recoveryMessageKeys
+  if (result.worktreeBootstrap) publicResult.worktreeBootstrap = result.worktreeBootstrap
+  return publicResult
 }
 
 export function withRepoIdsToInvalidate<T extends ExecResult>(

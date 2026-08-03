@@ -27,8 +27,9 @@ export async function settleRemoteWorkspaceRuntimeFailure(
   })
 }
 
-/** Type guard wrapper that fans out to `settleRemoteWorkspaceRuntimeFailure` only when the error matches. */
-export async function failRemoteWorkspaceRuntimeIfNeeded(userId: string, error: unknown): Promise<void> {
-  if (!isRemoteWorkspaceRuntimeFailure(error)) return
+/** Settle a classified runtime failure and report whether this error owned that lifecycle transition. */
+export async function failRemoteWorkspaceRuntimeIfNeeded(userId: string, error: unknown): Promise<boolean> {
+  if (!isRemoteWorkspaceRuntimeFailure(error)) return false
   await settleRemoteWorkspaceRuntimeFailure(userId, error)
+  return true
 }

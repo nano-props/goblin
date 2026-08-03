@@ -10,15 +10,9 @@ import {
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type * as RemoteWorkspaceFailureSettlement from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-
-const failRemoteWorkspaceRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
-vi.mock('#/server/modules/remote-workspace-runtime-failure-settlement.ts', async (importActual) => {
-  const actual = await importActual<typeof RemoteWorkspaceFailureSettlement>()
-  return { ...actual, failRemoteWorkspaceRuntimeIfNeeded: failRemoteWorkspaceRuntimeIfNeededMock }
-})
 
 const workspaceId = workspaceIdForTest('goblin+file:///repo')
 const worktreeRoot = workspaceIdForTest('goblin+file:///repo/worktree')
@@ -215,14 +209,13 @@ describe('WorktreeRemovalApplication', () => {
     await active.catch(() => undefined)
   })
 
-  test('fails remote lifecycle when capture hits a remote runtime failure', async () => {
+  test('leaves remote runtime settlement to the request application boundary', async () => {
     const failure = new RemoteWorkspaceRuntimeFailureError({
       workspaceId: target.repoRoot,
       workspaceRuntimeId: target.workspaceRuntimeId,
       reason: 'unreachable',
       message: 'connection refused',
     })
-    failRemoteWorkspaceRuntimeIfNeededMock.mockClear()
     const application = createApplication({
       physicalWorktrees: {
         capture: async () => {
@@ -233,8 +226,36 @@ describe('WorktreeRemovalApplication', () => {
 
     await expect(
       application.removeWorktree('user-a', { ...target, remove: async () => ({ ok: true, message: '' }) }),
-    ).resolves.toEqual({ ok: false, message: 'connection refused' })
-    expect(failRemoteWorkspaceRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
+    ).rejects.toBe(failure)
+  })
+
+  test('propagates a runtime carrier with its confirmed removal result', async () => {
+    const failure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: target.repoRoot,
+      workspaceRuntimeId: target.workspaceRuntimeId,
+      reason: 'unreachable',
+      message: 'connection lost',
+    })
+    const application = createApplication()
+    const carrier = new RepoMutationRuntimeFailureError(
+      {
+        ok: false,
+        message: 'cancelled',
+        recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
+        worktreeRemoved: true,
+        repoIdsToInvalidate: [target.repoRoot],
+      },
+      failure,
+    )
+
+    await expect(
+      application.removeWorktree('user-a', {
+        ...target,
+        remove: async () => {
+          throw carrier
+        },
+      }),
+    ).rejects.toBe(carrier)
   })
 
   test('does not retire pane layout after worktree and branch removal', async () => {

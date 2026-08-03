@@ -7,7 +7,8 @@ import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-rem
 import { serverLogger } from '#/server/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
-import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
@@ -65,7 +66,7 @@ export class WorktreeRemovalApplication {
         worktreePath,
       })
     } catch (error) {
-      await failRemoteWorkspaceRuntimeIfNeeded(userId, error)
+      if (isRemoteWorkspaceRuntimeFailure(error)) throw error
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }
     try {
@@ -121,7 +122,10 @@ export class WorktreeRemovalApplication {
       if (!result.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
       return result.value
     } catch (error) {
-      await failRemoteWorkspaceRuntimeIfNeeded(userId, error)
+      // Runtime lifecycle settlement belongs to the request application
+      // boundary. Re-throw both carriers so this workflow cannot become a
+      // second settlement owner or discard a carrier's mutation facts.
+      if (isRepoMutationRuntimeFailureError(error) || isRemoteWorkspaceRuntimeFailure(error)) throw error
       return { ok: false, message: abortMessage(error) }
     }
   }

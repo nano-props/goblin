@@ -96,4 +96,30 @@ describe('branch action dispatch', () => {
 
     expect(runBranchAction).toHaveBeenCalled()
   })
+
+  test('returns a cancelled result when it carries confirmed recovery guidance', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [
+        createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      ],
+      currentBranchName: 'feature/worktree',
+    })
+    const result = {
+      ok: false,
+      message: 'cancelled',
+      recoveryMessageKeys: ['error.worktree-removed-followup-failed'] as const,
+    }
+    useWorkspacesStore.setState({ runBranchAction: vi.fn(async () => result) })
+
+    await expect(
+      dispatchRemoveWorktree({
+        repo: repoPresentationFromQueryForTest(repo),
+        target: { branch: 'feature/worktree', path: WORKTREE_PATH },
+        deleteBranch: false,
+        forceDeleteBranch: false,
+        deleteUpstream: false,
+      }),
+    ).resolves.toEqual(result)
+  })
 })

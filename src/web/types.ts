@@ -8,7 +8,7 @@ export type {
   StatusEntry,
   WorktreeStatus,
   LogEntry,
-  ExecResult,
+  RepoMutationExecResult as ExecResult,
   PullRequestInfo,
   PullRequestFetchMode,
   BrowserRemoteProvider,

@@ -58,7 +58,9 @@ describe('server background sync scheduler', () => {
     vi.clearAllMocks()
     mocks.getServerFetchIntervalSec.mockResolvedValue(5)
     mocks.subscribeServerFetchInterval.mockImplementation(() => () => {})
-    mocks.failRemoteWorkspaceRuntimeIfNeeded.mockResolvedValue(undefined)
+    mocks.failRemoteWorkspaceRuntimeIfNeeded.mockImplementation(async (_userId, error) => {
+      return error instanceof Error && error.name === 'RemoteWorkspaceRuntimeFailureError'
+    })
   })
 
   afterEach(async () => {
@@ -80,7 +82,7 @@ describe('server background sync scheduler', () => {
     expect(mocks.fetchRepo).toHaveBeenNthCalledWith(3, REPO_A, 'background', expect.any(AbortSignal), RUNTIME_ID)
   })
 
-  test('settles a remote runtime when its background fetch loses transport', async () => {
+  test('settles a remote runtime and stops its automatic fetches after transport loss', async () => {
     const failure = new RemoteWorkspaceRuntimeFailureError({
       workspaceId: REMOTE_REPO,
       workspaceRuntimeId: RUNTIME_ID,
@@ -89,13 +91,17 @@ describe('server background sync scheduler', () => {
     })
     mocks.fetchRepo.mockRejectedValueOnce(failure)
 
+    const { getBackgroundSyncDiagnostics } = await import('#/server/modules/background-sync.ts')
     await registerRepos([REMOTE_REPO])
     await vi.runOnlyPendingTimersAsync()
 
     expect(mocks.failRemoteWorkspaceRuntimeIfNeeded).toHaveBeenCalledWith(USER_ID, failure)
+    expect(getBackgroundSyncDiagnostics().repos).toEqual([])
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(mocks.fetchRepo).toHaveBeenCalledOnce()
   })
 
-  test('records backoff and contains runtime settlement failures', async () => {
+  test('stops automatic sync when runtime settlement fails', async () => {
     const failure = new RemoteWorkspaceRuntimeFailureError({
       workspaceId: REMOTE_REPO,
       workspaceRuntimeId: RUNTIME_ID,
@@ -110,9 +116,32 @@ describe('server background sync scheduler', () => {
     await vi.runOnlyPendingTimersAsync()
 
     expect(mocks.fetchRepo).toHaveBeenCalledOnce()
-    expect(getBackgroundSyncDiagnostics().repos).toEqual([
-      expect.objectContaining({ repoId: REMOTE_REPO, failureCount: 1, backoffUntil: expect.any(Number) }),
-    ])
+    expect(getBackgroundSyncDiagnostics().repos).toEqual([])
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(mocks.fetchRepo).toHaveBeenCalledOnce()
+  })
+
+  test('aborts an uncommitted registration for a runtime whose automatic sync stops', async () => {
+    const failure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: REMOTE_REPO,
+      workspaceRuntimeId: RUNTIME_ID,
+      reason: 'unreachable',
+      message: 'connection refused',
+    })
+    mocks.fetchRepo.mockRejectedValueOnce(failure)
+    const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration } =
+      await import('#/server/modules/background-sync.ts')
+    await registerRepos([REMOTE_REPO])
+    const pending = requiredAdmission(
+      beginBackgroundSyncRegistration(USER_ID, 'pending-client', 1, [
+        { workspaceId: REMOTE_REPO, workspaceRuntimeId: RUNTIME_ID },
+      ]),
+    )
+
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(pending.signal.aborted).toBe(true)
+    expect(commitBackgroundSyncRegistration(pending)).toBe(false)
   })
 
   test('drains all initially due repos without waiting for repeated cron ticks', async () => {

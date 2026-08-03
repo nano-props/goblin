@@ -37,9 +37,9 @@ import {
 import {
   GIT_HASH_RE,
   type ExecResult,
-  type ExecResultRecoveryMessageKey,
   type GitRemoteInfo,
   type LogEntry,
+  type RepoMutationExecResult,
   type RepoRemoteInfo,
   type RepoUrlTarget,
   type WorktreeInfo,
@@ -63,6 +63,7 @@ import {
   hasWorktreeBootstrapSummaryDetails,
   worktreeBootstrapPreviewFromConfig,
   type WorktreeBootstrapPreviewResult,
+  type WorktreeBootstrapSummary,
 } from '#/shared/worktree-bootstrap-summary.ts'
 import { WORKTREE_COMMAND_TIMEOUT_MS } from '#/shared/worktree-operation-timeouts.ts'
 
@@ -90,14 +91,23 @@ class RemotePatchFileReadError extends Error {
   }
 }
 
-export interface RemoteWorktreeMutationResult extends ExecResult {
+export interface RemoteFilesystemMutationResult extends ExecResult {
   worktreePathsToInvalidate?: readonly string[]
-  worktreeRemoved?: true
 }
 
+export interface RemoteWorktreeRemovalResult extends RemoteFilesystemMutationResult {
+  worktreeRemoved?: true
+  branchEffect?: 'local-delete-confirmed'
+}
+
+export type RemoteBranchEffect = 'none' | 'may-have-changed' | 'local-delete-confirmed'
+
 export interface RemoteBranchDeleteResult extends ExecResult {
-  /** Failure-only impact: the local delete may have run or preceded a failed upstream delete. */
-  branchStateMayHaveChanged?: true
+  branchEffect: RemoteBranchEffect
+}
+
+interface RemoteBranchMutationStepResult extends ExecResult {
+  branchEffect?: 'local-delete-confirmed'
 }
 
 function remoteCommandExecution(result: RemoteCommandResult): CommandExecution {
@@ -456,7 +466,7 @@ export async function pullRemoteBranch(
   branch: string,
   worktreePath?: string,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
-): Promise<CommandOutcome<RemoteWorktreeMutationResult>> {
+): Promise<CommandOutcome<RemoteFilesystemMutationResult>> {
   if (!isSafeBranchName(branch)) return withoutMutationCommand({ ok: false, message: 'error.invalid-arguments' })
   if (worktreePath && !isValidRemotePath(worktreePath)) {
     return withoutMutationCommand({ ok: false, message: 'error.invalid-path' })
@@ -534,26 +544,22 @@ export async function createRemoteWorktree(
   input: CreateWorktreeInput & {
     signal?: AbortSignal
     run?: RemoteGitRunner
-    runMembershipMutation: <T>(mutation: () => Promise<T>) => Promise<T>
   },
-): Promise<CommandOutcome<RemoteWorktreeMutationResult>> {
+): Promise<CommandOutcome<RemoteFilesystemMutationResult>> {
   const normalized = normalizeCreateWorktreeInput(input)
   if (!normalized) return withoutMutationCommand({ ok: false, message: 'error.invalid-arguments' })
   if (!isValidRemotePath(normalized.worktreePath)) {
     return withoutMutationCommand({ ok: false, message: 'error.invalid-path' })
   }
   const run: RemoteGitRunner = input.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const result = await input.runMembershipMutation(
-    async () =>
-      await run(
-        {
-          type: 'gitWorktreeAdd',
-          path: target.remotePath,
-          input: normalized,
-        },
-        target,
-        { signal: input.signal, timeoutMs: WORKTREE_COMMAND_TIMEOUT_MS },
-      ),
+  const result = await run(
+    {
+      type: 'gitWorktreeAdd',
+      path: target.remotePath,
+      input: normalized,
+    },
+    target,
+    { signal: input.signal, timeoutMs: WORKTREE_COMMAND_TIMEOUT_MS },
   )
   const { result: createResult, execution } = remoteCommandOutcome(result)
   const resultWithImpact = createResult.ok
@@ -568,7 +574,7 @@ export async function createRemoteWorktree(
 function remoteOutcomeWithWorktreeInvalidation(
   outcome: CommandOutcome,
   worktreePath: string,
-): CommandOutcome<RemoteWorktreeMutationResult> {
+): CommandOutcome<RemoteFilesystemMutationResult> {
   const { result, execution } = outcome
   if (!commandMayHaveRun(execution)) return outcome
   return {
@@ -634,7 +640,7 @@ export async function bootstrapRemoteWorktreeAfterCreate(
   target: RemoteWorkspaceTarget,
   worktreePath: string,
   options: { signal?: AbortSignal; run?: RemoteGitRunner; expectedConfigHash?: string } = {},
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const loaded = await loadRemoteBootstrapConfig(target, { signal: options.signal, run })
   if (!loaded.ok) return remoteBootstrapFailure(loaded)
@@ -662,15 +668,29 @@ export async function bootstrapRemoteWorktreeAfterCreate(
     target,
     { signal: options.signal, timeoutMs: REMOTE_BOOTSTRAP_TIMEOUT_MS },
   )
-  if (bootstrapResult.message === 'cancelled') return { ok: false, message: 'cancelled' }
-  if (!bootstrapResult.ok) return { ok: false, message: `Worktree bootstrap failed: ${bootstrapResult.message}` }
-
   const summary = remoteBootstrapSummaryFromOutput(bootstrapResult.stdout)
+  if (bootstrapResult.message === 'cancelled') {
+    return remoteBootstrapResultWithSummary({ ok: false, message: 'cancelled' }, summary)
+  }
+  if (!bootstrapResult.ok) {
+    return remoteBootstrapResultWithSummary(
+      { ok: false, message: `Worktree bootstrap failed: ${bootstrapResult.message}` },
+      summary,
+    )
+  }
   return {
     ok: true,
     message: formatWorktreeBootstrapSummary(summary),
     ...(hasWorktreeBootstrapSummaryDetails(summary) ? { worktreeBootstrap: summary } : {}),
   }
+}
+
+function remoteBootstrapResultWithSummary(
+  result: ExecResult,
+  summary: WorktreeBootstrapSummary,
+): RepoMutationExecResult {
+  if (!hasWorktreeBootstrapSummaryDetails(summary)) return result
+  return { ...result, worktreeBootstrap: summary }
 }
 
 function remoteBootstrapFailure(result: ExecResult): ExecResult {
@@ -753,9 +773,8 @@ export async function removeRemoteWorktree(
     run?: RemoteGitRunner
     beforeRemove: () => Promise<ExecResult>
     afterWorktreeRemoved: () => Promise<ExecResult>
-    runMembershipMutation: <T>(mutation: () => Promise<T>) => Promise<T>
   },
-): Promise<RemoteWorktreeMutationResult> {
+): Promise<RemoteWorktreeRemovalResult> {
   if (!isSafeBranchName(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
   if (!isValidRemotePath(input.worktreePath)) return { ok: false, message: 'error.invalid-path' }
   const run: RemoteGitRunner = input.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
@@ -818,17 +837,18 @@ export async function removeRemoteWorktree(
   if (!prepared.ok) return prepared
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
 
-  const removeResult = await input.runMembershipMutation(
-    async () =>
-      await run({ type: 'gitWorktreeRemove', path: mutationPath, worktreePath: resolved.path }, target, {
-        timeoutMs: WORKTREE_COMMAND_TIMEOUT_MS,
-        signal: input.signal,
-      }),
+  const removeResult = await run(
+    { type: 'gitWorktreeRemove', path: mutationPath, worktreePath: resolved.path },
+    target,
+    {
+      timeoutMs: WORKTREE_COMMAND_TIMEOUT_MS,
+      signal: input.signal,
+    },
   )
   const { result: removeCommandResult, execution: removeExecution } = remoteCommandOutcome(removeResult)
   if (!removeCommandResult.ok) {
     const failureMessage = worktreeRemoveFailureMessage(removeCommandResult, removeExecution)
-    const failure: RemoteWorktreeMutationResult = {
+    const failure: RemoteWorktreeRemovalResult = {
       ok: false,
       message: failureMessage,
     }
@@ -860,11 +880,11 @@ export async function removeRemoteWorktree(
       run,
     },
   )
-  let finalDeleteResult = localDeleteResult
+  let finalDeleteResult: RemoteBranchMutationStepResult = localDeleteResult
   if (upstreamDeleteOutcome) {
     const { result: upstreamDeleteResult } = upstreamDeleteOutcome
     if (upstreamDeleteResult.ok) finalDeleteResult = upstreamDeleteResult
-    else finalDeleteResult = withRecoveryMessage(upstreamDeleteResult, 'error.local-branch-deleted-followup-failed')
+    else finalDeleteResult = { ...upstreamDeleteResult, branchEffect: 'local-delete-confirmed' }
   }
   return withWorktreePathsToInvalidate(worktreeRemovedResult(finalDeleteResult), worktreePathsToInvalidate)
 }
@@ -884,27 +904,17 @@ function worktreeRemoveFailureMessage(result: ExecResult, execution: CommandExec
   return exhaustive
 }
 
-function worktreeRemovedResult(result: ExecResult): RemoteWorktreeMutationResult {
+function worktreeRemovedResult(result: RemoteBranchMutationStepResult): RemoteWorktreeRemovalResult {
   if (result.ok) return { ok: true, message: result.message, worktreeRemoved: true }
-  const recoveryMessageKeys = Array.from(
-    new Set<ExecResultRecoveryMessageKey>([
-      'error.worktree-removed-followup-failed',
-      ...(result.recoveryMessageKeys ?? []),
-    ]),
-  )
-  return { ok: false, message: result.message, recoveryMessageKeys, worktreeRemoved: true }
-}
-
-function withRecoveryMessage<T extends ExecResult>(result: T, recoveryMessage: ExecResultRecoveryMessageKey): T {
-  if (result.ok) return result
-  const recoveryMessageKeys = Array.from(new Set([...(result.recoveryMessageKeys ?? []), recoveryMessage]))
-  return { ...result, recoveryMessageKeys }
+  const removed: RemoteWorktreeRemovalResult = { ok: false, message: result.message, worktreeRemoved: true }
+  if (result.branchEffect === 'local-delete-confirmed') removed.branchEffect = result.branchEffect
+  return removed
 }
 
 function withWorktreePathsToInvalidate(
-  result: RemoteWorktreeMutationResult,
+  result: RemoteWorktreeRemovalResult,
   worktreePathsToInvalidate: readonly string[],
-): RemoteWorktreeMutationResult {
+): RemoteWorktreeRemovalResult {
   const unique = Array.from(new Set(worktreePathsToInvalidate.filter((worktreePath) => worktreePath.length > 0)))
   return unique.length > 0 ? { ...result, worktreePathsToInvalidate: unique } : result
 }
@@ -914,11 +924,11 @@ export async function deleteRemoteBranch(
   input: { branch: string; force?: boolean; deleteUpstream?: boolean; signal?: AbortSignal; run?: RemoteGitRunner },
 ): Promise<RemoteBranchDeleteResult> {
   if (!isSafeBranchName(input.branch)) {
-    return { ok: false, message: 'error.invalid-arguments' }
+    return { ok: false, message: 'error.invalid-arguments', branchEffect: 'none' }
   }
   const run: RemoteGitRunner = input.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const snapshot = await getRemoteSnapshot(target, { signal: input.signal, run })
-  if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (input.signal?.aborted) return { ok: false, message: 'cancelled', branchEffect: 'none' }
   const shouldForce = input.force === true
   const upstream =
     !shouldForce || input.deleteUpstream
@@ -932,7 +942,7 @@ export async function deleteRemoteBranch(
         currentBranch: snapshot.current,
         upstream,
       })
-  if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (input.signal?.aborted) return { ok: false, message: 'cancelled', branchEffect: 'none' }
   const validation = validateBranchDeletionPolicy({
     branch: input.branch,
     currentBranch: snapshot?.current,
@@ -943,8 +953,8 @@ export async function deleteRemoteBranch(
     mergedToCurrent: mergeFacts.mergedToCurrent,
     mergedToUpstream: mergeFacts.mergedToUpstream,
   })
-  if (validation) return validation
-  if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (validation) return { ok: validation.ok, message: validation.message, branchEffect: 'none' }
+  if (input.signal?.aborted) return { ok: false, message: 'cancelled', branchEffect: 'none' }
   const result = await run(
     { type: 'gitBranchDelete', path: target.remotePath, branch: input.branch, force: shouldForce },
     target,
@@ -952,8 +962,10 @@ export async function deleteRemoteBranch(
   )
   const { result: localDeleteResult, execution: localDeleteExecution } = remoteCommandOutcome(result)
   if (!localDeleteResult.ok) {
-    if (!commandMayHaveRun(localDeleteExecution)) return localDeleteResult
-    return { ok: false, message: localDeleteResult.message, branchStateMayHaveChanged: true }
+    if (!commandMayHaveRun(localDeleteExecution)) {
+      return { ok: false, message: localDeleteResult.message, branchEffect: 'none' }
+    }
+    return { ok: false, message: localDeleteResult.message, branchEffect: 'may-have-changed' }
   }
   const upstreamDeleteOutcome = await deleteRemoteUpstreamBranch(
     target,
@@ -961,14 +973,16 @@ export async function deleteRemoteBranch(
     input.deleteUpstream ? upstream : null,
     { signal: input.signal, run },
   )
-  if (!upstreamDeleteOutcome) return localDeleteResult
+  if (!upstreamDeleteOutcome)
+    return { ok: true, message: localDeleteResult.message, branchEffect: 'local-delete-confirmed' }
   const { result: upstreamDeleteResult } = upstreamDeleteOutcome
-  if (upstreamDeleteResult.ok) return upstreamDeleteResult
+  if (upstreamDeleteResult.ok) {
+    return { ok: true, message: upstreamDeleteResult.message, branchEffect: 'local-delete-confirmed' }
+  }
   return {
     ok: false,
     message: upstreamDeleteResult.message,
-    recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
-    branchStateMayHaveChanged: true,
+    branchEffect: 'local-delete-confirmed',
   }
 }
 

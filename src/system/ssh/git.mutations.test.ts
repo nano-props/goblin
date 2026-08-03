@@ -21,8 +21,6 @@ import {
   worktreePorcelain,
 } from '#/system/ssh/git-test-utils.ts'
 
-const runMembershipMutation = async <T>(mutation: () => Promise<T>): Promise<T> => await mutation()
-
 describe('remote git mutations', () => {
   test('deleteRemoteBranch allows safe delete when branch is merged into current HEAD without upstream', async () => {
     const run = vi.fn<RemoteGitRunner>(
@@ -60,7 +58,11 @@ describe('remote git mutations', () => {
 
     const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', run: run })
 
-    expect(result).toEqual({ ok: true, message: 'Deleted branch feature/test' })
+    expect(result).toEqual({
+      ok: true,
+      message: 'Deleted branch feature/test',
+      branchEffect: 'local-delete-confirmed',
+    })
     expect(run).toHaveBeenCalledWith(
       { type: 'gitIsAncestor', path: '/srv/repo', ancestor: 'feature/test', descendant: 'release/1.0' },
       TARGET,
@@ -97,7 +99,7 @@ describe('remote git mutations', () => {
 
     const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', run })
 
-    expect(result).toEqual({ ok: false, message: 'error.branch-not-fully-merged' })
+    expect(result).toEqual({ ok: false, message: 'error.branch-not-fully-merged', branchEffect: 'none' })
     expect(run.mock.calls.filter(([command]) => command.type === 'gitIsAncestor')).toHaveLength(1)
     expect(run).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'gitBranchDelete' }),
@@ -112,7 +114,7 @@ describe('remote git mutations', () => {
       remote: 'fork',
       upstreamBranch: 'topic/feature-test',
       pushResult: okRemoteResult('deleted upstream'),
-      expected: { ok: true, message: 'deleted upstream' },
+      expected: { ok: true, message: 'deleted upstream', branchEffect: 'local-delete-confirmed' },
     },
     {
       name: 'reports upstream delete failure after deleting the local branch',
@@ -122,8 +124,7 @@ describe('remote git mutations', () => {
       expected: {
         ok: false,
         message: 'remote rejected delete',
-        recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
-        branchStateMayHaveChanged: true,
+        branchEffect: 'local-delete-confirmed',
       },
     },
   ] as const)('deleteRemoteBranch $name', async ({ remote, upstreamBranch, pushResult, expected }) => {
@@ -272,7 +273,6 @@ describe('remote git mutations', () => {
     })
 
     const result = await removeRemoteWorktree(TARGET, {
-      runMembershipMutation: async (mutation) => await mutation(),
       beforeRemove,
       afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
       branch: 'feature/test',
@@ -385,7 +385,6 @@ describe('remote git mutations', () => {
     })
 
     const result = await removeRemoteWorktree(TARGET, {
-      runMembershipMutation: async (mutation) => await mutation(),
       beforeRemove: async () => ({ ok: true, message: '' }),
       afterWorktreeRemoved,
       branch: 'feature/test',
@@ -536,7 +535,7 @@ describe('remote git mutations', () => {
     expect(result).toEqual({
       ok: false,
       message: 'cancelled',
-      recoveryMessageKeys: ['error.worktree-removed-followup-failed', 'error.local-branch-deleted-followup-failed'],
+      branchEffect: 'local-delete-confirmed',
       worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
       worktreeRemoved: true,
     })
@@ -555,7 +554,6 @@ describe('remote git mutations', () => {
 
     await expect(
       removeRemoteWorktree(TARGET, {
-        runMembershipMutation: async (mutation) => await mutation(),
         beforeRemove,
         afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
         branch: 'feature/test',
@@ -654,7 +652,6 @@ describe('remote git mutations', () => {
     const run = vi.fn<RemoteGitRunner>()
 
     const result = await createRemoteWorktree(TARGET, {
-      runMembershipMutation,
       worktreePath: 'relative/path',
       mode: { kind: 'newBranch', newBranch: 'feature/test', baseRef: 'main' },
       run: run,
@@ -674,7 +671,7 @@ describe('remote git mutations', () => {
       mode: { kind: 'newBranch' as const, newBranch: 'feature/test', baseRef: 'main' },
     }
 
-    const result = await createRemoteWorktree(TARGET, { ...input, run, runMembershipMutation })
+    const result = await createRemoteWorktree(TARGET, { ...input, run })
 
     expect(result).toEqual({
       result: {
@@ -701,7 +698,6 @@ describe('remote git mutations', () => {
     }))
 
     const result = await createRemoteWorktree(TARGET, {
-      runMembershipMutation,
       worktreePath: '/srv/repo-feature',
       mode: { kind: 'existingBranch', branch: 'feature/test' },
       run,
@@ -724,7 +720,6 @@ describe('remote git mutations', () => {
     }))
 
     const result = await createRemoteWorktree(TARGET, {
-      runMembershipMutation,
       worktreePath: '/srv/repo-feature',
       mode: { kind: 'existingBranch', branch: 'feature/test' },
       run,

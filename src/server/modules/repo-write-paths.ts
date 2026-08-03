@@ -12,7 +12,7 @@ import {
   RepoMutationRuntimeFailureError,
   isRepoMutationRuntimeFailureError,
 } from '#/server/modules/repo-mutation-runtime-failure.ts'
-import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
+import { publicRepoMutationResult, type RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import {
@@ -23,7 +23,7 @@ import {
   pruneServerWorkspaceSettingsForRemovedWorktree,
   setServerWorkspaceWorktreeBootstrapConfigTrust,
 } from '#/server/modules/settings-source.ts'
-import { type ExecResult, type RepoUrlTarget } from '#/shared/git-types.ts'
+import { type ExecResult, type RepoMutationExecResult, type RepoUrlTarget } from '#/shared/git-types.ts'
 import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
 import { isValidWorkspaceLocatorInput, toSafeWorkspaceLocator } from '#/shared/input-validation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -38,7 +38,7 @@ function execResultAfterMutationInvalidations(
   result: RepoMutationResult,
   domains: readonly RepoReadInvalidationDomain[],
 ): ExecResult {
-  return execResultOnly(publishMutationInvalidations(workspaceId, result, domains))
+  return publicRepoMutationResult(publishMutationInvalidations(workspaceId, result, domains))
 }
 
 function publishMutationInvalidations(
@@ -66,18 +66,8 @@ async function runMutationWithInvalidations(
   } catch (error) {
     if (!isRepoMutationRuntimeFailureError(error)) throw error
     publishMutationInvalidations(workspaceId, error.mutation, domains)
-    throw error.runtimeFailure
+    throw error
   }
-}
-
-function execResultOnly(result: RepoMutationResult): ExecResult {
-  const publicResult: ExecResult = {
-    ok: result.ok,
-    message: result.message,
-  }
-  if (result.recoveryMessageKeys?.length) publicResult.recoveryMessageKeys = result.recoveryMessageKeys
-  if (result.worktreeBootstrap) publicResult.worktreeBootstrap = result.worktreeBootstrap
-  return publicResult
 }
 
 async function runUserNetworkMutation(
@@ -111,7 +101,7 @@ async function runUserNetworkMutation(
   )
 }
 
-export interface RepoFilesystemMutationOutcome extends ExecResult {
+export interface RepoFilesystemMutationOutcome extends RepoMutationExecResult {
   worktreePathsToInvalidate?: readonly string[]
 }
 
@@ -203,7 +193,7 @@ export async function fetchRepo(
     const result = await runMutationWithInvalidations(cwd, ['metadata'], async () => {
       return await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
     })
-    return execResultOnly(result)
+    return publicRepoMutationResult(result)
   }
   return await enqueueRepoWriteOperation(
     cwd,
@@ -248,7 +238,7 @@ export async function pushRepoBranch(
   signal?: AbortSignal,
   options: { workspaceRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  return execResultOnly(
+  return publicRepoMutationResult(
     await runUserNetworkMutation(
       cwd,
       signal,
@@ -301,7 +291,7 @@ export async function createRepoWorktree(
       },
     })
   })
-  return execResultOnly(mutation)
+  return publicRepoMutationResult(mutation)
 }
 
 async function persistWorktreeBootstrapTrustChoice(
@@ -314,6 +304,10 @@ async function persistWorktreeBootstrapTrustChoice(
     configHash: decision.configHash,
     trusted: decision.configTrusted,
   })
+  // Settings and operation activity are independent projections of already
+  // committed authority. Publishing settings first may create a brief visual
+  // ordering difference, but neither projection authorizes the other; do not
+  // add cross-projection settlement coordination for that harmless window.
   if (changed) publishSettingsInvalidation(['settings-snapshot'])
 }
 
@@ -350,7 +344,7 @@ export async function deleteRepoBranch(
       },
     })
   })
-  return execResultOnly(mutation)
+  return publicRepoMutationResult(mutation)
 }
 
 export async function removeCapturedRepoWorktree(
@@ -412,7 +406,7 @@ async function removeRepoWorktreeWithBinding(
       },
     })
   })
-  return execResultOnly(mutation)
+  return publicRepoMutationResult(mutation)
 }
 
 async function pruneRemovedWorktreeSettings(

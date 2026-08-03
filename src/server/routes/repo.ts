@@ -44,6 +44,7 @@ import type { RepoLogResponse } from '#/shared/api-types.ts'
 import { IpcError } from '#/shared/ipc-error.ts'
 import {
   requireCurrentWorkspaceRuntime,
+  runGitWorkspaceMutationRuntimeRequest,
   runGitWorkspaceRuntimeRequest,
 } from '#/server/modules/workspace-runtime-request.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
@@ -194,7 +195,7 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceRuntimeRequest({
+      await runGitWorkspaceMutationRuntimeRequest({
         userId,
         run: () => fetchRepo(cwd, 'user', c.req.raw.signal, workspaceRuntimeId),
         label: 'fetch',
@@ -210,7 +211,7 @@ export function createRepoRoutes(options: {
     const { cwd, workspaceRuntimeId, branch, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
-    const result = await runGitWorkspaceRuntimeRequest({
+    const result = await runGitWorkspaceMutationRuntimeRequest({
       userId,
       run: () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal, { workspaceRuntimeId }),
       label: 'pull',
@@ -223,7 +224,7 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceRuntimeRequest({
+      await runGitWorkspaceMutationRuntimeRequest({
         userId,
         run: () => pushRepoBranch(cwd, branch, c.req.raw.signal, { workspaceRuntimeId }),
         label: 'push',
@@ -239,7 +240,7 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceRuntimeRequest({
+      await runGitWorkspaceMutationRuntimeRequest({
         userId,
         run: () =>
           createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
@@ -259,7 +260,7 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceRuntimeRequest({
+      await runGitWorkspaceMutationRuntimeRequest({
         userId,
         run: async () => {
           return await options.repoMutationApplication.deleteBranch(userId, {
@@ -281,7 +282,7 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceRuntimeRequest({
+      await runGitWorkspaceMutationRuntimeRequest({
         userId,
         run: () =>
           options.worktreeRemovalApplication.removeWorktree(userId, {

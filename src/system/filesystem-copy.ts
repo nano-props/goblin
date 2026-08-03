@@ -56,6 +56,9 @@ async function copyDirectory(
     }
     options.signal?.throwIfAborted()
   } catch (error) {
+    // Restoring the mode is cleanup for a newly created partial directory.
+    // Preserve the copy/cancellation error that owns recovery; do not replace
+    // it with a second cleanup failure or introduce a permission retry loop.
     await fs.chmod(destinationPath, mode).catch(() => {})
     throw error
   }
@@ -104,6 +107,10 @@ async function copiedSymlink(sourcePath: string, destinationPath: string, target
   if (process.platform !== 'win32') return { target, type: undefined }
   try {
     if (!(await fs.stat(sourcePath)).isDirectory()) return { target, type: 'file' }
+    // Junctions are the Windows happy path because directory symlinks commonly
+    // require elevated privileges. Their absolute target intentionally trades
+    // relocatability for predictable non-admin creation; do not add a hidden
+    // symlink/junction fallback. Unsupported targets fail directly.
     return {
       target: path.resolve(path.dirname(destinationPath), target),
       type: 'junction',

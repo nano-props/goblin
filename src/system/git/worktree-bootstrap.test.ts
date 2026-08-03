@@ -1,9 +1,11 @@
 import os from 'node:os'
 import path from 'node:path'
+import { createServer } from 'node:net'
 import { chmod, mkdir, mkdtemp, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
 import { bootstrapWorktreeAfterCreate, getWorktreeBootstrapPreview } from '#/system/git/worktree-bootstrap.ts'
 import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap-config.ts'
+import type { ExecResult } from '#/shared/git-types.ts'
 
 const mocks = vi.hoisted(() => ({
   getRepoRoot: vi.fn(),
@@ -312,6 +314,38 @@ copy = [".env.local", "later.txt"]
     await expect(readFile(path.join(targetRoot, 'later.txt'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  test('reports only fully completed materializations before a later failure', async () => {
+    await writeFile(path.join(sourceRoot, 'first.env'), 'first\n')
+    const socketPath = path.join(sourceRoot, 'unsupported.sock')
+    const server = createServer()
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    await writeConfig(`
+[worktree]
+copy = ["first.env", "unsupported.sock"]
+`)
+
+    let result: ExecResult
+    try {
+      result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+    }
+
+    expect(result).toEqual({
+      ok: false,
+      message: expect.stringContaining('Worktree bootstrap failed: failed to copy unsupported.sock:'),
+      worktreeBootstrap: {
+        copy: { count: 1, paths: ['first.env'] },
+        symlink: { count: 0, paths: [] },
+        hardlink: { count: 0, paths: [] },
+        skippedMissing: { count: 0, paths: [] },
+      },
+    })
+  })
+
   test('fails when one path is matched by multiple materialization modes', async () => {
     await writeFile(path.join(sourceRoot, 'shared.local'), 'value\n')
     await writeConfig(`
@@ -386,8 +420,10 @@ ${mode} = ["linked-dir/secret.txt"]
 
   test('fails when setup exits non-zero', async () => {
     const setupCommand = `${JSON.stringify(process.execPath)} -e "process.exit(7)"`
+    await writeFile(path.join(sourceRoot, 'before-setup.env'), 'copied\n')
     await writeConfig(`
 [worktree]
+copy = ["before-setup.env"]
 setup = ${JSON.stringify(setupCommand)}
 `)
 
@@ -395,6 +431,12 @@ setup = ${JSON.stringify(setupCommand)}
 
     expect(result.ok).toBe(false)
     expect(result.message).toContain('Worktree bootstrap failed:')
+    expect(result.worktreeBootstrap).toEqual({
+      copy: { count: 1, paths: ['before-setup.env'] },
+      symlink: { count: 0, paths: [] },
+      hardlink: { count: 0, paths: [] },
+      skippedMissing: { count: 0, paths: [] },
+    })
   })
 
   test('preserves copied symlinks instead of following them outside the repo', async () => {

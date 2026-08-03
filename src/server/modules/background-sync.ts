@@ -6,6 +6,7 @@ import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/serve
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
 import { onWorkspaceRuntimeClosed, onWorkspaceRuntimeMembershipReleased } from '#/server/modules/workspace-runtimes.ts'
 import {
   backgroundSyncBackoffDelayMs,
@@ -281,7 +282,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
     if (target) {
       recordTargetFetchStartedAt(target, now)
       recordTargetFailure(target, now)
-      await settleBackgroundRuntimeFailure(target, err)
+      await settleBackgroundRuntimeFailureOrStop(target, err)
     }
     const key = target ? backgroundSyncTargetKey(target) : null
     backgroundSyncLogger.warn(
@@ -301,18 +302,24 @@ async function runScheduledFetch(generation: number): Promise<void> {
   }
 }
 
-async function settleBackgroundRuntimeFailure(
+async function settleBackgroundRuntimeFailureOrStop(
   target: RegisteredGitBackgroundSyncTarget,
   error: unknown,
 ): Promise<void> {
+  const runtimeFailure = isRepoMutationRuntimeFailureError(error) ? error.runtimeFailure : error
   try {
-    await failRemoteWorkspaceRuntimeIfNeeded(target.userId, error)
+    const runtimeFailed = await failRemoteWorkspaceRuntimeIfNeeded(target.userId, runtimeFailure)
+    if (!runtimeFailed) return
   } catch (settlementError) {
     backgroundSyncLogger.warn(
       { err: settlementError, workspaceId: target.workspaceId },
-      'failed to settle background fetch runtime',
+      'failed to settle background fetch runtime; stopping automatic sync for this runtime',
     )
   }
+  // A classified runtime failure ends this runtime's automatic work whether
+  // lifecycle settlement succeeded or became uncertain. User-driven reopen or
+  // registration establishes a new runtime instead of replaying against this one.
+  removeBackgroundSyncRuntime(target.userId, target.workspaceId, target.workspaceRuntimeId)
 }
 
 export function beginBackgroundSyncRegistration(
@@ -459,6 +466,14 @@ export function resetBackgroundSyncForTests(): void {
 function removeBackgroundSyncRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
   const closedTarget = { userId, workspaceId, workspaceRuntimeId }
   const key = backgroundSyncTargetKey(closedTarget)
+  for (const [ownerKey, admission] of state.registrationAdmissionsByOwner) {
+    const admissionContainsRuntime = admission.targets.some(
+      (target) => backgroundSyncTargetKey({ userId: admission.userId, ...target }) === key,
+    )
+    if (!admissionContainsRuntime) continue
+    admission.controller.abort('workspace-runtime-background-sync-stopped')
+    state.registrationAdmissionsByOwner.delete(ownerKey)
+  }
   const wasRegistered = state.targets.some((target) => backgroundSyncTargetKey(target) === key)
   const hadCadence = state.lastFetchStartedAtByTarget[key] !== undefined
   if (!wasRegistered && !hadCadence) return

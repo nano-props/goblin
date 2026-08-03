@@ -2,6 +2,7 @@ import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/workspaces/branch-action-types.ts'
+import { isSilentBranchActionCancellation } from '#/web/stores/workspaces/branch-action-result.ts'
 
 export function isPushProtected(branch: string): boolean {
   return PROTECTED_BRANCHES.has(branch)
@@ -37,7 +38,7 @@ export async function dispatchRepoBranchAction(
     workspaceRuntimeId: workspaceRuntimeId,
     deferResultMessages: options?.deferResultMessages,
   })
-  if (!result || (!result.ok && result.message === 'cancelled')) return null
+  if (!result || isSilentBranchActionCancellation(result)) return null
   options?.handleResult?.(result)
   return result
 }

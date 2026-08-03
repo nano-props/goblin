@@ -81,6 +81,15 @@ authority.
   `recoveryMessageKeys` for confirmed partial successes. These keys are
   presentation guidance only: they do not carry execution facts, authorize
   cleanup, drive invalidation, or let the client infer repository state.
+- System Git and SSH boundaries return execution facts and domain effects, not
+  recovery presentation. The server application flow derives recovery notices,
+  publishes mutation impact once, and attempts typed runtime settlement at the
+  request boundary. Settlement failure never replaces a mutation result that
+  was already established.
+- A classified runtime failure removes that runtime from background automation
+  after lifecycle settlement, including when settlement itself becomes
+  uncertain. A later explicit client registration may admit it again; the
+  server does not keep retrying a failed or uncertain lifecycle.
 - A client may apply canonical response data or invalidate the owning query. It
   must not replace a concurrent collection with an unversioned snapshot or
   reconstruct the write from its request payload.

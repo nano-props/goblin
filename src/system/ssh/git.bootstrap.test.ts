@@ -191,8 +191,10 @@ describe('remote git bootstrap', () => {
 
   test('bootstrapRemoteWorktreeAfterCreate returns error when remote bootstrap fails', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
-      if (command.type === 'readRemoteFile') return okRemoteResult('[worktree]\nsetup = "bun install"')
-      if (command.type === 'bootstrapRemoteWorktree') return failRemoteResult('bun: command not found')
+      if (command.type === 'readRemoteFile') return okRemoteResult('[worktree]\ncopy = [".env"]\nsetup = "bun install"')
+      if (command.type === 'bootstrapRemoteWorktree') {
+        return { ...failRemoteResult('bun: command not found'), stdout: 'GOBLIN_BOOTSTRAP_COPY .env' }
+      }
       return okRemoteResult('')
     })
 
@@ -200,6 +202,12 @@ describe('remote git bootstrap', () => {
 
     expect(result.ok).toBe(false)
     expect(result.message).toContain('bun: command not found')
+    expect(result.worktreeBootstrap).toEqual({
+      copy: { count: 1, paths: ['.env'] },
+      symlink: { count: 0, paths: [] },
+      hardlink: { count: 0, paths: [] },
+      skippedMissing: { count: 0, paths: [] },
+    })
   })
 
   test('getRemoteLog rejects unsafe branch names before running remote commands', async () => {
@@ -216,7 +224,7 @@ describe('remote git bootstrap', () => {
 
     const result = await deleteRemoteBranch(TARGET, { branch: '../feature', run: run })
 
-    expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
+    expect(result).toEqual({ ok: false, message: 'error.invalid-arguments', branchEffect: 'none' })
     expect(run).not.toHaveBeenCalled()
   })
 })
