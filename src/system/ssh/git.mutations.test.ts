@@ -495,6 +495,47 @@ describe('remote git mutations', () => {
     expect(run.mock.calls.filter(([command]) => command.type === 'gitUpstream')).toHaveLength(1)
   })
 
+  test('removeRemoteWorktree surfaces recovery when upstream cleanup is cancelled after removal', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
+        case 'gitStatus':
+          return okRemoteResult('')
+        case 'gitSnapshot':
+          return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
+        case 'gitIsAncestor':
+          return okRemoteResult('true')
+        case 'gitUpstream':
+          return okRemoteResult(upstreamOutput('origin', 'feature/test'))
+        case 'gitWorktreeRemove':
+          return okRemoteResult('Removed worktree')
+        case 'gitBranchDelete':
+          return okRemoteResult('Deleted branch feature/test')
+        case 'gitPushDeleteBranch':
+          return failRemoteResult('cancelled')
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      ...SUCCESSFUL_REMOTE_REMOVAL_LIFECYCLE,
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      deleteBranch: true,
+      deleteUpstream: true,
+      run,
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'error.worktree-removed-followup-failed',
+      worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
+      worktreeRemoved: true,
+    })
+  })
+
   test('removeRemoteWorktree resolves the upstream before any mutation', async () => {
     const beforeRemove = vi.fn(async () => ({ ok: true, message: '' }))
     const run = vi.fn<RemoteGitRunner>(async (command) => {

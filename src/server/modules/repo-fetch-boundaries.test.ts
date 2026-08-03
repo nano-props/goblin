@@ -63,6 +63,18 @@ describe('fetchRepo canonical boundaries', () => {
     expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
   })
 
+  test('reports an uncertain result when fetch times out after starting', async () => {
+    mocks.fetchAll.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'git timed out after 90s' }, 'timed-out'),
+    )
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const result = await fetchRepo(REPO_ID, 'user')
+
+    expect(result).toEqual({ ok: false, message: 'error.git-command-timeout-check-state' })
+    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+  })
+
   test('publishes snapshot invalidation after a successful sync', async () => {
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 

@@ -88,6 +88,33 @@ describe('repo branch mutations', () => {
       'pullRepoBranch',
       () =>
         mocks.pullBranch.mockResolvedValueOnce(
+          commandOutcomeForTest({ ok: false, message: 'git timed out after 90s' }, 'timed-out'),
+        ),
+      async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
+    ],
+    [
+      'pushRepoBranch',
+      () =>
+        mocks.pushBranch.mockResolvedValueOnce(
+          commandOutcomeForTest({ ok: false, message: 'git timed out after 90s' }, 'timed-out'),
+        ),
+      async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a'),
+    ],
+  ])('%s reports an uncertain result after timeout', async (_name, setup, run) => {
+    setup()
+    const repo = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await run(repo)
+
+    expect(result).toMatchObject({ ok: false, message: 'error.git-command-timeout-check-state' })
+    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+  })
+
+  test.each([
+    [
+      'pullRepoBranch',
+      () =>
+        mocks.pullBranch.mockResolvedValueOnce(
           commandOutcomeForTest({ ok: false, message: 'fatal: pull failed' }, 'not-started'),
         ),
       async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
@@ -258,6 +285,19 @@ describe('repo branch mutations', () => {
     expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).not.toHaveBeenCalled()
   })
 
+  test('createRepoWorktree surfaces recovery when bootstrap is cancelled after creation', async () => {
+    mocks.bootstrapWorktreeAfterCreate.mockResolvedValueOnce({ ok: false, message: 'cancelled' })
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
+
+    expect(result).toEqual({ ok: false, message: 'error.worktree-created-followup-failed' })
+    expectRepoMetadataInvalidations(
+      { repoId: REPO_ID, domain: 'metadata' },
+      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
+    )
+  })
+
   test('createRepoWorktree publishes remote invalidation when bootstrap fails after remote worktree creation', async () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const worktreeRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
@@ -302,6 +342,39 @@ describe('repo branch mutations', () => {
       repoId: worktreeRepoId,
       domain: 'metadata',
     })
+  })
+
+  test('createRepoWorktree surfaces recovery when remote bootstrap is cancelled after creation', async () => {
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const worktreeRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
+    mocks.createRemoteWorktree.mockResolvedValueOnce(
+      commandOutcomeForTest({
+        ok: true,
+        message: 'created',
+        worktreePathsToInvalidate: ['/srv/repo-feature'],
+      }),
+    )
+    mocks.bootstrapRemoteWorktreeAfterCreate.mockResolvedValueOnce({ ok: false, message: 'cancelled' })
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepoWorktree(
+      repoId,
+      {
+        worktreePath: '/srv/repo-feature',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      undefined,
+      {
+        worktreeBootstrap: {
+          kind: 'run',
+          configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
+          configTrusted: false,
+        },
+      },
+    )
+
+    expect(result).toEqual({ ok: false, message: 'error.worktree-created-followup-failed' })
+    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: worktreeRepoId, domain: 'metadata' })
   })
 
   test('createRepoWorktree invalidates the remote source and target after a started SSH timeout', async () => {

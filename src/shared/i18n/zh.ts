@@ -537,6 +537,7 @@ export const zh: Record<DictKey, string> = {
   'error.trash-unavailable': '系统废纸篓不可用',
   'error.failed-trash-file': '无法将文件移到废纸篓',
   'error.git-command-cancelled-check-state': 'Git 操作启动后被取消。请检查仓库状态后再重试。',
+  'error.git-command-timeout-check-state': 'Git 操作启动后超时。请检查仓库状态后再重试。',
   'error.invalid-arguments': '参数无效',
   'error.workspace-runtime-stale': '工作区运行时已失效',
   'error.workspace-target-stale': '工作区目标已发生变化，请重试',

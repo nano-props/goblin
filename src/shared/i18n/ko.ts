@@ -550,6 +550,8 @@ export const ko: Record<DictKey, string> = {
   'error.failed-trash-file': '파일을 휴지통으로 이동할 수 없습니다',
   'error.git-command-cancelled-check-state':
     'Git 작업이 시작된 후 취소되었습니다. 다시 시도하기 전에 저장소 상태를 확인하세요.',
+  'error.git-command-timeout-check-state':
+    'Git 작업이 시작된 후 시간 초과되었습니다. 다시 시도하기 전에 저장소 상태를 확인하세요.',
   'error.invalid-arguments': '인수가 올바르지 않습니다',
   'error.workspace-runtime-stale': '워크스페이스 런타임이 만료되었습니다',
   'error.workspace-target-stale': '워크스페이스 대상이 변경되었습니다. 다시 시도해 주세요.',

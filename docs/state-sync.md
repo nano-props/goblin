@@ -61,11 +61,13 @@ authority.
   command observably started. A pre-spawn cancellation may therefore cause one
   conservative, retryable read conflict even when the command reports
   `not-started`; revisions are not rolled back and clients do not compensate.
-  Reads fail directly while the attempt is active and reject a completed result
-  if the epoch changed while they were running. The boundary never filters
-  paths, derives membership, or publishes mutation invalidation; one complete
-  Git read remains the authority and the application write path remains the
-  single owner of exact post-operation invalidation.
+  Reads fail directly while the attempt is active and reject a successful
+  result if the epoch changed while they were running. A read that fails keeps
+  its own cancellation or typed runtime error so the existing lifecycle owner
+  can settle it; the mutation's later invalidation drives a stable retry. The
+  boundary never filters paths, derives membership, or publishes mutation
+  invalidation; one complete Git read remains the authority and the application
+  write path remains the single owner of exact post-operation invalidation.
 - Keep four facts separate: whether the target mutation command was invoked,
   which domain steps definitely committed, which projections must be
   invalidated, and which recovery message the user receives. A later command

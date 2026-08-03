@@ -330,18 +330,19 @@ async function runRemoteRepoMutation(
 }
 
 function commandFailureForUser<T extends ExecResult>(result: T, execution: CommandExecution): T {
-  if (result.ok || execution.status !== 'cancelled') return result
-  return { ...result, message: 'error.git-command-cancelled-check-state' }
+  if (result.ok) return result
+  if (execution.status === 'cancelled') return { ...result, message: 'error.git-command-cancelled-check-state' }
+  if (execution.status === 'timed-out') return { ...result, message: 'error.git-command-timeout-check-state' }
+  return result
 }
 
-function withPossibleCommandImpact<T extends ExecResult>(
+function withCommandImpact<T extends ExecResult>(
   result: T,
   execution: CommandExecution,
   repoIdsToInvalidate: readonly WorkspaceId[],
 ): T & RepoMutationResult {
-  const userResult = commandFailureForUser(result, execution)
-  if (!commandMayHaveRun(execution)) return userResult
-  return withRepoIdsToInvalidate(userResult, repoIdsToInvalidate)
+  if (!commandMayHaveRun(execution)) return result
+  return withRepoIdsToInvalidate(result, repoIdsToInvalidate)
 }
 
 function worktreeCommandFailureForUser<T extends ExecResult>(
@@ -365,6 +366,18 @@ function worktreeCommandTimeoutMessage(operation: 'create' | 'remove'): string {
   }
   const exhaustive: never = operation
   return exhaustive
+}
+
+function worktreeCreatedFollowupFailureForUser<T extends ExecResult>(result: T): T {
+  if (result.ok || result.message !== 'cancelled') return result
+  return { ...result, message: 'error.worktree-created-followup-failed' }
+}
+
+function worktreeRemovedFollowupResult(result: ExecResult): RepoMutationResult {
+  if (!result.ok && result.message === 'cancelled') {
+    return { ok: false, message: 'error.worktree-removed-followup-failed', worktreeRemoved: true }
+  }
+  return { ok: result.ok, message: result.message, worktreeRemoved: true }
 }
 
 function branchDeleteResultForUser(result: BranchDeleteResult): BranchDeleteResult {
@@ -533,19 +546,19 @@ function createLocalRepoSource(
       if (!available.ok) return available
       const repoIdsToInvalidate = await readLocalRepoIdsToInvalidate(repoId, signal)
       const { result: fetchResult, execution: fetchExecution } = await fetchAll(repoId, signal)
-      return withPossibleCommandImpact(fetchResult, fetchExecution, repoIdsToInvalidate)
+      return withCommandImpact(commandFailureForUser(fetchResult, fetchExecution), fetchExecution, repoIdsToInvalidate)
     },
     async pull(branch, worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const repoIdsToInvalidate = await readLocalRepoIdsToInvalidate(repoId, signal)
       const { result: pullResult, execution: pullExecution } = await pullBranch(repoId, branch, worktreePath, signal)
-      return withPossibleCommandImpact(pullResult, pullExecution, repoIdsToInvalidate)
+      return withCommandImpact(commandFailureForUser(pullResult, pullExecution), pullExecution, repoIdsToInvalidate)
     },
     async push(branch, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const repoIdsToInvalidate = await readLocalRepoIdsToInvalidate(repoId, signal)
       const { result: pushResult, execution: pushExecution } = await pushBranch(repoId, branch, signal)
-      return withPossibleCommandImpact(pushResult, pushExecution, repoIdsToInvalidate)
+      return withCommandImpact(commandFailureForUser(pushResult, pushExecution), pushExecution, repoIdsToInvalidate)
     },
     async getWorktreeBootstrapPreview(signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -569,7 +582,7 @@ function createLocalRepoSource(
       )
       if (!created.ok) {
         const failure = worktreeCommandFailureForUser(created, execution, 'create')
-        return withPossibleCommandImpact(failure, execution, repoIdsToInvalidate)
+        return withCommandImpact(failure, execution, repoIdsToInvalidate)
       }
       if (options?.worktreeBootstrap?.kind !== 'run') return withRepoIdsToInvalidate(created, repoIdsToInvalidate)
       const bootstrapped = await bootstrapWorktreeAfterCreate(repoId, input.worktreePath, {
@@ -582,7 +595,7 @@ function createLocalRepoSource(
             message: [created.message, bootstrapped.message].filter(Boolean).join('\n'),
             ...(bootstrapped.worktreeBootstrap ? { worktreeBootstrap: bootstrapped.worktreeBootstrap } : {}),
           }
-        : bootstrapped
+        : worktreeCreatedFollowupFailureForUser(bootstrapped)
       return withRepoIdsToInvalidate(result, repoIdsToInvalidate)
     },
     async deleteBranch(branch, options, signal) {
@@ -656,14 +669,14 @@ function createLocalRepoSource(
       )
       if (!removed.ok) {
         const failure = worktreeCommandFailureForUser(removed, removeExecution, 'remove')
-        return withPossibleCommandImpact(failure, removeExecution, repoIdsToInvalidate)
+        return withCommandImpact(failure, removeExecution, repoIdsToInvalidate)
       }
       const finalized = await lifecycle.afterWorktreeRemoved()
       if (!finalized.ok) {
-        return withRepoIdsToInvalidate({ ...finalized, worktreeRemoved: true }, repoIdsToInvalidate)
+        return withRepoIdsToInvalidate(worktreeRemovedFollowupResult(finalized), repoIdsToInvalidate)
       }
       if (!input.deleteBranch)
-        return withRepoIdsToInvalidate({ ...removed, worktreeRemoved: true }, repoIdsToInvalidate)
+        return withRepoIdsToInvalidate(worktreeRemovedFollowupResult(removed), repoIdsToInvalidate)
       const deletedWithMilestone = await deleteBranchAfterValidation(
         input.branch,
         upstream,
@@ -671,11 +684,7 @@ function createLocalRepoSource(
         signal,
         mutationCwd,
       )
-      const removalResult: RepoMutationResult = {
-        ok: deletedWithMilestone.ok,
-        message: deletedWithMilestone.message,
-        worktreeRemoved: true,
-      }
+      const removalResult = worktreeRemovedFollowupResult(deletedWithMilestone)
       return withRepoIdsToInvalidate(removalResult, repoIdsToInvalidate)
     },
     async getPatch(worktreePath, signal) {
@@ -743,7 +752,11 @@ async function createRemoteRepoSource(
           signal,
           run: mutationRun,
         })
-        return withPossibleCommandImpact(fetchResult, fetchExecution, repoIdsToInvalidate)
+        return withCommandImpact(
+          commandFailureForUser(fetchResult, fetchExecution),
+          fetchExecution,
+          repoIdsToInvalidate,
+        )
       })
     },
     async pull(branch, worktreePath, signal) {
@@ -753,7 +766,7 @@ async function createRemoteRepoSource(
           signal,
           run: mutationRun,
         })
-        return withPossibleCommandImpact(pullResult, pullExecution, repoIdsToInvalidate)
+        return withCommandImpact(commandFailureForUser(pullResult, pullExecution), pullExecution, repoIdsToInvalidate)
       })
     },
     async push(branch, signal) {
@@ -763,7 +776,7 @@ async function createRemoteRepoSource(
           signal,
           run: mutationRun,
         })
-        return withPossibleCommandImpact(pushResult, pushExecution, repoIdsToInvalidate)
+        return withCommandImpact(commandFailureForUser(pushResult, pushExecution), pushExecution, repoIdsToInvalidate)
       })
     },
     async getWorktreeBootstrapPreview(signal) {
@@ -788,7 +801,7 @@ async function createRemoteRepoSource(
         const repoIdsToInvalidate = [...existingRepoIds, ...targetRepoIds]
         if (!created.ok) {
           const failure = worktreeCommandFailureForUser(created, execution, 'create')
-          return withPossibleCommandImpact(failure, execution, repoIdsToInvalidate)
+          return withCommandImpact(failure, execution, repoIdsToInvalidate)
         }
         if (options?.worktreeBootstrap?.kind !== 'run') return withRepoIdsToInvalidate(created, repoIdsToInvalidate)
         const bootstrapped = await bootstrapRemoteWorktreeAfterCreate(target, input.worktreePath, {
@@ -797,7 +810,7 @@ async function createRemoteRepoSource(
           expectedConfigHash: options.worktreeBootstrap.configHash,
         })
         if (!bootstrapped.ok) {
-          return withRepoIdsToInvalidate(bootstrapped, repoIdsToInvalidate)
+          return withRepoIdsToInvalidate(worktreeCreatedFollowupFailureForUser(bootstrapped), repoIdsToInvalidate)
         }
         return withRepoIdsToInvalidate(
           {

@@ -559,6 +559,8 @@ export const en = {
   'error.failed-trash-file': 'Could not move the file to Trash',
   'error.git-command-cancelled-check-state':
     'The Git operation was cancelled after it started. Check the repository state before trying again.',
+  'error.git-command-timeout-check-state':
+    'The Git operation timed out after it started. Check the repository state before trying again.',
   'error.invalid-arguments': 'Invalid arguments',
   'error.workspace-runtime-stale': 'Workspace runtime is stale',
   'error.workspace-target-stale': 'Workspace target changed. Please try again.',

@@ -10,8 +10,6 @@ export async function movePathToTrash(path: string, signal?: AbortSignal): Promi
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
 
   const commands = trashCommandsForPlatform(path)
-  let sawExecutable = false
-  let lastMessage = 'error.failed-trash-file'
 
   for (const command of commands) {
     try {
@@ -23,15 +21,11 @@ export async function movePathToTrash(path: string, signal?: AbortSignal): Promi
     } catch (err) {
       if (signal?.aborted) return { ok: false, message: 'cancelled' }
       if (isCommandMissing(err)) continue
-      sawExecutable = true
-      lastMessage = errorMessageFromUnknown(err) || lastMessage
+      return { ok: false, message: errorMessageFromUnknown(err) ?? 'error.failed-trash-file' }
     }
   }
 
-  return {
-    ok: false,
-    message: sawExecutable ? lastMessage : 'error.trash-unavailable',
-  }
+  return { ok: false, message: 'error.trash-unavailable' }
 }
 
 function trashCommandsForPlatform(path: string): ReadonlyArray<TrashCommand> {

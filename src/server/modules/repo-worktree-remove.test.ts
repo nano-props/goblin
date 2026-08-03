@@ -258,6 +258,27 @@ describe('repo worktree removal', () => {
     })
   })
 
+  test('removeRepoWorktree surfaces recovery when finalization is cancelled after removal', async () => {
+    mocks.readWorktreeMembership.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false },
+    ])
+
+    const result = await removeLocalRepoWorktreeForTest(
+      { deleteBranch: false },
+      {
+        ...successfulRemovalLifecycle,
+        afterWorktreeRemoved: async () => ({ ok: false, message: 'cancelled' }),
+      },
+    )
+
+    expect(result).toEqual({ ok: false, message: 'error.worktree-removed-followup-failed' })
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
+      worktreePath: '/tmp/repo-worktree',
+    })
+  })
+
   test('removeRepoWorktree publishes affected snapshot invalidations once after worktree and branch deletion success', async () => {
     mocks.readWorktreeMembership.mockResolvedValueOnce([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },

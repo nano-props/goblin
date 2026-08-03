@@ -5,6 +5,7 @@ import { serverLogger } from '#/server/logger.ts'
 import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/server/modules/settings-source.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
+import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 import { onWorkspaceRuntimeClosed, onWorkspaceRuntimeMembershipReleased } from '#/server/modules/workspace-runtimes.ts'
 import {
   backgroundSyncBackoffDelayMs,
@@ -277,6 +278,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
     }
   } catch (err) {
     if (activeFetch?.ctrl.signal.aborted) return
+    if (target) await failRemoteWorkspaceRuntimeIfNeeded(target.userId, err)
     if (target) {
       recordTargetFetchStartedAt(target, now)
       recordTargetFailure(target, now)

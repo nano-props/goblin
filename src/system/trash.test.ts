@@ -41,4 +41,15 @@ describe('movePathToTrash', () => {
       message: 'error.trash-unavailable',
     })
   })
+
+  test('does not try another trash tool after an invoked tool fails', async () => {
+    mocks.execa.mockRejectedValueOnce(new Error('trash command failed after invocation'))
+
+    await expect(movePathToTrash('/tmp/file.txt')).resolves.toEqual({
+      ok: false,
+      message: 'trash command failed after invocation',
+    })
+
+    expect(mocks.execa).toHaveBeenCalledOnce()
+  })
 })

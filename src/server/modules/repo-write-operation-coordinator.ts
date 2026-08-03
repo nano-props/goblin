@@ -530,6 +530,9 @@ export async function runWithRepoMembershipReadAdmission<T>(
   group.activeMembershipReads += 1
   try {
     const outcome = await observePromise(read)
+    // The epoch gates acceptance of successful projection data. A failed read
+    // keeps its own cancellation or typed runtime error so its lifecycle owner
+    // can settle it; the mutation's later invalidation drives a stable retry.
     if (!outcome.ok) throw outcome.error
     assertRepoMembershipReadStillAdmitted(group, revision)
     return outcome.value

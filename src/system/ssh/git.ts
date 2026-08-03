@@ -878,6 +878,9 @@ function worktreeRemoveFailureMessage(result: ExecResult, execution: CommandExec
 }
 
 function worktreeRemovedResult(result: ExecResult): RemoteWorktreeMutationResult {
+  if (!result.ok && result.message === 'cancelled') {
+    return { ok: false, message: 'error.worktree-removed-followup-failed', worktreeRemoved: true }
+  }
   return { ok: result.ok, message: result.message, worktreeRemoved: true }
 }
 

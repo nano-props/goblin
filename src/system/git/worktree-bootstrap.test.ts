@@ -1,6 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
-import { mkdir, mkdtemp, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
 import { bootstrapWorktreeAfterCreate, getWorktreeBootstrapPreview } from '#/system/git/worktree-bootstrap.ts'
 import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap-config.ts'
@@ -198,6 +198,27 @@ exclude = ["config/*.log", "config/nested"]
     await expect(readFile(path.join(targetRoot, 'config', 'nested', 'trace.log'), 'utf8')).rejects.toMatchObject({
       code: 'ENOENT',
     })
+  })
+
+  test('copies children before restoring a read-only directory mode', async () => {
+    const sourceDirectory = path.join(sourceRoot, 'readonly-config')
+    await mkdir(sourceDirectory)
+    await writeFile(path.join(sourceDirectory, 'settings.json'), '{"enabled":true}\n')
+    await writeConfig('[worktree]\ncopy = ["readonly-config"]\n')
+    await chmod(sourceDirectory, 0o555)
+
+    try {
+      const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
+
+      expect(result.ok).toBe(true)
+      await expect(readFile(path.join(targetRoot, 'readonly-config', 'settings.json'), 'utf8')).resolves.toBe(
+        '{"enabled":true}\n',
+      )
+      expect((await stat(path.join(targetRoot, 'readonly-config'))).mode & 0o777).toBe(0o555)
+    } finally {
+      await chmod(sourceDirectory, 0o755)
+      await chmod(path.join(targetRoot, 'readonly-config'), 0o755).catch(() => {})
+    }
   })
 
   test('removes operations nested under excluded parent paths', async () => {

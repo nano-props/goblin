@@ -1,7 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 import type { Readable, Writable } from 'node:stream'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { afterEach, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -43,4 +43,5 @@ test('passes cancellation to the file-copy stream', async () => {
     name: 'AbortError',
   })
   expect(mocks.pipeline).toHaveBeenCalledOnce()
+  await expect(stat(destinationPath)).rejects.toMatchObject({ code: 'ENOENT' })
 })

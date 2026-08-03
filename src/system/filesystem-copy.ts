@@ -1,4 +1,4 @@
-import { createReadStream, createWriteStream, promises as fs } from 'node:fs'
+import { createReadStream, promises as fs } from 'node:fs'
 import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 
@@ -45,7 +45,9 @@ async function copyDirectory(
   mode: number,
   options: CopyPathOptions,
 ): Promise<void> {
-  await fs.mkdir(destinationPath, { mode })
+  // The destination must remain writable while children are materialized;
+  // restore the source mode only after the directory is complete.
+  await fs.mkdir(destinationPath, { mode: mode | 0o700 })
   const directory = await fs.opendir(sourcePath)
   for await (const entry of directory) {
     options.signal?.throwIfAborted()
@@ -61,9 +63,19 @@ async function copyRegularFile(
   mode: number,
   signal: AbortSignal | undefined,
 ): Promise<void> {
-  await pipeline(createReadStream(sourcePath), createWriteStream(destinationPath, { flags: 'wx', mode }), { signal })
-  signal?.throwIfAborted()
-  await fs.chmod(destinationPath, mode)
+  const destination = await fs.open(destinationPath, 'wx', mode)
+  try {
+    await pipeline(createReadStream(sourcePath), destination.createWriteStream(), { signal })
+    signal?.throwIfAborted()
+    await fs.chmod(destinationPath, mode)
+  } catch (error) {
+    // This invocation exclusively created the destination, so removing only
+    // its incomplete file is safe. Cleanup is best-effort and must not replace
+    // the cancellation or copy error that tells the caller why copying failed.
+    await destination.close().catch(() => {})
+    await fs.rm(destinationPath, { force: true }).catch(() => {})
+    throw error
+  }
 }
 
 async function copySymbolicLink(
@@ -77,10 +89,10 @@ async function copySymbolicLink(
   signal?.throwIfAborted()
 }
 
-async function copiedSymlinkType(sourcePath: string): Promise<'file' | 'dir' | 'junction' | undefined> {
+async function copiedSymlinkType(sourcePath: string): Promise<'file' | 'dir' | undefined> {
   if (process.platform !== 'win32') return undefined
   try {
-    return (await fs.stat(sourcePath)).isDirectory() ? 'junction' : 'file'
+    return (await fs.stat(sourcePath)).isDirectory() ? 'dir' : 'file'
   } catch {
     return 'file'
   }
