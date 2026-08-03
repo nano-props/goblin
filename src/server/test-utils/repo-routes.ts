@@ -10,6 +10,14 @@ import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { isRemoteWorkspaceId, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import type { RepoOperationsReadOptions } from '#/server/modules/repo-read-paths.ts'
+import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
+type ReadRepoOperationsSnapshot = (
+  workspaceId: WorkspaceId,
+  options?: RepoOperationsReadOptions,
+) => Promise<RepoOperationsSnapshot>
 
 export const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 export const CLIENT_ID = 'client-read-test'
@@ -23,7 +31,7 @@ const mocks = vi.hoisted(() => ({
   readRepoSnapshot: vi.fn(),
   readRepoPullRequests: vi.fn(),
   readRepoWorktreeStatus: vi.fn(),
-  readRepoOperationsSnapshot: vi.fn(),
+  readRepoOperationsSnapshot: vi.fn<ReadRepoOperationsSnapshot>(),
   fetchRepo: vi.fn(),
   cloneRepo: vi.fn(),
   pullRepoBranch: vi.fn(),

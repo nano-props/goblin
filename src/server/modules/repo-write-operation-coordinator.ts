@@ -50,7 +50,6 @@ export interface RepoWriteOperationContext {
 }
 
 interface BeginRepoWriteOperationInput {
-  id?: string
   repoId?: WorkspaceId | null
   workspaceRuntimeId?: string | null
   kind: RepoServerOperationKind
@@ -85,12 +84,14 @@ interface WorkspaceRuntimeBoundaryRegistration {
 const MAX_SETTLED_OPERATIONS = 100
 
 let nextWriteOperationId = 1
+let nextSettledOperationOrdinal = 1
 let nextBoundaryGroupId = 1
 const boundaryGroups = new Set<RepoWriteBoundaryGroup>()
 const boundaryGroupByRepoId = new Map<WorkspaceId, RepoWriteBoundaryGroup>()
 const boundaryGroupByDescriptor = new Map<string, RepoWriteBoundaryGroup>()
 const workspaceRuntimeRegistrationsByRepoId = new Map<WorkspaceId, Map<string, WorkspaceRuntimeBoundaryRegistration>>()
 let boundaryGroupByHandle = new WeakMap<RepoWriteBoundaryHandle, RepoWriteBoundaryGroup>()
+let settledOperationOrdinal = new WeakMap<RepoServerOperationState, number>()
 let workspaceRuntimeCloseSubscription: (() => void) | null = null
 let workspaceRuntimeFailureSubscription: (() => void) | null = null
 
@@ -169,13 +170,21 @@ function pruneSettledOperations(): void {
       [...runtime.operations.values()].filter(isSettledRepoWriteOperation).map((operation) => ({ runtime, operation })),
     )
     .sort((a, b) => {
-      return repoWriteOperationTimestamp(b.operation) - repoWriteOperationTimestamp(a.operation)
+      const timestampOrder = repoWriteOperationTimestamp(b.operation) - repoWriteOperationTimestamp(a.operation)
+      if (timestampOrder !== 0) return timestampOrder
+      return settledRepoWriteOperationOrdinal(b.operation) - settledRepoWriteOperationOrdinal(a.operation)
     })
 
   for (const { runtime, operation } of settled.slice(MAX_SETTLED_OPERATIONS)) {
     runtime.operations.delete(operation.id)
     deleteBoundaryGroupIfIdle(runtime)
   }
+}
+
+function settledRepoWriteOperationOrdinal(operation: RepoServerOperationState): number {
+  const ordinal = settledOperationOrdinal.get(operation)
+  if (ordinal === undefined) throw new Error(`Repository write operation was not settled: ${operation.id}`)
+  return ordinal
 }
 
 function beginRepoWriteOperation(
@@ -185,7 +194,7 @@ function beginRepoWriteOperation(
   const now = Date.now()
   let settled = false
   const operation: RepoServerOperationState = {
-    id: input.id ?? freshWriteOperationId(),
+    id: freshWriteOperationId(),
     repoId: input.repoId ?? null,
     workspaceRuntimeId: input.workspaceRuntimeId ?? null,
     kind: input.kind,
@@ -253,6 +262,7 @@ function beginRepoWriteOperation(
       const cancellationReason = operation.cancellation.reason
       operation.phase = result.ok ? 'done' : 'failed'
       operation.settledAt = Date.now()
+      settledOperationOrdinal.set(operation, nextSettledOperationOrdinal++)
       operation.error = result.ok
         ? null
         : {
@@ -643,11 +653,13 @@ export function resetRepoWriteOperationCoordinatorForTests(): void {
   boundaryGroupByDescriptor.clear()
   workspaceRuntimeRegistrationsByRepoId.clear()
   boundaryGroupByHandle = new WeakMap()
+  settledOperationOrdinal = new WeakMap()
   workspaceRuntimeCloseSubscription?.()
   workspaceRuntimeCloseSubscription = null
   workspaceRuntimeFailureSubscription?.()
   workspaceRuntimeFailureSubscription = null
   nextWriteOperationId = 1
+  nextSettledOperationOrdinal = 1
   nextBoundaryGroupId = 1
 }
 

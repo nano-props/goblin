@@ -475,9 +475,9 @@ describe('repo write operation coordinator', () => {
   })
 
   test('keeps settled write operations globally bounded', async () => {
+    vi.setSystemTime(1_000)
     for (let index = 0; index < 105; index += 1) {
       const workspaceId = workspaceIdForTest(`goblin+file:///workspace-${index}`)
-      vi.setSystemTime(1_000 + index)
       await enqueueRepoWriteOperation(
         workspaceId,
         undefined,
@@ -499,6 +499,52 @@ describe('repo write operation coordinator', () => {
     ).resolves.toMatchObject([
       { repoId: workspaceIdForTest('goblin+file:///workspace-104'), kind: 'fetch', phase: 'done' },
     ])
+  })
+
+  test('uses settlement order when bounded operations share a timestamp', async () => {
+    vi.setSystemTime(2_000)
+    let releaseOldest!: () => void
+    const oldestCreatedWorkspace = workspaceIdForTest('goblin+file:///oldest-created')
+    const oldestCreated = enqueueRepoWriteOperation(
+      oldestCreatedWorkspace,
+      undefined,
+      { repoId: oldestCreatedWorkspace, kind: 'fetch', source: 'background' },
+      (operation) => async () => {
+        operation.start()
+        await new Promise<void>((resolve) => {
+          releaseOldest = resolve
+        })
+        operation.settle({ ok: false, message: 'latest failure' })
+        return { ok: false, message: 'latest failure' }
+      },
+    )
+    await vi.waitFor(() => expect(releaseOldest).toBeTypeOf('function'))
+
+    for (let index = 0; index < 100; index += 1) {
+      const workspaceId = workspaceIdForTest(`goblin+file:///settled-first-${index}`)
+      await enqueueRepoWriteOperation(
+        workspaceId,
+        undefined,
+        { repoId: workspaceId, kind: 'fetch', source: 'background' },
+        (operation) => async () => {
+          operation.start()
+          operation.settle({ ok: true, message: 'ok' })
+          return { ok: true, message: 'ok' }
+        },
+      )
+    }
+
+    releaseOldest()
+    await oldestCreated
+
+    await expect(
+      listRepoWriteOperationsForRepo(oldestCreatedWorkspace, { includeSettled: true }),
+    ).resolves.toMatchObject([{ phase: 'failed', error: { message: 'latest failure' } }])
+    await expect(
+      listRepoWriteOperationsForRepo(workspaceIdForTest('goblin+file:///settled-first-0'), {
+        includeSettled: true,
+      }),
+    ).resolves.toEqual([])
   })
 
   test('runs cancellable network operations inside the repo write runtime', async () => {

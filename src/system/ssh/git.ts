@@ -856,7 +856,9 @@ export async function removeRemoteWorktree(
       failureExecution: removeExecution,
       failureStage: 'worktree-remove',
     }
-    return withWorktreePathsToInvalidate(failure, worktreePathsToInvalidate)
+    return commandMayHaveRun(removeExecution)
+      ? withWorktreePathsToInvalidate(failure, worktreePathsToInvalidate)
+      : failure
   }
   const finalized = await input.afterWorktreeRemoved()
   if (!finalized.ok) {

@@ -466,6 +466,41 @@ describe('remote git mutations', () => {
     })
   })
 
+  test('removeRemoteWorktree omits mutation impact when SSH provably did not start', async () => {
+    const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
+      if (command.type === 'gitStatus') return okRemoteResult('')
+      if (command.type === 'gitWorktreeRemove') {
+        return {
+          ok: false,
+          stdout: '',
+          stderr: '',
+          message: 'ssh executable was not found',
+          commandNotStarted: true,
+        }
+      }
+      return failRemoteResult('unexpected command')
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved,
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      deleteBranch: false,
+      run,
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'ssh executable was not found',
+      failureExecution: { status: 'not-started' },
+      failureStage: 'worktree-remove',
+    })
+    expect(afterWorktreeRemoved).not.toHaveBeenCalled()
+  })
+
   test('removeRemoteWorktree rejects an equivalent path to the primary worktree', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'gitWorktreeList') {

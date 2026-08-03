@@ -1,12 +1,21 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
-import type { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
+import type {
+  RunRemoteWorkspaceLifecycleInput,
+  RunRemoteWorkspaceLifecycleOptions,
+} from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
+import type { RemoteWorkspaceLifecycleCommandResult } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const REMOTE_ID = workspaceIdForTest('goblin+ssh://example/repo')
 
+type RunRemoteWorkspaceLifecycleWrite = (
+  input: RunRemoteWorkspaceLifecycleInput,
+  options?: RunRemoteWorkspaceLifecycleOptions,
+) => Promise<RemoteWorkspaceLifecycleCommandResult>
+
 const mocks = vi.hoisted(() => ({
-  runLifecycleWrite: vi.fn<typeof runRemoteWorkspaceLifecycleWrite>(),
+  runLifecycleWrite: vi.fn<RunRemoteWorkspaceLifecycleWrite>(),
   getServerRemotePathSuggestions: vi.fn(),
 }))
 

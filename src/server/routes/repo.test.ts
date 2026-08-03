@@ -163,7 +163,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       operations: [
         {
           id: 'repo-op-1',
-          workspaceId: WORKSPACE_ID,
+          repoId: WORKSPACE_ID,
           workspaceRuntimeId: null,
           kind: 'fetch',
           phase: 'running',
@@ -185,6 +185,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
           canCancelUnderlying: true,
         },
       ],
+      lastFetchAt: null,
       loadedAt: 123,
     })
     const app = createTestRepoRoutes()
@@ -210,7 +211,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const repoId = workspaceIdForTest('goblin+ssh://remote/workspace')
     const app = createTestRepoRoutes()
     const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
-    mocks.readRepoOperationsSnapshot.mockResolvedValueOnce({ operations: [], loadedAt: 123 })
+    mocks.readRepoOperationsSnapshot.mockResolvedValueOnce({ operations: [], lastFetchAt: null, loadedAt: 123 })
     await failRemoteWorkspaceLifecycle({
       userId: 'user-test',
       workspaceId: repoId,
