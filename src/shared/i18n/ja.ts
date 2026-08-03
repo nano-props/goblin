@@ -557,9 +557,9 @@ export const ja: Record<DictKey, string> = {
   'error.trash-unavailable': 'システムのごみ箱を利用できません',
   'error.failed-trash-file': 'ファイルをごみ箱に移動できませんでした',
   'error.git-command-cancelled-check-state':
-    'Git 操作は開始後にキャンセルされました。再試行前にリポジトリの状態を確認してください。',
+    'Git 操作はキャンセルされました。リポジトリの状態が変更された可能性があります。確認してから再試行してください。',
   'error.git-command-timeout-check-state':
-    'Git 操作は開始後にタイムアウトしました。再試行前にリポジトリの状態を確認してください。',
+    'Git 操作はタイムアウトしました。リポジトリの状態が変更された可能性があります。確認してから再試行してください。',
   'error.invalid-arguments': '無効な引数',
   'error.workspace-runtime-stale': 'ワークスペースランタイムが無効です',
   'error.workspace-target-stale': 'ワークスペースの対象が変更されました。もう一度お試しください。',

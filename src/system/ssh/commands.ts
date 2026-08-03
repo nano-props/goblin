@@ -589,6 +589,10 @@ function remoteBootstrapScript(command: Extract<RemoteCommandKind, { type: 'boot
   ].join('\n')
 }
 
+function bootstrapPatternRequiresGlobstar(pattern: string): boolean {
+  return pattern.split('/').some((segment) => segment === '**')
+}
+
 function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 'bootstrapRemoteWorktree' }>): string {
   const quote = shellQuote
   const copy = command.copy.map(quote).join(' ')
@@ -598,11 +602,17 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
   const setup = command.setup ? quote(command.setup) : "''"
   const sourceRoot = quote(command.sourceRoot)
   const targetRoot = quote(command.targetRoot)
+  const patterns = [...command.copy, ...command.symlink, ...command.hardlink, ...command.exclude]
+  const requiresGlobstar = patterns.some(bootstrapPatternRequiresGlobstar)
 
   const lines: string[] = [
     'set -o pipefail',
     'shopt -s nullglob dotglob',
-    'shopt -s globstar 2>/dev/null || true',
+    ...(requiresGlobstar
+      ? [
+          'shopt -s globstar 2>/dev/null || { printf "%s\\n" "error: remote bash does not support ** glob patterns" >&2; exit 1; }',
+        ]
+      : []),
     '',
     'SOURCE_ROOT=' + sourceRoot,
     'TARGET_ROOT=' + targetRoot,

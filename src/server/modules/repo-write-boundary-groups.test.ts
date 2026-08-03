@@ -80,4 +80,18 @@ describe('repo write boundary groups', () => {
     expect(registry.getRepoLastSuccessfulFetchAt(REMOTE_REPO)).toEqual(expect.any(Number))
     expect(registry.getRepoLastSuccessfulFetchAt(OTHER_REPO)).toBeNull()
   })
+
+  test('does not carry fetch metadata across a physical boundary rebind', async () => {
+    const registry = await import('#/server/modules/repo-write-operation-coordinator.ts')
+    let boundaryKey = 'remote-git:goblin+ssh://host/repo-a'
+    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async () => boundaryKey)
+    await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)
+    await recordSuccessfulFetch(REMOTE_REPO)
+    expect(registry.getRepoLastSuccessfulFetchAt(REMOTE_REPO)).toEqual(expect.any(Number))
+
+    boundaryKey = 'remote-git:goblin+ssh://host/repo-b'
+    await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)
+
+    expect(registry.getRepoLastSuccessfulFetchAt(REMOTE_REPO)).toBeNull()
+  })
 })

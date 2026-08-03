@@ -260,7 +260,8 @@ exclude = ["config/*.log", "config/nested"]
 
     expect(result).toMatchObject({
       ok: false,
-      message: 'Worktree bootstrap failed: failed to copy config: failed to restore destination permissions: chmod failed',
+      message:
+        'Worktree bootstrap failed: failed to copy config: failed to restore destination permissions: chmod failed',
     })
   })
 
@@ -307,6 +308,9 @@ copy = ["config"]
     ['path escape', '../secret.env', 'escapes repo root'],
     ['git metadata', '.git/config', 'must not target .git'],
     ['repo root', '.', 'must not target repo root'],
+    ['dot segment', 'config/./app.json', 'must not contain dot segments'],
+    ['brace expansion', 'config/{app,dev}.json', 'unsupported bootstrap glob syntax'],
+    ['extglob', 'config/@(app|dev).json', 'unsupported bootstrap glob syntax'],
     ['windows drive-relative path', 'C:secret.env', 'must be relative'],
     ['windows drive-absolute path', String.raw`C:\secret.env`, 'must be relative'],
     ['windows rooted path', String.raw`\secret.env`, 'must be relative'],
@@ -320,6 +324,20 @@ copy = [${JSON.stringify(entry)}]
 
     expect(result.ok).toBe(false)
     expect(result.message).toContain(message)
+  })
+
+  test('materializes canonical paths after collapsing redundant separators', async () => {
+    await mkdir(path.join(sourceRoot, 'config'))
+    await writeFile(path.join(sourceRoot, 'config', 'app.json'), '{}\n')
+    await writeConfig('[worktree]\ncopy = ["config//app.json/"]\n')
+
+    const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
+
+    expect(result).toMatchObject({
+      ok: true,
+      worktreeBootstrap: { copy: { count: 1, paths: ['config/app.json'] } },
+    })
+    await expect(readFile(path.join(targetRoot, 'config', 'app.json'), 'utf8')).resolves.toBe('{}\n')
   })
 
   test('fails when a destination already exists and does not write later entries', async () => {

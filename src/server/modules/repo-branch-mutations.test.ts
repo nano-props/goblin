@@ -205,7 +205,7 @@ describe('repo branch mutations', () => {
     ).rejects.toMatchObject({ runtimeFailure, mutation: { repoIdsToInvalidate: [repoId, linkedRepoId] } })
   })
 
-  test('publishes an established SSH branch milestone before follow-up runtime failure escapes', async () => {
+  test('propagates mutation impact from a preclassified SSH branch runtime carrier', async () => {
     const [{ RepoMutationRuntimeFailureError }, { RemoteWorkspaceRuntimeFailureError }, { deleteRepoBranch }] =
       await Promise.all([
         import('#/server/modules/repo-mutation-runtime-failure.ts'),

@@ -294,10 +294,6 @@ interface GitWorkspaceMutationActions {
     action: RepoBranchAction,
     options?: RunBranchActionOptions,
   ) => Promise<RepoMutationExecResult | null>
-  /** Fire-and-forget submission for branch actions whose UI should close
-   *  immediately and let Git activity/toasts carry completion. This only
-   *  triggers submission; callers should not treat it as accepted/completed. */
-  submitBranchAction: (id: WorkspaceId, action: RepoBranchAction, options?: RunBranchActionOptions) => void
 }
 
 export interface WorkspacesStore

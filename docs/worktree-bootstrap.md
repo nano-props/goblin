@@ -59,6 +59,10 @@ setup = "bun install"
 
 - `.git` paths are reserved.
 - Paths are repo-relative.
+- Paths use `/` separators and are canonicalized before preview or execution;
+  explicit `.` and `..` segments are rejected.
+- Globs support `*`, `**`, `?`, and bracket expressions. Brace expansion and
+  extglobs are rejected so local and SSH bootstrap use the same grammar.
 - Existing destination paths are left unchanged; bootstrap fails instead of overwriting.
 - Missing source paths are skipped and reported.
 - If one concrete path matches more than one of `copy`, `symlink`, or `hardlink`, fail the bootstrap as a config error.

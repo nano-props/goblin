@@ -8,8 +8,6 @@ export interface RepoMutationResult extends RepoMutationExecResult {
   repoIdsToInvalidate?: readonly WorkspaceId[]
   /** Checked-out filesystem projections that must be invalidated. */
   worktreePathsToInvalidate?: readonly string[]
-  /** The worktree removal committed, even if a later lifecycle or branch step failed. */
-  worktreeRemoved?: true
 }
 
 /** Project an internal mutation result without exposing impact or milestone authority. */

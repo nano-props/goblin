@@ -114,11 +114,11 @@ interface BranchDeleteResult extends ExecResult {
 export type WorkspacePaneTargetIdentity =
   { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
 
-export interface RepoMembershipReadOptions {
+interface RepoMembershipReadOptions {
   signal?: AbortSignal
 }
 
-export type RunRepoMembershipMutation = <T>(mutation: () => Promise<T>) => Promise<T>
+type RunRepoMembershipMutation = <T>(mutation: () => Promise<T>) => Promise<T>
 
 export interface RepoSource {
   id: string
@@ -405,14 +405,14 @@ function worktreeRemovedFollowupResult(
   result: RepoMutationExecResult,
   branchEffect: BranchDeleteResult['branchEffect'],
 ): RepoMutationResult {
-  if (result.ok) return { ok: true, message: result.message, worktreeRemoved: true }
+  if (result.ok) return { ok: true, message: result.message }
   const recoveryMessages: ExecResultRecoveryMessageKey[] = ['error.worktree-removed-followup-failed']
   if (branchEffect === 'local-delete-confirmed') {
     recoveryMessages.push('error.local-branch-deleted-followup-failed')
   }
   recoveryMessages.push(...(result.recoveryMessageKeys ?? []))
   const recoveryMessageKeys = Array.from(new Set(recoveryMessages))
-  return { ok: false, message: result.message, recoveryMessageKeys, worktreeRemoved: true }
+  return { ok: false, message: result.message, recoveryMessageKeys }
 }
 
 function remoteWorktreeRemovalResultForUser(result: RemoteWorktreeRemovalResult): RepoMutationResult {
@@ -744,7 +744,8 @@ function createLocalRepoSource(
         signal,
         mutationCwd,
       )
-      const removalResult = worktreeRemovedFollowupResult(deletedWithMilestone, deletedWithMilestone.branchEffect)
+      const publicBranchResult = publicBranchDeleteResult(deletedWithMilestone)
+      const removalResult = worktreeRemovedFollowupResult(publicBranchResult, deletedWithMilestone.branchEffect)
       return withRepoIdsToInvalidate(removalResult, repoIdsToInvalidate)
     },
     async getPatch(worktreePath, signal) {

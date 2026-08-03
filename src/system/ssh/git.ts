@@ -6,7 +6,6 @@ import {
   worktreeBootstrapConfigHash,
   type WorktreeBootstrapConfig,
 } from '#/system/git/worktree-bootstrap-config.ts'
-import { validateBootstrapConfigPaths } from '#/system/git/worktree-bootstrap.ts'
 import { parseLog } from '#/system/git/parsers.ts'
 import {
   getRepoUrlForRemotes,
@@ -102,7 +101,7 @@ export interface RemoteWorktreeRemovalResult extends RemoteFilesystemMutationRes
   failureStage?: 'worktree-remove' | 'branch-delete'
 }
 
-export type RemoteBranchEffect = 'none' | 'may-have-changed' | 'local-delete-confirmed'
+type RemoteBranchEffect = 'none' | 'may-have-changed' | 'local-delete-confirmed'
 
 export interface RemoteBranchDeleteResult extends ExecResult {
   branchEffect: RemoteBranchEffect
@@ -626,8 +625,6 @@ async function loadRemoteBootstrapConfig(
   const loaded = parseBootstrapConfig(raw)
   if (loaded.kind === 'error') return { ok: false, message: loaded.message }
   if (loaded.kind === 'none') return { ok: true, value: { sourceRoot } }
-  const validPaths = validateBootstrapConfigPaths(loaded.config)
-  if (!validPaths.ok) return { ok: false, message: validPaths.message }
   return { ok: true, value: { sourceRoot, config: loaded.config, configHash: worktreeBootstrapConfigHash(raw) } }
 }
 

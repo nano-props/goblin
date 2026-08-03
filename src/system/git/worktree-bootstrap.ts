@@ -36,8 +36,6 @@ export async function getWorktreeBootstrapPreview(
     if (loaded.kind === 'none') return { ok: true, preview: worktreeBootstrapPreviewFromConfig(undefined) }
     if (loaded.kind === 'error') return { ok: false, message: loaded.message }
 
-    const valid = validateBootstrapConfigPaths(loaded.config)
-    if (!valid.ok) return { ok: false, message: valid.message }
     return { ok: true, preview: worktreeBootstrapPreviewFromConfig(loaded.config, loaded.configHash) }
   } catch (err) {
     if (options?.signal?.aborted) return { ok: false, message: 'cancelled' }
@@ -64,7 +62,6 @@ type MaterializationResult =
   | { ok: false; message: string; completedOperations: ReadyMaterialization[] }
 
 const SETUP_TIMEOUT_MS = 10 * 60_000
-const WINDOWS_ROOTED_PATH_RE = /^(?:[A-Za-z]:|[\\/])/
 
 export async function bootstrapWorktreeAfterCreate(
   sourceCwd: string,
@@ -142,22 +139,6 @@ async function loadBootstrapConfig(
   return loaded.kind === 'ready' ? { ...loaded, configHash: worktreeBootstrapConfigHash(raw) } : loaded
 }
 
-export function validateBootstrapConfigPaths(
-  config: WorktreeBootstrapConfig,
-): { ok: true } | { ok: false; message: string } {
-  for (const mode of materializationModes()) {
-    for (const entry of config[mode]) {
-      const valid = validateConfigPath(entry)
-      if (!valid.ok) return valid
-    }
-  }
-  for (const entry of config.exclude) {
-    const valid = validateConfigPath(entry)
-    if (!valid.ok) return valid
-  }
-  return { ok: true }
-}
-
 async function planMaterializations(
   sourceRoot: string,
   targetRoot: string,
@@ -221,9 +202,6 @@ async function expandSources(
 
   for (const entry of entries) {
     if (signal?.aborted) return { ok: false, message: 'cancelled' }
-    const valid = validateConfigPath(entry)
-    if (!valid.ok) return valid
-
     if (!isDynamicPattern(entry)) {
       const source = resolveConfigPath(sourceRoot, normalizeRelativePath(entry))
       if (!source.ok) return source
@@ -254,9 +232,6 @@ async function expandExcludes(
   const paths = new Set<string>()
   for (const entry of entries) {
     if (signal?.aborted) return { ok: false, message: 'cancelled' }
-    const valid = validateConfigPath(entry)
-    if (!valid.ok) return valid
-
     if (!isDynamicPattern(entry)) {
       const source = resolveConfigPath(sourceRoot, normalizeRelativePath(entry))
       if (!source.ok) return source
@@ -459,21 +434,6 @@ function buildSetupInvocation(setup: string): { command: string; args: string[] 
 
 function materializationModes(): MaterializationMode[] {
   return ['copy', 'symlink', 'hardlink']
-}
-
-function validateConfigPath(entry: string): { ok: true } | { ok: false; message: string } {
-  if (entry.length === 0) return { ok: false, message: 'bootstrap path must not be empty' }
-  if (/[\0-\x1f\x7f]/.test(entry)) return { ok: false, message: `bootstrap path contains control characters: ${entry}` }
-  if (entry.startsWith('!')) return { ok: false, message: `negative glob patterns are not supported: ${entry}` }
-  if (path.isAbsolute(entry) || WINDOWS_ROOTED_PATH_RE.test(entry))
-    return { ok: false, message: `bootstrap path must be relative: ${entry}` }
-  if (normalizeRelativePath(entry) === '.')
-    return { ok: false, message: `bootstrap path must not target repo root: ${entry}` }
-
-  const segments = entry.replace(/\\/g, '/').split('/').filter(Boolean)
-  if (segments.includes('..')) return { ok: false, message: `bootstrap path escapes repo root: ${entry}` }
-  if (segments.includes('.git')) return { ok: false, message: `bootstrap path must not target .git: ${entry}` }
-  return { ok: true }
 }
 
 function resolveConfigPath(

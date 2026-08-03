@@ -7,7 +7,7 @@ import { buildRemoteCommandInvocation } from '#/system/ssh/commands.ts'
 import { buildCanonicalSshConnectionSnapshot, buildRemoteTerminalInvocation } from '#/system/ssh/invocation.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { encodeRemoteWorktreeBootstrapRecord } from '#/system/ssh/worktree-bootstrap-protocol.ts'
+import { encodeRemoteWorktreeBootstrapRecord } from '#/test-utils/remote-worktree-bootstrap.ts'
 
 const originalPath = process.env.PATH
 const originalPathExt = process.env.PATHEXT
@@ -352,6 +352,41 @@ describe('remote ssh command builders', () => {
     expect(readFileSync(path.join(targetRoot, 'config dir', 'app.json'), 'utf8')).toBe('ok\n')
     expect(existsSync(path.join(targetRoot, 'config dir', 'debug.log'))).toBe(false)
     expect(existsSync(path.join(targetRoot, 'config dir', '.git', 'config'))).toBe(false)
+  })
+
+  test('remote bootstrap fails fast when required globstar support is unavailable', () => {
+    const withGlobstar = buildRemoteCommandInvocation(target(), {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot: '/srv/repo',
+      targetRoot: '/srv/repo-worktree',
+      copy: ['config/**/*.json'],
+      symlink: [],
+      hardlink: [],
+      exclude: [],
+    })
+    const withoutGlobstar = buildRemoteCommandInvocation(target(), {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot: '/srv/repo',
+      targetRoot: '/srv/repo-worktree',
+      copy: ['config/*.json'],
+      symlink: [],
+      hardlink: [],
+      exclude: [],
+    })
+    const ordinaryDoubleStars = buildRemoteCommandInvocation(target(), {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot: '/srv/repo',
+      targetRoot: '/srv/repo-worktree',
+      copy: ['config/[**].json', 'config/foo**.json'],
+      symlink: [],
+      hardlink: [],
+      exclude: [],
+    })
+
+    expect(withGlobstar.script).toContain('error: remote bash does not support ** glob patterns')
+    expect(withGlobstar.script).not.toContain('shopt -s globstar 2>/dev/null || true')
+    expect(withoutGlobstar.script).not.toContain('shopt -s globstar')
+    expect(ordinaryDoubleStars.script).not.toContain('shopt -s globstar')
   })
 
   testPosix('remote bootstrap script rejects sources under a symlink parent', async () => {

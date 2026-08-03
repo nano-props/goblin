@@ -6,9 +6,9 @@ export const REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS = {
   setup: 'GOBLIN_BOOTSTRAP_SETUP',
 } as const
 
-export type RemoteWorktreeBootstrapRecordKind = keyof typeof REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS
+type RemoteWorktreeBootstrapRecordKind = keyof typeof REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS
 
-export interface RemoteWorktreeBootstrapRecord {
+interface RemoteWorktreeBootstrapRecord {
   kind: RemoteWorktreeBootstrapRecordKind
   value: string
 }
@@ -45,8 +45,4 @@ function remoteWorktreeBootstrapRecordKind(tag: string): RemoteWorktreeBootstrap
     default:
       return null
   }
-}
-
-export function encodeRemoteWorktreeBootstrapRecord(kind: RemoteWorktreeBootstrapRecordKind, value: string): string {
-  return `${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS[kind]}\0${value}\0`
 }

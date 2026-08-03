@@ -153,6 +153,157 @@ describe('repo source runtime failure classification', () => {
     })
   })
 
+  test('carries a confirmed local branch deletion from raw SSH results', async () => {
+    mocks.runRemoteCommand.mockImplementation(async (_target, command: { type: string }) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(
+            worktreePorcelain(`worktree ${target.remotePath}\nHEAD f00ba40\nbranch refs/heads/main`),
+          )
+        case 'gitSnapshot':
+          return okRemoteResult(
+            [
+              '__GOBLIN_REMOTE_CURRENT__',
+              'value main',
+              '__GOBLIN_REMOTE_DEFAULT__',
+              'value main',
+              '__GOBLIN_REMOTE_BRANCHES__',
+              '',
+            ].join('\n'),
+          )
+        case 'gitRemoteVerbose':
+          return okRemoteResult('')
+        case 'gitUpstream':
+          return okRemoteResult(upstreamOutput('origin', 'feature/test'))
+        case 'gitBranchDelete':
+          return okRemoteResult('deleted local branch')
+        case 'gitPushDeleteBranch':
+          return {
+            ok: false,
+            stdout: '',
+            stderr: '',
+            transportStderr: 'client_loop: send disconnect: Broken pipe',
+            message: 'connection lost',
+            remoteStarted: true,
+          }
+        default:
+          throw new Error(`unexpected remote command: ${command.type}`)
+      }
+    })
+    const { runWithRepoSource } = await import('#/server/modules/repo-source.ts')
+
+    await expect(
+      runWithRepoSource(
+        target.id,
+        async (source) => await source.deleteBranch('feature/test', { force: true, deleteUpstream: true }),
+        { workspaceRuntimeId: 'repo-runtime-test' },
+      ),
+    ).rejects.toMatchObject({
+      name: 'RepoMutationRuntimeFailureError',
+      mutation: {
+        ok: false,
+        message: 'connection lost',
+        recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
+        repoIdsToInvalidate: [target.id],
+      },
+      runtimeFailure: {
+        workspaceId: target.id,
+        workspaceRuntimeId: 'repo-runtime-test',
+        reason: 'unreachable',
+      },
+    })
+  })
+
+  test('carries confirmed worktree and branch milestones from raw SSH results', async () => {
+    const linkedPath = `${target.remotePath}-feature`
+    const linkedWorkspaceId = workspaceIdForTest('goblin+ssh://prod/home/alice/service-feature')
+    mocks.runRemoteCommand.mockImplementation(async (_target, command: { type: string }) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(
+            worktreePorcelain(
+              [
+                `worktree ${target.remotePath}`,
+                'HEAD f00ba40',
+                'branch refs/heads/main',
+                '',
+                `worktree ${linkedPath}`,
+                'HEAD ba5eba1',
+                'branch refs/heads/feature/test',
+              ].join('\n'),
+            ),
+          )
+        case 'gitStatus':
+          return okRemoteResult('')
+        case 'gitSnapshot':
+          return okRemoteResult(
+            [
+              '__GOBLIN_REMOTE_CURRENT__',
+              'value main',
+              '__GOBLIN_REMOTE_DEFAULT__',
+              'value main',
+              '__GOBLIN_REMOTE_BRANCHES__',
+              '',
+            ].join('\n'),
+          )
+        case 'gitUpstream':
+          return okRemoteResult(upstreamOutput('origin', 'feature/test'))
+        case 'gitWorktreeRemove':
+          return okRemoteResult('removed worktree')
+        case 'gitBranchDelete':
+          return okRemoteResult('deleted local branch')
+        case 'gitPushDeleteBranch':
+          return {
+            ok: false,
+            stdout: '',
+            stderr: '',
+            transportStderr: 'client_loop: send disconnect: Broken pipe',
+            message: 'connection lost',
+            remoteStarted: true,
+          }
+        default:
+          throw new Error(`unexpected remote command: ${command.type}`)
+      }
+    })
+    const { runWithRepoSource } = await import('#/server/modules/repo-source.ts')
+
+    await expect(
+      runWithRepoSource(
+        target.id,
+        async (source) =>
+          await source.removeWorktree(
+            {
+              branch: 'feature/test',
+              worktreePath: linkedPath,
+              deleteBranch: true,
+              forceDeleteBranch: true,
+              deleteUpstream: true,
+            },
+            undefined,
+            {
+              beforeRemove: async () => ({ ok: true, message: '' }),
+              afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+            },
+            async (mutation) => await mutation(),
+          ),
+        { workspaceRuntimeId: 'repo-runtime-test' },
+      ),
+    ).rejects.toMatchObject({
+      name: 'RepoMutationRuntimeFailureError',
+      mutation: {
+        ok: false,
+        message: 'connection lost',
+        recoveryMessageKeys: ['error.worktree-removed-followup-failed', 'error.local-branch-deleted-followup-failed'],
+        repoIdsToInvalidate: [target.id, linkedWorkspaceId],
+      },
+      runtimeFailure: {
+        workspaceId: target.id,
+        workspaceRuntimeId: 'repo-runtime-test',
+        reason: 'unreachable',
+      },
+    })
+  })
+
   test('preserves normal remote read failures when no runtime context is supplied', async () => {
     mocks.runRemoteCommand.mockResolvedValue({
       ok: false,

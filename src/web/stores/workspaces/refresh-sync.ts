@@ -82,16 +82,15 @@ export function createRefreshSyncHelpers(
     workspaceRuntimeId: string,
     signal: AbortSignal,
   ): Promise<void> {
-    let fetchResult: RepoMutationExecResult | null = null
     const repoBeforeFetch = repoIfFresh(get, id, workspaceRuntimeId)
     if (!repoBeforeFetch) return
     if (shouldAttemptFetch(repoBeforeFetch, workspaceRuntimeId)) {
-      fetchResult = await attemptFetch(id, workspaceRuntimeId)
+      const fetchResult = await attemptFetch(id, workspaceRuntimeId)
+      finalizeSyncFetchResult(id, workspaceRuntimeId, fetchResult)
     }
     if (repoIfFresh(get, id, workspaceRuntimeId)) {
       await options.refreshReadModels(id, workspaceRuntimeId, signal)
     }
-    finalizeSyncFetchResult(id, workspaceRuntimeId, fetchResult)
   }
 
   return {

@@ -476,8 +476,12 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
         ),
   )
   assertWorkspaceRuntimeRegistrationActive(runtimeRegistration)
+  if (!capture.ok) {
+    if (closeWorkspaceRuntimeAdmissionForFailure(runtimeRegistration, capture.error)) throw capture.error
+    if (signal?.aborted) return cancelledRepoWriteResult()
+    throw capture.error
+  }
   if (signal?.aborted) return cancelledRepoWriteResult()
-  if (!capture.ok) throw capture.error
   const execution = capture.value
   const group = bindRepoWriteBoundaryGroup(repoId, repoWriteExecutionBoundaryKey(execution))
   const operation = beginRepoWriteOperation(group, operationInput)
@@ -524,11 +528,7 @@ export async function listRepoWriteOperationsForRepo(
 }
 
 export function getRepoLastSuccessfulFetchAt(repoId: WorkspaceId): number | null {
-  let lastFetchAt: number | null = null
-  for (const group of boundaryGroupsForRepoProjection(repoId)) {
-    if (group.lastSuccessfulFetchAt !== null) lastFetchAt = Math.max(lastFetchAt ?? 0, group.lastSuccessfulFetchAt)
-  }
-  return lastFetchAt
+  return boundaryGroupByRepoId.get(repoId)?.lastSuccessfulFetchAt ?? null
 }
 
 function boundaryGroupsForRepoProjection(repoId: WorkspaceId): RepoWriteBoundaryGroup[] {
@@ -548,13 +548,14 @@ function boundaryGroupsForRepoProjection(repoId: WorkspaceId): RepoWriteBoundary
 function closeWorkspaceRuntimeAdmissionForFailure(
   registration: WorkspaceRuntimeBoundaryRegistration | null,
   error: unknown,
-): void {
-  if (!registration) return
+): boolean {
+  if (!registration) return false
   const runtimeFailure = remoteRuntimeFailureFromWriteError(error)
-  if (!runtimeFailure) return
-  if (runtimeFailure.workspaceId !== registration.repoId) return
-  if (runtimeFailure.workspaceRuntimeId !== registration.workspaceRuntimeId) return
+  if (!runtimeFailure) return false
+  if (runtimeFailure.workspaceId !== registration.repoId) return false
+  if (runtimeFailure.workspaceRuntimeId !== registration.workspaceRuntimeId) return false
   unregisterRepoWriteOperationBoundaryRepoId(registration.repoId, registration.workspaceRuntimeId)
+  return true
 }
 
 function remoteRuntimeFailureFromWriteError(error: unknown): RemoteWorkspaceRuntimeFailureError | null {
@@ -584,7 +585,8 @@ export async function runWithRepoMembershipReadAdmission<T>(
     const outcome = await observePromise(read)
     // The epoch gates acceptance of successful projection data. A failed read
     // keeps its own cancellation or typed runtime error so its lifecycle owner
-    // can settle it; the mutation's later invalidation drives a stable retry.
+    // can settle it. A may-have-run mutation invalidates the projection;
+    // a conservative not-started conflict returns control through explicit retry.
     if (!outcome.ok) throw outcome.error
     assertRepoMembershipReadStillAdmitted(group, revision)
     return outcome.value

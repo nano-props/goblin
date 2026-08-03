@@ -112,6 +112,7 @@ describe('repo worktree creation', () => {
     expect(() =>
       parseHttpInput(REPO_PROCEDURE_SCHEMAS.createWorktree, {
         cwd: '/tmp/repo',
+        workspaceRuntimeId: 'runtime-test',
         worktreePath: '/tmp/repo-worktree',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
         worktreeBootstrap: {
@@ -119,7 +120,7 @@ describe('repo worktree creation', () => {
           configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
         },
       }),
-    ).toThrow()
+    ).toThrow('worktreeBootstrap')
   })
 
   test('createRepoWorktree allows one-time bootstrap run requests without trusted repo settings', async () => {
@@ -415,6 +416,9 @@ describe('repo worktree creation', () => {
     mocks.removeWorktree.mockImplementationOnce(async () => await secondRemove.promise)
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { resolveRepoWriteBoundaryForRead } =
+      await import('#/server/modules/repo-write-operation-coordinator.ts')
+    await resolveRepoWriteBoundaryForRead(LINKED_REPO_ID)
 
     const first = deleteRepoBranch(REPO_ID, 'feature/a')
     await vi.waitFor(() => {

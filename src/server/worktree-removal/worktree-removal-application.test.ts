@@ -265,7 +265,7 @@ describe('WorktreeRemovalApplication', () => {
     ).rejects.toBe(failure)
   })
 
-  test('propagates a runtime carrier with its confirmed removal result', async () => {
+  test('propagates a preclassified runtime carrier without becoming a settlement owner', async () => {
     const failure = new RemoteWorkspaceRuntimeFailureError({
       workspaceId: target.repoRoot,
       workspaceRuntimeId: target.workspaceRuntimeId,
@@ -278,7 +278,6 @@ describe('WorktreeRemovalApplication', () => {
         ok: false,
         message: 'cancelled',
         recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
-        worktreeRemoved: true,
         repoIdsToInvalidate: [target.repoRoot],
       },
       failure,

@@ -64,7 +64,9 @@ authority.
   Reads fail directly while the attempt is active and reject a successful
   result if the epoch changed while they were running. A read that fails keeps
   its own cancellation or typed runtime error so the existing lifecycle owner
-  can settle it; the mutation's later invalidation drives a stable retry. The
+  can settle it. A mutation that may have run publishes invalidation so a later
+  read can converge; a conservative `not-started` conflict fails fast and leaves
+  retry to an explicit user action. The
   boundary never filters paths, derives membership, or publishes mutation
   invalidation; one complete Git read remains the authority and the application
   write path remains the single owner of exact post-operation invalidation.
@@ -78,7 +80,8 @@ authority.
   application flow; do not replace errors through a cross-operation message
   classifier.
 - Public mutation failures keep the original `message` and may add bounded
-  `recoveryMessageKeys` for confirmed partial successes. These keys are
+  `recoveryMessageKeys` for confirmed partial successes or lifecycle settlement
+  uncertainty. These keys are
   presentation guidance only: they do not carry execution facts, authorize
   cleanup, drive invalidation, or let the client infer repository state.
 - System Git and SSH boundaries return execution facts and domain effects, not

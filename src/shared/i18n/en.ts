@@ -558,9 +558,9 @@ export const en = {
   'error.trash-unavailable': 'System Trash is not available',
   'error.failed-trash-file': 'Could not move the file to Trash',
   'error.git-command-cancelled-check-state':
-    'The Git operation was cancelled after it started. Check the repository state before trying again.',
+    'The Git operation was cancelled. Repository state may have changed; check it before trying again.',
   'error.git-command-timeout-check-state':
-    'The Git operation timed out after it started. Check the repository state before trying again.',
+    'The Git operation timed out. Repository state may have changed; check it before trying again.',
   'error.invalid-arguments': 'Invalid arguments',
   'error.workspace-runtime-stale': 'Workspace runtime is stale',
   'error.workspace-target-stale': 'Workspace target changed. Please try again.',

@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest'
 import {
   decodeRemoteWorktreeBootstrapRecords,
-  encodeRemoteWorktreeBootstrapRecord,
   REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS,
 } from '#/system/ssh/worktree-bootstrap-protocol.ts'
+import { encodeRemoteWorktreeBootstrapRecord } from '#/test-utils/remote-worktree-bootstrap.ts'
 
 describe('remote worktree bootstrap protocol', () => {
   test('round-trips POSIX paths and setup commands containing newlines', () => {

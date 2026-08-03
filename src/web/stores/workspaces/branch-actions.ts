@@ -199,13 +199,6 @@ function runBranchActionIpc(
 
 export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
   return {
-    submitBranchAction(id: WorkspaceId, action: RepoBranchAction, options?: RunBranchActionOptions): void {
-      const repo = get().workspaces[id]
-      const workspaceRuntimeId = options?.workspaceRuntimeId ?? repo?.workspaceRuntimeId
-      if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId || !isGitWorkspace(repo)) return
-      void get().runBranchAction(id, action, options)
-    },
-
     async runBranchAction(
       id: WorkspaceId,
       action: RepoBranchAction,

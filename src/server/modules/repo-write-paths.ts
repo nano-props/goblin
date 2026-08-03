@@ -23,11 +23,7 @@ import {
   pruneServerWorkspaceSettingsForRemovedWorktree,
   setServerWorkspaceWorktreeBootstrapConfigTrust,
 } from '#/server/modules/settings-source.ts'
-import {
-  type ExecResult,
-  type ExecResultRecoveryMessageKey,
-  type RepoUrlTarget,
-} from '#/shared/git-types.ts'
+import { type ExecResult, type ExecResultRecoveryMessageKey, type RepoUrlTarget } from '#/shared/git-types.ts'
 import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
 import { isValidWorkspaceLocatorInput, toSafeWorkspaceLocator } from '#/shared/input-validation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -326,12 +322,18 @@ async function removeRepoWorktreeWithBinding(
       ),
     task: async (context) => {
       return await context.runWithRepoSource(async (source) => {
+        const settingsFollowup = removedWorktreeSettingsFollowup(cwd, input.worktreePath, lifecycle)
         try {
-          const mutation = await source.removeWorktree(input, signal, lifecycle, context.runMembershipMutation)
-          return await pruneRemovedWorktreeSettings(cwd, input.worktreePath, mutation)
+          const mutation = await source.removeWorktree(
+            input,
+            signal,
+            settingsFollowup.lifecycle,
+            context.runMembershipMutation,
+          )
+          return await settingsFollowup.settle(mutation)
         } catch (error) {
           if (!isRepoMutationRuntimeFailureError(error)) throw error
-          const mutation = await pruneRemovedWorktreeSettings(cwd, input.worktreePath, error.mutation)
+          const mutation = await settingsFollowup.settle(error.mutation)
           throw new RepoMutationRuntimeFailureError(mutation, error.runtimeFailure)
         }
       })
@@ -339,24 +341,41 @@ async function removeRepoWorktreeWithBinding(
   })
 }
 
-async function pruneRemovedWorktreeSettings(
+interface RemovedWorktreeSettingsFollowup {
+  lifecycle: RepoWorktreeRemovalLifecycle
+  settle(mutation: RepoMutationResult): Promise<RepoMutationResult>
+}
+
+function removedWorktreeSettingsFollowup(
   repoId: WorkspaceId,
   worktreePath: string,
-  mutation: RepoMutationResult,
-): Promise<RepoMutationResult> {
-  if (mutation.worktreeRemoved !== true) return mutation
-  try {
-    const workspaceId = toSafeWorkspaceLocator(repoId)
-    if (!workspaceId) throw new Error('invalid workspace id after repo mutation')
-    const changed = await pruneServerWorkspaceSettingsForRemovedWorktree({ workspaceId, worktreePath })
-    if (changed) publishSettingsInvalidation(['settings-snapshot'])
-    return mutation
-  } catch (error) {
-    if (!mutation.ok) {
-      repoWriteLogger.warn({ error, repoId, worktreePath }, 'failed to prune settings after worktree removal')
-      return mutation
-    }
-    return worktreeFollowupFailure(mutation, error, 'error.worktree-removed-followup-failed')
+  lifecycle: RepoWorktreeRemovalLifecycle,
+): RemovedWorktreeSettingsFollowup {
+  let removalCommitted = false
+  return {
+    lifecycle: {
+      beforeRemove: lifecycle.beforeRemove,
+      afterWorktreeRemoved: async () => {
+        removalCommitted = true
+        return await lifecycle.afterWorktreeRemoved()
+      },
+    },
+    async settle(mutation) {
+      if (!removalCommitted) return mutation
+      try {
+        const workspaceId = toSafeWorkspaceLocator(repoId)
+        if (!workspaceId) throw new Error('invalid workspace id after repo mutation')
+        const changed = await pruneServerWorkspaceSettingsForRemovedWorktree({ workspaceId, worktreePath })
+        if (changed) publishSettingsInvalidation(['settings-snapshot'])
+        return mutation
+      } catch (error) {
+        if (!mutation.ok) {
+          repoWriteLogger.warn({ error, repoId, worktreePath }, 'failed to prune settings after worktree removal')
+          return mutation
+        }
+        return worktreeFollowupFailure(mutation, error, 'error.worktree-removed-followup-failed')
+      }
+    },
   }
 }
 
@@ -374,7 +393,6 @@ function worktreeFollowupFailure(
   if (mutation.worktreeBootstrap) failure.worktreeBootstrap = mutation.worktreeBootstrap
   if (mutation.repoIdsToInvalidate) failure.repoIdsToInvalidate = mutation.repoIdsToInvalidate
   if (mutation.worktreePathsToInvalidate) failure.worktreePathsToInvalidate = mutation.worktreePathsToInvalidate
-  if (mutation.worktreeRemoved) failure.worktreeRemoved = true
   return failure
 }
 

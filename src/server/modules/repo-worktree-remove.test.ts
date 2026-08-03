@@ -79,6 +79,7 @@ describe('repo worktree removal', () => {
     )
 
     expect(result).toMatchObject({ ok: true, message: 'ok' })
+    expect(result).not.toHaveProperty('worktreeRemoved')
     expect(beforeRemove).toHaveBeenCalledOnce()
     expect(afterWorktreeRemoved).toHaveBeenCalledOnce()
     expect(beforeRemove.mock.invocationCallOrder[0]).toBeLessThan(mocks.removeWorktree.mock.invocationCallOrder[0]!)
@@ -181,7 +182,7 @@ describe('repo worktree removal', () => {
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
   })
 
-  test('preserves removal finalization before an SSH follow-up runtime failure escapes', async () => {
+  test('prunes settings after an explicit removal lifecycle before propagating a preclassified carrier', async () => {
     const [{ RepoMutationRuntimeFailureError }, { RemoteWorkspaceRuntimeFailureError }] = await Promise.all([
       import('#/server/modules/repo-mutation-runtime-failure.ts'),
       import('#/server/modules/remote-workspace-runtime-failure.ts'),
@@ -194,17 +195,21 @@ describe('repo worktree removal', () => {
       reason: 'unreachable',
       message: 'branch cleanup connection lost',
     })
-    mocks.removeRemoteWorktree.mockRejectedValueOnce(
-      new RepoMutationRuntimeFailureError(
-        {
-          ok: false,
-          message: 'error.worktree-removed-followup-failed',
-          worktreeRemoved: true,
-          repoIdsToInvalidate: [repoId, linkedRepoId],
-        },
-        runtimeFailure,
-      ),
+    const carrier = new RepoMutationRuntimeFailureError(
+      {
+        ok: false,
+        message: 'error.worktree-removed-followup-failed',
+        repoIdsToInvalidate: [repoId, linkedRepoId],
+      },
+      runtimeFailure,
     )
+    mocks.removeRemoteWorktree.mockImplementationOnce(async (_target, input) => {
+      const prepared = await input.beforeRemove()
+      if (!prepared.ok) return prepared
+      const finalized = await input.afterWorktreeRemoved()
+      if (!finalized.ok) return finalized
+      throw carrier
+    })
 
     await expect(removeRemoteWorktreeForTest()).rejects.toMatchObject({
       runtimeFailure,
@@ -350,6 +355,63 @@ describe('repo worktree removal', () => {
       message: 'upstream rejected deletion',
       recoveryMessageKeys: ['error.worktree-removed-followup-failed', 'error.local-branch-deleted-followup-failed'],
     })
+    expect(mocks.deleteUpstreamBranch.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.pruneServerWorkspaceSettingsForRemovedWorktree.mock.invocationCallOrder[0]!,
+    )
+  })
+
+  test('reports confirmed local branch deletion when upstream deletion is cancelled after worktree removal', async () => {
+    mocks.readWorktreeMembership.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false },
+    ])
+    mocks.isAncestor.mockResolvedValue(true)
+    mocks.getUpstream.mockResolvedValueOnce({
+      ancestryRef: 'refs/remotes/origin/feature/a',
+      source: { remote: 'origin', branch: 'feature/a' },
+      deleteTarget: { remote: 'origin', branch: 'feature/a' },
+    })
+    mocks.deleteUpstreamBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'cancelled'),
+    )
+
+    const result = await removeLocalRepoWorktreeForTest(
+      { deleteBranch: true, deleteUpstream: true },
+      successfulRemovalLifecycle,
+    )
+
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'error.git-command-cancelled-check-state',
+      recoveryMessageKeys: ['error.worktree-removed-followup-failed', 'error.local-branch-deleted-followup-failed'],
+    })
+  })
+
+  test('reports confirmed local branch deletion when upstream deletion times out after worktree removal', async () => {
+    mocks.readWorktreeMembership.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false },
+    ])
+    mocks.isAncestor.mockResolvedValue(true)
+    mocks.getUpstream.mockResolvedValueOnce({
+      ancestryRef: 'refs/remotes/origin/feature/a',
+      source: { remote: 'origin', branch: 'feature/a' },
+      deleteTarget: { remote: 'origin', branch: 'feature/a' },
+    })
+    mocks.deleteUpstreamBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'git timed out after 90s' }, 'timed-out'),
+    )
+
+    const result = await removeLocalRepoWorktreeForTest(
+      { deleteBranch: true, deleteUpstream: true },
+      successfulRemovalLifecycle,
+    )
+
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'error.git-command-timeout-check-state',
+      recoveryMessageKeys: ['error.worktree-removed-followup-failed', 'error.local-branch-deleted-followup-failed'],
+    })
   })
 
   test('removeRepoWorktree does not use a missing tracking ref for branch deletion admission', async () => {
@@ -384,7 +446,7 @@ describe('repo worktree removal', () => {
     expect(result.repoIdsToInvalidate).toBeUndefined()
   })
 
-  test('removeRepoWorktree publishes affected invalidations after branch deletion fails post-removal', async () => {
+  test('removeRepoWorktree preserves an ordinary branch deletion failure after removal', async () => {
     const worktrees = [
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
       {
@@ -412,6 +474,50 @@ describe('repo worktree removal', () => {
       worktreePath: '/tmp/repo-worktree',
     })
     expect(result.repoIdsToInvalidate).toEqual([WORKTREE_REPO_ID, REPO_ID])
+  })
+
+  test('removeRepoWorktree reports uncertain local branch deletion when it is cancelled after removal', async () => {
+    const worktrees = [
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false },
+    ]
+    mocks.readWorktreeMembership.mockResolvedValueOnce(worktrees).mockResolvedValueOnce(worktrees)
+    mocks.deleteBranch.mockResolvedValueOnce(commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'cancelled'))
+
+    const result = await removeLocalRepoWorktreeForTest(
+      { deleteBranch: true, forceDeleteBranch: true },
+      successfulRemovalLifecycle,
+    )
+
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'error.git-command-cancelled-check-state',
+      recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
+      repoIdsToInvalidate: [WORKTREE_REPO_ID, REPO_ID],
+    })
+  })
+
+  test('removeRepoWorktree reports uncertain local branch deletion when it times out after removal', async () => {
+    const worktrees = [
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false },
+    ]
+    mocks.readWorktreeMembership.mockResolvedValueOnce(worktrees).mockResolvedValueOnce(worktrees)
+    mocks.deleteBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'git timed out after 30s' }, 'timed-out'),
+    )
+
+    const result = await removeLocalRepoWorktreeForTest(
+      { deleteBranch: true, forceDeleteBranch: true },
+      successfulRemovalLifecycle,
+    )
+
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'error.git-command-timeout-check-state',
+      recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
+      repoIdsToInvalidate: [WORKTREE_REPO_ID, REPO_ID],
+    })
   })
 
   test('removeRepoWorktree can remove and delete the currently opened linked worktree', async () => {

@@ -982,7 +982,7 @@ describe('repo write operation coordinator', () => {
     expect(queuedTask).not.toHaveBeenCalled()
   })
 
-  test('closes runtime admission for a classified preflight failure before releasing the queue', async () => {
+  test('closes runtime admission for a classified queued-task failure before releasing the queue', async () => {
     const releaseActive = Promise.withResolvers<void>()
     const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
       workspaceId: WORKSPACE_ID,
@@ -1024,6 +1024,112 @@ describe('repo write operation coordinator', () => {
     await expect(active).rejects.toBe(runtimeFailure)
     await expect(queued).rejects.toThrow('error.workspace-runtime-stale')
     expect(queuedTask).not.toHaveBeenCalled()
+  })
+
+  test('closes runtime admission when execution capture observes a classified failure', async () => {
+    const releaseActive = Promise.withResolvers<void>()
+    const active = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      (operation) => async () => {
+        operation.start()
+        await releaseActive.promise
+        operation.settle({ ok: true })
+        return { ok: true, message: 'active done' }
+      },
+    )
+    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().runningOperations).toBe(1))
+
+    const queuedTask = vi.fn(async () => ({ ok: true, message: 'unexpected' }))
+    const queued = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'delete-branch',
+        source: 'user',
+      },
+      () => queuedTask,
+    )
+    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().queuedOperations).toBe(1))
+
+    const captureStarted = Promise.withResolvers<void>()
+    const rejectCapture = Promise.withResolvers<RepoWriteExecutionCapability>()
+    const caller = new AbortController()
+    const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: 'runtime-a',
+      reason: 'unreachable',
+    })
+    const failedCapture = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      caller.signal,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'push',
+        source: 'user',
+        captureExecution: async () => {
+          captureStarted.resolve()
+          return await rejectCapture.promise
+        },
+      },
+      () => async () => ({ ok: true, message: 'unexpected' }),
+    )
+    await captureStarted.promise
+    caller.abort(new Error('caller disconnected'))
+    rejectCapture.reject(runtimeFailure)
+
+    await expect(failedCapture).rejects.toBe(runtimeFailure)
+    releaseActive.resolve()
+    await expect(active).resolves.toEqual({ ok: true, message: 'active done' })
+    await expect(queued).rejects.toThrow('error.workspace-runtime-stale')
+    expect(queuedTask).not.toHaveBeenCalled()
+  })
+
+  test('keeps runtime admission open when execution capture is only cancelled', async () => {
+    const captureStarted = Promise.withResolvers<void>()
+    const rejectCapture = Promise.withResolvers<RepoWriteExecutionCapability>()
+    const caller = new AbortController()
+    const cancelledCapture = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      caller.signal,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'push',
+        source: 'user',
+        captureExecution: async () => {
+          captureStarted.resolve()
+          return await rejectCapture.promise
+        },
+      },
+      () => async () => ({ ok: true, message: 'unexpected' }),
+    )
+    await captureStarted.promise
+    caller.abort(new Error('caller cancelled'))
+    rejectCapture.reject(caller.signal.reason)
+
+    await expect(cancelledCapture).resolves.toEqual({ ok: false, message: 'cancelled' })
+    await expect(
+      enqueueRepoWriteOperation(
+        WORKSPACE_ID,
+        undefined,
+        {
+          repoId: WORKSPACE_ID,
+          workspaceRuntimeId: 'runtime-a',
+          kind: 'fetch',
+          source: 'user',
+        },
+        (operation) => async () => {
+          operation.start()
+          operation.settle({ ok: true })
+          return { ok: true, message: 'next admitted' }
+        },
+      ),
+    ).resolves.toEqual({ ok: true, message: 'next admitted' })
   })
 
   test('reclaims an idle boundary group after its workspace runtime closes', async () => {

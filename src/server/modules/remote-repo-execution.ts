@@ -49,7 +49,7 @@ export function remoteRuntimeAwareGitRunner(
   }
 }
 
-export interface RemoteRepoMutationExecution {
+interface RemoteRepoMutationExecution {
   run: RemoteGitRunner
   runtimeFailure(): RemoteWorkspaceRuntimeFailureError | null
 }
