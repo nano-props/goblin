@@ -56,6 +56,18 @@ describe('remote runtime failure classification', () => {
     >)('classifies %s', (_name, input, expected) => {
       expect(remoteWorkspaceRuntimeFailureReasonFromCommandResult(failedCommand(input))).toBe(expected)
     })
+
+    test('fails the runtime when SSH exits zero without establishing the remote command protocol', () => {
+      expect(
+        remoteWorkspaceRuntimeFailureReasonFromCommandResult(
+          failedCommand({
+            message: 'error.ssh-remote-command-start-unconfirmed',
+            remoteStarted: false,
+            remoteStartUnconfirmed: true,
+          }),
+        ),
+      ).toBe('handshake-failed')
+    })
   })
 
   describe('after the remote shell starts', () => {

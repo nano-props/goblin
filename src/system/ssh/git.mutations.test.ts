@@ -795,4 +795,26 @@ describe('remote git mutations', () => {
       execution: { status: 'not-started' },
     })
   })
+
+  test('createRemoteWorktree treats an unconfirmed remote protocol start as a failed attempt', async () => {
+    const run = vi.fn<RemoteGitRunner>(async () => ({
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: 'error.ssh-remote-command-start-unconfirmed',
+      remoteStarted: false,
+      remoteStartUnconfirmed: true,
+    }))
+
+    const result = await createRemoteWorktree(TARGET, {
+      worktreePath: '/srv/repo-feature',
+      mode: { kind: 'existingBranch', branch: 'feature/test' },
+      run,
+    })
+
+    expect(result).toEqual({
+      result: { ok: false, message: 'error.ssh-remote-command-start-unconfirmed' },
+      execution: { status: 'failed' },
+    })
+  })
 })

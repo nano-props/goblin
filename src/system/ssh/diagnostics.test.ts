@@ -31,6 +31,19 @@ describe('classifySshFailure', () => {
       }),
     ).toBe('shell-failed')
   })
+
+  test('classifies a missing remote protocol marker as a shell failure', () => {
+    expect(
+      classifySshFailure({
+        ok: false,
+        stdout: '',
+        stderr: '',
+        message: 'error.ssh-remote-command-start-unconfirmed',
+        remoteStarted: false,
+        remoteStartUnconfirmed: true,
+      }),
+    ).toBe('shell-failed')
+  })
 })
 
 describe('testRemoteWorkspace parallel stages', () => {

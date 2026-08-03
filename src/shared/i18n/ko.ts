@@ -531,6 +531,8 @@ export const ko: Record<DictKey, string> = {
   'error.failed-read-repo': '리포지토리 읽기 실패',
   'error.repo-membership-changing': '저장소 워크트리를 변경하는 중입니다',
   'error.ssh-config-changed': 'SSH 설정이 변경됨',
+  'error.ssh-remote-command-start-unconfirmed':
+    '원격 명령이 실행되었는지 확인할 수 없습니다. 다시 시도하기 전에 원격 저장소 상태와 SSH 서버 구성을 확인하세요.',
   'error.repository-boundary-unavailable': '저장소 ID를 확인할 수 없습니다',
   'error.git-not-found': 'Git을 찾을 수 없습니다',
   'error.path-not-found': '경로를 찾을 수 없습니다',

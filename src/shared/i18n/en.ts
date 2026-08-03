@@ -540,6 +540,8 @@ export const en = {
   'error.failed-read-repo': 'Failed to read repository',
   'error.repo-membership-changing': 'Repository worktrees are changing',
   'error.ssh-config-changed': 'SSH config changed',
+  'error.ssh-remote-command-start-unconfirmed':
+    'Could not confirm whether the remote command ran. Before retrying, check the remote repository state and SSH server configuration.',
   'error.repository-boundary-unavailable': 'Repository identity could not be confirmed',
   'error.git-not-found': 'Git not found',
   'error.path-not-found': 'Path not found',

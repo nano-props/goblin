@@ -81,6 +81,32 @@ describe('runRemoteCommand', () => {
     )
   })
 
+  test('rejects SSH exit zero when the remote command protocol did not start', async () => {
+    mocks.execa.mockResolvedValueOnce({ stdout: '', stderr: '' })
+
+    await expect(runRemoteCommand(target(), { type: 'checkShell' })).resolves.toEqual({
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: 'error.ssh-remote-command-start-unconfirmed',
+      remoteStarted: false,
+      remoteStartUnconfirmed: true,
+    })
+  })
+
+  test('preserves unexpected server output when SSH exit zero bypasses the remote command protocol', async () => {
+    mocks.execa.mockResolvedValueOnce({ stdout: 'forced command output\n', stderr: 'server notice\n' })
+
+    await expect(runRemoteCommand(target(), { type: 'checkShell' })).resolves.toEqual({
+      ok: false,
+      stdout: 'forced command output',
+      stderr: 'server notice',
+      message: 'error.ssh-remote-command-start-unconfirmed',
+      remoteStarted: false,
+      remoteStartUnconfirmed: true,
+    })
+  })
+
   test('preserves remoteStarted on command failures after the remote shell starts', async () => {
     mocks.execa.mockRejectedValueOnce({
       stdout: `${REMOTE_COMMAND_STARTED_MARKER}\n`,

@@ -520,6 +520,7 @@ export const zh: Record<DictKey, string> = {
   'error.failed-read-repo': '读取仓库失败',
   'error.repo-membership-changing': '仓库工作树正在变更',
   'error.ssh-config-changed': 'SSH 配置已变更',
+  'error.ssh-remote-command-start-unconfirmed': '无法确认远程命令是否执行。重试前请检查远程仓库状态和 SSH 服务端配置。',
   'error.repository-boundary-unavailable': '无法确认仓库身份',
   'error.git-not-found': '未找到 Git',
   'error.path-not-found': '路径不存在',

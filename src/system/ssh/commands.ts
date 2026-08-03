@@ -77,6 +77,8 @@ export interface RemoteCommandResult {
   message?: string
   timedOut?: boolean
   remoteStarted?: boolean
+  /** SSH exited successfully without proving that the Goblin remote command started. */
+  remoteStartUnconfirmed?: true
   /** Locally authoritative proof that SSH was not invoked. */
   commandNotStarted?: true
   transportStderr?: string
@@ -138,6 +140,16 @@ export async function runRemoteCommand(
       maxBuffer: 2 * 1024 * 1024,
     })
     const parsed = parseRemoteCommandOutput(stdout, stderr)
+    if (!parsed.remoteStarted) {
+      return {
+        ok: false,
+        stdout: parsed.stdout,
+        stderr: parsed.stderr,
+        message: 'error.ssh-remote-command-start-unconfirmed',
+        remoteStarted: false,
+        remoteStartUnconfirmed: true,
+      }
+    }
     return { ok: true, stdout: parsed.stdout, stderr: parsed.stderr, remoteStarted: parsed.remoteStarted }
   } catch (err) {
     const e = err as { stdout?: unknown; stderr?: unknown; timedOut?: boolean; isCanceled?: boolean; message?: string }

@@ -39,6 +39,7 @@ export function remoteWorkspaceRuntimeFailureReasonFromCommandResult(
   // Git/SSH failures from inside the remote shell.
   if (result.remoteStarted) return remoteRuntimeTransportFailureAfterStart(result, target)
   if (result.timedOut || result.message === 'timeout') return 'timeout'
+  if (result.remoteStartUnconfirmed) return 'handshake-failed'
   const text = `${result.stderr}\n${result.stdout}\n${result.message ?? ''}`.toLowerCase()
   if (text.includes('host key verification failed') || text.includes('remote host identification has changed')) {
     return 'host-key'

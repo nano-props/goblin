@@ -539,6 +539,8 @@ export const ja: Record<DictKey, string> = {
   'error.failed-read-repo': 'リポジトリの読み込みに失敗しました',
   'error.repo-membership-changing': 'リポジトリのワークツリーを変更しています',
   'error.ssh-config-changed': 'SSH 設定が変更されました',
+  'error.ssh-remote-command-start-unconfirmed':
+    'リモートコマンドが実行されたか確認できませんでした。再試行する前に、リモートリポジトリの状態と SSH サーバーの設定を確認してください。',
   'error.repository-boundary-unavailable': 'リポジトリの識別情報を確認できませんでした',
   'error.git-not-found': 'Git が見つかりません',
   'error.path-not-found': 'パスが見つかりません',
