@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import { CloneRepositoryDialog, type CloneRepositoryRequest } from '#/web/components/CloneRepositoryDialog.tsx'
+import { CloneRepositoryDialog, type CloneRepositoryInput } from '#/web/components/CloneRepositoryDialog.tsx'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { cloneRepository as runCloneRepository } from '#/web/repo-client.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -16,9 +16,8 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
   const ensureWorkspaceOpen = useWorkspacesStore((s) => s.ensureWorkspaceOpen)
   const navigation = useAppNavigation()
 
-  async function handleClone(request: CloneRepositoryRequest): Promise<CloneRepoResult> {
-    const { signal, ...cloneInput } = request
-    const result = await runCloneRepository(cloneInput, { signal })
+  async function handleClone(input: CloneRepositoryInput, signal: AbortSignal): Promise<CloneRepoResult> {
+    const result = await runCloneRepository(input, { signal })
     if (!result.ok || !result.path) return result
     const openResult = await ensureWorkspaceOpen(result.path)
     if (!openResult.ok) {
