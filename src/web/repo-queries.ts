@@ -12,8 +12,7 @@ import {
 import { projectRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 
 export function useRepoSnapshotReadModel(repoRoot: WorkspaceId | null, workspaceRuntimeId: string, enabled: boolean) {
-  const query = useQuery(repoSnapshotReadModelQueryOptions(repoRoot, workspaceRuntimeId, enabled))
-  return repoReadProjection(query, query.error)
+  return useQuery(repoSnapshotReadModelQueryOptions(repoRoot, workspaceRuntimeId, enabled))
 }
 
 export function useRepoPullRequestsReadModel(
@@ -30,20 +29,7 @@ export function useRepoWorktreeStatusReadModel(
   workspaceRuntimeId: string,
   enabled: boolean,
 ) {
-  const query = useQuery(repoWorktreeStatusReadModelQueryOptions(repoRoot, workspaceRuntimeId, enabled))
-  return repoReadProjection(query, query.error)
-}
-
-function repoReadProjection<T extends object>(query: T, error: unknown) {
-  return {
-    ...query,
-    displayError: repoReadError(error),
-  }
-}
-
-function repoReadError(error: unknown): Error | null {
-  if (!error) return null
-  return error instanceof Error ? error : new Error(String(error))
+  return useQuery(repoWorktreeStatusReadModelQueryOptions(repoRoot, workspaceRuntimeId, enabled))
 }
 
 export function useRepoLogQuery(

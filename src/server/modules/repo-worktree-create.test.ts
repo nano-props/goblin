@@ -220,7 +220,11 @@ describe('repo worktree creation', () => {
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-created-followup-failed' })
+    expect(result).toEqual({
+      ok: false,
+      message: 'settings write failed',
+      recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+    })
     expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
       configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
@@ -523,7 +527,11 @@ describe('repo worktree creation', () => {
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: true })
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-created-followup-failed' })
+    expect(result).toEqual({
+      ok: false,
+      message: 'settings write failed',
+      recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+    })
     expect(mocks.createWorktree).toHaveBeenCalled()
     expect(mocks.bootstrapWorktreeAfterCreate).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', {
       signal: undefined,

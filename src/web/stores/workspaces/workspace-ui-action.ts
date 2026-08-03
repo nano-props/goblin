@@ -1,5 +1,5 @@
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { ExecResult } from '#/web/types.ts'
+import type { ExecResult } from '#/shared/git-types.ts'
 
 export async function dispatchWorkspaceUiAction(
   workspaceId: WorkspaceId,

@@ -7,6 +7,7 @@ import { buildRemoteCommandInvocation } from '#/system/ssh/commands.ts'
 import { buildCanonicalSshConnectionSnapshot, buildRemoteTerminalInvocation } from '#/system/ssh/invocation.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { encodeRemoteWorktreeBootstrapRecord } from '#/system/ssh/worktree-bootstrap-protocol.ts'
 
 const originalPath = process.env.PATH
 const originalPathExt = process.env.PATHEXT
@@ -316,7 +317,10 @@ describe('remote ssh command builders', () => {
 
     const result = await execa('bash', ['-lc', invocation.script])
 
-    expect(result.stdout.split('\n')).toEqual(['GOBLIN_BOOTSTRAP_COPY foo bar.txt', 'GOBLIN_BOOTSTRAP_COPY config dir'])
+    expect(result.stdout).toBe(
+      encodeRemoteWorktreeBootstrapRecord('copy', 'foo bar.txt') +
+        encodeRemoteWorktreeBootstrapRecord('copy', 'config dir'),
+    )
     expect(readFileSync(path.join(targetRoot, 'foo bar.txt'), 'utf8')).toBe('space\n')
     expect(readFileSync(path.join(targetRoot, 'config dir', 'app.json'), 'utf8')).toBe('ok\n')
     expect(existsSync(path.join(targetRoot, 'config dir', 'debug.log'))).toBe(false)
@@ -419,7 +423,7 @@ describe('remote ssh command builders', () => {
 
     const result = await execa('bash', ['-lc', invocation.script], { env: { SHELL: '/bin/sh' } })
 
-    expect(result.stdout).toBe(`GOBLIN_BOOTSTRAP_SETUP ${setup}`)
+    expect(result.stdout).toBe(encodeRemoteWorktreeBootstrapRecord('setup', setup))
     expect(result.stderr).toBe('')
   })
 
@@ -471,7 +475,7 @@ describe('remote ssh command builders', () => {
 
     const result = await execa('bash', ['-lc', invocation.script])
 
-    expect(result.stdout).toBe('GOBLIN_BOOTSTRAP_COPY config/app.json')
+    expect(result.stdout).toBe(encodeRemoteWorktreeBootstrapRecord('copy', 'config/app.json'))
     expect(readFileSync(path.join(targetRoot, 'config', 'app.json'), 'utf8')).toBe('ok\n')
     expect(existsSync(path.join(targetRoot, 'config', '.git', 'config'))).toBe(false)
   })
@@ -490,7 +494,7 @@ describe('remote ssh command builders', () => {
       type: 'bootstrapRemoteWorktree',
       sourceRoot,
       targetRoot,
-      copy: ['a.txt'],
+      copy: ['missing.txt', 'a.txt'],
       symlink: [],
       hardlink: [],
       exclude: [],
@@ -500,7 +504,7 @@ describe('remote ssh command builders', () => {
       const result = await execa('bash', ['-lc', invocation.script], { reject: false })
 
       expect(result.exitCode).toBe(1)
-      expect(result.stdout).toBe('')
+      expect(result.stdout).toBe(encodeRemoteWorktreeBootstrapRecord('missing', 'missing.txt'))
       expect(result.stderr).toContain('failed to copy a.txt')
       expect(existsSync(path.join(targetRoot, 'a.txt'))).toBe(false)
     } finally {

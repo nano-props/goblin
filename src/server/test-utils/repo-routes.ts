@@ -40,6 +40,7 @@ const mocks = vi.hoisted(() => ({
   publishUserWorkspaceFilesystemInvalidation: vi.fn(),
   publishUserWorkspaceRuntimeInvalidation: vi.fn(),
   getBackgroundSyncSnapshot: vi.fn(),
+  stopBackgroundSyncRuntime: vi.fn(),
 }))
 
 vi.mock('#/server/modules/background-sync.ts', () => ({
@@ -49,6 +50,7 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
   prepareBackgroundSync: mocks.prepareBackgroundSync,
   getBackgroundSyncRepos: mocks.getBackgroundSyncRepos,
   getBackgroundSyncDiagnostics: vi.fn(),
+  stopBackgroundSyncRuntime: mocks.stopBackgroundSyncRuntime,
 }))
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   getRepoLog: mocks.getRepoLog,

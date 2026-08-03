@@ -373,10 +373,7 @@ describe('repo worktree removal', () => {
     expect(result).toEqual({
       ok: false,
       message: 'upstream rejected deletion',
-      recoveryMessageKeys: [
-        'error.worktree-removed-followup-failed',
-        'error.local-branch-deleted-followup-failed',
-      ],
+      recoveryMessageKeys: ['error.worktree-removed-followup-failed', 'error.local-branch-deleted-followup-failed'],
     })
   })
 
@@ -531,7 +528,11 @@ describe('repo worktree removal', () => {
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-removed-followup-failed' })
+    expect(result).toEqual({
+      ok: false,
+      message: 'settings write failed',
+      recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
+    })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })

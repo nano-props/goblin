@@ -12,6 +12,7 @@ import {
   isCurrentWorkspaceRuntimeMembership,
   listWorkspaceRuntimes,
   onWorkspaceRuntimeClosed,
+  onWorkspaceRuntimeFailed,
   releaseWorkspaceRuntime,
   releaseWorkspaceRuntimeMembershipLease,
   retainWorkspaceRuntimeResource,
@@ -482,21 +483,31 @@ describe('workspace runtimes', () => {
         },
       },
     }))
+    const failedEvents = vi.fn()
+    const unsubscribeFailed = onWorkspaceRuntimeFailed(failedEvents)
 
-    await expect(
-      runRemoteWorkspaceLifecycle(USER_ID, workspaceId, workspaceRuntimeId, failed, undefined, 'ensure'),
-    ).resolves.toMatchObject({
-      kind: 'settled',
-      lifecycle: { kind: 'failed' },
-    })
-    await expect(
-      runRemoteWorkspaceLifecycle(USER_ID, workspaceId, workspaceRuntimeId, ready, undefined, 'ensure'),
-    ).resolves.toMatchObject({
-      kind: 'settled',
-      lifecycle: { kind: 'ready' },
-    })
-    expect(failed).toHaveBeenCalledTimes(1)
-    expect(ready).toHaveBeenCalledTimes(1)
+    try {
+      await expect(
+        runRemoteWorkspaceLifecycle(USER_ID, workspaceId, workspaceRuntimeId, failed, undefined, 'ensure'),
+      ).resolves.toMatchObject({
+        kind: 'settled',
+        lifecycle: { kind: 'failed' },
+      })
+      expect(failedEvents).toHaveBeenCalledOnce()
+      expect(failedEvents).toHaveBeenCalledWith({ userId: USER_ID, workspaceId, workspaceRuntimeId })
+
+      await expect(
+        runRemoteWorkspaceLifecycle(USER_ID, workspaceId, workspaceRuntimeId, ready, undefined, 'ensure'),
+      ).resolves.toMatchObject({
+        kind: 'settled',
+        lifecycle: { kind: 'ready' },
+      })
+      expect(failedEvents).toHaveBeenCalledOnce()
+      expect(failed).toHaveBeenCalledTimes(1)
+      expect(ready).toHaveBeenCalledTimes(1)
+    } finally {
+      unsubscribeFailed()
+    }
   })
 
   test('atomically replaces one client membership set without changing sibling clients', () => {

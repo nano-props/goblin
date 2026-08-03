@@ -57,12 +57,23 @@ async function copyDirectory(
     options.signal?.throwIfAborted()
   } catch (error) {
     // Restoring the mode is cleanup for a newly created partial directory.
-    // Preserve the copy/cancellation error that owns recovery; do not replace
-    // it with a second cleanup failure or introduce a permission retry loop.
-    await fs.chmod(destinationPath, mode).catch(() => {})
+    // Keep the copy/cancellation error as the primary reason, but do not hide
+    // a second failure that leaves destination permissions uncertain.
+    try {
+      await fs.chmod(destinationPath, mode)
+    } catch (restoreError) {
+      throw new Error(
+        `${filesystemErrorMessage(error)}; failed to restore destination permissions: ${filesystemErrorMessage(restoreError)}`,
+        { cause: error },
+      )
+    }
     throw error
   }
   await fs.chmod(destinationPath, mode)
+}
+
+function filesystemErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 async function copyRegularFile(

@@ -569,6 +569,8 @@ export const ko: Record<DictKey, string> = {
     '워크트리는 삭제되었지만 후속 단계가 실패했습니다. 계속하기 전에 작업 공간을 다시 열거나 복구하세요.',
   'error.local-branch-deleted-followup-failed':
     '로컬 브랜치는 삭제되었지만 후속 단계가 실패했습니다. 다시 시도하기 전에 원격 브랜치를 확인하세요.',
+  'error.workspace-runtime-settlement-failed':
+    '워크스페이스 런타임을 확정하지 못했습니다. 자동 Git 동기화를 중지했습니다. 계속하기 전에 워크스페이스를 다시 열거나 복구하세요.',
   'error.branch-action-wait-timeout': '저장소 새로고침 완료 대기 시간이 초과되었습니다.',
   'error.unknown': '알 수 없는 오류',
   'error.cannot-delete-current-branch': '현재 브랜치는 삭제할 수 없습니다',

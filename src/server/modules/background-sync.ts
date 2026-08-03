@@ -7,7 +7,11 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
-import { onWorkspaceRuntimeClosed, onWorkspaceRuntimeMembershipReleased } from '#/server/modules/workspace-runtimes.ts'
+import {
+  onWorkspaceRuntimeClosed,
+  onWorkspaceRuntimeFailed,
+  onWorkspaceRuntimeMembershipReleased,
+} from '#/server/modules/workspace-runtimes.ts'
 import {
   backgroundSyncBackoffDelayMs,
   backgroundSyncNextEligibleAt,
@@ -92,6 +96,7 @@ let settingsSubscription: (() => void) | null = null
 let settingsInitializationPromise: Promise<void> | null = null
 let settingsInitializationGeneration = 0
 let runtimeCloseSubscription: (() => void) | null = null
+let runtimeFailureSubscription: (() => void) | null = null
 let membershipReleaseSubscription: (() => void) | null = null
 const backgroundSyncLogger = serverLogger.child({ module: 'background-sync' })
 const syncQueue = new PQueue({ concurrency: 1 })
@@ -117,7 +122,10 @@ export async function prepareBackgroundSync(): Promise<void> {
   if (settingsSubscription) return
   if (settingsInitializationPromise) return await settingsInitializationPromise
   runtimeCloseSubscription ??= onWorkspaceRuntimeClosed((event) => {
-    removeBackgroundSyncRuntime(event.userId, event.workspaceId, event.workspaceRuntimeId)
+    stopBackgroundSyncRuntime(event.userId, event.workspaceId, event.workspaceRuntimeId)
+  })
+  runtimeFailureSubscription ??= onWorkspaceRuntimeFailed((event) => {
+    stopBackgroundSyncRuntime(event.userId, event.workspaceId, event.workspaceRuntimeId)
   })
   membershipReleaseSubscription ??= onWorkspaceRuntimeMembershipReleased((event) => {
     releaseBackgroundSyncMembership(
@@ -319,7 +327,7 @@ async function settleBackgroundRuntimeFailureOrStop(
   // A classified runtime failure ends this runtime's automatic work whether
   // lifecycle settlement succeeded or became uncertain. User-driven reopen or
   // registration establishes a new runtime instead of replaying against this one.
-  removeBackgroundSyncRuntime(target.userId, target.workspaceId, target.workspaceRuntimeId)
+  stopBackgroundSyncRuntime(target.userId, target.workspaceId, target.workspaceRuntimeId)
 }
 
 export function beginBackgroundSyncRegistration(
@@ -410,6 +418,8 @@ export function stopBackgroundSync(): void {
   settingsSubscription = null
   runtimeCloseSubscription?.()
   runtimeCloseSubscription = null
+  runtimeFailureSubscription?.()
+  runtimeFailureSubscription = null
   membershipReleaseSubscription?.()
   membershipReleaseSubscription = null
 }
@@ -463,7 +473,8 @@ export function resetBackgroundSyncForTests(): void {
   stopBackgroundSync()
 }
 
-function removeBackgroundSyncRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
+/** Stop automatic work owned by one exact runtime after its lifecycle becomes uncertain or closes. */
+export function stopBackgroundSyncRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
   const closedTarget = { userId, workspaceId, workspaceRuntimeId }
   const key = backgroundSyncTargetKey(closedTarget)
   for (const [ownerKey, admission] of state.registrationAdmissionsByOwner) {

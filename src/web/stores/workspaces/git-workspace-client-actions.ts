@@ -1,11 +1,16 @@
 import { appendRepoEvent, replaceWorkspaceState, resultEvent } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import type { ExecResult } from '#/web/types.ts'
+import type { RepoMutationExecResult } from '#/shared/git-types.ts'
 import type { RepoResultEventOptions, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { gitWorkspaceClientState, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 
 export function createGitWorkspaceClientActions(set: WorkspacesSet) {
   return {
-    setLastResult(id: string, result: ExecResult, workspaceRuntimeId: string, options?: RepoResultEventOptions) {
+    setLastResult(
+      id: string,
+      result: RepoMutationExecResult,
+      workspaceRuntimeId: string,
+      options?: RepoResultEventOptions,
+    ) {
       set((state) => {
         const workspace = state.workspaces[id]
         if (!workspace || workspace.workspaceRuntimeId !== workspaceRuntimeId || !isGitWorkspace(workspace))

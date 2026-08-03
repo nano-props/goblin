@@ -23,7 +23,12 @@ import {
   pruneServerWorkspaceSettingsForRemovedWorktree,
   setServerWorkspaceWorktreeBootstrapConfigTrust,
 } from '#/server/modules/settings-source.ts'
-import { type ExecResult, type RepoMutationExecResult, type RepoUrlTarget } from '#/shared/git-types.ts'
+import {
+  type ExecResult,
+  type ExecResultRecoveryMessageKey,
+  type RepoMutationExecResult,
+  type RepoUrlTarget,
+} from '#/shared/git-types.ts'
 import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
 import { isValidWorkspaceLocatorInput, toSafeWorkspaceLocator } from '#/shared/input-validation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -32,14 +37,6 @@ import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared
 import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
 
 const repoWriteLogger = serverLogger.child({ module: 'repo-write-paths' })
-
-function execResultAfterMutationInvalidations(
-  workspaceId: WorkspaceId,
-  result: RepoMutationResult,
-  domains: readonly RepoReadInvalidationDomain[],
-): ExecResult {
-  return publicRepoMutationResult(publishMutationInvalidations(workspaceId, result, domains))
-}
 
 function publishMutationInvalidations(
   workspaceId: WorkspaceId,
@@ -149,13 +146,13 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
       canCancelUnderlying: !!options.signal,
       captureExecution: options.captureExecution,
     },
-    (operation, context) => {
+    (operation, context) => async () => {
       const onAbort = () => {
         operation.requestCancel('caller-abort')
       }
       if (options.signal?.aborted) onAbort()
       else options.signal?.addEventListener('abort', onAbort, { once: true })
-      return async () => {
+      try {
         operation.start()
         if (options.signal?.aborted) {
           const result = { ok: false, message: 'cancelled' } as T
@@ -172,9 +169,9 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
             message: err instanceof Error ? err.message : String(err),
           })
           throw err
-        } finally {
-          options.signal?.removeEventListener('abort', onAbort)
         }
+      } finally {
+        options.signal?.removeEventListener('abort', onAbort)
       }
     },
   )
@@ -283,8 +280,8 @@ export async function createRepoWorktree(
           if (!result.ok) return result
           try {
             await persistWorktreeBootstrapTrustChoice(repoId, worktreeBootstrap)
-          } catch {
-            return { ...result, ok: false, message: 'error.worktree-created-followup-failed' }
+          } catch (error) {
+            return worktreeFollowupFailure(result, error, 'error.worktree-created-followup-failed')
           }
           return result
         })
@@ -426,8 +423,26 @@ async function pruneRemovedWorktreeSettings(
       repoWriteLogger.warn({ error, repoId, worktreePath }, 'failed to prune settings after worktree removal')
       return mutation
     }
-    return { ...mutation, ok: false, message: 'error.worktree-removed-followup-failed' }
+    return worktreeFollowupFailure(mutation, error, 'error.worktree-removed-followup-failed')
   }
+}
+
+function worktreeFollowupFailure(
+  mutation: RepoMutationResult,
+  error: unknown,
+  recoveryMessageKey: ExecResultRecoveryMessageKey,
+): RepoMutationResult {
+  const recoveryMessageKeys = Array.from(new Set([...(mutation.recoveryMessageKeys ?? []), recoveryMessageKey]))
+  const failure: RepoMutationResult = {
+    ok: false,
+    message: error instanceof Error ? error.message : String(error),
+    recoveryMessageKeys,
+  }
+  if (mutation.worktreeBootstrap) failure.worktreeBootstrap = mutation.worktreeBootstrap
+  if (mutation.repoIdsToInvalidate) failure.repoIdsToInvalidate = mutation.repoIdsToInvalidate
+  if (mutation.worktreePathsToInvalidate) failure.worktreePathsToInvalidate = mutation.worktreePathsToInvalidate
+  if (mutation.worktreeRemoved) failure.worktreeRemoved = true
+  return failure
 }
 
 export async function openRepoUrl(

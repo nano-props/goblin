@@ -2,7 +2,7 @@ import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.t
 import type { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 
 /**
- * Carries a completed domain mutation to its application owner before the
+ * Carries an established domain mutation result to its application owner before the
  * original runtime failure continues through normal lifecycle settlement.
  */
 export class RepoMutationRuntimeFailureError extends Error {

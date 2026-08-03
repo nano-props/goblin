@@ -10,14 +10,19 @@ import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-work
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const settleRemoteWorkspaceRuntimeFailureMock = vi.hoisted(() => vi.fn())
+const stopBackgroundSyncRuntimeMock = vi.hoisted(() => vi.fn())
 vi.mock('#/server/modules/remote-workspace-runtime-failure-settlement.ts', () => ({
   settleRemoteWorkspaceRuntimeFailure: settleRemoteWorkspaceRuntimeFailureMock,
+}))
+vi.mock('#/server/modules/background-sync.ts', () => ({
+  stopBackgroundSyncRuntime: stopBackgroundSyncRuntimeMock,
 }))
 
 describe('workspace runtime request', () => {
   beforeEach(() => {
     settleRemoteWorkspaceRuntimeFailureMock.mockReset()
     settleRemoteWorkspaceRuntimeFailureMock.mockResolvedValue(undefined)
+    stopBackgroundSyncRuntimeMock.mockReset()
   })
   test('preserves authoritative runtime closure when the request signal is also aborted', async () => {
     const request = new AbortController()
@@ -53,6 +58,51 @@ describe('workspace runtime request', () => {
     })
   })
 
+  test('stops automatic sync after a classified runtime failure settles', async () => {
+    const workspaceId = workspaceIdForTest('goblin+ssh://example.test/repo')
+    const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId,
+      workspaceRuntimeId: 'runtime-read-failure',
+      reason: 'unreachable',
+    })
+
+    await expect(
+      runGitWorkspaceRuntimeRequest({
+        userId: 'test-user',
+        label: 'snapshot',
+        run: async () => {
+          throw runtimeFailure
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
+    expect(stopBackgroundSyncRuntimeMock).not.toHaveBeenCalled()
+  })
+
+  test('surfaces lifecycle uncertainty and stops automatic sync when runtime settlement fails', async () => {
+    const workspaceId = workspaceIdForTest('goblin+ssh://example.test/repo')
+    const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId,
+      workspaceRuntimeId: 'runtime-read-settlement-failure',
+      reason: 'unreachable',
+    })
+    settleRemoteWorkspaceRuntimeFailureMock.mockRejectedValueOnce(new Error('settings unavailable'))
+
+    await expect(
+      runGitWorkspaceRuntimeRequest({
+        userId: 'test-user',
+        label: 'snapshot',
+        run: async () => {
+          throw runtimeFailure
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-settlement-failed' })
+    expect(stopBackgroundSyncRuntimeMock).toHaveBeenCalledWith(
+      'test-user',
+      workspaceId,
+      'runtime-read-settlement-failure',
+    )
+  })
+
   test('settles runtime failure and returns the authoritative mutation result', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example.test/repo')
     const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
@@ -67,6 +117,7 @@ describe('workspace runtime request', () => {
         message: 'cancelled',
         recoveryMessageKeys: ['error.worktree-created-followup-failed'],
         repoIdsToInvalidate: [workspaceId],
+        worktreePathsToInvalidate: ['/repo/worktree'],
       },
       runtimeFailure,
     )
@@ -83,8 +134,11 @@ describe('workspace runtime request', () => {
       ok: false,
       message: 'cancelled',
       recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+      repoIdsToInvalidate: [workspaceId],
+      worktreePathsToInvalidate: ['/repo/worktree'],
     })
     expect(settleRemoteWorkspaceRuntimeFailureMock).toHaveBeenCalledWith('test-user', runtimeFailure)
+    expect(stopBackgroundSyncRuntimeMock).not.toHaveBeenCalled()
   })
 
   test('preserves the mutation result when runtime lifecycle settlement fails', async () => {
@@ -115,7 +169,9 @@ describe('workspace runtime request', () => {
     ).resolves.toEqual({
       ok: false,
       message: 'cancelled',
-      recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+      repoIdsToInvalidate: [workspaceId],
+      recoveryMessageKeys: ['error.worktree-created-followup-failed', 'error.workspace-runtime-settlement-failed'],
     })
+    expect(stopBackgroundSyncRuntimeMock).toHaveBeenCalledWith('test-user', workspaceId, 'runtime-settlement-failure')
   })
 })

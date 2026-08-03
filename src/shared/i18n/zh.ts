@@ -552,6 +552,8 @@ export const zh: Record<DictKey, string> = {
     '工作树已创建，但后续步骤失败。继续操作前，请检查工作树并重新打开或修复工作区。',
   'error.worktree-removed-followup-failed': '工作树已删除，但后续步骤失败。继续操作前，请重新打开或修复工作区。',
   'error.local-branch-deleted-followup-failed': '本地分支已删除，但后续步骤失败。重试前请检查远端分支。',
+  'error.workspace-runtime-settlement-failed':
+    '工作区运行时无法完成状态结算。已停止自动 Git 同步；继续操作前，请重新打开或修复工作区。',
   'error.branch-action-wait-timeout': '等待仓库刷新完成超时。',
   'error.unknown': '未知错误',
   'error.cannot-delete-current-branch': '不能删除当前分支',

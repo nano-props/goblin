@@ -11,6 +11,7 @@ import {
 import type { BranchSnapshotInfo, ExecResult, RepoRemoteInfo, WorktreeInfo } from '#/shared/git-types.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import { compactWorktreeBootstrapPaths, type WorktreeBootstrapSummary } from '#/shared/worktree-bootstrap-summary.ts'
+import { decodeRemoteWorktreeBootstrapRecords } from '#/system/ssh/worktree-bootstrap-protocol.ts'
 
 export interface RemoteRepoSnapshot {
   branches: BranchSnapshotInfo[]
@@ -94,24 +95,22 @@ export function remoteBootstrapSummaryFromOutput(stdout: string): WorktreeBootst
   const hardlink: string[] = []
   const missing: string[] = []
   let setup: string | undefined
-  for (const line of stdout.split('\n')) {
-    const [marker, ...rest] = line.split(' ')
-    const value = rest.join(' ')
-    switch (marker) {
-      case 'GOBLIN_BOOTSTRAP_COPY':
-        copy.push(value)
+  for (const record of decodeRemoteWorktreeBootstrapRecords(stdout)) {
+    switch (record.kind) {
+      case 'copy':
+        copy.push(record.value)
         break
-      case 'GOBLIN_BOOTSTRAP_SYMLINK':
-        symlink.push(value)
+      case 'symlink':
+        symlink.push(record.value)
         break
-      case 'GOBLIN_BOOTSTRAP_HARDLINK':
-        hardlink.push(value)
+      case 'hardlink':
+        hardlink.push(record.value)
         break
-      case 'GOBLIN_BOOTSTRAP_MISSING':
-        missing.push(value)
+      case 'missing':
+        missing.push(record.value)
         break
-      case 'GOBLIN_BOOTSTRAP_SETUP':
-        setup = value
+      case 'setup':
+        setup = record.value
         break
     }
   }

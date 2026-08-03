@@ -578,6 +578,8 @@ export const en = {
     'The worktree was removed, but a follow-up step failed. Reopen or repair the workspace before continuing.',
   'error.local-branch-deleted-followup-failed':
     'The local branch was deleted, but a later step failed. Check the remote branch before retrying.',
+  'error.workspace-runtime-settlement-failed':
+    'The workspace runtime could not be finalized. Automatic Git sync was stopped; reopen or repair the workspace before continuing.',
   'error.branch-action-wait-timeout': 'Timed out waiting for repository refresh to finish.',
   'error.unknown': 'Unknown error',
   'error.cannot-delete-current-branch': 'Cannot delete the current branch',

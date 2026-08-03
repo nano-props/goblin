@@ -42,6 +42,20 @@ test('restores a partial destination directory to the source mode after failure'
   }
 })
 
+test('reports both copy and permission restoration failures', async () => {
+  temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'filesystem-copy-mode-failure-test-'))
+  const sourcePath = path.join(temporaryDirectory, 'source')
+  const destinationPath = path.join(temporaryDirectory, 'destination')
+  await mkdir(sourcePath)
+  await writeFile(path.join(sourcePath, 'file.txt'), 'source')
+  mocks.pipeline.mockRejectedValueOnce(new Error('copy failed'))
+  vi.spyOn(fs, 'chmod').mockRejectedValueOnce(new Error('chmod failed'))
+
+  await expect(copyPath(sourcePath, destinationPath)).rejects.toThrow(
+    'copy failed; failed to restore destination permissions: chmod failed',
+  )
+})
+
 test('uses a destination-relative absolute junction target for Windows directory links', async () => {
   temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'filesystem-copy-link-test-'))
   const sourceDirectory = path.join(temporaryDirectory, 'source')

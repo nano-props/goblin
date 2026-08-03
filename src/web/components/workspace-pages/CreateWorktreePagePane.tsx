@@ -121,8 +121,8 @@ export function CreateWorktreePagePane({
   const showLoadingSkeleton = useLoadingVisibility(!pageReady)
   const holdLoadingPage = !pageReady || showLoadingSkeleton
 
-  if (!snapshot && snapshotReadModel.displayError) {
-    const snapshotError = snapshotReadModel.displayError
+  if (!snapshot && snapshotReadModel.isError) {
+    const snapshotError = snapshotReadModel.error
     const messageKey = snapshotError instanceof Error ? snapshotError.message : String(snapshotError)
     return (
       <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
@@ -212,12 +212,12 @@ export function CreateWorktreePagePane({
 
   return (
     <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
-      {snapshotReadModel.displayError && (
+      {snapshotReadModel.isError && (
         <RepoStatusStaleNotice
           messageKey={
-            snapshotReadModel.displayError instanceof Error
-              ? snapshotReadModel.displayError.message
-              : String(snapshotReadModel.displayError)
+            snapshotReadModel.error instanceof Error
+              ? snapshotReadModel.error.message
+              : String(snapshotReadModel.error || 'error.failed-read-repo')
           }
           retrying={snapshotReadModel.isFetching}
           onRetry={() => void snapshotReadModel.refetch()}

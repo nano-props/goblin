@@ -2,7 +2,7 @@ import { openRepoUrl } from '#/web/repo-client.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
-import type { ExecResult } from '#/web/types.ts'
+import type { ExecResult } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export async function openBranchExternalTarget(

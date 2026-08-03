@@ -8,7 +8,7 @@ import type {
   RepoSnapshotResponse,
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
-import type { ExecResult, LogEntry, RepoUrlTarget } from '#/shared/git-types.ts'
+import type { ExecResult, LogEntry, RepoMutationExecResult, RepoUrlTarget } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { CreateWorktreeInput, RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
@@ -175,7 +175,7 @@ export async function fetchRepo(
   cwd: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   return await postServerJson(
     '/api/repo/fetch',
     { cwd, workspaceRuntimeId },
@@ -193,7 +193,7 @@ export async function pullRepoBranch(
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   return await postServerJson(
     '/api/repo/pull',
     { cwd, workspaceRuntimeId, branch, worktreePath },
@@ -207,7 +207,7 @@ export async function pushRepoBranch(
   workspaceRuntimeId: string,
   branch: string,
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   return await postServerJson(
     '/api/repo/push',
     { cwd, workspaceRuntimeId, branch },
@@ -225,7 +225,7 @@ export async function createRepoWorktree(
   input: CreateWorktreeInput,
   worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   return await postServerJson(
     '/api/repo/create-worktree',
     { cwd, workspaceRuntimeId, ...input, worktreeBootstrap },
@@ -255,7 +255,7 @@ export async function deleteRepoBranch(
   branch: string,
   options?: { force?: boolean; deleteUpstream?: boolean },
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   return await postServerJson(
     '/api/repo/delete-branch',
     { cwd, workspaceRuntimeId, branch, force: options?.force, deleteUpstream: options?.deleteUpstream },
@@ -275,7 +275,7 @@ export async function removeRepoWorktree(
     deleteUpstream?: boolean
   },
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   return await postServerJson(
     '/api/repo/remove-worktree',
     { cwd, workspaceRuntimeId, ...options },

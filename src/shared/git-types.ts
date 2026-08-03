@@ -114,12 +114,14 @@ export interface RepoRemoteInfo {
 
 export const GIT_HASH_RE = /^[0-9a-fA-F]{7,64}$/
 
-// These are presentation notices derived from domain milestones. They never
-// authorize cleanup, invalidation, retry, or client-side state inference.
+// These are application-level recovery notices derived from domain milestones
+// or lifecycle uncertainty. They never authorize cleanup, invalidation, retry,
+// or client-side state inference.
 export const EXEC_RESULT_RECOVERY_MESSAGE_KEYS = [
   'error.worktree-created-followup-failed',
   'error.worktree-removed-followup-failed',
   'error.local-branch-deleted-followup-failed',
+  'error.workspace-runtime-settlement-failed',
 ] as const
 
 export type ExecResultRecoveryMessageKey = (typeof EXEC_RESULT_RECOVERY_MESSAGE_KEYS)[number]
@@ -129,9 +131,9 @@ export interface ExecResult {
   message: string
 }
 
-/** Public result contract for repository mutations with partial-success guidance. */
+/** Public result contract for repository mutations with explicit recovery guidance. */
 export interface RepoMutationExecResult extends ExecResult {
-  /** Static i18n keys for recovery guidance after an authoritative partial success. */
+  /** Static i18n keys selected by the server application flow. */
   recoveryMessageKeys?: readonly ExecResultRecoveryMessageKey[]
   worktreeBootstrap?: WorktreeBootstrapSummary
 }

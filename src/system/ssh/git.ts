@@ -39,7 +39,6 @@ import {
   type ExecResult,
   type GitRemoteInfo,
   type LogEntry,
-  type RepoMutationExecResult,
   type RepoRemoteInfo,
   type RepoUrlTarget,
   type WorktreeInfo,
@@ -62,6 +61,7 @@ import {
   formatWorktreeBootstrapSummary,
   hasWorktreeBootstrapSummaryDetails,
   worktreeBootstrapPreviewFromConfig,
+  type WorktreeBootstrapResult,
   type WorktreeBootstrapPreviewResult,
   type WorktreeBootstrapSummary,
 } from '#/shared/worktree-bootstrap-summary.ts'
@@ -640,7 +640,7 @@ export async function bootstrapRemoteWorktreeAfterCreate(
   target: RemoteWorkspaceTarget,
   worktreePath: string,
   options: { signal?: AbortSignal; run?: RemoteGitRunner; expectedConfigHash?: string } = {},
-): Promise<RepoMutationExecResult> {
+): Promise<WorktreeBootstrapResult> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const loaded = await loadRemoteBootstrapConfig(target, { signal: options.signal, run })
   if (!loaded.ok) return remoteBootstrapFailure(loaded)
@@ -688,7 +688,7 @@ export async function bootstrapRemoteWorktreeAfterCreate(
 function remoteBootstrapResultWithSummary(
   result: ExecResult,
   summary: WorktreeBootstrapSummary,
-): RepoMutationExecResult {
+): WorktreeBootstrapResult {
   if (!hasWorktreeBootstrapSummaryDetails(summary)) return result
   return { ...result, worktreeBootstrap: summary }
 }

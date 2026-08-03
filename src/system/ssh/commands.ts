@@ -11,6 +11,7 @@ import {
   ensureSshControlDirectory,
   type RemoteCommandInvocation,
 } from '#/system/ssh/invocation.ts'
+import { REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS } from '#/system/ssh/worktree-bootstrap-protocol.ts'
 
 const SSH_COMMAND_TIMEOUT_MS = 15_000
 /** Boot-probe timeout for the placeholder-tab hydrate path. Shorter than
@@ -901,7 +902,7 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     'copy_item() {',
     '  local rel="$1"',
     '  copy_tree "$rel"',
-    '  printf \'GOBLIN_BOOTSTRAP_COPY %s\\n\' "$rel"',
+    `  printf '%s\\0%s\\0' '${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS.copy}' "$rel"`,
     '}',
     '',
     'symlink_item() {',
@@ -915,7 +916,7 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '  mkdir -p -- "$(dirname "$dst")" || die "failed to symlink $rel"',
     '  if target_parent_has_symlink "$rel"; then die "bootstrap target path uses symlink parent: $SYMLINK_PARENT"; fi',
     '  ln -s -- "$src" "$dst" || die "failed to symlink $rel"',
-    '  printf \'GOBLIN_BOOTSTRAP_SYMLINK %s\\n\' "$rel"',
+    `  printf '%s\\0%s\\0' '${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS.symlink}' "$rel"`,
     '}',
     '',
     'hardlink_item() {',
@@ -930,15 +931,18 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '  mkdir -p -- "$(dirname "$dst")" || die "failed to hardlink $rel"',
     '  if target_parent_has_symlink "$rel"; then die "bootstrap target path uses symlink parent: $SYMLINK_PARENT"; fi',
     '  ln -- "$src" "$dst" || die "failed to hardlink $rel"',
-    '  printf \'GOBLIN_BOOTSTRAP_HARDLINK %s\\n\' "$rel"',
+    `  printf '%s\\0%s\\0' '${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS.hardlink}' "$rel"`,
     '}',
     '',
+    // Publish missing paths only after the whole preflight succeeds. A
+    // preflight error has no materialization side effect, so partial planning
+    // observations are not a bootstrap completion summary.
+    'for rel in "${MISSING_PATHS[@]}"; do',
+    `  printf '%s\\0%s\\0' '${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS.missing}' "$rel"`,
+    'done',
     'for rel in "${READY_COPY_PATHS[@]}"; do copy_item "$rel"; done',
     'for rel in "${READY_SYMLINK_PATHS[@]}"; do symlink_item "$rel"; done',
     'for rel in "${READY_HARDLINK_PATHS[@]}"; do hardlink_item "$rel"; done',
-    'for rel in "${MISSING_PATHS[@]}"; do',
-    '  printf \'GOBLIN_BOOTSTRAP_MISSING %s\\n\' "$rel"',
-    'done',
     '',
     'if [ -n "$SETUP" ]; then',
     '  SETUP_LOG="$(mktemp "${TMPDIR:-/tmp}/goblin-bootstrap-setup.XXXXXX")" || die "failed to create setup log"',
@@ -947,7 +951,7 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '    tail -c 8192 "$SETUP_LOG" >&2 || true',
     '    exit 1',
     '  fi',
-    '  printf \'GOBLIN_BOOTSTRAP_SETUP %s\\n\' "$SETUP"',
+    `  printf '%s\\0%s\\0' '${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS.setup}' "$SETUP"`,
     'fi',
   ]
   return lines.join('\n')

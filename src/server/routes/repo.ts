@@ -23,7 +23,6 @@ import {
   pullRepoBranch,
   pushRepoBranch,
   removeCapturedRepoWorktree,
-  type RepoFilesystemMutationOutcome,
 } from '#/server/modules/repo-write-paths.ts'
 import { cloneRepo } from '#/server/modules/repo-clone-write.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
@@ -55,6 +54,7 @@ import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { resolveRepoSource } from '#/server/modules/repo-source.ts'
+import { publicRepoMutationResult, type RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
 
 export function createRepoRoutes(options: {
   worktreeRemovalApplication: ServerWorktreeRemovalHost
@@ -195,12 +195,14 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceMutationRuntimeRequest({
-        userId,
-        run: () => fetchRepo(cwd, 'user', c.req.raw.signal, workspaceRuntimeId),
-        label: 'fetch',
-        signal: c.req.raw.signal,
-      }),
+      publicRepoMutationResult(
+        await runGitWorkspaceMutationRuntimeRequest({
+          userId,
+          run: () => fetchRepo(cwd, 'user', c.req.raw.signal, workspaceRuntimeId),
+          label: 'fetch',
+          signal: c.req.raw.signal,
+        }),
+      ),
     )
   })
   app.post('/clone', async (c) => {
@@ -224,12 +226,14 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceMutationRuntimeRequest({
-        userId,
-        run: () => pushRepoBranch(cwd, branch, c.req.raw.signal, { workspaceRuntimeId }),
-        label: 'push',
-        signal: c.req.raw.signal,
-      }),
+      publicRepoMutationResult(
+        await runGitWorkspaceMutationRuntimeRequest({
+          userId,
+          run: () => pushRepoBranch(cwd, branch, c.req.raw.signal, { workspaceRuntimeId }),
+          label: 'push',
+          signal: c.req.raw.signal,
+        }),
+      ),
     )
   })
   app.post('/create-worktree', async (c) => {
@@ -240,16 +244,18 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceMutationRuntimeRequest({
-        userId,
-        run: () =>
-          createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
-            workspaceRuntimeId,
-            worktreeBootstrap,
-          }),
-        label: 'create-worktree',
-        signal: c.req.raw.signal,
-      }),
+      publicRepoMutationResult(
+        await runGitWorkspaceMutationRuntimeRequest({
+          userId,
+          run: () =>
+            createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
+              workspaceRuntimeId,
+              worktreeBootstrap,
+            }),
+          label: 'create-worktree',
+          signal: c.req.raw.signal,
+        }),
+      ),
     )
   })
   app.post('/delete-branch', async (c) => {
@@ -260,20 +266,24 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceMutationRuntimeRequest({
-        userId,
-        run: async () => {
-          return await options.repoMutationApplication.deleteBranch(userId, {
-            repoRoot: cwd,
-            workspaceRuntimeId,
-            branchName: branch,
-            deleteBranch: async () =>
-              await deleteRepoBranch(cwd, branch, { force, deleteUpstream }, c.req.raw.signal, { workspaceRuntimeId }),
-          })
-        },
-        label: 'delete-branch',
-        signal: c.req.raw.signal,
-      }),
+      publicRepoMutationResult(
+        await runGitWorkspaceMutationRuntimeRequest({
+          userId,
+          run: async () => {
+            return await options.repoMutationApplication.deleteBranch(userId, {
+              repoRoot: cwd,
+              workspaceRuntimeId,
+              branchName: branch,
+              deleteBranch: async () =>
+                await deleteRepoBranch(cwd, branch, { force, deleteUpstream }, c.req.raw.signal, {
+                  workspaceRuntimeId,
+                }),
+            })
+          },
+          label: 'delete-branch',
+          signal: c.req.raw.signal,
+        }),
+      ),
     )
   })
   app.post('/remove-worktree', async (c) => {
@@ -282,33 +292,35 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceMutationRuntimeRequest({
-        userId,
-        run: () =>
-          options.worktreeRemovalApplication.removeWorktree(userId, {
-            repoRoot: cwd,
-            workspaceRuntimeId,
-            worktreePath,
-            branchName: branch,
-            deleteBranch,
-            signal: c.req.raw.signal,
-            remove: async (
-              physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-              lifecycle: RepoWorktreeRemovalLifecycle,
-              signal: AbortSignal,
-            ) =>
-              await removeCapturedRepoWorktree(
-                cwd,
-                { branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream },
-                lifecycle,
-                physicalWorktreeCapability,
-                signal,
-                { workspaceRuntimeId },
-              ),
-          }),
-        label: 'remove-worktree',
-        signal: c.req.raw.signal,
-      }),
+      publicRepoMutationResult(
+        await runGitWorkspaceMutationRuntimeRequest({
+          userId,
+          run: () =>
+            options.worktreeRemovalApplication.removeWorktree(userId, {
+              repoRoot: cwd,
+              workspaceRuntimeId,
+              worktreePath,
+              branchName: branch,
+              deleteBranch,
+              signal: c.req.raw.signal,
+              remove: async (
+                physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
+                lifecycle: RepoWorktreeRemovalLifecycle,
+                signal: AbortSignal,
+              ) =>
+                await removeCapturedRepoWorktree(
+                  cwd,
+                  { branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream },
+                  lifecycle,
+                  physicalWorktreeCapability,
+                  signal,
+                  { workspaceRuntimeId },
+                ),
+            }),
+          label: 'remove-worktree',
+          signal: c.req.raw.signal,
+        }),
+      ),
     )
   })
   app.post('/open-url', async (c) => {
@@ -407,7 +419,7 @@ function publishPullFilesystemInvalidations(
   userId: string,
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
-  outcome: RepoFilesystemMutationOutcome,
+  outcome: RepoMutationResult,
 ) {
   const { worktreePathsToInvalidate = [] } = outcome
   const roots = new Set(
@@ -420,9 +432,5 @@ function publishPullFilesystemInvalidations(
       target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root },
     })
   }
-  return {
-    ok: outcome.ok,
-    message: outcome.message,
-    recoveryMessageKeys: outcome.recoveryMessageKeys,
-  }
+  return publicRepoMutationResult(outcome)
 }

@@ -3,13 +3,13 @@ import { constants as fsConstants, promises as fs } from 'node:fs'
 import { execa, ExecaError } from 'execa'
 import { glob, isDynamicPattern } from 'tinyglobby'
 import { getRepoRoot } from '#/system/git/branches.ts'
-import type { ExecResult, RepoMutationExecResult } from '#/shared/git-types.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
 import {
   compactWorktreeBootstrapPaths,
   formatWorktreeBootstrapSummary,
   hasWorktreeBootstrapSummaryDetails,
   worktreeBootstrapPreviewFromConfig,
+  type WorktreeBootstrapResult,
   type WorktreeBootstrapSummary,
   type WorktreeBootstrapPreviewResult,
 } from '#/shared/worktree-bootstrap-summary.ts'
@@ -70,7 +70,7 @@ export async function bootstrapWorktreeAfterCreate(
   sourceCwd: string,
   targetWorktreePath: string,
   options?: { signal?: AbortSignal; expectedConfigHash?: string },
-): Promise<RepoMutationExecResult> {
+): Promise<WorktreeBootstrapResult> {
   try {
     if (options?.signal?.aborted) return { ok: false, message: 'cancelled' }
     const sourceRepoRoot = await getRepoRoot(sourceCwd, { signal: options?.signal })
@@ -422,7 +422,7 @@ async function runSetupCommand(
   targetRoot: string,
   setup: string,
   signal: AbortSignal | undefined,
-): Promise<ExecResult> {
+): Promise<WorktreeBootstrapResult> {
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
   try {
     await fs.access(targetRoot, fsConstants.R_OK | fsConstants.W_OK)
@@ -589,11 +589,14 @@ function bootstrapSummary(
   }
 }
 
-function bootstrapFailure(message: string): ExecResult {
+function bootstrapFailure(message: string): WorktreeBootstrapResult {
   return { ok: false, message: `Worktree bootstrap failed: ${message}` }
 }
 
-function bootstrapStepFailure(result: ExecResult, summary?: WorktreeBootstrapSummary): RepoMutationExecResult {
+function bootstrapStepFailure(
+  result: WorktreeBootstrapResult,
+  summary?: WorktreeBootstrapSummary,
+): WorktreeBootstrapResult {
   if (result.ok) return result
   const failure = result.message === 'cancelled' ? result : bootstrapFailure(result.message)
   if (!hasWorktreeBootstrapSummaryDetails(summary)) return failure

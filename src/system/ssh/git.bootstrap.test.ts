@@ -11,6 +11,7 @@ import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap-config.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { TARGET, failRemoteResult, okRemoteResult } from '#/system/ssh/git-test-utils.ts'
+import { encodeRemoteWorktreeBootstrapRecord } from '#/system/ssh/worktree-bootstrap-protocol.ts'
 
 describe('remote git bootstrap', () => {
   test('getRemoteWorktreeBootstrapPreview reads config without running bootstrap', async () => {
@@ -71,7 +72,10 @@ describe('remote git bootstrap', () => {
         return okRemoteResult('[worktree]\ncopy = [".env"]\nsetup = "bun install"')
       }
       if (command.type === 'bootstrapRemoteWorktree') {
-        return okRemoteResult('GOBLIN_BOOTSTRAP_COPY .env\nGOBLIN_BOOTSTRAP_SETUP bun install')
+        return okRemoteResult(
+          encodeRemoteWorktreeBootstrapRecord('copy', '.env') +
+            encodeRemoteWorktreeBootstrapRecord('setup', 'bun install'),
+        )
       }
       return okRemoteResult('')
     })
@@ -117,7 +121,9 @@ describe('remote git bootstrap', () => {
     const trustedHash = worktreeBootstrapConfigHash('[worktree]\ncopy = [".env"]')
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'readRemoteFile') return okRemoteResult('[worktree]\ncopy = ["other.env"]')
-      if (command.type === 'bootstrapRemoteWorktree') return okRemoteResult('GOBLIN_BOOTSTRAP_COPY other.env')
+      if (command.type === 'bootstrapRemoteWorktree') {
+        return okRemoteResult(encodeRemoteWorktreeBootstrapRecord('copy', 'other.env'))
+      }
       return okRemoteResult('')
     })
 
@@ -148,7 +154,9 @@ describe('remote git bootstrap', () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'revParseTopLevel') return okRemoteResult('/srv/repo')
       if (command.type === 'readRemoteFile') return okRemoteResult('[worktree]\ncopy = [".env"]')
-      if (command.type === 'bootstrapRemoteWorktree') return okRemoteResult('GOBLIN_BOOTSTRAP_COPY .env')
+      if (command.type === 'bootstrapRemoteWorktree') {
+        return okRemoteResult(encodeRemoteWorktreeBootstrapRecord('copy', '.env'))
+      }
       return okRemoteResult('')
     })
 
@@ -193,7 +201,10 @@ describe('remote git bootstrap', () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'readRemoteFile') return okRemoteResult('[worktree]\ncopy = [".env"]\nsetup = "bun install"')
       if (command.type === 'bootstrapRemoteWorktree') {
-        return { ...failRemoteResult('bun: command not found'), stdout: 'GOBLIN_BOOTSTRAP_COPY .env' }
+        return {
+          ...failRemoteResult('bun: command not found'),
+          stdout: encodeRemoteWorktreeBootstrapRecord('copy', '.env'),
+        }
       }
       return okRemoteResult('')
     })

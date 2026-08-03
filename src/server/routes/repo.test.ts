@@ -11,6 +11,7 @@ import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-work
 import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
 import { runSerializedWorkspaceRefresh } from '#/server/modules/workspace-runtimes.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
 
 const mocks = repoRouteMocks()
 
@@ -461,6 +462,44 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         workspaceId: WORKSPACE_ID,
         workspaceRuntimeId,
         root: workspaceIdForTest('goblin+file:///tmp/repo-worktree'),
+      },
+    })
+  })
+
+  test('publishes pull filesystem impact carried by a runtime failure before projecting the response', async () => {
+    const app = createTestRepoRoutes()
+    const repoId = workspaceIdForTest('goblin+ssh://prod/home/example/service')
+    const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
+    const worktreePath = '/home/example/service-worktree'
+    const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: repoId,
+      workspaceRuntimeId,
+      reason: 'unreachable',
+      message: 'connection lost',
+    })
+    mocks.pullRepoBranch.mockRejectedValueOnce(
+      new RepoMutationRuntimeFailureError(
+        { ok: false, message: 'connection lost', worktreePathsToInvalidate: [worktreePath] },
+        runtimeFailure,
+      ),
+    )
+
+    const response = await app.request(
+      new Request('http://localhost/pull', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: repoId, workspaceRuntimeId, branch: 'feature/work', worktreePath }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ ok: false, message: 'connection lost' })
+    expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith('user-test', {
+      target: {
+        kind: 'git-worktree',
+        workspaceId: repoId,
+        workspaceRuntimeId,
+        root: workspaceIdForTest('goblin+ssh://prod/home/example/service-worktree'),
       },
     })
   })

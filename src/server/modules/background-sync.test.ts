@@ -121,6 +121,31 @@ describe('server background sync scheduler', () => {
     expect(mocks.fetchRepo).toHaveBeenCalledOnce()
   })
 
+  test('stops automatic sync when the authoritative runtime lifecycle fails elsewhere', async () => {
+    const { acquireWorkspaceRuntime, failRemoteWorkspaceLifecycle, releaseWorkspaceRuntime } =
+      await import('#/server/modules/workspace-runtimes.ts')
+    const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REMOTE_REPO, CLIENT_ID)
+    const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, getBackgroundSyncDiagnostics } =
+      await import('#/server/modules/background-sync.ts')
+    await registerRepos([])
+    const admission = requiredAdmission(
+      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, nextRegistrationRevision++, [
+        { workspaceId: REMOTE_REPO, workspaceRuntimeId },
+      ]),
+    )
+    expect(commitBackgroundSyncRegistration(admission)).toBe(true)
+
+    await failRemoteWorkspaceLifecycle({
+      userId: USER_ID,
+      workspaceId: REMOTE_REPO,
+      workspaceRuntimeId,
+      reason: 'unreachable',
+    })
+
+    expect(getBackgroundSyncDiagnostics().repos).toEqual([])
+    releaseWorkspaceRuntime(USER_ID, REMOTE_REPO, workspaceRuntimeId, CLIENT_ID)
+  })
+
   test('aborts an uncommitted registration for a runtime whose automatic sync stops', async () => {
     const failure = new RemoteWorkspaceRuntimeFailureError({
       workspaceId: REMOTE_REPO,

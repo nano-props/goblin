@@ -9,8 +9,9 @@ import { isWorkspaceRuntimeAdmissionClosedError } from '#/server/modules/workspa
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 import { isRepoMembershipReadConflictError } from '#/server/modules/repo-membership-read-conflict.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
-import { publicRepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
-import type { ExecResult } from '#/shared/git-types.ts'
+import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
+import { stopBackgroundSyncRuntime } from '#/server/modules/background-sync.ts'
+import type { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 
 const workspaceRuntimeRequestLogger = serverLogger.child({ module: 'workspace-runtime-request' })
 
@@ -46,30 +47,35 @@ export async function runGitWorkspaceRuntimeRequest<T>(input: {
 
 export async function runGitWorkspaceMutationRuntimeRequest(input: {
   userId: string
-  run: () => Promise<ExecResult>
+  run: () => Promise<RepoMutationResult>
   label: string
   signal?: AbortSignal
-}): Promise<ExecResult> {
+}): Promise<RepoMutationResult> {
   try {
     return await input.run()
   } catch (error) {
     if (!isRepoMutationRuntimeFailureError(error)) {
       return await throwRuntimeRequestError(input, error, 'error.failed-read-repo')
     }
-    try {
-      await settleRemoteWorkspaceRuntimeFailure(input.userId, error.runtimeFailure)
-    } catch (settlementError) {
-      // Runtime lifecycle projection must not replace an authoritative mutation
-      // result. Surface the established facts and leave explicit runtime recovery
-      // to the user instead of retrying or fabricating a settlement.
-      workspaceRuntimeRequestLogger.warn(
-        { err: settlementError, label: input.label },
-        'failed to settle mutation runtime',
-      )
+    let mutation = error.mutation
+    const lifecycleSettled = await settleRuntimeFailureAndStopAutomation(
+      input.userId,
+      input.label,
+      error.runtimeFailure,
+    )
+    if (!lifecycleSettled) {
+      mutation = mutationWithRuntimeSettlementRecovery(mutation)
     }
     workspaceRuntimeRequestLogger.warn({ err: error.runtimeFailure, label: input.label }, 'mutation runtime failed')
-    return publicRepoMutationResult(error.mutation)
+    return mutation
   }
+}
+
+function mutationWithRuntimeSettlementRecovery(mutation: RepoMutationResult): RepoMutationResult {
+  const runtimeRecoveryKey = 'error.workspace-runtime-settlement-failed' as const
+  if (mutation.recoveryMessageKeys?.includes(runtimeRecoveryKey)) return mutation
+  const recoveryMessageKeys = [...(mutation.recoveryMessageKeys ?? []), runtimeRecoveryKey]
+  return { ...mutation, recoveryMessageKeys }
 }
 
 async function runRuntimeRequest<T>(
@@ -97,9 +103,10 @@ async function throwRuntimeRequestError(
   if (error instanceof OperationCancelledError) throw error
   if (input.signal?.aborted) throw error
   if (isRemoteWorkspaceRuntimeFailure(error)) {
-    await settleRemoteWorkspaceRuntimeFailure(input.userId, error)
+    const lifecycleSettled = await settleRuntimeFailureAndStopAutomation(input.userId, input.label, error)
     workspaceRuntimeRequestLogger.warn({ err: error, label: input.label }, 'failed')
-    throw new IpcError({ code: 'BAD_REQUEST', message: remoteFailureMessage })
+    const message = lifecycleSettled ? remoteFailureMessage : 'error.workspace-runtime-settlement-failed'
+    throw new IpcError({ code: 'BAD_REQUEST', message })
   }
   if (isRepositoryBoundaryUnavailableError(error)) {
     workspaceRuntimeRequestLogger.warn({ err: error, label: input.label }, 'repository boundary unavailable')
@@ -107,4 +114,22 @@ async function throwRuntimeRequestError(
   }
   workspaceRuntimeRequestLogger.warn({ err: error, label: input.label }, 'failed')
   throw error
+}
+
+async function settleRuntimeFailureAndStopAutomation(
+  userId: string,
+  label: string,
+  error: RemoteWorkspaceRuntimeFailureError,
+): Promise<boolean> {
+  let lifecycleSettled = true
+  try {
+    await settleRemoteWorkspaceRuntimeFailure(userId, error)
+  } catch (settlementError) {
+    lifecycleSettled = false
+    workspaceRuntimeRequestLogger.warn({ err: settlementError, label }, 'failed to settle workspace runtime')
+    // No lifecycle transition was committed, so the lifecycle event cannot
+    // stop automation. Ask the background owner directly for this uncertain case.
+    stopBackgroundSyncRuntime(userId, error.workspaceId, error.workspaceRuntimeId)
+  }
+  return lifecycleSettled
 }

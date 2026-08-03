@@ -53,7 +53,7 @@ authority.
 - The authoritative write boundary returns the exact committed effect and
   publishes invalidation when a complete read model must converge.
 - Complete the operation's authoritative steps and settle its visible
-  lifecycle before publishing projection invalidation. Repository membership
+  lifecycle before publishing repository read invalidation. Repository membership
   reads use the physical repository write boundary only as an admission epoch.
   The epoch covers the admitted attempt to invoke `git worktree add/remove`,
   not bootstrap, branch cleanup, settings persistence, or the enclosing
@@ -86,10 +86,12 @@ authority.
   publishes mutation impact once, and attempts typed runtime settlement at the
   request boundary. Settlement failure never replaces a mutation result that
   was already established.
-- A classified runtime failure removes that runtime from background automation
-  after lifecycle settlement, including when settlement itself becomes
-  uncertain. A later explicit client registration may admit it again; the
-  server does not keep retrying a failed or uncertain lifecycle.
+- The workspace lifecycle authority publishes a committed failed transition;
+  the background-sync owner then removes that exact runtime from automation.
+  If lifecycle settlement itself becomes uncertain, the request or background
+  operation asks the same background owner to stop it directly. A later
+  explicit client registration may admit it again; the server does not keep
+  retrying a failed or uncertain lifecycle.
 - A client may apply canonical response data or invalidate the owning query. It
   must not replace a concurrent collection with an unversioned snapshot or
   reconstruct the write from its request payload.
