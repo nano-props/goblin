@@ -77,6 +77,8 @@ export interface RemoteCommandResult {
   message?: string
   timedOut?: boolean
   remoteStarted?: boolean
+  /** Locally authoritative proof that SSH was not invoked. */
+  commandNotStarted?: true
   transportStderr?: string
 }
 
@@ -103,7 +105,9 @@ export async function runRemoteCommand(
   command: RemoteCommandKind,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<RemoteCommandResult> {
-  if (options?.signal?.aborted) return { ok: false, stdout: '', stderr: '', message: 'cancelled' }
+  if (options?.signal?.aborted) {
+    return { ok: false, stdout: '', stderr: '', message: 'cancelled', commandNotStarted: true }
+  }
   const invocation = buildCanonicalSshInvocation(target, commandStartedMarkerScript(scriptForCommand(command)), [
     '-T',
     '-o',
@@ -113,6 +117,9 @@ export async function runRemoteCommand(
   // create a control socket in a missing directory, which on a fresh
   // install manifests as every probe failing before the handshake.
   await ensureSshControlDirectory()
+  if (options?.signal?.aborted) {
+    return { ok: false, stdout: '', stderr: '', message: 'cancelled', commandNotStarted: true }
+  }
   try {
     const { stdout, stderr } = await execa(invocation.command, invocation.args, {
       timeout: options?.timeoutMs ?? SSH_COMMAND_TIMEOUT_MS,

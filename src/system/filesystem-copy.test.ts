@@ -16,6 +16,7 @@ vi.mock('node:stream/promises', () => ({
 import { copyPath, DestinationPermissionRestoreError } from '#/system/filesystem-copy.ts'
 
 let temporaryDirectory: string | null = null
+const SPARSE_TEST_FILE_SIZE = 16 * 1024 * 1024
 
 afterEach(async () => {
   if (temporaryDirectory) await rm(temporaryDirectory, { recursive: true, force: true })
@@ -52,9 +53,7 @@ test('reports both copy and permission restoration failures', async () => {
   vi.spyOn(fs, 'chmod').mockRejectedValueOnce(new Error('chmod failed'))
 
   const copy = copyPath(sourcePath, destinationPath)
-  await expect(copy).rejects.toThrow(
-    'copy failed; failed to restore destination permissions: chmod failed',
-  )
+  await expect(copy).rejects.toThrow('copy failed; failed to restore destination permissions: chmod failed')
   await expect(copy).rejects.toBeInstanceOf(DestinationPermissionRestoreError)
 })
 
@@ -99,6 +98,52 @@ test('passes cancellation to the file-copy stream', async () => {
   expect(mocks.pipeline).toHaveBeenCalledOnce()
   await expect(stat(destinationPath)).rejects.toMatchObject({ code: 'ENOENT' })
 })
+
+test.runIf(process.platform !== 'win32')('preserves sparse extents without overwriting destinations', async () => {
+  temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'filesystem-copy-sparse-test-'))
+  const sourcePath = path.join(temporaryDirectory, 'source.img')
+  const destinationPath = path.join(temporaryDirectory, 'destination.img')
+  const existingPath = path.join(temporaryDirectory, 'existing.img')
+  await writeFile(sourcePath, '')
+  await fs.truncate(sourcePath, SPARSE_TEST_FILE_SIZE)
+  await writeFile(existingPath, 'keep')
+
+  const sourceStat = await stat(sourcePath)
+  expect(sourceStat.blocks * 512).toBeLessThan(sourceStat.size)
+
+  await copyPath(sourcePath, destinationPath)
+
+  const destinationStat = await stat(destinationPath)
+  expect(destinationStat.size).toBe(sourceStat.size)
+  expect(destinationStat.blocks * 512).toBeLessThan(destinationStat.size)
+  expect(mocks.pipeline).not.toHaveBeenCalled()
+  await expect(copyPath(sourcePath, existingPath)).rejects.toMatchObject({ code: 'EEXIST' })
+  await expect(fs.readFile(existingPath, 'utf8')).resolves.toBe('keep')
+})
+
+test.runIf(process.platform !== 'win32')(
+  'settles and removes a sparse copy when cancellation is observed',
+  async () => {
+    temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'filesystem-copy-sparse-cancel-test-'))
+    const sourcePath = path.join(temporaryDirectory, 'source.img')
+    const destinationPath = path.join(temporaryDirectory, 'destination.img')
+    await writeFile(sourcePath, '')
+    await fs.truncate(sourcePath, SPARSE_TEST_FILE_SIZE)
+    const controller = new AbortController()
+    const open = fs.open.bind(fs)
+    vi.spyOn(fs, 'open').mockImplementation(async (target, flags, mode) => {
+      const handle = await open(target, flags, mode)
+      if (flags === 'wx') controller.abort()
+      return handle
+    })
+
+    await expect(copyPath(sourcePath, destinationPath, { signal: controller.signal })).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+
+    await expect(stat(destinationPath)).rejects.toMatchObject({ code: 'ENOENT' })
+  },
+)
 
 test('treats a created symlink as complete when cancellation arrives at its commit point', async () => {
   temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'filesystem-copy-symlink-cancel-test-'))

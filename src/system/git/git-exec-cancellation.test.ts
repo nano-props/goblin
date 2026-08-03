@@ -86,4 +86,23 @@ describe('git cancellation decoding', () => {
       execution: { status: 'failed' },
     })
   })
+
+  test('reports a provable process start failure as not started', async () => {
+    const { ExecaError } = await import('execa')
+    const failure = Object.assign(new ExecaError(), {
+      message: 'git executable was not found',
+      code: 'ENOENT',
+      exitCode: undefined,
+      signal: undefined,
+    })
+    mocks.execa.mockRejectedValueOnce(failure)
+    const { gitCommandResultWithOptions } = await import('#/system/git/git-exec.ts')
+
+    const outcome = await gitCommandResultWithOptions('/tmp/repository', undefined, 'status')
+
+    expect(outcome).toEqual({
+      result: { ok: false, message: 'git executable was not found' },
+      execution: { status: 'not-started' },
+    })
+  })
 })

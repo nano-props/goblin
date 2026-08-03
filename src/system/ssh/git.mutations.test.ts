@@ -774,4 +774,25 @@ describe('remote git mutations', () => {
       execution: { status: 'timed-out' },
     })
   })
+
+  test('createRemoteWorktree preserves proof that SSH was not invoked', async () => {
+    const run = vi.fn<RemoteGitRunner>(async () => ({
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: 'cancelled',
+      commandNotStarted: true,
+    }))
+
+    const result = await createRemoteWorktree(TARGET, {
+      worktreePath: '/srv/repo-feature',
+      mode: { kind: 'existingBranch', branch: 'feature/test' },
+      run,
+    })
+
+    expect(result).toEqual({
+      result: { ok: false, message: 'cancelled' },
+      execution: { status: 'not-started' },
+    })
+  })
 })

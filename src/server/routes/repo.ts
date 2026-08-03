@@ -50,7 +50,7 @@ import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktr
 import type { ServerRepoMutationHost } from '#/server/repo-mutation/repo-mutation-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
-import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
+import { DEFAULT_REPOSITORY_LOG_COUNT, type RepoMutationExecResult } from '#/shared/git-types.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { resolveRepoSource } from '#/server/modules/repo-source.ts'
@@ -190,16 +190,14 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      publicRepoMutationResult(
-        await runRepoMutationRequest({
-          userId,
-          workspaceId: cwd,
-          invalidatedDomains: ['metadata'],
-          run: () => fetchRepo(cwd, 'user', c.req.raw.signal, workspaceRuntimeId),
-          label: 'fetch',
-          signal: c.req.raw.signal,
-        }),
-      ),
+      await runPublicRepoMutationRequest({
+        userId,
+        workspaceId: cwd,
+        invalidatedDomains: ['metadata'],
+        run: () => fetchRepo(cwd, 'user', c.req.raw.signal, workspaceRuntimeId),
+        label: 'fetch',
+        signal: c.req.raw.signal,
+      }),
     )
   })
   app.post('/clone', async (c) => {
@@ -226,16 +224,14 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      publicRepoMutationResult(
-        await runRepoMutationRequest({
-          userId,
-          workspaceId: cwd,
-          invalidatedDomains: ['metadata'],
-          run: () => pushRepoBranch(cwd, branch, c.req.raw.signal, { workspaceRuntimeId }),
-          label: 'push',
-          signal: c.req.raw.signal,
-        }),
-      ),
+      await runPublicRepoMutationRequest({
+        userId,
+        workspaceId: cwd,
+        invalidatedDomains: ['metadata'],
+        run: () => pushRepoBranch(cwd, branch, c.req.raw.signal, { workspaceRuntimeId }),
+        label: 'push',
+        signal: c.req.raw.signal,
+      }),
     )
   })
   app.post('/create-worktree', async (c) => {
@@ -246,20 +242,18 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      publicRepoMutationResult(
-        await runRepoMutationRequest({
-          userId,
-          workspaceId: cwd,
-          invalidatedDomains: ['metadata', 'worktree-status'],
-          run: () =>
-            createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
-              workspaceRuntimeId,
-              worktreeBootstrap,
-            }),
-          label: 'create-worktree',
-          signal: c.req.raw.signal,
-        }),
-      ),
+      await runPublicRepoMutationRequest({
+        userId,
+        workspaceId: cwd,
+        invalidatedDomains: ['metadata', 'worktree-status'],
+        run: () =>
+          createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
+            workspaceRuntimeId,
+            worktreeBootstrap,
+          }),
+        label: 'create-worktree',
+        signal: c.req.raw.signal,
+      }),
     )
   })
   app.post('/delete-branch', async (c) => {
@@ -270,26 +264,24 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      publicRepoMutationResult(
-        await runRepoMutationRequest({
-          userId,
-          workspaceId: cwd,
-          invalidatedDomains: ['metadata'],
-          run: async () => {
-            return await options.repoMutationApplication.deleteBranch(userId, {
-              repoRoot: cwd,
-              workspaceRuntimeId,
-              branchName: branch,
-              deleteBranch: async () =>
-                await deleteRepoBranch(cwd, branch, { force, deleteUpstream }, c.req.raw.signal, {
-                  workspaceRuntimeId,
-                }),
-            })
-          },
-          label: 'delete-branch',
-          signal: c.req.raw.signal,
-        }),
-      ),
+      await runPublicRepoMutationRequest({
+        userId,
+        workspaceId: cwd,
+        invalidatedDomains: ['metadata'],
+        run: async () => {
+          return await options.repoMutationApplication.deleteBranch(userId, {
+            repoRoot: cwd,
+            workspaceRuntimeId,
+            branchName: branch,
+            deleteBranch: async () =>
+              await deleteRepoBranch(cwd, branch, { force, deleteUpstream }, c.req.raw.signal, {
+                workspaceRuntimeId,
+              }),
+          })
+        },
+        label: 'delete-branch',
+        signal: c.req.raw.signal,
+      }),
     )
   })
   app.post('/remove-worktree', async (c) => {
@@ -298,37 +290,35 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      publicRepoMutationResult(
-        await runRepoMutationRequest({
-          userId,
-          workspaceId: cwd,
-          invalidatedDomains: ['metadata', 'worktree-status'],
-          run: () =>
-            options.worktreeRemovalApplication.removeWorktree(userId, {
-              repoRoot: cwd,
-              workspaceRuntimeId,
-              worktreePath,
-              branchName: branch,
-              deleteBranch,
-              signal: c.req.raw.signal,
-              remove: async (
-                physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-                lifecycle: RepoWorktreeRemovalLifecycle,
-                signal: AbortSignal,
-              ) =>
-                await removeCapturedRepoWorktree(
-                  cwd,
-                  { branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream },
-                  lifecycle,
-                  physicalWorktreeCapability,
-                  signal,
-                  { workspaceRuntimeId },
-                ),
-            }),
-          label: 'remove-worktree',
-          signal: c.req.raw.signal,
-        }),
-      ),
+      await runPublicRepoMutationRequest({
+        userId,
+        workspaceId: cwd,
+        invalidatedDomains: ['metadata', 'worktree-status'],
+        run: () =>
+          options.worktreeRemovalApplication.removeWorktree(userId, {
+            repoRoot: cwd,
+            workspaceRuntimeId,
+            worktreePath,
+            branchName: branch,
+            deleteBranch,
+            signal: c.req.raw.signal,
+            remove: async (
+              physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
+              lifecycle: RepoWorktreeRemovalLifecycle,
+              signal: AbortSignal,
+            ) =>
+              await removeCapturedRepoWorktree(
+                cwd,
+                { branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream },
+                lifecycle,
+                physicalWorktreeCapability,
+                signal,
+                { workspaceRuntimeId },
+              ),
+          }),
+        label: 'remove-worktree',
+        signal: c.req.raw.signal,
+      }),
     )
   })
   app.post('/open-url', async (c) => {
@@ -404,19 +394,25 @@ function requiredUserId(userId: string | null | undefined): string {
   return userId
 }
 
-async function runRepoMutationRequest(input: {
+interface RepoMutationRequest {
   userId: string
   workspaceId: WorkspaceId
   invalidatedDomains: readonly RepoReadInvalidationDomain[]
   run: () => Promise<RepoMutationResult>
   label: string
   signal?: AbortSignal
-}): Promise<RepoMutationResult> {
+}
+
+async function runRepoMutationRequest(input: RepoMutationRequest): Promise<RepoMutationResult> {
   const mutation = await runGitWorkspaceMutationRuntimeRequest(input)
   // Runtime settlement owns whether the remote workspace remains usable.
   // Publish repository convergence only after that lifecycle decision commits.
   publishRepoMutationInvalidations(input.workspaceId, mutation, input.invalidatedDomains)
   return mutation
+}
+
+async function runPublicRepoMutationRequest(input: RepoMutationRequest): Promise<RepoMutationExecResult> {
+  return publicRepoMutationResult(await runRepoMutationRequest(input))
 }
 
 async function backgroundSyncResponse(userId: string) {

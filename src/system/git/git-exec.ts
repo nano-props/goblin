@@ -128,7 +128,7 @@ export async function gitCommandResultWithOptions(
       const cleaned = stripNoise(stderr).trim()
       return {
         result: { ok: false, message: cleaned || err.message || 'Unknown error' },
-        execution: { status: 'failed' },
+        execution: { status: isProcessStartFailure(err) ? 'not-started' : 'failed' },
       }
     }
     return {
@@ -136,6 +136,11 @@ export async function gitCommandResultWithOptions(
       execution: { status: 'failed' },
     }
   }
+}
+
+function isProcessStartFailure(error: ExecaError): boolean {
+  if (error.exitCode !== undefined || error.signal !== undefined) return false
+  return error.code === 'ENOENT' || error.code === 'EACCES' || error.code === 'ENOEXEC'
 }
 
 /**

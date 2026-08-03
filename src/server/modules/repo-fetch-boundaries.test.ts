@@ -6,7 +6,6 @@ import {
   LINKED_REPO_ID,
   REPO_ID,
   expectNoRepoMetadataInvalidations,
-  expectRepoMetadataInvalidations,
   mocks,
   removeLocalRepoWorktreeForTest,
 } from '#/server/test-utils/repo-module.ts'
@@ -42,9 +41,9 @@ describe('fetchRepo canonical boundaries', () => {
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, kind as 'user' | 'background')
 
-    expect(result).toEqual({ ok: true, message: 'fetched' })
+    expect(result).toEqual({ ok: true, message: 'fetched', repoIdsToInvalidate: [REPO_ID] })
     expect(mocks.fetchAll).toHaveBeenCalledWith('/tmp/repo', expect.any(AbortSignal))
-    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+    expectNoRepoMetadataInvalidations()
   })
 
   test('merges caller abort signal into fetch operations', async () => {
@@ -59,8 +58,12 @@ describe('fetchRepo canonical boundaries', () => {
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'user', caller.signal)
 
-    expect(result).toEqual({ ok: false, message: 'error.git-command-cancelled-check-state' })
-    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+    expect(result).toEqual({
+      ok: false,
+      message: 'error.git-command-cancelled-check-state',
+      repoIdsToInvalidate: [REPO_ID],
+    })
+    expectNoRepoMetadataInvalidations()
   })
 
   test('reports an uncertain result when fetch times out after starting', async () => {
@@ -71,8 +74,12 @@ describe('fetchRepo canonical boundaries', () => {
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'user')
 
-    expect(result).toEqual({ ok: false, message: 'error.git-command-timeout-check-state' })
-    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+    expect(result).toEqual({
+      ok: false,
+      message: 'error.git-command-timeout-check-state',
+      repoIdsToInvalidate: [REPO_ID],
+    })
+    expectNoRepoMetadataInvalidations()
   })
 
   test('publishes snapshot invalidation after a successful sync', async () => {
@@ -81,15 +88,16 @@ describe('fetchRepo canonical boundaries', () => {
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'user')
 
-    expect(result).toEqual({ ok: true, message: 'fetched' })
-    expectRepoMetadataInvalidations({
-      repoId: REPO_ID,
-      domain: 'metadata',
-    })
+    expect(result).toEqual({ ok: true, message: 'fetched', repoIdsToInvalidate: [REPO_ID] })
+    expectNoRepoMetadataInvalidations()
   })
 
   test('shares successful fetch time across worktrees with one write boundary', async () => {
     mocks.resolveRepoCommonDir.mockResolvedValue('/tmp/repo/.git')
+    mocks.readWorktreeMembership.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false },
+    ])
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
@@ -112,17 +120,12 @@ describe('fetchRepo canonical boundaries', () => {
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'user')
 
-    expect(result).toEqual({ ok: true, message: 'fetched' })
-    expectRepoMetadataInvalidations(
-      {
-        repoId: REPO_ID,
-        domain: 'metadata',
-      },
-      {
-        repoId: LINKED_REPO_ID,
-        domain: 'metadata',
-      },
-    )
+    expect(result).toEqual({
+      ok: true,
+      message: 'fetched',
+      repoIdsToInvalidate: [REPO_ID, LINKED_REPO_ID],
+    })
+    expectNoRepoMetadataInvalidations()
   })
 
   test('user sync waits for an active sibling worktree background sync before fetching', async () => {
@@ -147,27 +150,18 @@ describe('fetchRepo canonical boundaries', () => {
     fetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched in background' }))
     const [backgroundResult, userResult] = await Promise.all([background, user])
 
-    expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
-    expect(userResult).toEqual({ ok: true, message: 'fetched by user' })
+    expect(backgroundResult).toEqual({
+      ok: true,
+      message: 'fetched in background',
+      repoIdsToInvalidate: [REPO_ID, LINKED_REPO_ID],
+    })
+    expect(userResult).toEqual({
+      ok: true,
+      message: 'fetched by user',
+      repoIdsToInvalidate: [LINKED_REPO_ID, REPO_ID],
+    })
     expect(mocks.fetchAll).toHaveBeenCalledTimes(2)
-    expectRepoMetadataInvalidations(
-      {
-        repoId: REPO_ID,
-        domain: 'metadata',
-      },
-      {
-        repoId: LINKED_REPO_ID,
-        domain: 'metadata',
-      },
-      {
-        repoId: LINKED_REPO_ID,
-        domain: 'metadata',
-      },
-      {
-        repoId: REPO_ID,
-        domain: 'metadata',
-      },
-    )
+    expectNoRepoMetadataInvalidations()
   })
 
   test('user sync waits for an active remote background sync with the same alias', async () => {
@@ -188,27 +182,18 @@ describe('fetchRepo canonical boundaries', () => {
     fetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched in background' }))
     const [backgroundResult, userResult] = await Promise.all([background, user])
 
-    expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
-    expect(userResult).toEqual({ ok: true, message: 'fetched by user' })
+    expect(backgroundResult).toEqual({
+      ok: true,
+      message: 'fetched in background',
+      repoIdsToInvalidate: [repoId, linkedRepoId],
+    })
+    expect(userResult).toEqual({
+      ok: true,
+      message: 'fetched by user',
+      repoIdsToInvalidate: [repoId, linkedRepoId],
+    })
     expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2)
-    expectRepoMetadataInvalidations(
-      {
-        repoId,
-        domain: 'metadata',
-      },
-      {
-        repoId: linkedRepoId,
-        domain: 'metadata',
-      },
-      {
-        repoId: linkedRepoId,
-        domain: 'metadata',
-      },
-      {
-        repoId,
-        domain: 'metadata',
-      },
-    )
+    expectNoRepoMetadataInvalidations()
   })
 
   test('does not admit a remote write without a confirmed canonical boundary', async () => {
@@ -228,13 +213,14 @@ describe('fetchRepo canonical boundaries', () => {
     expect(mocks.fetchAll).not.toHaveBeenCalled()
   })
 
-  test('does not bind a local read to a locator when canonical resolution fails', async () => {
+  test('reads operation state from memory without canonical boundary resolution', async () => {
     mocks.resolveRepoCommonDir.mockRejectedValueOnce(new Error('git unavailable'))
 
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
     const { repoWriteOperationCoordinatorStatsForTests } =
       await import('#/server/modules/repo-write-operation-coordinator.ts')
-    await expect(readRepoOperationsSnapshot(REPO_ID)).rejects.toThrow('error.repository-boundary-unavailable')
+    await expect(readRepoOperationsSnapshot(REPO_ID)).resolves.toMatchObject({ operations: [], lastFetchAt: null })
+    expect(mocks.resolveRepoCommonDir).not.toHaveBeenCalled()
     expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
       boundaryRuntimes: 0,
       registeredBoundaries: 0,
@@ -382,19 +368,14 @@ describe('fetchRepo canonical boundaries', () => {
     }
   })
 
-  test('preserves cancellation while resolving a local canonical boundary', async () => {
+  test('rejects an already-cancelled in-memory operations read', async () => {
     const caller = new AbortController()
-    mocks.resolveRepoCommonDir.mockImplementationOnce(
-      async (_cwd: string, options?: { signal?: AbortSignal }) =>
-        await new Promise<string>((_resolve, reject) => {
-          options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), { once: true })
-        }),
-    )
+    caller.abort(new Error('client disconnected'))
 
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
     const read = readRepoOperationsSnapshot(REPO_ID, { signal: caller.signal })
-    caller.abort(new Error('client disconnected'))
 
     await expect(read).rejects.toThrow('client disconnected')
+    expect(mocks.resolveRepoCommonDir).not.toHaveBeenCalled()
   })
 })

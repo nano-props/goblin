@@ -9,7 +9,7 @@ import { isWorkspaceRuntimeAdmissionClosedError } from '#/server/modules/workspa
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 import { isRepoMembershipReadConflictError } from '#/server/modules/repo-membership-read-conflict.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
-import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
+import { appendRepoMutationRecoveryMessageKey, type RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
 import { stopBackgroundSyncRuntime } from '#/server/modules/background-sync.ts'
 import type { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 
@@ -73,8 +73,8 @@ export async function runGitWorkspaceMutationRuntimeRequest(input: {
 
 function mutationWithRuntimeSettlementRecovery(mutation: RepoMutationResult): RepoMutationResult {
   const runtimeRecoveryKey = 'error.workspace-runtime-settlement-failed' as const
-  if (mutation.recoveryMessageKeys?.includes(runtimeRecoveryKey)) return mutation
-  const recoveryMessageKeys = [...(mutation.recoveryMessageKeys ?? []), runtimeRecoveryKey]
+  const recoveryMessageKeys = appendRepoMutationRecoveryMessageKey(mutation.recoveryMessageKeys, runtimeRecoveryKey)
+  if (recoveryMessageKeys === mutation.recoveryMessageKeys) return mutation
   return { ...mutation, recoveryMessageKeys }
 }
 

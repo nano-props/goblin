@@ -1,4 +1,5 @@
 import { createReadStream, promises as fs } from 'node:fs'
+import type { Stats } from 'node:fs'
 import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 
@@ -45,7 +46,7 @@ export async function copyPath(
     return
   }
   if (sourceStat.isFile()) {
-    await copyRegularFile(sourcePath, destinationPath, sourceStat.mode, options.signal)
+    await copyRegularFile(sourcePath, destinationPath, sourceStat, options.signal)
     return
   }
   if (sourceStat.isSymbolicLink()) {
@@ -96,9 +97,15 @@ function filesystemErrorMessage(error: unknown): string {
 async function copyRegularFile(
   sourcePath: string,
   destinationPath: string,
-  mode: number,
+  sourceStat: Stats,
   signal: AbortSignal | undefined,
 ): Promise<void> {
+  if (isSparseFile(sourceStat)) {
+    await copySparseFile(sourcePath, destinationPath, sourceStat.mode, signal)
+    return
+  }
+
+  const mode = sourceStat.mode
   const destination = await fs.open(destinationPath, 'wx', mode)
   try {
     await pipeline(createReadStream(sourcePath), destination.createWriteStream(), { signal })
@@ -112,6 +119,78 @@ async function copyRegularFile(
     await fs.rm(destinationPath, { force: true }).catch(() => {})
     throw error
   }
+}
+
+function isSparseFile(stat: Stats): boolean {
+  if (stat.size === 0) return false
+  return stat.blocks * 512 < stat.size
+}
+
+async function copySparseFile(
+  sourcePath: string,
+  destinationPath: string,
+  mode: number,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  signal?.throwIfAborted()
+  const source = await fs.open(sourcePath, 'r')
+  let destination: Awaited<ReturnType<typeof fs.open>> | undefined
+  try {
+    destination = await fs.open(destinationPath, 'wx', mode)
+    const buffer = Buffer.allocUnsafe(64 * 1024)
+    const sourceSize = (await source.stat()).size
+    let position = 0
+    while (position < sourceSize) {
+      signal?.throwIfAborted()
+      const length = Math.min(buffer.length, sourceSize - position)
+      const { bytesRead } = await source.read(buffer, 0, length, position)
+      if (bytesRead === 0) throw new Error(`source file ended while copying: ${sourcePath}`)
+      await writeNonZeroBlocks(destination, buffer.subarray(0, bytesRead), position, signal)
+      position += bytesRead
+    }
+    await destination.truncate(sourceSize)
+    signal?.throwIfAborted()
+    await fs.chmod(destinationPath, mode)
+  } catch (error) {
+    await destination?.close().catch(() => {})
+    if (destination) await fs.rm(destinationPath, { force: true }).catch(() => {})
+    throw error
+  } finally {
+    await destination?.close().catch(() => {})
+    await source.close().catch(() => {})
+  }
+}
+
+async function writeNonZeroBlocks(
+  destination: Awaited<ReturnType<typeof fs.open>>,
+  buffer: Buffer,
+  filePosition: number,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  const sparseBlockSize = 4 * 1024
+  for (let start = 0; start < buffer.length; start += sparseBlockSize) {
+    const end = Math.min(start + sparseBlockSize, buffer.length)
+    if (!containsNonZeroByte(buffer, start, end)) continue
+    let written = 0
+    while (written < end - start) {
+      signal?.throwIfAborted()
+      const result = await destination.write(
+        buffer,
+        start + written,
+        end - start - written,
+        filePosition + start + written,
+      )
+      if (result.bytesWritten === 0) throw new Error('destination file stopped accepting writes')
+      written += result.bytesWritten
+    }
+  }
+}
+
+function containsNonZeroByte(buffer: Buffer, start: number, end: number): boolean {
+  for (let index = start; index < end; index += 1) {
+    if (buffer[index] !== 0) return true
+  }
+  return false
 }
 
 async function copySymbolicLink(

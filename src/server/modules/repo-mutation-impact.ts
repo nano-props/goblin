@@ -1,5 +1,10 @@
 import { compact } from 'es-toolkit'
-import type { ExecResult, RepoMutationExecResult, WorktreeInfo } from '#/shared/git-types.ts'
+import type {
+  ExecResult,
+  ExecResultRecoveryMessageKey,
+  RepoMutationExecResult,
+  WorktreeInfo,
+} from '#/shared/git-types.ts'
 import { normalizeRemoteWorkspaceRef, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { formatWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
@@ -8,6 +13,22 @@ export interface RepoMutationResult extends RepoMutationExecResult {
   repoIdsToInvalidate?: readonly WorkspaceId[]
   /** Checked-out filesystem projections that must be invalidated. */
   worktreePathsToInvalidate?: readonly string[]
+}
+
+/** Append one recovery notice while preserving the server-selected order and uniqueness. */
+export function appendRepoMutationRecoveryMessageKey(
+  recoveryMessageKeys: readonly ExecResultRecoveryMessageKey[] | undefined,
+  recoveryMessageKey: ExecResultRecoveryMessageKey,
+): readonly ExecResultRecoveryMessageKey[] {
+  if (recoveryMessageKeys?.includes(recoveryMessageKey)) return recoveryMessageKeys
+  return [...(recoveryMessageKeys ?? []), recoveryMessageKey]
+}
+
+/** Preserve first occurrence order while removing duplicate recovery notices. */
+export function uniqueRepoMutationRecoveryMessageKeys(
+  recoveryMessageKeys: readonly ExecResultRecoveryMessageKey[],
+): readonly ExecResultRecoveryMessageKey[] {
+  return Array.from(new Set(recoveryMessageKeys))
 }
 
 /** Project an internal mutation result without exposing impact or milestone authority. */

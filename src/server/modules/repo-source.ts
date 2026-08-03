@@ -18,8 +18,10 @@ import {
   resolveRepoWriteBoundaryForLocator,
 } from '#/server/modules/repo-write-boundary.ts'
 import {
+  appendRepoMutationRecoveryMessageKey,
   localWorktreeRepoIds,
   remoteWorktreeRepoIds,
+  uniqueRepoMutationRecoveryMessageKeys,
   withRepoIdsToInvalidate,
   workspaceIdForLocalWorktreePath,
   type RepoMutationResult,
@@ -390,7 +392,7 @@ function withRecoveryMessage(
   recoveryMessage: ExecResultRecoveryMessageKey,
 ): RepoMutationExecResult {
   if (result.ok) return result
-  const recoveryMessageKeys = Array.from(new Set([...(result.recoveryMessageKeys ?? []), recoveryMessage]))
+  const recoveryMessageKeys = appendRepoMutationRecoveryMessageKey(result.recoveryMessageKeys, recoveryMessage)
   return { ...result, recoveryMessageKeys }
 }
 
@@ -411,7 +413,7 @@ function worktreeRemovedFollowupResult(
     recoveryMessages.push('error.local-branch-deleted-followup-failed')
   }
   recoveryMessages.push(...(result.recoveryMessageKeys ?? []))
-  const recoveryMessageKeys = Array.from(new Set(recoveryMessages))
+  const recoveryMessageKeys = uniqueRepoMutationRecoveryMessageKeys(recoveryMessages)
   return { ok: false, message: result.message, recoveryMessageKeys }
 }
 

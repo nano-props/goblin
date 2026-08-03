@@ -106,17 +106,9 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
           operation.settle(result)
           return result
         }
-        try {
-          const result = await options.task(context)
-          operation.settle(result)
-          return result
-        } catch (err) {
-          operation.settle({
-            ok: false,
-            message: err instanceof Error ? err.message : String(err),
-          })
-          throw err
-        }
+        const result = await options.task(context)
+        operation.settle(result)
+        return result
       } finally {
         options.signal?.removeEventListener('abort', onAbort)
       }

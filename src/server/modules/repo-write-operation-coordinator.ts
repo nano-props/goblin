@@ -40,7 +40,7 @@ export interface RepoWriteOperationLifecycle {
   requestCancel(reason: RepoOperationCancellationReason): void
   recordWaitCancellation(reason: RepoOperationCancellationReason): void
   runMembershipMutation<T>(mutation: () => Promise<T>): Promise<T>
-  settle(result: { ok: boolean; message?: string }): void
+  settle(result: { ok: boolean; message?: string; repoIdsToInvalidate?: readonly WorkspaceId[] }): void
 }
 
 export interface RepoWriteOperationContext {
@@ -249,6 +249,9 @@ function beginRepoWriteOperation(
     settle(result) {
       if (settled) return
       settled = true
+      for (const repoId of result.repoIdsToInvalidate ?? []) {
+        registerRepoWriteOperationBoundaryRepoId(runtime, repoId)
+      }
       if (result.ok && operation.kind === 'fetch') recordRepoBoundaryFetchSuccess(runtime)
       const cancellationReason = operation.cancellation.reason
       operation.phase = result.ok ? 'done' : 'failed'
@@ -415,11 +418,25 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
     operation.settle(result)
     return result
   }
-  operation.settle({
-    ok: false,
-    message: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
-  })
+  operation.settle(repoWriteOperationFailure(outcome.error))
   throw outcome.error
+}
+
+function repoWriteOperationFailure(error: unknown): {
+  ok: false
+  message: string
+  repoIdsToInvalidate?: readonly WorkspaceId[]
+} {
+  if (isRepoMutationRuntimeFailureError(error)) {
+    const failure = {
+      ok: false as const,
+      message: error.runtimeFailure.message,
+    }
+    return error.mutation.repoIdsToInvalidate
+      ? { ...failure, repoIdsToInvalidate: error.mutation.repoIdsToInvalidate }
+      : failure
+  }
+  return { ok: false, message: error instanceof Error ? error.message : String(error) }
 }
 
 function isCancellationError(error: unknown, signal: AbortSignal): boolean {
@@ -506,7 +523,7 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
         return await task()
       } catch (err) {
         closeWorkspaceRuntimeAdmissionForFailure(runtimeRegistration, err)
-        operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
+        operation.settle(repoWriteOperationFailure(err))
         throw err
       }
     },
@@ -523,7 +540,6 @@ export async function listRepoWriteOperationsForRepo(
   return listBoundaryGroupOperations(matchingGroups, {
     includeSettled: options.includeSettled,
     workspaceRuntimeId: options.workspaceRuntimeId,
-    requestedRepoId: repoId,
   })
 }
 

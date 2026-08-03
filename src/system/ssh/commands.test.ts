@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
 import { afterEach, describe, expect, test } from 'vitest'
-import { buildRemoteCommandInvocation } from '#/system/ssh/commands.ts'
+import { buildRemoteCommandInvocation, runRemoteCommand } from '#/system/ssh/commands.ts'
 import { buildCanonicalSshConnectionSnapshot, buildRemoteTerminalInvocation } from '#/system/ssh/invocation.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -22,6 +22,19 @@ afterEach(() => {
 })
 
 describe('remote ssh command builders', () => {
+  test('proves that a command was not started when cancellation predates invocation', async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(runRemoteCommand(target(), { type: 'checkGit' }, { signal: controller.signal })).resolves.toEqual({
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: 'cancelled',
+      commandNotStarted: true,
+    })
+  })
+
   testPosix('encodes optional upstream as structured NUL fields', async () => {
     const repo = path.join(os.tmpdir(), `goblin-upstream-protocol-${process.pid}-${Date.now()}`)
     tempDirs.push(repo)

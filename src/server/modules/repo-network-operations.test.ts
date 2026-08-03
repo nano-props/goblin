@@ -35,8 +35,16 @@ describe('fetchRepo coordination', () => {
     expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
 
     firstFetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched first alias' }))
-    await expect(first).resolves.toEqual({ ok: true, message: 'fetched first alias' })
-    await expect(second).resolves.toEqual({ ok: true, message: 'fetched second alias' })
+    await expect(first).resolves.toEqual({
+      ok: true,
+      message: 'fetched first alias',
+      repoIdsToInvalidate: [firstRepoId],
+    })
+    await expect(second).resolves.toEqual({
+      ok: true,
+      message: 'fetched second alias',
+      repoIdsToInvalidate: [secondRepoId],
+    })
     expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2)
   })
 
@@ -71,8 +79,16 @@ describe('fetchRepo coordination', () => {
 
     firstFetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched proxy a' }))
     secondFetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched proxy b' }))
-    await expect(first).resolves.toEqual({ ok: true, message: 'fetched proxy a' })
-    await expect(second).resolves.toEqual({ ok: true, message: 'fetched proxy b' })
+    await expect(first).resolves.toEqual({
+      ok: true,
+      message: 'fetched proxy a',
+      repoIdsToInvalidate: [firstRepoId],
+    })
+    await expect(second).resolves.toEqual({
+      ok: true,
+      message: 'fetched proxy b',
+      repoIdsToInvalidate: [secondRepoId],
+    })
   })
 
   test('remote syncs for different repos under the same alias use distinct write boundaries', async () => {
@@ -114,8 +130,8 @@ describe('fetchRepo coordination', () => {
     first.resolve(commandOutcomeForTest({ ok: true, message: 'fetched first' }))
     second.resolve(commandOutcomeForTest({ ok: true, message: 'fetched second' }))
 
-    await expect(active).resolves.toEqual({ ok: true, message: 'fetched first' })
-    await expect(other).resolves.toEqual({ ok: true, message: 'fetched second' })
+    await expect(active).resolves.toEqual({ ok: true, message: 'fetched first', repoIdsToInvalidate: [repoId] })
+    await expect(other).resolves.toEqual({ ok: true, message: 'fetched second', repoIdsToInvalidate: [otherRepoId] })
   })
 
   test('caller abort records wait cancellation for a queued user sync', async () => {
@@ -169,8 +185,8 @@ describe('fetchRepo coordination', () => {
     })
 
     deleteBranch.resolve(commandOutcomeForTest({ ok: true, message: 'deleted' }))
-    await expect(write).resolves.toEqual({ ok: true, message: 'deleted' })
-    await expect(background).resolves.toEqual({ ok: true, message: 'fetched' })
+    await expect(write).resolves.toEqual({ ok: true, message: 'deleted', repoIdsToInvalidate: [REPO_ID] })
+    await expect(background).resolves.toEqual({ ok: true, message: 'fetched', repoIdsToInvalidate: [REPO_ID] })
   })
 
   test('does not publish invalidations after a failed sync', async () => {

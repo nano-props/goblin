@@ -115,6 +115,7 @@ interface RemoteBranchMutationStepResult extends ExecResult {
 }
 
 function remoteCommandExecution(result: RemoteCommandResult): CommandExecution {
+  if (result.commandNotStarted) return { status: 'not-started' }
   if (result.ok) return { status: 'succeeded' }
   if (result.timedOut) return { status: 'timed-out' }
   if (result.message === 'cancelled') return { status: 'cancelled' }
