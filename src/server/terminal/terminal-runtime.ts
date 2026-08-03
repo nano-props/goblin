@@ -95,7 +95,6 @@ export interface ServerTerminalRuntime {
 }
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
-  const { ptySupervisor } = options
   const workspacePaneLayoutRepository = options.workspacePaneLayoutRepository ?? serverWorkspacePaneLayoutRepository
   const workspacePaneLayout = new WorkspacePaneLayoutAggregate({
     repository: workspacePaneLayoutRepository,
@@ -112,7 +111,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   let broker: RealtimeBroker<AppRealtimeMessage>
   let sessionService: ReturnType<typeof createTerminalSessionService>
   const manager = new TerminalSessionManager<string>(
-    ptySupervisor,
+    options.ptySupervisor,
     {
       onOutput(userId, event) {
         broker.broadcastToUser(userId, { type: 'output', event })
@@ -327,7 +326,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broker,
     isValidClientId: isValidTerminalClientId,
     getDiagnostics() {
-      const pty = ptySupervisor.getDiagnostics()
+      const pty = options.ptySupervisor.getDiagnostics()
       return {
         terminal: {
           mode: pty.mode,
@@ -349,7 +348,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       physicalWorktrees.dispose()
       coordinator.shutdown()
       manager.forceShutdown()
-      ptySupervisor.shutdown()
+      options.ptySupervisor.shutdown()
     },
   })
 
@@ -361,7 +360,10 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
   }
 
-  terminalRuntimeLogger.info({ ptyMode: ptySupervisor.getDiagnostics().mode }, 'server terminal runtime created')
+  terminalRuntimeLogger.info(
+    { ptyMode: options.ptySupervisor.getDiagnostics().mode },
+    'server terminal runtime created',
+  )
 
   const workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost = {
     async commitGitCapabilityRemoval({ userId, workspaceId, workspaceRuntimeId, assertCurrent }) {

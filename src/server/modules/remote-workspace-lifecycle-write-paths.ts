@@ -21,17 +21,16 @@ export async function runRemoteWorkspaceLifecycleWrite(
   input: RunRemoteWorkspaceLifecycleInput,
   options: RunRemoteWorkspaceLifecycleOptions = {},
 ): Promise<RemoteWorkspaceLifecycleCommandResult> {
-  const { userId, workspaceId, workspaceRuntimeId, mode } = input
-  if (!isRemoteWorkspaceId(workspaceId)) {
+  if (!isRemoteWorkspaceId(input.workspaceId)) {
     throw new TypeError('remote workspace lifecycle requires an SSH workspace id')
   }
   const result = await runRemoteWorkspaceLifecycle(
-    userId,
-    workspaceId,
-    workspaceRuntimeId,
-    async (signal) => await resolveServerRemoteWorkspaceConnection({ workspaceId }, signal),
-    () => publishUserWorkspaceRuntimeInvalidation(userId, { workspaceId }),
-    mode,
+    input.userId,
+    input.workspaceId,
+    input.workspaceRuntimeId,
+    async (signal) => await resolveServerRemoteWorkspaceConnection({ workspaceId: input.workspaceId }, signal),
+    () => publishUserWorkspaceRuntimeInvalidation(input.userId, { workspaceId: input.workspaceId }),
+    input.mode,
     (resolved) => {
       if (resolved.kind === 'failed') {
         return {
@@ -72,11 +71,13 @@ export async function runRemoteWorkspaceLifecycleWrite(
       }
     },
   )
-  if (result.kind !== 'settled') return { kind: result.kind, workspaceId }
-  if (!isCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId)) return { kind: 'stale-runtime', workspaceId }
+  if (result.kind !== 'settled') return { kind: result.kind, workspaceId: input.workspaceId }
+  if (!isCurrentWorkspaceRuntime(input.userId, input.workspaceId, input.workspaceRuntimeId)) {
+    return { kind: 'stale-runtime', workspaceId: input.workspaceId }
+  }
   return {
     kind: 'settled',
-    workspaceId,
+    workspaceId: input.workspaceId,
     lifecycle: result.lifecycle,
     workspaceProbe: result.workspaceProbe,
   }

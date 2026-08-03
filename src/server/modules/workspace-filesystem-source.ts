@@ -82,22 +82,21 @@ async function readFilesystemSourceRemote(
   input: GitWorktreeFilesystemSourceRemoteInput,
   readDirectory: typeof getRemoteTreeWalk | typeof getRemoteDirectoryWalk,
 ): Promise<WorkspaceFilesystemSourceResult> {
-  const { target, worktreePath, options, signal, run, knownWorktrees } = input
-  if (signal?.aborted) throw new Error('aborted')
+  if (input.signal?.aborted) throw new Error('aborted')
 
-  const prefix = normalizePrefix(options.prefix)
+  const prefix = normalizePrefix(input.options.prefix)
   if (!isSafeNormalizedPrefix(prefix)) throw new Error('invalid tree prefix')
 
-  const remoteResult = await readDirectory(target, worktreePath, {
-    signal,
+  const remoteResult = await readDirectory(input.target, input.worktreePath, {
+    signal: input.signal,
     prefix,
-    ...(run ? { run } : {}),
-    ...(knownWorktrees ? { knownWorktrees } : {}),
+    ...(input.run ? { run: input.run } : {}),
+    ...(input.knownWorktrees ? { knownWorktrees: input.knownWorktrees } : {}),
   })
-  if (signal?.aborted) throw new Error('aborted')
+  if (input.signal?.aborted) throw new Error('aborted')
   if (!remoteResult.ok) throw new Error(remoteResult.message)
 
-  const root = worktreePath.replace(/\/+$/u, '')
+  const root = input.worktreePath.replace(/\/+$/u, '')
   const entries = parseNullSeparatedPaths(remoteResult.message)
     .map((entry) => {
       if (path.isAbsolute(entry)) return stripRemoteEntryPrefix(entry, root)

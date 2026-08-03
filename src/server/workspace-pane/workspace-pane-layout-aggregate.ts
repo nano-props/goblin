@@ -196,18 +196,19 @@ export class WorkspacePaneLayoutAggregate {
   }
 
   private async snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot> {
-    const { scope, validTargets, providerSnapshots, knownLayout } = input
-    const layout = knownLayout ?? (await this.repository.load(scope.workspaceId)).layout
-    const entries = this.projectEntries(scope, layout, validTargets, providerSnapshots)
-    return { revision: this.revision(scope, layout, validTargets, providerSnapshots, entries), entries }
+    const layout = input.knownLayout ?? (await this.repository.load(input.scope.workspaceId)).layout
+    const entries = this.projectEntries(input.scope, layout, input.validTargets, input.providerSnapshots)
+    return {
+      revision: this.revision(input.scope, layout, input.validTargets, input.providerSnapshots, entries),
+      entries,
+    }
   }
 
   private async projectEntriesForAdmission(
     input: WorkspacePaneLayoutSnapshotInput,
   ): Promise<WorkspacePaneTabsSnapshot['entries']> {
-    const { scope, validTargets, providerSnapshots } = input
-    const layout = (await this.repository.load(scope.workspaceId)).layout
-    return this.projectEntries(scope, layout, validTargets, providerSnapshots)
+    const layout = (await this.repository.load(input.scope.workspaceId)).layout
+    return this.projectEntries(input.scope, layout, input.validTargets, input.providerSnapshots)
   }
 
   private async validateMembershipAndSnapshot(

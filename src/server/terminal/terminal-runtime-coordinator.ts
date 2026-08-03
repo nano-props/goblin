@@ -31,13 +31,11 @@ export interface TerminalRuntimeCoordinator {
 export function createTerminalRuntimeCoordinator(
   options: TerminalRuntimeCoordinatorOptions,
 ): TerminalRuntimeCoordinator {
-  const { manager, workspaceTabsCoordinator, detachedTtlMs, clientStateTtlMs } = options
-
   // Detached-user timers key by userId, not clientId. clientId is only
   // the page-instance routing id; terminal lifetime is owned by the
   // access-token-derived userId.
-  const detachedUsers = new DelayedPresenceExpiry<string>(detachedTtlMs)
-  const clientStateExpiry = new DelayedPresenceExpiry<string>(clientStateTtlMs)
+  const detachedUsers = new DelayedPresenceExpiry<string>(options.detachedTtlMs)
+  const clientStateExpiry = new DelayedPresenceExpiry<string>(options.clientStateTtlMs)
 
   const broker = new RealtimeBroker<AppRealtimeMessage>({
     livenessTimeoutReason: 'terminal liveness timeout',
@@ -49,7 +47,7 @@ export function createTerminalRuntimeCoordinator(
       } else {
         scheduleClientStateExpiry(event.userId, event.clientId)
       }
-      manager.handleClientPresenceChanged(event.userId, event.clientId, event.previousOnline)
+      options.manager.handleClientPresenceChanged(event.userId, event.clientId, event.previousOnline)
     },
     onUserSocketsDrained(userId) {
       if (!detachedUsers.has(userId)) {
@@ -88,9 +86,9 @@ export function createTerminalRuntimeCoordinator(
   }
 
   async function closeDetachedUserRuntime(userId: string): Promise<void> {
-    const retirement = await manager.closeSessionsForUser(userId)
+    const retirement = await options.manager.closeSessionsForUser(userId)
     if (retirement.failures.length > 0) return
-    await workspaceTabsCoordinator.closeUser({ userId })
+    await options.workspaceTabsCoordinator.closeUser({ userId })
   }
 
   function scheduleClientStateExpiry(userId: string, clientId: string): void {
@@ -99,7 +97,7 @@ export function createTerminalRuntimeCoordinator(
       workspaceRuntimeClientLeaseKey(userId, clientId),
       () => broker.isClientOnline(userId, clientId),
       () => {
-        manager.expireClientAttachments(userId, clientId)
+        options.manager.expireClientAttachments(userId, clientId)
         expireWorkspaceRuntimeMembershipLease(lease)
       },
     )

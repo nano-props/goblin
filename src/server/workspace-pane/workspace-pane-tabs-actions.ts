@@ -39,19 +39,17 @@ export interface WorkspacePaneTabsActionDependencies {
 }
 
 export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDependencies) {
-  const { sessionService, isValidClientId } = deps
-
   return {
     async replaceTabs(
       clientId: string,
       userId: string,
       input: WorkspacePaneTabsReplaceInput,
     ): Promise<WorkspacePaneTabsSnapshot> {
-      if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
+      if (!deps.isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
       if (!validInputTarget(input)) return emptyWorkspacePaneTabsSnapshot()
       const assertCurrentMembership = membershipAssertion(clientId, userId, input.workspaceId, input.workspaceRuntimeId)
       assertCurrentMembership()
-      return await sessionService.replaceTabs(userId, input, assertCurrentMembership)
+      return await deps.sessionService.replaceTabs(userId, input, assertCurrentMembership)
     },
 
     async updateTabs(
@@ -59,11 +57,11 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       userId: string,
       input: WorkspacePaneTabsUpdateInput,
     ): Promise<WorkspacePaneTabsSnapshot> {
-      if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
+      if (!deps.isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
       if (!validInputTarget(input)) return emptyWorkspacePaneTabsSnapshot()
       const assertCurrentMembership = membershipAssertion(clientId, userId, input.workspaceId, input.workspaceRuntimeId)
       assertCurrentMembership()
-      return await sessionService.updateTabs(userId, input, assertCurrentMembership)
+      return await deps.sessionService.updateTabs(userId, input, assertCurrentMembership)
     },
 
     async listWorkspaceTabs(
@@ -71,11 +69,11 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       userId: string,
       input: WorkspacePaneTabsListInput,
     ): Promise<WorkspacePaneTabsSnapshot> {
-      if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
+      if (!deps.isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
       if (!isValidWorkspaceLocatorInput(input?.workspaceId)) return emptyWorkspacePaneTabsSnapshot()
       const assertCurrentMembership = membershipAssertion(clientId, userId, input.workspaceId, input.workspaceRuntimeId)
       assertCurrentMembership()
-      return await sessionService.listWorkspaceTabs(
+      return await deps.sessionService.listWorkspaceTabs(
         userId,
         input.workspaceId,
         input.workspaceRuntimeId,
