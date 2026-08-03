@@ -12,7 +12,7 @@ import {
   RepoMutationRuntimeFailureError,
   isRepoMutationRuntimeFailureError,
 } from '#/server/modules/repo-mutation-runtime-failure.ts'
-import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
+import { appendRepoMutationRecoveryMessageKey, type RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import {
@@ -122,12 +122,6 @@ export async function fetchRepo(
   signal?: AbortSignal,
   workspaceRuntimeId?: string,
 ): Promise<RepoMutationResult> {
-  async function runFetch(
-    task: (signal: AbortSignal) => Promise<RepoMutationResult>,
-    context: RepoWriteOperationContext,
-  ) {
-    return await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
-  }
   return await enqueueRepoWriteOperation(
     cwd,
     signal,
@@ -139,7 +133,9 @@ export async function fetchRepo(
       canCancelUnderlying: true,
     },
     (_operation, context) => async () =>
-      await context.runWithRepoSource(async (source) => await runFetch((signal) => source.fetch(signal), context)),
+      await context.runWithRepoSource(async (source) => {
+        return await context.runNetworkOperation(async (networkSignal) => await source.fetch(networkSignal))
+      }),
   )
 }
 
@@ -376,7 +372,7 @@ function worktreeFollowupFailure(
   error: unknown,
   recoveryMessageKey: ExecResultRecoveryMessageKey,
 ): RepoMutationResult {
-  const recoveryMessageKeys = Array.from(new Set([...(mutation.recoveryMessageKeys ?? []), recoveryMessageKey]))
+  const recoveryMessageKeys = appendRepoMutationRecoveryMessageKey(mutation.recoveryMessageKeys, recoveryMessageKey)
   const failure: RepoMutationResult = {
     ok: false,
     message: error instanceof Error ? error.message : String(error),

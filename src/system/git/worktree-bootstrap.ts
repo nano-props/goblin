@@ -22,6 +22,7 @@ import {
 import { copyPath, DestinationPermissionRestoreError } from '#/system/filesystem-copy.ts'
 
 type MaterializationMode = 'copy' | 'symlink' | 'hardlink'
+const MATERIALIZATION_MODES: readonly MaterializationMode[] = ['copy', 'symlink', 'hardlink']
 
 export async function getWorktreeBootstrapPreview(
   sourceCwd: string,
@@ -155,7 +156,7 @@ async function planMaterializations(
     hardlink: new Map<string, ConcreteSource>(),
   } satisfies Record<MaterializationMode, Map<string, ConcreteSource>>
 
-  for (const mode of materializationModes()) {
+  for (const mode of MATERIALIZATION_MODES) {
     const result = await expandSources(sourceRoot, config[mode], signal)
     if (!result.ok) return result
     for (const missing of result.missingSources) missingSources.add(missing)
@@ -164,7 +165,7 @@ async function planMaterializations(
 
   const excludes = await expandExcludes(sourceRoot, config.exclude, signal)
   if (!excludes.ok) return excludes
-  for (const mode of materializationModes()) {
+  for (const mode of MATERIALIZATION_MODES) {
     for (const rel of expanded[mode].keys()) {
       if (isExcludedPath(rel, excludes.paths)) expanded[mode].delete(rel)
     }
@@ -174,7 +175,7 @@ async function planMaterializations(
   if (ambiguous) return { ok: false, message: `path matches multiple materialization modes: ${ambiguous}` }
 
   const planned: PlannedMaterialization[] = []
-  for (const mode of materializationModes()) {
+  for (const mode of MATERIALIZATION_MODES) {
     for (const source of expanded[mode].values()) planned.push({ ...source, mode })
   }
 
@@ -432,10 +433,6 @@ function buildSetupInvocation(setup: string): { command: string; args: string[] 
   return { command: '/bin/sh', args: ['-c', setup] }
 }
 
-function materializationModes(): MaterializationMode[] {
-  return ['copy', 'symlink', 'hardlink']
-}
-
 function resolveConfigPath(
   sourceRoot: string,
   rel: string,
@@ -485,7 +482,7 @@ function globOptions(sourceRoot: string, signal: AbortSignal | undefined) {
 
 function findAmbiguousSource(expanded: Record<MaterializationMode, Map<string, ConcreteSource>>): string | null {
   const firstModeByPath = new Map<string, MaterializationMode>()
-  for (const mode of materializationModes()) {
+  for (const mode of MATERIALIZATION_MODES) {
     for (const rel of expanded[mode].keys()) {
       const existing = firstModeByPath.get(rel)
       if (existing && existing !== mode) return rel

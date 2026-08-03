@@ -430,8 +430,7 @@ function remoteWorktreeRemovalResultForUser(result: RemoteWorktreeRemovalResult)
   if (result.worktreeRemoved === true) {
     return worktreeRemovedFollowupResult(normalized, result.branchEffect ?? 'none')
   }
-  const publicResult: RepoMutationResult = normalized
-  return publicResult
+  return normalized
 }
 
 function publicBranchDeleteResult(result: BranchDeleteResult): RepoMutationExecResult {
