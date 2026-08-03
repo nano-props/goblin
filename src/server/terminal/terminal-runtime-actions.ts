@@ -74,16 +74,18 @@ interface TerminalRuntimeActionDependencies {
 // identifier, but it must not decide session visibility or lifecycle
 // fanout.
 export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependencies) {
+  const { manager, broker, sessionService, isValidTerminalClientId, worktreeOperations } = deps
+
   return {
     async attach(clientId: string, userId: string, input: TerminalAttachInput): Promise<TerminalAttachResult> {
       if (
-        !deps.isValidTerminalClientId(clientId) ||
+        !isValidTerminalClientId(clientId) ||
         !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
         !isValidTerminalSize(input?.cols, input?.rows)
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const result = await deps.manager.attachSession(
+      const result = await manager.attachSession(
         userId,
         input.terminalRuntimeSessionId,
         input.terminalRuntimeGeneration,
@@ -97,21 +99,21 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     async restart(clientId: string, userId: string, input: TerminalRestartInput): Promise<TerminalRestartResult> {
       const terminalRuntimeSessionId = input?.terminalRuntimeSessionId
       if (
-        !deps.isValidTerminalClientId(clientId) ||
+        !isValidTerminalClientId(clientId) ||
         !isValidTerminalRuntimeSessionId(terminalRuntimeSessionId) ||
         !isValidTerminalSize(input?.cols, input?.rows)
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      const physicalWorktreeCapability = deps.manager.getPhysicalWorktreeExecutionCapabilityForUser(
+      const physicalWorktreeCapability = manager.getPhysicalWorktreeExecutionCapabilityForUser(
         userId,
         terminalRuntimeSessionId,
       )
       if (!physicalWorktreeCapability) return { ok: false, message: 'error.invalid-worktree-capability' }
-      const operation = await deps.worktreeOperations.runOperation(
+      const operation = await worktreeOperations.runOperation(
         physicalWorktreeCapability,
         async (_permit, context) =>
-          await deps.manager.restartSessionWithProjectionOutcome(
+          await manager.restartSessionWithProjectionOutcome(
             userId,
             terminalRuntimeSessionId,
             input.terminalRuntimeGeneration,
@@ -124,7 +126,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!operation.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
       const { result, projectionChanged } = operation.value
       if (projectionChanged) {
-        deps.broker.broadcastToUser(userId, {
+        broker.broadcastToUser(userId, {
           type: 'sessions-changed',
           ...projectionChanged,
         })
@@ -133,7 +135,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     },
 
     async write(clientId: string, userId: string, input: TerminalWriteInput): Promise<TerminalWriteResult> {
-      if (!deps.isValidTerminalClientId(clientId)) return { status: 'rejected' }
+      if (!isValidTerminalClientId(clientId)) return { status: 'rejected' }
       if (
         !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
         !isBoundTerminalRuntimeGeneration(input?.terminalRuntimeGeneration) ||
@@ -141,7 +143,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { status: 'rejected' }
       }
-      return await deps.manager.writeSession(
+      return await manager.writeSession(
         userId,
         input.terminalRuntimeSessionId,
         input.terminalRuntimeGeneration,
@@ -151,7 +153,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     },
 
     async resize(clientId: string, userId: string, input: TerminalResizeInput): Promise<TerminalResizeResult> {
-      if (!deps.isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
+      if (!isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
       if (
         !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
         !isBoundTerminalRuntimeGeneration(input?.terminalRuntimeGeneration) ||
@@ -159,7 +161,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      return await deps.manager.resizeSession(
+      return await manager.resizeSession(
         userId,
         input.terminalRuntimeSessionId,
         input.terminalRuntimeGeneration,
@@ -183,7 +185,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     },
 
     async takeover(clientId: string, userId: string, input: TerminalTakeoverInput): Promise<TerminalTakeoverResult> {
-      if (!deps.isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
+      if (!isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
       if (
         !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
         !isBoundTerminalRuntimeGeneration(input?.terminalRuntimeGeneration) ||
@@ -191,7 +193,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      return await deps.manager.takeoverSession(
+      return await manager.takeoverSession(
         userId,
         input.terminalRuntimeSessionId,
         input.terminalRuntimeGeneration,
@@ -206,12 +208,12 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       userId: string,
       input: TerminalListSessionsInput,
     ): Promise<TerminalSessionsSnapshot> {
-      if (!deps.isValidTerminalClientId(clientId) || !isValidWorkspaceLocatorInput(input.workspaceId)) {
+      if (!isValidTerminalClientId(clientId) || !isValidWorkspaceLocatorInput(input.workspaceId)) {
         return { revision: 0, sessions: [] }
       }
       membershipAssertion(clientId, userId, input)()
       const scope = terminalSessionRuntimeScope(input.workspaceId, input.workspaceRuntimeId)
-      return deps.manager.terminalSessionsSnapshotForUser(userId, scope)
+      return manager.terminalSessionsSnapshotForUser(userId, scope)
     },
 
     async listSessions(
@@ -219,11 +221,11 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       userId: string,
       input: TerminalListSessionsInput,
     ): Promise<TerminalSessionSummary[]> {
-      if (!deps.isValidTerminalClientId(clientId)) return []
+      if (!isValidTerminalClientId(clientId)) return []
       if (!isValidWorkspaceLocatorInput(input.workspaceId)) return []
       const assertCurrentMembership = membershipAssertion(clientId, userId, input)
       assertCurrentMembership()
-      return await deps.sessionService.listSessions(
+      return await sessionService.listSessions(
         userId,
         input.workspaceId,
         input.workspaceRuntimeId,
@@ -238,16 +240,16 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     input: TerminalSessionInput,
     reason: TerminalSessionCloseReason,
   ): Promise<TerminalSessionCloseOutcome> {
-    if (!deps.isValidTerminalClientId(clientId)) return { kind: 'failed' }
+    if (!isValidTerminalClientId(clientId)) return { kind: 'failed' }
     if (!isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId)) return { kind: 'failed' }
-    const outcome = await deps.manager.closeSessionForUserOutcome(userId, input.terminalRuntimeSessionId, reason)
+    const outcome = await manager.closeSessionForUserOutcome(userId, input.terminalRuntimeSessionId, reason)
     if (outcome.kind === 'closed') {
       const session = outcome.session
       // General repo/session-list invalidation is emitted by the
       // manager close lifecycle. This action owns only the targeted
       // sibling-window event; other users must not hear about this
       // session id.
-      deps.broker.broadcastToUser(userId, {
+      broker.broadcastToUser(userId, {
         type: 'session-closed',
         terminalRuntimeSessionId: input.terminalRuntimeSessionId,
         terminalRuntimeGeneration: session.terminalRuntimeGeneration,

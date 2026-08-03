@@ -59,6 +59,7 @@ export interface AppRealtimeRuntimeOptions {
 }
 
 export function createAppRealtimeHost(options: AppRealtimeRuntimeOptions): ServerAppRealtimeHost {
+  const { broker } = options
   const socketBindingByRawSocket = new WeakMap<
     ServerAppRealtimeSocket,
     { transport: MemoryBoundRealtimeSocket; buffered: BufferedAppRealtimeSocket }
@@ -75,12 +76,12 @@ export function createAppRealtimeHost(options: AppRealtimeRuntimeOptions): Serve
       const transport = new MemoryBoundRealtimeSocket(socket)
       let buffered: BufferedAppRealtimeSocket
       buffered = new BufferedAppRealtimeSocket(transport, () => {
-        options.broker.unregisterSocket(buffered)
+        broker.unregisterSocket(buffered)
         socketBindingByRawSocket.delete(socket)
       })
       socketBindingByRawSocket.set(socket, { transport, buffered })
       try {
-        options.broker.registerSocket(clientId, userId, buffered)
+        broker.registerSocket(clientId, userId, buffered)
       } catch (error) {
         buffered.release()
         throw error
@@ -113,7 +114,7 @@ export function createAppRealtimeHost(options: AppRealtimeRuntimeOptions): Serve
       if (!binding) return
       const { transport, buffered } = binding
       if (message.type === 'ping') {
-        options.broker.recordLiveness(buffered)
+        broker.recordLiveness(buffered)
         try {
           transport.send(JSON.stringify({ type: 'pong', requestId: message.requestId }))
         } catch {

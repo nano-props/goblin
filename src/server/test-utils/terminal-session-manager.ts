@@ -182,17 +182,10 @@ export function ensureSession(
     clientId?: string
   },
 ): Promise<TerminalAttachResult> {
+  const { cols, rows, clientId = CLIENT_ID, ...prepareInput } = input
   const prepared = manager.prepareSession({
-    userId: input.userId,
-    terminalSessionId: input.terminalSessionId,
-    cwd: input.cwd,
-    command: input.command,
-    args: input.args,
-    startupShellCommand: input.startupShellCommand,
-    env: input.env,
-    signal: input.signal,
-    target: input.target,
-    physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(terminalExecutionPath(input.target)),
+    ...prepareInput,
+    physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(terminalExecutionPath(prepareInput.target)),
   })
   if (!prepared.ok) return Promise.resolve(prepared)
   const committed = prepared.admission.commit({
@@ -203,9 +196,9 @@ export function ensureSession(
     input.userId,
     prepared.terminalRuntimeSessionId,
     committed.terminalRuntimeGeneration,
-    input.cols,
-    input.rows,
-    input.clientId ?? CLIENT_ID,
+    cols,
+    rows,
+    clientId,
     input.signal,
   )
 }
