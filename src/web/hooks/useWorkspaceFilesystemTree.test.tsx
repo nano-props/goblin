@@ -37,8 +37,8 @@ vi.mock('#/web/workspace-filesystem-invalidation-ingress.ts', () => ({
 
 type HarnessSnapshot = {
   tree: WorkspaceFilesystemTreeResult | null
-  loading: boolean
-  reading: boolean
+  initialLoading: boolean
+  isReading: boolean
   error: string | null
   loadingKeys: ReadonlySet<string>
   expandedDirectoryReadsSettled: boolean
@@ -337,7 +337,7 @@ describe('useWorkspaceFilesystemTree', () => {
 
     await setProps(props(['src/web']))
     expect(lastSnapshot?.loadingKeys.size).toBe(0)
-    expect(lastSnapshot?.reading).toBe(false)
+    expect(lastSnapshot?.isReading).toBe(false)
     expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
 
     rootRefreshFailure = true
@@ -346,7 +346,7 @@ describe('useWorkspaceFilesystemTree', () => {
     })
     await flush()
     expect(lastSnapshot?.error).toBe('root refresh failed')
-    expect(lastSnapshot?.reading).toBe(false)
+    expect(lastSnapshot?.isReading).toBe(false)
 
     rootRefreshFailure = false
     await act(async () => {
@@ -387,7 +387,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await render(mainHarnessProps())
 
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledWith(mainExecutionTarget(), {})
-    expect(lastSnapshot?.loading).toBe(true)
+    expect(lastSnapshot?.initialLoading).toBe(true)
     expect(lastSnapshot?.error).toBeNull()
     const result: WorkspaceFilesystemTreeResult = {
       nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
@@ -401,7 +401,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
 
     expect(lastSnapshot?.tree).toEqual(result)
-    expect(lastSnapshot?.loading).toBe(false)
+    expect(lastSnapshot?.initialLoading).toBe(false)
     expect(lastSnapshot?.error).toBeNull()
   })
 
@@ -500,7 +500,7 @@ describe('useWorkspaceFilesystemTree', () => {
 
     expect(lastSnapshot?.tree).toEqual({ nodes: [], truncated: false })
     expect(lastSnapshot?.error).toBeNull()
-    expect(lastSnapshot?.loading).toBe(false)
+    expect(lastSnapshot?.initialLoading).toBe(false)
   })
 
   test('reports an error when the client rejects with a real failure', async () => {
@@ -510,7 +510,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
 
     expect(lastSnapshot?.error).toBe('boom')
-    expect(lastSnapshot?.loading).toBe(false)
+    expect(lastSnapshot?.initialLoading).toBe(false)
   })
 
   test('starts the new target read without letting the previous cache read clobber it', async () => {
@@ -619,7 +619,7 @@ describe('useWorkspaceFilesystemTree', () => {
       await Promise.resolve()
     })
     expect(lastSnapshot?.loadingKeys.has('src')).toBe(false)
-    expect(lastSnapshot?.reading).toBe(false)
+    expect(lastSnapshot?.isReading).toBe(false)
 
     await setProps({
       workspaceRootPath: '/repo-a',
@@ -650,7 +650,7 @@ describe('useWorkspaceFilesystemTree', () => {
     })
     await flush()
     expect(lastSnapshot?.loadingKeys.has('src')).toBe(false)
-    expect(lastSnapshot?.reading).toBe(false)
+    expect(lastSnapshot?.isReading).toBe(false)
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/index.ts'])
   })
 
@@ -694,7 +694,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(filesystemReadCount('src')).toBe(1)
     expect(filesystemReadCount('src/web')).toBe(0)
     expect(lastSnapshot?.error).toBe('filetree.error')
-    expect(lastSnapshot?.reading).toBe(false)
+    expect(lastSnapshot?.isReading).toBe(false)
     expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
   })
 
@@ -848,14 +848,14 @@ describe('useWorkspaceFilesystemTree', () => {
 
     await render(mainHarnessProps())
     await flush()
-    expect(lastSnapshot?.loading).toBe(false)
+    expect(lastSnapshot?.initialLoading).toBe(false)
     expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('first.ts')
 
     await emitFilesystemInvalidation()
     await flush()
 
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
-    expect(lastSnapshot?.loading).toBe(false)
+    expect(lastSnapshot?.initialLoading).toBe(false)
     expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('second.ts')
   })
 
@@ -881,7 +881,7 @@ describe('useWorkspaceFilesystemTree', () => {
 
     expect(filesystemReadCount()).toBe(2)
     expect(filesystemReadCount('src')).toBe(2)
-    expect(lastSnapshot?.reading).toBe(true)
+    expect(lastSnapshot?.isReading).toBe(true)
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
 
     await act(async () => {
@@ -891,7 +891,7 @@ describe('useWorkspaceFilesystemTree', () => {
     })
     await flush()
 
-    expect(lastSnapshot?.reading).toBe(false)
+    expect(lastSnapshot?.isReading).toBe(false)
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
   })
 
