@@ -269,6 +269,7 @@ describe('repo branch mutations', () => {
     expect(result).toEqual({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
+      recoveryMessageKeys: ['error.worktree-created-followup-failed'],
     })
     expect(mocks.bootstrapWorktreeAfterCreate).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', {
       signal: undefined,
@@ -291,7 +292,11 @@ describe('repo branch mutations', () => {
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-created-followup-failed' })
+    expect(result).toEqual({
+      ok: false,
+      message: 'cancelled',
+      recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+    })
     expectRepoMetadataInvalidations(
       { repoId: REPO_ID, domain: 'metadata' },
       { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
@@ -333,6 +338,7 @@ describe('repo branch mutations', () => {
     expect(result).toEqual({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
+      recoveryMessageKeys: ['error.worktree-created-followup-failed'],
     })
     expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId,
@@ -373,7 +379,11 @@ describe('repo branch mutations', () => {
       },
     )
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-created-followup-failed' })
+    expect(result).toEqual({
+      ok: false,
+      message: 'cancelled',
+      recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+    })
     expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: worktreeRepoId, domain: 'metadata' })
   })
 
@@ -407,6 +417,7 @@ describe('repo branch mutations', () => {
     expect(result).toEqual({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
+      recoveryMessageKeys: ['error.worktree-created-followup-failed'],
     })
     expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).not.toHaveBeenCalled()
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
@@ -451,6 +462,7 @@ describe('repo branch mutations', () => {
     mocks.deleteRemoteBranch.mockResolvedValueOnce({
       ok: false,
       message: 'cancelled',
+      recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
       branchStateMayHaveChanged: true,
     })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
@@ -459,7 +471,8 @@ describe('repo branch mutations', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'error.git-command-cancelled-check-state',
+      message: 'cancelled',
+      recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
     })
     expect(mocks.deleteRemoteBranch).toHaveBeenCalledWith(expect.objectContaining({ remotePath: '/srv/repo' }), {
       branch: 'feature/a',
@@ -592,7 +605,8 @@ describe('repo branch mutations', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'error.git-command-cancelled-check-state',
+      message: 'cancelled',
+      recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
     })
     expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
   })

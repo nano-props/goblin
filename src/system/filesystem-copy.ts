@@ -46,14 +46,19 @@ async function copyDirectory(
   options: CopyPathOptions,
 ): Promise<void> {
   // The destination must remain writable while children are materialized;
-  // restore the source mode only after the directory is complete.
+  // restore the source mode after either completion or a partial failure.
   await fs.mkdir(destinationPath, { mode: mode | 0o700 })
-  const directory = await fs.opendir(sourcePath)
-  for await (const entry of directory) {
+  try {
+    const directory = await fs.opendir(sourcePath)
+    for await (const entry of directory) {
+      options.signal?.throwIfAborted()
+      await copyPath(path.join(sourcePath, entry.name), path.join(destinationPath, entry.name), options)
+    }
     options.signal?.throwIfAborted()
-    await copyPath(path.join(sourcePath, entry.name), path.join(destinationPath, entry.name), options)
+  } catch (error) {
+    await fs.chmod(destinationPath, mode).catch(() => {})
+    throw error
   }
-  options.signal?.throwIfAborted()
   await fs.chmod(destinationPath, mode)
 }
 
@@ -85,15 +90,25 @@ async function copySymbolicLink(
 ): Promise<void> {
   const target = await fs.readlink(sourcePath)
   signal?.throwIfAborted()
-  await fs.symlink(target, destinationPath, await copiedSymlinkType(sourcePath))
+  const copied = await copiedSymlink(sourcePath, destinationPath, target)
+  await fs.symlink(copied.target, destinationPath, copied.type)
   signal?.throwIfAborted()
 }
 
-async function copiedSymlinkType(sourcePath: string): Promise<'file' | 'dir' | undefined> {
-  if (process.platform !== 'win32') return undefined
+interface CopiedSymlink {
+  target: string
+  type: 'file' | 'junction' | undefined
+}
+
+async function copiedSymlink(sourcePath: string, destinationPath: string, target: string): Promise<CopiedSymlink> {
+  if (process.platform !== 'win32') return { target, type: undefined }
   try {
-    return (await fs.stat(sourcePath)).isDirectory() ? 'dir' : 'file'
+    if (!(await fs.stat(sourcePath)).isDirectory()) return { target, type: 'file' }
+    return {
+      target: path.resolve(path.dirname(destinationPath), target),
+      type: 'junction',
+    }
   } catch {
-    return 'file'
+    return { target, type: 'file' }
   }
 }

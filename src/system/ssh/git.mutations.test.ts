@@ -119,7 +119,12 @@ describe('remote git mutations', () => {
       remote: 'origin',
       upstreamBranch: 'feature/test',
       pushResult: { ...failRemoteResult('remote rejected delete'), remoteStarted: true },
-      expected: { ok: false, message: 'remote rejected delete', branchStateMayHaveChanged: true },
+      expected: {
+        ok: false,
+        message: 'remote rejected delete',
+        recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
+        branchStateMayHaveChanged: true,
+      },
     },
   ] as const)('deleteRemoteBranch $name', async ({ remote, upstreamBranch, pushResult, expected }) => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
@@ -530,7 +535,8 @@ describe('remote git mutations', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'error.worktree-removed-followup-failed',
+      message: 'cancelled',
+      recoveryMessageKeys: ['error.worktree-removed-followup-failed', 'error.local-branch-deleted-followup-failed'],
       worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
       worktreeRemoved: true,
     })

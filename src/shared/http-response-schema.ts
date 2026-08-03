@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import type { ExecResult } from '#/shared/git-types.ts'
+import { EXEC_RESULT_RECOVERY_MESSAGE_KEYS, type ExecResult } from '#/shared/git-types.ts'
 
 const NonNegativeIntegerSchema = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0))
 const WorktreeBootstrapPathSummarySchema = v.strictObject({
@@ -18,6 +18,7 @@ export const WorktreeBootstrapSummaryResponseSchema = v.strictObject({
 export const ExecResultResponseSchema = v.strictObject({
   ok: v.boolean(),
   message: v.string(),
+  recoveryMessageKeys: v.optional(v.pipe(v.array(v.picklist(EXEC_RESULT_RECOVERY_MESSAGE_KEYS)), v.maxLength(3))),
   worktreeBootstrap: v.optional(WorktreeBootstrapSummaryResponseSchema),
 }) satisfies v.GenericSchema<ExecResult>
 

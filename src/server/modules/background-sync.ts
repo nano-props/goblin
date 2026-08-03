@@ -278,10 +278,10 @@ async function runScheduledFetch(generation: number): Promise<void> {
     }
   } catch (err) {
     if (activeFetch?.ctrl.signal.aborted) return
-    if (target) await failRemoteWorkspaceRuntimeIfNeeded(target.userId, err)
     if (target) {
       recordTargetFetchStartedAt(target, now)
       recordTargetFailure(target, now)
+      await settleBackgroundRuntimeFailure(target, err)
     }
     const key = target ? backgroundSyncTargetKey(target) : null
     backgroundSyncLogger.warn(
@@ -298,6 +298,20 @@ async function runScheduledFetch(generation: number): Promise<void> {
     if (generation === state.generation && state.intervalMs > 0 && hasDueRepo(Date.now())) {
       requestScheduledFetch(generation)
     }
+  }
+}
+
+async function settleBackgroundRuntimeFailure(
+  target: RegisteredGitBackgroundSyncTarget,
+  error: unknown,
+): Promise<void> {
+  try {
+    await failRemoteWorkspaceRuntimeIfNeeded(target.userId, error)
+  } catch (settlementError) {
+    backgroundSyncLogger.warn(
+      { err: settlementError, workspaceId: target.workspaceId },
+      'failed to settle background fetch runtime',
+    )
   }
 }
 

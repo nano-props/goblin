@@ -575,6 +575,8 @@ export const ja: Record<DictKey, string> = {
     'ワークツリーは作成されましたが、後続の処理に失敗しました。続行する前にワークツリーを確認し、ワークスペースを再度開くか修復してください。',
   'error.worktree-removed-followup-failed':
     'ワークツリーは削除されましたが、後続の処理に失敗しました。続行する前にワークスペースを再度開くか修復してください。',
+  'error.local-branch-deleted-followup-failed':
+    'ローカルブランチは削除されましたが、後続処理に失敗しました。再試行する前にリモートブランチを確認してください。',
   'error.branch-action-wait-timeout': 'リポジトリの更新完了待ちがタイムアウトしました。',
   'error.unknown': '不明なエラー',
   'error.cannot-delete-current-branch': '現在のブランチは削除できません',

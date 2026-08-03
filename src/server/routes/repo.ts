@@ -419,5 +419,9 @@ function publishPullFilesystemInvalidations(
       target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root },
     })
   }
-  return { ok: outcome.ok, message: outcome.message }
+  return {
+    ok: outcome.ok,
+    message: outcome.message,
+    recoveryMessageKeys: outcome.recoveryMessageKeys,
+  }
 }

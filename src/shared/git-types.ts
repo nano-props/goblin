@@ -114,9 +114,19 @@ export interface RepoRemoteInfo {
 
 export const GIT_HASH_RE = /^[0-9a-fA-F]{7,64}$/
 
+export const EXEC_RESULT_RECOVERY_MESSAGE_KEYS = [
+  'error.worktree-created-followup-failed',
+  'error.worktree-removed-followup-failed',
+  'error.local-branch-deleted-followup-failed',
+] as const
+
+export type ExecResultRecoveryMessageKey = (typeof EXEC_RESULT_RECOVERY_MESSAGE_KEYS)[number]
+
 export interface ExecResult {
   ok: boolean
   message: string
+  /** Static i18n keys for recovery guidance after an authoritative partial success. */
+  recoveryMessageKeys?: readonly ExecResultRecoveryMessageKey[]
   worktreeBootstrap?: WorktreeBootstrapSummary
 }
 

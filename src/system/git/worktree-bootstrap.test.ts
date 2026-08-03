@@ -152,6 +152,21 @@ setup = ${JSON.stringify(setupCommand)}
     await expect(readFile(path.join(targetRoot, 'other.env'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  test('preserves cancellation through the real setup failure boundary', async () => {
+    const setupCommand = `${JSON.stringify(process.execPath)} -e "setTimeout(() => {}, 10000)"`
+    await writeConfig(`[worktree]\nsetup = ${JSON.stringify(setupCommand)}\n`)
+    const controller = new AbortController()
+    const abort = setTimeout(() => controller.abort(), 100)
+
+    try {
+      await expect(
+        bootstrapWorktreeAfterCreate(sourceRoot, targetRoot, { signal: controller.signal }),
+      ).resolves.toEqual({ ok: false, message: 'cancelled' })
+    } finally {
+      clearTimeout(abort)
+    }
+  })
+
   test('reports missing literal sources without failing create', async () => {
     await writeConfig(`
 [worktree]

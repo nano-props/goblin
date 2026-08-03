@@ -251,7 +251,11 @@ describe('repo worktree removal', () => {
       },
     )
 
-    expect(result).toEqual({ ok: false, message: 'tabs finalize failed' })
+    expect(result).toEqual({
+      ok: false,
+      message: 'tabs finalize failed',
+      recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
+    })
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
@@ -272,7 +276,11 @@ describe('repo worktree removal', () => {
       },
     )
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-removed-followup-failed' })
+    expect(result).toEqual({
+      ok: false,
+      message: 'cancelled',
+      recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
+    })
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
@@ -391,7 +399,11 @@ describe('repo worktree removal', () => {
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: true }, successfulRemovalLifecycle)
 
-    expect(result).toEqual({ ok: false, message: 'fatal: delete failed' })
+    expect(result).toEqual({
+      ok: false,
+      message: 'fatal: delete failed',
+      recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
+    })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
       workspaceId: REPO_ID,

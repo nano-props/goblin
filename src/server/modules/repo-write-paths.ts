@@ -71,17 +71,13 @@ async function runMutationWithInvalidations(
 }
 
 function execResultOnly(result: RepoMutationResult): ExecResult {
-  if (result.worktreeBootstrap) {
-    return {
-      ok: result.ok,
-      message: result.message,
-      worktreeBootstrap: result.worktreeBootstrap,
-    }
-  }
-  return {
+  const publicResult: ExecResult = {
     ok: result.ok,
     message: result.message,
   }
+  if (result.recoveryMessageKeys?.length) publicResult.recoveryMessageKeys = result.recoveryMessageKeys
+  if (result.worktreeBootstrap) publicResult.worktreeBootstrap = result.worktreeBootstrap
+  return publicResult
 }
 
 async function runUserNetworkMutation(
@@ -120,11 +116,13 @@ export interface RepoFilesystemMutationOutcome extends ExecResult {
 }
 
 function filesystemMutationOutcome(result: RepoMutationResult): RepoFilesystemMutationOutcome {
-  return {
+  const outcome: RepoFilesystemMutationOutcome = {
     ok: result.ok,
     message: result.message,
     worktreePathsToInvalidate: result.worktreePathsToInvalidate,
   }
+  if (result.recoveryMessageKeys?.length) outcome.recoveryMessageKeys = result.recoveryMessageKeys
+  return outcome
 }
 
 function createWorktreeTargetBranch(input: CreateWorktreeInput): string {

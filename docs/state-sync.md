@@ -77,6 +77,10 @@ authority.
   next safe user action. In that case recovery guidance belongs to the owning
   application flow; do not replace errors through a cross-operation message
   classifier.
+- Public mutation failures keep the original `message` and may add bounded
+  `recoveryMessageKeys` for confirmed partial successes. These keys are
+  presentation guidance only: they do not carry execution facts, authorize
+  cleanup, drive invalidation, or let the client infer repository state.
 - A client may apply canonical response data or invalidate the owning query. It
   must not replace a concurrent collection with an unversioned snapshot or
   reconstruct the write from its request payload.

@@ -37,6 +37,7 @@ import {
 import {
   GIT_HASH_RE,
   type ExecResult,
+  type ExecResultRecoveryMessageKey,
   type GitRemoteInfo,
   type LogEntry,
   type RepoRemoteInfo,
@@ -636,7 +637,7 @@ export async function bootstrapRemoteWorktreeAfterCreate(
 ): Promise<ExecResult> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const loaded = await loadRemoteBootstrapConfig(target, { signal: options.signal, run })
-  if (!loaded.ok) return { ok: false, message: `Worktree bootstrap failed: ${loaded.message}` }
+  if (!loaded.ok) return remoteBootstrapFailure(loaded)
   if (!loaded.value.config) {
     if (options.expectedConfigHash) {
       return { ok: false, message: 'Worktree bootstrap failed: goblin.toml changed after confirmation' }
@@ -670,6 +671,11 @@ export async function bootstrapRemoteWorktreeAfterCreate(
     message: formatWorktreeBootstrapSummary(summary),
     ...(hasWorktreeBootstrapSummaryDetails(summary) ? { worktreeBootstrap: summary } : {}),
   }
+}
+
+function remoteBootstrapFailure(result: ExecResult): ExecResult {
+  if (result.message === 'cancelled') return result
+  return { ok: false, message: `Worktree bootstrap failed: ${result.message}` }
 }
 
 export async function getRemoteTrackingBranches(
@@ -857,7 +863,8 @@ export async function removeRemoteWorktree(
   let finalDeleteResult = localDeleteResult
   if (upstreamDeleteOutcome) {
     const { result: upstreamDeleteResult } = upstreamDeleteOutcome
-    finalDeleteResult = upstreamDeleteResult
+    if (upstreamDeleteResult.ok) finalDeleteResult = upstreamDeleteResult
+    else finalDeleteResult = withRecoveryMessage(upstreamDeleteResult, 'error.local-branch-deleted-followup-failed')
   }
   return withWorktreePathsToInvalidate(worktreeRemovedResult(finalDeleteResult), worktreePathsToInvalidate)
 }
@@ -878,10 +885,20 @@ function worktreeRemoveFailureMessage(result: ExecResult, execution: CommandExec
 }
 
 function worktreeRemovedResult(result: ExecResult): RemoteWorktreeMutationResult {
-  if (!result.ok && result.message === 'cancelled') {
-    return { ok: false, message: 'error.worktree-removed-followup-failed', worktreeRemoved: true }
-  }
-  return { ok: result.ok, message: result.message, worktreeRemoved: true }
+  if (result.ok) return { ok: true, message: result.message, worktreeRemoved: true }
+  const recoveryMessageKeys = Array.from(
+    new Set<ExecResultRecoveryMessageKey>([
+      'error.worktree-removed-followup-failed',
+      ...(result.recoveryMessageKeys ?? []),
+    ]),
+  )
+  return { ok: false, message: result.message, recoveryMessageKeys, worktreeRemoved: true }
+}
+
+function withRecoveryMessage<T extends ExecResult>(result: T, recoveryMessage: ExecResultRecoveryMessageKey): T {
+  if (result.ok) return result
+  const recoveryMessageKeys = Array.from(new Set([...(result.recoveryMessageKeys ?? []), recoveryMessage]))
+  return { ...result, recoveryMessageKeys }
 }
 
 function withWorktreePathsToInvalidate(
@@ -950,6 +967,7 @@ export async function deleteRemoteBranch(
   return {
     ok: false,
     message: upstreamDeleteResult.message,
+    recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
     branchStateMayHaveChanged: true,
   }
 }

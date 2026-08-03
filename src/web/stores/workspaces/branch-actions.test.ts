@@ -813,6 +813,31 @@ describe('runBranchAction', () => {
     })
   })
 
+  test('does not suppress a cancelled follow-up that carries recovery guidance', async () => {
+    installGoblinTestBridge({
+      'repo.createWorktree': async () => ({
+        ok: false,
+        message: 'cancelled',
+        recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+      }),
+    })
+
+    await useWorkspacesStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), {
+      workspaceRuntimeId: 'repo-runtime-test',
+    })
+
+    expect(
+      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.events.at(-1),
+    ).toMatchObject({
+      kind: 'result',
+      result: {
+        ok: false,
+        message: 'cancelled',
+        recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+      },
+    })
+  })
+
   test('keeps the current branch selection after creating a worktree', async () => {
     setBranchViewModeForTest('all')
     installSuccessfulCreateWorktreeBridge()

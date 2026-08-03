@@ -138,7 +138,9 @@ function throwIfStale(get: WorkspacesGet, id: WorkspaceId, workspaceRuntimeId: s
 }
 
 function branchActionErrorFromResult(result: ExecResult): string | null {
-  return !result.ok && result.message !== 'cancelled' ? result.message : null
+  if (result.ok) return null
+  if (result.message !== 'cancelled') return result.message
+  return result.recoveryMessageKeys?.[0] ?? null
 }
 
 function branchActionErrorResult(message: string): ExecResult {
@@ -146,7 +148,7 @@ function branchActionErrorResult(message: string): ExecResult {
 }
 
 function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: RunBranchActionOptions): boolean {
-  if (result.message === 'cancelled') return true
+  if (result.message === 'cancelled' && !result.recoveryMessageKeys?.length) return true
   if (options?.deferResultMessages?.includes(result.message)) return true
   return false
 }

@@ -86,7 +86,7 @@ export async function bootstrapWorktreeAfterCreate(
     }
 
     const planned = await planMaterializations(sourceRoot, targetRoot, loaded.config, options?.signal)
-    if (!planned.ok) return bootstrapFailure(planned.message)
+    if (!planned.ok) return bootstrapStepFailure(planned)
 
     const materialized = await materializePlan(
       sourceRoot,
@@ -95,11 +95,11 @@ export async function bootstrapWorktreeAfterCreate(
       planned.excludedPaths,
       options?.signal,
     )
-    if (!materialized.ok) return bootstrapFailure(materialized.message)
+    if (!materialized.ok) return bootstrapStepFailure(materialized)
 
     if (loaded.config.setup) {
       const setup = await runSetupCommand(targetRoot, loaded.config.setup, options?.signal)
-      if (!setup.ok) return bootstrapFailure(setup.message)
+      if (!setup.ok) return bootstrapStepFailure(setup)
     }
 
     const summary = bootstrapSummary(planned.operations, planned.missingSources, loaded.config.setup)
@@ -574,6 +574,12 @@ function bootstrapSummary(
 
 function bootstrapFailure(message: string): ExecResult {
   return { ok: false, message: `Worktree bootstrap failed: ${message}` }
+}
+
+function bootstrapStepFailure(result: ExecResult): ExecResult {
+  if (result.ok) return result
+  if (result.message === 'cancelled') return result
+  return bootstrapFailure(result.message)
 }
 
 function pathsForMode(operations: ReadyMaterialization[], mode: MaterializationMode): string[] {

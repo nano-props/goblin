@@ -100,7 +100,8 @@ describe('useRepoToasts', () => {
       REPO_ID,
       {
         ok: false,
-        message: 'error.worktree-created-followup-failed',
+        message: 'setup exited with status 1',
+        recoveryMessageKeys: ['error.worktree-created-followup-failed'],
         worktreeBootstrap: {
           copy: { count: 1, paths: ['.env.local'] },
           symlink: { count: 0, paths: [] },
@@ -117,7 +118,7 @@ describe('useRepoToasts', () => {
     expect(toastMocks.error).toHaveBeenCalledTimes(1)
     const [, options] = toastMocks.error.mock.calls[0]!
     expect(String(options.description.props.children)).toBe(
-      'The worktree was created, but saving trust failed.\nCopied 1 path: .env.local',
+      'setup exited with status 1\nThe worktree was created, but saving trust failed.\nCopied 1 path: .env.local',
     )
   })
 })

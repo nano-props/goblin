@@ -95,6 +95,26 @@ describe('server background sync scheduler', () => {
     expect(mocks.failRemoteWorkspaceRuntimeIfNeeded).toHaveBeenCalledWith(USER_ID, failure)
   })
 
+  test('records backoff and contains runtime settlement failures', async () => {
+    const failure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: REMOTE_REPO,
+      workspaceRuntimeId: RUNTIME_ID,
+      reason: 'unreachable',
+      message: 'connection refused',
+    })
+    mocks.fetchRepo.mockRejectedValueOnce(failure)
+    mocks.failRemoteWorkspaceRuntimeIfNeeded.mockRejectedValueOnce(new Error('settlement failed'))
+    const { getBackgroundSyncDiagnostics } = await import('#/server/modules/background-sync.ts')
+
+    await registerRepos([REMOTE_REPO])
+    await vi.runOnlyPendingTimersAsync()
+
+    expect(mocks.fetchRepo).toHaveBeenCalledOnce()
+    expect(getBackgroundSyncDiagnostics().repos).toEqual([
+      expect.objectContaining({ repoId: REMOTE_REPO, failureCount: 1, backoffUntil: expect.any(Number) }),
+    ])
+  })
+
   test('drains all initially due repos without waiting for repeated cron ticks', async () => {
     mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     await registerRepos([REPO_A, REPO_B, REPO_C])

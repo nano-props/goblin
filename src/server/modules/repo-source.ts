@@ -56,6 +56,7 @@ import {
 import { getWorktreePatch } from '#/system/git/patch.ts'
 import {
   type ExecResult,
+  type ExecResultRecoveryMessageKey,
   type LogEntry,
   type PullRequestFetchMode,
   type PullRequestInfo,
@@ -368,20 +369,30 @@ function worktreeCommandTimeoutMessage(operation: 'create' | 'remove'): string {
   return exhaustive
 }
 
+function withRecoveryMessage<T extends ExecResult>(result: T, recoveryMessage: ExecResultRecoveryMessageKey): T {
+  if (result.ok) return result
+  const recoveryMessageKeys = Array.from(new Set([...(result.recoveryMessageKeys ?? []), recoveryMessage]))
+  return { ...result, recoveryMessageKeys }
+}
+
 function worktreeCreatedFollowupFailureForUser<T extends ExecResult>(result: T): T {
-  if (result.ok || result.message !== 'cancelled') return result
-  return { ...result, message: 'error.worktree-created-followup-failed' }
+  return withRecoveryMessage(result, 'error.worktree-created-followup-failed')
 }
 
 function worktreeRemovedFollowupResult(result: ExecResult): RepoMutationResult {
-  if (!result.ok && result.message === 'cancelled') {
-    return { ok: false, message: 'error.worktree-removed-followup-failed', worktreeRemoved: true }
-  }
-  return { ok: result.ok, message: result.message, worktreeRemoved: true }
+  if (result.ok) return { ok: true, message: result.message, worktreeRemoved: true }
+  const recoveryMessageKeys = Array.from(
+    new Set<ExecResultRecoveryMessageKey>([
+      'error.worktree-removed-followup-failed',
+      ...(result.recoveryMessageKeys ?? []),
+    ]),
+  )
+  return { ok: false, message: result.message, recoveryMessageKeys, worktreeRemoved: true }
 }
 
 function branchDeleteResultForUser(result: BranchDeleteResult): BranchDeleteResult {
   if (result.ok) return result
+  if (result.recoveryMessageKeys?.length) return result
   if (result.branchStateMayHaveChanged && result.message === 'cancelled') {
     return {
       ok: false,
@@ -394,7 +405,9 @@ function branchDeleteResultForUser(result: BranchDeleteResult): BranchDeleteResu
 
 function publicBranchDeleteResult(result: BranchDeleteResult): ExecResult {
   const userResult = branchDeleteResultForUser(result)
-  return { ok: userResult.ok, message: userResult.message }
+  const publicResult: ExecResult = { ok: userResult.ok, message: userResult.message }
+  if (userResult.recoveryMessageKeys?.length) publicResult.recoveryMessageKeys = userResult.recoveryMessageKeys
+  return publicResult
 }
 
 async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
@@ -489,6 +502,7 @@ function createLocalRepoSource(
     return {
       ok: false,
       message: upstreamDeleteResult.message,
+      recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
       branchStateMayHaveChanged: true,
     }
   }
