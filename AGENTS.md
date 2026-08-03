@@ -13,7 +13,8 @@
   optional-dependency boundary. Keep it local and explain a non-obvious use.
   Refactor circular dependencies instead of hiding them behind dynamic imports.
 - Use object destructuring when the source remains obvious and the binding is
-  short-lived, such as local callbacks, projections, and tuple-like results.
+  short-lived, such as local callbacks, projections, and small local results.
+  Array and tuple destructuring remain appropriate for positional contracts.
   Prefer retaining named boundary objects such as `input`, `options`, and
   `deps` in longer-lived factory, service, runtime, and repository code when
   that makes ownership clearer. Do not mechanically replace concise local
