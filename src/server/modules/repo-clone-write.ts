@@ -1,10 +1,4 @@
 import { constants as fsConstants, promises as fs } from 'node:fs'
-import {
-  beginRepoServerOperation,
-  requestRepoServerOperationCancel,
-  settleRepoServerOperation,
-  startRepoServerOperation,
-} from '#/server/modules/repo-operation-registry.ts'
 import { cloneRepo as cloneGitRepo } from '#/system/git/clone.ts'
 import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import { isValidCwd } from '#/shared/input-validation.ts'
@@ -31,41 +25,13 @@ export async function cloneRepo(
   }
   if (!isValidCwd(targetParent)) return { ok: false, message: 'error.invalid-path' }
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
-  const operation = beginRepoServerOperation({
-    repoId: null,
-    kind: 'clone',
-    source: 'user',
-    target: { parentPath: targetParent, directoryName: targetName },
-    canCancelUnderlying: !!signal,
-  })
-  const onAbort = () => {
-    requestRepoServerOperationCancel(operation.id, 'caller-abort')
-  }
-  if (signal?.aborted) onAbort()
-  else signal?.addEventListener('abort', onAbort, { once: true })
-  startRepoServerOperation(operation.id)
-  const settleClone = (result: CloneRepoResult): CloneRepoResult => {
-    settleRepoServerOperation(operation.id, result)
-    return result
-  }
-  try {
-    if (signal?.aborted) return settleClone({ ok: false, message: 'cancelled' })
-    const gitAvailable = await checkGitAvailable()
-    if (!gitAvailable.ok) return settleClone(gitAvailable)
-    if (signal?.aborted) return settleClone({ ok: false, message: 'cancelled' })
-    const writable = await ensureWritableDirectory(targetParent)
-    if (!writable.ok) return settleClone(writable)
-    if (signal?.aborted) return settleClone({ ok: false, message: 'cancelled' })
-    return settleClone(await cloneGitRepo(targetParent, targetName, repoUrl, signal))
-  } catch (err) {
-    settleRepoServerOperation(operation.id, {
-      ok: false,
-      message: err instanceof Error ? err.message : String(err),
-    })
-    throw err
-  } finally {
-    signal?.removeEventListener('abort', onAbort)
-  }
+  const gitAvailable = await checkGitAvailable()
+  if (!gitAvailable.ok) return gitAvailable
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  const writable = await ensureWritableDirectory(targetParent)
+  if (!writable.ok) return writable
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  return await cloneGitRepo(targetParent, targetName, repoUrl, signal)
 }
 
 async function probeWritableDirectory(cwd: string): Promise<ProbeAvailability> {

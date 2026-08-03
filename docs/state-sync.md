@@ -76,12 +76,13 @@ authority.
   outcome cannot erase an earlier committed milestone.
 - A command that returns an error may still require conservative invalidation.
   Preserve its domain reason unless execution ended by cancellation or timeout,
-  in which case the owning application flow may normalize `message` to explicit
-  check-state guidance because the command may have changed repository state.
+  or a remote command start could not be confirmed. In those cases, the owning
+  application flow may normalize `message` to explicit check-state guidance
+  because the command may have changed repository state.
   A confirmed partial success adds recovery guidance for its specific follow-up;
   do not replace errors through a cross-operation message classifier.
 - Public mutation failures keep the established domain `message`, subject to
-  that cancellation or timeout normalization, and may add bounded
+  that execution-uncertainty normalization, and may add bounded
   `recoveryMessageKeys` for confirmed partial successes or lifecycle settlement
   uncertainty. These keys are
   presentation guidance only: they do not carry execution facts, authorize

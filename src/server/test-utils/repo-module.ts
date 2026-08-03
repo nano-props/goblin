@@ -274,10 +274,8 @@ vi.mock('#/server/modules/invalidation-broker.ts', () => ({
 export const mocks = hoistedMocks
 
 beforeEach(async () => {
-  const { resetRepoServerOperationRegistryForTests } = await import('#/server/modules/repo-operation-registry.ts')
   const { resetRepoWriteOperationCoordinatorForTests } =
     await import('#/server/modules/repo-write-operation-coordinator.ts')
-  resetRepoServerOperationRegistryForTests()
   resetRepoWriteOperationCoordinatorForTests()
   vi.clearAllMocks()
   hoistedMocks.checkGitAvailable.mockResolvedValue({ ok: true, message: '' })

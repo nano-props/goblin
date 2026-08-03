@@ -1,6 +1,5 @@
 import { runWithRepoSource, type RepoSource, type WorkspacePaneTargetIdentity } from '#/server/modules/repo-source.ts'
 import type { RepoSourceRuntimeContext } from '#/server/modules/remote-repo-execution.ts'
-import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import {
   getRepoLastSuccessfulFetchAt,
   listRepoWriteOperationsForRepo,
@@ -21,7 +20,6 @@ import type {
   RepoSnapshotResponse,
   RepoOperationsSnapshot,
   RepoWorktreeStatusSnapshot,
-  RepoServerOperationState,
   RepoSnapshot,
 } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
@@ -150,14 +148,6 @@ export interface RepoOperationsReadOptions {
   workspaceRuntimeId?: string
 }
 
-function sortedRepoOperations(states: RepoServerOperationState[]): RepoServerOperationState[] {
-  return [...states].sort((a, b) => {
-    const aTime = a.settledAt ?? a.startedAt ?? a.queuedAt
-    const bTime = b.settledAt ?? b.startedAt ?? b.queuedAt
-    return bTime - aTime
-  })
-}
-
 /**
  * Build a per-read boundary that fires when either the
  * caller's signal or the timeout fires. The timeout is a hard cap
@@ -261,18 +251,13 @@ export async function readRepoOperationsSnapshot(
   cwd: WorkspaceId,
   options: RepoOperationsReadOptions = {},
 ): Promise<RepoOperationsSnapshot> {
-  const registrySnapshot = getRepoOperationsSnapshot({
-    repoId: cwd,
-    workspaceRuntimeId: options.workspaceRuntimeId,
-    includeSettled: options.includeSettled,
-  })
   // Operation activity is process-local coordinator authority. Reading it
   // must not probe Git or SSH, especially while a runtime failure is being
   // settled and this projection is invalidated.
   const writeOperations = await listRepoWriteOperationsForRepo(cwd, options)
   const lastFetchAt = getRepoLastSuccessfulFetchAt(cwd)
   return {
-    operations: sortedRepoOperations([...registrySnapshot.operations, ...writeOperations]),
+    operations: writeOperations,
     lastFetchAt,
     loadedAt: Date.now(),
   }

@@ -230,47 +230,4 @@ describe('cloneRepo cancellation', () => {
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })
   })
-
-  test('records clone operation state and structured caller cancellation', async () => {
-    mocks.cloneGitRepo.mockImplementationOnce(
-      (_parentPath: string, _directoryName: string, _url: string, signal?: AbortSignal) =>
-        new Promise((resolve) => {
-          signal?.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }))
-        }),
-    )
-    const { cloneRepo } = await import('#/server/modules/repo-clone-write.ts')
-    const { listRepoServerOperations } = await import('#/server/modules/repo-operation-registry.ts')
-    const caller = new AbortController()
-
-    const work = cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
-    let operationId = ''
-    await vi.waitFor(() => {
-      const operation = listRepoServerOperations({ includeSettled: true }).find(
-        (operation) => operation.kind === 'clone',
-      )
-      expect(operation).toMatchObject({
-        kind: 'clone',
-        phase: 'running',
-        target: { parentPath: '/tmp', directoryName: 'repo' },
-      })
-      operationId = operation!.id
-    })
-
-    caller.abort('stopped')
-    await expect(work).resolves.toEqual({ ok: false, message: 'cancelled' })
-    expect(
-      listRepoServerOperations({ includeSettled: true }).find((operation) => operation.id === operationId),
-    ).toMatchObject({
-      kind: 'clone',
-      phase: 'failed',
-      cancellation: {
-        underlyingRequested: true,
-        reason: 'caller-abort',
-      },
-      error: {
-        message: 'cancelled',
-        reason: 'caller-abort',
-      },
-    })
-  })
 })
