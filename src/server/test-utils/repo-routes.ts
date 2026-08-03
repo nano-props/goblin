@@ -15,6 +15,7 @@ export const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 export const CLIENT_ID = 'client-read-test'
 
 const mocks = vi.hoisted(() => ({
+  currentUserId: 'user-test',
   probeLocalWorkspace: vi.fn(),
   probeWorkspace: vi.fn(),
   getRepoLog: vi.fn(),
@@ -91,12 +92,14 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
   resolveRepoSource: vi.fn(async () => ({ getSnapshot: mocks.getBackgroundSyncSnapshot })),
 }))
 vi.mock('#/server/common/identity.ts', () => ({
-  userIdFromContext: () => 'user-test',
+  userIdFromContext: () => mocks.currentUserId,
 }))
 
 export function resetRepoRouteHarness() {
   vi.clearAllMocks()
+  mocks.currentUserId = 'user-test'
   clearWorkspaceRuntimesForUser('user-test')
+  clearWorkspaceRuntimesForUser('user-other')
   mocks.probeLocalWorkspace.mockResolvedValue({
     status: 'ready',
     capabilities: {
@@ -114,6 +117,10 @@ export function resetRepoRouteHarness() {
   mocks.probeWorkspace.mockImplementation(mocks.probeLocalWorkspace)
   mocks.pullRepoBranch.mockResolvedValue({ ok: true, message: '' })
   mocks.getBackgroundSyncSnapshot.mockResolvedValue({ remote: { hasRemotes: true } })
+}
+
+export function setRepoRouteTestUserId(userId: string): void {
+  mocks.currentUserId = userId
 }
 
 export function createTestRepoRoutes(

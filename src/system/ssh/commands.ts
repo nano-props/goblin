@@ -116,7 +116,17 @@ export async function runRemoteCommand(
   // Ensure the ControlMaster socket directory exists. ssh will refuse to
   // create a control socket in a missing directory, which on a fresh
   // install manifests as every probe failing before the handshake.
-  await ensureSshControlDirectory()
+  try {
+    await ensureSshControlDirectory()
+  } catch (err) {
+    return {
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: errorMessage(err),
+      commandNotStarted: true,
+    }
+  }
   if (options?.signal?.aborted) {
     return { ok: false, stdout: '', stderr: '', message: 'cancelled', commandNotStarted: true }
   }
@@ -157,6 +167,15 @@ export async function runRemoteCommand(
         ...transport,
       }
     }
+    if (err instanceof ExecaError && isProcessStartFailure(err)) {
+      return {
+        ok: false,
+        stdout: parsed.stdout,
+        stderr: parsed.stderr,
+        message: parsed.stderr || parsed.transportStderr || e.message || 'unknown',
+        commandNotStarted: true,
+      }
+    }
     return {
       ok: false,
       stdout: parsed.stdout,
@@ -166,6 +185,15 @@ export async function runRemoteCommand(
       ...transport,
     }
   }
+}
+
+function isProcessStartFailure(error: ExecaError): boolean {
+  if (error.exitCode !== undefined || error.signal !== undefined) return false
+  return error.code === 'ENOENT' || error.code === 'EACCES' || error.code === 'ENOEXEC'
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 function commandStartedMarkerScript(script: string): string {

@@ -119,13 +119,7 @@ function RepoMembershipChangingView({ retrying, onRetry }: { retrying: boolean; 
   )
 }
 
-function RepoMembershipChangingNotice({
-  retrying,
-  onRetry,
-}: {
-  retrying?: boolean
-  onRetry?: () => void
-}) {
+function RepoMembershipChangingNotice({ retrying, onRetry }: { retrying?: boolean; onRetry?: () => void }) {
   const t = useT()
   return (
     <div

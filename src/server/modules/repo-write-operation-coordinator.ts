@@ -249,9 +249,6 @@ function beginRepoWriteOperation(
     settle(result) {
       if (settled) return
       settled = true
-      for (const repoId of result.repoIdsToInvalidate ?? []) {
-        registerRepoWriteOperationBoundaryRepoId(runtime, repoId)
-      }
       if (result.ok && operation.kind === 'fetch') recordRepoBoundaryFetchSuccess(runtime)
       const cancellationReason = operation.cancellation.reason
       operation.phase = result.ok ? 'done' : 'failed'
@@ -262,7 +259,7 @@ function beginRepoWriteOperation(
             message: result.message ?? 'error.failed-read-repo',
             reason: repoWriteOperationFailureReason(result.message, cancellationReason),
           }
-      publishRepoRuntimeInvalidation(runtime, operation)
+      publishRepoRuntimeInvalidation(runtime, operation, result.repoIdsToInvalidate)
       pruneSettledOperations()
     },
   }
@@ -271,9 +268,11 @@ function beginRepoWriteOperation(
 function publishRepoRuntimeInvalidation(
   runtime: RepoWriteBoundaryGroup,
   operation: Pick<RepoServerOperationState, 'repoId'>,
+  additionalRepoIds: readonly WorkspaceId[] = [],
 ): void {
   const repoIds = new Set(runtime.repoIds)
   if (operation.repoId) repoIds.add(operation.repoId)
+  for (const repoId of additionalRepoIds) repoIds.add(repoId)
   for (const repoId of repoIds) {
     publishRepoReadInvalidation({ repoId, domain: 'operations' })
   }

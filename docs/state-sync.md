@@ -75,11 +75,13 @@ authority.
   invalidated, and which recovery message the user receives. A later command
   outcome cannot erase an earlier committed milestone.
 - A command that returns an error may still require conservative invalidation.
-  Preserve the original reason unless a confirmed partial success changes the
-  next safe user action. In that case recovery guidance belongs to the owning
-  application flow; do not replace errors through a cross-operation message
-  classifier.
-- Public mutation failures keep the original `message` and may add bounded
+  Preserve its domain reason unless execution ended by cancellation or timeout,
+  in which case the owning application flow may normalize `message` to explicit
+  check-state guidance because the command may have changed repository state.
+  A confirmed partial success adds recovery guidance for its specific follow-up;
+  do not replace errors through a cross-operation message classifier.
+- Public mutation failures keep the established domain `message`, subject to
+  that cancellation or timeout normalization, and may add bounded
   `recoveryMessageKeys` for confirmed partial successes or lifecycle settlement
   uncertainty. These keys are
   presentation guidance only: they do not carry execution facts, authorize

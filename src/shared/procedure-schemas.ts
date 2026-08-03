@@ -222,14 +222,11 @@ export const REPO_PROCEDURE_SCHEMAS = {
     cwd: WorkspaceIdSchema,
     workspaceRuntimeId: WorkspaceRuntimeIdSchema,
   }),
-  operations: v.union([
-    v.strictObject({ includeSettled: v.optional(v.boolean()) }),
-    v.strictObject({
-      cwd: WorkspaceIdSchema,
-      workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-      includeSettled: v.optional(v.boolean()),
-    }),
-  ]),
+  operations: v.strictObject({
+    cwd: WorkspaceIdSchema,
+    workspaceRuntimeId: WorkspaceRuntimeIdSchema,
+    includeSettled: v.optional(v.boolean()),
+  }),
 } as const
 
 export const REMOTE_PROCEDURE_SCHEMAS = {

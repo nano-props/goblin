@@ -613,9 +613,13 @@ describe('repo write operation coordinator', () => {
       repoId: LINKED_WORKSPACE_ID,
       domain: 'operations',
     })
+    await expect(listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID, { includeSettled: true })).resolves.toEqual([
+      expect.objectContaining({ repoId: WORKSPACE_ID, kind: 'fetch', phase: 'done' }),
+    ])
+    expect(getRepoLastSuccessfulFetchAt(LINKED_WORKSPACE_ID)).toBe(0)
   })
 
-  test('binds authoritative sibling impact without probing during an operations read', async () => {
+  test('invalidates a cold sibling impact without binding or probing during an operations read', async () => {
     mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) =>
       workspaceId === WORKSPACE_ID || workspaceId === LINKED_WORKSPACE_ID ? WORKSPACE_BOUNDARY_KEY : workspaceId,
     )
@@ -650,15 +654,8 @@ describe('repo write operation coordinator', () => {
         includeSettled: true,
         workspaceRuntimeId: 'runtime-source',
       }),
-    ).resolves.toEqual([
-      expect.objectContaining({
-        repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-source',
-        kind: 'fetch',
-        phase: 'done',
-      }),
-    ])
-    expect(getRepoLastSuccessfulFetchAt(LINKED_WORKSPACE_ID)).toBe(0)
+    ).resolves.toEqual([])
+    expect(getRepoLastSuccessfulFetchAt(LINKED_WORKSPACE_ID)).toBeNull()
     expect(mocks.resolveRepoWriteBoundaryKey).not.toHaveBeenCalled()
   })
 
@@ -1019,21 +1016,16 @@ describe('repo write operation coordinator', () => {
     await expect(active).rejects.toBeInstanceOf(RepoMutationRuntimeFailureError)
     await expect(queued).rejects.toThrow('error.workspace-runtime-stale')
     expect(queuedTask).not.toHaveBeenCalled()
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
+      repoId: LINKED_WORKSPACE_ID,
+      domain: 'operations',
+    })
     await expect(
       listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID, {
         includeSettled: true,
         workspaceRuntimeId: 'runtime-a',
       }),
-    ).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          repoId: WORKSPACE_ID,
-          kind: 'pull',
-          phase: 'failed',
-          error: expect.objectContaining({ message: 'unreachable' }),
-        }),
-      ]),
-    )
+    ).resolves.toEqual([])
   })
 
   test('closes runtime admission for a classified queued-task failure before releasing the queue', async () => {

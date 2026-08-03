@@ -1,8 +1,4 @@
-import {
-  runWithRepoSource,
-  type RepoSource,
-  type WorkspacePaneTargetIdentity,
-} from '#/server/modules/repo-source.ts'
+import { runWithRepoSource, type RepoSource, type WorkspacePaneTargetIdentity } from '#/server/modules/repo-source.ts'
 import type { RepoSourceRuntimeContext } from '#/server/modules/remote-repo-execution.ts'
 import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import {
@@ -262,7 +258,7 @@ function repoReadRuntime(options: { workspaceRuntimeId?: string } | undefined): 
 }
 
 export async function readRepoOperationsSnapshot(
-  cwd?: WorkspaceId,
+  cwd: WorkspaceId,
   options: RepoOperationsReadOptions = {},
 ): Promise<RepoOperationsSnapshot> {
   const registrySnapshot = getRepoOperationsSnapshot({
@@ -270,17 +266,11 @@ export async function readRepoOperationsSnapshot(
     workspaceRuntimeId: options.workspaceRuntimeId,
     includeSettled: options.includeSettled,
   })
-  let writeOperations: RepoServerOperationState[]
-  let lastFetchAt: number | null = null
-  if (cwd) {
-    // Operation activity is process-local coordinator authority. Reading it
-    // must not probe Git or SSH, especially while a runtime failure is being
-    // settled and this projection is invalidated.
-    writeOperations = await listRepoWriteOperationsForRepo(cwd, options)
-    lastFetchAt = getRepoLastSuccessfulFetchAt(cwd)
-  } else {
-    writeOperations = await listRepoWriteOperationsForRepo(undefined, options)
-  }
+  // Operation activity is process-local coordinator authority. Reading it
+  // must not probe Git or SSH, especially while a runtime failure is being
+  // settled and this projection is invalidated.
+  const writeOperations = await listRepoWriteOperationsForRepo(cwd, options)
+  const lastFetchAt = getRepoLastSuccessfulFetchAt(cwd)
   return {
     operations: sortedRepoOperations([...registrySnapshot.operations, ...writeOperations]),
     lastFetchAt,

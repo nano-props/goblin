@@ -168,19 +168,11 @@ export function createRepoRoutes(options: {
   })
   app.post('/operations', async (c) => {
     const input = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
-    if ('cwd' in input) {
-      requireCurrentWorkspaceRuntime(userIdFromContext(c), input.cwd, input.workspaceRuntimeId)
-      return c.json(
-        await readRepoOperationsSnapshot(input.cwd, {
-          includeSettled: input.includeSettled,
-          workspaceRuntimeId: input.workspaceRuntimeId,
-          signal: c.req.raw.signal,
-        }),
-      )
-    }
+    requireCurrentWorkspaceRuntime(userIdFromContext(c), input.cwd, input.workspaceRuntimeId)
     return c.json(
-      await readRepoOperationsSnapshot(undefined, {
+      await readRepoOperationsSnapshot(input.cwd, {
         includeSettled: input.includeSettled,
+        workspaceRuntimeId: input.workspaceRuntimeId,
         signal: c.req.raw.signal,
       }),
     )

@@ -101,7 +101,9 @@ describe('fetchRepo canonical boundaries', () => {
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { resolveRepoWriteBoundaryForRead } = await import('#/server/modules/repo-write-operation-coordinator.ts')
 
+    await resolveRepoWriteBoundaryForRead(LINKED_REPO_ID, { workspaceRuntimeId: 'workspace-runtime-b' })
     await fetchRepo(REPO_ID, 'user', undefined, 'workspace-runtime-a')
 
     const primary = await readRepoOperationsSnapshot(REPO_ID, { workspaceRuntimeId: 'workspace-runtime-a' })

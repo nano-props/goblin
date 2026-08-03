@@ -4,6 +4,7 @@ import {
   openTestWorkspaceRuntime,
   repoRouteMocks,
   resetRepoRouteHarness,
+  setRepoRouteTestUserId,
   WORKSPACE_ID,
 } from '#/server/test-utils/repo-routes.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
@@ -233,8 +234,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     })
   })
 
-  test.each([{ cwd: WORKSPACE_ID }, { workspaceRuntimeId: 'workspace-runtime-partial' }])(
-    'rejects a partial operations runtime scope at the request boundary',
+  test.each([{}, { cwd: WORKSPACE_ID }, { workspaceRuntimeId: 'workspace-runtime-partial' }])(
+    'rejects an incomplete operations runtime scope at the request boundary',
     async (body) => {
       const app = createTestRepoRoutes()
       const response = await app.request(
@@ -250,22 +251,21 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     },
   )
 
-  test('accepts an explicitly unscoped operations request', async () => {
-    mocks.readRepoOperationsSnapshot.mockResolvedValue({ operations: [], loadedAt: 123 })
+  test("does not expose one user's operation scope to another user", async () => {
     const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    setRepoRouteTestUserId('user-other')
     const response = await app.request(
       new Request('http://localhost/operations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ includeSettled: true }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, includeSettled: true }),
       }),
     )
 
-    expect(response.status).toBe(200)
-    expect(mocks.readRepoOperationsSnapshot).toHaveBeenCalledWith(undefined, {
-      includeSettled: true,
-      signal: expect.any(AbortSignal),
-    })
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ message: 'error.workspace-runtime-stale' })
+    expect(mocks.readRepoOperationsSnapshot).not.toHaveBeenCalled()
   })
 
   test('passes patch body through to getRepoPatch', async () => {

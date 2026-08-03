@@ -416,8 +416,7 @@ describe('repo worktree creation', () => {
     mocks.removeWorktree.mockImplementationOnce(async () => await secondRemove.promise)
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
-    const { resolveRepoWriteBoundaryForRead } =
-      await import('#/server/modules/repo-write-operation-coordinator.ts')
+    const { resolveRepoWriteBoundaryForRead } = await import('#/server/modules/repo-write-operation-coordinator.ts')
     await resolveRepoWriteBoundaryForRead(LINKED_REPO_ID)
 
     const first = deleteRepoBranch(REPO_ID, 'feature/a')

@@ -61,7 +61,11 @@ describe('repo refresh actions', () => {
     const store = repoRefreshStoreAccess('workspace-runtime-test-9', 'unavailable')
     const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
 
-    await handleRepoInvalidationRefresh(store, { repoId: WORKSPACE_ID, domain: 'operations' }, 'workspace-runtime-test-9')
+    await handleRepoInvalidationRefresh(
+      store,
+      { repoId: WORKSPACE_ID, domain: 'operations' },
+      'workspace-runtime-test-9',
+    )
 
     expect(invalidateSpy).toHaveBeenCalledWith(
       {

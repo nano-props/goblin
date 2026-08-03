@@ -164,10 +164,7 @@ describe('independent repository reads', () => {
 
     await expect(readRepoSnapshot(WORKSPACE_ID)).resolves.toEqual({ snapshot })
     expect(getSnapshot).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) })
-    expect(mocks.runWithRepoMembershipReadAdmission).toHaveBeenCalledWith(
-      { id: 'test-boundary' },
-      expect.any(Function),
-    )
+    expect(mocks.runWithRepoMembershipReadAdmission).toHaveBeenCalledWith({ id: 'test-boundary' }, expect.any(Function))
     expect(getPullRequests).not.toHaveBeenCalled()
   })
 

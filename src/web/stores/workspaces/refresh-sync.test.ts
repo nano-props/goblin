@@ -2,13 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createRefreshSyncHelpers, refreshFailureMessage } from '#/web/stores/workspaces/refresh-sync.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
-import {
-  REPO_ID,
-  branch,
-  ipcHandlers,
-  resetRefreshTest,
-  seedRepo,
-} from '#/web/stores/workspaces/refresh-test-utils.ts'
+import { REPO_ID, branch, ipcHandlers, resetRefreshTest, seedRepo } from '#/web/stores/workspaces/refresh-test-utils.ts'
 
 beforeEach(resetRefreshTest)
 
@@ -56,9 +50,9 @@ describe('refresh sync pipeline', () => {
       { refreshReadModels },
     )
 
-    await expect(
-      runRefreshSyncPipeline(REPO_ID, workspaceRuntimeId, new AbortController().signal),
-    ).rejects.toBe(projectionFailure)
+    await expect(runRefreshSyncPipeline(REPO_ID, workspaceRuntimeId, new AbortController().signal)).rejects.toBe(
+      projectionFailure,
+    )
     expect(refreshReadModels).toHaveBeenCalledOnce()
     expect(
       requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.events.at(-1),
