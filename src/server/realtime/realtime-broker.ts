@@ -156,8 +156,7 @@ export class RealtimeBroker<TMessage> {
     for (const sockets of Array.from(this.socketsByUserId.values())) {
       for (const socket of Array.from(sockets)) {
         try {
-          if (socket.forceClose) socket.forceClose(1001, this.options.shutdownReason)
-          else socket.close(1001, this.options.shutdownReason)
+          socket.close(1001, this.options.shutdownReason)
         } catch {}
       }
     }
