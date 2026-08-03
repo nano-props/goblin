@@ -25,7 +25,7 @@ import { useRestoreTopVisibleRowIndex } from '#/web/hooks/useRestoreTopVisibleRo
 
 export interface FiletreeViewProps {
   readonly tree: LazyWorkspaceFilesystemTreeAggregate | null
-  readonly initialLoading: boolean
+  readonly isInitialLoading: boolean
   readonly isReading: boolean
   readonly loadingKeys?: ReadonlySet<string>
   readonly openingFileKeys?: ReadonlySet<string>
@@ -56,7 +56,7 @@ const FILE_TREE_I18N_KEYS = {
 
 export function FiletreeView({
   tree,
-  initialLoading,
+  isInitialLoading,
   isReading,
   loadingKeys = new Set(),
   openingFileKeys = new Set(),
@@ -215,11 +215,11 @@ export function FiletreeView({
   }
 
   if (!tree) {
-    if (initialLoading) {
-      return <FiletreeShell loading={initialLoading} />
+    if (isInitialLoading) {
+      return <FiletreeShell loading={isInitialLoading} />
     }
     return (
-      <FiletreeShell loading={initialLoading}>
+      <FiletreeShell loading={isInitialLoading}>
         <EmptyState icon={<FolderTree size={16} />} title={t(FILE_TREE_I18N_KEYS.empty)} />
       </FiletreeShell>
     )

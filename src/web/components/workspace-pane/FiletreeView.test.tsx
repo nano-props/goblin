@@ -181,7 +181,7 @@ function buildTree(): WorkspaceFilesystemTreeResult {
 describe('FiletreeView', () => {
   test('renders the empty state when the tree has no nodes', () => {
     const tree: WorkspaceFilesystemTreeResult = { nodes: [], truncated: false }
-    renderView({ tree, initialLoading: false, error: null })
+    renderView({ tree, isInitialLoading: false, error: null })
     expect(container?.querySelector('[data-filetree=""]')).not.toBeNull()
     expect(container?.querySelectorAll('[role="treeitem"]').length).toBe(0)
     expect(container?.textContent).toMatch(/filetree\.empty/)
@@ -190,7 +190,7 @@ describe('FiletreeView', () => {
   test('renders a retryable error state when the initial read fails', async () => {
     const user = userEvent.setup()
     const onRetry = vi.fn()
-    renderView({ tree: null, initialLoading: false, error: 'boom', onRetry })
+    renderView({ tree: null, isInitialLoading: false, error: 'boom', onRetry })
     expect(container?.textContent).toMatch(/filetree\.error/)
     await user.click(container!.querySelector('button')!)
     expect(onRetry).toHaveBeenCalledOnce()
@@ -201,7 +201,7 @@ describe('FiletreeView', () => {
     const onRetry = vi.fn()
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
-      initialLoading: false,
+      isInitialLoading: false,
       error: 'boom',
       onRetry,
     })
@@ -217,7 +217,7 @@ describe('FiletreeView', () => {
     const onRetry = vi.fn()
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
-      initialLoading: false,
+      isInitialLoading: false,
       isReading: true,
       error: 'boom',
       onRetry,
@@ -230,7 +230,7 @@ describe('FiletreeView', () => {
   test('renders a virtualized tree labelled by i18n', () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
-      initialLoading: false,
+      isInitialLoading: false,
       error: null,
     })
     expect(tree().getAttribute('aria-label')).toBe('filetree.aria-label')
@@ -239,7 +239,7 @@ describe('FiletreeView', () => {
   test('keeps file action triggers clear of the overlay scrollbar', () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
-      initialLoading: false,
+      isInitialLoading: false,
       error: null,
     })
 
@@ -250,7 +250,7 @@ describe('FiletreeView', () => {
   test('does not add an extra panel border around the tree body', () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
-      initialLoading: false,
+      isInitialLoading: false,
       error: null,
     })
     expect(tree().className).not.toContain('border-l')
@@ -259,7 +259,7 @@ describe('FiletreeView', () => {
   test('uses the app sans font for explorer file names', () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
-      initialLoading: false,
+      isInitialLoading: false,
       error: null,
     })
     expect(tree().className).toContain('font-sans')
@@ -277,7 +277,7 @@ describe('FiletreeView', () => {
       ],
       truncated: false,
     }
-    renderView({ tree, initialLoading: false, error: null })
+    renderView({ tree, isInitialLoading: false, error: null })
 
     expect(rowNames()).toEqual(['src', 'README.md'])
     expect(row('src').getAttribute('aria-level')).toBe('1')
@@ -292,7 +292,7 @@ describe('FiletreeView', () => {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
       truncated: false,
     }
-    renderView({ tree, initialLoading: false, error: null })
+    renderView({ tree, isInitialLoading: false, error: null })
 
     await user.click(row('src'))
 
@@ -318,7 +318,7 @@ describe('FiletreeView', () => {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
       truncated: false,
     }
-    renderView({ tree, initialLoading: false, error: null })
+    renderView({ tree, isInitialLoading: false, error: null })
 
     await user.click(row('README.md'))
     expect(row('README.md').getAttribute('aria-selected')).toBe('true')
@@ -336,7 +336,7 @@ describe('FiletreeView', () => {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
       truncated: false,
     }
-    renderView({ tree, initialLoading: false, error: null })
+    renderView({ tree, isInitialLoading: false, error: null })
 
     await user.click(row('src'))
     expect(row('src').getAttribute('aria-expanded')).toBe('true')
@@ -353,7 +353,7 @@ describe('FiletreeView', () => {
     const onOpenFile = vi.fn()
     const onRequestTrashFile = vi.fn()
     const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
-    renderView({ tree, initialLoading: false, error: null, onOpenFile, onRequestTrashFile })
+    renderView({ tree, isInitialLoading: false, error: null, onOpenFile, onRequestTrashFile })
 
     const actionButton = row('README.md').querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
     expect(actionButton).toBeTruthy()
@@ -385,7 +385,7 @@ describe('FiletreeView', () => {
   test('keeps the file action menu trigger visible in compact mode', () => {
     compactUi = true
     const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
-    renderView({ tree, initialLoading: false, error: null, onOpenFile: vi.fn() })
+    renderView({ tree, isInitialLoading: false, error: null, onOpenFile: vi.fn() })
 
     const actionButton = row('README.md').querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
     expect(actionButton).toBeTruthy()
@@ -400,7 +400,7 @@ describe('FiletreeView', () => {
     const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({
       tree,
-      initialLoading: false,
+      isInitialLoading: false,
       openingFileKeys: new Set(['README.md']),
       error: null,
       onOpenFile: vi.fn(),
@@ -425,7 +425,7 @@ describe('FiletreeView', () => {
     const user = userEvent.setup()
     const onOpenFile = vi.fn()
     const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
-    renderView({ tree, initialLoading: false, error: null, onOpenFile })
+    renderView({ tree, isInitialLoading: false, error: null, onOpenFile })
 
     await user.dblClick(row('README.md'))
 
@@ -436,7 +436,7 @@ describe('FiletreeView', () => {
   test('renders selected rows without rounded corners', async () => {
     const user = userEvent.setup()
     const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
-    renderView({ tree, initialLoading: false, error: null })
+    renderView({ tree, isInitialLoading: false, error: null })
 
     await user.click(row('README.md'))
 
@@ -450,7 +450,7 @@ describe('FiletreeView', () => {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src')],
       truncated: false,
     }
-    renderView({ tree, initialLoading: false, error: null })
+    renderView({ tree, isInitialLoading: false, error: null })
 
     await user.click(row('src').querySelector<HTMLButtonElement>('button[slot="chevron"]')!)
 
@@ -463,7 +463,7 @@ describe('FiletreeView', () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
     const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
-    renderView({ tree, initialLoading: false, error: null, onSelect })
+    renderView({ tree, isInitialLoading: false, error: null, onSelect })
 
     await user.click(row('README.md'))
 
@@ -476,7 +476,7 @@ describe('FiletreeView', () => {
     const user = userEvent.setup()
     const onActivate = vi.fn()
     const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
-    renderView({ tree, initialLoading: false, error: null, onActivate })
+    renderView({ tree, isInitialLoading: false, error: null, onActivate })
 
     row('README.md').focus()
     await user.keyboard('{Enter}')
@@ -490,7 +490,7 @@ describe('FiletreeView', () => {
       nodes: [fileNode('README.md')],
       truncated: true,
     }
-    renderView({ tree, initialLoading: false, error: null })
+    renderView({ tree, isInitialLoading: false, error: null })
     expect(container?.textContent).toMatch(/filetree\.truncated/)
   })
 
@@ -499,14 +499,14 @@ describe('FiletreeView', () => {
       nodes: [fileNode('README.md', null, 'modified')],
       truncated: false,
     }
-    renderView({ tree, initialLoading: false, error: null })
+    renderView({ tree, isInitialLoading: false, error: null })
     // The wire union allows non-clean values, but the filesystem tree source
     // does not own status projection and the view must not imply that it does.
     expect(container?.querySelector('[aria-label^="filetree.status."]')).toBeNull()
   })
 
   test('keeps the initial loading state visually quiet and announces aria-busy', () => {
-    renderView({ tree: null, initialLoading: true, error: null })
+    renderView({ tree: null, isInitialLoading: true, error: null })
     expect(container?.querySelectorAll('[role="treeitem"]').length).toBe(0)
     expect(container?.textContent).not.toMatch(/filetree\.loading/)
     expect(container?.textContent).not.toMatch(/filetree\.empty/)
@@ -515,7 +515,7 @@ describe('FiletreeView', () => {
 
   test('reports the top visible row index instead of the raw scroll offset', () => {
     const onTopVisibleRowIndexChange = vi.fn()
-    renderView({ tree: buildTree(), initialLoading: false, error: null, onTopVisibleRowIndexChange })
+    renderView({ tree: buildTree(), isInitialLoading: false, error: null, onTopVisibleRowIndexChange })
     const viewport = scrollViewport()
     viewport.scrollTop = 145
     act(() => {
@@ -531,7 +531,7 @@ describe('FiletreeView', () => {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
       truncated: false,
     }
-    renderView({ tree: treeA, initialLoading: false, error: null })
+    renderView({ tree: treeA, isInitialLoading: false, error: null })
 
     await user.click(row('src'))
     await user.click(row('README.md'))
@@ -543,7 +543,7 @@ describe('FiletreeView', () => {
       truncated: false,
     }
     await act(async () => {
-      rerenderView({ tree: treeB, initialLoading: false, error: null })
+      rerenderView({ tree: treeB, isInitialLoading: false, error: null })
     })
 
     expect(rowNames()).toEqual(['src', 'index.ts', 'README.md'])
@@ -557,7 +557,7 @@ describe('FiletreeView', () => {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
       truncated: false,
     }
-    renderView({ tree: treeA, initialLoading: false, error: null })
+    renderView({ tree: treeA, isInitialLoading: false, error: null })
 
     await user.click(row('src'))
     await user.click(row('README.md'))
@@ -569,7 +569,7 @@ describe('FiletreeView', () => {
       truncated: false,
     }
     await act(async () => {
-      rerenderView({ tree: treeB, initialLoading: false, error: null })
+      rerenderView({ tree: treeB, isInitialLoading: false, error: null })
     })
 
     expect(rowNames()).toEqual(['docs', 'CHANGELOG.md'])
@@ -581,7 +581,7 @@ describe('FiletreeView', () => {
 describe('FiletreeView — React Aria keyboard integration', () => {
   test('ArrowDown and ArrowUp move focus through visible rows', async () => {
     const user = userEvent.setup()
-    renderView({ tree: buildTree(), initialLoading: false, error: null })
+    renderView({ tree: buildTree(), isInitialLoading: false, error: null })
 
     row('src').focus()
     await user.keyboard('{ArrowDown}')
@@ -599,7 +599,7 @@ describe('FiletreeView — React Aria keyboard integration', () => {
 
   test('ArrowRight expands the focused directory', async () => {
     const user = userEvent.setup()
-    renderView({ tree: buildTree(), initialLoading: false, error: null })
+    renderView({ tree: buildTree(), isInitialLoading: false, error: null })
 
     row('src').focus()
     await user.keyboard('{ArrowRight}')
@@ -610,7 +610,7 @@ describe('FiletreeView — React Aria keyboard integration', () => {
 
   test('ArrowLeft collapses the focused expanded directory', async () => {
     const user = userEvent.setup()
-    renderView({ tree: buildTree(), initialLoading: false, error: null })
+    renderView({ tree: buildTree(), isInitialLoading: false, error: null })
 
     row('src').focus()
     await user.keyboard('{ArrowRight}')
@@ -627,7 +627,7 @@ describe('FiletreeView — locale-aware sorting', () => {
       nodes: [fileNode('10.txt'), dirNode('a'), fileNode('2.txt'), dirNode('A'), fileNode('b.txt'), fileNode('a.txt')],
       truncated: false,
     }
-    renderView({ tree, initialLoading: false, error: null })
+    renderView({ tree, isInitialLoading: false, error: null })
 
     expect(rowNames()).toEqual(['a', 'A', '2.txt', '10.txt', 'a.txt', 'b.txt'])
   })

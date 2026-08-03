@@ -37,7 +37,7 @@ vi.mock('#/web/workspace-filesystem-invalidation-ingress.ts', () => ({
 
 type HarnessSnapshot = {
   tree: WorkspaceFilesystemTreeResult | null
-  initialLoading: boolean
+  isInitialLoading: boolean
   isReading: boolean
   error: string | null
   loadingKeys: ReadonlySet<string>
@@ -387,7 +387,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await render(mainHarnessProps())
 
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledWith(mainExecutionTarget(), {})
-    expect(lastSnapshot?.initialLoading).toBe(true)
+    expect(lastSnapshot?.isInitialLoading).toBe(true)
     expect(lastSnapshot?.error).toBeNull()
     const result: WorkspaceFilesystemTreeResult = {
       nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
@@ -401,7 +401,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
 
     expect(lastSnapshot?.tree).toEqual(result)
-    expect(lastSnapshot?.initialLoading).toBe(false)
+    expect(lastSnapshot?.isInitialLoading).toBe(false)
     expect(lastSnapshot?.error).toBeNull()
   })
 
@@ -500,7 +500,7 @@ describe('useWorkspaceFilesystemTree', () => {
 
     expect(lastSnapshot?.tree).toEqual({ nodes: [], truncated: false })
     expect(lastSnapshot?.error).toBeNull()
-    expect(lastSnapshot?.initialLoading).toBe(false)
+    expect(lastSnapshot?.isInitialLoading).toBe(false)
   })
 
   test('reports an error when the client rejects with a real failure', async () => {
@@ -510,7 +510,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
 
     expect(lastSnapshot?.error).toBe('boom')
-    expect(lastSnapshot?.initialLoading).toBe(false)
+    expect(lastSnapshot?.isInitialLoading).toBe(false)
   })
 
   test('starts the new target read without letting the previous cache read clobber it', async () => {
@@ -848,14 +848,14 @@ describe('useWorkspaceFilesystemTree', () => {
 
     await render(mainHarnessProps())
     await flush()
-    expect(lastSnapshot?.initialLoading).toBe(false)
+    expect(lastSnapshot?.isInitialLoading).toBe(false)
     expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('first.ts')
 
     await emitFilesystemInvalidation()
     await flush()
 
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2)
-    expect(lastSnapshot?.initialLoading).toBe(false)
+    expect(lastSnapshot?.isInitialLoading).toBe(false)
     expect(lastSnapshot?.tree?.nodes[0]?.id).toBe('second.ts')
   })
 

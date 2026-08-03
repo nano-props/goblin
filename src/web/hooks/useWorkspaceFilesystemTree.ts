@@ -31,7 +31,7 @@ export interface UseWorkspaceFilesystemTreeInput {
 
 export interface UseWorkspaceFilesystemTreeResult {
   readonly tree: LazyWorkspaceFilesystemTreeAggregate | null
-  readonly initialLoading: boolean
+  readonly isInitialLoading: boolean
   readonly isReading: boolean
   readonly error: string | null
   readonly loadingKeys: ReadonlySet<string>
@@ -163,7 +163,7 @@ export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInpu
 
   return {
     tree: rootData ? treeState.result : null,
-    initialLoading: isPending,
+    isInitialLoading: isPending,
     isReading: isFetching || expansionProjection.visibleLoadingPrefixes.size > 0,
     error,
     loadingKeys: expansionProjection.visibleLoadingPrefixes,

@@ -193,7 +193,7 @@ function ExecutionTargetFilesystemTabPanel({
   return (
     <FiletreeView
       tree={result.tree}
-      initialLoading={result.initialLoading}
+      isInitialLoading={result.isInitialLoading}
       isReading={result.isReading}
       loadingKeys={result.loadingKeys}
       openingFileKeys={openingFileKeys}
