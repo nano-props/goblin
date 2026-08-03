@@ -5,13 +5,13 @@ import { trashRemoteFile } from '#/system/ssh/git.ts'
 import { movePathToTrash } from '#/system/trash.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import { resolveWorkspaceFilesystemExecution } from '#/server/modules/workspace-filesystem-execution.ts'
-import type { TrashCommandOutcome } from '#/system/trash-command-outcome.ts'
+import type { CommandOutcome } from '#/system/command-execution.ts'
 
 export async function trashWorkspaceFile(
   target: WorkspacePaneFilesystemExecutionTarget,
   filePath: string,
   signal?: AbortSignal,
-): Promise<TrashCommandOutcome> {
+): Promise<CommandOutcome> {
   if (signal?.aborted) return trashNotStarted({ ok: false, message: 'cancelled' })
   const resolved = await resolveWorkspaceFilesystemExecution(target, { signal })
 
@@ -43,11 +43,11 @@ export async function trashWorkspaceFile(
   return trashOutcomeForUser(await movePathToTrash(absolutePath, signal))
 }
 
-function trashNotStarted(result: ExecResult): TrashCommandOutcome {
+function trashNotStarted(result: ExecResult): CommandOutcome {
   return { result, execution: { status: 'not-started' } }
 }
 
-function trashOutcomeForUser(outcome: TrashCommandOutcome): TrashCommandOutcome {
+function trashOutcomeForUser(outcome: CommandOutcome): CommandOutcome {
   switch (outcome.execution.status) {
     case 'cancelled':
       return { ...outcome, result: { ...outcome.result, message: 'error.trash-cancelled-check-state' } }

@@ -42,9 +42,9 @@ import type { ExecResult } from '#/shared/git-types.ts'
 import { getLocalPathSuggestions } from '#/server/modules/local-path-suggestions.ts'
 import { workspaceLocatorFromNativeCommandInput } from '#/server/modules/native-workspace-input.ts'
 import {
-  isTrashCommandInvokedError,
-  trashCommandMayHaveRun,
-} from '#/system/trash-command-outcome.ts'
+  commandMayHaveRun,
+  isInvokedCommandError,
+} from '#/system/command-execution.ts'
 
 export function createWorkspaceRoutes(options: {
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
@@ -295,10 +295,10 @@ async function runTrashFileRequest(input: {
       run: async () => {
         try {
           const outcome = await trashWorkspaceFile(input.target, input.filePath, input.signal)
-          mutationMayHaveRun = trashCommandMayHaveRun(outcome)
+          mutationMayHaveRun = commandMayHaveRun(outcome.execution)
           return outcome.result
         } catch (error) {
-          if (!isTrashCommandInvokedError(error)) throw error
+          if (!isInvokedCommandError(error)) throw error
           mutationMayHaveRun = true
           throw error.cause
         }

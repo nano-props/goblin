@@ -62,5 +62,6 @@ describe('movePathToTrash', () => {
       result: { ok: false, message: 'permission denied' },
       execution: { status: 'failed' },
     })
+    expect(mocks.execa).toHaveBeenCalledTimes(1)
   })
 })

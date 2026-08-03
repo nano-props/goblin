@@ -10,7 +10,7 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
-import { TrashCommandInvokedError } from '#/system/trash-command-outcome.ts'
+import { InvokedCommandError } from '#/system/command-execution.ts'
 
 const USER_ID = 'workspace-route-user'
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace-route')
@@ -437,7 +437,7 @@ describe('workspace routes', () => {
     const workspaceRuntimeId = await openWorkspaceRuntime(app, workspaceId)
     const target = workspaceRootTarget(workspaceId, workspaceRuntimeId)
     mocks.trashWorkspaceFile.mockRejectedValueOnce(
-      new TrashCommandInvokedError(
+      new InvokedCommandError(
         new RemoteWorkspaceRuntimeFailureError({
           workspaceId,
           workspaceRuntimeId,

@@ -1,19 +1,17 @@
 import { execa } from 'execa'
-import type { TrashCommandOutcome } from '#/system/trash-command-outcome.ts'
+import type { CommandOutcome } from '#/system/command-execution.ts'
 
 interface TrashCommand {
   readonly command: string
   readonly args: ReadonlyArray<string>
 }
 
-export async function movePathToTrash(path: string, signal?: AbortSignal): Promise<TrashCommandOutcome> {
+export async function movePathToTrash(path: string, signal?: AbortSignal): Promise<CommandOutcome> {
   if (signal?.aborted) {
     return { result: { ok: false, message: 'cancelled' }, execution: { status: 'not-started' } }
   }
 
   const commands = trashCommandsForPlatform(path)
-  let sawExecutable = false
-  let lastMessage = 'error.failed-trash-file'
 
   for (const command of commands) {
     try {
@@ -24,17 +22,17 @@ export async function movePathToTrash(path: string, signal?: AbortSignal): Promi
       return { result: { ok: true, message: 'ok' }, execution: { status: 'succeeded' } }
     } catch (err) {
       if (isCommandMissing(err)) continue
-      sawExecutable = true
       if (signal?.aborted) {
         return { result: { ok: false, message: 'cancelled' }, execution: { status: 'cancelled' } }
       }
-      lastMessage = errorMessageFromUnknown(err) || lastMessage
+      return {
+        result: { ok: false, message: errorMessageFromUnknown(err) ?? 'error.failed-trash-file' },
+        execution: { status: 'failed' },
+      }
     }
   }
 
-  return sawExecutable
-    ? { result: { ok: false, message: lastMessage }, execution: { status: 'failed' } }
-    : { result: { ok: false, message: 'error.trash-unavailable' }, execution: { status: 'not-started' } }
+  return { result: { ok: false, message: 'error.trash-unavailable' }, execution: { status: 'not-started' } }
 }
 
 function trashCommandsForPlatform(path: string): ReadonlyArray<TrashCommand> {

@@ -19,14 +19,11 @@ import {
 import { runRemoteCommand, type RemoteCommandKind, type RemoteCommandResult } from '#/system/ssh/commands.ts'
 import {
   commandMayHaveRun,
+  InvokedCommandError,
   withoutMutationCommand,
   type CommandExecution,
   type CommandOutcome,
 } from '#/system/command-execution.ts'
-import {
-  TrashCommandInvokedError,
-  type TrashCommandOutcome,
-} from '#/system/trash-command-outcome.ts'
 import {
   decodeRemoteStatus,
   decodeRemoteWorktrees,
@@ -292,7 +289,7 @@ export async function trashRemoteFile(
     run?: RemoteGitRunner
     knownWorktrees?: ReadonlyArray<WorktreeInfo>
   } = {},
-): Promise<TrashCommandOutcome> {
+): Promise<CommandOutcome> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const known = await resolveKnownRemoteWorktree(target, worktreePath, {
     signal: options.signal,
@@ -304,7 +301,7 @@ export async function trashRemoteFile(
   try {
     result = await run({ type: 'trashFile', path: known.path, filePath }, target, { signal: options.signal })
   } catch (error) {
-    throw new TrashCommandInvokedError(error)
+    throw new InvokedCommandError(error)
   }
   if (options.signal?.aborted || result.message === 'cancelled') {
     return { result: { ok: false, message: 'cancelled' }, execution: { status: 'cancelled' } }
