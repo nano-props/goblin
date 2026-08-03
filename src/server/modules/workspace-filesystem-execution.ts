@@ -27,6 +27,7 @@ export async function resolveWorkspaceFilesystemExecution(
   target: WorkspacePaneFilesystemExecutionTarget,
   options: { signal?: AbortSignal } = {},
 ): Promise<ResolvedWorkspaceFilesystemExecution> {
+  const { signal } = options
   const platform = process.platform === 'win32' ? 'win32' : 'posix'
   const workspace = parseWorkspaceLocator(target.workspaceId, platform)
   if (!workspace) throw new Error('error.workspace-locator-malformed')
@@ -42,13 +43,13 @@ export async function resolveWorkspaceFilesystemExecution(
     const remoteTarget = await resolveRemoteWorkspaceTarget(
       target.workspaceId,
       { workspaceRuntimeId: target.workspaceRuntimeId },
-      options.signal,
+      signal,
     )
     const run = remoteRuntimeAwareGitRunner(target.workspaceId, target.workspaceRuntimeId, remoteTarget)
     const worktree =
       target.kind === 'git-worktree'
         ? await resolveRemoteWorktree(remoteTarget, root.path, {
-            signal: options.signal,
+            signal,
             run,
           })
         : null
@@ -60,7 +61,7 @@ export async function resolveWorkspaceFilesystemExecution(
   }
   const worktree =
     target.kind === 'git-worktree'
-      ? requiredLocalWorktree(await readWorktreeMembership(workspace.path, options.signal), root.path)
+      ? requiredLocalWorktree(await readWorktreeMembership(workspace.path, signal), root.path)
       : null
   return { transport: 'local', target, executionPath: root.path, worktree }
 }

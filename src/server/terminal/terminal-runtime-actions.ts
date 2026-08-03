@@ -122,13 +122,14 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
           ),
       )
       if (!operation.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
-      if (operation.value.projectionChanged) {
+      const { result, projectionChanged } = operation.value
+      if (projectionChanged) {
         deps.broker.broadcastToUser(userId, {
           type: 'sessions-changed',
-          ...operation.value.projectionChanged,
+          ...projectionChanged,
         })
       }
-      return operation.value.result
+      return result
     },
 
     async write(clientId: string, userId: string, input: TerminalWriteInput): Promise<TerminalWriteResult> {

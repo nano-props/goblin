@@ -36,8 +36,9 @@ export function createSettingsRoutes(options: {
   serverHost: string
   serverPort: number
 }) {
+  const { settingsState, workspacePaneTabsHost, workspaceCapabilityTransitionHost } = options
   const app = createRouteApp()
-  app.get('/', async (c) => c.json(await getSettingsSnapshot(options.settingsState)))
+  app.get('/', async (c) => c.json(await getSettingsSnapshot(settingsState)))
   app.post('/github-cli', async (c) => {
     const { hosts } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.githubCli, c)
     return c.json(await getServerGitHubCliState(c.req.raw.signal, hosts))
@@ -73,7 +74,7 @@ export function createSettingsRoutes(options: {
   })
   app.post('/global-shortcut-state', async (c) => {
     const { registered } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.globalShortcutState, c)
-    return c.json(handleSetGlobalShortcutRegistered({ registered }, options.settingsState))
+    return c.json(handleSetGlobalShortcutRegistered({ registered }, settingsState))
   })
   app.post('/workspace/restore', async (c) => {
     const userId = userIdFromContext(c)
@@ -84,8 +85,8 @@ export function createSettingsRoutes(options: {
         userId,
         clientId,
         activeWorkspaceId: activeWorkspaceId ?? null,
-        workspacePaneTabsHost: options.workspacePaneTabsHost,
-        workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
+        workspacePaneTabsHost,
+        workspaceCapabilityTransitionHost,
         signal: c.req.raw.signal,
       }),
     )
@@ -115,8 +116,8 @@ export function createSettingsRoutes(options: {
         clientId,
         workspaceId,
         workspaceRuntimeId,
-        workspacePaneTabsHost: options.workspacePaneTabsHost,
-        workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
+        workspacePaneTabsHost,
+        workspaceCapabilityTransitionHost,
         signal: c.req.raw.signal,
       }),
     )

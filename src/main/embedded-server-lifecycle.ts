@@ -307,6 +307,7 @@ export async function stopEmbeddedServer(reason: EmbeddedServerStopReason): Prom
   runtime = null
   startPromise = null
   if (!record) return
+  const { proc } = record
   await new Promise<void>((resolve, reject) => {
     let settled = false
     const settle = () => {
@@ -317,7 +318,7 @@ export async function stopEmbeddedServer(reason: EmbeddedServerStopReason): Prom
     let forceExitTimer: ReturnType<typeof setTimeout> | null = null
     const timer = setTimeout(() => {
       try {
-        record.proc.kill('SIGKILL')
+        proc.kill('SIGKILL')
         forceExitTimer = setTimeout(() => {
           if (settled) return
           settled = true
@@ -329,13 +330,13 @@ export async function stopEmbeddedServer(reason: EmbeddedServerStopReason): Prom
         reject(error)
       }
     }, SERVER_STOP_TIMEOUT_MS)
-    record.proc.once('exit', () => {
+    proc.once('exit', () => {
       clearTimeout(timer)
       if (forceExitTimer) clearTimeout(forceExitTimer)
       settle()
     })
     try {
-      record.proc.kill('SIGTERM')
+      proc.kill('SIGTERM')
     } catch (error) {
       clearTimeout(timer)
       if (forceExitTimer) clearTimeout(forceExitTimer)

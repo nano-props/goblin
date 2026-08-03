@@ -84,19 +84,19 @@ export interface EmbedAuthCookieOptions {
  * by the time the caller is ready, but in dev mode the proxy
  * round-trip is fast enough that this matters in practice.
  */
-export async function plantEmbedAuthCookie(options: EmbedAuthCookieOptions): Promise<void> {
+export async function plantEmbedAuthCookie({ accessToken, url, webContents }: EmbedAuthCookieOptions): Promise<void> {
   // Keep the concrete URL for Electron; the cookie is host-scoped, not port-scoped.
   //
   // Query params (`?theme=light&colorTheme=macos`) are dropped
   // because they do not affect cookie matching; stripping them keeps
   // the cookies.set payload stable.
-  const parsed = new URL(options.url)
+  const parsed = new URL(url)
   parsed.search = ''
   const cookieUrl = parsed.toString()
-  await options.webContents.session.cookies.set({
+  await webContents.session.cookies.set({
     url: cookieUrl,
     name: ACCESS_TOKEN_COOKIE,
-    value: options.accessToken,
+    value: accessToken,
     httpOnly: true,
     sameSite: 'lax',
     secure: parsed.protocol === 'https:',
@@ -124,12 +124,14 @@ export interface ReplantEmbedAuthCookieForRotationOptions {
  * rejects it, and the user sees the token gate re-appear even
  * though the rotation IPC returned the new token successfully.
  */
-export async function replantEmbedAuthCookieForRotation(
-  options: ReplantEmbedAuthCookieForRotationOptions,
-): Promise<void> {
+export async function replantEmbedAuthCookieForRotation({
+  accessToken,
+  url,
+  webContents,
+}: ReplantEmbedAuthCookieForRotationOptions): Promise<void> {
   await plantEmbedAuthCookie({
-    accessToken: options.accessToken,
-    url: options.url,
-    webContents: options.webContents,
+    accessToken,
+    url,
+    webContents,
   })
 }

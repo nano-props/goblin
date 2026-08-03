@@ -202,22 +202,23 @@ function rollbackWorkspaceRuntimeAdmission(input: {
   previousWorkspaceRuntimeId: string | null
   previousGeneration: number | undefined
 }): void {
+  const { userId, clientId, state, lease, previousWorkspaceRuntimeId, previousGeneration } = input
   if (
-    workspaceRuntimesByUser.get(input.userId)?.get(input.lease.workspaceId) !== input.state ||
-    input.state.currentWorkspaceRuntimeId !== input.lease.workspaceRuntimeId ||
-    input.state.members.get(input.clientId) !== input.lease.generation
+    workspaceRuntimesByUser.get(userId)?.get(lease.workspaceId) !== state ||
+    state.currentWorkspaceRuntimeId !== lease.workspaceRuntimeId ||
+    state.members.get(clientId) !== lease.generation
   ) {
     return
   }
-  if (input.previousWorkspaceRuntimeId === input.lease.workspaceRuntimeId && input.previousGeneration !== undefined) {
-    input.state.members.set(input.clientId, input.previousGeneration)
+  if (previousWorkspaceRuntimeId === lease.workspaceRuntimeId && previousGeneration !== undefined) {
+    state.members.set(clientId, previousGeneration)
     return
   }
-  input.state.members.delete(input.clientId)
-  if (workspaceRuntimeHasOwners(input.state)) return
-  const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(input.state)
+  state.members.delete(clientId)
+  if (workspaceRuntimeHasOwners(state)) return
+  const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(state)
   if (!workspaceRuntimeId) return
-  emitWorkspaceRuntimeClosed({ userId: input.userId, workspaceId: input.lease.workspaceId, workspaceRuntimeId })
+  emitWorkspaceRuntimeClosed({ userId, workspaceId: lease.workspaceId, workspaceRuntimeId })
 }
 
 export function acquireWorkspaceRuntimeLease(
