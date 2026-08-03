@@ -1,20 +1,26 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { generateAccessToken, readOrCreateAccessToken } from '#/shared/access-token-file.ts'
+import {
+  accessTokenFilePath,
+  generateAccessToken,
+  readOrCreateAccessToken,
+  removeAccessTokenFile,
+} from '#/shared/access-token-file.ts'
 
 /**
  * The access-token file is the security-sensitive root of all
  * auth: a torn write, a corrupt file, or a world-readable mode
  * would each re-enable one of the failure modes the implementation
- * claims to defend against. These tests pin down the four
- * guarantees the file IO has to keep across any future refactor:
+ * claims to defend against. These tests pin down the guarantees
+ * the file IO has to keep across any future refactor:
  *
  *  - generated tokens are exactly 25 chars in [0-9a-z]
  *  - generated files persist as exactly 25 chars + newline
  *  - persisted files are created with mode 0o600
  *  - corrupt or short files are silently regenerated, not accepted
+ *  - removal is idempotent but does not hide other filesystem failures
  */
 
 const TOKEN_PATTERN = /^[0-9a-z]{25}$/
@@ -166,5 +172,32 @@ describe('readOrCreateAccessToken', () => {
     // without that flag. The implementation's mkdir uses
     // recursive:true so the call is a no-op.
     await expect(readOrCreateAccessToken(dataDir)).resolves.toMatch(TOKEN_PATTERN)
+  })
+})
+
+describe('removeAccessTokenFile', () => {
+  test('removes the persisted token', async () => {
+    const token = await readOrCreateAccessToken(dataDir)
+
+    await expect(removeAccessTokenFile(dataDir)).resolves.toBe(true)
+    await expect(readFile(accessTokenFilePath(dataDir), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+
+    const replacement = await readOrCreateAccessToken(dataDir)
+    expect(replacement).not.toBe(token)
+  })
+
+  test('succeeds without creating anything when the token is already missing', async () => {
+    const missingDataDir = path.join(dataDir, 'missing')
+
+    await expect(removeAccessTokenFile(missingDataDir)).resolves.toBe(false)
+    await expect(stat(missingDataDir)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  test('surfaces filesystem errors other than a missing token', async () => {
+    await mkdir(accessTokenFilePath(dataDir))
+
+    await expect(removeAccessTokenFile(dataDir)).rejects.toHaveProperty('code')
   })
 })

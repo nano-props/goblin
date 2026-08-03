@@ -45,6 +45,15 @@ Use `--host` or `--port` to override the listen address:
 On first start the server writes a 25-char token to `<dataDir>/server-token`
 and prints it. Paste it once at the browser login gate.
 
+To rotate a generated token, stop the server, reset it, then restart:
+
+```sh
+bun run reset-token
+bun run reset-token -- --data-dir /path/to/data # custom data dir
+```
+
+Tokens supplied with `--token` are not file-backed and are unaffected.
+
 ## Develop
 
 ```sh

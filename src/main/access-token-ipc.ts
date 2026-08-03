@@ -1,8 +1,6 @@
-import { unlink } from 'node:fs/promises'
 import { app, ipcMain } from 'electron'
 import { ROTATE_ACCESS_TOKEN_CHANNEL } from '#/shared/ipc-channels.ts'
-import { accessTokenFilePath, readOrCreateAccessToken } from '#/shared/access-token-file.ts'
-import { hasErrorCode } from '#/shared/error-code.ts'
+import { readOrCreateAccessToken, removeAccessTokenFile } from '#/shared/access-token-file.ts'
 import { startEmbeddedServer, stopEmbeddedServer, getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
 import { getPrimaryWindow } from '#/main/window.ts'
 import { createBrowserEntryUrl } from '#/main/window-security.ts'
@@ -55,12 +53,7 @@ function rotateToken(): Promise<{ accessToken: string }> {
 
 async function doRotate(): Promise<{ accessToken: string }> {
   const dataDir = app.getPath('userData')
-  const tokenFile = accessTokenFilePath(dataDir)
-  try {
-    await unlink(tokenFile)
-  } catch (err) {
-    if (!hasErrorCode(err, 'ENOENT')) throw err
-  }
+  await removeAccessTokenFile(dataDir)
   await stopEmbeddedServer('access-token-rotation')
   await startEmbeddedServer()
   // After the server is back up, read the freshly written file so

@@ -22,6 +22,7 @@
     "build:server": "bun scripts/build-server.ts",
     "build:standalone-server": "bun scripts/build-standalone-server.ts",
     "start:server": "node scripts/start-server.ts",
+    "reset-token": "bun scripts/reset-token.ts",
     "build:electron": "electron-builder",
     "install:app": "bun install.ts",
     "check:boundaries": "bun scripts/check-boundaries.ts",

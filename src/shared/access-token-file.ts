@@ -17,6 +17,24 @@ export function accessTokenFilePath(dataDir: string = serverDataDir()): string {
 }
 
 /**
+ * Remove the canonical on-disk access token so the next server start
+ * generates a new one. Returns whether a file was removed; a missing
+ * token is already in the requested state and is not an error.
+ *
+ * This only changes the on-disk authority. A running server keeps its
+ * in-memory token until it is restarted.
+ */
+export async function removeAccessTokenFile(dataDir: string = serverDataDir()): Promise<boolean> {
+  try {
+    await unlink(accessTokenFilePath(dataDir))
+    return true
+  } catch (err) {
+    if (hasErrorCode(err, 'ENOENT')) return false
+    throw err
+  }
+}
+
+/**
  * Generate a 128-bit access token and base36-encode it. The format
  * is 25 chars from `[0-9a-z]`, no padding, no case. Designed to be
  * QR-friendly, paste-friendly, and the smallest printable form
