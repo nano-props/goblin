@@ -64,7 +64,7 @@ describe('repo write boundary groups', () => {
     await recordSuccessfulFetch(REMOTE_REPO)
 
     expect(await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)).toBe(boundary)
-    expect(registry.getRepoBoundaryLastFetchAt(boundary)).toEqual(expect.any(Number))
+    expect(registry.getRepoLastSuccessfulFetchAt(REMOTE_REPO)).toEqual(expect.any(Number))
   })
 
   test('keeps distinct repository boundaries isolated', async () => {
@@ -73,11 +73,11 @@ describe('repo write boundary groups', () => {
       repoId === REMOTE_REPO ? 'remote-git:goblin+ssh://host/repo' : 'remote-git:goblin+ssh://host/other',
     )
 
-    const firstKey = await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)
-    const secondKey = await registry.resolveRepoWriteBoundaryForRead(OTHER_REPO)
+    await registry.resolveRepoWriteBoundaryForRead(REMOTE_REPO)
+    await registry.resolveRepoWriteBoundaryForRead(OTHER_REPO)
     await recordSuccessfulFetch(REMOTE_REPO)
 
-    expect(registry.getRepoBoundaryLastFetchAt(firstKey)).toEqual(expect.any(Number))
-    expect(registry.getRepoBoundaryLastFetchAt(secondKey)).toBeNull()
+    expect(registry.getRepoLastSuccessfulFetchAt(REMOTE_REPO)).toEqual(expect.any(Number))
+    expect(registry.getRepoLastSuccessfulFetchAt(OTHER_REPO)).toBeNull()
   })
 })

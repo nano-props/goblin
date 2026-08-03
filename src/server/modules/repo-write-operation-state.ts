@@ -3,10 +3,12 @@ import type {
   RepoOperationFailureReason,
   RepoServerOperationState,
 } from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface RepoWriteOperationListOptions {
   includeSettled?: boolean
   workspaceRuntimeId?: string
+  requestedRepoId?: WorkspaceId
 }
 
 export function repoWriteOperationFailureReason(
@@ -36,7 +38,9 @@ export function projectRepoWriteOperations(
   const includeSettled = options.includeSettled === true
   return states
     .filter((operation) => {
+      const runtimeScopeApplies = !options.requestedRepoId || operation.repoId === options.requestedRepoId
       if (
+        runtimeScopeApplies &&
         options.workspaceRuntimeId &&
         operation.workspaceRuntimeId &&
         operation.workspaceRuntimeId !== options.workspaceRuntimeId

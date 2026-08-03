@@ -16,11 +16,11 @@ export async function handleRepoInvalidationRefresh(
   const repoId = event.repoId
   const repo = store.get().workspaces[repoId]
   if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId) return
-  if (!gitWorkspaceCanExecute(repo)) return
   if (event.domain === 'operations') {
     invalidateRepoOperationsQueries(repoId, workspaceRuntimeId)
     return
   }
+  if (!gitWorkspaceCanExecute(repo)) return
   if (event.domain === 'worktree-status') {
     invalidateRepoWorktreeStatusQueries(repoId, workspaceRuntimeId)
     return
@@ -31,11 +31,11 @@ export async function handleRepoInvalidationRefresh(
 export async function resyncActiveRepoReadQueries(store: RepoRefreshStoreReader): Promise<void> {
   const pullRequestRefreshes: Promise<void>[] = []
   for (const repo of Object.values(store.get().workspaces)) {
-    if (!gitWorkspaceCanExecute(repo)) continue
     const workspaceRuntimeId = repo.workspaceRuntimeId
+    invalidateRepoOperationsQueries(repo.id, workspaceRuntimeId)
+    if (!gitWorkspaceCanExecute(repo)) continue
     invalidateRepoMetadataQueries(repo.id, workspaceRuntimeId)
     invalidateRepoWorktreeStatusQueries(repo.id, workspaceRuntimeId)
-    invalidateRepoOperationsQueries(repo.id, workspaceRuntimeId)
     pullRequestRefreshes.push(refreshActiveRepoPullRequestQueries(repo.id, workspaceRuntimeId))
   }
   await Promise.all(pullRequestRefreshes)

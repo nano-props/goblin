@@ -386,9 +386,9 @@ async function materializePlan(
   for (const item of operations) {
     if (signal?.aborted) return { ok: false, message: 'cancelled', completedOperations }
     try {
-      await fs.mkdir(path.dirname(item.dest), { recursive: true })
       const safeDestination = await validateDestinationPathWithinRoot(targetRoot, item.rel)
       if (!safeDestination.ok) return { ...safeDestination, completedOperations }
+      await fs.mkdir(path.dirname(item.dest), { recursive: true })
       switch (item.mode) {
         case 'copy':
           await copyPath(item.abs, item.dest, {

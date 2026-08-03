@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   runWithRepoMembershipReadAdmission: vi.fn(),
   runWithRepoSource: vi.fn(),
   listRepoWriteOperationsForRepo: vi.fn(),
+  getRepoLastSuccessfulFetchAt: vi.fn(),
   resolveRepoWriteBoundaryForRead: vi.fn(),
 }))
 
@@ -21,6 +22,7 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
 vi.mock('#/server/modules/repo-write-operation-coordinator.ts', () => ({
   runWithRepoMembershipReadAdmission: mocks.runWithRepoMembershipReadAdmission,
   listRepoWriteOperationsForRepo: mocks.listRepoWriteOperationsForRepo,
+  getRepoLastSuccessfulFetchAt: mocks.getRepoLastSuccessfulFetchAt,
   resolveRepoWriteBoundaryForRead: mocks.resolveRepoWriteBoundaryForRead,
 }))
 
@@ -70,6 +72,8 @@ beforeEach(() => {
   mocks.runWithRepoSource.mockReset()
   mocks.listRepoWriteOperationsForRepo.mockReset()
   mocks.listRepoWriteOperationsForRepo.mockResolvedValue([])
+  mocks.getRepoLastSuccessfulFetchAt.mockReset()
+  mocks.getRepoLastSuccessfulFetchAt.mockReturnValue(null)
   mocks.resolveRepoWriteBoundaryForRead.mockReset()
   mocks.resolveRepoWriteBoundaryForRead.mockResolvedValue({ id: 'test-boundary' })
   mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) => task(asRepoSource(makeSource())))
@@ -241,6 +245,18 @@ describe('independent repository reads', () => {
     await expect(
       readRepoWorktreeStatus(WORKSPACE_ID, { workspaceRuntimeId: 'repo-runtime-test', signal: controller.signal }),
     ).rejects.toMatchObject({ name: 'AbortError' })
+    expect(mocks.runWithRepoSource).not.toHaveBeenCalled()
+  })
+
+  test('reads operation activity from coordinator memory without probing Git', async () => {
+    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+
+    const result = await readRepoOperationsSnapshot(WORKSPACE_ID, {
+      workspaceRuntimeId: 'repo-runtime-test',
+      includeSettled: true,
+    })
+
+    expect(result).toMatchObject({ operations: [], lastFetchAt: null })
     expect(mocks.runWithRepoSource).not.toHaveBeenCalled()
   })
 })

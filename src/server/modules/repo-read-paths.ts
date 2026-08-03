@@ -6,8 +6,7 @@ import {
 import type { RepoSourceRuntimeContext } from '#/server/modules/remote-repo-execution.ts'
 import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import {
-  getRepoBoundaryLastFetchAt,
-  listRepoWriteOperationsForBoundary,
+  getRepoLastSuccessfulFetchAt,
   listRepoWriteOperationsForRepo,
   resolveRepoWriteBoundaryForRead,
   runWithRepoMembershipReadAdmission,
@@ -274,12 +273,11 @@ export async function readRepoOperationsSnapshot(
   let writeOperations: RepoServerOperationState[]
   let lastFetchAt: number | null = null
   if (cwd) {
-    const boundary = await resolveRepoWriteBoundaryForRead(cwd, {
-      signal: options.signal,
-      workspaceRuntimeId: options.workspaceRuntimeId,
-    })
-    writeOperations = listRepoWriteOperationsForBoundary(cwd, boundary, options)
-    lastFetchAt = getRepoBoundaryLastFetchAt(boundary)
+    // Operation activity is process-local coordinator authority. Reading it
+    // must not probe Git or SSH, especially while a runtime failure is being
+    // settled and this projection is invalidated.
+    writeOperations = await listRepoWriteOperationsForRepo(cwd, options)
+    lastFetchAt = getRepoLastSuccessfulFetchAt(cwd)
   } else {
     writeOperations = await listRepoWriteOperationsForRepo(undefined, options)
   }

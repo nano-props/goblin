@@ -468,6 +468,7 @@ export function workspaceRuntimeHasGitCapability(
   workspaceRuntimeId: string,
 ): boolean {
   const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
+  if (isRemoteWorkspaceId(workspaceId) && state?.remoteLifecycle.kind !== 'ready') return false
   return (
     state?.currentWorkspaceRuntimeId === workspaceRuntimeId &&
     state.pendingWorkspaceProbeTransition === null &&

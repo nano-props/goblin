@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import {
   enqueueRepoWriteOperation,
-  getRepoBoundaryLastFetchAt,
+  getRepoLastSuccessfulFetchAt,
   listRepoWriteOperationsForRepo,
   repoWriteOperationCoordinatorStatsForTests,
   resetRepoWriteOperationCoordinatorForTests,
@@ -11,6 +11,8 @@ import {
 } from '#/server/modules/repo-write-operation-coordinator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoWriteExecutionCapability } from '#/server/modules/repo-source.ts'
+import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
@@ -26,6 +28,8 @@ const mocks = vi.hoisted(() => ({
   ),
   publishRepoReadInvalidation: vi.fn(),
   workspaceRuntimeClosed: null as
+    ((event: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string }) => void) | null,
+  workspaceRuntimeFailed: null as
     ((event: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string }) => void) | null,
 }))
 
@@ -55,6 +59,14 @@ vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
       if (mocks.workspaceRuntimeClosed === listener) mocks.workspaceRuntimeClosed = null
     }
   },
+  onWorkspaceRuntimeFailed: (
+    listener: (event: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string }) => void,
+  ) => {
+    mocks.workspaceRuntimeFailed = listener
+    return () => {
+      if (mocks.workspaceRuntimeFailed === listener) mocks.workspaceRuntimeFailed = null
+    }
+  },
 }))
 
 beforeEach(() => {
@@ -63,6 +75,7 @@ beforeEach(() => {
   mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) => workspaceId)
   mocks.publishRepoReadInvalidation.mockReset()
   mocks.workspaceRuntimeClosed = null
+  mocks.workspaceRuntimeFailed = null
   useFakeTimers()
   vi.setSystemTime(0)
 })
@@ -527,11 +540,10 @@ describe('repo write operation coordinator', () => {
   })
 
   test('records successful fetch state before publishing its settled invalidation', async () => {
-    const boundary = await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
+    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
     const observedFetchTimes: Array<number | null> = []
-    const { getRepoBoundaryLastFetchAt } = await import('#/server/modules/repo-write-operation-coordinator.ts')
     mocks.publishRepoReadInvalidation.mockImplementation(() => {
-      observedFetchTimes.push(getRepoBoundaryLastFetchAt(boundary))
+      observedFetchTimes.push(getRepoLastSuccessfulFetchAt(WORKSPACE_ID))
     })
 
     await enqueueRepoWriteOperation(
@@ -549,8 +561,7 @@ describe('repo write operation coordinator', () => {
   })
 
   test('does not record failed fetches or successful non-fetch operations', async () => {
-    const boundary = await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
-    const { getRepoBoundaryLastFetchAt } = await import('#/server/modules/repo-write-operation-coordinator.ts')
+    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
 
     await enqueueRepoWriteOperation(
       WORKSPACE_ID,
@@ -573,14 +584,14 @@ describe('repo write operation coordinator', () => {
       },
     )
 
-    expect(getRepoBoundaryLastFetchAt(boundary)).toBeNull()
+    expect(getRepoLastSuccessfulFetchAt(WORKSPACE_ID)).toBeNull()
   })
 
   test('publishes repo-runtime invalidations to known sibling repos sharing a write boundary', async () => {
     mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) =>
       workspaceId === WORKSPACE_ID || workspaceId === LINKED_WORKSPACE_ID ? WORKSPACE_BOUNDARY_KEY : workspaceId,
     )
-    await expect(listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID)).resolves.toEqual([])
+    await resolveRepoWriteBoundaryForRead(LINKED_WORKSPACE_ID)
     mocks.publishRepoReadInvalidation.mockClear()
 
     await enqueueRepoWriteOperation(
@@ -604,6 +615,49 @@ describe('repo write operation coordinator', () => {
     })
   })
 
+  test('invalidates operations when a linked repo first joins an active boundary projection', async () => {
+    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) =>
+      workspaceId === WORKSPACE_ID || workspaceId === LINKED_WORKSPACE_ID ? WORKSPACE_BOUNDARY_KEY : workspaceId,
+    )
+    await enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-source',
+        kind: 'fetch',
+        source: 'background',
+      },
+      (operation) => async () => {
+        operation.start()
+        operation.settle({ ok: true })
+        return { ok: true, message: 'fetched' }
+      },
+    )
+    await expect(listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID, { includeSettled: true })).resolves.toEqual([])
+    mocks.publishRepoReadInvalidation.mockClear()
+
+    await resolveRepoWriteBoundaryForRead(LINKED_WORKSPACE_ID, { workspaceRuntimeId: 'runtime-linked' })
+
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
+      repoId: LINKED_WORKSPACE_ID,
+      domain: 'operations',
+    })
+    await expect(
+      listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID, {
+        includeSettled: true,
+        workspaceRuntimeId: 'runtime-linked',
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-source',
+        kind: 'fetch',
+        phase: 'done',
+      }),
+    ])
+  })
+
   test('stops invalidating a repo after it resolves to another write boundary', async () => {
     let linkedBoundary = WORKSPACE_BOUNDARY_KEY
     mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) => {
@@ -611,9 +665,9 @@ describe('repo write operation coordinator', () => {
       if (workspaceId === LINKED_WORKSPACE_ID) return linkedBoundary
       return workspaceId
     })
-    await expect(listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID)).resolves.toEqual([])
+    await resolveRepoWriteBoundaryForRead(LINKED_WORKSPACE_ID)
     linkedBoundary = LINKED_WORKSPACE_BOUNDARY_KEY
-    await expect(listRepoWriteOperationsForRepo(LINKED_WORKSPACE_ID)).resolves.toEqual([])
+    await resolveRepoWriteBoundaryForRead(LINKED_WORKSPACE_ID)
     mocks.publishRepoReadInvalidation.mockClear()
 
     await enqueueRepoWriteOperation(
@@ -747,7 +801,7 @@ describe('repo write operation coordinator', () => {
   })
 
   test('retains the write lease until an aborted network operation has drained', async () => {
-    const boundary = await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
+    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
     const caller = new AbortController()
     const firstStarted = Promise.withResolvers<void>()
     const releaseFirst = Promise.withResolvers<void>()
@@ -785,7 +839,7 @@ describe('repo write operation coordinator', () => {
     await expect(first).resolves.toEqual({ ok: true, message: 'first drained' })
     await expect(second).resolves.toEqual({ ok: true, message: 'second complete' })
     expect(secondTask).toHaveBeenCalledOnce()
-    expect(getRepoBoundaryLastFetchAt(boundary)).not.toBeNull()
+    expect(getRepoLastSuccessfulFetchAt(WORKSPACE_ID)).not.toBeNull()
     await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID, { includeSettled: true })).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -881,8 +935,99 @@ describe('repo write operation coordinator', () => {
     )
   })
 
+  test('closes runtime admission before a classified failure releases the write queue', async () => {
+    const releaseActive = Promise.withResolvers<void>()
+    const active = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'pull',
+        source: 'user',
+      },
+      (operation) => async () => {
+        operation.start()
+        await releaseActive.promise
+        throw new RepoMutationRuntimeFailureError(
+          { ok: false, message: 'transport failed' },
+          new RemoteWorkspaceRuntimeFailureError({
+            workspaceId: WORKSPACE_ID,
+            workspaceRuntimeId: 'runtime-a',
+            reason: 'unreachable',
+          }),
+        )
+      },
+    )
+    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().runningOperations).toBe(1))
+
+    const queuedTask = vi.fn(async () => ({ ok: true, message: 'unexpected' }))
+    const queued = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'delete-branch',
+        source: 'user',
+      },
+      () => queuedTask,
+    )
+    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().queuedOperations).toBe(1))
+
+    releaseActive.resolve()
+
+    await expect(active).rejects.toBeInstanceOf(RepoMutationRuntimeFailureError)
+    await expect(queued).rejects.toThrow('error.workspace-runtime-stale')
+    expect(queuedTask).not.toHaveBeenCalled()
+  })
+
+  test('closes runtime admission for a classified preflight failure before releasing the queue', async () => {
+    const releaseActive = Promise.withResolvers<void>()
+    const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: 'runtime-a',
+      reason: 'unreachable',
+    })
+    const active = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'pull',
+        source: 'user',
+      },
+      () => async () => {
+        await releaseActive.promise
+        throw runtimeFailure
+      },
+    )
+    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().runningOperations).toBe(1))
+
+    const queuedTask = vi.fn(async () => ({ ok: true, message: 'unexpected' }))
+    const queued = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      {
+        repoId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime-a',
+        kind: 'delete-branch',
+        source: 'user',
+      },
+      () => queuedTask,
+    )
+    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().queuedOperations).toBe(1))
+
+    releaseActive.resolve()
+
+    await expect(active).rejects.toBe(runtimeFailure)
+    await expect(queued).rejects.toThrow('error.workspace-runtime-stale')
+    expect(queuedTask).not.toHaveBeenCalled()
+  })
+
   test('reclaims an idle boundary group after its workspace runtime closes', async () => {
-    await listRepoWriteOperationsForRepo(WORKSPACE_ID, { workspaceRuntimeId: 'runtime-a' })
+    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID, { workspaceRuntimeId: 'runtime-a' })
     expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
       boundaryRuntimes: 1,
       registeredBoundaries: 1,
@@ -899,8 +1044,8 @@ describe('repo write operation coordinator', () => {
   })
 
   test('keeps a boundary registered until its final workspace runtime closes', async () => {
-    await listRepoWriteOperationsForRepo(WORKSPACE_ID, { workspaceRuntimeId: 'runtime-a' })
-    await listRepoWriteOperationsForRepo(WORKSPACE_ID, { workspaceRuntimeId: 'runtime-b' })
+    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID, { workspaceRuntimeId: 'runtime-a' })
+    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID, { workspaceRuntimeId: 'runtime-b' })
 
     mocks.workspaceRuntimeClosed?.({ userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' })
     expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({

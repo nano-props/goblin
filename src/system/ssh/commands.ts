@@ -481,7 +481,7 @@ function remoteTrashFileScript(worktreePath: string, filePath: string): string {
   return [
     `cd -- ${worktree}`,
     `if [ ! -e ${file} ] && [ ! -L ${file} ]; then printf '%s\\n' 'error.file-not-found' >&2; exit 65; fi`,
-    `if [ -d ${file} ]; then printf '%s\\n' 'error.filetree-delete-directory-unsupported' >&2; exit 66; fi`,
+    `if [ -d ${file} ] && [ ! -L ${file} ]; then printf '%s\\n' 'error.filetree-delete-directory-unsupported' >&2; exit 66; fi`,
     `if command -v gio >/dev/null 2>&1; then exec gio trash -- ${file}; fi`,
     `if command -v trash-put >/dev/null 2>&1; then exec trash-put -- ${file}; fi`,
     `if command -v kioclient6 >/dev/null 2>&1; then exec kioclient6 move ${file} trash:/; fi`,
@@ -504,7 +504,7 @@ function remoteDirectoryChildrenScript(rootPath: string, prefix: string | undefi
     'shift',
     'for entry do',
     '  rel=${entry#"$root"/}',
-    '  if [ -d "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
+    '  if [ -d "$entry" ] && [ ! -L "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
     'done',
     '\' sh "$root" {} +',
   ].join('\n')
@@ -526,7 +526,7 @@ function remoteGitDirectoryChildrenScript(rootPath: string, prefix: string | und
     '  if git -C "$root" check-ignore -q -- "$rel"; then',
     '    git -C "$root" ls-files -- "$rel" | IFS= read -r _tracked || continue',
     '  fi',
-    '  if [ -d "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
+    '  if [ -d "$entry" ] && [ ! -L "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
     'done',
     '\' sh "$root" {} +',
   ].join('\n')

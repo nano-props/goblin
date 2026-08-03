@@ -221,6 +221,33 @@ describe('remote ssh command builders', () => {
     expect(invocation.script).not.toContain('check-ignore')
     expect(invocation.script).not.toContain('ls-files -- "$rel"')
     expect(invocation.script).toContain('error.workspace-path-not-found')
+    expect(invocation.script).toContain('[ -d "$entry" ] && [ ! -L "$entry" ]')
+  })
+
+  testPosix('remote trash treats a directory symlink as the link itself', async () => {
+    const root = path.join(os.tmpdir(), `goblin-trash-symlink-${process.pid}-${Date.now()}`)
+    const bin = path.join(root, 'bin')
+    const targetDir = path.join(root, 'target')
+    const link = path.join(root, 'linked-dir')
+    tempDirs.push(root)
+    mkdirSync(bin, { recursive: true })
+    mkdirSync(targetDir)
+    symlinkSync(targetDir, link, 'dir')
+    const gio = path.join(bin, 'gio')
+    writeFileSync(gio, '#!/bin/sh\nprintf "%s\\n" "$*"\n')
+    chmodSync(gio, 0o755)
+    const invocation = buildRemoteCommandInvocation(targetWithPath(root), {
+      type: 'trashFile',
+      path: root,
+      filePath: link,
+    })
+
+    const result = await execa('sh', ['-lc', invocation.script], {
+      env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` },
+      reject: false,
+    })
+
+    expect(result).toMatchObject({ exitCode: 0, stdout: `trash -- ${link}` })
   })
 
   test('bounds remote directory and Git log result counts after flooring', () => {

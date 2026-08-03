@@ -88,6 +88,9 @@ authority.
   was already established.
 - The workspace lifecycle authority publishes a committed failed transition;
   the background-sync owner then removes that exact runtime from automation.
+  A failed remote lifecycle also closes server-side Git admission and releases
+  queued repository writes for that runtime with a stale-runtime failure. Git
+  capability requires both a ready probe and a ready remote lifecycle.
   If lifecycle settlement itself becomes uncertain, the request or background
   operation asks the same background owner to stop it directly. A later
   explicit client registration may admit it again; the server does not keep
@@ -95,6 +98,10 @@ authority.
 - A client may apply canonical response data or invalidate the owning query. It
   must not replace a concurrent collection with an unversioned snapshot or
   reconstruct the write from its request payload.
+- Repository operation activity is process-local coordinator authority. Its
+  projection reads coordinator memory and never probes Git or SSH, so an
+  operation invalidation cannot start remote work while lifecycle failure is
+  still settling.
 - When one user action changes a resource and another server-owned projection
   of that resource, compose both changes in one server application operation.
   Do not make the client issue a second write to repair membership.

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { okRemoteResult, upstreamOutput, worktreePorcelain } from '#/system/ssh/git-test-utils.ts'
 
 const target: RemoteWorkspaceTarget = {
   id: workspaceIdForTest('goblin+ssh://prod/home/alice/service'),
@@ -103,6 +104,53 @@ describe('repo source runtime failure classification', () => {
       workspaceRuntimeId: 'repo-runtime-test',
       reason: 'unreachable',
     } satisfies Partial<RemoteWorkspaceRuntimeFailureError>)
+  })
+
+  test('carries mutation impact established from a raw SSH transport failure', async () => {
+    mocks.runRemoteCommand.mockImplementation(async (_target, command: { type: string }) => {
+      switch (command.type) {
+        case 'resolveRepoCommonDir':
+          return okRemoteResult(`${target.remotePath}/.git\0`)
+        case 'gitWorktreeList':
+          return okRemoteResult(
+            worktreePorcelain(`worktree ${target.remotePath}\nHEAD f00ba40\nbranch refs/heads/main`),
+          )
+        case 'gitRemoteVerbose':
+          return okRemoteResult(
+            'origin\tgit@example.test:project/repo.git (fetch)\norigin\tgit@example.test:project/repo.git (push)',
+          )
+        case 'gitUpstream':
+          return okRemoteResult(upstreamOutput('origin', 'feature/test'))
+        case 'gitPush':
+          return {
+            ok: false,
+            stdout: '',
+            stderr: '',
+            transportStderr: 'client_loop: send disconnect: Broken pipe',
+            message: 'connection lost',
+            remoteStarted: true,
+          }
+        default:
+          throw new Error(`unexpected remote command: ${command.type}`)
+      }
+    })
+    const { pushRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    await expect(
+      pushRepoBranch(target.id, 'feature/test', undefined, { workspaceRuntimeId: 'repo-runtime-test' }),
+    ).rejects.toMatchObject({
+      name: 'RepoMutationRuntimeFailureError',
+      mutation: {
+        ok: false,
+        message: 'connection lost',
+        repoIdsToInvalidate: [target.id],
+      },
+      runtimeFailure: {
+        workspaceId: target.id,
+        workspaceRuntimeId: 'repo-runtime-test',
+        reason: 'unreachable',
+      },
+    })
   })
 
   test('preserves normal remote read failures when no runtime context is supplied', async () => {

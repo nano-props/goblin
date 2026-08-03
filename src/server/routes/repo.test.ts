@@ -8,8 +8,7 @@ import {
 } from '#/server/test-utils/repo-routes.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
-import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
-import { runSerializedWorkspaceRefresh } from '#/server/modules/workspace-runtimes.ts'
+import { failRemoteWorkspaceLifecycle, runSerializedWorkspaceRefresh } from '#/server/modules/workspace-runtimes.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
 
@@ -206,23 +205,31 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(await response.json()).toMatchObject({ operations: [{ kind: 'fetch', phase: 'running' }] })
   })
 
-  test('returns a stable repository boundary error from operations reads', async () => {
-    mocks.readRepoOperationsSnapshot.mockRejectedValueOnce(new RepositoryBoundaryUnavailableError())
+  test('reads in-memory operations after a remote lifecycle fails', async () => {
+    const repoId = workspaceIdForTest('goblin+ssh://remote/workspace')
     const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
+    mocks.readRepoOperationsSnapshot.mockResolvedValueOnce({ operations: [], loadedAt: 123 })
+    await failRemoteWorkspaceLifecycle({
+      userId: 'user-test',
+      workspaceId: repoId,
+      workspaceRuntimeId,
+      reason: 'unreachable',
+    })
 
     const response = await app.request(
       new Request('http://localhost/operations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId }),
+        body: JSON.stringify({ cwd: repoId, workspaceRuntimeId }),
       }),
     )
 
-    expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'error.repository-boundary-unavailable',
+    expect(response.status).toBe(200)
+    expect(mocks.readRepoOperationsSnapshot).toHaveBeenCalledWith(repoId, {
+      includeSettled: undefined,
+      workspaceRuntimeId,
+      signal: expect.any(AbortSignal),
     })
   })
 

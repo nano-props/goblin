@@ -34,7 +34,6 @@ import {
 } from '#/shared/repo-response-schema.ts'
 
 const REPO_REQUEST_TIMEOUT_MS = {
-  gitNetwork: 240_000,
   clone: 360_000,
   patch: 15 * 60_000,
 } as const
@@ -181,7 +180,7 @@ export async function fetchRepo(
     decodeWith(RepoMutationExecResultResponseSchema),
     {
       signal,
-      timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
+      timeoutMs: 0,
     },
   )
 }
@@ -197,7 +196,7 @@ export async function pullRepoBranch(
     '/api/repo/pull',
     { cwd, workspaceRuntimeId, branch, worktreePath },
     decodeWith(RepoMutationExecResultResponseSchema),
-    { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork },
+    { signal, timeoutMs: 0 },
   )
 }
 
@@ -213,7 +212,7 @@ export async function pushRepoBranch(
     decodeWith(RepoMutationExecResultResponseSchema),
     {
       signal,
-      timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
+      timeoutMs: 0,
     },
   )
 }

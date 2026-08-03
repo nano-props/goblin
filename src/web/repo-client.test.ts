@@ -258,22 +258,34 @@ describe('repo-client', () => {
     )
   })
 
-  test('times out long-running fetch requests with a stable error key', async () => {
+  test('leaves Git network deadlines to the server while preserving caller cancellation', async () => {
     useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const requestSignals: AbortSignal[] = []
     mockFetch((_url, init) => {
       const signal = (init as RequestInit | undefined)?.signal
+      if (signal) requestSignals.push(signal)
       return new Promise((_resolve, reject) => {
         signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
       })
     })
 
-    const { fetchRepo } = await import('#/web/repo-client.ts')
-    const request = fetchRepo(workspaceId, workspaceRuntimeId)
-    const assertion = expect(request).rejects.toThrow('error.request-timeout')
+    const { fetchRepo, pullRepoBranch, pushRepoBranch } = await import('#/web/repo-client.ts')
+    const controllers = [new AbortController(), new AbortController(), new AbortController()]
+    const requests = [
+      fetchRepo(workspaceId, workspaceRuntimeId, controllers[0]!.signal),
+      pullRepoBranch(workspaceId, workspaceRuntimeId, 'main', undefined, controllers[1]!.signal),
+      pushRepoBranch(workspaceId, workspaceRuntimeId, 'main', controllers[2]!.signal),
+    ]
+    const assertions = requests.map(async (request) => await expect(request).rejects.toThrow('caller cancelled'))
 
     await vi.advanceTimersByTimeAsync(240_000)
-    await assertion
+    expect(requestSignals).toHaveLength(3)
+    expect(requestSignals.every((signal) => !signal.aborted)).toBe(true)
+    expect(vi.getTimerCount()).toBe(0)
+
+    for (const controller of controllers) controller.abort(new Error('caller cancelled'))
+    await Promise.all(assertions)
   })
 
   test('rejects malformed repository responses at the client boundary', async () => {

@@ -8,7 +8,12 @@ import {
 } from '#/server/modules/repo-source.ts'
 import { resolveRepoWriteBoundaryKey } from '#/server/modules/repo-write-boundary.ts'
 import { publishRepoReadInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { onWorkspaceRuntimeClosed } from '#/server/modules/workspace-runtimes.ts'
+import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import {
+  isRemoteWorkspaceRuntimeFailure,
+  type RemoteWorkspaceRuntimeFailureError,
+} from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { onWorkspaceRuntimeClosed, onWorkspaceRuntimeFailed } from '#/server/modules/workspace-runtimes.ts'
 import type {
   RepoOperationCancellationReason,
   RepoServerOperationKind,
@@ -87,6 +92,7 @@ const boundaryGroupByDescriptor = new Map<string, RepoWriteBoundaryGroup>()
 const workspaceRuntimeRegistrationsByRepoId = new Map<WorkspaceId, Map<string, WorkspaceRuntimeBoundaryRegistration>>()
 let boundaryGroupByHandle = new WeakMap<RepoWriteBoundaryHandle, RepoWriteBoundaryGroup>()
 let workspaceRuntimeCloseSubscription: (() => void) | null = null
+let workspaceRuntimeFailureSubscription: (() => void) | null = null
 
 function freshWriteOperationId(): string {
   return `repo-write-op-${nextWriteOperationId++}`
@@ -121,15 +127,8 @@ async function resolveRepoWriteBoundaryGroup(
 }
 
 function bindRepoWriteBoundaryGroup(repoId: WorkspaceId, descriptor: string): RepoWriteBoundaryGroup {
-  ensureRepoRuntimeCloseSubscription()
-  const previousGroup = boundaryGroupByRepoId.get(repoId)
   const group = boundaryGroupByDescriptor.get(descriptor) ?? createBoundaryGroup(descriptor)
-  if (previousGroup !== group && previousGroup) {
-    previousGroup.repoIds.delete(repoId)
-    deleteBoundaryGroupIfIdle(previousGroup)
-  }
-  group.repoIds.add(repoId)
-  boundaryGroupByRepoId.set(repoId, group)
+  registerRepoWriteOperationBoundaryRepoId(group, repoId)
   return group
 }
 
@@ -282,10 +281,23 @@ function registerRepoWriteOperationBoundaryRepoId(
   repoId: WorkspaceId | null | undefined,
 ): void {
   ensureRepoRuntimeCloseSubscription()
-  if (repoId) {
-    boundaryGroupByRepoId.set(repoId, group)
-    group.repoIds.add(repoId)
+  if (!repoId) return
+  const previousGroup = boundaryGroupByRepoId.get(repoId)
+  if (previousGroup === group) return
+  const projectionChanged =
+    boundaryGroupHasOperationProjection(group) ||
+    (previousGroup !== undefined && boundaryGroupHasOperationProjection(previousGroup))
+  if (previousGroup) {
+    previousGroup.repoIds.delete(repoId)
+    deleteBoundaryGroupIfIdle(previousGroup)
   }
+  boundaryGroupByRepoId.set(repoId, group)
+  group.repoIds.add(repoId)
+  if (projectionChanged) publishRepoReadInvalidation({ repoId, domain: 'operations' })
+}
+
+function boundaryGroupHasOperationProjection(group: RepoWriteBoundaryGroup): boolean {
+  return group.operations.size > 0 || group.lastSuccessfulFetchAt !== null
 }
 
 function unregisterRepoWriteOperationBoundaryRepoId(repoId: WorkspaceId, workspaceRuntimeId: string): void {
@@ -311,10 +323,16 @@ function deleteBoundaryGroupIfIdle(group: RepoWriteBoundaryGroup): void {
 }
 
 function ensureRepoRuntimeCloseSubscription(): void {
-  if (workspaceRuntimeCloseSubscription) return
-  workspaceRuntimeCloseSubscription = onWorkspaceRuntimeClosed((event) => {
-    unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId, event.workspaceRuntimeId)
-  })
+  if (!workspaceRuntimeCloseSubscription) {
+    workspaceRuntimeCloseSubscription = onWorkspaceRuntimeClosed((event) => {
+      unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId, event.workspaceRuntimeId)
+    })
+  }
+  if (!workspaceRuntimeFailureSubscription) {
+    workspaceRuntimeFailureSubscription = onWorkspaceRuntimeFailed((event) => {
+      unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId, event.workspaceRuntimeId)
+    })
+  }
 }
 
 function cancelledRepoWriteResult<T extends ExecResult>(): T {
@@ -483,6 +501,7 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
       try {
         return await task()
       } catch (err) {
+        closeWorkspaceRuntimeAdmissionForFailure(runtimeRegistration, err)
         operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
         throw err
       }
@@ -495,36 +514,62 @@ export async function listRepoWriteOperationsForRepo(
   repoId: WorkspaceId | undefined,
   options: { includeSettled?: boolean; workspaceRuntimeId?: string; signal?: AbortSignal } = {},
 ): Promise<RepoServerOperationState[]> {
-  let runtimes: RepoWriteBoundaryGroup[]
-  if (repoId) {
-    const runtimeRegistration = registerWorkspaceRuntime(repoId, options.workspaceRuntimeId)
-    const group = await resolveRepoWriteBoundaryGroup(repoId, options.signal, runtimeRegistration)
-    registerRepoWriteOperationBoundaryRepoId(group, repoId)
-    runtimes = [group]
-  } else {
-    runtimes = [...boundaryGroups]
-  }
-  return listRuntimeOperations(runtimes, options)
+  options.signal?.throwIfAborted()
+  const matchingGroups = repoId ? boundaryGroupsForRepoProjection(repoId) : [...boundaryGroups]
+  return listBoundaryGroupOperations(matchingGroups, {
+    includeSettled: options.includeSettled,
+    workspaceRuntimeId: options.workspaceRuntimeId,
+    requestedRepoId: repoId,
+  })
 }
 
-function listRuntimeOperations(
-  runtimes: RepoWriteBoundaryGroup[],
+export function getRepoLastSuccessfulFetchAt(repoId: WorkspaceId): number | null {
+  let lastFetchAt: number | null = null
+  for (const group of boundaryGroupsForRepoProjection(repoId)) {
+    if (group.lastSuccessfulFetchAt !== null) lastFetchAt = Math.max(lastFetchAt ?? 0, group.lastSuccessfulFetchAt)
+  }
+  return lastFetchAt
+}
+
+function boundaryGroupsForRepoProjection(repoId: WorkspaceId): RepoWriteBoundaryGroup[] {
+  const matchingGroups = new Set<RepoWriteBoundaryGroup>()
+  const currentGroup = boundaryGroupByRepoId.get(repoId)
+  if (currentGroup) matchingGroups.add(currentGroup)
+  for (const group of boundaryGroups) {
+    for (const operation of group.operations.values()) {
+      if (operation.repoId !== repoId) continue
+      matchingGroups.add(group)
+      break
+    }
+  }
+  return [...matchingGroups]
+}
+
+function closeWorkspaceRuntimeAdmissionForFailure(
+  registration: WorkspaceRuntimeBoundaryRegistration | null,
+  error: unknown,
+): void {
+  if (!registration) return
+  const runtimeFailure = remoteRuntimeFailureFromWriteError(error)
+  if (!runtimeFailure) return
+  if (runtimeFailure.workspaceId !== registration.repoId) return
+  if (runtimeFailure.workspaceRuntimeId !== registration.workspaceRuntimeId) return
+  unregisterRepoWriteOperationBoundaryRepoId(registration.repoId, registration.workspaceRuntimeId)
+}
+
+function remoteRuntimeFailureFromWriteError(error: unknown): RemoteWorkspaceRuntimeFailureError | null {
+  if (isRepoMutationRuntimeFailureError(error)) return error.runtimeFailure
+  return isRemoteWorkspaceRuntimeFailure(error) ? error : null
+}
+
+function listBoundaryGroupOperations(
+  groups: RepoWriteBoundaryGroup[],
   options: RepoWriteOperationListOptions,
 ): RepoServerOperationState[] {
   return projectRepoWriteOperations(
-    runtimes.flatMap((runtime) => [...runtime.operations.values()]),
+    groups.flatMap((group) => [...group.operations.values()]),
     options,
   )
-}
-
-export function listRepoWriteOperationsForBoundary(
-  repoId: WorkspaceId,
-  handle: RepoWriteBoundaryHandle,
-  options: { includeSettled?: boolean; workspaceRuntimeId?: string } = {},
-): RepoServerOperationState[] {
-  const group = boundaryGroupForHandle(handle)
-  registerRepoWriteOperationBoundaryRepoId(group, repoId)
-  return listRuntimeOperations([group], options)
 }
 
 export async function runWithRepoMembershipReadAdmission<T>(
@@ -575,10 +620,6 @@ function recordRepoBoundaryFetchSuccess(group: RepoWriteBoundaryGroup): void {
   group.lastSuccessfulFetchAt = Math.max(group.lastSuccessfulFetchAt ?? 0, Date.now())
 }
 
-export function getRepoBoundaryLastFetchAt(handle: RepoWriteBoundaryHandle): number | null {
-  return boundaryGroupForHandle(handle).lastSuccessfulFetchAt
-}
-
 export function resetRepoWriteOperationCoordinatorForTests(): void {
   boundaryGroups.clear()
   boundaryGroupByRepoId.clear()
@@ -587,6 +628,8 @@ export function resetRepoWriteOperationCoordinatorForTests(): void {
   boundaryGroupByHandle = new WeakMap()
   workspaceRuntimeCloseSubscription?.()
   workspaceRuntimeCloseSubscription = null
+  workspaceRuntimeFailureSubscription?.()
+  workspaceRuntimeFailureSubscription = null
   nextWriteOperationId = 1
   nextBoundaryGroupId = 1
 }
@@ -598,10 +641,10 @@ export function repoWriteOperationCoordinatorStatsForTests(): {
   queuedOperations: number
   runningOperations: number
 } {
-  const runtimes = [...boundaryGroups]
-  const queues = new Set(runtimes.map((runtime) => runtime.queue))
+  const groups = [...boundaryGroups]
+  const queues = new Set(groups.map((group) => group.queue))
   return {
-    boundaryRuntimes: runtimes.length,
+    boundaryRuntimes: groups.length,
     registeredBoundaries: boundaryGroupByDescriptor.size,
     registeredRepoIds: boundaryGroupByRepoId.size,
     queuedOperations: [...queues].reduce((total, queue) => total + queue.size, 0),

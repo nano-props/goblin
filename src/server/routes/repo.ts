@@ -169,18 +169,11 @@ export function createRepoRoutes(options: {
   app.post('/operations', async (c) => {
     const input = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
     if ('cwd' in input) {
-      const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), input.cwd, input.workspaceRuntimeId)
-      assertGitCapability(userId, input.cwd, input.workspaceRuntimeId)
+      requireCurrentWorkspaceRuntime(userIdFromContext(c), input.cwd, input.workspaceRuntimeId)
       return c.json(
-        await runGitWorkspaceRuntimeRequest({
-          userId,
-          run: () =>
-            readRepoOperationsSnapshot(input.cwd, {
-              includeSettled: input.includeSettled,
-              workspaceRuntimeId: input.workspaceRuntimeId,
-              signal: c.req.raw.signal,
-            }),
-          label: 'operations',
+        await readRepoOperationsSnapshot(input.cwd, {
+          includeSettled: input.includeSettled,
+          workspaceRuntimeId: input.workspaceRuntimeId,
           signal: c.req.raw.signal,
         }),
       )
