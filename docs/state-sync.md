@@ -55,28 +55,26 @@ authority.
 - Complete the operation's authoritative steps and settle its visible
   lifecycle before publishing projection invalidation. Repository membership
   reads use the physical repository write boundary only as an admission epoch.
-  The epoch covers the actual `git worktree add/remove` command, not preflight,
-  bootstrap, branch cleanup, settings persistence, or the enclosing operation
-  lifecycle. Reads fail directly while that command is active and reject a
-  completed result if the epoch changed while they were running. The boundary
-  never filters paths, derives membership, or publishes mutation invalidation;
-  one complete Git read remains the authority and the application write path
-  remains the single owner of exact post-operation invalidation.
+  The epoch covers the admitted attempt to invoke `git worktree add/remove`,
+  not bootstrap, branch cleanup, settings persistence, or the enclosing
+  operation lifecycle. It does not claim that a local Git process or remote Git
+  command observably started. A pre-spawn cancellation may therefore cause one
+  conservative, retryable read conflict even when the command reports
+  `not-started`; revisions are not rolled back and clients do not compensate.
+  Reads fail directly while the attempt is active and reject a completed result
+  if the epoch changed while they were running. The boundary never filters
+  paths, derives membership, or publishes mutation invalidation; one complete
+  Git read remains the authority and the application write path remains the
+  single owner of exact post-operation invalidation.
 - Keep four facts separate: whether the target mutation command was invoked,
   which domain steps definitely committed, which projections must be
   invalidated, and which recovery message the user receives. A later command
   outcome cannot erase an earlier committed milestone.
 - A command that returns an error may still require conservative invalidation.
-  Preserve the original reason. Any recovery guidance belongs to the owning
+  Preserve the original reason unless a confirmed partial success changes the
+  next safe user action. In that case recovery guidance belongs to the owning
   application flow; do not replace errors through a cross-operation message
   classifier.
-- Filesystem mutations keep their execution facts separate from Git mutation
-  outcomes. Trash validation and command discovery establish `not-started`;
-  once the local or remote trash command is invoked, its application owner
-  publishes filesystem invalidation even when cancellation, timeout, or
-  transport loss leaves the result uncertain. Git-worktree targets additionally
-  invalidate status. These facts remain internal and never become a shared
-  mutation boolean or authorize compensation.
 - A client may apply canonical response data or invalidate the owning query. It
   must not replace a concurrent collection with an unversioned snapshot or
   reconstruct the write from its request payload.

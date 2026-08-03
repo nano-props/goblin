@@ -20,8 +20,8 @@ describe('movePathToTrash', () => {
     mocks.execa.mockResolvedValueOnce({ exitCode: 0 })
 
     await expect(movePathToTrash('/tmp/file.txt', signal)).resolves.toEqual({
-      result: { ok: true, message: 'ok' },
-      execution: { status: 'succeeded' },
+      ok: true,
+      message: 'ok',
     })
 
     expect(mocks.execa).toHaveBeenCalledWith(
@@ -37,31 +37,8 @@ describe('movePathToTrash', () => {
     mocks.execa.mockRejectedValue(err)
 
     await expect(movePathToTrash('/tmp/file.txt')).resolves.toEqual({
-      result: { ok: false, message: 'error.trash-unavailable' },
-      execution: { status: 'not-started' },
+      ok: false,
+      message: 'error.trash-unavailable',
     })
-  })
-
-  test('marks cancellation after command invocation as uncertain', async () => {
-    const controller = new AbortController()
-    mocks.execa.mockImplementationOnce(async () => {
-      controller.abort()
-      throw new Error('cancelled')
-    })
-
-    await expect(movePathToTrash('/tmp/file.txt', controller.signal)).resolves.toEqual({
-      result: { ok: false, message: 'cancelled' },
-      execution: { status: 'cancelled' },
-    })
-  })
-
-  test('preserves an invoked trash tool rejection', async () => {
-    mocks.execa.mockRejectedValue(Object.assign(new Error('permission denied'), { code: 'EPERM' }))
-
-    await expect(movePathToTrash('/tmp/file.txt')).resolves.toEqual({
-      result: { ok: false, message: 'permission denied' },
-      execution: { status: 'failed' },
-    })
-    expect(mocks.execa).toHaveBeenCalledTimes(1)
   })
 })

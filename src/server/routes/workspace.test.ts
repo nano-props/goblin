@@ -10,7 +10,6 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
-import { InvokedCommandError } from '#/system/command-execution.ts'
 
 const USER_ID = 'workspace-route-user'
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace-route')
@@ -92,10 +91,7 @@ describe('workspace routes', () => {
       topLevelDirectoryCount: 1,
       totalSizeBytes: 128,
     })
-    mocks.trashWorkspaceFile.mockResolvedValue({
-      result: { ok: true, message: '' },
-      execution: { status: 'succeeded' },
-    })
+    mocks.trashWorkspaceFile.mockResolvedValue({ ok: true, message: '' })
     mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
     mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
     mocks.openWorkspaceInFinder.mockResolvedValue({ ok: true, message: '' })
@@ -398,63 +394,6 @@ describe('workspace routes', () => {
       repoId: WORKSPACE_ID,
       domain: 'worktree-status',
     })
-  })
-
-  test('does not invalidate projections when trash never reached its mutation command', async () => {
-    const app = createTestWorkspaceRoutes()
-    const workspaceRuntimeId = await openWorkspaceRuntime(app, WORKSPACE_ID)
-    const target = workspaceRootTarget(WORKSPACE_ID, workspaceRuntimeId)
-    mocks.trashWorkspaceFile.mockResolvedValueOnce({
-      result: { ok: false, message: 'error.file-not-found' },
-      execution: { status: 'not-started' },
-    })
-
-    const response = await post(app, '/trash-file', { target, path: 'missing.txt' })
-
-    expect(response.status).toBe(200)
-    expect(mocks.publishUserWorkspaceFilesystemInvalidation).not.toHaveBeenCalled()
-  })
-
-  test('invalidates projections when an invoked trash command is cancelled', async () => {
-    const app = createTestWorkspaceRoutes()
-    const workspaceRuntimeId = await openWorkspaceRuntime(app, WORKSPACE_ID)
-    const target = workspaceRootTarget(WORKSPACE_ID, workspaceRuntimeId)
-    mocks.trashWorkspaceFile.mockResolvedValueOnce({
-      result: { ok: false, message: 'error.trash-cancelled-check-state' },
-      execution: { status: 'cancelled' },
-    })
-
-    const response = await post(app, '/trash-file', { target, path: 'notes.txt' })
-
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ ok: false, message: 'error.trash-cancelled-check-state' })
-    expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith(USER_ID, { target })
-  })
-
-  test('invalidates and surfaces recovery guidance after remote transport loss', async () => {
-    const workspaceId = workspaceIdForTest('goblin+ssh://example.test/workspace')
-    const app = createTestWorkspaceRoutes()
-    const workspaceRuntimeId = await openWorkspaceRuntime(app, workspaceId)
-    const target = workspaceRootTarget(workspaceId, workspaceRuntimeId)
-    mocks.trashWorkspaceFile.mockRejectedValueOnce(
-      new InvokedCommandError(
-        new RemoteWorkspaceRuntimeFailureError({
-          workspaceId,
-          workspaceRuntimeId,
-          reason: 'unreachable',
-          message: 'connection closed',
-        }),
-      ),
-    )
-
-    const response = await post(app, '/trash-file', { target, path: 'notes.txt' })
-
-    expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toMatchObject({
-      ok: false,
-      message: 'error.trash-failed-check-state',
-    })
-    expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith(USER_ID, { target })
   })
 
   test('rejects a stale filesystem target before invoking native operations', async () => {

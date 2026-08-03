@@ -556,9 +556,6 @@ export const ja: Record<DictKey, string> = {
   'error.filetree-delete-directory-unsupported': 'ファイルツリーからごみ箱に移動できるのはファイルのみです',
   'error.trash-unavailable': 'システムのごみ箱を利用できません',
   'error.failed-trash-file': 'ファイルをごみ箱に移動できませんでした',
-  'error.trash-cancelled-check-state': 'ごみ箱への移動はキャンセルされました。再試行前にファイルの状態を確認してください。',
-  'error.trash-timeout-check-state': 'ごみ箱への移動がタイムアウトしました。再試行前にファイルの状態を確認してください。',
-  'error.trash-failed-check-state': 'ごみ箱への移動が完了した可能性があります。再試行前にファイルの状態を確認してください。',
   'error.git-command-cancelled-check-state':
     'Git 操作は開始後にキャンセルされました。再試行前にリポジトリの状態を確認してください。',
   'error.invalid-arguments': '無効な引数',

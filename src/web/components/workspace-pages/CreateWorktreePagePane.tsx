@@ -212,12 +212,12 @@ export function CreateWorktreePagePane({
 
   return (
     <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
-      {snapshotReadModel.isError && (
+      {snapshotReadModel.displayError && (
         <RepoStatusStaleNotice
           messageKey={
-            snapshotReadModel.error instanceof Error
-              ? snapshotReadModel.error.message
-              : String(snapshotReadModel.error || 'error.failed-read-repo')
+            snapshotReadModel.displayError instanceof Error
+              ? snapshotReadModel.displayError.message
+              : String(snapshotReadModel.displayError)
           }
           retrying={snapshotReadModel.isFetching}
           onRetry={() => void snapshotReadModel.refetch()}

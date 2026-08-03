@@ -232,6 +232,12 @@ function beginRepoWriteOperation(
       publishRepoRuntimeInvalidation(runtime, operation)
     },
     async runMembershipMutation<T>(mutation: () => Promise<T>): Promise<T> {
+      // This is an admission fence around the attempt to invoke a membership
+      // mutation, not proof that a Git/SSH process started. A pre-spawn
+      // cancellation may therefore advance the revision and make a concurrent
+      // read fail once with a retryable conflict. That conservative fast-fail
+      // is intentional: do not add revision rollback, invocation leases, or
+      // client compensation merely to remove that harmless edge case.
       runtime.activeMembershipWrites += 1
       runtime.membershipRevision += 1
       const outcome = await observePromise(mutation)

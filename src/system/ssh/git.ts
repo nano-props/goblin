@@ -19,7 +19,6 @@ import {
 import { runRemoteCommand, type RemoteCommandKind, type RemoteCommandResult } from '#/system/ssh/commands.ts'
 import {
   commandMayHaveRun,
-  InvokedCommandError,
   withoutMutationCommand,
   type CommandExecution,
   type CommandOutcome,
@@ -289,28 +288,18 @@ export async function trashRemoteFile(
     run?: RemoteGitRunner
     knownWorktrees?: ReadonlyArray<WorktreeInfo>
   } = {},
-): Promise<CommandOutcome> {
+): Promise<ExecResult> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const known = await resolveKnownRemoteWorktree(target, worktreePath, {
     signal: options.signal,
     run,
     knownWorktrees: options.knownWorktrees,
   })
-  if ('ok' in known) return { result: known, execution: { status: 'not-started' } }
-  let result: RemoteCommandResult
-  try {
-    result = await run({ type: 'trashFile', path: known.path, filePath }, target, { signal: options.signal })
-  } catch (error) {
-    throw new InvokedCommandError(error)
-  }
-  if (options.signal?.aborted || result.message === 'cancelled') {
-    return { result: { ok: false, message: 'cancelled' }, execution: { status: 'cancelled' } }
-  }
-  if (result.ok) return { result: { ok: true, message: 'ok' }, execution: { status: 'succeeded' } }
-  return {
-    result: remoteExecResult(result),
-    execution: { status: result.timedOut ? 'timed-out' : 'failed' },
-  }
+  if ('ok' in known) return known
+  const result = await run({ type: 'trashFile', path: known.path, filePath }, target, { signal: options.signal })
+  if (options.signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (!result.ok) return remoteExecResult(result)
+  return { ok: true, message: 'ok' }
 }
 
 export async function remoteCommandExists(
@@ -836,12 +825,10 @@ export async function removeRemoteWorktree(
   )
   const { result: removeCommandResult, execution: removeExecution } = remoteCommandOutcome(removeResult)
   if (!removeCommandResult.ok) {
+    const failureMessage = worktreeRemoveFailureMessage(removeCommandResult, removeExecution)
     const failure: RemoteWorktreeMutationResult = {
       ok: false,
-      message:
-        removeExecution.status === 'timed-out'
-          ? 'error.worktree-remove-timeout-check-state'
-          : removeCommandResult.message,
+      message: failureMessage,
     }
     return withWorktreePathsToInvalidate(failure, worktreePathsToInvalidate)
   }
@@ -877,6 +864,21 @@ export async function removeRemoteWorktree(
     finalDeleteResult = upstreamDeleteResult
   }
   return withWorktreePathsToInvalidate(worktreeRemovedResult(finalDeleteResult), worktreePathsToInvalidate)
+}
+
+function worktreeRemoveFailureMessage(result: ExecResult, execution: CommandExecution): string {
+  switch (execution.status) {
+    case 'timed-out':
+      return 'error.worktree-remove-timeout-check-state'
+    case 'cancelled':
+      return 'error.git-command-cancelled-check-state'
+    case 'not-started':
+    case 'succeeded':
+    case 'failed':
+      return result.message
+  }
+  const exhaustive: never = execution.status
+  return exhaustive
 }
 
 function worktreeRemovedResult(result: ExecResult): RemoteWorktreeMutationResult {

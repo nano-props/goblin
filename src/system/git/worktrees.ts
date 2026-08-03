@@ -12,10 +12,6 @@ export async function readWorktreeMembership(cwd: string, signal?: AbortSignal):
   return parseWorktrees(output)
 }
 
-/** Worktree create/remove can both touch tens of thousands of files
- *  on large repos (mp-main: 7.8 GB, 91k files, ~22s on a hot SSD).
- *  5 minutes gives ~13× headroom on the largest known repo so a slower
- *  external disk or a busy filesystem still stays inside the budget. */
 /** Plain `git worktree remove` — no `--force`. Git refuses on dirty,
  *  locked, or otherwise non-removable worktrees, which is exactly the
  *  safety net we want; the IPC handler has already pre-checked the

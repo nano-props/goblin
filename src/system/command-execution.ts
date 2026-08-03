@@ -17,17 +17,3 @@ export function commandMayHaveRun(execution: CommandExecution): boolean {
 export function withoutMutationCommand<T extends ExecResult>(result: T): CommandOutcome<T> {
   return { result, execution: { status: 'not-started' } }
 }
-
-export class InvokedCommandError extends Error {
-  override readonly cause: unknown
-
-  constructor(cause: unknown) {
-    super('command failed after invocation', { cause })
-    this.name = 'InvokedCommandError'
-    this.cause = cause
-  }
-}
-
-export function isInvokedCommandError(error: unknown): error is InvokedCommandError {
-  return error instanceof InvokedCommandError
-}

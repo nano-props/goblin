@@ -368,6 +368,41 @@ describe('repo-client', () => {
     await expect(request).rejects.toThrow('caller cancelled')
   })
 
+  test('does not impose the former client watchdog on create-worktree', async () => {
+    useFakeTimers()
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const caller = new AbortController()
+    let requestSignal: AbortSignal | undefined
+    const requestStarted = Promise.withResolvers<void>()
+    mockFetch((_url, init) => {
+      requestSignal = (init as RequestInit | undefined)?.signal ?? undefined
+      return new Promise((_resolve, reject) => {
+        requestSignal?.addEventListener('abort', () => reject(requestSignal?.reason), { once: true })
+        requestStarted.resolve()
+      })
+    })
+
+    const { createRepoWorktree } = await import('#/web/repo-client.ts')
+    const request = createRepoWorktree(
+      workspaceId,
+      'repo-runtime-test',
+      {
+        worktreePath: '/tmp/repo-feature',
+        mode: { kind: 'newBranch', newBranch: 'feature/work', baseRef: 'main' },
+      },
+      { kind: 'skip' },
+      caller.signal,
+    )
+
+    await requestStarted.promise
+    if (!requestSignal) throw new Error('missing create-worktree request signal')
+    await vi.advanceTimersByTimeAsync(15 * 60_000 + 1)
+    expect(requestSignal.aborted).toBe(false)
+
+    caller.abort(new Error('caller cancelled'))
+    await expect(request).rejects.toThrow('caller cancelled')
+  })
+
   test('gives patch generation an explicit long-read request budget', async () => {
     useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))

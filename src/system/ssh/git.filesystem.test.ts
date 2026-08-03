@@ -3,7 +3,6 @@ import {
   getRemoteTreeWalk,
   remoteCommandExists,
   remoteCommandExistsAtWorkspaceRoot,
-  trashRemoteFile,
   type RemoteGitRunner,
   resolveRemoteWorktree,
 } from '#/system/ssh/git.ts'
@@ -12,39 +11,6 @@ import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import { NUL, TARGET, failRemoteResult, okRemoteResult } from '#/system/ssh/git-test-utils.ts'
 
 describe('remote git filesystem', () => {
-  test('treats a trash runner failure as invoked even without observing the remote marker', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
-      if (command.type === 'trashFile') {
-        return { ...failRemoteResult('connection closed'), remoteStarted: false }
-      }
-      return failRemoteResult('unexpected command')
-    })
-
-    await expect(
-      trashRemoteFile(TARGET, '/srv/repo', 'README.md', {
-        run,
-        knownWorktrees: [{ path: '/srv/repo', branch: 'main', isBare: false, isPrimary: true }],
-      }),
-    ).resolves.toEqual({
-      result: { ok: false, message: 'connection closed' },
-      execution: { status: 'failed' },
-    })
-  })
-
-  test('preserves an exception thrown after the trash runner was invoked', async () => {
-    const failure = new Error('transport failed')
-    const run = vi.fn<RemoteGitRunner>(async () => {
-      throw failure
-    })
-
-    await expect(
-      trashRemoteFile(TARGET, '/srv/repo', 'README.md', {
-        run,
-        knownWorktrees: [{ path: '/srv/repo', branch: 'main', isBare: false, isPrimary: true }],
-      }),
-    ).rejects.toMatchObject({ cause: failure })
-  })
-
   test('skips gitWorktreeList when knownWorktrees is supplied', async () => {
     // A caller that already resolved membership must not pay for another
     // `gitWorktreeList` SSH call.

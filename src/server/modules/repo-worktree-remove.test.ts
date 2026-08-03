@@ -202,6 +202,42 @@ describe('repo worktree removal', () => {
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
   })
 
+  test('preserves removal finalization before an SSH follow-up runtime failure escapes', async () => {
+    const [{ RepoMutationRuntimeFailureError }, { RemoteWorkspaceRuntimeFailureError }] = await Promise.all([
+      import('#/server/modules/repo-mutation-runtime-failure.ts'),
+      import('#/server/modules/remote-workspace-runtime-failure.ts'),
+    ])
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
+    const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: repoId,
+      workspaceRuntimeId: 'test-runtime',
+      reason: 'unreachable',
+      message: 'branch cleanup connection lost',
+    })
+    mocks.removeRemoteWorktree.mockRejectedValueOnce(
+      new RepoMutationRuntimeFailureError(
+        {
+          ok: false,
+          message: 'error.worktree-removed-followup-failed',
+          worktreeRemoved: true,
+          repoIdsToInvalidate: [repoId, linkedRepoId],
+        },
+        runtimeFailure,
+      ),
+    )
+
+    await expect(removeRemoteWorktreeForTest()).rejects.toBe(runtimeFailure)
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      workspaceId: repoId,
+      worktreePath: '/srv/repo-feature',
+    })
+    expectRepoMetadataInvalidations(
+      { repoId, domain: 'metadata' },
+      { repoId: linkedRepoId, domain: 'metadata' },
+    )
+  })
+
   test('removeRepoWorktree prunes settings when application finalization fails after removal', async () => {
     mocks.readWorktreeMembership.mockResolvedValueOnce([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },

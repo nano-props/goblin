@@ -5,6 +5,7 @@ import {
 import { parseRemoteWorkspaceId, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/config.ts'
+import type { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import type { RemoteGitRunner } from '#/system/ssh/git.ts'
 
 export interface RepoSourceRuntimeContext {
@@ -45,5 +46,37 @@ export function remoteRuntimeAwareGitRunner(
     })
     if (failure) throw failure
     return result
+  }
+}
+
+export interface RemoteRepoMutationExecution {
+  run: RemoteGitRunner
+  runtimeFailure(): RemoteWorkspaceRuntimeFailureError | null
+}
+
+/**
+ * Mutation commands must reach their domain flow before a transport failure
+ * escapes. This runner records the runtime failure while returning the raw
+ * command result so the caller can first establish execution facts,
+ * milestones, and projection impact.
+ */
+export function remoteRepoMutationExecution(
+  repoRoot: string,
+  workspaceRuntimeId: string,
+  sourceTarget: RemoteWorkspaceTarget,
+): RemoteRepoMutationExecution {
+  let runtimeFailure: RemoteWorkspaceRuntimeFailureError | null = null
+  return {
+    run: async (command, target, options) => {
+      const result = await runRemoteCommand(target, command, options)
+      runtimeFailure ??= remoteWorkspaceRuntimeFailureFromCommandResult({
+        workspaceId: repoRoot,
+        workspaceRuntimeId,
+        target: sourceTarget,
+        result,
+      })
+      return result
+    },
+    runtimeFailure: () => runtimeFailure,
   }
 }

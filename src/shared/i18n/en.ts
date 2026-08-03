@@ -557,9 +557,6 @@ export const en = {
   'error.filetree-delete-directory-unsupported': 'Only files can be moved to Trash from the file tree',
   'error.trash-unavailable': 'System Trash is not available',
   'error.failed-trash-file': 'Could not move the file to Trash',
-  'error.trash-cancelled-check-state': 'Trash was cancelled. Check the file state before trying again.',
-  'error.trash-timeout-check-state': 'Trash timed out. Check the file state before trying again.',
-  'error.trash-failed-check-state': 'Trash may have completed. Check the file state before trying again.',
   'error.git-command-cancelled-check-state':
     'The Git operation was cancelled after it started. Check the repository state before trying again.',
   'error.invalid-arguments': 'Invalid arguments',

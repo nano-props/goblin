@@ -71,6 +71,40 @@ describe('repo source runtime failure classification', () => {
     } satisfies Partial<RemoteWorkspaceRuntimeFailureError>)
   })
 
+  test('records a mutation transport failure without throwing before the domain consumes the result', async () => {
+    const commandResult = {
+      ok: false as const,
+      stdout: '',
+      stderr: '',
+      transportStderr: 'client_loop: send disconnect: Broken pipe',
+      message: 'connection lost',
+      remoteStarted: true,
+    }
+    mocks.runRemoteCommand.mockResolvedValue(commandResult)
+    const { remoteRepoMutationExecution } = await import('#/server/modules/remote-repo-execution.ts')
+    const execution = remoteRepoMutationExecution(target.id, 'repo-runtime-test', target)
+
+    await expect(
+      execution.run(
+        {
+          type: 'gitPush',
+          path: target.remotePath,
+          remote: 'origin',
+          branch: 'feature/test',
+          targetBranch: 'feature/test',
+          setUpstream: false,
+        },
+        target,
+      ),
+    ).resolves.toBe(commandResult)
+    expect(execution.runtimeFailure()).toMatchObject({
+      name: 'RemoteWorkspaceRuntimeFailureError',
+      workspaceId: target.id,
+      workspaceRuntimeId: 'repo-runtime-test',
+      reason: 'unreachable',
+    } satisfies Partial<RemoteWorkspaceRuntimeFailureError>)
+  })
+
   test('preserves normal remote read failures when no runtime context is supplied', async () => {
     mocks.runRemoteCommand.mockResolvedValue({
       ok: false,

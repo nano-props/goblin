@@ -548,9 +548,6 @@ export const ko: Record<DictKey, string> = {
   'error.filetree-delete-directory-unsupported': '파일 트리에서는 파일만 휴지통으로 이동할 수 있습니다',
   'error.trash-unavailable': '시스템 휴지통을 사용할 수 없습니다',
   'error.failed-trash-file': '파일을 휴지통으로 이동할 수 없습니다',
-  'error.trash-cancelled-check-state': '휴지통 이동이 취소되었습니다. 다시 시도하기 전에 파일 상태를 확인하세요.',
-  'error.trash-timeout-check-state': '휴지통 이동 시간이 초과되었습니다. 다시 시도하기 전에 파일 상태를 확인하세요.',
-  'error.trash-failed-check-state': '휴지통 이동이 완료되었을 수 있습니다. 다시 시도하기 전에 파일 상태를 확인하세요.',
   'error.git-command-cancelled-check-state':
     'Git 작업이 시작된 후 취소되었습니다. 다시 시도하기 전에 저장소 상태를 확인하세요.',
   'error.invalid-arguments': '인수가 올바르지 않습니다',

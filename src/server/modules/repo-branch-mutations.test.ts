@@ -148,6 +148,76 @@ describe('repo branch mutations', () => {
     expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
   })
 
+  test('publishes primary SSH mutation impact before the runtime transport failure escapes', async () => {
+    const [{ RepoMutationRuntimeFailureError }, { RemoteWorkspaceRuntimeFailureError }, { pushRepoBranch }] =
+      await Promise.all([
+        import('#/server/modules/repo-mutation-runtime-failure.ts'),
+        import('#/server/modules/remote-workspace-runtime-failure.ts'),
+        import('#/server/modules/repo-write-paths.ts'),
+      ])
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
+    const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: repoId,
+      workspaceRuntimeId: 'runtime-test',
+      reason: 'unreachable',
+      message: 'connection lost',
+    })
+    mocks.pushRemoteBranch.mockRejectedValueOnce(
+      new RepoMutationRuntimeFailureError(
+        {
+          ok: false,
+          message: 'connection lost',
+          repoIdsToInvalidate: [repoId, linkedRepoId],
+        },
+        runtimeFailure,
+      ),
+    )
+    await expect(pushRepoBranch(repoId, 'feature/a', undefined, { workspaceRuntimeId: 'runtime-test' })).rejects.toBe(
+      runtimeFailure,
+    )
+    expectRepoMetadataInvalidations(
+      { repoId, domain: 'metadata' },
+      { repoId: linkedRepoId, domain: 'metadata' },
+    )
+  })
+
+  test('publishes an established SSH branch milestone before follow-up runtime failure escapes', async () => {
+    const [{ RepoMutationRuntimeFailureError }, { RemoteWorkspaceRuntimeFailureError }, { deleteRepoBranch }] =
+      await Promise.all([
+        import('#/server/modules/repo-mutation-runtime-failure.ts'),
+        import('#/server/modules/remote-workspace-runtime-failure.ts'),
+        import('#/server/modules/repo-write-paths.ts'),
+      ])
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
+    const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: repoId,
+      workspaceRuntimeId: 'runtime-test',
+      reason: 'unreachable',
+      message: 'upstream connection lost',
+    })
+    mocks.deleteRemoteBranch.mockRejectedValueOnce(
+      new RepoMutationRuntimeFailureError(
+        {
+          ok: false,
+          message: 'error.local-branch-deleted-upstream-failed-check-state',
+          repoIdsToInvalidate: [repoId, linkedRepoId],
+        },
+        runtimeFailure,
+      ),
+    )
+    await expect(
+      deleteRepoBranch(repoId, 'feature/a', { deleteUpstream: true }, undefined, {
+        workspaceRuntimeId: 'runtime-test',
+      }),
+    ).rejects.toBe(runtimeFailure)
+    expectRepoMetadataInvalidations(
+      { repoId, domain: 'metadata' },
+      { repoId: linkedRepoId, domain: 'metadata' },
+    )
+  })
+
   test('createRepoWorktree invalidates source and target projections when a failed command may have run', async () => {
     mocks.createWorktree.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'fatal: worktree failed' }, 'failed'),

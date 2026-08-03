@@ -5,68 +5,34 @@ import { trashRemoteFile } from '#/system/ssh/git.ts'
 import { movePathToTrash } from '#/system/trash.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import { resolveWorkspaceFilesystemExecution } from '#/server/modules/workspace-filesystem-execution.ts'
-import type { CommandOutcome } from '#/system/command-execution.ts'
 
 export async function trashWorkspaceFile(
   target: WorkspacePaneFilesystemExecutionTarget,
   filePath: string,
   signal?: AbortSignal,
-): Promise<CommandOutcome> {
-  if (signal?.aborted) return trashNotStarted({ ok: false, message: 'cancelled' })
+): Promise<ExecResult> {
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
   const resolved = await resolveWorkspaceFilesystemExecution(target, { signal })
 
   if (resolved.transport === 'remote') {
-    return trashOutcomeForUser(
-      await trashRemoteFile(resolved.remoteTarget, resolved.executionPath, filePath, {
-        signal,
-        run: resolved.run,
-      }),
-    )
-  }
-
-  const absolutePath = resolveWorktreeRelativePath(resolved.executionPath, filePath)
-  if (!absolutePath) return trashNotStarted({ ok: false, message: 'error.invalid-path' })
-
-  try {
-    const stat = await lstat(absolutePath)
-    if (stat.isDirectory()) {
-      return trashNotStarted({ ok: false, message: 'error.filetree-delete-directory-unsupported' })
-    }
-  } catch (err) {
-    const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: unknown }).code) : ''
-    return trashNotStarted({
-      ok: false,
-      message: code === 'ENOENT' ? 'error.file-not-found' : 'error.failed-trash-file',
+    return await trashRemoteFile(resolved.remoteTarget, resolved.executionPath, filePath, {
+      signal,
+      run: resolved.run,
     })
   }
 
-  return trashOutcomeForUser(await movePathToTrash(absolutePath, signal))
-}
+  const absolutePath = resolveWorktreeRelativePath(resolved.executionPath, filePath)
+  if (!absolutePath) return { ok: false, message: 'error.invalid-path' }
 
-function trashNotStarted(result: ExecResult): CommandOutcome {
-  return { result, execution: { status: 'not-started' } }
-}
-
-function trashOutcomeForUser(outcome: CommandOutcome): CommandOutcome {
-  const { execution } = outcome
-  switch (execution.status) {
-    case 'cancelled':
-      return {
-        result: { ok: false, message: 'error.trash-cancelled-check-state' },
-        execution,
-      }
-    case 'timed-out':
-      return {
-        result: { ok: false, message: 'error.trash-timeout-check-state' },
-        execution,
-      }
-    case 'not-started':
-    case 'succeeded':
-    case 'failed':
-      return outcome
+  try {
+    const stat = await lstat(absolutePath)
+    if (stat.isDirectory()) return { ok: false, message: 'error.filetree-delete-directory-unsupported' }
+  } catch (err) {
+    const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: unknown }).code) : ''
+    return { ok: false, message: code === 'ENOENT' ? 'error.file-not-found' : 'error.failed-trash-file' }
   }
-  const exhaustive: never = execution.status
-  return exhaustive
+
+  return await movePathToTrash(absolutePath, signal)
 }
 
 function resolveWorktreeRelativePath(worktreePath: string, filePath: string): string | null {
