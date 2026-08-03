@@ -468,6 +468,30 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
   })
 
+  test('joins the query-owned root read when the tree remounts before it settles', async () => {
+    const rootRead = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
+    const root = filesystemTree(fileNode('README.md'))
+    mocks.getWorkspaceFilesystemTree.mockReturnValue(rootRead.promise)
+    const props = mainHarnessProps()
+
+    await render(props)
+    expect(filesystemReadCount()).toBe(1)
+
+    rendered?.unmount()
+    rendered = null
+    await render(props)
+    expect(filesystemReadCount()).toBe(1)
+
+    await act(async () => {
+      rootRead.resolve(root)
+      await rootRead.promise
+    })
+    await flush()
+
+    expect(filesystemReadCount()).toBe(1)
+    expect(lastSnapshot?.tree).toEqual(root)
+  })
+
   test('treats an authoritative empty tree as success', async () => {
     mocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({ nodes: [], truncated: false })
 
@@ -837,24 +861,37 @@ describe('useWorkspaceFilesystemTree', () => {
 
   test('invalidating keeps the current tree visible and reloads restored expanded children', async () => {
     const root = filesystemTree(directoryNode('src'))
-    let invalidated = false
-    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) =>
-      Promise.resolve(
-        options.prefix === 'src' ? filesystemTree(fileNode(invalidated ? 'src/new.ts' : 'src/old.ts', 'src')) : root,
-      ),
-    )
+    const oldChildren = filesystemTree(fileNode('src/old.ts', 'src'))
+    const newChildren = filesystemTree(fileNode('src/new.ts', 'src'))
+    const refreshedRoot = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
+    const refreshedChildren = Promise.withResolvers<WorkspaceFilesystemTreeResult>()
+    let refreshing = false
+    mocks.getWorkspaceFilesystemTree.mockImplementation((_target, options) => {
+      if (!refreshing) return Promise.resolve(options.prefix === 'src' ? oldChildren : root)
+      return options.prefix === 'src' ? refreshedChildren.promise : refreshedRoot.promise
+    })
 
     await render(mainHarnessProps({ expandedKeys: ['src'] }))
     await flush()
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
 
-    invalidated = true
-    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
+    refreshing = true
     await emitFilesystemInvalidation()
     await flush()
 
     expect(filesystemReadCount()).toBe(2)
     expect(filesystemReadCount('src')).toBe(2)
+    expect(lastSnapshot?.reading).toBe(true)
+    expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
+
+    await act(async () => {
+      refreshedRoot.resolve(root)
+      refreshedChildren.resolve(newChildren)
+      await Promise.all([refreshedRoot.promise, refreshedChildren.promise])
+    })
+    await flush()
+
+    expect(lastSnapshot?.reading).toBe(false)
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/new.ts'])
   })
 
