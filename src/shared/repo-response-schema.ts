@@ -112,7 +112,7 @@ export const RepoOperationsResponseSchema = v.strictObject({
       id: v.string(),
       repoId: v.nullable(WorkspaceIdSchema),
       workspaceRuntimeId: v.nullable(v.string()),
-      kind: v.picklist(['fetch', 'pull', 'push', 'create-worktree', 'delete-branch', 'remove-worktree', 'network']),
+      kind: v.picklist(['fetch', 'pull', 'push', 'create-worktree', 'delete-branch', 'remove-worktree']),
       phase: v.picklist(['queued', 'running', 'cancelling', 'done', 'failed']),
       source: v.picklist(['user', 'background', 'system']),
       target: v.nullable(

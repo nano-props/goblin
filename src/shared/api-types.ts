@@ -308,7 +308,7 @@ export interface RepoPullRequestsResponse {
 
 export type RepoServerOperationPhase = 'queued' | 'running' | 'cancelling' | 'done' | 'failed'
 export type RepoServerOperationKind =
-  'fetch' | 'pull' | 'push' | 'create-worktree' | 'delete-branch' | 'remove-worktree' | 'network'
+  'fetch' | 'pull' | 'push' | 'create-worktree' | 'delete-branch' | 'remove-worktree'
 export type RepoServerOperationSource = NetworkOpKind | 'system'
 export type RepoOperationCancellationReason =
   'caller-abort' | 'request-watchdog-timeout' | 'git-timeout' | 'network-op-superseded'
