@@ -82,6 +82,27 @@ describe('fetchRepo canonical boundaries', () => {
     expectNoRepoMetadataInvalidations()
   })
 
+  test('selects recovery guidance when a remote fetch outcome cannot be confirmed', async () => {
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    mocks.getRemoteRepoWorktreePaths.mockResolvedValueOnce(['/srv/repo'])
+    mocks.fetchRemoteRepo.mockResolvedValueOnce(
+      commandOutcomeForTest(
+        { ok: false, message: 'remote command execution could not be confirmed' },
+        'remote-start-unconfirmed',
+      ),
+    )
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const result = await fetchRepo(repoId, 'user')
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'error.ssh-remote-command-start-unconfirmed',
+      repoIdsToInvalidate: [repoId],
+    })
+    expectNoRepoMetadataInvalidations()
+  })
+
   test('publishes snapshot invalidation after a successful sync', async () => {
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 

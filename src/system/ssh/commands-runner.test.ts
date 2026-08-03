@@ -88,7 +88,7 @@ describe('runRemoteCommand', () => {
       ok: false,
       stdout: '',
       stderr: '',
-      message: 'error.ssh-remote-command-start-unconfirmed',
+      message: 'remote command execution could not be confirmed',
       remoteStarted: false,
       remoteStartUnconfirmed: true,
     })
@@ -101,7 +101,7 @@ describe('runRemoteCommand', () => {
       ok: false,
       stdout: 'forced command output',
       stderr: 'server notice',
-      message: 'error.ssh-remote-command-start-unconfirmed',
+      message: 'remote command execution could not be confirmed',
       remoteStarted: false,
       remoteStartUnconfirmed: true,
     })

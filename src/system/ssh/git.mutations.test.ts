@@ -836,7 +836,7 @@ describe('remote git mutations', () => {
       ok: false,
       stdout: '',
       stderr: '',
-      message: 'error.ssh-remote-command-start-unconfirmed',
+      message: 'remote command execution could not be confirmed',
       remoteStarted: false,
       remoteStartUnconfirmed: true,
     }))
@@ -848,8 +848,8 @@ describe('remote git mutations', () => {
     })
 
     expect(result).toEqual({
-      result: { ok: false, message: 'error.ssh-remote-command-start-unconfirmed' },
-      execution: { status: 'failed' },
+      result: { ok: false, message: 'remote command execution could not be confirmed' },
+      execution: { status: 'remote-start-unconfirmed' },
     })
   })
 })

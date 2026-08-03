@@ -61,7 +61,7 @@ describe('remote runtime failure classification', () => {
       expect(
         remoteWorkspaceRuntimeFailureReasonFromCommandResult(
           failedCommand({
-            message: 'error.ssh-remote-command-start-unconfirmed',
+            message: 'remote command execution could not be confirmed',
             remoteStarted: false,
             remoteStartUnconfirmed: true,
           }),

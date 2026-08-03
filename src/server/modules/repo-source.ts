@@ -352,6 +352,9 @@ function commandFailureForUser<T extends ExecResult>(result: T, execution: Comma
   if (result.ok) return result
   if (execution.status === 'cancelled') return { ...result, message: 'error.git-command-cancelled-check-state' }
   if (execution.status === 'timed-out') return { ...result, message: 'error.git-command-timeout-check-state' }
+  if (execution.status === 'remote-start-unconfirmed') {
+    return { ...result, message: 'error.ssh-remote-command-start-unconfirmed' }
+  }
   return result
 }
 

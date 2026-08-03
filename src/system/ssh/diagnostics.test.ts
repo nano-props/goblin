@@ -38,7 +38,7 @@ describe('classifySshFailure', () => {
         ok: false,
         stdout: '',
         stderr: '',
-        message: 'error.ssh-remote-command-start-unconfirmed',
+        message: 'remote command execution could not be confirmed',
         remoteStarted: false,
         remoteStartUnconfirmed: true,
       }),

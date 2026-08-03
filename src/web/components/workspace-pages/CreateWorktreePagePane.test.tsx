@@ -11,7 +11,7 @@ import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { CreateWorktreePagePane } from '#/web/components/workspace-pages/CreateWorktreePagePane.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { getRepoSnapshot, getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
+import { getRepoOperations, getRepoSnapshot, getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
@@ -27,6 +27,7 @@ import {
   currentAppNavigationGeneration,
   resetAppNavigationForTest,
 } from '#/web/app-navigation-lifecycle.ts'
+import { repoOperationsForTest } from '#/web/test-utils/repo-query-runtime.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
@@ -77,10 +78,11 @@ vi.mock('#/web/components/workspace-toolbar-chrome.tsx', () => ({
 vi.mock('#/web/repo-client.ts', () => ({
   getRepoSnapshot: vi.fn(),
   getRepoWorktreeBootstrapPreview: vi.fn(async () => ({ ok: false, message: 'error.failed-read-repo' })),
-  getRepoOperations: vi.fn(async () => ({ operations: [], loadedAt: 0 })),
+  getRepoOperations: vi.fn(),
 }))
 
 const mockedGetRepoSnapshot = vi.mocked(getRepoSnapshot)
+const mockedGetRepoOperations = vi.mocked(getRepoOperations)
 
 beforeEach(() => {
   resetAppNavigationForTest()
@@ -92,6 +94,8 @@ beforeEach(() => {
     message: 'error.failed-read-repo',
   }))
   mockedGetRepoSnapshot.mockReset()
+  mockedGetRepoOperations.mockReset()
+  mockedGetRepoOperations.mockResolvedValue(repoOperationsForTest(0))
   mockedGetSettingsSnapshot.mockReset()
   mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ workspaceSettings: [] }))
   appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ workspaceSettings: [] }))

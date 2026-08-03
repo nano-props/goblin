@@ -2,7 +2,7 @@ import type { ExecResult } from '#/shared/git-types.ts'
 
 export type CommandExecution = {
   /** `not-started` proves the target mutation command was not invoked. */
-  status: 'not-started' | 'succeeded' | 'failed' | 'timed-out' | 'cancelled'
+  status: 'not-started' | 'succeeded' | 'failed' | 'timed-out' | 'cancelled' | 'remote-start-unconfirmed'
 }
 
 export interface CommandOutcome<T extends ExecResult = ExecResult> {

@@ -177,6 +177,7 @@ function pruneSettledOperations(): void {
 
   for (const { runtime, operation } of settled.slice(MAX_SETTLED_OPERATIONS)) {
     runtime.operations.delete(operation.id)
+    publishRepoRuntimeInvalidation(runtime, operation)
     deleteBoundaryGroupIfIdle(runtime)
   }
 }

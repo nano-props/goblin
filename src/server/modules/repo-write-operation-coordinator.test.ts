@@ -477,6 +477,7 @@ describe('repo write operation coordinator', () => {
   test('keeps settled write operations globally bounded', async () => {
     vi.setSystemTime(1_000)
     for (let index = 0; index < 105; index += 1) {
+      if (index === 100) mocks.publishRepoReadInvalidation.mockClear()
       const workspaceId = workspaceIdForTest(`goblin+file:///workspace-${index}`)
       await enqueueRepoWriteOperation(
         workspaceId,
@@ -499,6 +500,10 @@ describe('repo write operation coordinator', () => {
     ).resolves.toMatchObject([
       { repoId: workspaceIdForTest('goblin+file:///workspace-104'), kind: 'fetch', phase: 'done' },
     ])
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
+      repoId: workspaceIdForTest('goblin+file:///workspace-0'),
+      domain: 'operations',
+    })
   })
 
   test('uses settlement order when bounded operations share a timestamp', async () => {

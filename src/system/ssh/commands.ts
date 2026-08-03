@@ -145,7 +145,7 @@ export async function runRemoteCommand(
         ok: false,
         stdout: parsed.stdout,
         stderr: parsed.stderr,
-        message: 'error.ssh-remote-command-start-unconfirmed',
+        message: 'remote command execution could not be confirmed',
         remoteStarted: false,
         remoteStartUnconfirmed: true,
       }
