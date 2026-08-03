@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
@@ -365,6 +365,83 @@ describe('remote ssh command builders', () => {
     expect(readFileSync(path.join(targetRoot, 'config dir', 'app.json'), 'utf8')).toBe('ok\n')
     expect(existsSync(path.join(targetRoot, 'config dir', 'debug.log'))).toBe(false)
     expect(existsSync(path.join(targetRoot, 'config dir', '.git', 'config'))).toBe(false)
+  })
+
+  testPosix('remote bootstrap script preserves copied directory permissions', async () => {
+    const dir = path.join(os.tmpdir(), `goblin-remote-bootstrap-test-${Date.now()}-${process.pid}`)
+    tempDirs.push(dir)
+    const sourceRoot = path.join(dir, 'repo')
+    const targetRoot = path.join(dir, 'worktree')
+    const sourceConfig = path.join(sourceRoot, 'config')
+    const sourceReadonly = path.join(sourceConfig, 'readonly')
+    mkdirSync(sourceReadonly, { recursive: true })
+    mkdirSync(targetRoot, { recursive: true })
+    writeFileSync(path.join(sourceReadonly, 'settings.json'), '{}\n')
+    chmodSync(sourceReadonly, 0o555)
+    chmodSync(sourceConfig, 0o750)
+
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot,
+      targetRoot,
+      copy: ['config'],
+      symlink: [],
+      hardlink: [],
+      exclude: [],
+    })
+
+    const targetReadonly = path.join(targetRoot, 'config', 'readonly')
+    try {
+      const result = await execa('bash', ['-lc', `umask 0077\n${invocation.script}`])
+
+      expect(result.stdout).toBe(encodeRemoteWorktreeBootstrapRecord('copy', 'config'))
+      expect(readFileSync(path.join(targetReadonly, 'settings.json'), 'utf8')).toBe('{}\n')
+      expect(statSync(path.join(targetRoot, 'config')).mode & 0o7777).toBe(0o750)
+      expect(statSync(targetReadonly).mode & 0o7777).toBe(0o555)
+    } finally {
+      chmodSync(sourceReadonly, 0o755)
+      if (existsSync(targetReadonly)) chmodSync(targetReadonly, 0o755)
+    }
+  })
+
+  testPosix('remote bootstrap restores directory permissions when a nested copy fails', async () => {
+    const dir = path.join(os.tmpdir(), `goblin-remote-bootstrap-test-${Date.now()}-${process.pid}`)
+    tempDirs.push(dir)
+    const sourceRoot = path.join(dir, 'repo')
+    const targetRoot = path.join(dir, 'worktree')
+    const sourceConfig = path.join(sourceRoot, 'config')
+    const targetConfig = path.join(targetRoot, 'config')
+    const bashEnv = path.join(dir, 'bash-env')
+    mkdirSync(sourceConfig, { recursive: true })
+    mkdirSync(targetRoot, { recursive: true })
+    writeFileSync(path.join(sourceConfig, 'settings.json'), '{}\n')
+    writeFileSync(bashEnv, 'cp() { return 23; }\n')
+    chmodSync(sourceConfig, 0o555)
+
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot,
+      targetRoot,
+      copy: ['config'],
+      symlink: [],
+      hardlink: [],
+      exclude: [],
+    })
+
+    try {
+      const result = await execa('bash', ['-lc', invocation.script], {
+        env: { BASH_ENV: bashEnv },
+        reject: false,
+      })
+
+      expect(result.exitCode).toBe(1)
+      expect(result.stdout).toBe('')
+      expect(result.stderr).toContain('failed to copy config/settings.json')
+      expect(statSync(targetConfig).mode & 0o7777).toBe(0o555)
+    } finally {
+      chmodSync(sourceConfig, 0o755)
+      if (existsSync(targetConfig)) chmodSync(targetConfig, 0o755)
+    }
   })
 
   test('remote bootstrap fails fast when required globstar support is unavailable', () => {
