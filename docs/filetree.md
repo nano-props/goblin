@@ -32,8 +32,11 @@ Use this document for the workspace-pane filesystem tree and its file actions.
   and read failure are distinct from an empty directory.
 - Server invalidation causes affected reads to converge. The tree does not add a
   parallel polling authority.
-- Showing the file-tree surface revalidates the root and restored expanded
-  directories while preserving the last accepted projection during refresh.
+- Showing the file-tree surface starts or joins a read for the root and
+  reachable restored directories while preserving the last accepted projection
+  during refresh.
+- These independent reads form a best-effort projection, not an atomic snapshot
+  for one surface activation. Out-of-band changes converge on a later read.
 
 ## Client state
 
