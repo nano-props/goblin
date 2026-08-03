@@ -8,10 +8,6 @@ import { getWorkspaceFilesystemTree } from '#/web/workspace-filesystem-client.ts
 import { subscribeWorkspaceFilesystemInvalidation } from '#/web/workspace-filesystem-invalidation-ingress.ts'
 
 const invalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
-const invalidationConsumersByClient = new WeakMap<
-  QueryClient,
-  Set<(target: WorkspacePaneFilesystemExecutionTarget) => void>
->()
 const invalidationSyncByClient = new WeakMap<QueryClient, { references: number; stop: () => void }>()
 
 export function workspaceFilesystemTreeChildrenQueryKey(
@@ -37,7 +33,6 @@ export function startWorkspaceFilesystemQueryInvalidationSync(queryClient: Query
       if (queryClient.getQueryCache().findAll({ queryKey: queryPrefix }).length === 0) return
       bumpInvalidationVersion(queryClient, event.target)
       void queryClient.invalidateQueries({ queryKey: queryPrefix, refetchType: 'active' }, { cancelRefetch: false })
-      for (const notify of invalidationConsumersByClient.get(queryClient) ?? []) notify(event.target)
     })
     const unsubscribeCache = queryClient.getQueryCache().subscribe((event) => {
       if (event.type !== 'removed') return
@@ -68,21 +63,17 @@ export function startWorkspaceFilesystemQueryInvalidationSync(queryClient: Query
   }
 }
 
-export function subscribeWorkspaceFilesystemQueryInvalidationConsumer(
+export function subscribeWorkspaceFilesystemRootReloadStart(
   queryClient: QueryClient,
-  consumer: (target: WorkspacePaneFilesystemExecutionTarget) => void,
+  target: WorkspacePaneFilesystemExecutionTarget,
+  consumer: () => void,
 ): () => void {
-  let consumers = invalidationConsumersByClient.get(queryClient)
-  if (!consumers) {
-    consumers = new Set()
-    invalidationConsumersByClient.set(queryClient, consumers)
-  }
-  consumers.add(consumer)
-  return () => {
-    const current = invalidationConsumersByClient.get(queryClient)
-    current?.delete(consumer)
-    if (current?.size === 0) invalidationConsumersByClient.delete(queryClient)
-  }
+  const rootQueryHash = hashKey(workspaceFilesystemTreeChildrenQueryKey(target, ''))
+  return queryClient.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.query.queryHash !== rootQueryHash) return
+    if (event.action.type === 'fetch') consumer()
+    if (event.action.type === 'invalidate' && event.query.state.fetchStatus === 'fetching') consumer()
+  })
 }
 
 export async function readCurrentWorkspaceFilesystemTree(

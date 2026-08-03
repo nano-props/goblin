@@ -17,7 +17,6 @@ export interface LazyWorkspaceFilesystemTreeState {
 }
 
 export type LazyWorkspaceFilesystemTreeAction =
-  | { readonly type: 'replace'; readonly state: LazyWorkspaceFilesystemTreeState }
   | { readonly type: 'markForReload' }
   | { readonly type: 'childrenLoading'; readonly prefix: string }
   | { readonly type: 'childrenLoaded'; readonly prefix: string; readonly result: WorkspaceFilesystemTreeResult }
@@ -42,8 +41,6 @@ export function lazyWorkspaceFilesystemTreeReducer(
   action: LazyWorkspaceFilesystemTreeAction,
 ): LazyWorkspaceFilesystemTreeState {
   switch (action.type) {
-    case 'replace':
-      return action.state
     case 'markForReload':
       return {
         ...state,
@@ -53,15 +50,19 @@ export function lazyWorkspaceFilesystemTreeReducer(
         reloadEpoch: state.reloadEpoch + 1,
       }
     case 'childrenLoading': {
+      if (!isCurrentDirectoryPrefix(state, action.prefix)) return state
       const errorPrefixes = new Set(state.errorPrefixes)
       errorPrefixes.delete(action.prefix)
       return { ...state, loadingPrefixes: new Set(state.loadingPrefixes).add(action.prefix), errorPrefixes }
     }
     case 'childrenLoaded':
+      if (!isCurrentDirectoryPrefix(state, action.prefix)) return state
       return mergeChildren(state, action.prefix, action.result)
     case 'childrenFailed':
+      if (!isCurrentDirectoryPrefix(state, action.prefix)) return state
       return { ...state, errorPrefixes: new Set(state.errorPrefixes).add(action.prefix) }
     case 'childrenSettled': {
+      if (!isCurrentDirectoryPrefix(state, action.prefix)) return state
       const loadingPrefixes = new Set(state.loadingPrefixes)
       loadingPrefixes.delete(action.prefix)
       return { ...state, loadingPrefixes }
@@ -80,25 +81,35 @@ function mergeChildren(
   const nodesById = new Map(current.nodesById)
   const childIdsByParentId = new Map(current.childIdsByParentId)
   const previousChildIds = childIdsByParentId.get(parentId) ?? []
+  const nextNodesById = new Map(result.nodes.map((node) => [node.id, node]))
   for (const id of previousChildIds) {
-    if (!result.nodes.some((node) => node.id === id)) removeSubtree(id, nodesById, childIdsByParentId)
+    const previousNode = nodesById.get(id)
+    const nextNode = nextNodesById.get(id)
+    if (!nextNode || (previousNode?.kind === 'directory' && nextNode.kind !== 'directory')) {
+      removeSubtree(id, nodesById, childIdsByParentId)
+    }
   }
 
   const childIds = result.nodes.map((node) => node.id)
   for (const node of result.nodes) nodesById.set(node.id, node)
   childIdsByParentId.set(parentId, childIds)
 
-  const truncatedPrefixes = new Set(current.truncatedPrefixes)
-  if (result.truncated) truncatedPrefixes.add(prefix)
-  else truncatedPrefixes.delete(prefix)
+  const nextTruncatedPrefixes = new Set(current.truncatedPrefixes)
+  if (result.truncated) nextTruncatedPrefixes.add(prefix)
+  else nextTruncatedPrefixes.delete(prefix)
+
+  const truncatedPrefixes = existingDirectoryPrefixes(nextTruncatedPrefixes, nodesById)
+  const loadedPrefixes = existingDirectoryPrefixes(new Set(current.loadedPrefixes).add(prefix), nodesById)
+  const loadingPrefixes = existingDirectoryPrefixes(current.loadingPrefixes, nodesById)
+  const errorPrefixes = existingDirectoryPrefixes(withoutPrefix(current.errorPrefixes, prefix), nodesById)
 
   return {
     nodesById,
     childIdsByParentId,
     truncatedPrefixes,
-    loadedPrefixes: new Set(current.loadedPrefixes).add(prefix),
-    loadingPrefixes: current.loadingPrefixes,
-    errorPrefixes: withoutPrefix(current.errorPrefixes, prefix),
+    loadedPrefixes,
+    loadingPrefixes,
+    errorPrefixes,
     reloadEpoch: current.reloadEpoch,
     result: {
       nodes: Array.from(nodesById.values()),
@@ -116,6 +127,17 @@ function removeSubtree(
   for (const childId of childIds) removeSubtree(childId, nodesById, childIdsByParentId)
   nodesById.delete(id)
   childIdsByParentId.delete(id)
+}
+
+function isCurrentDirectoryPrefix(state: LazyWorkspaceFilesystemTreeState, prefix: string): boolean {
+  return prefix === '' || state.nodesById.get(prefix)?.kind === 'directory'
+}
+
+function existingDirectoryPrefixes(
+  prefixes: ReadonlySet<string>,
+  nodesById: ReadonlyMap<string, WorkspaceFilesystemNode>,
+): ReadonlySet<string> {
+  return new Set(Array.from(prefixes).filter((prefix) => prefix === '' || nodesById.get(prefix)?.kind === 'directory'))
 }
 
 function withoutPrefix(prefixes: ReadonlySet<string>, prefix: string): ReadonlySet<string> {

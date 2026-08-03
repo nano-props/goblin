@@ -32,15 +32,28 @@ Use this document for the workspace-pane filesystem tree and its file actions.
   and read failure are distinct from an empty directory.
 - Server invalidation causes affected reads to converge. The tree does not add a
   parallel polling authority.
+- Showing the file-tree surface starts or joins a read for the root and
+  reachable restored directories while preserving the last accepted projection
+  during refresh.
+- These independent reads form a best-effort projection, not an atomic snapshot
+  for one surface activation. Out-of-band changes converge on a later read.
 
 ## Client state
 
 - Expansion, selection, and scroll position are client-owned presentation
   preferences and may be restored across sessions. Loading and action state are
   ephemeral.
+- A remembered expansion participates in restored reads and visible read status
+  only while all of its ancestor directories are expanded.
+- Each filesystem execution target owns one read lifecycle. Changing the target
+  replaces that owner; results from the previous target remain isolated in its
+  query cache and cannot enter the new projection.
 - Restored presentation state never becomes filesystem or workspace authority.
 - Replacing or invalidating a directory result must not allow a stale response
   to overwrite the newer target projection.
+- A failed refresh keeps the last accepted tree visible, marks it as stale, and
+  offers an explicit retry. An initial read failure does not fabricate an empty
+  tree.
 
 ## File actions
 

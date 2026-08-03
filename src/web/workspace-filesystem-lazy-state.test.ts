@@ -17,6 +17,11 @@ function node(
 describe('filetree lazy state', () => {
   test('tracks loading and loaded prefixes around child reads', () => {
     let state = emptyLazyWorkspaceFilesystemTreeState()
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
+      type: 'childrenLoaded',
+      prefix: '',
+      result: { nodes: [node('src', null, 'directory')], truncated: false },
+    })
     state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenLoading', prefix: 'src' })
     expect(state.loadingPrefixes.has('src')).toBe(true)
 
@@ -29,11 +34,16 @@ describe('filetree lazy state', () => {
 
     expect(state.loadingPrefixes.has('src')).toBe(false)
     expect(state.loadedPrefixes.has('src')).toBe(true)
-    expect(state.result.nodes.map((entry) => entry.id)).toEqual(['src/index.ts'])
+    expect(state.result.nodes.map((entry) => entry.id)).toEqual(['src', 'src/index.ts'])
   })
 
   test('tracks child read failures by prefix and clears them on retry', () => {
     let state = emptyLazyWorkspaceFilesystemTreeState()
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
+      type: 'childrenLoaded',
+      prefix: '',
+      result: { nodes: [node('src', null, 'directory')], truncated: false },
+    })
     state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenLoading', prefix: 'src' })
     state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenFailed', prefix: 'src' })
     state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenSettled', prefix: 'src' })
@@ -83,5 +93,71 @@ describe('filetree lazy state', () => {
     })
 
     expect(state.result.nodes.map((entry) => entry.id)).toEqual(['docs'])
+  })
+
+  test('removing a directory prunes its metadata and ignores late child actions', () => {
+    let state = emptyLazyWorkspaceFilesystemTreeState()
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
+      type: 'childrenLoaded',
+      prefix: '',
+      result: { nodes: [node('src', null, 'directory')], truncated: false },
+    })
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
+      type: 'childrenLoaded',
+      prefix: 'src',
+      result: { nodes: [node('src/web', 'src', 'directory')], truncated: true },
+    })
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
+      type: 'childrenLoaded',
+      prefix: 'src/web',
+      result: { nodes: [node('src/web/index.ts', 'src/web')], truncated: true },
+    })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'markForReload' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenLoading', prefix: 'src' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenLoading', prefix: 'src/web' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenFailed', prefix: 'src' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenFailed', prefix: 'src/web' })
+
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
+      type: 'childrenLoaded',
+      prefix: '',
+      result: { nodes: [], truncated: false },
+    })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenFailed', prefix: 'src' })
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
+      type: 'childrenLoaded',
+      prefix: 'src',
+      result: { nodes: [node('src/late.ts', 'src')], truncated: false },
+    })
+    state = lazyWorkspaceFilesystemTreeReducer(state, { type: 'childrenSettled', prefix: 'src' })
+
+    expect(state.result).toEqual({ nodes: [], truncated: false })
+    expect(state.loadedPrefixes).toEqual(new Set(['']))
+    expect(state.loadingPrefixes.size).toBe(0)
+    expect(state.errorPrefixes.size).toBe(0)
+    expect(state.truncatedPrefixes.size).toBe(0)
+  })
+
+  test('replacing a directory with a file prunes its former descendants and metadata', () => {
+    let state = emptyLazyWorkspaceFilesystemTreeState()
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
+      type: 'childrenLoaded',
+      prefix: '',
+      result: { nodes: [node('src', null, 'directory')], truncated: false },
+    })
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
+      type: 'childrenLoaded',
+      prefix: 'src',
+      result: { nodes: [node('src/index.ts', 'src')], truncated: true },
+    })
+    state = lazyWorkspaceFilesystemTreeReducer(state, {
+      type: 'childrenLoaded',
+      prefix: '',
+      result: { nodes: [node('src', null, 'file')], truncated: false },
+    })
+
+    expect(state.result).toEqual({ nodes: [node('src', null, 'file')], truncated: false })
+    expect(state.loadedPrefixes).toEqual(new Set(['']))
+    expect(state.truncatedPrefixes.size).toBe(0)
   })
 })

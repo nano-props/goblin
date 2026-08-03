@@ -350,6 +350,7 @@ export const ko: Record<DictKey, string> = {
   'filetree.no-worktree-body': '이 브랜치의 워크트리를 만들면 여기서 파일을 탐색할 수 있습니다.',
   'filetree.truncated': '파일 트리가 잘렸습니다 — 범위를 좁히면 더 표시됩니다.',
   'filetree.error': '파일 트리를 읽을 수 없습니다.',
+  'filetree.stale-title': '이전 파일 트리를 표시하고 있습니다',
   'filetree.confirm-trash-title': '파일을 휴지통으로 이동할까요?',
   'filetree.confirm-trash-body': '이 파일을 시스템 휴지통으로 이동합니다:',
   'filetree.confirm-trash-confirm': '휴지통으로 이동',

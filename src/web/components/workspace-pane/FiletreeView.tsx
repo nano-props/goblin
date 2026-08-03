@@ -4,13 +4,14 @@
 import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent, type ReactNode, type UIEvent } from 'react'
 import type { Key } from 'react-aria-components'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { FolderTree } from 'lucide-react'
+import { FolderTree, RefreshCw } from 'lucide-react'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspace-filesystem-lazy-state.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { focusRingInset } from '#/web/components/ui/focus.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
+import { Button } from '#/web/components/ui/button.tsx'
 import { buildFiletreeCollection } from '#/web/components/workspace-pane/filetree-collection.ts'
 import { FiletreeTreeRow } from '#/web/components/workspace-pane/FiletreeTreeRow.tsx'
 import {
@@ -24,7 +25,8 @@ import { useRestoreTopVisibleRowIndex } from '#/web/hooks/useRestoreTopVisibleRo
 
 export interface FiletreeViewProps {
   readonly tree: LazyWorkspaceFilesystemTreeAggregate | null
-  readonly loading: boolean
+  readonly isInitialLoading: boolean
+  readonly isReading: boolean
   readonly loadingKeys?: ReadonlySet<string>
   readonly openingFileKeys?: ReadonlySet<string>
   readonly error: string | null
@@ -37,6 +39,7 @@ export interface FiletreeViewProps {
   readonly onSelectedKeysChange: (keys: Set<Key>) => void
   readonly onDirectoryRowToggle: (key: string, expanded: boolean) => void
   readonly onPruneKeys: (validKeys: ReadonlySet<string>) => void
+  readonly onRetry?: () => void
   readonly initialTopVisibleRowIndex: number
   readonly scrollRestoreKey: string
   readonly scrollRestoreReady: boolean
@@ -48,11 +51,13 @@ const FILE_TREE_I18N_KEYS = {
   empty: 'filetree.empty',
   truncated: 'filetree.truncated',
   error: 'filetree.error',
+  stale: 'filetree.stale-title',
 } as const satisfies Record<string, string>
 
 export function FiletreeView({
   tree,
-  loading,
+  isInitialLoading,
+  isReading,
   loadingKeys = new Set(),
   openingFileKeys = new Set(),
   error,
@@ -65,6 +70,7 @@ export function FiletreeView({
   onSelectedKeysChange,
   onDirectoryRowToggle,
   onPruneKeys,
+  onRetry,
   initialTopVisibleRowIndex,
   scrollRestoreKey,
   scrollRestoreReady,
@@ -189,20 +195,31 @@ export function FiletreeView({
     [collection.rows, expandedKeys, handleOpenFile, onDirectoryRowToggle, rowVirtualizer],
   )
 
-  if (error) {
+  if (error && !tree) {
     return (
-      <FiletreeShell loading={loading}>
-        <EmptyState icon={<FolderTree size={16} />} title={t(FILE_TREE_I18N_KEYS.error)} />
+      <FiletreeShell loading={isReading}>
+        <EmptyState
+          icon={<FolderTree size={16} />}
+          title={t(FILE_TREE_I18N_KEYS.error)}
+          body={
+            onRetry ? (
+              <Button type="button" variant="default" disabled={isReading} onClick={onRetry}>
+                <RefreshCw className={isReading ? 'animate-spin' : undefined} />
+                {t('error.try-again')}
+              </Button>
+            ) : undefined
+          }
+        />
       </FiletreeShell>
     )
   }
 
   if (!tree) {
-    if (loading) {
-      return <FiletreeShell loading={loading} />
+    if (isInitialLoading) {
+      return <FiletreeShell loading={isInitialLoading} />
     }
     return (
-      <FiletreeShell loading={loading}>
+      <FiletreeShell loading={isInitialLoading}>
         <EmptyState icon={<FolderTree size={16} />} title={t(FILE_TREE_I18N_KEYS.empty)} />
       </FiletreeShell>
     )
@@ -210,14 +227,16 @@ export function FiletreeView({
 
   if (collection.rows.length === 0) {
     return (
-      <FiletreeShell loading={loading}>
+      <FiletreeShell loading={isReading}>
+        {error ? <FiletreeStaleNotice isReading={isReading} onRetry={onRetry} /> : null}
         <EmptyState icon={<FolderTree size={16} />} title={t(FILE_TREE_I18N_KEYS.empty)} />
       </FiletreeShell>
     )
   }
 
   return (
-    <FiletreeShell loading={loading}>
+    <FiletreeShell loading={isReading}>
+      {error ? <FiletreeStaleNotice isReading={isReading} onRetry={onRetry} /> : null}
       <ScrollArea
         className="min-h-0 flex-1"
         scrollbarMode="compact"
@@ -264,6 +283,24 @@ export function FiletreeView({
         </div>
       ) : null}
     </FiletreeShell>
+  )
+}
+
+function FiletreeStaleNotice({ isReading, onRetry }: { isReading: boolean; onRetry?: () => void }) {
+  const t = useT()
+  return (
+    <div
+      role="status"
+      className="flex items-center justify-between gap-3 border-b border-warning-border bg-warning-surface px-4 py-2 text-xs text-warning"
+    >
+      <span className="font-medium">{t(FILE_TREE_I18N_KEYS.stale)}</span>
+      {onRetry ? (
+        <Button type="button" size="sm" variant="ghost" disabled={isReading} onClick={onRetry}>
+          <RefreshCw className={isReading ? 'animate-spin' : undefined} />
+          {t('error.try-again')}
+        </Button>
+      ) : null}
+    </div>
   )
 }
 

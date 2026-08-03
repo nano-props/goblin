@@ -81,6 +81,15 @@ export type RuntimeWorkspacePaneTarget =
 /** Runtime targets that authorize operations against a concrete filesystem root. */
 export type WorkspacePaneFilesystemExecutionTarget = Exclude<RuntimeWorkspacePaneTarget, { kind: 'git-branch' }>
 
+/** Stable identity for the owner of filesystem reads and target-scoped UI work. */
+export function workspacePaneFilesystemExecutionTargetKey(target: WorkspacePaneFilesystemExecutionTarget): string {
+  return JSON.stringify(
+    target.kind === 'workspace-root'
+      ? [target.kind, target.workspaceId, target.workspaceRuntimeId]
+      : [target.kind, target.workspaceId, target.workspaceRuntimeId, target.root],
+  )
+}
+
 export function workspacePaneFilesystemExecutionPath(target: WorkspacePaneFilesystemExecutionTarget): string {
   const locator = parseCanonicalWorkspaceLocator(target.kind === 'workspace-root' ? target.workspaceId : target.root)
   if (!locator) throw new Error('filesystem execution target locator is invalid')

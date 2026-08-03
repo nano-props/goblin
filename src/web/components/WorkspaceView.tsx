@@ -14,7 +14,6 @@ import {
 import { WorkspaceLayoutPane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
 import { useRestoreWorkspaceTabsOnView } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
-import { getWorkspacePresentation } from '#/web/workspace-presentation.ts'
 import { UnavailableWorkspaceView } from '#/web/components/UnavailableWorkspaceView.tsx'
 import { WorkspaceProjectionFailureView } from '#/web/components/WorkspaceProjectionFailureView.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -88,17 +87,11 @@ function WorkspaceViewContent({
   const uiMode = useResponsiveUiMode()
   const compact = uiMode === 'compact'
   const view = useWorkspacesStore(
-    useShallow((s) => {
-      const workspace = s.workspaces[workspaceId]
-      const presentation = getWorkspacePresentation(workspace)
-      return {
-        exists: presentation.exists,
-        initialLoading: presentation.initialLoading,
-        workspaceMembershipReady: s.workspaceMembershipReady,
-        zenMode: s.zenMode,
-        workspacePaneSize: s.workspacePaneSize,
-      }
-    }),
+    useShallow((s) => ({
+      workspaceMembershipReady: s.workspaceMembershipReady,
+      zenMode: s.zenMode,
+      workspacePaneSize: s.workspacePaneSize,
+    })),
   )
   const setWorkspacePaneSize = useWorkspacesStore((s) => s.setWorkspacePaneSize)
   const workspace = useWorkspacesStore((s) => s.workspaces[workspaceId])
@@ -167,7 +160,7 @@ function WorkspaceViewContent({
       />
     )
   }
-  if (!view.exists || !workspace) return <RoutedWorkspaceNotFound workspaceId={workspaceId} />
+  if (!workspace) return <RoutedWorkspaceNotFound workspaceId={workspaceId} />
 
   const zenModeCollapsed = !compact && view.zenMode && workspacePaneActive
   const workspaceTrafficLightOffset = zenModeCollapsed
@@ -342,7 +335,7 @@ function WorkspaceViewContent({
       )
     }
 
-    if (workspace.session.projectionState === 'stub' || view.initialLoading) {
+    if (workspace.session.projectionState === 'stub') {
       return (
         <WorkspaceLayoutShell
           workspaceId={workspaceId}

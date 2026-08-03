@@ -357,6 +357,7 @@ export const ja: Record<DictKey, string> = {
   'filetree.no-worktree-body': 'このブランチのワークツリーを作成すると、ここでファイルを閲覧できます。',
   'filetree.truncated': 'ファイルツリーが切り詰められました — 範囲を絞るとさらに表示されます。',
   'filetree.error': 'ファイルツリーを読み込めませんでした。',
+  'filetree.stale-title': '古いファイルツリーを表示しています',
   'filetree.confirm-trash-title': 'ファイルをごみ箱に移動しますか？',
   'filetree.confirm-trash-body': 'このファイルをシステムのごみ箱に移動します：',
   'filetree.confirm-trash-confirm': 'ごみ箱に移動',
