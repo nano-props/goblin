@@ -23,10 +23,10 @@
   protocol boundaries, do not use object-pattern `...rest` to decide which
   fields cross the boundary; construct the boundary object explicitly.
   Open-ended platform adapters may forward their option bag when preserving
-  unknown standard fields is part of the adapter contract. A readability-only
-  refactor preserves the established field set, property-read order, and
-  capture timing; tightening a boundary is a separate behavioral change. This
-  is a readability guideline, not a destructuring ban or a static-check
+  unknown standard fields is part of the adapter contract. Refactors must
+  preserve declared protocol fields and business behavior; an intentional
+  boundary tightening should be reviewed separately from mechanical cleanup.
+  This is a readability guideline, not a destructuring ban or a static-check
   requirement.
 
 ## Verification and test data
