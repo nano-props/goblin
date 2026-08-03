@@ -61,9 +61,18 @@ export function issuePhysicalWorktreeExecutionCapability(
   }) as PhysicalWorktreeAdmissionLease
   const capability = Object.freeze({ identity: frozenIdentity }) as PhysicalWorktreeExecutionCapability
   const execution = freezeExecutionBinding(state.execution)
-  const { runtimeSignal, ...capabilityState } = state
-  admissionSignals.set(admissionLease, runtimeSignal)
-  capabilities.set(capability, Object.freeze({ ...capabilityState, admissionLease, execution }))
+  admissionSignals.set(admissionLease, state.runtimeSignal)
+  capabilities.set(
+    capability,
+    Object.freeze({
+      userId: state.userId,
+      workspaceId: state.workspaceId,
+      workspaceRuntimeId: state.workspaceRuntimeId,
+      worktreePath: state.worktreePath,
+      admissionLease,
+      execution,
+    }),
+  )
   return capability
 }
 
