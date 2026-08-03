@@ -539,6 +539,7 @@ export const zh: Record<DictKey, string> = {
   'error.trash-cancelled-check-state': '移到废纸篓已取消，请检查文件状态后再重试',
   'error.trash-timeout-check-state': '移到废纸篓超时，请检查文件状态后再重试',
   'error.trash-failed-check-state': '文件可能已移到废纸篓，请检查文件状态后再重试',
+  'error.git-command-cancelled-check-state': 'Git 操作启动后被取消。请检查仓库状态后再重试。',
   'error.invalid-arguments': '参数无效',
   'error.workspace-runtime-stale': '工作区运行时已失效',
   'error.workspace-target-stale': '工作区目标已发生变化，请重试',

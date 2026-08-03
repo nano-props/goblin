@@ -14,7 +14,7 @@ import type { CreateWorktreeInput, RemoteTrackingBranchIdentity } from '#/shared
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
-import { REPO_MEMBERSHIP_READ_CONFLICT_MESSAGE } from '#/shared/repo-membership-read.ts'
+import { REPO_MEMBERSHIP_READ_CONFLICT_KEY } from '#/shared/repo-membership-read.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
 import { decodeWith, ExecResultResponseSchema } from '#/shared/http-response-schema.ts'
 import {
@@ -45,7 +45,7 @@ async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?:
   } catch (err) {
     if (signal?.aborted) throw err
     if (err instanceof Error && err.message === SERVER_REQUEST_TIMEOUT_ERROR) throw err
-    if (err instanceof Error && err.message === REPO_MEMBERSHIP_READ_CONFLICT_MESSAGE) throw err
+    if (err instanceof Error && err.message === REPO_MEMBERSHIP_READ_CONFLICT_KEY) throw err
     throw new Error('error.failed-read-repo', { cause: err })
   }
 }

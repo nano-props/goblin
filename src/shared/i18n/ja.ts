@@ -559,6 +559,8 @@ export const ja: Record<DictKey, string> = {
   'error.trash-cancelled-check-state': 'ごみ箱への移動はキャンセルされました。再試行前にファイルの状態を確認してください。',
   'error.trash-timeout-check-state': 'ごみ箱への移動がタイムアウトしました。再試行前にファイルの状態を確認してください。',
   'error.trash-failed-check-state': 'ごみ箱への移動が完了した可能性があります。再試行前にファイルの状態を確認してください。',
+  'error.git-command-cancelled-check-state':
+    'Git 操作は開始後にキャンセルされました。再試行前にリポジトリの状態を確認してください。',
   'error.invalid-arguments': '無効な引数',
   'error.workspace-runtime-stale': 'ワークスペースランタイムが無効です',
   'error.workspace-target-stale': 'ワークスペースの対象が変更されました。もう一度お試しください。',

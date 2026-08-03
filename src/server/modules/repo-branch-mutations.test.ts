@@ -498,6 +498,16 @@ describe('repo branch mutations', () => {
     expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
   })
 
+  test('deleteRepoBranch surfaces cancellation after the delete command started', async () => {
+    mocks.deleteBranch.mockResolvedValueOnce(commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'cancelled'))
+    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+
+    expect(result).toEqual({ ok: false, message: 'error.git-command-cancelled-check-state' })
+    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+  })
+
   test('deleteRepoBranch preserves an ordinary Git error while conservatively invalidating', async () => {
     mocks.deleteBranch.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'error: branch is not fully merged' }, 'failed'),

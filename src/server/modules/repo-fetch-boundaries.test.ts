@@ -59,7 +59,7 @@ describe('fetchRepo canonical boundaries', () => {
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'user', caller.signal)
 
-    expect(result).toEqual({ ok: false, message: 'cancelled' })
+    expect(result).toEqual({ ok: false, message: 'error.git-command-cancelled-check-state' })
     expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
   })
 

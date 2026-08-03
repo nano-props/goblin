@@ -307,13 +307,19 @@ async function readRemoteRepoIdsToInvalidate(
   return Array.from(new Set([target.id, ...remoteWorktreeRepoIds(target, worktreePaths)]))
 }
 
+function commandFailureForUser<T extends ExecResult>(result: T, execution: CommandExecution): T {
+  if (result.ok || execution.status !== 'cancelled') return result
+  return { ...result, message: 'error.git-command-cancelled-check-state' }
+}
+
 function withPossibleCommandImpact<T extends ExecResult>(
   result: T,
   execution: CommandExecution,
   repoIdsToInvalidate: readonly WorkspaceId[],
 ): T & RepoMutationResult {
-  if (!commandMayHaveRun(execution)) return result
-  return withRepoIdsToInvalidate(result, repoIdsToInvalidate)
+  const userResult = commandFailureForUser(result, execution)
+  if (!commandMayHaveRun(execution)) return userResult
+  return withRepoIdsToInvalidate(userResult, repoIdsToInvalidate)
 }
 
 function worktreeCommandFailureForUser<T extends ExecResult>(
@@ -325,7 +331,7 @@ function worktreeCommandFailureForUser<T extends ExecResult>(
   if (execution.status === 'timed-out') {
     return { ...result, message: worktreeCommandTimeoutMessage(operation) }
   }
-  return result
+  return commandFailureForUser(result, execution)
 }
 
 function worktreeCommandTimeoutMessage(operation: 'create' | 'remove'): string {
@@ -344,6 +350,9 @@ function worktreeRemovalResultForUser(result: RepoMutationResult): RepoMutationR
   if (result.worktreeRemoved) {
     return { ...result, message: 'error.worktree-removed-followup-failed' }
   }
+  if (result.message === 'cancelled' && result.worktreePathsToInvalidate?.length) {
+    return { ...result, message: 'error.git-command-cancelled-check-state' }
+  }
   return result
 }
 
@@ -351,6 +360,9 @@ function branchDeleteResultForUser(result: BranchDeleteResult): BranchDeleteResu
   if (result.ok) return result
   if (result.localBranchDeleted) {
     return { ...result, message: 'error.local-branch-deleted-upstream-failed-check-state' }
+  }
+  if (result.branchStateMayHaveChanged && result.message === 'cancelled') {
+    return { ...result, message: 'error.git-command-cancelled-check-state' }
   }
   return result
 }
@@ -512,20 +524,20 @@ function createLocalRepoSource(
       const available = await probeGitRepo(repoId)
       if (!available.ok) return available
       const repoIdsToInvalidate = await readLocalRepoIdsToInvalidate(repoId, signal)
-      const { result, execution } = await fetchAll(repoId, signal)
-      return withPossibleCommandImpact(result, execution, repoIdsToInvalidate)
+      const { result: fetchResult, execution: fetchExecution } = await fetchAll(repoId, signal)
+      return withPossibleCommandImpact(fetchResult, fetchExecution, repoIdsToInvalidate)
     },
     async pull(branch, worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const repoIdsToInvalidate = await readLocalRepoIdsToInvalidate(repoId, signal)
-      const { result, execution } = await pullBranch(repoId, branch, worktreePath, signal)
-      return withPossibleCommandImpact(result, execution, repoIdsToInvalidate)
+      const { result: pullResult, execution: pullExecution } = await pullBranch(repoId, branch, worktreePath, signal)
+      return withPossibleCommandImpact(pullResult, pullExecution, repoIdsToInvalidate)
     },
     async push(branch, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const repoIdsToInvalidate = await readLocalRepoIdsToInvalidate(repoId, signal)
-      const { result, execution } = await pushBranch(repoId, branch, signal)
-      return withPossibleCommandImpact(result, execution, repoIdsToInvalidate)
+      const { result: pushResult, execution: pushExecution } = await pushBranch(repoId, branch, signal)
+      return withPossibleCommandImpact(pushResult, pushExecution, repoIdsToInvalidate)
     },
     async getWorktreeBootstrapPreview(signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -723,18 +735,21 @@ async function createRemoteRepoSource(
     },
     async fetch(signal) {
       const repoIdsToInvalidate = await readRemoteRepoIdsToInvalidate(target, signal, run)
-      const { result, execution } = await fetchRemoteRepo(target, { signal, run })
-      return withPossibleCommandImpact(result, execution, repoIdsToInvalidate)
+      const { result: fetchResult, execution: fetchExecution } = await fetchRemoteRepo(target, { signal, run })
+      return withPossibleCommandImpact(fetchResult, fetchExecution, repoIdsToInvalidate)
     },
     async pull(branch, worktreePath, signal) {
       const repoIdsToInvalidate = await readRemoteRepoIdsToInvalidate(target, signal, run)
-      const { result, execution } = await pullRemoteBranch(target, branch, worktreePath, { signal, run })
-      return withPossibleCommandImpact(result, execution, repoIdsToInvalidate)
+      const { result: pullResult, execution: pullExecution } = await pullRemoteBranch(target, branch, worktreePath, {
+        signal,
+        run,
+      })
+      return withPossibleCommandImpact(pullResult, pullExecution, repoIdsToInvalidate)
     },
     async push(branch, signal) {
       const repoIdsToInvalidate = await readRemoteRepoIdsToInvalidate(target, signal, run)
-      const { result, execution } = await pushRemoteBranch(target, branch, { signal, run })
-      return withPossibleCommandImpact(result, execution, repoIdsToInvalidate)
+      const { result: pushResult, execution: pushExecution } = await pushRemoteBranch(target, branch, { signal, run })
+      return withPossibleCommandImpact(pushResult, pushExecution, repoIdsToInvalidate)
     },
     async getWorktreeBootstrapPreview(signal) {
       return await getRemoteWorktreeBootstrapPreview(target, { signal, run })

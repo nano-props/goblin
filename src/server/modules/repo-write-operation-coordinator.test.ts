@@ -127,6 +127,37 @@ describe('repo write operation coordinator', () => {
     await expect(work).resolves.toEqual({ ok: true, message: 'created' })
   })
 
+  test('keeps membership admission on one physical boundary after its runtime closes', async () => {
+    mocks.resolveRepoWriteBoundaryKey.mockResolvedValue(WORKSPACE_BOUNDARY_KEY)
+    const boundary = await resolveRepoWriteBoundaryForRead(WORKSPACE_ID, { workspaceRuntimeId: 'runtime-a' })
+    const readStarted = Promise.withResolvers<void>()
+    const releaseRead = Promise.withResolvers<void>()
+    const read = runWithRepoMembershipReadAdmission(boundary, async () => {
+      readStarted.resolve()
+      await releaseRead.promise
+      return 'stale snapshot'
+    })
+    await readStarted.promise
+
+    mocks.workspaceRuntimeClosed?.({ userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' })
+
+    const mutation = enqueueRepoWriteOperation(
+      LINKED_WORKSPACE_ID,
+      undefined,
+      { repoId: LINKED_WORKSPACE_ID, kind: 'create-worktree', source: 'user' },
+      (operation) => async () => {
+        operation.start()
+        await operation.runMembershipMutation(async () => {})
+        operation.settle({ ok: true })
+        return { ok: true, message: 'created' }
+      },
+    )
+    await expect(mutation).resolves.toEqual({ ok: true, message: 'created' })
+
+    releaseRead.resolve()
+    await expect(read).rejects.toThrow('error.repo-membership-changing')
+  })
+
   test('does not block an unrelated repo behind slow boundary resolution', async () => {
     const slowBoundary = Promise.withResolvers<string>()
     mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) => {

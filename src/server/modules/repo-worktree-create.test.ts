@@ -104,6 +104,22 @@ describe('repo worktree creation', () => {
     expect(repoMetadataInvalidations()).toEqual([])
   })
 
+  test('createRepoWorktree reports uncertain state when cancellation happened after Git started', async () => {
+    mocks.createWorktree.mockResolvedValueOnce(commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'cancelled'))
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepoWorktree(REPO_ID, {
+      worktreePath: '/tmp/repo-worktree',
+      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+    })
+
+    expect(result).toEqual({ ok: false, message: 'error.git-command-cancelled-check-state' })
+    expectRepoMetadataInvalidations(
+      { repoId: REPO_ID, domain: 'metadata' },
+      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
+    )
+  })
+
   test('createRepoWorktree skips bootstrap unless run is explicitly requested', async () => {
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 

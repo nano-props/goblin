@@ -66,6 +66,7 @@ interface RepoWriteBoundaryGroup extends RepoWriteBoundaryHandle {
   operations: Map<string, RepoServerOperationState>
   lastSuccessfulFetchAt: number | null
   membershipRevision: number
+  activeMembershipReads: number
   activeMembershipWrites: number
 }
 
@@ -99,6 +100,7 @@ function createBoundaryGroup(descriptor: string): RepoWriteBoundaryGroup {
     operations: new Map(),
     lastSuccessfulFetchAt: null,
     membershipRevision: 0,
+    activeMembershipReads: 0,
     activeMembershipWrites: 0,
   }
   boundaryGroups.add(group)
@@ -295,7 +297,7 @@ function unregisterRepoWriteOperationBoundaryRepoId(repoId: WorkspaceId, workspa
 }
 
 function deleteBoundaryGroupIfIdle(group: RepoWriteBoundaryGroup): void {
-  if (group.repoIds.size > 0 || group.operations.size > 0) return
+  if (group.repoIds.size > 0 || group.operations.size > 0 || group.activeMembershipReads > 0) return
   boundaryGroups.delete(group)
   if (boundaryGroupByDescriptor.get(group.descriptor) === group) boundaryGroupByDescriptor.delete(group.descriptor)
   boundaryGroupByHandle.delete(group)
@@ -519,10 +521,16 @@ export async function runWithRepoMembershipReadAdmission<T>(
   const group = boundaryGroupForHandle(handle)
   if (group.activeMembershipWrites > 0) throw new RepoMembershipReadConflictError()
   const revision = group.membershipRevision
-  const outcome = await observePromise(read)
-  assertRepoMembershipReadStillAdmitted(group, revision)
-  if (!outcome.ok) throw outcome.error
-  return outcome.value
+  group.activeMembershipReads += 1
+  try {
+    const outcome = await observePromise(read)
+    assertRepoMembershipReadStillAdmitted(group, revision)
+    if (!outcome.ok) throw outcome.error
+    return outcome.value
+  } finally {
+    group.activeMembershipReads -= 1
+    deleteBoundaryGroupIfIdle(group)
+  }
 }
 
 function assertRepoMembershipReadStillAdmitted(group: RepoWriteBoundaryGroup, revision: number): void {

@@ -7,7 +7,6 @@ import type {
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { REPO_MEMBERSHIP_READ_CONFLICT_MESSAGE } from '#/shared/repo-membership-read.ts'
 import { getRepoOperations, getRepoPullRequests, getRepoSnapshot, getRepoWorktreeStatus } from '#/web/repo-client.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { waitForPromiseWithSignal } from '#/web/lib/abort.ts'
@@ -105,10 +104,6 @@ async function currentRead<T>(
 
 export function isStaleRepoRuntimeReadError(error: unknown): boolean {
   return error instanceof StaleRepoRuntimeReadError
-}
-
-export function isRepoMembershipReadConflict(error: unknown): boolean {
-  return error instanceof Error && error.message === REPO_MEMBERSHIP_READ_CONFLICT_MESSAGE
 }
 
 export async function fetchRepoSnapshotReadModel(

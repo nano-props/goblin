@@ -560,6 +560,8 @@ export const en = {
   'error.trash-cancelled-check-state': 'Trash was cancelled. Check the file state before trying again.',
   'error.trash-timeout-check-state': 'Trash timed out. Check the file state before trying again.',
   'error.trash-failed-check-state': 'Trash may have completed. Check the file state before trying again.',
+  'error.git-command-cancelled-check-state':
+    'The Git operation was cancelled after it started. Check the repository state before trying again.',
   'error.invalid-arguments': 'Invalid arguments',
   'error.workspace-runtime-stale': 'Workspace runtime is stale',
   'error.workspace-target-stale': 'Workspace target changed. Please try again.',

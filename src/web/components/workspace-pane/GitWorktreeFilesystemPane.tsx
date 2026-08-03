@@ -46,7 +46,7 @@ export function GitWorktreeFilesystemPane({
   const statusReadModel = useRepoWorktreeStatusReadModel(repo.id, repo.workspaceRuntimeId, true)
   const worktree = statusReadModel.data?.status.find((candidate) => candidate.path === worktreePath)
   const target = gitWorktreeWorkspacePaneTabsTarget(repo.id, worktreePath)
-  if (!statusReadModel.data && (statusReadModel.isPending || statusReadModel.membershipChanging)) {
+  if (!statusReadModel.data && statusReadModel.isPending) {
     return <WorkspacePaneSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
   if (!statusReadModel.data && statusReadModel.displayError) {

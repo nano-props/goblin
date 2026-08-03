@@ -10,11 +10,10 @@ import {
   repoWorktreeStatusReadModelQueryOptions,
 } from '#/web/repo-query-options.ts'
 import { projectRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
-import { isRepoMembershipReadConflict } from '#/web/repo-query-runtime.ts'
 
 export function useRepoSnapshotReadModel(repoRoot: WorkspaceId | null, workspaceRuntimeId: string, enabled: boolean) {
   const query = useQuery(repoSnapshotReadModelQueryOptions(repoRoot, workspaceRuntimeId, enabled))
-  return repoMembershipReadProjection(query, query.error)
+  return repoReadProjection(query, query.error)
 }
 
 export function useRepoPullRequestsReadModel(
@@ -32,15 +31,13 @@ export function useRepoWorktreeStatusReadModel(
   enabled: boolean,
 ) {
   const query = useQuery(repoWorktreeStatusReadModelQueryOptions(repoRoot, workspaceRuntimeId, enabled))
-  return repoMembershipReadProjection(query, query.error)
+  return repoReadProjection(query, query.error)
 }
 
-function repoMembershipReadProjection<T extends object>(query: T, error: unknown) {
-  const membershipChanging = isRepoMembershipReadConflict(error)
+function repoReadProjection<T extends object>(query: T, error: unknown) {
   return {
     ...query,
-    membershipChanging,
-    displayError: membershipChanging ? null : repoReadError(error),
+    displayError: repoReadError(error),
   }
 }
 

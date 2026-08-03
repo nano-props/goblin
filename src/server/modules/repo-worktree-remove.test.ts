@@ -158,6 +158,25 @@ describe('repo worktree removal', () => {
     )
   })
 
+  test('removeRepoWorktree reports uncertain state when cancellation happened after Git started', async () => {
+    mocks.removeWorktree.mockResolvedValueOnce(commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'cancelled'))
+    mocks.readWorktreeMembership.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false },
+    ])
+
+    const result = await removeLocalRepoWorktreeForTest(
+      { deleteBranch: false },
+      successfulRemovalLifecycle,
+    )
+
+    expect(result).toEqual({ ok: false, message: 'error.git-command-cancelled-check-state' })
+    expectRepoMetadataInvalidations(
+      { repoId: REPO_ID, domain: 'metadata' },
+      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
+    )
+  })
+
   test('remote removal preflight failure does not publish mutation invalidations', async () => {
     mocks.removeRemoteWorktree.mockResolvedValueOnce({ ok: false, message: 'error.cannot-remove-main-worktree' })
 

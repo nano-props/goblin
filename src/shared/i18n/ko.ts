@@ -551,6 +551,8 @@ export const ko: Record<DictKey, string> = {
   'error.trash-cancelled-check-state': '휴지통 이동이 취소되었습니다. 다시 시도하기 전에 파일 상태를 확인하세요.',
   'error.trash-timeout-check-state': '휴지통 이동 시간이 초과되었습니다. 다시 시도하기 전에 파일 상태를 확인하세요.',
   'error.trash-failed-check-state': '휴지통 이동이 완료되었을 수 있습니다. 다시 시도하기 전에 파일 상태를 확인하세요.',
+  'error.git-command-cancelled-check-state':
+    'Git 작업이 시작된 후 취소되었습니다. 다시 시도하기 전에 저장소 상태를 확인하세요.',
   'error.invalid-arguments': '인수가 올바르지 않습니다',
   'error.workspace-runtime-stale': '워크스페이스 런타임이 만료되었습니다',
   'error.workspace-target-stale': '워크스페이스 대상이 변경되었습니다. 다시 시도해 주세요.',
