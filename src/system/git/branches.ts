@@ -1,7 +1,8 @@
 import path from 'node:path'
 import { realpath } from 'node:fs/promises'
 import { omit } from 'es-toolkit'
-import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
+import { git, gitCommandResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
+import { withoutMutationCommand, type CommandOutcome } from '#/system/command-execution.ts'
 import { FOR_EACH_REF_FIELD_SEP, PRETTY_FIELD_SEP, parseBranches, parseLog } from '#/system/git/parsers.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
@@ -218,9 +219,16 @@ export async function deleteBranch(
   cwd: string,
   name: string,
   options?: { force?: boolean; signal?: AbortSignal },
-): Promise<ExecResult> {
-  if (!isSafeBranchName(name)) return { ok: false, message: 'error.invalid-arguments' }
-  return gitResultWithOptions(cwd, { signal: options?.signal }, 'branch', options?.force ? '-D' : '-d', '--', name)
+): Promise<CommandOutcome> {
+  if (!isSafeBranchName(name)) return withoutMutationCommand({ ok: false, message: 'error.invalid-arguments' })
+  return gitCommandResultWithOptions(
+    cwd,
+    { signal: options?.signal },
+    'branch',
+    options?.force ? '-D' : '-d',
+    '--',
+    name,
+  )
 }
 
 export async function deleteUpstreamBranch(
@@ -228,9 +236,17 @@ export async function deleteUpstreamBranch(
   remote: string,
   branch: string,
   signal?: AbortSignal,
-): Promise<ExecResult> {
-  if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
-  return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'push', '--delete', '--', remote, branch)
+): Promise<CommandOutcome> {
+  if (!isSafeBranchName(branch)) return withoutMutationCommand({ ok: false, message: 'error.invalid-arguments' })
+  return gitCommandResultWithOptions(
+    cwd,
+    { timeoutMs: NETWORK_TIMEOUT_MS, signal },
+    'push',
+    '--delete',
+    '--',
+    remote,
+    branch,
+  )
 }
 
 /** Resolve and validate `branch`'s upstream, or null when none is configured. */

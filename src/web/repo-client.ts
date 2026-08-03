@@ -14,6 +14,7 @@ import type { CreateWorktreeInput, RemoteTrackingBranchIdentity } from '#/shared
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
+import { REPO_MEMBERSHIP_READ_CONFLICT_MESSAGE } from '#/shared/repo-membership-read.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
 import { decodeWith, ExecResultResponseSchema } from '#/shared/http-response-schema.ts'
 import {
@@ -33,7 +34,6 @@ const REPO_REQUEST_TIMEOUT_MS = {
   clone: 360_000,
   branchMutation: 240_000,
   removeWorktree: 10 * 60_000,
-  worktreeCreate: 15 * 60_000,
   patch: 15 * 60_000,
 } as const
 
@@ -45,6 +45,7 @@ async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?:
   } catch (err) {
     if (signal?.aborted) throw err
     if (err instanceof Error && err.message === SERVER_REQUEST_TIMEOUT_ERROR) throw err
+    if (err instanceof Error && err.message === REPO_MEMBERSHIP_READ_CONFLICT_MESSAGE) throw err
     throw new Error('error.failed-read-repo', { cause: err })
   }
 }
@@ -221,7 +222,9 @@ export async function createRepoWorktree(
     '/api/repo/create-worktree',
     { cwd, workspaceRuntimeId, ...input, worktreeBootstrap },
     decodeWith(ExecResultResponseSchema),
-    { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.worktreeCreate },
+    // Mutation subcommands own their applicable server-side deadlines. A fixed
+    // request watchdog could abort a valid queued workflow; caller cancellation remains active.
+    { signal, timeoutMs: 0 },
   )
 }
 

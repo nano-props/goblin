@@ -1,3 +1,4 @@
+import path from 'node:path'
 import PQueue from 'p-queue'
 import { parseStatus } from '#/system/git/parsers.ts'
 import type { StatusEntry, WorktreeInfo, WorktreeStatus } from '#/shared/git-types.ts'
@@ -63,7 +64,10 @@ async function readStatusEntries(worktreePath: string, args: string[], signal?: 
  *  each in parallel. Bare worktrees are omitted. Any other read failure
  *  rejects the complete status read so callers cannot mistake partial data
  *  for an authoritative clean snapshot. */
-export async function getWorkingStatus(cwd: string, options?: { signal?: AbortSignal }): Promise<WorktreeStatus[]> {
+export async function getWorkingStatus(
+  cwd: string,
+  options?: { signal?: AbortSignal },
+): Promise<WorktreeStatus[]> {
   const worktrees = await readWorktreeMembership(cwd, options?.signal)
   const samples = await sampleWorktreeStatus(worktrees, options?.signal)
   const filtered = samples.flatMap((sample): WorktreeStatus[] =>

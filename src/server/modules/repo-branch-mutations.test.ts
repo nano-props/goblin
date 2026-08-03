@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type * as RepoWritePaths from '#/server/modules/repo-write-paths.ts'
+import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import {
   LINKED_REPO_ID,
   REPO_ID,
@@ -9,11 +10,20 @@ import {
   createLocalRepoWorktreeWithBootstrap,
   expectNoRepoMetadataInvalidations,
   expectRepoMetadataInvalidations,
+  expectRepoOperationSettledBeforeProjectionInvalidation,
   repoWorktreeStatusInvalidations,
   mocks,
 } from '#/server/test-utils/repo-module.ts'
 
 describe('repo branch mutations', () => {
+  test('deleteRepoBranch settles the write operation before invalidating projections', async () => {
+    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    await expect(deleteRepoBranch(REPO_ID, 'feature/a')).resolves.toEqual({ ok: true, message: 'ok' })
+
+    expectRepoOperationSettledBeforeProjectionInvalidation()
+  })
+
   test.each([
     ['pullRepoBranch', async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
     ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
@@ -39,11 +49,13 @@ describe('repo branch mutations', () => {
   })
 
   test('pullRepoBranch preserves the authoritative changed worktree paths for route projection', async () => {
-    mocks.pullBranch.mockResolvedValueOnce({
-      ok: true,
-      message: 'ok',
-      affectedWorktreePaths: ['/tmp/repo-worktree'],
-    })
+    mocks.pullBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({
+        ok: true,
+        message: 'ok',
+        worktreePathsToInvalidate: ['/tmp/repo-worktree'],
+      }),
+    )
     const { pullRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await pullRepoBranch(REPO_ID, 'feature/a', '/tmp/repo-worktree')
@@ -51,21 +63,22 @@ describe('repo branch mutations', () => {
     expect(result).toEqual({
       ok: true,
       message: 'ok',
-      affectedWorktreePaths: ['/tmp/repo-worktree'],
+      worktreePathsToInvalidate: ['/tmp/repo-worktree'],
     })
   })
 
   test('pullRepoBranch publishes invalidation when failure may follow partial ref updates', async () => {
-    mocks.pullBranch.mockResolvedValueOnce({
-      ok: false,
-      message: 'fatal: pull failed',
-      repositoryStateChanged: true,
-      affectedWorktreePaths: ['/tmp/repo'],
-    })
+    mocks.pullBranch.mockResolvedValueOnce(
+      commandOutcomeForTest(
+        { ok: false, message: 'fatal: pull failed', worktreePathsToInvalidate: ['/tmp/repo'] },
+        'failed',
+      ),
+    )
     const repo = await import('#/server/modules/repo-write-paths.ts')
 
-    await repo.pullRepoBranch(REPO_ID, 'feature/a')
+    const result = await repo.pullRepoBranch(REPO_ID, 'feature/a')
 
+    expect(result).toMatchObject({ ok: false, message: 'fatal: pull failed' })
     expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
     expect(repoWorktreeStatusInvalidations()).toEqual([{ repoId: REPO_ID, domain: 'worktree-status' }])
   })
@@ -73,17 +86,26 @@ describe('repo branch mutations', () => {
   test.each([
     [
       'pullRepoBranch',
-      () => mocks.pullBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: pull failed' }),
+      () =>
+        mocks.pullBranch.mockResolvedValueOnce(
+          commandOutcomeForTest({ ok: false, message: 'fatal: pull failed' }, 'not-started'),
+        ),
       async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
     ],
     [
       'pushRepoBranch',
-      () => mocks.pushBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: push failed' }),
+      () =>
+        mocks.pushBranch.mockResolvedValueOnce(
+          commandOutcomeForTest({ ok: false, message: 'fatal: push failed' }, 'not-started'),
+        ),
       async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a'),
     ],
     [
       'createRepoWorktree',
-      () => mocks.createWorktree.mockResolvedValueOnce({ ok: false, message: 'fatal: worktree failed' }),
+      () =>
+        mocks.createWorktree.mockResolvedValueOnce(
+          commandOutcomeForTest({ ok: false, message: 'fatal: worktree failed' }, 'not-started'),
+        ),
       async (repo: typeof RepoWritePaths) =>
         repo.createRepoWorktree(REPO_ID, {
           worktreePath: '/tmp/repo-worktree',
@@ -99,16 +121,52 @@ describe('repo branch mutations', () => {
     expectNoRepoMetadataInvalidations()
   })
 
+  test('pushRepoBranch invalidates repository projections when a failed command may have run', async () => {
+    mocks.pushBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'fatal: push failed' }, 'failed'),
+    )
+    const { pushRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await pushRepoBranch(REPO_ID, 'feature/a')
+
+    expect(result).toEqual({ ok: false, message: 'fatal: push failed' })
+    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+  })
+
+  test('pushRepoBranch invalidates remote projections when a failed SSH command ran remotely', async () => {
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
+    mocks.getRemoteRepoWorktreePaths.mockResolvedValueOnce(['/srv/repo', '/srv/repo-feature'])
+    mocks.pushRemoteBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'connection closed after push' }, 'failed'),
+    )
+    const { pushRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await pushRepoBranch(repoId, 'feature/a')
+
+    expect(result).toEqual({ ok: false, message: 'connection closed after push' })
+    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
+  })
+
+  test('createRepoWorktree invalidates source and target projections when a failed command may have run', async () => {
+    mocks.createWorktree.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'fatal: worktree failed' }, 'failed'),
+    )
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepoWorktree(REPO_ID, {
+      worktreePath: '/tmp/repo-worktree',
+      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+    })
+
+    expect(result).toEqual({ ok: false, message: 'fatal: worktree failed' })
+    expectRepoMetadataInvalidations(
+      { repoId: REPO_ID, domain: 'metadata' },
+      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
+    )
+  })
+
   test('createRepoWorktree publishes invalidation when bootstrap fails after git created the worktree', async () => {
-    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([
-      {
-        repoId: REPO_ID,
-        worktreeBootstrapTrust: {
-          configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
-          trustedAt: '2026-06-26T00:00:00.000Z',
-        },
-      },
-    ])
     mocks.bootstrapWorktreeAfterCreate.mockResolvedValueOnce({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
@@ -119,8 +177,7 @@ describe('repo branch mutations', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'Worktree bootstrap failed: destination already exists: .env.local',
-      repositoryStateChanged: true,
+      message: 'error.worktree-created-followup-failed',
     })
     expect(mocks.bootstrapWorktreeAfterCreate).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', {
       signal: undefined,
@@ -134,17 +191,19 @@ describe('repo branch mutations', () => {
       repoId: WORKTREE_REPO_ID,
       domain: 'metadata',
     })
-    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).not.toHaveBeenCalled()
   })
 
   test('createRepoWorktree publishes remote invalidation when bootstrap fails after remote worktree creation', async () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const worktreeRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
-    mocks.createRemoteWorktree.mockResolvedValueOnce({
-      ok: true,
-      message: 'created',
-      affectedWorktreePaths: ['/srv/repo-feature'],
-    })
+    mocks.createRemoteWorktree.mockResolvedValueOnce(
+      commandOutcomeForTest({
+        ok: true,
+        message: 'created',
+        worktreePathsToInvalidate: ['/srv/repo-feature'],
+      }),
+    )
     mocks.bootstrapRemoteWorktreeAfterCreate.mockResolvedValueOnce({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
@@ -169,8 +228,7 @@ describe('repo branch mutations', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'Worktree bootstrap failed: destination already exists: .env.local',
-      repositoryStateChanged: true,
+      message: 'error.worktree-created-followup-failed',
     })
     expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId,
@@ -180,6 +238,24 @@ describe('repo branch mutations', () => {
       repoId: worktreeRepoId,
       domain: 'metadata',
     })
+  })
+
+  test('createRepoWorktree invalidates the remote source and target after a started SSH timeout', async () => {
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const worktreeRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
+    mocks.createRemoteWorktree.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'error.worktree-create-timeout-check-state' }, 'timed-out'),
+    )
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepoWorktree(repoId, {
+      worktreePath: '/srv/repo-feature',
+      mode: { kind: 'existingBranch', branch: 'feature/a' },
+    })
+
+    expect(result).toEqual({ ok: false, message: 'error.worktree-create-timeout-check-state' })
+    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: worktreeRepoId, domain: 'metadata' })
+    expect(mocks.bootstrapRemoteWorktreeAfterCreate).not.toHaveBeenCalled()
   })
 
   test('createRepoWorktree does not store bootstrap trust when bootstrap fails', async () => {
@@ -193,11 +269,9 @@ describe('repo branch mutations', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'Worktree bootstrap failed: destination already exists: .env.local',
-      repositoryStateChanged: true,
+      message: 'error.worktree-created-followup-failed',
     })
-    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
-    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).not.toHaveBeenCalled()
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 
@@ -237,16 +311,15 @@ describe('repo branch mutations', () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-linked' })
     mocks.getRemoteRepoWorktreePaths.mockResolvedValueOnce(['/srv/repo', '/srv/repo-linked'])
-    mocks.deleteRemoteBranch.mockResolvedValueOnce({
-      ok: false,
-      message: 'remote rejected delete',
-      repositoryStateChanged: true,
-    })
+    mocks.deleteRemoteBranch.mockResolvedValueOnce({ ok: false, message: 'cancelled', localBranchDeleted: true })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await deleteRepoBranch(repoId, 'feature/a', { deleteUpstream: true })
 
-    expect(result).toEqual({ ok: false, message: 'remote rejected delete', repositoryStateChanged: true })
+    expect(result).toEqual({
+      ok: false,
+      message: 'error.local-branch-deleted-upstream-failed-check-state',
+    })
     expect(mocks.deleteRemoteBranch).toHaveBeenCalledWith(expect.objectContaining({ remotePath: '/srv/repo' }), {
       branch: 'feature/a',
       force: undefined,
@@ -360,6 +433,29 @@ describe('repo branch mutations', () => {
     expect(mocks.deleteUpstreamBranch).toHaveBeenCalledWith('/tmp/repo', 'origin', 'feature/a', undefined)
   })
 
+  test('deleteRepoBranch invalidates metadata when local deletion succeeded before upstream cancellation', async () => {
+    mocks.getCurrentBranch.mockResolvedValueOnce('release/1.0')
+    mocks.readWorktreeMembership.mockResolvedValueOnce([])
+    mocks.isAncestor.mockResolvedValue(true)
+    mocks.getUpstream.mockResolvedValueOnce({
+      ancestryRef: 'refs/remotes/origin/feature/a',
+      source: { remote: 'origin', branch: 'feature/a' },
+      deleteTarget: { remote: 'origin', branch: 'feature/a' },
+    })
+    mocks.deleteUpstreamBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'not-started'),
+    )
+    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'error.local-branch-deleted-upstream-failed-check-state',
+    })
+    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+  })
+
   test('uses a local upstream for merge safety without attempting remote deletion', async () => {
     mocks.getCurrentBranch.mockResolvedValueOnce('release/1.0')
     mocks.readWorktreeMembership.mockResolvedValueOnce([])
@@ -380,11 +476,37 @@ describe('repo branch mutations', () => {
   })
 
   test('deleteRepoBranch does not publish snapshot invalidation after failure', async () => {
-    mocks.deleteBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: delete failed' })
+    mocks.deleteBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'fatal: delete failed' }, 'not-started'),
+    )
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
     await deleteRepoBranch(REPO_ID, 'feature/a')
 
     expectNoRepoMetadataInvalidations()
+  })
+
+  test('deleteRepoBranch reports uncertainty and invalidates when the delete command may have run', async () => {
+    mocks.deleteBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'connection closed' }, 'failed'),
+    )
+    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+
+    expect(result).toEqual({ ok: false, message: 'connection closed' })
+    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+  })
+
+  test('deleteRepoBranch preserves an ordinary Git error while conservatively invalidating', async () => {
+    mocks.deleteBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'error: branch is not fully merged' }, 'failed'),
+    )
+    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+
+    expect(result).toEqual({ ok: false, message: 'error: branch is not fully merged' })
+    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
   })
 })

@@ -17,15 +17,12 @@ import {
   type RepoWriteOperationContext,
 } from '#/server/modules/repo-write-operation-coordinator.ts'
 import {
-  getServerWorkspaceSettings,
   pruneServerWorkspaceSettingsForRemovedWorktree,
-  trustServerWorkspaceWorktreeBootstrapConfig,
-  untrustServerWorkspaceWorktreeBootstrapConfig,
+  setServerWorkspaceWorktreeBootstrapConfigTrust,
 } from '#/server/modules/settings-source.ts'
 import { type ExecResult, type RepoUrlTarget } from '#/shared/git-types.ts'
 import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
 import { isValidWorkspaceLocatorInput, toSafeWorkspaceLocator } from '#/shared/input-validation.ts'
-import { isWorkspaceWorktreeBootstrapConfigTrusted } from '#/shared/workspace-settings.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoReadInvalidationDomain } from '#/shared/repo-read-invalidation.ts'
 import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
@@ -46,9 +43,9 @@ function publishMutationInvalidations(
   result: RepoMutationResult,
   domains: readonly RepoReadInvalidationDomain[],
 ): RepoMutationResult {
-  const affectedRepoIds = result.affectedRepoIds ?? []
-  if (result.ok || result.repositoryStateChanged || affectedRepoIds.length > 0) {
-    const uniqueRepoIds = Array.from(new Set([workspaceId, ...affectedRepoIds]))
+  const repoIdsToInvalidate = result.repoIdsToInvalidate ?? []
+  if (repoIdsToInvalidate.length > 0) {
+    const uniqueRepoIds = Array.from(new Set([workspaceId, ...repoIdsToInvalidate]))
     for (const repoId of uniqueRepoIds) {
       for (const domain of domains) publishRepoReadInvalidation({ repoId, domain })
     }
@@ -56,8 +53,8 @@ function publishMutationInvalidations(
   return result
 }
 
-function execResultOnly(result: RepoMutationResult & { affectedWorktreePaths?: readonly string[] }): ExecResult {
-  return omit(result, ['affectedRepoIds', 'affectedWorktreePaths'])
+function execResultOnly(result: RepoMutationResult & { worktreePathsToInvalidate?: readonly string[] }): ExecResult {
+  return omit(result, ['repoIdsToInvalidate', 'worktreePathsToInvalidate', 'worktreeRemoved'])
 }
 
 async function runUserNetworkMutation(
@@ -90,11 +87,11 @@ async function runUserNetworkMutation(
 }
 
 export interface RepoFilesystemMutationOutcome extends ExecResult {
-  affectedWorktreePaths?: readonly string[]
+  worktreePathsToInvalidate?: readonly string[]
 }
 
 function filesystemMutationOutcome(result: RepoMutationResult): RepoFilesystemMutationOutcome {
-  return omit(result, ['affectedRepoIds'])
+  return omit(result, ['repoIdsToInvalidate', 'worktreeRemoved'])
 }
 
 function createWorktreeTargetBranch(input: CreateWorktreeInput): string {
@@ -247,7 +244,7 @@ export async function createRepoWorktree(
     return { ok: false, message: 'error.invalid-path' }
   }
   const worktreeBootstrap = options?.worktreeBootstrap ?? { kind: 'skip' }
-  return await runRepoServerWriteOperation({
+  const mutation = await runRepoServerWriteOperation({
     repoId,
     workspaceRuntimeId: options?.workspaceRuntimeId,
     kind: 'create-worktree',
@@ -256,38 +253,33 @@ export async function createRepoWorktree(
     task: async (context) => {
       return await context.runWithRepoSource(async (source) => {
         const result = await source.createWorktree(normalized, signal, {
+          runMembershipMutation: context.runMembershipMutation,
           worktreeBootstrap,
         })
-        const trustSyncedResult = await syncWorktreeBootstrapTrustAfterSuccessfulRun(repoId, worktreeBootstrap, result)
-        return await execResultAfterMutationInvalidations(cwd, trustSyncedResult, ['metadata', 'worktree-status'])
+        if (!result.ok) return result
+        try {
+          await persistWorktreeBootstrapTrustChoice(repoId, worktreeBootstrap)
+        } catch {
+          return { ...result, ok: false, message: 'error.worktree-created-followup-failed' }
+        }
+        return result
       })
     },
   })
+  return execResultAfterMutationInvalidations(cwd, mutation, ['metadata', 'worktree-status'])
 }
 
-async function syncWorktreeBootstrapTrustAfterSuccessfulRun(
+async function persistWorktreeBootstrapTrustChoice(
   repoId: WorkspaceId,
   decision: WorktreeBootstrapDecision,
-  result: RepoMutationResult,
-): Promise<RepoMutationResult> {
-  if (!result.ok || decision.kind !== 'run') return result
-  try {
-    const workspaceSettings = await getServerWorkspaceSettings()
-    const currentlyTrusted = isWorkspaceWorktreeBootstrapConfigTrusted(workspaceSettings, repoId, decision.configHash)
-    if (decision.configTrusted) {
-      if (currentlyTrusted) return result
-      await trustServerWorkspaceWorktreeBootstrapConfig({ workspaceId: repoId, configHash: decision.configHash })
-      publishSettingsInvalidation(['settings-snapshot'])
-      return result
-    }
-    if (!currentlyTrusted) return result
-    if (await untrustServerWorkspaceWorktreeBootstrapConfig({ workspaceId: repoId, configHash: decision.configHash })) {
-      publishSettingsInvalidation(['settings-snapshot'])
-    }
-    return result
-  } catch {
-    return { ...result, ok: false, message: 'error.settings-write-title', repositoryStateChanged: true }
-  }
+): Promise<void> {
+  if (decision.kind !== 'run') return
+  const changed = await setServerWorkspaceWorktreeBootstrapConfigTrust({
+    workspaceId: repoId,
+    configHash: decision.configHash,
+    trusted: decision.configTrusted,
+  })
+  if (changed) publishSettingsInvalidation(['settings-snapshot'])
 }
 
 export async function getRepoRemoteBranches(
@@ -309,7 +301,7 @@ export async function deleteRepoBranch(
   signal?: AbortSignal,
   runtime?: { workspaceRuntimeId?: string },
 ): Promise<ExecResult> {
-  return await runRepoServerWriteOperation({
+  const mutation = await runRepoServerWriteOperation({
     repoId: cwd,
     workspaceRuntimeId: runtime?.workspaceRuntimeId,
     kind: 'delete-branch',
@@ -317,12 +309,11 @@ export async function deleteRepoBranch(
     signal,
     task: async (context) => {
       return await context.runWithRepoSource(async (source) => {
-        return await execResultAfterMutationInvalidations(cwd, await source.deleteBranch(branch, options, signal), [
-          'metadata',
-        ])
+        return await source.deleteBranch(branch, options, signal)
       })
     },
   })
+  return execResultAfterMutationInvalidations(cwd, mutation, ['metadata'])
 }
 
 export async function removeCapturedRepoWorktree(
@@ -356,7 +347,7 @@ async function removeRepoWorktreeWithBinding(
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
   options: { workspaceRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  return await runRepoServerWriteOperation({
+  const mutation = await runRepoServerWriteOperation({
     repoId: cwd,
     workspaceRuntimeId: options.workspaceRuntimeId,
     kind: 'remove-worktree',
@@ -371,9 +362,8 @@ async function removeRepoWorktreeWithBinding(
       ),
     task: async (context) => {
       return await context.runWithRepoSource(async (source) => {
-        const mutation = await source.removeWorktree(input, signal, lifecycle)
-        const result = await execResultAfterMutationInvalidations(cwd, mutation, ['metadata', 'worktree-status'])
-        if (!mutation.ok && !mutation.repositoryStateChanged) return result
+        const mutation = await source.removeWorktree(input, signal, lifecycle, context.runMembershipMutation)
+        if (mutation.worktreeRemoved !== true) return mutation
         try {
           const workspaceId = toSafeWorkspaceLocator(cwd)
           if (!workspaceId) throw new Error('invalid workspace id after repo mutation')
@@ -383,19 +373,20 @@ async function removeRepoWorktreeWithBinding(
           })
           if (changed) publishSettingsInvalidation(['settings-snapshot'])
         } catch (error) {
-          if (!result.ok) {
+          if (!mutation.ok) {
             repoWriteLogger.warn(
               { error, repoId: cwd, worktreePath: input.worktreePath },
               'failed to prune settings after worktree removal',
             )
-            return result
+            return mutation
           }
-          return { ...result, ok: false, message: 'error.settings-write-title', repositoryStateChanged: true }
+          return { ...mutation, ok: false, message: 'error.worktree-removed-followup-failed' }
         }
-        return result
+        return mutation
       })
     },
   })
+  return execResultAfterMutationInvalidations(cwd, mutation, ['metadata', 'worktree-status'])
 }
 
 export async function openRepoUrl(

@@ -7,6 +7,7 @@ import { settleRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-wor
 import { isRepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
 import { isWorkspaceRuntimeAdmissionClosedError } from '#/server/modules/workspace-runtime-admission-error.ts'
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
+import { isRepoMembershipReadConflictError } from '#/server/modules/repo-membership-read-conflict.ts'
 
 const workspaceRuntimeRequestLogger = serverLogger.child({ module: 'workspace-runtime-request' })
 
@@ -48,6 +49,9 @@ async function runRuntimeRequest<T>(
     return await input.run()
   } catch (error) {
     if (isWorkspaceRuntimeAdmissionClosedError(error)) {
+      throw new IpcError({ code: 'BAD_REQUEST', message: error.message })
+    }
+    if (isRepoMembershipReadConflictError(error)) {
       throw new IpcError({ code: 'BAD_REQUEST', message: error.message })
     }
     if (error instanceof OperationCancelledError) throw error

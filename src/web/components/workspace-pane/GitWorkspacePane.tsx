@@ -55,8 +55,8 @@ export function GitWorkspacePane({
   const operationsReadModel = useRepoOperationsReadModel(gitWorkspace.id, gitWorkspace.workspaceRuntimeId)
   const statusReadModel = useRepoWorktreeStatusReadModel(gitWorkspace.id, gitWorkspace.workspaceRuntimeId, true)
   const statusSnapshot = statusReadModel.data
-  if (!snapshot && snapshotReadModel.isError) {
-    const snapshotError = snapshotReadModel.error
+  if (!snapshot && snapshotReadModel.displayError) {
+    const snapshotError = snapshotReadModel.displayError
     const messageKey = snapshotError instanceof Error ? snapshotError.message : String(snapshotError)
     return (
       <RepoStatusFailureView
@@ -94,14 +94,14 @@ export function GitWorkspacePane({
     status: statusSnapshot?.status,
     probe: gitWorkspace.probe,
   }
-  const statusError = statusReadModel.error
+  const statusError = statusReadModel.displayError
   const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
   const detailBase = getCurrentGitWorkspacePanePresentation(
     gitWorkspacePaneProjection,
     {
       loading: statusReadModel.isPending || statusReadModel.isFetching,
       error: statusErrorKey,
-      stale: !!statusSnapshot && statusReadModel.isError,
+      stale: !!statusSnapshot && !!statusError,
     },
     pullRequest,
     pullRequestRead,
@@ -116,10 +116,12 @@ export function GitWorkspacePane({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      {snapshotReadModel.isError && (
+      {snapshotReadModel.displayError && (
         <RepoStatusStaleNotice
           messageKey={
-            snapshotReadModel.error instanceof Error ? snapshotReadModel.error.message : String(snapshotReadModel.error)
+            snapshotReadModel.displayError instanceof Error
+              ? snapshotReadModel.displayError.message
+              : String(snapshotReadModel.displayError)
           }
           retrying={snapshotReadModel.isFetching}
           onRetry={() => void snapshotReadModel.refetch()}

@@ -291,7 +291,10 @@ describe('main repo ipc cancellation', () => {
       ok: true,
       path: '/repo-feature',
     })
-    vi.mocked(pullBranch).mockResolvedValue({ ok: true, message: 'ok' })
+    vi.mocked(pullBranch).mockResolvedValue({
+      result: { ok: true, message: 'ok' },
+      execution: { status: 'succeeded' },
+    })
   })
 
   test('rejects IPC calls from untrusted senders', async () => {

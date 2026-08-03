@@ -2,6 +2,7 @@ import { QueryClient, QueryObserver } from '@tanstack/react-query'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type * as InvalidationBroker from '#/server/modules/invalidation-broker.ts'
 import { REPO_ID, mocks } from '#/server/test-utils/repo-module.ts'
+import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 
 const USER_ID = 'background-convergence-user'
@@ -43,7 +44,7 @@ describe('background sync projection convergence', () => {
     mocks.publishRepoReadInvalidation.mockImplementation((event) => broker.publishRepoReadInvalidation(event))
     mocks.fetchAll.mockImplementation(async () => {
       projection = 'after-fetch'
-      return { ok: true, message: 'fetched' }
+      return commandOutcomeForTest({ ok: true, message: 'fetched' })
     })
 
     try {

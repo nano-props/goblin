@@ -57,6 +57,7 @@ export const MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT = [
 export const SUCCESSFUL_REMOTE_REMOVAL_LIFECYCLE = {
   beforeRemove: async () => ({ ok: true as const, message: '' }),
   afterWorktreeRemoved: async () => ({ ok: true as const, message: '' }),
+  runMembershipMutation: async <T>(mutation: () => Promise<T>): Promise<T> => await mutation(),
 }
 
 export function okRemoteResult(stdout: string): RemoteCommandResult {

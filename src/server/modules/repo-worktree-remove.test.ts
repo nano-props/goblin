@@ -1,10 +1,13 @@
 import { describe, expect, test, vi } from 'vitest'
+import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import {
   LINKED_REPO_ID,
   REPO_ID,
   WORKTREE_REPO_ID,
   expectNoRepoMetadataInvalidations,
   expectRepoMetadataInvalidations,
+  expectRepoOperationSettledBeforeProjectionInvalidation,
   mocks,
   removeLocalRepoWorktreeForTest,
   removeRepoWorktreeForTest,
@@ -12,12 +15,54 @@ import {
 } from '#/server/test-utils/repo-module.ts'
 
 describe('repo worktree removal', () => {
+  async function removeRemoteWorktreeForTest() {
+    const [{ removeCapturedRepoWorktree }, { issuePhysicalWorktreeExecutionCapability }] = await Promise.all([
+      import('#/server/modules/repo-write-paths.ts'),
+      import('#/server/worktree-removal/physical-worktree-capability.ts'),
+    ])
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    const target = {
+      id: repoId,
+      alias: 'prod',
+      host: 'example.test',
+      user: 'deploy',
+      port: 22,
+      remotePath: '/srv/repo',
+      displayName: 'prod:repo',
+      sshConnection: {
+        destination: 'prod',
+        options: ['hostname=example.test', 'user=deploy', 'port=22'],
+      },
+    }
+    mocks.resolveRemoteTarget.mockResolvedValueOnce({ target })
+    const capability = issuePhysicalWorktreeExecutionCapability(
+      { kind: 'remote', executionNamespaceId: 'prod-test', endpoint: '/srv/repo-feature' },
+      {
+        userId: 'test-user',
+        workspaceId: repoId,
+        workspaceRuntimeId: 'test-runtime',
+        worktreePath: '/srv/repo-feature',
+        execution: {
+          kind: 'remote',
+          canonicalWorktreePath: '/srv/repo-feature',
+          target,
+          configFingerprint: 'test-config-fingerprint',
+        },
+        runtimeSignal: new AbortController().signal,
+      },
+    )
+    const result = await removeCapturedRepoWorktree(
+      repoId,
+      { branch: 'feature/a', worktreePath: '/srv/repo-feature', deleteBranch: false },
+      successfulRemovalLifecycle,
+      capability,
+    )
+    return { repoId, result }
+  }
+
   test('removeRepoWorktree publishes snapshot invalidations for affected worktrees after removal success', async () => {
     mocks.resolveRepoCommonDir.mockResolvedValue('/tmp/repo/.git')
-    mocks.removeWorktree.mockResolvedValueOnce({
-      ok: true,
-      message: 'ok',
-    })
+    mocks.removeWorktree.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'ok' }))
     mocks.readWorktreeMembership.mockResolvedValueOnce([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
       {
@@ -59,10 +104,13 @@ describe('repo worktree removal', () => {
         domain: 'metadata',
       },
     )
+    expectRepoOperationSettledBeforeProjectionInvalidation()
   })
 
   test('removeRepoWorktree returns Git removal failure without finalization', async () => {
-    mocks.removeWorktree.mockResolvedValueOnce({ ok: false, message: 'git remove failed' })
+    mocks.removeWorktree.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'git remove failed' }, 'failed'),
+    )
     mocks.readWorktreeMembership.mockResolvedValueOnce([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
       {
@@ -79,6 +127,59 @@ describe('repo worktree removal', () => {
     ).resolves.toEqual({ ok: false, message: 'git remove failed' })
 
     expect(afterWorktreeRemoved).not.toHaveBeenCalled()
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
+    expectRepoMetadataInvalidations(
+      { repoId: REPO_ID, domain: 'metadata' },
+      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
+    )
+  })
+
+  test('removeRepoWorktree fails fast and invalidates projections after a removal timeout', async () => {
+    mocks.removeWorktree.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'error.worktree-remove-timeout-check-state' }, 'timed-out'),
+    )
+    mocks.readWorktreeMembership.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false },
+    ])
+    const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
+
+    const result = await removeLocalRepoWorktreeForTest(
+      { deleteBranch: false },
+      { ...successfulRemovalLifecycle, afterWorktreeRemoved },
+    )
+
+    expect(result).toEqual({ ok: false, message: 'error.worktree-remove-timeout-check-state' })
+    expect(afterWorktreeRemoved).not.toHaveBeenCalled()
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
+    expectRepoMetadataInvalidations(
+      { repoId: REPO_ID, domain: 'metadata' },
+      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
+    )
+  })
+
+  test('remote removal preflight failure does not publish mutation invalidations', async () => {
+    mocks.removeRemoteWorktree.mockResolvedValueOnce({ ok: false, message: 'error.cannot-remove-main-worktree' })
+
+    const { result } = await removeRemoteWorktreeForTest()
+
+    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-main-worktree' })
+    expectNoRepoMetadataInvalidations()
+    expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
+  })
+
+  test('remote removal timeout invalidates captured projections without finalizing removal', async () => {
+    const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
+    mocks.removeRemoteWorktree.mockResolvedValueOnce({
+      ok: false,
+      message: 'error.worktree-remove-timeout-check-state',
+      worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
+    })
+
+    const { repoId, result } = await removeRemoteWorktreeForTest()
+
+    expect(result).toEqual({ ok: false, message: 'error.worktree-remove-timeout-check-state' })
+    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
   })
 
@@ -101,7 +202,7 @@ describe('repo worktree removal', () => {
       },
     )
 
-    expect(result).toEqual({ ok: false, message: 'tabs finalize failed', repositoryStateChanged: true })
+    expect(result).toEqual({ ok: false, message: 'error.worktree-removed-followup-failed' })
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
@@ -214,11 +315,13 @@ describe('repo worktree removal', () => {
       },
     ]
     mocks.readWorktreeMembership.mockResolvedValueOnce(worktrees).mockResolvedValueOnce(worktrees)
-    mocks.deleteBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: delete failed' })
+    mocks.deleteBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'fatal: delete failed' }, 'failed'),
+    )
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: true }, successfulRemovalLifecycle)
 
-    expect(result).toEqual({ ok: false, message: 'fatal: delete failed', repositoryStateChanged: true })
+    expect(result).toEqual({ ok: false, message: 'error.worktree-removed-followup-failed' })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
@@ -316,7 +419,7 @@ describe('repo worktree removal', () => {
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
-    expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repositoryStateChanged: true })
+    expect(result).toEqual({ ok: false, message: 'error.worktree-removed-followup-failed' })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })

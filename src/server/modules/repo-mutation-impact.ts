@@ -4,22 +4,20 @@ import { normalizeRemoteWorkspaceRef, type RemoteWorkspaceTarget } from '#/share
 import { formatWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface RepoMutationResult extends ExecResult {
-  /** Repo sessions whose snapshots changed, including partial failures after an earlier write. */
-  affectedRepoIds?: readonly WorkspaceId[]
-  /** Filesystem roots whose checked-out contents changed during the mutation. */
-  affectedWorktreePaths?: readonly string[]
+  /** Repo projections that must be invalidated, including uncertain or partially applied failures. */
+  repoIdsToInvalidate?: readonly WorkspaceId[]
+  /** Checked-out filesystem projections that must be invalidated. */
+  worktreePathsToInvalidate?: readonly string[]
+  /** The worktree removal committed, even if a later lifecycle or branch step failed. */
+  worktreeRemoved?: true
 }
 
-export function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly WorkspaceId[]): RepoMutationResult {
-  const unique = Array.from(new Set(affectedRepoIds.filter((repoId) => repoId.length > 0)))
-  return unique.length > 0 ? { ...result, affectedRepoIds: unique } : result
-}
-
-export function withAffectedRepoIdsIfChanged(
-  result: ExecResult,
-  affectedRepoIds: readonly WorkspaceId[],
-): RepoMutationResult {
-  return result.ok || result.repositoryStateChanged ? withAffectedRepoIds(result, affectedRepoIds) : result
+export function withRepoIdsToInvalidate<T extends ExecResult>(
+  result: T,
+  repoIdsToInvalidate: readonly WorkspaceId[],
+): T & RepoMutationResult {
+  const unique = Array.from(new Set(repoIdsToInvalidate.filter((repoId) => repoId.length > 0)))
+  return unique.length > 0 ? { ...result, repoIdsToInvalidate: unique } : result
 }
 
 export function localWorktreeRepoIds(worktrees: readonly WorktreeInfo[]): WorkspaceId[] {

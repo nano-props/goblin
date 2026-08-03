@@ -538,6 +538,7 @@ export const en = {
   'error.workspace-open-failed': 'Failed to open workspace',
   'error.workspace-close-failed': 'Failed to close workspace',
   'error.failed-read-repo': 'Failed to read repository',
+  'error.repo-membership-changing': 'Repository worktrees are changing',
   'error.ssh-config-changed': 'SSH config changed',
   'error.repository-boundary-unavailable': 'Repository identity could not be confirmed',
   'error.git-not-found': 'Git not found',
@@ -556,6 +557,9 @@ export const en = {
   'error.filetree-delete-directory-unsupported': 'Only files can be moved to Trash from the file tree',
   'error.trash-unavailable': 'System Trash is not available',
   'error.failed-trash-file': 'Could not move the file to Trash',
+  'error.trash-cancelled-check-state': 'Trash was cancelled. Check the file state before trying again.',
+  'error.trash-timeout-check-state': 'Trash timed out. Check the file state before trying again.',
+  'error.trash-failed-check-state': 'Trash may have completed. Check the file state before trying again.',
   'error.invalid-arguments': 'Invalid arguments',
   'error.workspace-runtime-stale': 'Workspace runtime is stale',
   'error.workspace-target-stale': 'Workspace target changed. Please try again.',
@@ -563,6 +567,16 @@ export const en = {
   'error.not-controller': 'Another session is controlling this terminal',
   'error.network-op-in-progress': 'Another git network operation is already running.',
   'error.request-timeout': 'Request timed out. Try again.',
+  'error.worktree-create-timeout-check-state':
+    'Creating the worktree timed out. Git state may have changed; check the target branch and path before retrying.',
+  'error.worktree-remove-timeout-check-state':
+    'Removing the worktree timed out. Git state may have changed; check the worktree and reopen or repair the workspace before retrying.',
+  'error.worktree-created-followup-failed':
+    'The worktree was created, but a follow-up step failed. Check the worktree and reopen or repair the workspace before continuing.',
+  'error.worktree-removed-followup-failed':
+    'The worktree was removed, but a follow-up step failed. Reopen or repair the workspace before continuing.',
+  'error.local-branch-deleted-upstream-failed-check-state':
+    'The local branch was deleted, but deleting its upstream did not complete. Refresh and check the remote branch before retrying.',
   'error.branch-action-wait-timeout': 'Timed out waiting for repository refresh to finish.',
   'error.unknown': 'Unknown error',
   'error.cannot-delete-current-branch': 'Cannot delete the current branch',

@@ -7,6 +7,7 @@ import {
 } from '#/system/ssh/git.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
+import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import {
   LINKED_TARGET,
   MAIN_AND_LINKED_WORKTREES_OUTPUT,
@@ -19,6 +20,8 @@ import {
   upstreamOutput,
   worktreePorcelain,
 } from '#/system/ssh/git-test-utils.ts'
+
+const runMembershipMutation = async <T>(mutation: () => Promise<T>): Promise<T> => await mutation()
 
 describe('remote git mutations', () => {
   test('deleteRemoteBranch allows safe delete when branch is merged into current HEAD without upstream', async () => {
@@ -57,7 +60,7 @@ describe('remote git mutations', () => {
 
     const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', run: run })
 
-    expect(result).toEqual({ ok: true, message: 'Deleted branch feature/test' })
+    expect(result).toEqual({ ok: true, message: 'Deleted branch feature/test', localBranchDeleted: true })
     expect(run).toHaveBeenCalledWith(
       { type: 'gitIsAncestor', path: '/srv/repo', ancestor: 'feature/test', descendant: 'release/1.0' },
       TARGET,
@@ -109,14 +112,14 @@ describe('remote git mutations', () => {
       remote: 'fork',
       upstreamBranch: 'topic/feature-test',
       pushResult: okRemoteResult('deleted upstream'),
-      expected: { ok: true, message: 'deleted upstream' },
+      expected: { ok: true, message: 'deleted upstream', localBranchDeleted: true },
     },
     {
       name: 'reports upstream delete failure after deleting the local branch',
       remote: 'origin',
       upstreamBranch: 'feature/test',
-      pushResult: failRemoteResult('remote rejected delete'),
-      expected: { ok: false, message: 'remote rejected delete', repositoryStateChanged: true },
+      pushResult: { ...failRemoteResult('remote rejected delete'), remoteStarted: true },
+      expected: { ok: false, message: 'remote rejected delete', localBranchDeleted: true },
     },
   ] as const)('deleteRemoteBranch $name', async ({ remote, upstreamBranch, pushResult, expected }) => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
@@ -227,12 +230,13 @@ describe('remote git mutations', () => {
     expect(result).toEqual({
       ok: true,
       message: 'Deleted branch feature/test',
-      affectedWorktreePaths: ['/srv/repo', '/srv/repo-feature'],
+      worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
+      worktreeRemoved: true,
     })
     expect(run).toHaveBeenCalledWith(
       { type: 'gitWorktreeRemove', path: '/srv/repo', worktreePath: '/srv/repo-feature' },
       TARGET,
-      { signal: undefined, timeoutMs: 180_000 },
+      { signal: undefined, timeoutMs: 300_000 },
     )
     expect(run).toHaveBeenCalledWith(
       { type: 'gitBranchDelete', path: '/srv/repo', branch: 'feature/test', force: false },
@@ -263,6 +267,7 @@ describe('remote git mutations', () => {
     })
 
     const result = await removeRemoteWorktree(TARGET, {
+      runMembershipMutation: async (mutation) => await mutation(),
       beforeRemove,
       afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
       branch: 'feature/test',
@@ -306,12 +311,13 @@ describe('remote git mutations', () => {
     expect(result).toEqual({
       ok: true,
       message: 'Removed worktree',
-      affectedWorktreePaths: ['/srv/repo', '/srv/repo-feature'],
+      worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
+      worktreeRemoved: true,
     })
     expect(run).toHaveBeenCalledWith(
       { type: 'gitWorktreeRemove', path: '/srv/repo', worktreePath: '/srv/repo-feature' },
       TARGET,
-      { timeoutMs: 180_000 },
+      { timeoutMs: 300_000 },
     )
   })
 
@@ -353,6 +359,65 @@ describe('remote git mutations', () => {
       TARGET,
       expect.anything(),
     )
+  })
+
+  test('removeRemoteWorktree reports uncertainty and impact after a started timeout', async () => {
+    const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
+      if (command.type === 'gitStatus') return okRemoteResult('')
+      if (command.type === 'gitWorktreeRemove') {
+        return {
+          ok: false,
+          stdout: '',
+          stderr: '',
+          message: 'timeout',
+          timedOut: true,
+          remoteStarted: true,
+        }
+      }
+      return failRemoteResult('unexpected command')
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      runMembershipMutation: async (mutation) => await mutation(),
+      beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved,
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      deleteBranch: false,
+      run,
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'error.worktree-remove-timeout-check-state',
+      worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
+    })
+    expect(afterWorktreeRemoved).not.toHaveBeenCalled()
+  })
+
+  test('removeRemoteWorktree treats an unobserved start marker as uncertain mutation impact', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
+      if (command.type === 'gitStatus') return okRemoteResult('')
+      if (command.type === 'gitWorktreeRemove') return failRemoteResult('connection failed')
+      return failRemoteResult('unexpected command')
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      ...SUCCESSFUL_REMOTE_REMOVAL_LIFECYCLE,
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      deleteBranch: false,
+      run,
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'connection failed',
+      worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
+    })
   })
 
   test('removeRemoteWorktree rejects an equivalent path to the primary worktree', async () => {
@@ -419,7 +484,8 @@ describe('remote git mutations', () => {
     expect(result).toEqual({
       ok: true,
       message: 'deleted upstream',
-      affectedWorktreePaths: ['/srv/repo', '/srv/repo-feature'],
+      worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
+      worktreeRemoved: true,
     })
     expect(run).toHaveBeenCalledWith(
       { type: 'gitPushDeleteBranch', path: '/srv/repo', remote: 'fork', branch: 'topic/feature-test' },
@@ -442,6 +508,7 @@ describe('remote git mutations', () => {
 
     await expect(
       removeRemoteWorktree(TARGET, {
+        runMembershipMutation: async (mutation) => await mutation(),
         beforeRemove,
         afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
         branch: 'feature/test',
@@ -520,13 +587,14 @@ describe('remote git mutations', () => {
     expect(result).toEqual({
       ok: true,
       message: 'Deleted branch feature/test',
-      affectedWorktreePaths: ['/srv/repo', '/srv/repo-feature'],
+      worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
+      worktreeRemoved: true,
     })
     expect(run).toHaveBeenCalledWith({ type: 'gitSnapshot', path: '/srv/repo' }, LINKED_TARGET, { signal: undefined })
     expect(run).toHaveBeenCalledWith(
       { type: 'gitWorktreeRemove', path: '/srv/repo', worktreePath: '/srv/repo-feature' },
       LINKED_TARGET,
-      { signal: undefined, timeoutMs: 180_000 },
+      { signal: undefined, timeoutMs: 300_000 },
     )
     expect(run).toHaveBeenCalledWith(
       { type: 'gitBranchDelete', path: '/srv/repo', branch: 'feature/test', force: false },
@@ -539,12 +607,85 @@ describe('remote git mutations', () => {
     const run = vi.fn<RemoteGitRunner>()
 
     const result = await createRemoteWorktree(TARGET, {
+      runMembershipMutation,
       worktreePath: 'relative/path',
       mode: { kind: 'newBranch', newBranch: 'feature/test', baseRef: 'main' },
       run: run,
     })
 
-    expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
+    expect(result).toEqual({
+      result: { ok: false, message: 'error.invalid-path' },
+      execution: { status: 'not-started' },
+    })
     expect(run).not.toHaveBeenCalled()
+  })
+
+  test('createRemoteWorktree uses the worktree operation timeout', async () => {
+    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult('Created worktree'))
+    const input = {
+      worktreePath: '/srv/repo-feature',
+      mode: { kind: 'newBranch' as const, newBranch: 'feature/test', baseRef: 'main' },
+    }
+
+    const result = await createRemoteWorktree(TARGET, { ...input, run, runMembershipMutation })
+
+    expect(result).toEqual({
+      result: {
+        ok: true,
+        message: 'Created worktree',
+        worktreePathsToInvalidate: ['/srv/repo-feature'],
+      },
+      execution: { status: 'succeeded' },
+    })
+    expect(run).toHaveBeenCalledWith({ type: 'gitWorktreeAdd', path: '/srv/repo', input }, TARGET, {
+      signal: undefined,
+      timeoutMs: 300_000,
+    })
+  })
+
+  test('createRemoteWorktree reports uncertain state when a started remote command times out', async () => {
+    const run = vi.fn<RemoteGitRunner>(async () => ({
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: 'timeout',
+      timedOut: true,
+      remoteStarted: true,
+    }))
+
+    const result = await createRemoteWorktree(TARGET, {
+      runMembershipMutation,
+      worktreePath: '/srv/repo-feature',
+      mode: { kind: 'existingBranch', branch: 'feature/test' },
+      run,
+    })
+
+    expect(result).toEqual({
+      result: { ok: false, message: 'timeout' },
+      execution: { status: 'timed-out' },
+    })
+  })
+
+  test('createRemoteWorktree keeps timeout uncertain when the start marker was not observed', async () => {
+    const run = vi.fn<RemoteGitRunner>(async () => ({
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: 'timeout',
+      timedOut: true,
+      remoteStarted: false,
+    }))
+
+    const result = await createRemoteWorktree(TARGET, {
+      runMembershipMutation,
+      worktreePath: '/srv/repo-feature',
+      mode: { kind: 'existingBranch', branch: 'feature/test' },
+      run,
+    })
+
+    expect(result).toEqual({
+      result: { ok: false, message: 'timeout' },
+      execution: { status: 'timed-out' },
+    })
   })
 })

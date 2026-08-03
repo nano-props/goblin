@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
+import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import {
   deleteRemoteBranch,
   getRemoteTrackingBranches,
@@ -43,7 +44,24 @@ describe('remote git network', () => {
 
     const result = await pullRemoteBranch(TARGET, 'feature/test', undefined, { run: run })
 
-    expect(result).toEqual({ ok: false, message: 'error.pull-no-remote' })
+    expect(result).toEqual(commandOutcomeForTest({ ok: false, message: 'error.pull-no-remote' }, 'not-started'))
+  })
+
+  test('pullRemoteBranch reports possible filesystem impact when the start marker was not observed', async () => {
+    const run = vi.fn<RemoteGitRunner>(async () => failRemoteResult('connection failed'))
+
+    const result = await pullRemoteBranch(TARGET, 'feature/test', '/srv/repo-feature', { run })
+
+    expect(result).toEqual(
+      commandOutcomeForTest(
+        {
+          ok: false,
+          message: 'connection failed',
+          worktreePathsToInvalidate: ['/srv/repo-feature'],
+        },
+        'failed',
+      ),
+    )
   })
 
   test('pushRemoteBranch prefers the configured upstream remote and branch', async () => {
@@ -69,7 +87,7 @@ describe('remote git network', () => {
 
     const result = await pushRemoteBranch(TARGET, 'feature/test', { run: run })
 
-    expect(result).toEqual({ ok: true, message: 'pushed' })
+    expect(result).toEqual(commandOutcomeForTest({ ok: true, message: 'pushed' }))
     expect(run).toHaveBeenCalledWith(
       {
         type: 'gitPush',
@@ -102,7 +120,7 @@ describe('remote git network', () => {
 
     const result = await pushRemoteBranch(TARGET, 'feature/test', { run: run })
 
-    expect(result).toEqual({ ok: true, message: 'pushed' })
+    expect(result).toEqual(commandOutcomeForTest({ ok: true, message: 'pushed' }))
     expect(run).toHaveBeenCalledWith(
       {
         type: 'gitPush',
@@ -177,7 +195,7 @@ describe('remote git network', () => {
 
     const result = await fetchRemoteRepo(TARGET, { run: run })
 
-    expect(result).toEqual({ ok: true, message: 'fetched fork' })
+    expect(result).toEqual({ result: { ok: true, message: 'fetched fork' }, execution: { status: 'succeeded' } })
     expect(run).toHaveBeenCalledWith({ type: 'gitFetchRemote', path: '/srv/repo', remote: 'fork' }, TARGET, {
       signal: undefined,
       timeoutMs: 180_000,

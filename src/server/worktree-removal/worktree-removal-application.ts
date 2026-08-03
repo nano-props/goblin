@@ -109,7 +109,6 @@ export class WorktreeRemovalApplication {
                   return {
                     ok: false,
                     message: error instanceof Error ? error.message : String(error),
-                    repositoryStateChanged: true,
                   }
                 }
               },

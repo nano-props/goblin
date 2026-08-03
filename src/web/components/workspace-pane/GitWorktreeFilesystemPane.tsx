@@ -46,11 +46,11 @@ export function GitWorktreeFilesystemPane({
   const statusReadModel = useRepoWorktreeStatusReadModel(repo.id, repo.workspaceRuntimeId, true)
   const worktree = statusReadModel.data?.status.find((candidate) => candidate.path === worktreePath)
   const target = gitWorktreeWorkspacePaneTabsTarget(repo.id, worktreePath)
-  if (!statusReadModel.data && statusReadModel.isPending) {
+  if (!statusReadModel.data && (statusReadModel.isPending || statusReadModel.membershipChanging)) {
     return <WorkspacePaneSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
-  if (!statusReadModel.data && statusReadModel.isError) {
-    const error = statusReadModel.error
+  if (!statusReadModel.data && statusReadModel.displayError) {
+    const error = statusReadModel.displayError
     return (
       <RepoStatusFailureView
         messageKey={error instanceof Error ? error.message : String(error)}
@@ -69,10 +69,10 @@ export function GitWorktreeFilesystemPane({
       head={gitHead(worktree.branch ?? null)}
       status={worktree}
       statusError={
-        statusReadModel.isError
-          ? statusReadModel.error instanceof Error
-            ? statusReadModel.error.message
-            : String(statusReadModel.error)
+        statusReadModel.displayError
+          ? statusReadModel.displayError instanceof Error
+            ? statusReadModel.displayError.message
+            : String(statusReadModel.displayError)
           : null
       }
       statusRetrying={statusReadModel.isFetching}

@@ -12,17 +12,18 @@ import {
 } from '#/system/git/remote.ts'
 import type { BrowserRemoteProvider, GitRemoteInfo } from '#/shared/git-types.ts'
 import type * as GitExecModule from '#/system/git/git-exec.ts'
+import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 
 const gitMock = vi.hoisted(() => vi.fn())
-const gitResultWithOptionsMock = vi.hoisted(() => vi.fn())
+const gitCommandResultWithOptionsMock = vi.hoisted(() => vi.fn())
 
 vi.mock('#/system/git/git-exec.ts', async () => {
   const actual = await vi.importActual<typeof GitExecModule>('#/system/git/git-exec.ts')
   return {
     ...actual,
     git: vi.fn((cwd: string, args: string[], options?: unknown) => gitMock(cwd, args, options)),
-    gitResultWithOptions: vi.fn((cwd: string, options: unknown, ...args: string[]) =>
-      gitResultWithOptionsMock(cwd, options, ...args),
+    gitCommandResultWithOptions: vi.fn((cwd: string, options: unknown, ...args: string[]) =>
+      gitCommandResultWithOptionsMock(cwd, options, ...args),
     ),
   }
 })
@@ -341,7 +342,9 @@ describe('fetchAll', () => {
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
 
-    await expect(fetchAll('/tmp/repo')).resolves.toEqual({ ok: false, message: 'failed to read remotes' })
+    await expect(fetchAll('/tmp/repo')).resolves.toEqual(
+      commandOutcomeForTest({ ok: false, message: 'failed to read remotes' }, 'not-started'),
+    )
   })
 
   test('marks a failed fetch command as mutation-ambiguous', async () => {
@@ -353,25 +356,32 @@ describe('fetchAll', () => {
       if (args[0] === 'for-each-ref') return 'refs/remotes/origin/main\0origin\0refs/heads/main\0='
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     })
-    gitResultWithOptionsMock.mockResolvedValueOnce({ ok: false, message: 'fetch failed' })
+    gitCommandResultWithOptionsMock.mockResolvedValueOnce({
+      result: { ok: false, message: 'fetch failed' },
+      execution: { status: 'failed' },
+    })
 
     await expect(fetchAll('/tmp/repo')).resolves.toEqual({
-      ok: false,
-      message: 'fetch failed',
-      repositoryStateChanged: true,
+      result: { ok: false, message: 'fetch failed' },
+      execution: { status: 'failed' },
     })
   })
 })
 
 describe('pullBranch', () => {
   test('marks a failed pull command and its worktree as mutation-ambiguous', async () => {
-    gitResultWithOptionsMock.mockResolvedValueOnce({ ok: false, message: 'pull failed' })
+    gitCommandResultWithOptionsMock.mockResolvedValueOnce({
+      result: { ok: false, message: 'pull failed' },
+      execution: { status: 'failed' },
+    })
 
     await expect(pullBranch('/tmp/repo', 'main', '/tmp/repo-worktree')).resolves.toEqual({
-      ok: false,
-      message: 'pull failed',
-      repositoryStateChanged: true,
-      affectedWorktreePaths: ['/tmp/repo-worktree'],
+      result: {
+        ok: false,
+        message: 'pull failed',
+        worktreePathsToInvalidate: ['/tmp/repo-worktree'],
+      },
+      execution: { status: 'failed' },
     })
   })
 
@@ -380,8 +390,8 @@ describe('pullBranch', () => {
     controller.abort('stopped')
 
     await expect(pullBranch('/tmp/repo', 'main', '/tmp/repo-worktree', controller.signal)).resolves.toEqual({
-      ok: false,
-      message: 'cancelled',
+      result: { ok: false, message: 'cancelled' },
+      execution: { status: 'not-started' },
     })
     expect(gitMock).not.toHaveBeenCalled()
   })

@@ -38,8 +38,13 @@ import type { WorkspaceId, WorkspaceLocatorPlatform } from '#/shared/workspace-l
 import { homedir } from 'node:os'
 import { canonicalRuntimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-validators.ts'
 import type { RuntimeWorkspacePaneTarget, WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import type { ExecResult } from '#/shared/git-types.ts'
 import { getLocalPathSuggestions } from '#/server/modules/local-path-suggestions.ts'
 import { workspaceLocatorFromNativeCommandInput } from '#/server/modules/native-workspace-input.ts'
+import {
+  isTrashCommandInvokedError,
+  trashCommandMayHaveRun,
+} from '#/system/trash-command-outcome.ts'
 
 export function createWorkspaceRoutes(options: {
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
@@ -210,23 +215,14 @@ export function createWorkspaceRoutes(options: {
       executionTarget.workspaceId,
       executionTarget.workspaceRuntimeId,
     )
-    const result = await runWorkspaceRuntimeRequest({
-      userId,
-      run: () => trashWorkspaceFile(executionTarget, path, c.req.raw.signal),
-      label: 'trash-file',
-      signal: c.req.raw.signal,
-    })
-    const invalidationRequired = result.ok || result.repositoryStateChanged === true
-    if (invalidationRequired) {
-      publishUserWorkspaceFilesystemInvalidation(userId, { target: executionTarget })
-    }
-    if (executionTarget.kind === 'git-worktree' && invalidationRequired) {
-      publishUserRepoReadInvalidation(userId, {
-        repoId: executionTarget.workspaceId,
-        domain: 'worktree-status',
-      })
-    }
-    return c.json(result)
+    return c.json(
+      await runTrashFileRequest({
+        userId,
+        target: executionTarget,
+        filePath: path,
+        signal: c.req.raw.signal,
+      }),
+    )
   })
 
   app.post('/open-terminal', async (c) => {
@@ -284,6 +280,50 @@ export function createWorkspaceRoutes(options: {
   })
 
   return app
+}
+
+async function runTrashFileRequest(input: {
+  userId: string
+  target: WorkspacePaneFilesystemExecutionTarget
+  filePath: string
+  signal?: AbortSignal
+}): Promise<ExecResult> {
+  let mutationMayHaveRun = false
+  try {
+    return await runWorkspaceRuntimeRequest({
+      userId: input.userId,
+      run: async () => {
+        try {
+          const outcome = await trashWorkspaceFile(input.target, input.filePath, input.signal)
+          mutationMayHaveRun = trashCommandMayHaveRun(outcome)
+          return outcome.result
+        } catch (error) {
+          if (!isTrashCommandInvokedError(error)) throw error
+          mutationMayHaveRun = true
+          throw error.cause
+        }
+      },
+      label: 'trash-file',
+      signal: input.signal,
+    })
+  } catch (error) {
+    if (mutationMayHaveRun) {
+      throw new IpcError({ code: 'BAD_REQUEST', message: 'error.trash-failed-check-state' })
+    }
+    throw error
+  } finally {
+    if (mutationMayHaveRun) publishTrashFileInvalidations(input.userId, input.target)
+  }
+}
+
+function publishTrashFileInvalidations(userId: string, target: WorkspacePaneFilesystemExecutionTarget): void {
+  publishUserWorkspaceFilesystemInvalidation(userId, { target })
+  if (target.kind === 'git-worktree') {
+    publishUserRepoReadInvalidation(userId, {
+      repoId: target.workspaceId,
+      domain: 'worktree-status',
+    })
+  }
 }
 
 function requireUserId(userId: string | null | undefined): string {

@@ -4,20 +4,48 @@ import {
   getBranches,
   getBranchWorktreeIdentities,
   getCurrentBranch,
+  deleteBranch,
+  deleteUpstreamBranch,
   resolveRepoCommonDir,
   resolveRepoObjectsDir,
 } from '#/system/git/branches.ts'
-import { git } from '#/system/git/git-exec.ts'
+import { git, gitCommandResultWithOptions } from '#/system/git/git-exec.ts'
 
 vi.mock('#/system/git/git-exec.ts', () => ({
   git: vi.fn(),
-  gitResultWithOptions: vi.fn(),
+  gitCommandResultWithOptions: vi.fn(),
   NETWORK_TIMEOUT_MS: 30_000,
 }))
 
 vi.mock('node:fs/promises', () => ({
   realpath: vi.fn(),
 }))
+
+describe('branch mutations', () => {
+  test('preserves local branch deletion execution facts', async () => {
+    vi.mocked(gitCommandResultWithOptions).mockResolvedValueOnce({
+      result: { ok: false, message: 'delete failed' },
+      execution: { status: 'failed' },
+    })
+
+    await expect(deleteBranch('/repo', 'feature/test')).resolves.toEqual({
+      result: { ok: false, message: 'delete failed' },
+      execution: { status: 'failed' },
+    })
+  })
+
+  test('preserves upstream deletion execution facts', async () => {
+    vi.mocked(gitCommandResultWithOptions).mockResolvedValueOnce({
+      result: { ok: false, message: 'push failed' },
+      execution: { status: 'timed-out' },
+    })
+
+    await expect(deleteUpstreamBranch('/repo', 'origin', 'feature/test')).resolves.toEqual({
+      result: { ok: false, message: 'push failed' },
+      execution: { status: 'timed-out' },
+    })
+  })
+})
 
 describe('getBranchWorktreeIdentities', () => {
   test('reads strict branch identity and maps known worktree paths', async () => {

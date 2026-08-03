@@ -47,7 +47,10 @@ beforeEach(() => {
     { path: '/tmp/repo-feature', branch: 'feature', isBare: false, isPrimary: false },
   ])
   mocks.lstat.mockResolvedValue({ isDirectory: () => false })
-  mocks.movePathToTrash.mockResolvedValue({ ok: true, message: 'ok', repositoryStateChanged: true })
+  mocks.movePathToTrash.mockResolvedValue({
+    result: { ok: true, message: 'ok' },
+    execution: { status: 'succeeded' },
+  })
   mocks.remoteRuntimeAwareGitRunner.mockReturnValue(async () => ({ ok: true, stdout: '', stderr: '', code: 0 }))
   mocks.resolveRemoteWorktree.mockResolvedValue({
     path: '/srv/repo-feature',
@@ -64,7 +67,7 @@ describe('workspace file trash write layer', () => {
       'notes.txt',
     )
 
-    expect(result.ok).toBe(true)
+    expect(result.result.ok).toBe(true)
     expect(mocks.readWorktreeMembership).not.toHaveBeenCalled()
     expect(mocks.lstat).toHaveBeenCalledWith('/tmp/plain-workspace/notes.txt')
   })
@@ -75,7 +78,10 @@ describe('workspace file trash write layer', () => {
       'src/index.ts',
     )
 
-    expect(result).toEqual({ ok: true, message: 'ok', repositoryStateChanged: true })
+    expect(result).toEqual({
+      result: { ok: true, message: 'ok' },
+      execution: { status: 'succeeded' },
+    })
     expect(mocks.readWorktreeMembership).toHaveBeenCalledWith('/tmp/repo', undefined)
     expect(mocks.lstat).toHaveBeenCalledWith('/tmp/repo-feature/src/index.ts')
     expect(mocks.movePathToTrash).toHaveBeenCalledWith('/tmp/repo-feature/src/index.ts', undefined)
@@ -97,7 +103,10 @@ describe('workspace file trash write layer', () => {
       'src',
     )
 
-    expect(result).toEqual({ ok: false, message: 'error.filetree-delete-directory-unsupported' })
+    expect(result).toEqual({
+      result: { ok: false, message: 'error.filetree-delete-directory-unsupported' },
+      execution: { status: 'not-started' },
+    })
     expect(mocks.movePathToTrash).not.toHaveBeenCalled()
   })
 
@@ -113,11 +122,17 @@ describe('workspace file trash write layer', () => {
       port: 22,
     }
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
-    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repositoryStateChanged: true })
+    mocks.trashRemoteFile.mockResolvedValueOnce({
+      result: { ok: true, message: 'ok' },
+      execution: { status: 'succeeded' },
+    })
 
     const result = await trashWorkspaceFile(worktreeTarget(repoId, '/srv/repo-feature'), 'README.md')
 
-    expect(result).toEqual({ ok: true, message: 'ok', repositoryStateChanged: true })
+    expect(result).toEqual({
+      result: { ok: true, message: 'ok' },
+      execution: { status: 'succeeded' },
+    })
     expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/repo-feature', 'README.md', {
       run: expect.any(Function),
       signal: undefined,
@@ -137,7 +152,10 @@ describe('workspace file trash write layer', () => {
       port: 22,
     }
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
-    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok' })
+    mocks.trashRemoteFile.mockResolvedValueOnce({
+      result: { ok: true, message: 'ok' },
+      execution: { status: 'succeeded' },
+    })
 
     await trashWorkspaceFile(rootTarget(repoId), 'notes.txt')
     expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/plain-workspace', 'notes.txt', {
@@ -161,14 +179,16 @@ describe('workspace file trash write layer', () => {
     const run = async () => ({ ok: true as const, stdout: '', stderr: '', code: 0 })
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.remoteRuntimeAwareGitRunner.mockReturnValueOnce(run)
-    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repositoryStateChanged: true })
+    mocks.trashRemoteFile.mockResolvedValueOnce({
+      result: { ok: true, message: 'ok' },
+      execution: { status: 'succeeded' },
+    })
 
     await expect(
       trashWorkspaceFile(worktreeTarget(repoId, '/srv/repo-feature', workspaceRuntimeId), 'README.md'),
     ).resolves.toEqual({
-      ok: true,
-      message: 'ok',
-      repositoryStateChanged: true,
+      result: { ok: true, message: 'ok' },
+      execution: { status: 'succeeded' },
     })
 
     expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId }, undefined)

@@ -18,7 +18,6 @@ export const WorktreeBootstrapSummaryResponseSchema = v.strictObject({
 export const ExecResultResponseSchema = v.strictObject({
   ok: v.boolean(),
   message: v.string(),
-  repositoryStateChanged: v.optional(v.boolean()),
   worktreeBootstrap: v.optional(WorktreeBootstrapSummaryResponseSchema),
 }) satisfies v.GenericSchema<ExecResult>
 

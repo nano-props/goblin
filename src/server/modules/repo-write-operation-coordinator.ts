@@ -26,18 +26,21 @@ import {
   repoWriteOperationTimestamp,
   type RepoWriteOperationListOptions,
 } from '#/server/modules/repo-write-operation-state.ts'
+import { RepoMembershipReadConflictError } from '#/server/modules/repo-membership-read-conflict.ts'
 
 export interface RepoWriteOperationLifecycle {
   id: string
   start(): void
   requestCancel(reason: RepoOperationCancellationReason): void
   recordWaitCancellation(reason: RepoOperationCancellationReason): void
+  runMembershipMutation<T>(mutation: () => Promise<T>): Promise<T>
   settle(result: { ok: boolean; message?: string }): void
 }
 
 export interface RepoWriteOperationContext {
   runNetworkOperation<T extends ExecResult>(task: (signal: AbortSignal) => Promise<T>): Promise<T>
   runWithRepoSource<T extends ExecResult>(task: (source: RepoSource) => Promise<T>): Promise<T>
+  runMembershipMutation<T>(mutation: () => Promise<T>): Promise<T>
 }
 
 interface BeginRepoWriteOperationInput {
@@ -62,6 +65,8 @@ interface RepoWriteBoundaryGroup extends RepoWriteBoundaryHandle {
   readonly queue: PQueue
   operations: Map<string, RepoServerOperationState>
   lastSuccessfulFetchAt: number | null
+  membershipRevision: number
+  activeMembershipWrites: number
 }
 
 interface WorkspaceRuntimeBoundaryRegistration {
@@ -93,6 +98,8 @@ function createBoundaryGroup(descriptor: string): RepoWriteBoundaryGroup {
     queue: new PQueue({ concurrency: 1 }),
     operations: new Map(),
     lastSuccessfulFetchAt: null,
+    membershipRevision: 0,
+    activeMembershipWrites: 0,
   }
   boundaryGroups.add(group)
   boundaryGroupByDescriptor.set(descriptor, group)
@@ -221,6 +228,15 @@ function beginRepoWriteOperation(
       operation.cancellation.lastWaitCancelledAt = Date.now()
       operation.cancellation.lastWaitCancellationReason = reason
       publishRepoRuntimeInvalidation(runtime, operation)
+    },
+    async runMembershipMutation<T>(mutation: () => Promise<T>): Promise<T> {
+      runtime.activeMembershipWrites += 1
+      runtime.membershipRevision += 1
+      const outcome = await observePromise(mutation)
+      runtime.activeMembershipWrites -= 1
+      runtime.membershipRevision += 1
+      if (!outcome.ok) throw outcome.error
+      return outcome.value
     },
     settle(result) {
       if (settled) return
@@ -386,6 +402,9 @@ function createRepoWriteOperationContext(
   callerSignal: AbortSignal | undefined,
 ): RepoWriteOperationContext {
   return {
+    async runMembershipMutation<T>(mutation: () => Promise<T>): Promise<T> {
+      return await operation.runMembershipMutation(mutation)
+    },
     async runNetworkOperation(task) {
       return await runRepoWriteNetworkOperation(operation, task, callerSignal)
     },
@@ -491,6 +510,25 @@ export function listRepoWriteOperationsForBoundary(
   const group = boundaryGroupForHandle(handle)
   registerRepoWriteOperationBoundaryRepoId(group, repoId)
   return listRuntimeOperations([group], options)
+}
+
+export async function runWithRepoMembershipReadAdmission<T>(
+  handle: RepoWriteBoundaryHandle,
+  read: () => Promise<T>,
+): Promise<T> {
+  const group = boundaryGroupForHandle(handle)
+  if (group.activeMembershipWrites > 0) throw new RepoMembershipReadConflictError()
+  const revision = group.membershipRevision
+  const outcome = await observePromise(read)
+  assertRepoMembershipReadStillAdmitted(group, revision)
+  if (!outcome.ok) throw outcome.error
+  return outcome.value
+}
+
+function assertRepoMembershipReadStillAdmitted(group: RepoWriteBoundaryGroup, revision: number): void {
+  if (group.activeMembershipWrites > 0 || revision !== group.membershipRevision) {
+    throw new RepoMembershipReadConflictError()
+  }
 }
 
 export async function resolveRepoWriteBoundaryForRead(

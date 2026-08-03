@@ -112,10 +112,10 @@ export function WorkspaceDashboardPane({
     [branchModel, pullRequestEntries],
   )
   const hasAttentionBranches = !!summary?.attentionBranches.length
-  const statusError = statusReadModel.error
+  const statusError = statusReadModel.displayError
   const statusErrorKey = statusError instanceof Error ? statusError.message : String(statusError)
-  const statusStale = !!statusReadModel.data && statusReadModel.isError
-  const snapshotError = snapshotReadModel.error
+  const statusStale = !!statusReadModel.data && !!statusError
+  const snapshotError = snapshotReadModel.displayError
   const snapshotErrorKey = snapshotError instanceof Error ? snapshotError.message : String(snapshotError)
   const pullRequestError = pullRequestsReadModel.error
   const pullRequestErrorKey =
@@ -141,7 +141,10 @@ export function WorkspaceDashboardPane({
             <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'p-4 text-sm text-destructive')}>
               {t('dashboard.directory.read-failed')}
             </div>
-          ) : workspace && workspace.capability.kind === 'git' && !snapshot && snapshotReadModel.isError ? (
+          ) : workspace &&
+            workspace.capability.kind === 'git' &&
+            !snapshot &&
+            snapshotError ? (
             <RepoStatusFailureView
               messageKey={snapshotErrorKey || 'error.failed-read-repo'}
               retrying={snapshotReadModel.isFetching}
@@ -149,14 +152,14 @@ export function WorkspaceDashboardPane({
             />
           ) : workspace && workspace.capability.kind === 'git' && branchModel && summary ? (
             <>
-              {snapshotReadModel.isError && (
+              {snapshotError && (
                 <RepoStatusStaleNotice
                   messageKey={snapshotErrorKey || 'error.failed-read-repo'}
                   retrying={snapshotReadModel.isFetching}
                   onRetry={() => void snapshotReadModel.refetch()}
                 />
               )}
-              {statusReadModel.isError &&
+              {statusError &&
                 (statusStale ? (
                   <RepoStatusStaleNotice
                     messageKey={statusErrorKey}

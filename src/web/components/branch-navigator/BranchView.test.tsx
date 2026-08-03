@@ -246,6 +246,30 @@ describe('BranchView', () => {
     await vi.waitFor(() => expect(readStatus).toHaveBeenCalledTimes(2))
     await vi.waitFor(() => expect(screen.queryByText('status.stale-title')).toBeNull())
   })
+
+  test('keeps the last accepted projection without a stale warning while worktree membership changes', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    seedRepoQueryDataForTest(repo, {
+      branches: [createRepoBranch('main')],
+      currentBranch: 'main',
+      status: [{ path: REPO_ID, branch: 'main', isMain: true, entries: [] }],
+    })
+    const readStatus = vi.fn(async () => {
+      throw new Error('error.repo-membership-changing')
+    })
+    installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
+
+    renderBranchView()
+
+    await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
+    expect(screen.getByText('main')).toBeTruthy()
+    expect(screen.queryByText('status.stale-title')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
 })
 
 function renderBranchView() {

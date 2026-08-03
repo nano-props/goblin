@@ -117,11 +117,6 @@ export const GIT_HASH_RE = /^[0-9a-fA-F]{7,64}$/
 export interface ExecResult {
   ok: boolean
   message: string
-  /**
-   * True when the operation changed repository state. In particular, callers
-   * must refresh when a later step fails after an irreversible mutation.
-   */
-  repositoryStateChanged?: boolean
   worktreeBootstrap?: WorktreeBootstrapSummary
 }
 

@@ -1,6 +1,10 @@
 import { describe, expect, test, vi } from 'vitest'
 import type * as RepoWritePaths from '#/server/modules/repo-write-paths.ts'
+import type { CommandOutcome } from '#/system/command-execution.ts'
+import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
+import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
+import { useFakeTimers } from '#/test-utils/timers.ts'
 import {
   LINKED_REPO_ID,
   REPO_ID,
@@ -8,6 +12,7 @@ import {
   WORKTREE_REPO_ID,
   createLocalRepoWorktreeWithBootstrap,
   expectRepoMetadataInvalidations,
+  expectRepoOperationSettledBeforeProjectionInvalidation,
   mocks,
   removeRepoWorktreeForTest,
   repoMetadataInvalidations,
@@ -57,6 +62,46 @@ describe('repo worktree creation', () => {
         domain: 'metadata',
       },
     )
+    expectRepoOperationSettledBeforeProjectionInvalidation()
+  })
+
+  test('createRepoWorktree returns timeout failure and invalidates the complete possible impact scope', async () => {
+    mocks.readWorktreeMembership.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-linked', branch: 'feature/b', isBare: false, isPrimary: false },
+    ])
+    mocks.createWorktree.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'error.worktree-create-timeout-check-state' }, 'timed-out'),
+    )
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepoWorktree(REPO_ID, {
+      worktreePath: '/tmp/repo-worktree',
+      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+    })
+
+    expect(result).toEqual({ ok: false, message: 'error.worktree-create-timeout-check-state' })
+    expectRepoMetadataInvalidations(
+      { repoId: REPO_ID, domain: 'metadata' },
+      { repoId: LINKED_REPO_ID, domain: 'metadata' },
+      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
+    )
+    expect(mocks.bootstrapWorktreeAfterCreate).not.toHaveBeenCalled()
+  })
+
+  test('createRepoWorktree does not invalidate when cancellation happened before Git started', async () => {
+    mocks.createWorktree.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'not-started'),
+    )
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepoWorktree(REPO_ID, {
+      worktreePath: '/tmp/repo-worktree',
+      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+    })
+
+    expect(result).toEqual({ ok: false, message: 'cancelled' })
+    expect(repoMetadataInvalidations()).toEqual([])
   })
 
   test('createRepoWorktree skips bootstrap unless run is explicitly requested', async () => {
@@ -89,6 +134,7 @@ describe('repo worktree creation', () => {
   })
 
   test('createRepoWorktree allows one-time bootstrap run requests without trusted repo settings', async () => {
+    mocks.setServerWorkspaceWorktreeBootstrapConfigTrust.mockResolvedValueOnce(false)
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
@@ -99,21 +145,15 @@ describe('repo worktree creation', () => {
       signal: undefined,
       expectedConfigHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
     })
-    expect(mocks.getServerWorkspaceSettings).toHaveBeenCalledTimes(1)
-    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
-    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
+      configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
+      trusted: false,
+    })
+    expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 
   test('createRepoWorktree clears existing bootstrap trust when the create request leaves trust unchecked', async () => {
-    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([
-      {
-        workspaceId: REPO_ID,
-        worktreeBootstrapTrust: {
-          configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
-          trustedAt: '2026-06-26T00:00:00.000Z',
-        },
-      },
-    ])
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
@@ -123,33 +163,25 @@ describe('repo worktree creation', () => {
       signal: undefined,
       expectedConfigHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
     })
-    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
-    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({
+    expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
       configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
+      trusted: false,
     })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
   })
 
   test('createRepoWorktree reports settings failure when clearing bootstrap trust fails after bootstrap succeeds', async () => {
-    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([
-      {
-        workspaceId: REPO_ID,
-        worktreeBootstrapTrust: {
-          configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
-          trustedAt: '2026-06-26T00:00:00.000Z',
-        },
-      },
-    ])
-    mocks.untrustServerWorkspaceWorktreeBootstrapConfig.mockRejectedValueOnce(new Error('settings write failed'))
+    mocks.setServerWorkspaceWorktreeBootstrapConfigTrust.mockRejectedValueOnce(new Error('settings write failed'))
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
 
-    expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repositoryStateChanged: true })
-    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({
+    expect(result).toEqual({ ok: false, message: 'error.worktree-created-followup-failed' })
+    expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
       configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
+      trusted: false,
     })
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
@@ -165,32 +197,24 @@ describe('repo worktree creation', () => {
       signal: undefined,
       expectedConfigHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
     })
-    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({
+    expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
       configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
+      trusted: true,
     })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
     expect(mocks.bootstrapWorktreeAfterCreate.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.trustServerWorkspaceWorktreeBootstrapConfig.mock.invocationCallOrder[0],
+      mocks.setServerWorkspaceWorktreeBootstrapConfigTrust.mock.invocationCallOrder[0],
     )
   })
 
   test('createRepoWorktree serializes concurrent repo write service operations for the same repo', async () => {
     const configHash = WORKTREE_BOOTSTRAP_CONFIG_HASH
-    const firstCreate = Promise.withResolvers<{ ok: true; message: string }>()
-    const secondCreate = Promise.withResolvers<{ ok: true; message: string }>()
+    const firstCreate = Promise.withResolvers<CommandOutcome>()
+    const secondCreate = Promise.withResolvers<CommandOutcome>()
     mocks.createWorktree
       .mockImplementationOnce(async () => await firstCreate.promise)
       .mockImplementationOnce(async () => await secondCreate.promise)
-    mocks.getServerWorkspaceSettings.mockResolvedValueOnce([]).mockResolvedValueOnce([
-      {
-        workspaceId: REPO_ID,
-        worktreeBootstrapTrust: {
-          configHash,
-          trustedAt: '2026-06-26T00:00:00.000Z',
-        },
-      },
-    ])
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
@@ -255,12 +279,12 @@ describe('repo worktree creation', () => {
       target: { branch: 'feature/b', worktreePath: '/tmp/repo-worktree-b' },
     })
 
-    firstCreate.resolve({ ok: true, message: 'first created' })
+    firstCreate.resolve(commandOutcomeForTest({ ok: true, message: 'first created' }))
     await expect(first).resolves.toEqual({ ok: true, message: 'first created' })
     await flushMicrotasks(2)
     expect(mocks.createWorktree).toHaveBeenCalledTimes(2)
 
-    secondCreate.resolve({ ok: true, message: 'second created' })
+    secondCreate.resolve(commandOutcomeForTest({ ok: true, message: 'second created' }))
     await expect(second).resolves.toEqual({ ok: true, message: 'second created' })
     expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual([])
     expect(
@@ -271,22 +295,27 @@ describe('repo worktree creation', () => {
 
     expect(mocks.createWorktree.mock.calls[0]?.[1]).toMatchObject({ worktreePath: '/tmp/repo-worktree-a' })
     expect(mocks.createWorktree.mock.calls[1]?.[1]).toMatchObject({ worktreePath: '/tmp/repo-worktree-b' })
-    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({ workspaceId: REPO_ID, configHash })
-    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).toHaveBeenCalledWith({
+    expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
       configHash,
+      trusted: true,
     })
-    expect(mocks.trustServerWorkspaceWorktreeBootstrapConfig.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
+      configHash,
+      trusted: false,
+    })
+    expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.createWorktree.mock.invocationCallOrder[1],
     )
     expect(mocks.createWorktree.mock.invocationCallOrder[1]).toBeLessThan(
-      mocks.untrustServerWorkspaceWorktreeBootstrapConfig.mock.invocationCallOrder[0],
+      mocks.setServerWorkspaceWorktreeBootstrapConfigTrust.mock.invocationCallOrder[1],
     )
   })
 
   test('repo write service operations serialize across mutation kinds for the same repo', async () => {
-    const firstDelete = Promise.withResolvers<{ ok: true; message: string }>()
-    const secondRemove = Promise.withResolvers<{ ok: true; message: string }>()
+    const firstDelete = Promise.withResolvers<CommandOutcome>()
+    const secondRemove = Promise.withResolvers<CommandOutcome>()
     mocks.resolveRepoCommonDir.mockResolvedValue('/tmp/repo/.git')
     mocks.readWorktreeMembership.mockResolvedValueOnce([]).mockResolvedValueOnce([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
@@ -336,20 +365,20 @@ describe('repo worktree creation', () => {
       })
     })
 
-    firstDelete.resolve({ ok: true, message: 'deleted' })
+    firstDelete.resolve(commandOutcomeForTest({ ok: true, message: 'deleted' }))
     await expect(first).resolves.toEqual({ ok: true, message: 'deleted' })
     await vi.waitFor(() => {
       expect(mocks.removeWorktree).toHaveBeenCalledTimes(1)
     })
 
-    secondRemove.resolve({ ok: true, message: 'removed' })
+    secondRemove.resolve(commandOutcomeForTest({ ok: true, message: 'removed' }))
     await expect(second).resolves.toEqual({ ok: true, message: 'removed' })
     expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual([])
   })
 
   test('repo write service operations serialize linked worktree repo ids by common git dir', async () => {
-    const firstDelete = Promise.withResolvers<{ ok: true; message: string }>()
-    const secondRemove = Promise.withResolvers<{ ok: true; message: string }>()
+    const firstDelete = Promise.withResolvers<CommandOutcome>()
+    const secondRemove = Promise.withResolvers<CommandOutcome>()
     mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
       cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
     )
@@ -404,20 +433,20 @@ describe('repo worktree creation', () => {
       })
     })
 
-    firstDelete.resolve({ ok: true, message: 'deleted' })
+    firstDelete.resolve(commandOutcomeForTest({ ok: true, message: 'deleted' }))
     await expect(first).resolves.toEqual({ ok: true, message: 'deleted' })
     await vi.waitFor(() => {
       expect(mocks.removeWorktree).toHaveBeenCalledTimes(1)
     })
 
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked', undefined)
-    secondRemove.resolve({ ok: true, message: 'removed' })
+    secondRemove.resolve(commandOutcomeForTest({ ok: true, message: 'removed' }))
     await expect(second).resolves.toEqual({ ok: true, message: 'removed' })
   })
 
   test('repo write service operations serialize linked worktree network mutations by common git dir', async () => {
-    const firstDelete = Promise.withResolvers<{ ok: true; message: string }>()
-    const secondPull = Promise.withResolvers<{ ok: true; message: string }>()
+    const firstDelete = Promise.withResolvers<CommandOutcome>()
+    const secondPull = Promise.withResolvers<CommandOutcome>()
     mocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
       cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
     )
@@ -435,23 +464,23 @@ describe('repo worktree creation', () => {
 
     expect(mocks.pullBranch).not.toHaveBeenCalled()
 
-    firstDelete.resolve({ ok: true, message: 'deleted' })
+    firstDelete.resolve(commandOutcomeForTest({ ok: true, message: 'deleted' }))
     await expect(first).resolves.toEqual({ ok: true, message: 'deleted' })
     await vi.waitFor(() => {
       expect(mocks.pullBranch).toHaveBeenCalledTimes(1)
     })
 
-    secondPull.resolve({ ok: true, message: 'pulled' })
+    secondPull.resolve(commandOutcomeForTest({ ok: true, message: 'pulled' }))
     await expect(second).resolves.toEqual({ ok: true, message: 'pulled' })
   })
 
   test('createRepoWorktree reports settings failure after creating and bootstrapping the worktree', async () => {
-    mocks.trustServerWorkspaceWorktreeBootstrapConfig.mockRejectedValueOnce(new Error('settings write failed'))
+    mocks.setServerWorkspaceWorktreeBootstrapConfigTrust.mockRejectedValueOnce(new Error('settings write failed'))
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: true })
 
-    expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repositoryStateChanged: true })
+    expect(result).toEqual({ ok: false, message: 'error.worktree-created-followup-failed' })
     expect(mocks.createWorktree).toHaveBeenCalled()
     expect(mocks.bootstrapWorktreeAfterCreate).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', {
       signal: undefined,
@@ -466,6 +495,6 @@ describe('repo worktree creation', () => {
       repoId: WORKTREE_REPO_ID,
       domain: 'metadata',
     })
-    expect(mocks.untrustServerWorkspaceWorktreeBootstrapConfig).not.toHaveBeenCalled()
+    expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).toHaveBeenCalledTimes(1)
   })
 })

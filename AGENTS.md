@@ -1,6 +1,6 @@
 # Repository Instructions
 
-## TypeScript and dependencies
+## TypeScript, clarity, and dependencies
 
 - The project runs TypeScript in Node.js strip-only mode. Do not use enums,
   runtime namespaces, parameter properties, or import aliases.
@@ -12,6 +12,13 @@
 - Runtime `import('…')` is reserved for a real lazy-loading or
   optional-dependency boundary. Keep it local and explain a non-obvious use.
   Refactor circular dependencies instead of hiding them behind dynamic imports.
+- Do not encode multi-state decisions with nested ternaries, chained object
+  spreads, or later properties that silently overwrite earlier ones. Use a
+  named classifier with direct returns or an exhaustive `switch`, keeping the
+  caller's happy path linear.
+- Keep execution facts, domain milestones, projection impact, and user-facing
+  messages separate. Extract a helper only when it gives a decision one clear
+  name and owner, not merely to hide branching.
 
 ## Verification and test data
 

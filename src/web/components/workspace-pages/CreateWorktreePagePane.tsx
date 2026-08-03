@@ -121,8 +121,8 @@ export function CreateWorktreePagePane({
   const showLoadingSkeleton = useLoadingVisibility(!pageReady)
   const holdLoadingPage = !pageReady || showLoadingSkeleton
 
-  if (!snapshot && snapshotReadModel.isError) {
-    const snapshotError = snapshotReadModel.error
+  if (!snapshot && snapshotReadModel.displayError) {
+    const snapshotError = snapshotReadModel.displayError
     const messageKey = snapshotError instanceof Error ? snapshotError.message : String(snapshotError)
     return (
       <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>

@@ -230,7 +230,7 @@ describe('settings source external app recents', () => {
     const mod = await import('#/server/modules/settings-source.ts')
     const configHash = `sha256:${'a'.repeat(64)}`
 
-    await mod.trustServerWorkspaceWorktreeBootstrapConfig({ workspaceId: REPO_A, configHash })
+    await mod.setServerWorkspaceWorktreeBootstrapConfigTrust({ workspaceId: REPO_A, configHash, trusted: true })
     await mod.setServerWorkspaceExternalAppRecent({
       workspaceId: REPO_A,
       targetKey: externalAppTargetKey('/repo-a/worktree-x'),

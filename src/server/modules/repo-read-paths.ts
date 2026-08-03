@@ -1,4 +1,8 @@
-import { runWithRepoSource, type WorkspacePaneTargetIdentity } from '#/server/modules/repo-source.ts'
+import {
+  runWithRepoSource,
+  type RepoSource,
+  type WorkspacePaneTargetIdentity,
+} from '#/server/modules/repo-source.ts'
 import type { RepoSourceRuntimeContext } from '#/server/modules/remote-repo-execution.ts'
 import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import {
@@ -6,6 +10,7 @@ import {
   listRepoWriteOperationsForBoundary,
   listRepoWriteOperationsForRepo,
   resolveRepoWriteBoundaryForRead,
+  runWithRepoMembershipReadAdmission,
 } from '#/server/modules/repo-write-operation-coordinator.ts'
 import { isValidWorkspaceLocatorInput } from '#/shared/input-validation.ts'
 import {
@@ -31,41 +36,41 @@ export async function getRepoSnapshot(
   cwd: WorkspaceId,
   options: { signal?: AbortSignal; workspaceRuntimeId?: string } = {},
 ): Promise<RepoSnapshot | null> {
-  options.signal?.throwIfAborted()
-  return await runWithRepoSource(
-    cwd,
-    async (source) => await source.getSnapshot(options.signal),
-    repoReadRuntime(options),
-    options.signal,
-  )
+  return await runRepoMembershipRead(cwd, options, async (source) => {
+    return await source.getSnapshot({ signal: options.signal })
+  })
 }
 
 export async function getWorkspacePaneTargetIdentities(
   cwd: WorkspaceId,
   options: { signal?: AbortSignal; workspaceRuntimeId?: string } = {},
 ): Promise<WorkspacePaneTargetIdentity[]> {
-  options.signal?.throwIfAborted()
-  const identities = await runWithRepoSource(
-    cwd,
-    async (source) => await source.getWorkspacePaneTargetIdentities(options.signal),
-    repoReadRuntime(options),
-  )
-  options.signal?.throwIfAborted()
-  return identities
+  return await runRepoMembershipRead(cwd, options, async (source) => {
+    return await source.getWorkspacePaneTargetIdentities({ signal: options.signal })
+  })
 }
 
 export async function getRepoStatus(
   cwd: WorkspaceId,
   options: { signal?: AbortSignal; workspaceRuntimeId?: string } = {},
 ): Promise<WorktreeStatus[]> {
+  return await runRepoMembershipRead(cwd, options, async (source) => {
+    return await source.getStatus({ signal: options.signal })
+  })
+}
+
+async function runRepoMembershipRead<T>(
+  cwd: WorkspaceId,
+  options: { signal?: AbortSignal; workspaceRuntimeId?: string },
+  read: (source: RepoSource) => Promise<T>,
+): Promise<T> {
   options.signal?.throwIfAborted()
-  const status = await runWithRepoSource(
-    cwd,
-    async (source) => await source.getStatus(options.signal),
-    repoReadRuntime(options),
-  )
-  options.signal?.throwIfAborted()
-  return status
+  const boundary = await resolveRepoWriteBoundaryForRead(cwd, options)
+  return await runWithRepoMembershipReadAdmission(boundary, async () => {
+    const result = await runWithRepoSource(cwd, read, repoReadRuntime(options), options.signal)
+    options.signal?.throwIfAborted()
+    return result
+  })
 }
 
 export async function getRepoPullRequests(

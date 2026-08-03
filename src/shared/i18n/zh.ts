@@ -518,6 +518,7 @@ export const zh: Record<DictKey, string> = {
   'error.workspace-open-failed': '打开工作区失败',
   'error.workspace-close-failed': '关闭工作区失败',
   'error.failed-read-repo': '读取仓库失败',
+  'error.repo-membership-changing': '仓库工作树正在变更',
   'error.ssh-config-changed': 'SSH 配置已变更',
   'error.repository-boundary-unavailable': '无法确认仓库身份',
   'error.git-not-found': '未找到 Git',
@@ -535,6 +536,9 @@ export const zh: Record<DictKey, string> = {
   'error.filetree-delete-directory-unsupported': '文件树中只能将文件移到废纸篓',
   'error.trash-unavailable': '系统废纸篓不可用',
   'error.failed-trash-file': '无法将文件移到废纸篓',
+  'error.trash-cancelled-check-state': '移到废纸篓已取消，请检查文件状态后再重试',
+  'error.trash-timeout-check-state': '移到废纸篓超时，请检查文件状态后再重试',
+  'error.trash-failed-check-state': '文件可能已移到废纸篓，请检查文件状态后再重试',
   'error.invalid-arguments': '参数无效',
   'error.workspace-runtime-stale': '工作区运行时已失效',
   'error.workspace-target-stale': '工作区目标已发生变化，请重试',
@@ -542,6 +546,14 @@ export const zh: Record<DictKey, string> = {
   'error.not-controller': '此终端正由另一个会话控制',
   'error.network-op-in-progress': '另一个 git 网络操作正在进行中。',
   'error.request-timeout': '请求超时，请重试。',
+  'error.worktree-create-timeout-check-state': '创建工作树超时。Git 状态可能已经改变，请检查目标分支和路径后再重试。',
+  'error.worktree-remove-timeout-check-state':
+    '删除工作树超时。Git 状态可能已经改变，请检查工作树并重新打开或修复工作区后再重试。',
+  'error.worktree-created-followup-failed':
+    '工作树已创建，但后续步骤失败。继续操作前，请检查工作树并重新打开或修复工作区。',
+  'error.worktree-removed-followup-failed': '工作树已删除，但后续步骤失败。继续操作前，请重新打开或修复工作区。',
+  'error.local-branch-deleted-upstream-failed-check-state':
+    '本地分支已删除，但删除上游分支未能完成。请刷新并检查远端分支后再重试。',
   'error.branch-action-wait-timeout': '等待仓库刷新完成超时。',
   'error.unknown': '未知错误',
   'error.cannot-delete-current-branch': '不能删除当前分支',

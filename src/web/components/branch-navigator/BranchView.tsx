@@ -76,18 +76,18 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
     : 'branches.empty'
 
   const highlightedBranch = currentBranchName ?? null
-  const statusError = statusReadModel.error
+  const statusError = statusReadModel.displayError
   const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
   const retryStatus = () => {
     if (!workspaceRuntimeId) return
     void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, repoId, workspaceRuntimeId)
   }
 
-  const snapshotError = snapshotReadModel.error
+  const snapshotError = snapshotReadModel.displayError
   const snapshotErrorKey =
     snapshotError instanceof Error ? snapshotError.message : snapshotError ? String(snapshotError) : null
 
-  if (!repo && snapshotReadModel.isError) {
+  if (!repo && snapshotError) {
     return (
       <RepoStatusFailureView
         messageKey={snapshotErrorKey ?? 'error.failed-read-repo'}
@@ -101,15 +101,14 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
 
   return (
     <>
-      {snapshotReadModel.isError && snapshotErrorKey && (
+      {snapshotErrorKey && (
         <RepoStatusStaleNotice
           messageKey={snapshotErrorKey}
           retrying={snapshotReadModel.isFetching}
           onRetry={() => void snapshotReadModel.refetch()}
         />
       )}
-      {statusReadModel.isError &&
-        statusErrorKey &&
+      {statusErrorKey &&
         (statusReadModel.data ? (
           <RepoStatusStaleNotice
             messageKey={statusErrorKey}

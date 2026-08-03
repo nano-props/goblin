@@ -1,0 +1,1 @@
+export const WORKTREE_COMMAND_TIMEOUT_MS = 5 * 60_000

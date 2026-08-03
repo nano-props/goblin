@@ -7,6 +7,7 @@ import {
   repoWriteOperationCoordinatorStatsForTests,
   resetRepoWriteOperationCoordinatorForTests,
   resolveRepoWriteBoundaryForRead,
+  runWithRepoMembershipReadAdmission,
 } from '#/server/modules/repo-write-operation-coordinator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoWriteExecutionCapability } from '#/server/modules/repo-source.ts'
@@ -67,6 +68,65 @@ beforeEach(() => {
 })
 
 describe('repo write operation coordinator', () => {
+  test('rejects membership reads that start during or overlap a worktree mutation', async () => {
+    const boundary = await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
+    const releaseRead = Promise.withResolvers<void>()
+    const readStarted = Promise.withResolvers<void>()
+    const overlappingRead = runWithRepoMembershipReadAdmission(boundary, async () => {
+      readStarted.resolve()
+      await releaseRead.promise
+      throw new Error('worktree disappeared while sampling status')
+    })
+    await readStarted.promise
+    const started = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const followupStarted = Promise.withResolvers<void>()
+    const releaseFollowup = Promise.withResolvers<void>()
+    const work = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      {
+        repoId: WORKSPACE_ID,
+        kind: 'create-worktree',
+        source: 'user',
+        target: { branch: 'feature/creating', worktreePath: '/workspace-creating' },
+      },
+      (operation) => async () => {
+        operation.start()
+        await operation.runMembershipMutation(async () => {
+          started.resolve()
+          await release.promise
+        })
+        followupStarted.resolve()
+        await releaseFollowup.promise
+        operation.settle({ ok: true })
+        return { ok: true, message: 'created' }
+      },
+    )
+
+    await started.promise
+    await expect(runWithRepoMembershipReadAdmission(boundary, async () => 'snapshot')).rejects.toThrow(
+      'error.repo-membership-changing',
+    )
+    expect(mocks.publishRepoReadInvalidation).not.toHaveBeenCalledWith({
+      repoId: WORKSPACE_ID,
+      domain: 'metadata',
+    })
+
+    release.resolve()
+    await followupStarted.promise
+    expect(mocks.publishRepoReadInvalidation).not.toHaveBeenCalledWith({
+      repoId: WORKSPACE_ID,
+      domain: 'worktree-status',
+    })
+    releaseRead.resolve()
+    await expect(overlappingRead).rejects.toThrow('error.repo-membership-changing')
+
+    await expect(runWithRepoMembershipReadAdmission(boundary, async () => 'stable')).resolves.toBe('stable')
+    releaseFollowup.resolve()
+    await expect(work).resolves.toEqual({ ok: true, message: 'created' })
+  })
+
   test('does not block an unrelated repo behind slow boundary resolution', async () => {
     const slowBoundary = Promise.withResolvers<string>()
     mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (workspaceId) => {

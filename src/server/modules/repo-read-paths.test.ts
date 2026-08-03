@@ -9,15 +9,19 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 const mocks = vi.hoisted(() => ({
+  runWithRepoMembershipReadAdmission: vi.fn(),
   runWithRepoSource: vi.fn(),
   listRepoWriteOperationsForRepo: vi.fn(),
+  resolveRepoWriteBoundaryForRead: vi.fn(),
 }))
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
   runWithRepoSource: mocks.runWithRepoSource,
 }))
 vi.mock('#/server/modules/repo-write-operation-coordinator.ts', () => ({
+  runWithRepoMembershipReadAdmission: mocks.runWithRepoMembershipReadAdmission,
   listRepoWriteOperationsForRepo: mocks.listRepoWriteOperationsForRepo,
+  resolveRepoWriteBoundaryForRead: mocks.resolveRepoWriteBoundaryForRead,
 }))
 
 // Tests only need the read surface; cast to the full interface at the
@@ -59,9 +63,15 @@ function makeSource(overrides: Partial<ReadSource> = {}): ReadSource {
 }
 
 beforeEach(() => {
+  mocks.runWithRepoMembershipReadAdmission.mockReset()
+  mocks.runWithRepoMembershipReadAdmission.mockImplementation(async (_boundary, read: () => Promise<unknown>) => {
+    return await read()
+  })
   mocks.runWithRepoSource.mockReset()
   mocks.listRepoWriteOperationsForRepo.mockReset()
   mocks.listRepoWriteOperationsForRepo.mockResolvedValue([])
+  mocks.resolveRepoWriteBoundaryForRead.mockReset()
+  mocks.resolveRepoWriteBoundaryForRead.mockResolvedValue({ id: 'test-boundary' })
   mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) => task(asRepoSource(makeSource())))
 })
 
@@ -149,7 +159,11 @@ describe('independent repository reads', () => {
     const { readRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
     await expect(readRepoSnapshot(WORKSPACE_ID)).resolves.toEqual({ snapshot })
-    expect(getSnapshot).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(getSnapshot).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) })
+    expect(mocks.runWithRepoMembershipReadAdmission).toHaveBeenCalledWith(
+      { id: 'test-boundary' },
+      expect.any(Function),
+    )
     expect(getPullRequests).not.toHaveBeenCalled()
   })
 

@@ -436,7 +436,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     mocks.pullRepoBranch.mockResolvedValueOnce({
       ok: true,
       message: '',
-      affectedWorktreePaths: [worktreePath, worktreePath],
+      worktreePathsToInvalidate: [worktreePath, worktreePath],
     })
 
     const response = await app.request(
@@ -472,8 +472,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     mocks.pullRepoBranch.mockResolvedValueOnce({
       ok: false,
       message: 'pull failed',
-      repositoryStateChanged: true,
-      affectedWorktreePaths: [worktreePath],
+      worktreePathsToInvalidate: [worktreePath],
     })
 
     const response = await app.request(
@@ -493,7 +492,6 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     await expect(response.json()).resolves.toEqual({
       ok: false,
       message: 'pull failed',
-      repositoryStateChanged: true,
     })
     expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith('user-test', {
       target: {

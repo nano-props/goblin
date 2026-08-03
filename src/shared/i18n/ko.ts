@@ -529,6 +529,7 @@ export const ko: Record<DictKey, string> = {
   'error.workspace-open-failed': '작업 공간을 열지 못했습니다',
   'error.workspace-close-failed': '작업 공간을 닫지 못했습니다',
   'error.failed-read-repo': '리포지토리 읽기 실패',
+  'error.repo-membership-changing': '저장소 워크트리를 변경하는 중입니다',
   'error.ssh-config-changed': 'SSH 설정이 변경됨',
   'error.repository-boundary-unavailable': '저장소 ID를 확인할 수 없습니다',
   'error.git-not-found': 'Git을 찾을 수 없습니다',
@@ -547,6 +548,9 @@ export const ko: Record<DictKey, string> = {
   'error.filetree-delete-directory-unsupported': '파일 트리에서는 파일만 휴지통으로 이동할 수 있습니다',
   'error.trash-unavailable': '시스템 휴지통을 사용할 수 없습니다',
   'error.failed-trash-file': '파일을 휴지통으로 이동할 수 없습니다',
+  'error.trash-cancelled-check-state': '휴지통 이동이 취소되었습니다. 다시 시도하기 전에 파일 상태를 확인하세요.',
+  'error.trash-timeout-check-state': '휴지통 이동 시간이 초과되었습니다. 다시 시도하기 전에 파일 상태를 확인하세요.',
+  'error.trash-failed-check-state': '휴지통 이동이 완료되었을 수 있습니다. 다시 시도하기 전에 파일 상태를 확인하세요.',
   'error.invalid-arguments': '인수가 올바르지 않습니다',
   'error.workspace-runtime-stale': '워크스페이스 런타임이 만료되었습니다',
   'error.workspace-target-stale': '워크스페이스 대상이 변경되었습니다. 다시 시도해 주세요.',
@@ -554,6 +558,16 @@ export const ko: Record<DictKey, string> = {
   'error.not-controller': '이 터미널은 다른 세션이 제어하고 있습니다',
   'error.network-op-in-progress': '다른 git 네트워크 작업이 이미 실행 중입니다.',
   'error.request-timeout': '요청 시간이 초과되었습니다. 다시 시도하세요.',
+  'error.worktree-create-timeout-check-state':
+    '워크트리 생성 시간이 초과되었습니다. Git 상태가 변경되었을 수 있으므로 다시 시도하기 전에 대상 브랜치와 경로를 확인하세요.',
+  'error.worktree-remove-timeout-check-state':
+    '워크트리 삭제 시간이 초과되었습니다. Git 상태가 변경되었을 수 있으므로 다시 시도하기 전에 워크트리를 확인하고 작업 공간을 다시 열거나 복구하세요.',
+  'error.worktree-created-followup-failed':
+    '워크트리는 생성되었지만 후속 단계가 실패했습니다. 계속하기 전에 워크트리를 확인하고 작업 공간을 다시 열거나 복구하세요.',
+  'error.worktree-removed-followup-failed':
+    '워크트리는 삭제되었지만 후속 단계가 실패했습니다. 계속하기 전에 작업 공간을 다시 열거나 복구하세요.',
+  'error.local-branch-deleted-upstream-failed-check-state':
+    '로컬 브랜치는 삭제되었지만 업스트림 브랜치 삭제를 완료하지 못했습니다. 새로 고친 뒤 원격 브랜치를 확인하고 다시 시도하세요.',
   'error.branch-action-wait-timeout': '저장소 새로고침 완료 대기 시간이 초과되었습니다.',
   'error.unknown': '알 수 없는 오류',
   'error.cannot-delete-current-branch': '현재 브랜치는 삭제할 수 없습니다',

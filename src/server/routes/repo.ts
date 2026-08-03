@@ -352,7 +352,7 @@ export function createRepoRoutes(options: {
               const source = await resolveRepoSource(target.workspaceId, {
                 workspaceRuntimeId: target.workspaceRuntimeId,
               })
-              const snapshot = await source.getSnapshot(signal)
+              const snapshot = await source.getSnapshot({ signal })
               signal.throwIfAborted()
               if (snapshot?.remote.hasRemotes !== true) {
                 throw new IpcError({ code: 'BAD_REQUEST', message: 'error.no-remote-url' })
@@ -408,9 +408,9 @@ function publishPullFilesystemInvalidations(
   workspaceRuntimeId: string,
   outcome: RepoFilesystemMutationOutcome,
 ) {
-  const { affectedWorktreePaths = [], ...result } = outcome
+  const { worktreePathsToInvalidate = [], ...result } = outcome
   const roots = new Set(
-    affectedWorktreePaths
+    worktreePathsToInvalidate
       .map((worktreePath) => workspaceLocatorForPath(workspaceId, worktreePath))
       .filter((root): root is WorkspaceId => root !== null),
   )

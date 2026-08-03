@@ -244,6 +244,20 @@ describe('repo-client', () => {
     })
   })
 
+  test('preserves a membership read conflict without collapsing it into a repository failure', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    mockFetch(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ ok: false, code: 'BAD_REQUEST', message: 'error.repo-membership-changing' }),
+    }))
+    const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
+
+    await expect(getRepoWorktreeStatus(workspaceId, workspaceRuntimeId)).rejects.toThrow(
+      'error.repo-membership-changing',
+    )
+  })
+
   test('times out long-running fetch requests with a stable error key', async () => {
     useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
@@ -326,6 +340,32 @@ describe('repo-client', () => {
     expect(requestSignal.aborted).toBe(false)
     await vi.advanceTimersByTimeAsync(360_000)
     await assertion
+  })
+
+  test('does not reclassify caller cancellation as a create-worktree timeout', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const caller = new AbortController()
+    mockFetch((_url, init) => {
+      const signal = (init as RequestInit | undefined)?.signal
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    })
+
+    const { createRepoWorktree } = await import('#/web/repo-client.ts')
+    const request = createRepoWorktree(
+      workspaceId,
+      'repo-runtime-test',
+      {
+        worktreePath: '/tmp/repo-feature',
+        mode: { kind: 'newBranch', newBranch: 'feature/work', baseRef: 'main' },
+      },
+      { kind: 'skip' },
+      caller.signal,
+    )
+    caller.abort(new Error('caller cancelled'))
+
+    await expect(request).rejects.toThrow('caller cancelled')
   })
 
   test('gives patch generation an explicit long-read request budget', async () => {

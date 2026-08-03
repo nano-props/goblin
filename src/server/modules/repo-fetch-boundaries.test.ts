@@ -1,5 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import type { CommandOutcome } from '#/system/command-execution.ts'
+import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import {
   LINKED_REPO_ID,
   REPO_ID,
@@ -35,7 +37,7 @@ describe('fetchRepo canonical boundaries', () => {
     ['user', 'user'],
     ['background', 'background'],
   ])('%s sync publishes snapshot invalidation after fetching with prune', async (_name, kind) => {
-    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
+    mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, kind as 'user' | 'background')
@@ -51,18 +53,18 @@ describe('fetchRepo canonical boundaries', () => {
       expect(signal?.aborted).toBe(false)
       caller.abort('stopped')
       expect(signal?.aborted).toBe(true)
-      return { ok: false, message: 'cancelled', repositoryStateChanged: true }
+      return { result: { ok: false, message: 'cancelled' }, execution: { status: 'cancelled' } }
     })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'user', caller.signal)
 
-    expect(result).toEqual({ ok: false, message: 'cancelled', repositoryStateChanged: true })
+    expect(result).toEqual({ ok: false, message: 'cancelled' })
     expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
   })
 
   test('publishes snapshot invalidation after a successful sync', async () => {
-    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
+    mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'user')
@@ -76,7 +78,7 @@ describe('fetchRepo canonical boundaries', () => {
 
   test('shares successful fetch time across worktrees with one write boundary', async () => {
     mocks.resolveRepoCommonDir.mockResolvedValue('/tmp/repo/.git')
-    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
+    mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
@@ -93,7 +95,7 @@ describe('fetchRepo canonical boundaries', () => {
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
       { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false },
     ])
-    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
+    mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'user')
@@ -119,9 +121,9 @@ describe('fetchRepo canonical boundaries', () => {
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
       { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false },
     ])
-    const fetch = Promise.withResolvers<{ ok: true; message: string }>()
+    const fetch = Promise.withResolvers<CommandOutcome>()
     mocks.fetchAll.mockImplementationOnce(() => fetch.promise)
-    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched by user' })
+    mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched by user' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const background = fetchRepo(REPO_ID, 'background')
@@ -130,7 +132,7 @@ describe('fetchRepo canonical boundaries', () => {
     })
     const user = fetchRepo(LINKED_REPO_ID, 'user')
 
-    fetch.resolve({ ok: true, message: 'fetched in background' })
+    fetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched in background' }))
     const [backgroundResult, userResult] = await Promise.all([background, user])
 
     expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
@@ -160,9 +162,9 @@ describe('fetchRepo canonical boundaries', () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-linked' })
     mocks.getRemoteRepoWorktreePaths.mockResolvedValue(['/srv/repo', '/srv/repo-linked'])
-    const fetch = Promise.withResolvers<{ ok: true; message: string }>()
+    const fetch = Promise.withResolvers<CommandOutcome>()
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await fetch.promise)
-    mocks.fetchRemoteRepo.mockResolvedValueOnce({ ok: true, message: 'fetched by user' })
+    mocks.fetchRemoteRepo.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched by user' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const background = fetchRepo(repoId, 'background')
@@ -171,7 +173,7 @@ describe('fetchRepo canonical boundaries', () => {
     })
     const user = fetchRepo(linkedRepoId, 'user')
 
-    fetch.resolve({ ok: true, message: 'fetched in background' })
+    fetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched in background' }))
     const [backgroundResult, userResult] = await Promise.all([background, user])
 
     expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })

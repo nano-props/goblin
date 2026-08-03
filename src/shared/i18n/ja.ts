@@ -537,6 +537,7 @@ export const ja: Record<DictKey, string> = {
   'error.workspace-open-failed': 'ワークスペースを開けませんでした',
   'error.workspace-close-failed': 'ワークスペースを閉じられませんでした',
   'error.failed-read-repo': 'リポジトリの読み込みに失敗しました',
+  'error.repo-membership-changing': 'リポジトリのワークツリーを変更しています',
   'error.ssh-config-changed': 'SSH 設定が変更されました',
   'error.repository-boundary-unavailable': 'リポジトリの識別情報を確認できませんでした',
   'error.git-not-found': 'Git が見つかりません',
@@ -555,6 +556,9 @@ export const ja: Record<DictKey, string> = {
   'error.filetree-delete-directory-unsupported': 'ファイルツリーからごみ箱に移動できるのはファイルのみです',
   'error.trash-unavailable': 'システムのごみ箱を利用できません',
   'error.failed-trash-file': 'ファイルをごみ箱に移動できませんでした',
+  'error.trash-cancelled-check-state': 'ごみ箱への移動はキャンセルされました。再試行前にファイルの状態を確認してください。',
+  'error.trash-timeout-check-state': 'ごみ箱への移動がタイムアウトしました。再試行前にファイルの状態を確認してください。',
+  'error.trash-failed-check-state': 'ごみ箱への移動が完了した可能性があります。再試行前にファイルの状態を確認してください。',
   'error.invalid-arguments': '無効な引数',
   'error.workspace-runtime-stale': 'ワークスペースランタイムが無効です',
   'error.workspace-target-stale': 'ワークスペースの対象が変更されました。もう一度お試しください。',
@@ -562,6 +566,16 @@ export const ja: Record<DictKey, string> = {
   'error.not-controller': 'このターミナルは他のセッションが制御しています',
   'error.network-op-in-progress': '別の git ネットワーク操作がすでに実行中です。',
   'error.request-timeout': 'リクエストがタイムアウトしました。もう一度お試しください。',
+  'error.worktree-create-timeout-check-state':
+    'ワークツリーの作成がタイムアウトしました。Git の状態が変更された可能性があります。再試行する前に対象のブランチとパスを確認してください。',
+  'error.worktree-remove-timeout-check-state':
+    'ワークツリーの削除がタイムアウトしました。Git の状態が変更された可能性があります。再試行する前にワークツリーを確認し、ワークスペースを再度開くか修復してください。',
+  'error.worktree-created-followup-failed':
+    'ワークツリーは作成されましたが、後続の処理に失敗しました。続行する前にワークツリーを確認し、ワークスペースを再度開くか修復してください。',
+  'error.worktree-removed-followup-failed':
+    'ワークツリーは削除されましたが、後続の処理に失敗しました。続行する前にワークスペースを再度開くか修復してください。',
+  'error.local-branch-deleted-upstream-failed-check-state':
+    'ローカルブランチは削除されましたが、上流ブランチの削除が完了しませんでした。更新してリモートブランチを確認してから再試行してください。',
   'error.branch-action-wait-timeout': 'リポジトリの更新完了待ちがタイムアウトしました。',
   'error.unknown': '不明なエラー',
   'error.cannot-delete-current-branch': '現在のブランチは削除できません',

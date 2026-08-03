@@ -21,6 +21,40 @@ describe('resolveRemoteWorkspaceTarget', () => {
 })
 
 describe('getRepoSnapshot', () => {
+  test('rejects a snapshot while worktree membership is changing', async () => {
+    const started = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const { enqueueRepoWriteOperation } = await import('#/server/modules/repo-write-operation-coordinator.ts')
+    const write = enqueueRepoWriteOperation(
+      REPO_ID,
+      undefined,
+      {
+        repoId: REPO_ID,
+        kind: 'create-worktree',
+        source: 'user',
+        target: { branch: 'feature/creating', worktreePath: '/tmp/repo-creating' },
+      },
+      (operation) => async () => {
+        operation.start()
+        await operation.runMembershipMutation(async () => {
+          started.resolve()
+          await release.promise
+        })
+        operation.settle({ ok: true })
+        return { ok: true, message: 'created' }
+      },
+    )
+    await started.promise
+    try {
+      const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+      await expect(getRepoSnapshot(REPO_ID)).rejects.toThrow('error.repo-membership-changing')
+      expect(mocks.readWorktreeMembership).not.toHaveBeenCalled()
+    } finally {
+      release.resolve()
+      await write
+    }
+  })
+
   test('reads git state directly without publishing invalidation', async () => {
     mocks.readWorktreeMembership.mockResolvedValueOnce([])
     const snapshot = repoSnapshot('fresh')
