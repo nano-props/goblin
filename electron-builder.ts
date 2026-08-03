@@ -20,6 +20,7 @@ const config: Configuration = {
     'src/main/**/*.ts',
     'src/node/**/*.ts',
     'src/system/**/*.ts',
+    'src/system/**/*.sh',
     'src/server/**/*.ts',
     'src/shared/**/*.ts',
     'dist/preload/**/*',

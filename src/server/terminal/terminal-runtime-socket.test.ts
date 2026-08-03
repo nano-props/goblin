@@ -22,7 +22,7 @@ describe('server terminal runtime sockets and diagnostics', () => {
     expect(host.getDiagnostics().terminal.shuttingDown).toBe(true)
   })
 
-  test('shutdown does not leave detached-user timers after closing registered sockets', () => {
+  test('shutdown gracefully closes registered sockets without leaving detached-user timers', () => {
     useFakeTimers()
     try {
       const { host, shutdown } = buildRuntime()
@@ -32,6 +32,8 @@ describe('server terminal runtime sockets and diagnostics', () => {
       shutdown()
 
       expect(vi.getTimerCount()).toBe(0)
+      expect(socket.close).toHaveBeenCalledWith(1001, 'server shutting down')
+      expect(socket.terminate).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }

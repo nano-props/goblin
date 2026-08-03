@@ -444,11 +444,22 @@ describe('remote ssh command builders', () => {
     }
   })
 
-  test('remote bootstrap fails fast when required globstar support is unavailable', () => {
+  testPosix('remote bootstrap fails fast when required globstar support is unavailable', async () => {
+    const dir = path.join(os.tmpdir(), `goblin-remote-bootstrap-test-${Date.now()}-${process.pid}`)
+    tempDirs.push(dir)
+    const sourceRoot = path.join(dir, 'repo')
+    const targetRoot = path.join(dir, 'worktree')
+    const bashEnv = path.join(dir, 'bash-env')
+    mkdirSync(sourceRoot, { recursive: true })
+    mkdirSync(targetRoot, { recursive: true })
+    writeFileSync(
+      bashEnv,
+      'shopt() {\n  if [ "$1" = "-s" ] && [ "$2" = "globstar" ]; then return 1; fi\n  builtin shopt "$@"\n}\n',
+    )
     const withGlobstar = buildRemoteCommandInvocation(target(), {
       type: 'bootstrapRemoteWorktree',
-      sourceRoot: '/srv/repo',
-      targetRoot: '/srv/repo-worktree',
+      sourceRoot,
+      targetRoot,
       copy: ['config/**/*.json'],
       symlink: [],
       hardlink: [],
@@ -456,8 +467,8 @@ describe('remote ssh command builders', () => {
     })
     const withoutGlobstar = buildRemoteCommandInvocation(target(), {
       type: 'bootstrapRemoteWorktree',
-      sourceRoot: '/srv/repo',
-      targetRoot: '/srv/repo-worktree',
+      sourceRoot,
+      targetRoot,
       copy: ['config/*.json'],
       symlink: [],
       hardlink: [],
@@ -465,18 +476,24 @@ describe('remote ssh command builders', () => {
     })
     const ordinaryDoubleStars = buildRemoteCommandInvocation(target(), {
       type: 'bootstrapRemoteWorktree',
-      sourceRoot: '/srv/repo',
-      targetRoot: '/srv/repo-worktree',
+      sourceRoot,
+      targetRoot,
       copy: ['config/[**].json', 'config/foo**.json'],
       symlink: [],
       hardlink: [],
       exclude: [],
     })
 
-    expect(withGlobstar.script).toContain('error: remote bash does not support ** glob patterns')
-    expect(withGlobstar.script).not.toContain('shopt -s globstar 2>/dev/null || true')
-    expect(withoutGlobstar.script).not.toContain('shopt -s globstar')
-    expect(ordinaryDoubleStars.script).not.toContain('shopt -s globstar')
+    const [withGlobstarResult, withoutGlobstarResult, ordinaryDoubleStarsResult] = await Promise.all([
+      execa('bash', ['-lc', withGlobstar.script], { env: { BASH_ENV: bashEnv }, reject: false }),
+      execa('bash', ['-lc', withoutGlobstar.script], { env: { BASH_ENV: bashEnv }, reject: false }),
+      execa('bash', ['-lc', ordinaryDoubleStars.script], { env: { BASH_ENV: bashEnv }, reject: false }),
+    ])
+
+    expect(withGlobstarResult.exitCode).toBe(1)
+    expect(withGlobstarResult.stderr).toContain('error: remote bash does not support ** glob patterns')
+    expect(withoutGlobstarResult.exitCode).toBe(0)
+    expect(ordinaryDoubleStarsResult.exitCode).toBe(0)
   })
 
   testPosix('remote bootstrap script rejects sources under a symlink parent', async () => {

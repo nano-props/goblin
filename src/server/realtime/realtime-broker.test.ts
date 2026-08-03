@@ -290,7 +290,7 @@ describe('realtime broker', () => {
     broker.disconnectAll()
   })
 
-  test('disconnectAll force-closes transports and clears broker state', () => {
+  test('disconnectAll gracefully closes transports and clears broker state', () => {
     const broker = new RealtimeBroker<{ type: 'noop' }>({
       onClientPresenceChanged: vi.fn(),
       onUserSocketsDrained: vi.fn(),
@@ -300,8 +300,8 @@ describe('realtime broker', () => {
 
     broker.disconnectAll()
 
-    expect(socket.forceClose).toHaveBeenCalledWith(1001, 'server shutting down')
-    expect(socket.close).not.toHaveBeenCalled()
+    expect(socket.close).toHaveBeenCalledWith(1001, 'server shutting down')
+    expect(socket.forceClose).not.toHaveBeenCalled()
     expect(broker.socketCount()).toBe(0)
     expect(broker.hasUserSockets(USER_ID)).toBe(false)
     expect(broker.isClientOnline(USER_ID, 'client_a')).toBe(false)
