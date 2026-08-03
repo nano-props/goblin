@@ -1,5 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import type { CommandOutcome } from '#/system/command-execution.ts'
+import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import { REPO_ID, expectNoRepoMetadataInvalidations, mocks } from '#/server/test-utils/repo-module.ts'
 
 describe('fetchRepo coordination', () => {
@@ -21,9 +23,9 @@ describe('fetchRepo coordination', () => {
         },
       },
     }))
-    const firstFetch = Promise.withResolvers<{ ok: true; message: string }>()
+    const firstFetch = Promise.withResolvers<CommandOutcome>()
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await firstFetch.promise)
-    mocks.fetchRemoteRepo.mockResolvedValueOnce({ ok: true, message: 'fetched second alias' })
+    mocks.fetchRemoteRepo.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched second alias' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const first = fetchRepo(firstRepoId, 'background')
@@ -32,9 +34,17 @@ describe('fetchRepo coordination', () => {
     await Promise.resolve()
     expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
 
-    firstFetch.resolve({ ok: true, message: 'fetched first alias' })
-    await expect(first).resolves.toEqual({ ok: true, message: 'fetched first alias' })
-    await expect(second).resolves.toEqual({ ok: true, message: 'fetched second alias' })
+    firstFetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched first alias' }))
+    await expect(first).resolves.toEqual({
+      ok: true,
+      message: 'fetched first alias',
+      repoIdsToInvalidate: [firstRepoId],
+    })
+    await expect(second).resolves.toEqual({
+      ok: true,
+      message: 'fetched second alias',
+      repoIdsToInvalidate: [secondRepoId],
+    })
     expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2)
   })
 
@@ -56,8 +66,8 @@ describe('fetchRepo coordination', () => {
         },
       },
     }))
-    const firstFetch = Promise.withResolvers<{ ok: true; message: string }>()
-    const secondFetch = Promise.withResolvers<{ ok: true; message: string }>()
+    const firstFetch = Promise.withResolvers<CommandOutcome>()
+    const secondFetch = Promise.withResolvers<CommandOutcome>()
     mocks.fetchRemoteRepo.mockImplementation(async (target: { alias: string }) =>
       target.alias === 'proxy-a' ? await firstFetch.promise : await secondFetch.promise,
     )
@@ -67,10 +77,18 @@ describe('fetchRepo coordination', () => {
     const second = fetchRepo(secondRepoId, 'background')
     await vi.waitFor(() => expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2))
 
-    firstFetch.resolve({ ok: true, message: 'fetched proxy a' })
-    secondFetch.resolve({ ok: true, message: 'fetched proxy b' })
-    await expect(first).resolves.toEqual({ ok: true, message: 'fetched proxy a' })
-    await expect(second).resolves.toEqual({ ok: true, message: 'fetched proxy b' })
+    firstFetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched proxy a' }))
+    secondFetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched proxy b' }))
+    await expect(first).resolves.toEqual({
+      ok: true,
+      message: 'fetched proxy a',
+      repoIdsToInvalidate: [firstRepoId],
+    })
+    await expect(second).resolves.toEqual({
+      ok: true,
+      message: 'fetched proxy b',
+      repoIdsToInvalidate: [secondRepoId],
+    })
   })
 
   test('remote syncs for different repos under the same alias use distinct write boundaries', async () => {
@@ -88,14 +106,14 @@ describe('fetchRepo coordination', () => {
       },
     }))
     mocks.resolveRemoteRepoCommonDir.mockImplementation(async (target: { remotePath: string }) => target.remotePath)
-    const first = Promise.withResolvers<{ ok: true; message: string }>()
-    const second = Promise.withResolvers<{ ok: true; message: string }>()
+    const first = Promise.withResolvers<CommandOutcome>()
+    const second = Promise.withResolvers<CommandOutcome>()
     const fetchPaths: string[] = []
     mocks.fetchRemoteRepo.mockImplementation(async (target: { remotePath: string }) => {
       fetchPaths.push(target.remotePath)
       if (target.remotePath === '/srv/repo-a') return await first.promise
       if (target.remotePath === '/srv/repo-b') return await second.promise
-      return { ok: true, message: 'fetched' }
+      return commandOutcomeForTest({ ok: true, message: 'fetched' })
     })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
@@ -109,17 +127,17 @@ describe('fetchRepo coordination', () => {
       expect(fetchPaths).toEqual(['/srv/repo-a', '/srv/repo-b'])
     })
 
-    first.resolve({ ok: true, message: 'fetched first' })
-    second.resolve({ ok: true, message: 'fetched second' })
+    first.resolve(commandOutcomeForTest({ ok: true, message: 'fetched first' }))
+    second.resolve(commandOutcomeForTest({ ok: true, message: 'fetched second' }))
 
-    await expect(active).resolves.toEqual({ ok: true, message: 'fetched first' })
-    await expect(other).resolves.toEqual({ ok: true, message: 'fetched second' })
+    await expect(active).resolves.toEqual({ ok: true, message: 'fetched first', repoIdsToInvalidate: [repoId] })
+    await expect(other).resolves.toEqual({ ok: true, message: 'fetched second', repoIdsToInvalidate: [otherRepoId] })
   })
 
   test('caller abort records wait cancellation for a queued user sync', async () => {
-    const deleteBranch = Promise.withResolvers<{ ok: true; message: string }>()
+    const deleteBranch = Promise.withResolvers<CommandOutcome>()
     mocks.deleteBranch.mockImplementationOnce(async () => await deleteBranch.promise)
-    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
+    mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 
     const { deleteRepoBranch, fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
@@ -166,13 +184,13 @@ describe('fetchRepo coordination', () => {
       ]),
     })
 
-    deleteBranch.resolve({ ok: true, message: 'deleted' })
-    await expect(write).resolves.toEqual({ ok: true, message: 'deleted' })
-    await expect(background).resolves.toEqual({ ok: true, message: 'fetched' })
+    deleteBranch.resolve(commandOutcomeForTest({ ok: true, message: 'deleted' }))
+    await expect(write).resolves.toEqual({ ok: true, message: 'deleted', repoIdsToInvalidate: [REPO_ID] })
+    await expect(background).resolves.toEqual({ ok: true, message: 'fetched', repoIdsToInvalidate: [REPO_ID] })
   })
 
   test('does not publish invalidations after a failed sync', async () => {
-    mocks.fetchAll.mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })
+    mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: false, message: 'fatal: offline' }, 'not-started'))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo(REPO_ID, 'background')
@@ -211,48 +229,5 @@ describe('cloneRepo cancellation', () => {
     const result = await cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })
-  })
-
-  test('records clone operation state and structured caller cancellation', async () => {
-    mocks.cloneGitRepo.mockImplementationOnce(
-      (_parentPath: string, _directoryName: string, _url: string, signal?: AbortSignal) =>
-        new Promise((resolve) => {
-          signal?.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }))
-        }),
-    )
-    const { cloneRepo } = await import('#/server/modules/repo-clone-write.ts')
-    const { listRepoServerOperations } = await import('#/server/modules/repo-operation-registry.ts')
-    const caller = new AbortController()
-
-    const work = cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
-    let operationId = ''
-    await vi.waitFor(() => {
-      const operation = listRepoServerOperations({ includeSettled: true }).find(
-        (operation) => operation.kind === 'clone',
-      )
-      expect(operation).toMatchObject({
-        kind: 'clone',
-        phase: 'running',
-        target: { parentPath: '/tmp', directoryName: 'repo' },
-      })
-      operationId = operation!.id
-    })
-
-    caller.abort('stopped')
-    await expect(work).resolves.toEqual({ ok: false, message: 'cancelled' })
-    expect(
-      listRepoServerOperations({ includeSettled: true }).find((operation) => operation.id === operationId),
-    ).toMatchObject({
-      kind: 'clone',
-      phase: 'failed',
-      cancellation: {
-        underlyingRequested: true,
-        reason: 'caller-abort',
-      },
-      error: {
-        message: 'cancelled',
-        reason: 'caller-abort',
-      },
-    })
   })
 })

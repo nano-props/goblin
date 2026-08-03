@@ -11,10 +11,11 @@ import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { CreateWorktreePagePane } from '#/web/components/workspace-pages/CreateWorktreePagePane.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
+import { getRepoOperations, getRepoSnapshot, getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
-import type { ExecResult } from '#/web/types.ts'
+import type { ExecResult } from '#/shared/git-types.ts'
+import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { getSettingsSnapshot } from '#/web/settings-client.ts'
 import type * as SettingsClient from '#/web/settings-client.ts'
@@ -26,6 +27,7 @@ import {
   currentAppNavigationGeneration,
   resetAppNavigationForTest,
 } from '#/web/app-navigation-lifecycle.ts'
+import { repoOperationsForTest } from '#/web/test-utils/repo-query-runtime.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
@@ -74,9 +76,13 @@ vi.mock('#/web/components/workspace-toolbar-chrome.tsx', () => ({
 }))
 
 vi.mock('#/web/repo-client.ts', () => ({
+  getRepoSnapshot: vi.fn(),
   getRepoWorktreeBootstrapPreview: vi.fn(async () => ({ ok: false, message: 'error.failed-read-repo' })),
-  getRepoOperations: vi.fn(async () => ({ operations: [], loadedAt: 0 })),
+  getRepoOperations: vi.fn(),
 }))
+
+const mockedGetRepoSnapshot = vi.mocked(getRepoSnapshot)
+const mockedGetRepoOperations = vi.mocked(getRepoOperations)
 
 beforeEach(() => {
   resetAppNavigationForTest()
@@ -87,6 +93,9 @@ beforeEach(() => {
     ok: false,
     message: 'error.failed-read-repo',
   }))
+  mockedGetRepoSnapshot.mockReset()
+  mockedGetRepoOperations.mockReset()
+  mockedGetRepoOperations.mockResolvedValue(repoOperationsForTest(0))
   mockedGetSettingsSnapshot.mockReset()
   mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ workspaceSettings: [] }))
   appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ workspaceSettings: [] }))
@@ -146,6 +155,40 @@ describe('CreateWorktreePagePane', () => {
     await waitFor(() => expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull())
     expect(container.textContent).toContain('status.stale-title')
     expect(container.textContent).toContain('snapshot refresh failed')
+  })
+
+  test('keeps the create form with a neutral retry when a snapshot read crosses a membership change', async () => {
+    const snapshotQueryKey = repoSnapshotQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID)
+    const snapshotQuery = appQueryClient.getQueryCache().find({
+      queryKey: snapshotQueryKey,
+      exact: true,
+    })
+    const acceptedSnapshot = appQueryClient.getQueryData<RepoSnapshotResponse>(snapshotQueryKey)
+    if (!snapshotQuery || !acceptedSnapshot) throw new Error('missing snapshot query data')
+    mockedGetRepoSnapshot.mockRejectedValue(new Error('error.repo-membership-changing'))
+    snapshotQuery.setState({
+      ...snapshotQuery.state,
+      status: 'error',
+      error: new Error('error.repo-membership-changing'),
+    })
+
+    const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
+
+    await waitFor(() => expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull())
+    await waitFor(() => expect(container.textContent).toContain('error.repo-membership-changing'))
+    expect(container.textContent).not.toContain('status.stale-title')
+    const retry = [...container.querySelectorAll('button')].find(
+      (candidate) => candidate.textContent === 'error.try-again',
+    )
+    if (!retry) throw new Error('missing membership retry')
+
+    mockedGetRepoSnapshot.mockResolvedValue(acceptedSnapshot)
+    await act(async () => retry.click())
+
+    await waitFor(() => expect(mockedGetRepoSnapshot).toHaveBeenCalled())
+    await waitFor(() => expect(container.textContent).not.toContain('error.repo-membership-changing'))
+    expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull()
+    expect(container.textContent).not.toContain('status.stale-title')
   })
 
   test('keeps stable page chrome while branch data is loading', () => {

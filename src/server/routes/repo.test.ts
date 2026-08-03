@@ -4,13 +4,14 @@ import {
   openTestWorkspaceRuntime,
   repoRouteMocks,
   resetRepoRouteHarness,
+  setRepoRouteTestUserId,
   WORKSPACE_ID,
 } from '#/server/test-utils/repo-routes.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
-import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
-import { runSerializedWorkspaceRefresh } from '#/server/modules/workspace-runtimes.ts'
+import { failRemoteWorkspaceLifecycle, runSerializedWorkspaceRefresh } from '#/server/modules/workspace-runtimes.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
 
 const mocks = repoRouteMocks()
 
@@ -162,7 +163,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       operations: [
         {
           id: 'repo-op-1',
-          workspaceId: WORKSPACE_ID,
+          repoId: WORKSPACE_ID,
           workspaceRuntimeId: null,
           kind: 'fetch',
           phase: 'running',
@@ -184,6 +185,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
           canCancelUnderlying: true,
         },
       ],
+      lastFetchAt: null,
       loadedAt: 123,
     })
     const app = createTestRepoRoutes()
@@ -205,28 +207,36 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(await response.json()).toMatchObject({ operations: [{ kind: 'fetch', phase: 'running' }] })
   })
 
-  test('returns a stable repository boundary error from operations reads', async () => {
-    mocks.readRepoOperationsSnapshot.mockRejectedValueOnce(new RepositoryBoundaryUnavailableError())
+  test('reads in-memory operations after a remote lifecycle fails', async () => {
+    const repoId = workspaceIdForTest('goblin+ssh://remote/workspace')
     const app = createTestRepoRoutes()
-    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
+    mocks.readRepoOperationsSnapshot.mockResolvedValueOnce({ operations: [], lastFetchAt: null, loadedAt: 123 })
+    await failRemoteWorkspaceLifecycle({
+      userId: 'user-test',
+      workspaceId: repoId,
+      workspaceRuntimeId,
+      reason: 'unreachable',
+    })
 
     const response = await app.request(
       new Request('http://localhost/operations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId }),
+        body: JSON.stringify({ cwd: repoId, workspaceRuntimeId }),
       }),
     )
 
-    expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'error.repository-boundary-unavailable',
+    expect(response.status).toBe(200)
+    expect(mocks.readRepoOperationsSnapshot).toHaveBeenCalledWith(repoId, {
+      includeSettled: undefined,
+      workspaceRuntimeId,
+      signal: expect.any(AbortSignal),
     })
   })
 
-  test.each([{ cwd: WORKSPACE_ID }, { workspaceRuntimeId: 'workspace-runtime-partial' }])(
-    'rejects a partial operations runtime scope at the request boundary',
+  test.each([{}, { cwd: WORKSPACE_ID }, { workspaceRuntimeId: 'workspace-runtime-partial' }])(
+    'rejects an incomplete operations runtime scope at the request boundary',
     async (body) => {
       const app = createTestRepoRoutes()
       const response = await app.request(
@@ -242,22 +252,21 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     },
   )
 
-  test('accepts an explicitly unscoped operations request', async () => {
-    mocks.readRepoOperationsSnapshot.mockResolvedValue({ operations: [], loadedAt: 123 })
+  test("does not expose one user's operation scope to another user", async () => {
     const app = createTestRepoRoutes()
+    const workspaceRuntimeId = await openTestWorkspaceRuntime()
+    setRepoRouteTestUserId('user-other')
     const response = await app.request(
       new Request('http://localhost/operations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ includeSettled: true }),
+        body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, includeSettled: true }),
       }),
     )
 
-    expect(response.status).toBe(200)
-    expect(mocks.readRepoOperationsSnapshot).toHaveBeenCalledWith(undefined, {
-      includeSettled: true,
-      signal: expect.any(AbortSignal),
-    })
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ message: 'error.workspace-runtime-stale' })
+    expect(mocks.readRepoOperationsSnapshot).not.toHaveBeenCalled()
   })
 
   test('passes patch body through to getRepoPatch', async () => {
@@ -436,7 +445,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     mocks.pullRepoBranch.mockResolvedValueOnce({
       ok: true,
       message: '',
-      affectedWorktreePaths: [worktreePath, worktreePath],
+      worktreePathsToInvalidate: [worktreePath, worktreePath],
     })
 
     const response = await app.request(
@@ -465,6 +474,54 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     })
   })
 
+  test('settles runtime failure before publishing repository and filesystem impact', async () => {
+    const app = createTestRepoRoutes()
+    const repoId = workspaceIdForTest('goblin+ssh://prod/home/example/service')
+    const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
+    const worktreePath = '/home/example/service-worktree'
+    const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId: repoId,
+      workspaceRuntimeId,
+      reason: 'unreachable',
+      message: 'connection lost',
+    })
+    mocks.pullRepoBranch.mockRejectedValueOnce(
+      new RepoMutationRuntimeFailureError(
+        {
+          ok: false,
+          message: 'connection lost',
+          repoIdsToInvalidate: [repoId],
+          worktreePathsToInvalidate: [worktreePath],
+        },
+        runtimeFailure,
+      ),
+    )
+
+    const response = await app.request(
+      new Request('http://localhost/pull', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: repoId, workspaceRuntimeId, branch: 'feature/work', worktreePath }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ ok: false, message: 'connection lost' })
+    expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith('user-test', {
+      target: {
+        kind: 'git-worktree',
+        workspaceId: repoId,
+        workspaceRuntimeId,
+        root: workspaceIdForTest('goblin+ssh://prod/home/example/service-worktree'),
+      },
+    })
+    const lifecycleCall = mocks.publishUserWorkspaceRuntimeInvalidation.mock.invocationCallOrder[0]
+    const repositoryCall = mocks.publishRepoReadInvalidation.mock.invocationCallOrder[0]
+    const filesystemCall = mocks.publishUserWorkspaceFilesystemInvalidation.mock.invocationCallOrder[0]
+    expect(lifecycleCall).toBeLessThan(repositoryCall!)
+    expect(repositoryCall).toBeLessThan(filesystemCall!)
+  })
+
   test('publishes filesystem invalidation when a failed pull command may have changed a worktree', async () => {
     const app = createTestRepoRoutes()
     const workspaceRuntimeId = await openTestWorkspaceRuntime()
@@ -472,8 +529,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     mocks.pullRepoBranch.mockResolvedValueOnce({
       ok: false,
       message: 'pull failed',
-      repositoryStateChanged: true,
-      affectedWorktreePaths: [worktreePath],
+      worktreePathsToInvalidate: [worktreePath],
     })
 
     const response = await app.request(
@@ -493,7 +549,6 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     await expect(response.json()).resolves.toEqual({
       ok: false,
       message: 'pull failed',
-      repositoryStateChanged: true,
     })
     expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith('user-test', {
       target: {

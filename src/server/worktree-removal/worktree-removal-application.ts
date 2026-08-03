@@ -1,4 +1,4 @@
-import type { ExecResult } from '#/shared/git-types.ts'
+import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { terminalSessionExecutionPath } from '#/server/terminal/terminal-session-scope.ts'
@@ -7,7 +7,8 @@ import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-rem
 import { serverLogger } from '#/server/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
-import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
@@ -51,9 +52,9 @@ export class WorktreeRemovalApplication {
         capability: PhysicalWorktreeExecutionCapability,
         lifecycle: RepoWorktreeRemovalLifecycle,
         signal: AbortSignal,
-      ): Promise<ExecResult>
+      ): Promise<RepoMutationResult>
     },
-  ): Promise<ExecResult> {
+  ): Promise<RepoMutationResult> {
     if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.workspace-runtime-stale' }
     const worktreePath = terminalSessionExecutionPath(input.repoRoot, input.worktreePath)
     let physicalCapability: PhysicalWorktreeExecutionCapability
@@ -65,7 +66,7 @@ export class WorktreeRemovalApplication {
         worktreePath,
       })
     } catch (error) {
-      await failRemoteWorkspaceRuntimeIfNeeded(userId, error)
+      if (isRemoteWorkspaceRuntimeFailure(error)) throw error
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }
     try {
@@ -101,15 +102,14 @@ export class WorktreeRemovalApplication {
                   // cannot authorize durable retirement: a stable target may
                   // already be rebound under a newer admission lease.
                   await this.deps.workspaceTabs.clearPhysicalWorktreeIndex(physicalCapability)
-                  this.broadcast(affectedScopes)
+                  this.broadcastWorkspaceTabChanges(affectedScopes)
                   return { ok: true, message: '' }
                 } catch (error) {
                   worktreeRemovalLogger.error({ error, repoRoot: input.repoRoot, worktreePath }, 'tabs finalize failed')
-                  this.broadcast(affectedScopes)
+                  this.broadcastWorkspaceTabChanges(affectedScopes)
                   return {
                     ok: false,
                     message: error instanceof Error ? error.message : String(error),
-                    repositoryStateChanged: true,
                   }
                 }
               },
@@ -122,7 +122,11 @@ export class WorktreeRemovalApplication {
       if (!result.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
       return result.value
     } catch (error) {
-      await failRemoteWorkspaceRuntimeIfNeeded(userId, error)
+      // Runtime lifecycle settlement belongs to the request application
+      // boundary. Re-throw both carriers so this workflow cannot become a
+      // second settlement owner or discard a carrier's mutation facts.
+      if (isRepoMutationRuntimeFailureError(error) || isRemoteWorkspaceRuntimeFailure(error)) throw error
+      if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
       return { ok: false, message: abortMessage(error) }
     }
   }
@@ -160,8 +164,16 @@ export class WorktreeRemovalApplication {
   > {
     const targets = this.deps.workspaceTabs.physicalWorktreeTargets(physicalWorktreeCapability)
     const terminal = await this.deps.terminalSessions.closeSessionsForPhysicalWorktree(physicalWorktreeCapability)
+    const terminalScopes = terminal.scopes.map(({ workspaceId, ...item }) => ({
+      ...item,
+      repoRoot: workspaceId,
+      worktreePath,
+    }))
+    // Terminal closure is authoritative even when a later closure, caller
+    // cancellation, or Git removal fails. Publish it at the quiescence owner.
+    this.broadcastSessionChanges(terminalScopes)
     const scopes = uniqueScopes([
-      ...terminal.scopes.map(({ workspaceId, ...item }) => ({ ...item, repoRoot: workspaceId, worktreePath })),
+      ...terminalScopes,
       ...targets.map(({ userId, scope, target }) => ({
         userId,
         repoRoot: target.workspaceId,
@@ -173,7 +185,7 @@ export class WorktreeRemovalApplication {
     return terminal.ok ? { ok: true, scopes } : { ok: false, scopes, message: terminal.message }
   }
 
-  private broadcast(
+  private broadcastSessionChanges(
     scopes: readonly { userId: string; repoRoot: WorkspaceId; workspaceRuntimeId: string; scope: string }[],
   ): void {
     const targets = new Map(
@@ -184,6 +196,14 @@ export class WorktreeRemovalApplication {
     )
     for (const { userId, repoRoot, workspaceRuntimeId } of targets.values()) {
       this.deps.broadcastSessionsChanged(userId, repoRoot, workspaceRuntimeId)
+    }
+  }
+
+  private broadcastWorkspaceTabChanges(
+    scopes: readonly { userId: string; repoRoot: WorkspaceId; workspaceRuntimeId: string; scope: string }[],
+  ): void {
+    const targets = new Map(scopes.map(({ userId, repoRoot }) => [`${userId}\0${repoRoot}`, { userId, repoRoot }]))
+    for (const { userId, repoRoot } of targets.values()) {
       this.deps.broadcastWorkspaceTabsChanged(userId, repoRoot)
     }
   }

@@ -13,6 +13,9 @@ export function repoWriteOperationFailureReason(
   message: string | null | undefined,
   cancellationReason: RepoOperationCancellationReason | null,
 ): RepoOperationFailureReason | null {
+  // This records why the operation stopped, not whether earlier domain steps
+  // changed repository state. Confirmed partial success stays in the result
+  // and its recovery notice instead of creating another activity phase.
   if (cancellationReason) return cancellationReason
   if (message === 'cancelled') return 'caller-abort'
   return null

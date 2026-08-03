@@ -8,14 +8,19 @@ import type {
   RepoSnapshotResponse,
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
-import type { ExecResult, LogEntry, RepoUrlTarget } from '#/shared/git-types.ts'
+import type { ExecResult, LogEntry, RepoMutationExecResult, RepoUrlTarget } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { CreateWorktreeInput, RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
+import { REPO_MEMBERSHIP_READ_CONFLICT_KEY } from '#/shared/repo-membership-read.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
-import { decodeWith, ExecResultResponseSchema } from '#/shared/http-response-schema.ts'
+import {
+  decodeWith,
+  ExecResultResponseSchema,
+  RepoMutationExecResultResponseSchema,
+} from '#/shared/http-response-schema.ts'
 import {
   BackgroundSyncReposResponseSchema,
   CloneRepoResponseSchema,
@@ -29,11 +34,7 @@ import {
 } from '#/shared/repo-response-schema.ts'
 
 const REPO_REQUEST_TIMEOUT_MS = {
-  gitNetwork: 240_000,
   clone: 360_000,
-  branchMutation: 240_000,
-  removeWorktree: 10 * 60_000,
-  worktreeCreate: 15 * 60_000,
   patch: 15 * 60_000,
 } as const
 
@@ -45,6 +46,7 @@ async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?:
   } catch (err) {
     if (signal?.aborted) throw err
     if (err instanceof Error && err.message === SERVER_REQUEST_TIMEOUT_ERROR) throw err
+    if (err instanceof Error && err.message === REPO_MEMBERSHIP_READ_CONFLICT_KEY) throw err
     throw new Error('error.failed-read-repo', { cause: err })
   }
 }
@@ -171,11 +173,16 @@ export async function fetchRepo(
   cwd: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
-): Promise<ExecResult> {
-  return await postServerJson('/api/repo/fetch', { cwd, workspaceRuntimeId }, decodeWith(ExecResultResponseSchema), {
-    signal,
-    timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
-  })
+): Promise<RepoMutationExecResult> {
+  return await postServerJson(
+    '/api/repo/fetch',
+    { cwd, workspaceRuntimeId },
+    decodeWith(RepoMutationExecResultResponseSchema),
+    {
+      signal,
+      timeoutMs: 0,
+    },
+  )
 }
 
 export async function pullRepoBranch(
@@ -184,12 +191,12 @@ export async function pullRepoBranch(
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   return await postServerJson(
     '/api/repo/pull',
     { cwd, workspaceRuntimeId, branch, worktreePath },
-    decodeWith(ExecResultResponseSchema),
-    { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork },
+    decodeWith(RepoMutationExecResultResponseSchema),
+    { signal, timeoutMs: 0 },
   )
 }
 
@@ -198,14 +205,14 @@ export async function pushRepoBranch(
   workspaceRuntimeId: string,
   branch: string,
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   return await postServerJson(
     '/api/repo/push',
     { cwd, workspaceRuntimeId, branch },
-    decodeWith(ExecResultResponseSchema),
+    decodeWith(RepoMutationExecResultResponseSchema),
     {
       signal,
-      timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
+      timeoutMs: 0,
     },
   )
 }
@@ -216,12 +223,14 @@ export async function createRepoWorktree(
   input: CreateWorktreeInput,
   worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   return await postServerJson(
     '/api/repo/create-worktree',
     { cwd, workspaceRuntimeId, ...input, worktreeBootstrap },
-    decodeWith(ExecResultResponseSchema),
-    { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.worktreeCreate },
+    decodeWith(RepoMutationExecResultResponseSchema),
+    // Mutation subcommands own their applicable server-side deadlines. A fixed
+    // request watchdog could abort a valid queued workflow; caller cancellation remains active.
+    { signal, timeoutMs: 0 },
   )
 }
 
@@ -244,12 +253,15 @@ export async function deleteRepoBranch(
   branch: string,
   options?: { force?: boolean; deleteUpstream?: boolean },
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   return await postServerJson(
     '/api/repo/delete-branch',
     { cwd, workspaceRuntimeId, branch, force: options?.force, deleteUpstream: options?.deleteUpstream },
-    decodeWith(ExecResultResponseSchema),
-    { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.branchMutation },
+    decodeWith(RepoMutationExecResultResponseSchema),
+    // Local deletion and optional upstream deletion are one server workflow,
+    // each with its own command deadline. Do not let a client watchdog erase
+    // an already-confirmed local deletion milestone.
+    { signal, timeoutMs: 0 },
   )
 }
 
@@ -264,14 +276,16 @@ export async function removeRepoWorktree(
     deleteUpstream?: boolean
   },
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   return await postServerJson(
     '/api/repo/remove-worktree',
     { cwd, workspaceRuntimeId, ...options },
-    decodeWith(ExecResultResponseSchema),
+    decodeWith(RepoMutationExecResultResponseSchema),
     {
       signal,
-      timeoutMs: REPO_REQUEST_TIMEOUT_MS.removeWorktree,
+      // Removal is a multi-step server workflow. Its mutation commands own
+      // their deadlines; a client watchdog could cut off confirmed follow-up.
+      timeoutMs: 0,
     },
   )
 }

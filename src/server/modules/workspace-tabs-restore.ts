@@ -29,7 +29,7 @@ import {
 } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-interface RestoreWorkspaceTabsInput {
+export interface RestoreWorkspaceTabsInput {
   userId: string
   clientId: string
   workspaceId: WorkspaceId

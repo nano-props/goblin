@@ -431,41 +431,36 @@ export async function getServerWorkspaceSettings(): Promise<WorkspaceSettingsEnt
   return cloneWorkspaceSettings((await loadUserSettings()).workspaceSettings)
 }
 
-export async function trustServerWorkspaceWorktreeBootstrapConfig(input: {
+export async function setServerWorkspaceWorktreeBootstrapConfigTrust(input: {
   workspaceId: WorkspaceId
   configHash: string
-}): Promise<WorkspaceSettingsEntry[]> {
-  return await mutateUserSettings(async (data) => {
-    if (!isWorktreeBootstrapConfigHash(input.configHash)) {
-      return unchangedUserSettings(data, cloneWorkspaceSettings(data.workspaceSettings))
-    }
-    const worktreeBootstrapTrust: WorktreeBootstrapTrust = {
-      configHash: input.configHash,
-      trustedAt: new Date().toISOString(),
-    }
-    const workspaceSettings = updateWorkspaceSettingsEntry(data.workspaceSettings, input.workspaceId, (existing) => ({
-      workspaceId: input.workspaceId,
-      ...existing,
-      worktreeBootstrapTrust,
-    }))
-    const nextData = workspaceSettings ? { ...data, workspaceSettings } : data
-    return {
-      next: nextData,
-      result: cloneWorkspaceSettings(nextData.workspaceSettings),
-      changed: workspaceSettings !== null,
-    }
-  })
-}
-
-export async function untrustServerWorkspaceWorktreeBootstrapConfig(input: {
-  workspaceId: WorkspaceId
-  configHash: string
+  trusted: boolean
 }): Promise<boolean> {
   return await mutateUserSettings(async (data) => {
-    if (!isWorktreeBootstrapConfigHash(input.configHash)) return unchangedUserSettings(data, false)
+    if (!isWorktreeBootstrapConfigHash(input.configHash)) {
+      return unchangedUserSettings(data, false)
+    }
     const existingIndex = data.workspaceSettings.findIndex((entry) => entry.workspaceId === input.workspaceId)
-    if (existingIndex < 0) return unchangedUserSettings(data, false)
-    const existing = data.workspaceSettings[existingIndex]
+    const existing = existingIndex >= 0 ? data.workspaceSettings[existingIndex] : undefined
+
+    if (input.trusted) {
+      if (existing?.worktreeBootstrapTrust?.configHash === input.configHash) {
+        return unchangedUserSettings(data, false)
+      }
+      const worktreeBootstrapTrust: WorktreeBootstrapTrust = {
+        configHash: input.configHash,
+        trustedAt: new Date().toISOString(),
+      }
+      const workspaceSettings = updateWorkspaceSettingsEntry(data.workspaceSettings, input.workspaceId, (entry) => ({
+        workspaceId: input.workspaceId,
+        ...entry,
+        worktreeBootstrapTrust,
+      }))
+      if (!workspaceSettings) return unchangedUserSettings(data, false)
+      return { next: { ...data, workspaceSettings }, result: true }
+    }
+
+    if (!existing) return unchangedUserSettings(data, false)
     if (existing.worktreeBootstrapTrust?.configHash !== input.configHash) return unchangedUserSettings(data, false)
 
     const nextEntry: WorkspaceSettingsEntry = { ...existing }

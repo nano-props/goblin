@@ -4,15 +4,26 @@ import {
   clearWorkspaceRuntimesForUser,
   commitWorkspaceProbeState,
   listWorkspaceRuntimes,
+  runRemoteWorkspaceLifecycle,
 } from '#/server/modules/workspace-runtimes.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { isRemoteWorkspaceId, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import type { RepoOperationsReadOptions } from '#/server/modules/repo-read-paths.ts'
+import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
+type ReadRepoOperationsSnapshot = (
+  workspaceId: WorkspaceId,
+  options?: RepoOperationsReadOptions,
+) => Promise<RepoOperationsSnapshot>
 
 export const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 export const CLIENT_ID = 'client-read-test'
 
 const mocks = vi.hoisted(() => ({
+  currentUserId: 'user-test',
   probeLocalWorkspace: vi.fn(),
   probeWorkspace: vi.fn(),
   getRepoLog: vi.fn(),
@@ -20,7 +31,7 @@ const mocks = vi.hoisted(() => ({
   readRepoSnapshot: vi.fn(),
   readRepoPullRequests: vi.fn(),
   readRepoWorktreeStatus: vi.fn(),
-  readRepoOperationsSnapshot: vi.fn(),
+  readRepoOperationsSnapshot: vi.fn<ReadRepoOperationsSnapshot>(),
   fetchRepo: vi.fn(),
   cloneRepo: vi.fn(),
   pullRepoBranch: vi.fn(),
@@ -40,6 +51,7 @@ const mocks = vi.hoisted(() => ({
   publishUserWorkspaceFilesystemInvalidation: vi.fn(),
   publishUserWorkspaceRuntimeInvalidation: vi.fn(),
   getBackgroundSyncSnapshot: vi.fn(),
+  stopBackgroundSyncRuntime: vi.fn(),
 }))
 
 vi.mock('#/server/modules/background-sync.ts', () => ({
@@ -49,6 +61,7 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
   prepareBackgroundSync: mocks.prepareBackgroundSync,
   getBackgroundSyncRepos: mocks.getBackgroundSyncRepos,
   getBackgroundSyncDiagnostics: vi.fn(),
+  stopBackgroundSyncRuntime: mocks.stopBackgroundSyncRuntime,
 }))
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   getRepoLog: mocks.getRepoLog,
@@ -87,12 +100,14 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
   resolveRepoSource: vi.fn(async () => ({ getSnapshot: mocks.getBackgroundSyncSnapshot })),
 }))
 vi.mock('#/server/common/identity.ts', () => ({
-  userIdFromContext: () => 'user-test',
+  userIdFromContext: () => mocks.currentUserId,
 }))
 
 export function resetRepoRouteHarness() {
   vi.clearAllMocks()
+  mocks.currentUserId = 'user-test'
   clearWorkspaceRuntimesForUser('user-test')
+  clearWorkspaceRuntimesForUser('user-other')
   mocks.probeLocalWorkspace.mockResolvedValue({
     status: 'ready',
     capabilities: {
@@ -110,6 +125,10 @@ export function resetRepoRouteHarness() {
   mocks.probeWorkspace.mockImplementation(mocks.probeLocalWorkspace)
   mocks.pullRepoBranch.mockResolvedValue({ ok: true, message: '' })
   mocks.getBackgroundSyncSnapshot.mockResolvedValue({ remote: { hasRemotes: true } })
+}
+
+export function setRepoRouteTestUserId(userId: string): void {
+  mocks.currentUserId = userId
 }
 
 export function createTestRepoRoutes(
@@ -141,6 +160,26 @@ export function createTestRepoRoutes(
 
 export async function openTestWorkspaceRuntime(repoRoot = WORKSPACE_ID): Promise<string> {
   const workspaceRuntimeId = acquireWorkspaceRuntime('user-test', repoRoot, CLIENT_ID)
+  if (isRemoteWorkspaceId(repoRoot)) {
+    const remote = parseRemoteWorkspaceId(repoRoot)
+    if (!remote) throw new Error('expected remote workspace id')
+    await runRemoteWorkspaceLifecycle('user-test', repoRoot, workspaceRuntimeId, async () => ({
+      kind: 'ready',
+      gitAvailable: true,
+      lifecycle: {
+        kind: 'ready',
+        target: {
+          id: repoRoot,
+          alias: remote.alias,
+          host: 'example.test',
+          user: 'developer',
+          port: 22,
+          remotePath: remote.remotePath,
+          displayName: `${remote.alias}:${remote.remotePath}`,
+        },
+      },
+    }))
+  }
   commitWorkspaceProbeState({
     userId: 'user-test',
     workspaceId: repoRoot,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import * as v from 'valibot'
-import { ExecResultResponseSchema } from '#/shared/http-response-schema.ts'
+import { ExecResultResponseSchema, RepoMutationExecResultResponseSchema } from '#/shared/http-response-schema.ts'
 import {
   RepoLogResponseSchema,
   RepoPullRequestsResponseSchema,
@@ -31,9 +31,39 @@ describe('repo response schemas', () => {
   })
 
   test('rejects malformed, forward-incompatible, and full-read-model mutation envelopes', () => {
+    expect(
+      v.parse(RepoMutationExecResultResponseSchema, {
+        ok: false,
+        message: 'upstream deletion failed',
+        recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
+      }),
+    ).toEqual({
+      ok: false,
+      message: 'upstream deletion failed',
+      recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
+    })
     expect(v.safeParse(ExecResultResponseSchema, { ok: true }).success).toBe(false)
+    expect(
+      v.safeParse(ExecResultResponseSchema, {
+        ok: false,
+        message: 'failed',
+        recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+      }).success,
+    ).toBe(false)
     expect(v.safeParse(ExecResultResponseSchema, { ok: true, message: 'ok', legacy: true }).success).toBe(false)
     expect(v.safeParse(ExecResultResponseSchema, { ok: true, message: 'ok', snapshot: {} }).success).toBe(false)
+    expect(
+      v.safeParse(RepoMutationExecResultResponseSchema, {
+        ok: false,
+        message: 'failed',
+        recoveryMessageKeys: [
+          'error.worktree-created-followup-failed',
+          'error.worktree-removed-followup-failed',
+          'error.local-branch-deleted-followup-failed',
+          'error.worktree-created-followup-failed',
+        ],
+      }).success,
+    ).toBe(false)
   })
 
   test('rejects a malformed member instead of turning a list into an empty result', () => {

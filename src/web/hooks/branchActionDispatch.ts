@@ -28,7 +28,7 @@ import {
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import type { ExecResult } from '#/web/types.ts'
+import type { RepoMutationExecResult } from '#/shared/git-types.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 
@@ -53,7 +53,7 @@ export function dispatchDeleteBranch({
   branchName: string
   force: boolean
   deleteUpstream: boolean
-}): Promise<ExecResult | null> {
+}): Promise<RepoMutationExecResult | null> {
   const actionRepo = repoForBranchActionDispatch(repo)
   if (!actionRepo) return Promise.resolve(recordRepoDataUnavailable(repo))
   return dispatchRepoBranchAction(
@@ -93,7 +93,7 @@ export async function dispatchRemoveWorktree({
   deleteBranch: boolean
   forceDeleteBranch: boolean
   deleteUpstream: boolean
-}): Promise<ExecResult | null> {
+}): Promise<RepoMutationExecResult | null> {
   const actionRepo = repoForBranchActionDispatch(repo)
   if (!actionRepo) return recordRepoDataUnavailable(repo)
   return await dispatchRepoBranchAction(
@@ -132,7 +132,7 @@ export async function dispatchRemoveWorktree({
 export function dispatchPush({
   repo,
   branchName,
-}: BranchActionDispatchContext & { branchName: string }): Promise<ExecResult | null> {
+}: BranchActionDispatchContext & { branchName: string }): Promise<RepoMutationExecResult | null> {
   const actionRepo = repoForBranchActionDispatch(repo)
   if (!actionRepo) return Promise.resolve(recordRepoDataUnavailable(repo))
   return dispatchRepoBranchAction(
@@ -154,7 +154,7 @@ function repoForBranchActionDispatch(repo: BranchActionRepo): BranchActionRepo |
   }
 }
 
-function recordRepoDataUnavailable(repo: BranchActionRepo): ExecResult {
+function recordRepoDataUnavailable(repo: BranchActionRepo): RepoMutationExecResult {
   const result = { ok: false as const, message: 'error.failed-read-repo' }
   useWorkspacesStore.getState().setLastResult(repo.id, result, repo.workspaceRuntimeId)
   return result

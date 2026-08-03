@@ -2,6 +2,7 @@ import { execa, ExecaError } from 'execa'
 import type { ExecResult } from '#/shared/git-types.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
+import type { CommandOutcome } from '#/system/command-execution.ts'
 
 /** Default per-call timeout. Network ops (push/pull/fetch) override via opts. */
 const DEFAULT_TIMEOUT_MS = 30_000
@@ -91,29 +92,55 @@ export async function gitResultWithOptions(
   opts: GitOptions | undefined,
   ...args: string[]
 ): Promise<ExecResult> {
-  if (opts?.signal?.aborted) return { ok: false, message: 'cancelled' }
+  return (await gitCommandResultWithOptions(cwd, opts, ...args)).result
+}
+
+export async function gitCommandResultWithOptions(
+  cwd: string,
+  opts: GitOptions | undefined,
+  ...args: string[]
+): Promise<CommandOutcome> {
+  if (opts?.signal?.aborted) {
+    return { result: { ok: false, message: 'cancelled' }, execution: { status: 'not-started' } }
+  }
   try {
     const output = await git(cwd, args, opts)
-    return { ok: true, message: output }
+    return { result: { ok: true, message: output }, execution: { status: 'succeeded' } }
   } catch (err: unknown) {
     // Distinguish three "we ended the process" reasons. The user-visible
     // copy is short on purpose — the client surfaces these via toast
     // and the kbps user is rarely interested in the underlying signal.
-    if (err instanceof OperationCancelledError || opts?.signal?.aborted) return { ok: false, message: 'cancelled' }
+    if (err instanceof OperationCancelledError || opts?.signal?.aborted) {
+      return { result: { ok: false, message: 'cancelled' }, execution: { status: 'cancelled' } }
+    }
     if (err instanceof ExecaError) {
       if (err.timedOut) {
         // No auto-clean of stray .lock files on timeout — we can't tell
         // ours from a concurrent tool's, and a stale-clean is worse than
         // the retry's "lock exists" stderr. Same conservative stance as
         // stripNoise below; revisit with data if this actually bites.
-        return { ok: false, message: `git timed out after ${(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000}s` }
+        return {
+          result: { ok: false, message: `git timed out after ${(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000}s` },
+          execution: { status: 'timed-out' },
+        }
       }
       const stderr = typeof err.stderr === 'string' ? err.stderr : ''
       const cleaned = stripNoise(stderr).trim()
-      return { ok: false, message: cleaned || err.message || 'Unknown error' }
+      return {
+        result: { ok: false, message: cleaned || err.message || 'Unknown error' },
+        execution: { status: isProcessStartFailure(err) ? 'not-started' : 'failed' },
+      }
     }
-    return { ok: false, message: err instanceof Error ? err.message : 'Unknown error' }
+    return {
+      result: { ok: false, message: err instanceof Error ? err.message : 'Unknown error' },
+      execution: { status: 'failed' },
+    }
   }
+}
+
+function isProcessStartFailure(error: ExecaError): boolean {
+  if (error.exitCode !== undefined || error.signal !== undefined) return false
+  return error.code === 'ENOENT' || error.code === 'EACCES' || error.code === 'ENOEXEC'
 }
 
 /**

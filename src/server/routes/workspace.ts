@@ -210,23 +210,25 @@ export function createWorkspaceRoutes(options: {
       executionTarget.workspaceId,
       executionTarget.workspaceRuntimeId,
     )
-    const result = await runWorkspaceRuntimeRequest({
-      userId,
-      run: () => trashWorkspaceFile(executionTarget, path, c.req.raw.signal),
-      label: 'trash-file',
-      signal: c.req.raw.signal,
-    })
-    const invalidationRequired = result.ok || result.repositoryStateChanged === true
-    if (invalidationRequired) {
-      publishUserWorkspaceFilesystemInvalidation(userId, { target: executionTarget })
-    }
-    if (executionTarget.kind === 'git-worktree' && invalidationRequired) {
-      publishUserRepoReadInvalidation(userId, {
-        repoId: executionTarget.workspaceId,
-        domain: 'worktree-status',
+    try {
+      const result = await runWorkspaceRuntimeRequest({
+        userId,
+        run: () => trashWorkspaceFile(executionTarget, path, c.req.raw.signal),
+        label: 'trash-file',
+        signal: c.req.raw.signal,
       })
+      return c.json(result)
+    } finally {
+      // Moving a file to trash is not atomic with observing its result. Refresh
+      // projections after every accepted attempt without retrying or claiming success.
+      publishUserWorkspaceFilesystemInvalidation(userId, { target: executionTarget })
+      if (executionTarget.kind === 'git-worktree') {
+        publishUserRepoReadInvalidation(userId, {
+          repoId: executionTarget.workspaceId,
+          domain: 'worktree-status',
+        })
+      }
     }
-    return c.json(result)
   })
 
   app.post('/open-terminal', async (c) => {

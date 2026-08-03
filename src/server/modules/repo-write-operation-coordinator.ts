@@ -8,7 +8,12 @@ import {
 } from '#/server/modules/repo-source.ts'
 import { resolveRepoWriteBoundaryKey } from '#/server/modules/repo-write-boundary.ts'
 import { publishRepoReadInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { onWorkspaceRuntimeClosed } from '#/server/modules/workspace-runtimes.ts'
+import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import {
+  isRemoteWorkspaceRuntimeFailure,
+  type RemoteWorkspaceRuntimeFailureError,
+} from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { onWorkspaceRuntimeClosed, onWorkspaceRuntimeFailed } from '#/server/modules/workspace-runtimes.ts'
 import type {
   RepoOperationCancellationReason,
   RepoServerOperationKind,
@@ -26,22 +31,25 @@ import {
   repoWriteOperationTimestamp,
   type RepoWriteOperationListOptions,
 } from '#/server/modules/repo-write-operation-state.ts'
+import { RepoMembershipReadConflictError } from '#/server/modules/repo-membership-read-conflict.ts'
+import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 
 export interface RepoWriteOperationLifecycle {
   id: string
   start(): void
   requestCancel(reason: RepoOperationCancellationReason): void
   recordWaitCancellation(reason: RepoOperationCancellationReason): void
-  settle(result: { ok: boolean; message?: string }): void
+  runMembershipMutation<T>(mutation: () => Promise<T>): Promise<T>
+  settle(result: { ok: boolean; message?: string; repoIdsToInvalidate?: readonly WorkspaceId[] }): void
 }
 
 export interface RepoWriteOperationContext {
   runNetworkOperation<T extends ExecResult>(task: (signal: AbortSignal) => Promise<T>): Promise<T>
   runWithRepoSource<T extends ExecResult>(task: (source: RepoSource) => Promise<T>): Promise<T>
+  runMembershipMutation<T>(mutation: () => Promise<T>): Promise<T>
 }
 
 interface BeginRepoWriteOperationInput {
-  id?: string
   repoId?: WorkspaceId | null
   workspaceRuntimeId?: string | null
   kind: RepoServerOperationKind
@@ -62,6 +70,9 @@ interface RepoWriteBoundaryGroup extends RepoWriteBoundaryHandle {
   readonly queue: PQueue
   operations: Map<string, RepoServerOperationState>
   lastSuccessfulFetchAt: number | null
+  membershipRevision: number
+  activeMembershipReads: number
+  activeMembershipWrites: number
 }
 
 interface WorkspaceRuntimeBoundaryRegistration {
@@ -73,13 +84,16 @@ interface WorkspaceRuntimeBoundaryRegistration {
 const MAX_SETTLED_OPERATIONS = 100
 
 let nextWriteOperationId = 1
+let nextSettledOperationOrdinal = 1
 let nextBoundaryGroupId = 1
 const boundaryGroups = new Set<RepoWriteBoundaryGroup>()
 const boundaryGroupByRepoId = new Map<WorkspaceId, RepoWriteBoundaryGroup>()
 const boundaryGroupByDescriptor = new Map<string, RepoWriteBoundaryGroup>()
 const workspaceRuntimeRegistrationsByRepoId = new Map<WorkspaceId, Map<string, WorkspaceRuntimeBoundaryRegistration>>()
 let boundaryGroupByHandle = new WeakMap<RepoWriteBoundaryHandle, RepoWriteBoundaryGroup>()
+let settledOperationOrdinal = new WeakMap<RepoServerOperationState, number>()
 let workspaceRuntimeCloseSubscription: (() => void) | null = null
+let workspaceRuntimeFailureSubscription: (() => void) | null = null
 
 function freshWriteOperationId(): string {
   return `repo-write-op-${nextWriteOperationId++}`
@@ -93,6 +107,9 @@ function createBoundaryGroup(descriptor: string): RepoWriteBoundaryGroup {
     queue: new PQueue({ concurrency: 1 }),
     operations: new Map(),
     lastSuccessfulFetchAt: null,
+    membershipRevision: 0,
+    activeMembershipReads: 0,
+    activeMembershipWrites: 0,
   }
   boundaryGroups.add(group)
   boundaryGroupByDescriptor.set(descriptor, group)
@@ -111,15 +128,8 @@ async function resolveRepoWriteBoundaryGroup(
 }
 
 function bindRepoWriteBoundaryGroup(repoId: WorkspaceId, descriptor: string): RepoWriteBoundaryGroup {
-  ensureRepoRuntimeCloseSubscription()
-  const previousGroup = boundaryGroupByRepoId.get(repoId)
   const group = boundaryGroupByDescriptor.get(descriptor) ?? createBoundaryGroup(descriptor)
-  if (previousGroup !== group && previousGroup) {
-    previousGroup.repoIds.delete(repoId)
-    deleteBoundaryGroupIfIdle(previousGroup)
-  }
-  group.repoIds.add(repoId)
-  boundaryGroupByRepoId.set(repoId, group)
+  registerRepoWriteOperationBoundaryRepoId(group, repoId)
   return group
 }
 
@@ -160,13 +170,22 @@ function pruneSettledOperations(): void {
       [...runtime.operations.values()].filter(isSettledRepoWriteOperation).map((operation) => ({ runtime, operation })),
     )
     .sort((a, b) => {
-      return repoWriteOperationTimestamp(b.operation) - repoWriteOperationTimestamp(a.operation)
+      const timestampOrder = repoWriteOperationTimestamp(b.operation) - repoWriteOperationTimestamp(a.operation)
+      if (timestampOrder !== 0) return timestampOrder
+      return settledRepoWriteOperationOrdinal(b.operation) - settledRepoWriteOperationOrdinal(a.operation)
     })
 
   for (const { runtime, operation } of settled.slice(MAX_SETTLED_OPERATIONS)) {
     runtime.operations.delete(operation.id)
+    publishRepoRuntimeInvalidation(runtime, operation)
     deleteBoundaryGroupIfIdle(runtime)
   }
+}
+
+function settledRepoWriteOperationOrdinal(operation: RepoServerOperationState): number {
+  const ordinal = settledOperationOrdinal.get(operation)
+  if (ordinal === undefined) throw new Error(`Repository write operation was not settled: ${operation.id}`)
+  return ordinal
 }
 
 function beginRepoWriteOperation(
@@ -176,7 +195,7 @@ function beginRepoWriteOperation(
   const now = Date.now()
   let settled = false
   const operation: RepoServerOperationState = {
-    id: input.id ?? freshWriteOperationId(),
+    id: freshWriteOperationId(),
     repoId: input.repoId ?? null,
     workspaceRuntimeId: input.workspaceRuntimeId ?? null,
     kind: input.kind,
@@ -222,6 +241,21 @@ function beginRepoWriteOperation(
       operation.cancellation.lastWaitCancellationReason = reason
       publishRepoRuntimeInvalidation(runtime, operation)
     },
+    async runMembershipMutation<T>(mutation: () => Promise<T>): Promise<T> {
+      // This is an admission fence around the attempt to invoke a membership
+      // mutation, not proof that a Git/SSH process started. A pre-spawn
+      // cancellation may therefore advance the revision and make a concurrent
+      // read fail once with a retryable conflict. That conservative fast-fail
+      // is intentional: do not add revision rollback, invocation leases, or
+      // client compensation merely to remove that harmless edge case.
+      runtime.activeMembershipWrites += 1
+      runtime.membershipRevision += 1
+      const outcome = await observePromise(mutation)
+      runtime.activeMembershipWrites -= 1
+      runtime.membershipRevision += 1
+      if (!outcome.ok) throw outcome.error
+      return outcome.value
+    },
     settle(result) {
       if (settled) return
       settled = true
@@ -229,13 +263,14 @@ function beginRepoWriteOperation(
       const cancellationReason = operation.cancellation.reason
       operation.phase = result.ok ? 'done' : 'failed'
       operation.settledAt = Date.now()
+      settledOperationOrdinal.set(operation, nextSettledOperationOrdinal++)
       operation.error = result.ok
         ? null
         : {
             message: result.message ?? 'error.failed-read-repo',
             reason: repoWriteOperationFailureReason(result.message, cancellationReason),
           }
-      publishRepoRuntimeInvalidation(runtime, operation)
+      publishRepoRuntimeInvalidation(runtime, operation, result.repoIdsToInvalidate)
       pruneSettledOperations()
     },
   }
@@ -244,9 +279,11 @@ function beginRepoWriteOperation(
 function publishRepoRuntimeInvalidation(
   runtime: RepoWriteBoundaryGroup,
   operation: Pick<RepoServerOperationState, 'repoId'>,
+  additionalRepoIds: readonly WorkspaceId[] = [],
 ): void {
   const repoIds = new Set(runtime.repoIds)
   if (operation.repoId) repoIds.add(operation.repoId)
+  for (const repoId of additionalRepoIds) repoIds.add(repoId)
   for (const repoId of repoIds) {
     publishRepoReadInvalidation({ repoId, domain: 'operations' })
   }
@@ -257,10 +294,23 @@ function registerRepoWriteOperationBoundaryRepoId(
   repoId: WorkspaceId | null | undefined,
 ): void {
   ensureRepoRuntimeCloseSubscription()
-  if (repoId) {
-    boundaryGroupByRepoId.set(repoId, group)
-    group.repoIds.add(repoId)
+  if (!repoId) return
+  const previousGroup = boundaryGroupByRepoId.get(repoId)
+  if (previousGroup === group) return
+  const projectionChanged =
+    boundaryGroupHasOperationProjection(group) ||
+    (previousGroup !== undefined && boundaryGroupHasOperationProjection(previousGroup))
+  if (previousGroup) {
+    previousGroup.repoIds.delete(repoId)
+    deleteBoundaryGroupIfIdle(previousGroup)
   }
+  boundaryGroupByRepoId.set(repoId, group)
+  group.repoIds.add(repoId)
+  if (projectionChanged) publishRepoReadInvalidation({ repoId, domain: 'operations' })
+}
+
+function boundaryGroupHasOperationProjection(group: RepoWriteBoundaryGroup): boolean {
+  return group.operations.size > 0 || group.lastSuccessfulFetchAt !== null
 }
 
 function unregisterRepoWriteOperationBoundaryRepoId(repoId: WorkspaceId, workspaceRuntimeId: string): void {
@@ -279,17 +329,23 @@ function unregisterRepoWriteOperationBoundaryRepoId(repoId: WorkspaceId, workspa
 }
 
 function deleteBoundaryGroupIfIdle(group: RepoWriteBoundaryGroup): void {
-  if (group.repoIds.size > 0 || group.operations.size > 0) return
+  if (group.repoIds.size > 0 || group.operations.size > 0 || group.activeMembershipReads > 0) return
   boundaryGroups.delete(group)
   if (boundaryGroupByDescriptor.get(group.descriptor) === group) boundaryGroupByDescriptor.delete(group.descriptor)
   boundaryGroupByHandle.delete(group)
 }
 
 function ensureRepoRuntimeCloseSubscription(): void {
-  if (workspaceRuntimeCloseSubscription) return
-  workspaceRuntimeCloseSubscription = onWorkspaceRuntimeClosed((event) => {
-    unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId, event.workspaceRuntimeId)
-  })
+  if (!workspaceRuntimeCloseSubscription) {
+    workspaceRuntimeCloseSubscription = onWorkspaceRuntimeClosed((event) => {
+      unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId, event.workspaceRuntimeId)
+    })
+  }
+  if (!workspaceRuntimeFailureSubscription) {
+    workspaceRuntimeFailureSubscription = onWorkspaceRuntimeFailed((event) => {
+      unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId, event.workspaceRuntimeId)
+    })
+  }
 }
 
 function cancelledRepoWriteResult<T extends ExecResult>(): T {
@@ -367,16 +423,36 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
     operation.settle(outcome.value)
     return outcome.value
   }
-  if (callerSignal?.aborted) {
+  if (callerSignal?.aborted && isCancellationError(outcome.error, ctrl.signal)) {
     const result = cancelledRepoWriteResult<T>()
     operation.settle(result)
     return result
   }
-  operation.settle({
-    ok: false,
-    message: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
-  })
+  operation.settle(repoWriteOperationFailure(outcome.error))
   throw outcome.error
+}
+
+function repoWriteOperationFailure(error: unknown): {
+  ok: false
+  message: string
+  repoIdsToInvalidate?: readonly WorkspaceId[]
+} {
+  if (isRepoMutationRuntimeFailureError(error)) {
+    const failure = {
+      ok: false as const,
+      message: error.runtimeFailure.message,
+    }
+    return error.mutation.repoIdsToInvalidate
+      ? { ...failure, repoIdsToInvalidate: error.mutation.repoIdsToInvalidate }
+      : failure
+  }
+  return { ok: false, message: error instanceof Error ? error.message : String(error) }
+}
+
+function isCancellationError(error: unknown, signal: AbortSignal): boolean {
+  if (error === signal.reason) return true
+  if (error instanceof OperationCancelledError) return true
+  return error instanceof Error && error.name === 'AbortError'
 }
 
 function createRepoWriteOperationContext(
@@ -386,6 +462,9 @@ function createRepoWriteOperationContext(
   callerSignal: AbortSignal | undefined,
 ): RepoWriteOperationContext {
   return {
+    async runMembershipMutation<T>(mutation: () => Promise<T>): Promise<T> {
+      return await operation.runMembershipMutation(mutation)
+    },
     async runNetworkOperation(task) {
       return await runRepoWriteNetworkOperation(operation, task, callerSignal)
     },
@@ -424,8 +503,12 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
         ),
   )
   assertWorkspaceRuntimeRegistrationActive(runtimeRegistration)
+  if (!capture.ok) {
+    if (closeWorkspaceRuntimeAdmissionForFailure(runtimeRegistration, capture.error)) throw capture.error
+    if (signal?.aborted) return cancelledRepoWriteResult()
+    throw capture.error
+  }
   if (signal?.aborted) return cancelledRepoWriteResult()
-  if (!capture.ok) throw capture.error
   const execution = capture.value
   const group = bindRepoWriteBoundaryGroup(repoId, repoWriteExecutionBoundaryKey(execution))
   const operation = beginRepoWriteOperation(group, operationInput)
@@ -449,7 +532,8 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
       try {
         return await task()
       } catch (err) {
-        operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
+        closeWorkspaceRuntimeAdmissionForFailure(runtimeRegistration, err)
+        operation.settle(repoWriteOperationFailure(err))
         throw err
       }
     },
@@ -461,36 +545,87 @@ export async function listRepoWriteOperationsForRepo(
   repoId: WorkspaceId | undefined,
   options: { includeSettled?: boolean; workspaceRuntimeId?: string; signal?: AbortSignal } = {},
 ): Promise<RepoServerOperationState[]> {
-  let runtimes: RepoWriteBoundaryGroup[]
-  if (repoId) {
-    const runtimeRegistration = registerWorkspaceRuntime(repoId, options.workspaceRuntimeId)
-    const group = await resolveRepoWriteBoundaryGroup(repoId, options.signal, runtimeRegistration)
-    registerRepoWriteOperationBoundaryRepoId(group, repoId)
-    runtimes = [group]
-  } else {
-    runtimes = [...boundaryGroups]
-  }
-  return listRuntimeOperations(runtimes, options)
+  options.signal?.throwIfAborted()
+  const matchingGroups = repoId ? boundaryGroupsForRepoProjection(repoId) : [...boundaryGroups]
+  return listBoundaryGroupOperations(matchingGroups, {
+    includeSettled: options.includeSettled,
+    workspaceRuntimeId: options.workspaceRuntimeId,
+  })
 }
 
-function listRuntimeOperations(
-  runtimes: RepoWriteBoundaryGroup[],
+export function getRepoLastSuccessfulFetchAt(repoId: WorkspaceId): number | null {
+  return boundaryGroupByRepoId.get(repoId)?.lastSuccessfulFetchAt ?? null
+}
+
+function boundaryGroupsForRepoProjection(repoId: WorkspaceId): RepoWriteBoundaryGroup[] {
+  const matchingGroups = new Set<RepoWriteBoundaryGroup>()
+  const currentGroup = boundaryGroupByRepoId.get(repoId)
+  if (currentGroup) matchingGroups.add(currentGroup)
+  for (const group of boundaryGroups) {
+    for (const operation of group.operations.values()) {
+      if (operation.repoId !== repoId) continue
+      matchingGroups.add(group)
+      break
+    }
+  }
+  return [...matchingGroups]
+}
+
+function closeWorkspaceRuntimeAdmissionForFailure(
+  registration: WorkspaceRuntimeBoundaryRegistration | null,
+  error: unknown,
+): boolean {
+  if (!registration) return false
+  const runtimeFailure = remoteRuntimeFailureFromWriteError(error)
+  if (!runtimeFailure) return false
+  if (runtimeFailure.workspaceId !== registration.repoId) return false
+  if (runtimeFailure.workspaceRuntimeId !== registration.workspaceRuntimeId) return false
+  unregisterRepoWriteOperationBoundaryRepoId(registration.repoId, registration.workspaceRuntimeId)
+  return true
+}
+
+function remoteRuntimeFailureFromWriteError(error: unknown): RemoteWorkspaceRuntimeFailureError | null {
+  if (isRepoMutationRuntimeFailureError(error)) return error.runtimeFailure
+  return isRemoteWorkspaceRuntimeFailure(error) ? error : null
+}
+
+function listBoundaryGroupOperations(
+  groups: RepoWriteBoundaryGroup[],
   options: RepoWriteOperationListOptions,
 ): RepoServerOperationState[] {
   return projectRepoWriteOperations(
-    runtimes.flatMap((runtime) => [...runtime.operations.values()]),
+    groups.flatMap((group) => [...group.operations.values()]),
     options,
   )
 }
 
-export function listRepoWriteOperationsForBoundary(
-  repoId: WorkspaceId,
+export async function runWithRepoMembershipReadAdmission<T>(
   handle: RepoWriteBoundaryHandle,
-  options: { includeSettled?: boolean; workspaceRuntimeId?: string } = {},
-): RepoServerOperationState[] {
+  read: () => Promise<T>,
+): Promise<T> {
   const group = boundaryGroupForHandle(handle)
-  registerRepoWriteOperationBoundaryRepoId(group, repoId)
-  return listRuntimeOperations([group], options)
+  if (group.activeMembershipWrites > 0) throw new RepoMembershipReadConflictError()
+  const revision = group.membershipRevision
+  group.activeMembershipReads += 1
+  try {
+    const outcome = await observePromise(read)
+    // The epoch gates acceptance of successful projection data. A failed read
+    // keeps its own cancellation or typed runtime error so its lifecycle owner
+    // can settle it. A may-have-run mutation invalidates the projection;
+    // a conservative not-started conflict returns control through explicit retry.
+    if (!outcome.ok) throw outcome.error
+    assertRepoMembershipReadStillAdmitted(group, revision)
+    return outcome.value
+  } finally {
+    group.activeMembershipReads -= 1
+    deleteBoundaryGroupIfIdle(group)
+  }
+}
+
+function assertRepoMembershipReadStillAdmitted(group: RepoWriteBoundaryGroup, revision: number): void {
+  if (group.activeMembershipWrites > 0 || revision !== group.membershipRevision) {
+    throw new RepoMembershipReadConflictError()
+  }
 }
 
 export async function resolveRepoWriteBoundaryForRead(
@@ -513,19 +648,19 @@ function recordRepoBoundaryFetchSuccess(group: RepoWriteBoundaryGroup): void {
   group.lastSuccessfulFetchAt = Math.max(group.lastSuccessfulFetchAt ?? 0, Date.now())
 }
 
-export function getRepoBoundaryLastFetchAt(handle: RepoWriteBoundaryHandle): number | null {
-  return boundaryGroupForHandle(handle).lastSuccessfulFetchAt
-}
-
 export function resetRepoWriteOperationCoordinatorForTests(): void {
   boundaryGroups.clear()
   boundaryGroupByRepoId.clear()
   boundaryGroupByDescriptor.clear()
   workspaceRuntimeRegistrationsByRepoId.clear()
   boundaryGroupByHandle = new WeakMap()
+  settledOperationOrdinal = new WeakMap()
   workspaceRuntimeCloseSubscription?.()
   workspaceRuntimeCloseSubscription = null
+  workspaceRuntimeFailureSubscription?.()
+  workspaceRuntimeFailureSubscription = null
   nextWriteOperationId = 1
+  nextSettledOperationOrdinal = 1
   nextBoundaryGroupId = 1
 }
 
@@ -536,10 +671,10 @@ export function repoWriteOperationCoordinatorStatsForTests(): {
   queuedOperations: number
   runningOperations: number
 } {
-  const runtimes = [...boundaryGroups]
-  const queues = new Set(runtimes.map((runtime) => runtime.queue))
+  const groups = [...boundaryGroups]
+  const queues = new Set(groups.map((group) => group.queue))
   return {
-    boundaryRuntimes: runtimes.length,
+    boundaryRuntimes: groups.length,
     registeredBoundaries: boundaryGroupByDescriptor.size,
     registeredRepoIds: boundaryGroupByRepoId.size,
     queuedOperations: [...queues].reduce((total, queue) => total + queue.size, 0),

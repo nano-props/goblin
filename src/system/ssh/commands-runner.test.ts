@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { ExecaError } from 'execa'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -31,6 +32,19 @@ beforeEach(() => {
 })
 
 describe('runRemoteCommand', () => {
+  test('reports a control-directory preparation failure before SSH as not started', async () => {
+    mocks.mkdir.mockRejectedValueOnce(new Error('control directory is read-only'))
+
+    await expect(runRemoteCommand(target(), { type: 'checkShell' })).resolves.toEqual({
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: 'control directory is read-only',
+      commandNotStarted: true,
+    })
+    expect(mocks.execa).not.toHaveBeenCalled()
+  })
+
   test('marks the remote shell as started and strips the marker from successful stdout', async () => {
     const signal = new AbortController().signal
     mocks.execa.mockResolvedValueOnce({
@@ -65,6 +79,32 @@ describe('runRemoteCommand', () => {
         timeout: 1234,
       }),
     )
+  })
+
+  test('rejects SSH exit zero when the remote command protocol did not start', async () => {
+    mocks.execa.mockResolvedValueOnce({ stdout: '', stderr: '' })
+
+    await expect(runRemoteCommand(target(), { type: 'checkShell' })).resolves.toEqual({
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: 'remote command execution could not be confirmed',
+      remoteStarted: false,
+      remoteStartUnconfirmed: true,
+    })
+  })
+
+  test('preserves unexpected server output when SSH exit zero bypasses the remote command protocol', async () => {
+    mocks.execa.mockResolvedValueOnce({ stdout: 'forced command output\n', stderr: 'server notice\n' })
+
+    await expect(runRemoteCommand(target(), { type: 'checkShell' })).resolves.toEqual({
+      ok: false,
+      stdout: 'forced command output',
+      stderr: 'server notice',
+      message: 'remote command execution could not be confirmed',
+      remoteStarted: false,
+      remoteStartUnconfirmed: true,
+    })
   })
 
   test('preserves remoteStarted on command failures after the remote shell starts', async () => {
@@ -145,6 +185,24 @@ describe('runRemoteCommand', () => {
       stderr: 'ssh: connect to host example.test port 22: Connection refused',
       message: 'ssh: connect to host example.test port 22: Connection refused',
       remoteStarted: false,
+    })
+  })
+
+  test('reports a provable SSH process start failure as not started', async () => {
+    const failure = Object.assign(new ExecaError(), {
+      message: 'ssh executable was not found',
+      code: 'ENOENT',
+      exitCode: undefined,
+      signal: undefined,
+    })
+    mocks.execa.mockRejectedValueOnce(failure)
+
+    await expect(runRemoteCommand(target(), { type: 'checkShell' })).resolves.toEqual({
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: 'ssh executable was not found',
+      commandNotStarted: true,
     })
   })
 })

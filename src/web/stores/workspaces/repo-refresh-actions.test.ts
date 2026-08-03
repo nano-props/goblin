@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoDataQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
-import { handleRepoInvalidationRefresh } from '#/web/stores/workspaces/repo-refresh-actions.ts'
+import { repoDataQueryKey, repoOperationsQueryPrefix, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import {
+  handleRepoInvalidationRefresh,
+  resyncActiveRepoReadQueries,
+} from '#/web/stores/workspaces/repo-refresh-actions.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -51,6 +54,44 @@ describe('repo refresh actions', () => {
     await handleRepoInvalidationRefresh(store, { repoId: WORKSPACE_ID, domain: 'metadata' }, 'workspace-runtime-test-9')
 
     expect(invalidateSpy).not.toHaveBeenCalled()
+    invalidateSpy.mockRestore()
+  })
+
+  test('refreshes in-memory operations without requiring Git capability', async () => {
+    const store = repoRefreshStoreAccess('workspace-runtime-test-9', 'unavailable')
+    const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
+
+    await handleRepoInvalidationRefresh(
+      store,
+      { repoId: WORKSPACE_ID, domain: 'operations' },
+      'workspace-runtime-test-9',
+    )
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: repoOperationsQueryPrefix(WORKSPACE_ID, 'workspace-runtime-test-9'),
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
+    expect(invalidateSpy).toHaveBeenCalledOnce()
+    invalidateSpy.mockRestore()
+  })
+
+  test('resyncs in-memory operations when Git reads are unavailable', async () => {
+    const store = repoRefreshStoreAccess('workspace-runtime-test-9', 'unavailable')
+    const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
+
+    await resyncActiveRepoReadQueries(store)
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: repoOperationsQueryPrefix(WORKSPACE_ID, 'workspace-runtime-test-9'),
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
+    expect(invalidateSpy).toHaveBeenCalledOnce()
     invalidateSpy.mockRestore()
   })
 

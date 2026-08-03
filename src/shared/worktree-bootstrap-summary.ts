@@ -15,6 +15,13 @@ export interface WorktreeBootstrapSummary {
   }
 }
 
+/** Result owned by bootstrap materialization before repository recovery policy is applied. */
+export interface WorktreeBootstrapResult {
+  ok: boolean
+  message: string
+  worktreeBootstrap?: WorktreeBootstrapSummary
+}
+
 export type WorktreeBootstrapDecision =
   | { kind: 'skip' }
   | {

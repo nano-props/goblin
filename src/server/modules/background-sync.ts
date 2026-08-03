@@ -5,7 +5,14 @@ import { serverLogger } from '#/server/logger.ts'
 import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/server/modules/settings-source.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
-import { onWorkspaceRuntimeClosed, onWorkspaceRuntimeMembershipReleased } from '#/server/modules/workspace-runtimes.ts'
+import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import { publishRepoMutationInvalidations } from '#/server/modules/repo-mutation-invalidation.ts'
+import {
+  onWorkspaceRuntimeClosed,
+  onWorkspaceRuntimeFailed,
+  onWorkspaceRuntimeMembershipReleased,
+} from '#/server/modules/workspace-runtimes.ts'
 import {
   backgroundSyncBackoffDelayMs,
   backgroundSyncNextEligibleAt,
@@ -90,6 +97,7 @@ let settingsSubscription: (() => void) | null = null
 let settingsInitializationPromise: Promise<void> | null = null
 let settingsInitializationGeneration = 0
 let runtimeCloseSubscription: (() => void) | null = null
+let runtimeFailureSubscription: (() => void) | null = null
 let membershipReleaseSubscription: (() => void) | null = null
 const backgroundSyncLogger = serverLogger.child({ module: 'background-sync' })
 const syncQueue = new PQueue({ concurrency: 1 })
@@ -115,7 +123,10 @@ export async function prepareBackgroundSync(): Promise<void> {
   if (settingsSubscription) return
   if (settingsInitializationPromise) return await settingsInitializationPromise
   runtimeCloseSubscription ??= onWorkspaceRuntimeClosed((event) => {
-    removeBackgroundSyncRuntime(event.userId, event.workspaceId, event.workspaceRuntimeId)
+    stopBackgroundSyncRuntime(event.userId, event.workspaceId, event.workspaceRuntimeId)
+  })
+  runtimeFailureSubscription ??= onWorkspaceRuntimeFailed((event) => {
+    stopBackgroundSyncRuntime(event.userId, event.workspaceId, event.workspaceRuntimeId)
   })
   membershipReleaseSubscription ??= onWorkspaceRuntimeMembershipReleased((event) => {
     releaseBackgroundSyncMembership(
@@ -248,6 +259,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
     state.activeFetch = activeFetch
     const fetchStart = Date.now()
     const result = await fetchRepo(target.workspaceId, 'background', ctrl.signal, target.workspaceRuntimeId)
+    publishRepoMutationInvalidations(target.workspaceId, result, ['metadata'])
     const fetchDuration = Date.now() - fetchStart
     // Log slow fetchs for performance monitoring
     if (fetchDuration > 5000) {
@@ -280,6 +292,10 @@ async function runScheduledFetch(generation: number): Promise<void> {
     if (target) {
       recordTargetFetchStartedAt(target, now)
       recordTargetFailure(target, now)
+      await settleBackgroundRuntimeFailureOrStop(target, err)
+      if (isRepoMutationRuntimeFailureError(err)) {
+        publishRepoMutationInvalidations(target.workspaceId, err.mutation, ['metadata'])
+      }
     }
     const key = target ? backgroundSyncTargetKey(target) : null
     backgroundSyncLogger.warn(
@@ -297,6 +313,26 @@ async function runScheduledFetch(generation: number): Promise<void> {
       requestScheduledFetch(generation)
     }
   }
+}
+
+async function settleBackgroundRuntimeFailureOrStop(
+  target: RegisteredGitBackgroundSyncTarget,
+  error: unknown,
+): Promise<void> {
+  const runtimeFailure = isRepoMutationRuntimeFailureError(error) ? error.runtimeFailure : error
+  try {
+    const runtimeFailed = await failRemoteWorkspaceRuntimeIfNeeded(target.userId, runtimeFailure)
+    if (!runtimeFailed) return
+  } catch (settlementError) {
+    backgroundSyncLogger.warn(
+      { err: settlementError, workspaceId: target.workspaceId },
+      'failed to settle background fetch runtime; stopping automatic sync for this runtime',
+    )
+  }
+  // A classified runtime failure ends this runtime's automatic work whether
+  // lifecycle settlement succeeded or became uncertain. User-driven reopen or
+  // registration establishes a new runtime instead of replaying against this one.
+  stopBackgroundSyncRuntime(target.userId, target.workspaceId, target.workspaceRuntimeId)
 }
 
 export function beginBackgroundSyncRegistration(
@@ -387,6 +423,8 @@ export function stopBackgroundSync(): void {
   settingsSubscription = null
   runtimeCloseSubscription?.()
   runtimeCloseSubscription = null
+  runtimeFailureSubscription?.()
+  runtimeFailureSubscription = null
   membershipReleaseSubscription?.()
   membershipReleaseSubscription = null
 }
@@ -440,9 +478,18 @@ export function resetBackgroundSyncForTests(): void {
   stopBackgroundSync()
 }
 
-function removeBackgroundSyncRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
+/** Stop automatic work owned by one exact runtime after its lifecycle becomes uncertain or closes. */
+export function stopBackgroundSyncRuntime(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
   const closedTarget = { userId, workspaceId, workspaceRuntimeId }
   const key = backgroundSyncTargetKey(closedTarget)
+  for (const [ownerKey, admission] of state.registrationAdmissionsByOwner) {
+    const admissionContainsRuntime = admission.targets.some(
+      (target) => backgroundSyncTargetKey({ userId: admission.userId, ...target }) === key,
+    )
+    if (!admissionContainsRuntime) continue
+    admission.controller.abort('workspace-runtime-background-sync-stopped')
+    state.registrationAdmissionsByOwner.delete(ownerKey)
+  }
   const wasRegistered = state.targets.some((target) => backgroundSyncTargetKey(target) === key)
   const hadCadence = state.lastFetchStartedAtByTarget[key] !== undefined
   if (!wasRegistered && !hadCadence) return

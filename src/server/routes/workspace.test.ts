@@ -396,6 +396,46 @@ describe('workspace routes', () => {
     })
   })
 
+  test('refreshes trash projections when the accepted mutation reports failure', async () => {
+    const app = createTestWorkspaceRoutes()
+    const workspaceRuntimeId = await openWorkspaceRuntime(app, WORKSPACE_ID)
+    const target = gitWorktreeTarget(
+      WORKSPACE_ID,
+      workspaceRuntimeId,
+      workspaceIdForTest('goblin+file:///tmp/workspace-worktree'),
+    )
+    mocks.trashWorkspaceFile.mockResolvedValueOnce({ ok: false, message: 'cancelled' })
+
+    const response = await post(app, '/trash-file', { target, path: 'src/example.ts' })
+
+    expect(response.status).toBe(200)
+    expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith(USER_ID, { target })
+    expect(mocks.publishUserRepoReadInvalidation).toHaveBeenCalledWith(USER_ID, {
+      repoId: WORKSPACE_ID,
+      domain: 'worktree-status',
+    })
+  })
+
+  test('refreshes the filesystem projection when remote trash loses its transport', async () => {
+    const workspaceId = workspaceIdForTest('goblin+ssh://example.test/workspace')
+    const app = createTestWorkspaceRoutes()
+    const workspaceRuntimeId = await openWorkspaceRuntime(app, workspaceId)
+    const target = workspaceRootTarget(workspaceId, workspaceRuntimeId)
+    mocks.trashWorkspaceFile.mockRejectedValueOnce(
+      new RemoteWorkspaceRuntimeFailureError({
+        workspaceId,
+        workspaceRuntimeId,
+        reason: 'unreachable',
+        message: 'connection refused',
+      }),
+    )
+
+    const response = await post(app, '/trash-file', { target, path: 'src/example.ts' })
+
+    expect(response.status).toBe(400)
+    expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith(USER_ID, { target })
+  })
+
   test('rejects a stale filesystem target before invoking native operations', async () => {
     const app = createTestWorkspaceRoutes()
     await openWorkspaceRuntime(app, WORKSPACE_ID)

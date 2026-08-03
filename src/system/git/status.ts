@@ -1,3 +1,4 @@
+import path from 'node:path'
 import PQueue from 'p-queue'
 import { parseStatus } from '#/system/git/parsers.ts'
 import type { StatusEntry, WorktreeInfo, WorktreeStatus } from '#/shared/git-types.ts'

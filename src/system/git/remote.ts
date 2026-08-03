@@ -1,4 +1,5 @@
-import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
+import { git, gitCommandResultWithOptions, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
+import { commandMayHaveRun, withoutMutationCommand, type CommandOutcome } from '#/system/command-execution.ts'
 import {
   GIT_HASH_RE,
   type BrowserRemoteProvider,
@@ -29,7 +30,19 @@ export interface BrowserRemote {
 }
 
 export interface GitPullResult extends ExecResult {
-  affectedWorktreePaths?: readonly string[]
+  worktreePathsToInvalidate?: readonly string[]
+}
+
+function withWorktreeInvalidationScope(
+  outcome: CommandOutcome,
+  worktreePathsToInvalidate: readonly string[],
+): CommandOutcome<GitPullResult> {
+  const { result, execution } = outcome
+  if (!commandMayHaveRun(execution)) return outcome
+  return {
+    result: { ok: result.ok, message: result.message, worktreePathsToInvalidate },
+    execution,
+  }
 }
 
 export async function getBrowserRepoUrl(
@@ -262,25 +275,25 @@ async function resolvePushTarget(cwd: string, branch: string, signal?: AbortSign
   return resolvePushTargetForRemotes(remotes, upstream, branch)
 }
 
-export async function fetchAll(cwd: string, signal?: AbortSignal): Promise<ExecResult> {
+export async function fetchAll(cwd: string, signal?: AbortSignal): Promise<CommandOutcome> {
   let remotes: GitRemoteInfo[]
   let upstream: UpstreamParts | null
   try {
     const currentBranch = await getCurrentBranch(cwd, { signal })
-    if (signal?.aborted) return { ok: false, message: 'cancelled' }
+    if (signal?.aborted) return withoutMutationCommand({ ok: false, message: 'cancelled' })
     ;[remotes, upstream] = await Promise.all([
       getRemotes(cwd, signal),
       currentBranch ? getUpstreamParts(cwd, currentBranch, signal) : Promise.resolve(null),
     ])
   } catch (err) {
-    if (signal?.aborted) return { ok: false, message: 'cancelled' }
-    return { ok: false, message: err instanceof Error ? err.message : 'error.failed-read-repo' }
+    if (signal?.aborted) return withoutMutationCommand({ ok: false, message: 'cancelled' })
+    return withoutMutationCommand({ ok: false, message: err instanceof Error ? err.message : 'error.failed-read-repo' })
   }
-  if (signal?.aborted) return { ok: false, message: 'cancelled' }
-  if (remotes.length === 0) return { ok: true, message: '' }
+  if (signal?.aborted) return withoutMutationCommand({ ok: false, message: 'cancelled' })
+  if (remotes.length === 0) return withoutMutationCommand({ ok: true, message: '' })
   const remote = resolveFetchRemoteForRemotes(remotes, upstream)
-  if (!remote) return { ok: true, message: '' }
-  const result = await gitResultWithOptions(
+  if (!remote) return withoutMutationCommand({ ok: true, message: '' })
+  return await gitCommandResultWithOptions(
     cwd,
     { timeoutMs: NETWORK_TIMEOUT_MS, signal },
     'fetch',
@@ -288,7 +301,6 @@ export async function fetchAll(cwd: string, signal?: AbortSignal): Promise<ExecR
     '--',
     remote,
   )
-  return result.ok ? result : { ...result, repositoryStateChanged: true }
 }
 
 export async function pullBranch(
@@ -296,37 +308,39 @@ export async function pullBranch(
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
-): Promise<GitPullResult> {
-  if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
+): Promise<CommandOutcome<GitPullResult>> {
+  if (!isSafeBranchName(branch)) return withoutMutationCommand({ ok: false, message: 'error.invalid-arguments' })
   if (worktreePath) {
-    if (signal?.aborted) return { ok: false, message: 'cancelled' }
-    const result = await gitResultWithOptions(
+    if (signal?.aborted) return withoutMutationCommand({ ok: false, message: 'cancelled' })
+    const outcome = await gitCommandResultWithOptions(
       worktreePath,
       { timeoutMs: NETWORK_TIMEOUT_MS, signal },
       'pull',
       '--ff-only',
     )
-    return {
-      ...(result.ok ? result : { ...result, repositoryStateChanged: true }),
-      affectedWorktreePaths: [worktreePath],
-    }
+    return withWorktreeInvalidationScope(outcome, [worktreePath])
   }
   const current = await getCurrentBranch(cwd, { signal })
-  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (signal?.aborted) return withoutMutationCommand({ ok: false, message: 'cancelled' })
   if (branch === current) {
-    const result = await gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'pull', '--ff-only')
-    return { ...(result.ok ? result : { ...result, repositoryStateChanged: true }), affectedWorktreePaths: [cwd] }
+    const outcome = await gitCommandResultWithOptions(
+      cwd,
+      { timeoutMs: NETWORK_TIMEOUT_MS, signal },
+      'pull',
+      '--ff-only',
+    )
+    return withWorktreeInvalidationScope(outcome, [cwd])
   }
   const target = await getUpstreamParts(cwd, branch, signal)
-  if (signal?.aborted) return { ok: false, message: 'cancelled' }
-  if (!target) return { ok: false, message: 'error.invalid-arguments' }
+  if (signal?.aborted) return withoutMutationCommand({ ok: false, message: 'cancelled' })
+  if (!target) return withoutMutationCommand({ ok: false, message: 'error.invalid-arguments' })
   const remoteExists = target.remote === '.' || (await hasRemote(cwd, target.remote, signal))
-  if (signal?.aborted) return { ok: false, message: 'cancelled' }
+  if (signal?.aborted) return withoutMutationCommand({ ok: false, message: 'cancelled' })
   if (!remoteExists) {
-    return { ok: false, message: 'error.pull-no-remote' }
+    return withoutMutationCommand({ ok: false, message: 'error.pull-no-remote' })
   }
-  if (signal?.aborted) return { ok: false, message: 'cancelled' }
-  const result = await gitResultWithOptions(
+  if (signal?.aborted) return withoutMutationCommand({ ok: false, message: 'cancelled' })
+  return await gitCommandResultWithOptions(
     cwd,
     { timeoutMs: NETWORK_TIMEOUT_MS, signal },
     'fetch',
@@ -334,16 +348,15 @@ export async function pullBranch(
     target.remote,
     `${target.branch}:${branch}`,
   )
-  return result.ok ? result : { ...result, repositoryStateChanged: true }
 }
 
-export async function pushBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {
-  if (!isSafeBranchName(branch)) return { ok: false, message: 'error.invalid-arguments' }
+export async function pushBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<CommandOutcome> {
+  if (!isSafeBranchName(branch)) return withoutMutationCommand({ ok: false, message: 'error.invalid-arguments' })
   const target = await resolvePushTarget(cwd, branch, signal)
-  if (signal?.aborted) return { ok: false, message: 'cancelled' }
-  if ('ok' in target) return target
+  if (signal?.aborted) return withoutMutationCommand({ ok: false, message: 'cancelled' })
+  if ('ok' in target) return withoutMutationCommand(target)
   const args = target.setUpstream
     ? ['push', '-u', '--', target.remote, `${branch}:${target.branch}`]
     : ['push', '--', target.remote, `${branch}:${target.branch}`]
-  return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, ...args)
+  return await gitCommandResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, ...args)
 }

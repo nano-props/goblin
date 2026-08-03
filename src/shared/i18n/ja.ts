@@ -537,7 +537,10 @@ export const ja: Record<DictKey, string> = {
   'error.workspace-open-failed': 'ワークスペースを開けませんでした',
   'error.workspace-close-failed': 'ワークスペースを閉じられませんでした',
   'error.failed-read-repo': 'リポジトリの読み込みに失敗しました',
+  'error.repo-membership-changing': 'リポジトリのワークツリーを変更しています',
   'error.ssh-config-changed': 'SSH 設定が変更されました',
+  'error.ssh-remote-command-start-unconfirmed':
+    'リモートコマンドが実行されたか確認できませんでした。再試行する前に、リモートリポジトリの状態と SSH サーバーの設定を確認してください。',
   'error.repository-boundary-unavailable': 'リポジトリの識別情報を確認できませんでした',
   'error.git-not-found': 'Git が見つかりません',
   'error.path-not-found': 'パスが見つかりません',
@@ -555,6 +558,10 @@ export const ja: Record<DictKey, string> = {
   'error.filetree-delete-directory-unsupported': 'ファイルツリーからごみ箱に移動できるのはファイルのみです',
   'error.trash-unavailable': 'システムのごみ箱を利用できません',
   'error.failed-trash-file': 'ファイルをごみ箱に移動できませんでした',
+  'error.git-command-cancelled-check-state':
+    'Git 操作はキャンセルされました。リポジトリの状態が変更された可能性があります。確認してから再試行してください。',
+  'error.git-command-timeout-check-state':
+    'Git 操作はタイムアウトしました。リポジトリの状態が変更された可能性があります。確認してから再試行してください。',
   'error.invalid-arguments': '無効な引数',
   'error.workspace-runtime-stale': 'ワークスペースランタイムが無効です',
   'error.workspace-target-stale': 'ワークスペースの対象が変更されました。もう一度お試しください。',
@@ -562,6 +569,18 @@ export const ja: Record<DictKey, string> = {
   'error.not-controller': 'このターミナルは他のセッションが制御しています',
   'error.network-op-in-progress': '別の git ネットワーク操作がすでに実行中です。',
   'error.request-timeout': 'リクエストがタイムアウトしました。もう一度お試しください。',
+  'error.worktree-create-timeout-check-state':
+    'ワークツリーの作成がタイムアウトしました。Git の状態が変更された可能性があります。再試行する前に対象のブランチとパスを確認してください。',
+  'error.worktree-remove-timeout-check-state':
+    'ワークツリーの削除がタイムアウトしました。Git の状態が変更された可能性があります。再試行する前にワークツリーを確認し、ワークスペースを再度開くか修復してください。',
+  'error.worktree-created-followup-failed':
+    'ワークツリーは作成されましたが、後続の処理に失敗しました。続行する前にワークツリーを確認し、ワークスペースを再度開くか修復してください。',
+  'error.worktree-removed-followup-failed':
+    'ワークツリーは削除されましたが、後続の処理に失敗しました。続行する前にワークスペースを再度開くか修復してください。',
+  'error.local-branch-deleted-followup-failed':
+    'ローカルブランチは削除されましたが、後続処理に失敗しました。再試行する前にリモートブランチを確認してください。',
+  'error.workspace-runtime-settlement-failed':
+    'ワークスペースランタイムの確定に失敗しました。Git の自動同期を停止しました。続行する前にワークスペースを再度開くか修復してください。',
   'error.branch-action-wait-timeout': 'リポジトリの更新完了待ちがタイムアウトしました。',
   'error.unknown': '不明なエラー',
   'error.cannot-delete-current-branch': '現在のブランチは削除できません',

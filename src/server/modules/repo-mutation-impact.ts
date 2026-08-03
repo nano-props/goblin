@@ -1,25 +1,50 @@
 import { compact } from 'es-toolkit'
-import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
+import type {
+  ExecResult,
+  ExecResultRecoveryMessageKey,
+  RepoMutationExecResult,
+  WorktreeInfo,
+} from '#/shared/git-types.ts'
 import { normalizeRemoteWorkspaceRef, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { formatWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
-export interface RepoMutationResult extends ExecResult {
-  /** Repo sessions whose snapshots changed, including partial failures after an earlier write. */
-  affectedRepoIds?: readonly WorkspaceId[]
-  /** Filesystem roots whose checked-out contents changed during the mutation. */
-  affectedWorktreePaths?: readonly string[]
+export interface RepoMutationResult extends RepoMutationExecResult {
+  /** Repo projections that must be invalidated, including uncertain or partially applied failures. */
+  repoIdsToInvalidate?: readonly WorkspaceId[]
+  /** Checked-out filesystem projections that must be invalidated. */
+  worktreePathsToInvalidate?: readonly string[]
 }
 
-export function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly WorkspaceId[]): RepoMutationResult {
-  const unique = Array.from(new Set(affectedRepoIds.filter((repoId) => repoId.length > 0)))
-  return unique.length > 0 ? { ...result, affectedRepoIds: unique } : result
+/** Append one recovery notice while preserving the server-selected order and uniqueness. */
+export function appendRepoMutationRecoveryMessageKey(
+  recoveryMessageKeys: readonly ExecResultRecoveryMessageKey[] | undefined,
+  recoveryMessageKey: ExecResultRecoveryMessageKey,
+): readonly ExecResultRecoveryMessageKey[] {
+  if (recoveryMessageKeys?.includes(recoveryMessageKey)) return recoveryMessageKeys
+  return [...(recoveryMessageKeys ?? []), recoveryMessageKey]
 }
 
-export function withAffectedRepoIdsIfChanged(
-  result: ExecResult,
-  affectedRepoIds: readonly WorkspaceId[],
-): RepoMutationResult {
-  return result.ok || result.repositoryStateChanged ? withAffectedRepoIds(result, affectedRepoIds) : result
+/** Preserve first occurrence order while removing duplicate recovery notices. */
+export function uniqueRepoMutationRecoveryMessageKeys(
+  recoveryMessageKeys: readonly ExecResultRecoveryMessageKey[],
+): readonly ExecResultRecoveryMessageKey[] {
+  return Array.from(new Set(recoveryMessageKeys))
+}
+
+/** Project an internal mutation result without exposing impact or milestone authority. */
+export function publicRepoMutationResult(result: RepoMutationResult): RepoMutationExecResult {
+  const publicResult: RepoMutationExecResult = { ok: result.ok, message: result.message }
+  if (result.recoveryMessageKeys?.length) publicResult.recoveryMessageKeys = result.recoveryMessageKeys
+  if (result.worktreeBootstrap) publicResult.worktreeBootstrap = result.worktreeBootstrap
+  return publicResult
+}
+
+export function withRepoIdsToInvalidate<T extends ExecResult>(
+  result: T,
+  repoIdsToInvalidate: readonly WorkspaceId[],
+): T & RepoMutationResult {
+  const unique = Array.from(new Set(repoIdsToInvalidate.filter((repoId) => repoId.length > 0)))
+  return unique.length > 0 ? { ...result, repoIdsToInvalidate: unique } : result
 }
 
 export function localWorktreeRepoIds(worktrees: readonly WorktreeInfo[]): WorkspaceId[] {

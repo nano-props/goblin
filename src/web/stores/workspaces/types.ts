@@ -1,5 +1,5 @@
 import type { StoreApi } from 'zustand'
-import type { ExecResult } from '#/web/types.ts'
+import type { RepoMutationExecResult } from '#/shared/git-types.ts'
 import type { RemoteWorkspaceConnectionLifecycle, WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type {
   BranchViewMode,
@@ -30,7 +30,7 @@ export interface RepoResultEventOptions {
 }
 
 export type RepoEvent =
-  | { id: number; kind: 'result'; result: ExecResult; action?: RepoEventAction }
+  | { id: number; kind: 'result'; result: RepoMutationExecResult; action?: RepoEventAction }
   | { id: number; kind: 'error'; message: string }
 
 /** Discriminated union: a successful open guarantees `workspaceId`; a failed
@@ -281,7 +281,7 @@ export interface GitWorkspacePreferenceActions {
 export interface GitWorkspaceClientActions extends GitWorkspacePreferenceActions {
   setLastResult: (
     id: WorkspaceId,
-    result: ExecResult,
+    result: RepoMutationExecResult,
     workspaceRuntimeId: string,
     options?: RepoResultEventOptions,
   ) => void
@@ -293,11 +293,7 @@ interface GitWorkspaceMutationActions {
     id: WorkspaceId,
     action: RepoBranchAction,
     options?: RunBranchActionOptions,
-  ) => Promise<ExecResult | null>
-  /** Fire-and-forget submission for branch actions whose UI should close
-   *  immediately and let Git activity/toasts carry completion. This only
-   *  triggers submission; callers should not treat it as accepted/completed. */
-  submitBranchAction: (id: WorkspaceId, action: RepoBranchAction, options?: RunBranchActionOptions) => void
+  ) => Promise<RepoMutationExecResult | null>
 }
 
 export interface WorkspacesStore

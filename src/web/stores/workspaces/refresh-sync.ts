@@ -11,7 +11,13 @@ import { canStartRemoteFetch } from '#/web/stores/workspaces/sync-state.ts'
 import { fetchRepo } from '#/web/repo-client.ts'
 import type { RepoOperationReason } from '#/web/stores/workspaces/operations.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
-import type { ExecResult } from '#/web/types.ts'
+import type { RepoMutationExecResult } from '#/shared/git-types.ts'
+
+export function refreshFailureMessage(result: RepoMutationExecResult): string | null {
+  if (result.ok) return null
+  if (result.message !== 'cancelled') return result.message
+  return result.recoveryMessageKeys?.[0] ?? null
+}
 
 export function createRefreshSyncHelpers(
   set: WorkspacesSet,
@@ -20,9 +26,9 @@ export function createRefreshSyncHelpers(
 ) {
   async function runNetworkTask(
     id: WorkspaceId,
-    task: (signal: AbortSignal) => Promise<ExecResult>,
+    task: (signal: AbortSignal) => Promise<RepoMutationExecResult>,
     options?: { workspaceRuntimeId?: string; reason?: RepoOperationReason; priority?: number },
-  ): Promise<ExecResult | null> {
+  ): Promise<RepoMutationExecResult | null> {
     const resolved = resolveActionWorkspaceRuntimeId(get, id, options?.workspaceRuntimeId)
     if (!resolved) return null
     const { repo: repoBefore, workspaceRuntimeId } = resolved
@@ -38,12 +44,12 @@ export function createRefreshSyncHelpers(
       canStart: canStartRemoteFetch,
       busyResult: { ok: false, message: 'error.network-op-in-progress' },
       task: (signal) => task(signal),
-      errorFromResult: (result) => (!result.ok && result.message !== 'cancelled' ? result.message : null),
+      errorFromResult: refreshFailureMessage,
       rethrow: true,
     })
   }
 
-  async function attemptFetch(id: WorkspaceId, workspaceRuntimeId: string): Promise<ExecResult | null> {
+  async function attemptFetch(id: WorkspaceId, workspaceRuntimeId: string): Promise<RepoMutationExecResult | null> {
     let repo = repoIfFresh(get, id, workspaceRuntimeId)
     if (!repo || !shouldAttemptFetch(repo, workspaceRuntimeId)) return null
     if (!canStartRemoteFetch(repo)) {
@@ -62,10 +68,13 @@ export function createRefreshSyncHelpers(
     }
   }
 
-  function finalizeSyncFetchResult(id: WorkspaceId, workspaceRuntimeId: string, fetchResult: ExecResult | null): void {
+  function finalizeSyncFetchResult(
+    id: WorkspaceId,
+    workspaceRuntimeId: string,
+    fetchResult: RepoMutationExecResult | null,
+  ): void {
     if (!fetchResult) return
-    if (fetchResult.ok) return
-    if (fetchResult.message !== 'cancelled') get().setLastResult(id, fetchResult, workspaceRuntimeId)
+    if (refreshFailureMessage(fetchResult)) get().setLastResult(id, fetchResult, workspaceRuntimeId)
   }
 
   async function runRefreshSyncPipeline(
@@ -73,16 +82,15 @@ export function createRefreshSyncHelpers(
     workspaceRuntimeId: string,
     signal: AbortSignal,
   ): Promise<void> {
-    let fetchResult: ExecResult | null = null
     const repoBeforeFetch = repoIfFresh(get, id, workspaceRuntimeId)
     if (!repoBeforeFetch) return
     if (shouldAttemptFetch(repoBeforeFetch, workspaceRuntimeId)) {
-      fetchResult = await attemptFetch(id, workspaceRuntimeId)
+      const fetchResult = await attemptFetch(id, workspaceRuntimeId)
+      finalizeSyncFetchResult(id, workspaceRuntimeId, fetchResult)
     }
     if (repoIfFresh(get, id, workspaceRuntimeId)) {
       await options.refreshReadModels(id, workspaceRuntimeId, signal)
     }
-    finalizeSyncFetchResult(id, workspaceRuntimeId, fetchResult)
   }
 
   return {

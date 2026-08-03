@@ -1,7 +1,7 @@
 import { produce, type Draft } from 'immer'
 import { isRemoteWorkspaceId, localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { emptyWorkspaceOperations } from '#/web/stores/workspaces/operations.ts'
-import type { ExecResult } from '#/web/types.ts'
+import type { RepoMutationExecResult } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type {
@@ -45,7 +45,7 @@ export function emptyGitWorkspaceClientState(): GitWorkspaceClientState {
   }
 }
 
-export function resultEvent(result: ExecResult, options?: RepoResultEventOptions): RepoEvent {
+export function resultEvent(result: RepoMutationExecResult, options?: RepoResultEventOptions): RepoEvent {
   return { id: nextEventId++, kind: 'result', result, action: options?.action }
 }
 

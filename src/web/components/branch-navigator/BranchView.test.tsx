@@ -222,6 +222,32 @@ describe('BranchView', () => {
     expect(screen.queryByLabelText('branches.dirty')).toBeNull()
   })
 
+  test('offers a neutral retry when the initial status read crosses a membership change', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    seedRepoQueryDataForTest(repo, {
+      branches: [createRepoBranch('main')],
+      currentBranch: 'main',
+    })
+    appQueryClient.removeQueries({
+      queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
+    })
+    const readStatus = vi.fn(async () => {
+      throw new Error('error.repo-membership-changing')
+    })
+    installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
+
+    renderBranchView()
+
+    expect((await screen.findByRole('status')).textContent).toContain('error.repo-membership-changing')
+    expect(screen.getByText('main')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('button', { name: 'error.try-again' })).toBeTruthy()
+  })
+
   test('keeps last-good branch status visible with a retryable stale warning', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -245,6 +271,32 @@ describe('BranchView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'error.try-again' }))
     await vi.waitFor(() => expect(readStatus).toHaveBeenCalledTimes(2))
     await vi.waitFor(() => expect(screen.queryByText('status.stale-title')).toBeNull())
+  })
+
+  test('keeps the last accepted projection with a neutral retry while worktree membership changes', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    seedRepoQueryDataForTest(repo, {
+      branches: [createRepoBranch('main')],
+      currentBranch: 'main',
+      status: [{ path: REPO_ID, branch: 'main', isMain: true, entries: [] }],
+    })
+    const readStatus = vi.fn(async () => {
+      throw new Error('error.repo-membership-changing')
+    })
+    installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
+
+    renderBranchView()
+
+    await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
+    expect(screen.getByText('main')).toBeTruthy()
+    expect(screen.queryByText('status.stale-title')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect((await screen.findByRole('status')).textContent).toContain('error.repo-membership-changing')
+    expect(screen.getByRole('button', { name: 'error.try-again' })).toBeTruthy()
   })
 })
 

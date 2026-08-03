@@ -23,7 +23,6 @@ import {
   pullRepoBranch,
   pushRepoBranch,
   removeCapturedRepoWorktree,
-  type RepoFilesystemMutationOutcome,
 } from '#/server/modules/repo-write-paths.ts'
 import { cloneRepo } from '#/server/modules/repo-clone-write.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
@@ -44,16 +43,20 @@ import type { RepoLogResponse } from '#/shared/api-types.ts'
 import { IpcError } from '#/shared/ipc-error.ts'
 import {
   requireCurrentWorkspaceRuntime,
+  runGitWorkspaceMutationRuntimeRequest,
   runGitWorkspaceRuntimeRequest,
 } from '#/server/modules/workspace-runtime-request.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { ServerRepoMutationHost } from '#/server/repo-mutation/repo-mutation-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
-import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
+import { DEFAULT_REPOSITORY_LOG_COUNT, type RepoMutationExecResult } from '#/shared/git-types.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { resolveRepoSource } from '#/server/modules/repo-source.ts'
+import { publicRepoMutationResult, type RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
+import { publishRepoMutationInvalidations } from '#/server/modules/repo-mutation-invalidation.ts'
+import type { RepoReadInvalidationDomain } from '#/shared/repo-read-invalidation.ts'
 
 export function createRepoRoutes(options: {
   worktreeRemovalApplication: ServerWorktreeRemovalHost
@@ -165,26 +168,11 @@ export function createRepoRoutes(options: {
   })
   app.post('/operations', async (c) => {
     const input = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
-    if ('cwd' in input) {
-      const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), input.cwd, input.workspaceRuntimeId)
-      assertGitCapability(userId, input.cwd, input.workspaceRuntimeId)
-      return c.json(
-        await runGitWorkspaceRuntimeRequest({
-          userId,
-          run: () =>
-            readRepoOperationsSnapshot(input.cwd, {
-              includeSettled: input.includeSettled,
-              workspaceRuntimeId: input.workspaceRuntimeId,
-              signal: c.req.raw.signal,
-            }),
-          label: 'operations',
-          signal: c.req.raw.signal,
-        }),
-      )
-    }
+    requireCurrentWorkspaceRuntime(userIdFromContext(c), input.cwd, input.workspaceRuntimeId)
     return c.json(
-      await readRepoOperationsSnapshot(undefined, {
+      await readRepoOperationsSnapshot(input.cwd, {
         includeSettled: input.includeSettled,
+        workspaceRuntimeId: input.workspaceRuntimeId,
         signal: c.req.raw.signal,
       }),
     )
@@ -194,8 +182,10 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceRuntimeRequest({
+      await runPublicRepoMutationRequest({
         userId,
+        workspaceId: cwd,
+        invalidatedDomains: ['metadata'],
         run: () => fetchRepo(cwd, 'user', c.req.raw.signal, workspaceRuntimeId),
         label: 'fetch',
         signal: c.req.raw.signal,
@@ -210,21 +200,26 @@ export function createRepoRoutes(options: {
     const { cwd, workspaceRuntimeId, branch, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
-    const result = await runGitWorkspaceRuntimeRequest({
+    const result = await runRepoMutationRequest({
       userId,
+      workspaceId: cwd,
+      invalidatedDomains: ['metadata', 'worktree-status'],
       run: () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal, { workspaceRuntimeId }),
       label: 'pull',
       signal: c.req.raw.signal,
     })
-    return c.json(publishPullFilesystemInvalidations(userId, cwd, workspaceRuntimeId, result))
+    publishPullFilesystemInvalidations(userId, cwd, workspaceRuntimeId, result)
+    return c.json(publicRepoMutationResult(result))
   })
   app.post('/push', async (c) => {
     const { cwd, workspaceRuntimeId, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceRuntimeRequest({
+      await runPublicRepoMutationRequest({
         userId,
+        workspaceId: cwd,
+        invalidatedDomains: ['metadata'],
         run: () => pushRepoBranch(cwd, branch, c.req.raw.signal, { workspaceRuntimeId }),
         label: 'push',
         signal: c.req.raw.signal,
@@ -239,8 +234,10 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceRuntimeRequest({
+      await runPublicRepoMutationRequest({
         userId,
+        workspaceId: cwd,
+        invalidatedDomains: ['metadata', 'worktree-status'],
         run: () =>
           createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
             workspaceRuntimeId,
@@ -259,15 +256,19 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceRuntimeRequest({
+      await runPublicRepoMutationRequest({
         userId,
+        workspaceId: cwd,
+        invalidatedDomains: ['metadata'],
         run: async () => {
           return await options.repoMutationApplication.deleteBranch(userId, {
             repoRoot: cwd,
             workspaceRuntimeId,
             branchName: branch,
             deleteBranch: async () =>
-              await deleteRepoBranch(cwd, branch, { force, deleteUpstream }, c.req.raw.signal, { workspaceRuntimeId }),
+              await deleteRepoBranch(cwd, branch, { force, deleteUpstream }, c.req.raw.signal, {
+                workspaceRuntimeId,
+              }),
           })
         },
         label: 'delete-branch',
@@ -281,8 +282,10 @@ export function createRepoRoutes(options: {
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
-      await runGitWorkspaceRuntimeRequest({
+      await runPublicRepoMutationRequest({
         userId,
+        workspaceId: cwd,
+        invalidatedDomains: ['metadata', 'worktree-status'],
         run: () =>
           options.worktreeRemovalApplication.removeWorktree(userId, {
             repoRoot: cwd,
@@ -352,7 +355,7 @@ export function createRepoRoutes(options: {
               const source = await resolveRepoSource(target.workspaceId, {
                 workspaceRuntimeId: target.workspaceRuntimeId,
               })
-              const snapshot = await source.getSnapshot(signal)
+              const snapshot = await source.getSnapshot({ signal })
               signal.throwIfAborted()
               if (snapshot?.remote.hasRemotes !== true) {
                 throw new IpcError({ code: 'BAD_REQUEST', message: 'error.no-remote-url' })
@@ -383,6 +386,27 @@ function requiredUserId(userId: string | null | undefined): string {
   return userId
 }
 
+interface RepoMutationRequest {
+  userId: string
+  workspaceId: WorkspaceId
+  invalidatedDomains: readonly RepoReadInvalidationDomain[]
+  run: () => Promise<RepoMutationResult>
+  label: string
+  signal?: AbortSignal
+}
+
+async function runRepoMutationRequest(input: RepoMutationRequest): Promise<RepoMutationResult> {
+  const mutation = await runGitWorkspaceMutationRuntimeRequest(input)
+  // Runtime settlement owns whether the remote workspace remains usable.
+  // Publish repository convergence only after that lifecycle decision commits.
+  publishRepoMutationInvalidations(input.workspaceId, mutation, input.invalidatedDomains)
+  return mutation
+}
+
+async function runPublicRepoMutationRequest(input: RepoMutationRequest): Promise<RepoMutationExecResult> {
+  return publicRepoMutationResult(await runRepoMutationRequest(input))
+}
+
 async function backgroundSyncResponse(userId: string) {
   return {
     ok: true as const,
@@ -406,11 +430,11 @@ function publishPullFilesystemInvalidations(
   userId: string,
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
-  outcome: RepoFilesystemMutationOutcome,
-) {
-  const { affectedWorktreePaths = [], ...result } = outcome
+  outcome: RepoMutationResult,
+): void {
+  const { worktreePathsToInvalidate = [] } = outcome
   const roots = new Set(
-    affectedWorktreePaths
+    worktreePathsToInvalidate
       .map((worktreePath) => workspaceLocatorForPath(workspaceId, worktreePath))
       .filter((root): root is WorkspaceId => root !== null),
   )
@@ -419,5 +443,4 @@ function publishPullFilesystemInvalidations(
       target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root },
     })
   }
-  return result
 }

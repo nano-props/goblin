@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   acquireWorkspaceRuntime,
   clearWorkspaceRuntimesForUser,
+  commitWorkspaceProbeState,
   closeWorkspaceRuntimesForDurableRemoval,
   failRemoteWorkspaceLifecycle,
   listWorkspaceRuntimes,
   releaseWorkspaceRuntime,
   runRemoteWorkspaceLifecycle,
+  workspaceRuntimeHasGitCapability,
 } from '#/server/modules/workspace-runtimes.ts'
 import type { RemoteWorkspaceConnectionResult, RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -89,6 +91,20 @@ describe('workspace runtime remote lifecycle', () => {
   test('ensure reuses the complete settled projection without resolving again', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     await runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, async () => ready)
+    commitWorkspaceProbeState({
+      userId,
+      workspaceId,
+      workspaceRuntimeId: runtimeId,
+      probe: {
+        status: 'ready',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
+      },
+    })
     const resolver = vi.fn(async () => ready)
 
     await expect(
@@ -488,6 +504,35 @@ describe('workspace runtime remote lifecycle', () => {
       attemptId: 2,
       reason: 'timeout',
     })
+  })
+
+  test('failed remote lifecycle closes server Git capability admission', async () => {
+    const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
+    await runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, async () => ready)
+    commitWorkspaceProbeState({
+      userId,
+      workspaceId,
+      workspaceRuntimeId: runtimeId,
+      probe: {
+        status: 'ready',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+        diagnostics: [],
+      },
+    })
+    expect(workspaceRuntimeHasGitCapability(userId, workspaceId, runtimeId)).toBe(true)
+
+    await failRemoteWorkspaceLifecycle({
+      userId,
+      workspaceId,
+      workspaceRuntimeId: runtimeId,
+      reason: 'unreachable',
+    })
+
+    expect(workspaceRuntimeHasGitCapability(userId, workspaceId, runtimeId)).toBe(false)
   })
 
   test('external failure preserves the last known remote target', async () => {

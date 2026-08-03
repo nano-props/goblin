@@ -244,22 +244,48 @@ describe('repo-client', () => {
     })
   })
 
-  test('times out long-running fetch requests with a stable error key', async () => {
+  test('preserves a membership read conflict without collapsing it into a repository failure', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    mockFetch(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ ok: false, code: 'BAD_REQUEST', message: 'error.repo-membership-changing' }),
+    }))
+    const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
+
+    await expect(getRepoWorktreeStatus(workspaceId, workspaceRuntimeId)).rejects.toThrow(
+      'error.repo-membership-changing',
+    )
+  })
+
+  test('leaves Git network deadlines to the server while preserving caller cancellation', async () => {
     useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const requestSignals: AbortSignal[] = []
     mockFetch((_url, init) => {
       const signal = (init as RequestInit | undefined)?.signal
+      if (signal) requestSignals.push(signal)
       return new Promise((_resolve, reject) => {
         signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
       })
     })
 
-    const { fetchRepo } = await import('#/web/repo-client.ts')
-    const request = fetchRepo(workspaceId, workspaceRuntimeId)
-    const assertion = expect(request).rejects.toThrow('error.request-timeout')
+    const { fetchRepo, pullRepoBranch, pushRepoBranch } = await import('#/web/repo-client.ts')
+    const controllers = [new AbortController(), new AbortController(), new AbortController()]
+    const requests = [
+      fetchRepo(workspaceId, workspaceRuntimeId, controllers[0]!.signal),
+      pullRepoBranch(workspaceId, workspaceRuntimeId, 'main', undefined, controllers[1]!.signal),
+      pushRepoBranch(workspaceId, workspaceRuntimeId, 'main', controllers[2]!.signal),
+    ]
+    const assertions = requests.map(async (request) => await expect(request).rejects.toThrow('caller cancelled'))
 
     await vi.advanceTimersByTimeAsync(240_000)
-    await assertion
+    expect(requestSignals).toHaveLength(3)
+    expect(requestSignals.every((signal) => !signal.aborted)).toBe(true)
+    expect(vi.getTimerCount()).toBe(0)
+
+    for (const controller of controllers) controller.abort(new Error('caller cancelled'))
+    await Promise.all(assertions)
   })
 
   test('rejects malformed repository responses at the client boundary', async () => {
@@ -298,9 +324,10 @@ describe('repo-client', () => {
     expect(new URL(String((fetchMock.mock.calls[0] as unknown as [unknown])[0])).pathname).toBe('/api/repo/clone')
   })
 
-  test('gives remove-worktree a multi-step mutation request budget', async () => {
+  test('does not impose a client watchdog on remove-worktree', async () => {
     useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const caller = new AbortController()
     let requestSignal: AbortSignal | undefined
     const requestStarted = Promise.withResolvers<void>()
     mockFetch((_url, init) => {
@@ -312,20 +339,86 @@ describe('repo-client', () => {
     })
 
     const { removeRepoWorktree } = await import('#/web/repo-client.ts')
-    const request = removeRepoWorktree(workspaceId, 'repo-runtime-test', {
-      branch: 'feature/remove',
-      worktreePath: '/tmp/repo-feature-remove',
-      deleteBranch: true,
-      deleteUpstream: true,
-    })
-    const assertion = expect(request).rejects.toThrow('error.request-timeout')
+    const request = removeRepoWorktree(
+      workspaceId,
+      'repo-runtime-test',
+      {
+        branch: 'feature/remove',
+        worktreePath: '/tmp/repo-feature-remove',
+        deleteBranch: true,
+        deleteUpstream: true,
+      },
+      caller.signal,
+    )
 
     await requestStarted.promise
     if (!requestSignal) throw new Error('missing remove-worktree request signal')
-    await vi.advanceTimersByTimeAsync(240_000)
+    await vi.advanceTimersByTimeAsync(10 * 60_000 + 1)
     expect(requestSignal.aborted).toBe(false)
-    await vi.advanceTimersByTimeAsync(360_000)
-    await assertion
+
+    caller.abort(new Error('caller cancelled'))
+    await expect(request).rejects.toThrow('caller cancelled')
+  })
+
+  test('does not reclassify caller cancellation as a create-worktree timeout', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const caller = new AbortController()
+    mockFetch((_url, init) => {
+      const signal = (init as RequestInit | undefined)?.signal
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    })
+
+    const { createRepoWorktree } = await import('#/web/repo-client.ts')
+    const request = createRepoWorktree(
+      workspaceId,
+      'repo-runtime-test',
+      {
+        worktreePath: '/tmp/repo-feature',
+        mode: { kind: 'newBranch', newBranch: 'feature/work', baseRef: 'main' },
+      },
+      { kind: 'skip' },
+      caller.signal,
+    )
+    caller.abort(new Error('caller cancelled'))
+
+    await expect(request).rejects.toThrow('caller cancelled')
+  })
+
+  test('does not impose the former client watchdog on create-worktree', async () => {
+    useFakeTimers()
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const caller = new AbortController()
+    let requestSignal: AbortSignal | undefined
+    const requestStarted = Promise.withResolvers<void>()
+    mockFetch((_url, init) => {
+      requestSignal = (init as RequestInit | undefined)?.signal ?? undefined
+      return new Promise((_resolve, reject) => {
+        requestSignal?.addEventListener('abort', () => reject(requestSignal?.reason), { once: true })
+        requestStarted.resolve()
+      })
+    })
+
+    const { createRepoWorktree } = await import('#/web/repo-client.ts')
+    const request = createRepoWorktree(
+      workspaceId,
+      'repo-runtime-test',
+      {
+        worktreePath: '/tmp/repo-feature',
+        mode: { kind: 'newBranch', newBranch: 'feature/work', baseRef: 'main' },
+      },
+      { kind: 'skip' },
+      caller.signal,
+    )
+
+    await requestStarted.promise
+    if (!requestSignal) throw new Error('missing create-worktree request signal')
+    await vi.advanceTimersByTimeAsync(15 * 60_000 + 1)
+    expect(requestSignal.aborted).toBe(false)
+
+    caller.abort(new Error('caller cancelled'))
+    await expect(request).rejects.toThrow('caller cancelled')
   })
 
   test('gives patch generation an explicit long-read request budget', async () => {

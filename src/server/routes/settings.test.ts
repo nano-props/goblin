@@ -2,8 +2,11 @@ import { Hono } from 'hono'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import type { restoreWorkspaceTabs as restoreWorkspaceTabsWrite } from '#/server/modules/workspace-tabs-restore.ts'
+import type { RestoreWorkspaceTabsInput } from '#/server/modules/workspace-tabs-restore.ts'
+import type { WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+
+type RestoreWorkspaceTabsWrite = (input: RestoreWorkspaceTabsInput) => Promise<WorkspaceTabsRestoreResult>
 
 const mocks = vi.hoisted(() => ({
   getServerExternalAppsSnapshot: vi.fn(),
@@ -17,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   handleSetWorkspaceExternalAppRecent: vi.fn(),
   handleUpdateUserSettings: vi.fn(),
   restoreServerWorkspace: vi.fn(),
-  restoreWorkspaceTabs: vi.fn<typeof restoreWorkspaceTabsWrite>(),
+  restoreWorkspaceTabs: vi.fn<RestoreWorkspaceTabsWrite>(),
   addServerWorkspaceEntry: vi.fn(),
   removeServerWorkspaceEntry: vi.fn(),
 }))

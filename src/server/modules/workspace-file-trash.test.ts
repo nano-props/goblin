@@ -47,7 +47,7 @@ beforeEach(() => {
     { path: '/tmp/repo-feature', branch: 'feature', isBare: false, isPrimary: false },
   ])
   mocks.lstat.mockResolvedValue({ isDirectory: () => false })
-  mocks.movePathToTrash.mockResolvedValue({ ok: true, message: 'ok', repositoryStateChanged: true })
+  mocks.movePathToTrash.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.remoteRuntimeAwareGitRunner.mockReturnValue(async () => ({ ok: true, stdout: '', stderr: '', code: 0 }))
   mocks.resolveRemoteWorktree.mockResolvedValue({
     path: '/srv/repo-feature',
@@ -75,7 +75,7 @@ describe('workspace file trash write layer', () => {
       'src/index.ts',
     )
 
-    expect(result).toEqual({ ok: true, message: 'ok', repositoryStateChanged: true })
+    expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.readWorktreeMembership).toHaveBeenCalledWith('/tmp/repo', undefined)
     expect(mocks.lstat).toHaveBeenCalledWith('/tmp/repo-feature/src/index.ts')
     expect(mocks.movePathToTrash).toHaveBeenCalledWith('/tmp/repo-feature/src/index.ts', undefined)
@@ -113,11 +113,11 @@ describe('workspace file trash write layer', () => {
       port: 22,
     }
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
-    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repositoryStateChanged: true })
+    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok' })
 
     const result = await trashWorkspaceFile(worktreeTarget(repoId, '/srv/repo-feature'), 'README.md')
 
-    expect(result).toEqual({ ok: true, message: 'ok', repositoryStateChanged: true })
+    expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/repo-feature', 'README.md', {
       run: expect.any(Function),
       signal: undefined,
@@ -161,14 +161,13 @@ describe('workspace file trash write layer', () => {
     const run = async () => ({ ok: true as const, stdout: '', stderr: '', code: 0 })
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(target)
     mocks.remoteRuntimeAwareGitRunner.mockReturnValueOnce(run)
-    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repositoryStateChanged: true })
+    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok' })
 
     await expect(
       trashWorkspaceFile(worktreeTarget(repoId, '/srv/repo-feature', workspaceRuntimeId), 'README.md'),
     ).resolves.toEqual({
       ok: true,
       message: 'ok',
-      repositoryStateChanged: true,
     })
 
     expect(mocks.resolveRemoteWorkspaceTarget).toHaveBeenCalledWith(repoId, { workspaceRuntimeId }, undefined)

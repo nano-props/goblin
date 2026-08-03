@@ -6,6 +6,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type * as RepoWritePaths from '#/server/modules/repo-write-paths.ts'
+import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 
 // No library fixture spans Git, SSH, settings, invalidation, and write-coordination boundaries.
 // Keep those module mocks shared while each suite owns one observable repository behavior.
@@ -134,6 +135,8 @@ const hoistedMocks = vi.hoisted(() => ({
   createRemoteWorktree: vi.fn(),
   deleteRemoteBranch: vi.fn(),
   fetchRemoteRepo: vi.fn(),
+  pullRemoteBranch: vi.fn(),
+  pushRemoteBranch: vi.fn(),
   getWorktreeBootstrapPreview: vi.fn(),
   getRemoteRepoWorktreePaths: vi.fn(),
   getRemoteSnapshot: vi.fn(),
@@ -146,8 +149,7 @@ const hoistedMocks = vi.hoisted(() => ({
   subscribeServerFetchInterval: vi.fn(),
   pruneServerWorkspaceSettingsForRemovedWorktree: vi.fn(),
   resolveRemoteTarget: vi.fn(),
-  trustServerWorkspaceWorktreeBootstrapConfig: vi.fn(),
-  untrustServerWorkspaceWorktreeBootstrapConfig: vi.fn(),
+  setServerWorkspaceWorktreeBootstrapConfigTrust: vi.fn(),
 }))
 
 vi.mock('#/system/git/branches.ts', () => ({
@@ -229,8 +231,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerFetchIntervalSec: hoistedMocks.getServerFetchIntervalSec,
   subscribeServerFetchInterval: hoistedMocks.subscribeServerFetchInterval,
   pruneServerWorkspaceSettingsForRemovedWorktree: hoistedMocks.pruneServerWorkspaceSettingsForRemovedWorktree,
-  trustServerWorkspaceWorktreeBootstrapConfig: hoistedMocks.trustServerWorkspaceWorktreeBootstrapConfig,
-  untrustServerWorkspaceWorktreeBootstrapConfig: hoistedMocks.untrustServerWorkspaceWorktreeBootstrapConfig,
+  setServerWorkspaceWorktreeBootstrapConfigTrust: hoistedMocks.setServerWorkspaceWorktreeBootstrapConfigTrust,
 }))
 
 vi.mock('#/system/ssh/config.ts', () => ({
@@ -256,8 +257,8 @@ vi.mock('#/system/ssh/git.ts', () => ({
   getRemoteStatus: vi.fn(),
   getRemoteTrackingBranches: vi.fn(),
   getRemoteWorktreeBootstrapPreview: hoistedMocks.getRemoteWorktreeBootstrapPreview,
-  pullRemoteBranch: vi.fn(),
-  pushRemoteBranch: vi.fn(),
+  pullRemoteBranch: hoistedMocks.pullRemoteBranch,
+  pushRemoteBranch: hoistedMocks.pushRemoteBranch,
   removeRemoteWorktree: hoistedMocks.removeRemoteWorktree,
 }))
 
@@ -273,10 +274,8 @@ vi.mock('#/server/modules/invalidation-broker.ts', () => ({
 export const mocks = hoistedMocks
 
 beforeEach(async () => {
-  const { resetRepoServerOperationRegistryForTests } = await import('#/server/modules/repo-operation-registry.ts')
   const { resetRepoWriteOperationCoordinatorForTests } =
     await import('#/server/modules/repo-write-operation-coordinator.ts')
-  resetRepoServerOperationRegistryForTests()
   resetRepoWriteOperationCoordinatorForTests()
   vi.clearAllMocks()
   hoistedMocks.checkGitAvailable.mockResolvedValue({ ok: true, message: '' })
@@ -285,11 +284,12 @@ beforeEach(async () => {
   hoistedMocks.fsMkdir.mockResolvedValue(undefined)
   hoistedMocks.fsRealpath.mockImplementation(async (cwd: string) => cwd)
   hoistedMocks.isGitRepo.mockResolvedValue(true)
-  hoistedMocks.pullBranch.mockResolvedValue({ ok: true, message: 'ok' })
-  hoistedMocks.pushBranch.mockResolvedValue({ ok: true, message: 'ok' })
+  hoistedMocks.fetchAll.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'fetched' }))
+  hoistedMocks.pullBranch.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
+  hoistedMocks.pushBranch.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
   hoistedMocks.cloneGitRepo.mockResolvedValue({ ok: true, message: 'ok', path: '/tmp/repo' })
-  hoistedMocks.createWorktree.mockResolvedValue({ ok: true, message: 'ok' })
-  hoistedMocks.createRemoteWorktree.mockResolvedValue({ ok: true, message: 'ok' })
+  hoistedMocks.createWorktree.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
+  hoistedMocks.createRemoteWorktree.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
   hoistedMocks.bootstrapWorktreeAfterCreate.mockResolvedValue({ ok: true, message: '' })
   hoistedMocks.bootstrapRemoteWorktreeAfterCreate.mockResolvedValue({ ok: true, message: '' })
   hoistedMocks.getWorktreeBootstrapPreview.mockResolvedValue({
@@ -331,14 +331,15 @@ beforeEach(async () => {
       displayName: 'prod:repo',
     },
   })
-  hoistedMocks.trustServerWorkspaceWorktreeBootstrapConfig.mockResolvedValue([])
-  hoistedMocks.untrustServerWorkspaceWorktreeBootstrapConfig.mockResolvedValue(true)
-  hoistedMocks.deleteBranch.mockResolvedValue({ ok: true, message: 'ok' })
-  hoistedMocks.deleteUpstreamBranch.mockResolvedValue({ ok: true, message: 'ok' })
-  hoistedMocks.removeWorktree.mockResolvedValue({ ok: true, message: 'ok' })
+  hoistedMocks.setServerWorkspaceWorktreeBootstrapConfigTrust.mockResolvedValue(true)
+  hoistedMocks.deleteBranch.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
+  hoistedMocks.deleteUpstreamBranch.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
+  hoistedMocks.removeWorktree.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
   hoistedMocks.deleteRemoteBranch.mockResolvedValue({ ok: true, message: 'ok' })
-  hoistedMocks.removeRemoteWorktree.mockResolvedValue({ ok: true, message: 'ok' })
-  hoistedMocks.fetchRemoteRepo.mockResolvedValue({ ok: true, message: 'fetched' })
+  hoistedMocks.removeRemoteWorktree.mockResolvedValue({ ok: true, message: 'ok', worktreeRemoved: true })
+  hoistedMocks.fetchRemoteRepo.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'fetched' }))
+  hoistedMocks.pullRemoteBranch.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
+  hoistedMocks.pushRemoteBranch.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
   hoistedMocks.getRemoteRepoWorktreePaths.mockResolvedValue([])
   hoistedMocks.resolveRemoteRepoCommonDir.mockImplementation(
     async (target: { remotePath: string }) => target.remotePath,
@@ -431,4 +432,13 @@ export function expectRepoMetadataInvalidations(...events: TestRepoMetadataInval
 
 export function expectNoRepoMetadataInvalidations(): void {
   expectRepoMetadataInvalidations()
+}
+
+export function expectRepoOperationSettledBeforeProjectionInvalidation(): void {
+  const domains = repoReadInvalidationEvents().map((event) => event.domain)
+  const firstProjectionInvalidation = domains.findIndex((domain) => domain !== 'operations')
+  const finalOperationInvalidation = domains.lastIndexOf('operations')
+  expect(firstProjectionInvalidation).toBeGreaterThanOrEqual(0)
+  expect(finalOperationInvalidation).toBeGreaterThanOrEqual(0)
+  expect(finalOperationInvalidation).toBeLessThan(firstProjectionInvalidation)
 }

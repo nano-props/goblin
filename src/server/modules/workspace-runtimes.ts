@@ -54,6 +54,12 @@ export interface WorkspaceRuntimeClosedEvent {
   workspaceRuntimeId: string
 }
 
+export interface WorkspaceRuntimeFailedEvent {
+  userId: string
+  workspaceId: WorkspaceId
+  workspaceRuntimeId: string
+}
+
 export interface WorkspaceRuntimeMembershipAcquiredEvent {
   userId: string
   clientId: string
@@ -93,6 +99,7 @@ export type RemoteWorkspaceLifecycleFailResult =
 
 const workspaceRuntimesByUser = new Map<string, Map<WorkspaceId, WorkspaceRuntimeState>>()
 const workspaceRuntimeClosedListeners = new Set<(event: WorkspaceRuntimeClosedEvent) => void>()
+const workspaceRuntimeFailedListeners = new Set<(event: WorkspaceRuntimeFailedEvent) => void>()
 const workspaceRuntimeMembershipAcquiredListeners = new Set<(event: WorkspaceRuntimeMembershipAcquiredEvent) => void>()
 const workspaceRuntimeMembershipReleasedListeners = new Set<(event: WorkspaceRuntimeMembershipReleasedEvent) => void>()
 const workspaceRuntimeAdmissionTails = new Map<string, Promise<void>>()
@@ -461,6 +468,7 @@ export function workspaceRuntimeHasGitCapability(
   workspaceRuntimeId: string,
 ): boolean {
   const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
+  if (isRemoteWorkspaceId(workspaceId) && state?.remoteLifecycle.kind !== 'ready') return false
   return (
     state?.currentWorkspaceRuntimeId === workspaceRuntimeId &&
     state.pendingWorkspaceProbeTransition === null &&
@@ -657,6 +665,11 @@ export async function failRemoteWorkspaceLifecycle(input: {
       ...(target ? { target } : {}),
     }
     notifyRemoteLifecycleTransition(input.onTransition ?? (() => {}), state.remoteLifecycle, input.workspaceId)
+    emitWorkspaceRuntimeFailed({
+      userId: input.userId,
+      workspaceId: input.workspaceId,
+      workspaceRuntimeId: input.workspaceRuntimeId,
+    })
     return {
       kind: 'settled',
       lifecycle: state.remoteLifecycle,
@@ -819,6 +832,11 @@ async function commitRemoteWorkspaceLifecycleTerminal(input: {
       }
       clearRemoteWorkspaceAttempt(state)
       notifyRemoteLifecycleTransition(input.onTransition, state.remoteLifecycle, input.workspaceId)
+      emitWorkspaceRuntimeFailed({
+        userId: input.userId,
+        workspaceId: input.workspaceId,
+        workspaceRuntimeId: input.workspaceRuntimeId,
+      })
       throw error
     }
     if (!remoteAttemptMayCommit(input)) return null
@@ -827,6 +845,13 @@ async function commitRemoteWorkspaceLifecycleTerminal(input: {
     state.pendingWorkspaceProbeTransition = null
     const settled = settledRemoteWorkspaceLifecycleResult(state.remoteLifecycle, state.workspaceProbe)
     notifyRemoteLifecycleTransition(input.onTransition, settled.lifecycle, input.workspaceId)
+    if (settled.lifecycle.kind === 'failed') {
+      emitWorkspaceRuntimeFailed({
+        userId: input.userId,
+        workspaceId: input.workspaceId,
+        workspaceRuntimeId: input.workspaceRuntimeId,
+      })
+    }
     return settled
   })
 }
@@ -934,6 +959,13 @@ export function onWorkspaceRuntimeClosed(listener: (event: WorkspaceRuntimeClose
   }
 }
 
+export function onWorkspaceRuntimeFailed(listener: (event: WorkspaceRuntimeFailedEvent) => void): () => void {
+  workspaceRuntimeFailedListeners.add(listener)
+  return () => {
+    workspaceRuntimeFailedListeners.delete(listener)
+  }
+}
+
 export function onWorkspaceRuntimeMembershipAcquired(
   listener: (event: WorkspaceRuntimeMembershipAcquiredEvent) => void,
 ): () => void {
@@ -958,6 +990,16 @@ function emitWorkspaceRuntimeClosed(event: WorkspaceRuntimeClosedEvent): void {
       listener(event)
     } catch (err) {
       workspaceRuntimeLogger.warn({ err, workspaceId: event.workspaceId }, 'workspace runtime close listener failed')
+    }
+  }
+}
+
+function emitWorkspaceRuntimeFailed(event: WorkspaceRuntimeFailedEvent): void {
+  for (const listener of workspaceRuntimeFailedListeners) {
+    try {
+      listener(event)
+    } catch (err) {
+      workspaceRuntimeLogger.warn({ err, workspaceId: event.workspaceId }, 'workspace runtime failure listener failed')
     }
   }
 }

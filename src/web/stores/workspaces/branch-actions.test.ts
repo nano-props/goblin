@@ -767,30 +767,6 @@ describe('runBranchAction', () => {
     },
   )
 
-  test('submitBranchAction starts create worktree without waiting for completion', async () => {
-    let release!: () => void
-    installGoblinTestBridge({
-      'repo.createWorktree': () =>
-        new Promise((resolve) => {
-          release = () => resolve({ ok: true, message: 'ok' })
-        }),
-    })
-
-    useWorkspacesStore.getState().submitBranchAction(REPO_ID, createWorktreeAction())
-
-    expect(
-      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations
-        .branchAction,
-    ).toMatchObject({
-      phase: 'running',
-      reason: 'branch:createWorktree',
-      target: 'feature/new',
-    })
-
-    release()
-    await flushAsyncWork()
-  })
-
   test('records branch action metadata on result events', async () => {
     installGoblinTestBridge({
       'repo.createWorktree': async () => ({ ok: false, message: 'error.invalid-path' }),
@@ -809,6 +785,31 @@ describe('runBranchAction', () => {
         kind: 'createWorktree',
         branch: 'feature/new',
         worktreePath: '/tmp/goblin-branch-actions-test-worktree',
+      },
+    })
+  })
+
+  test('does not suppress a cancelled follow-up that carries recovery guidance', async () => {
+    installGoblinTestBridge({
+      'repo.createWorktree': async () => ({
+        ok: false,
+        message: 'cancelled',
+        recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+      }),
+    })
+
+    await useWorkspacesStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), {
+      workspaceRuntimeId: 'repo-runtime-test',
+    })
+
+    expect(
+      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.events.at(-1),
+    ).toMatchObject({
+      kind: 'result',
+      result: {
+        ok: false,
+        message: 'cancelled',
+        recoveryMessageKeys: ['error.worktree-created-followup-failed'],
       },
     })
   })

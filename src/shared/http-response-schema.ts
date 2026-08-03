@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import type { ExecResult } from '#/shared/git-types.ts'
+import { EXEC_RESULT_RECOVERY_MESSAGE_KEYS, type ExecResult, type RepoMutationExecResult } from '#/shared/git-types.ts'
 
 const NonNegativeIntegerSchema = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0))
 const WorktreeBootstrapPathSummarySchema = v.strictObject({
@@ -18,9 +18,19 @@ export const WorktreeBootstrapSummaryResponseSchema = v.strictObject({
 export const ExecResultResponseSchema = v.strictObject({
   ok: v.boolean(),
   message: v.string(),
-  repositoryStateChanged: v.optional(v.boolean()),
-  worktreeBootstrap: v.optional(WorktreeBootstrapSummaryResponseSchema),
 }) satisfies v.GenericSchema<ExecResult>
+
+export const RepoMutationExecResultResponseSchema = v.strictObject({
+  ...ExecResultResponseSchema.entries,
+  recoveryMessageKeys: v.optional(
+    v.pipe(
+      v.array(v.picklist(EXEC_RESULT_RECOVERY_MESSAGE_KEYS)),
+      v.maxLength(EXEC_RESULT_RECOVERY_MESSAGE_KEYS.length),
+      v.check((keys) => new Set(keys).size === keys.length, 'duplicate recovery message keys'),
+    ),
+  ),
+  worktreeBootstrap: v.optional(WorktreeBootstrapSummaryResponseSchema),
+}) satisfies v.GenericSchema<RepoMutationExecResult>
 
 export function decodeWith<TSchema extends v.BaseSchema<unknown, unknown, v.BaseIssue<unknown>>>(schema: TSchema) {
   return (value: unknown): v.InferOutput<TSchema> => {

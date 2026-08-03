@@ -11,6 +11,7 @@ import {
   ensureSshControlDirectory,
   type RemoteCommandInvocation,
 } from '#/system/ssh/invocation.ts'
+import { REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS } from '#/system/ssh/worktree-bootstrap-protocol.ts'
 
 const SSH_COMMAND_TIMEOUT_MS = 15_000
 /** Boot-probe timeout for the placeholder-tab hydrate path. Shorter than
@@ -76,6 +77,10 @@ export interface RemoteCommandResult {
   message?: string
   timedOut?: boolean
   remoteStarted?: boolean
+  /** SSH exited successfully without proving that the Goblin remote command started. */
+  remoteStartUnconfirmed?: true
+  /** Locally authoritative proof that SSH was not invoked. */
+  commandNotStarted?: true
   transportStderr?: string
 }
 
@@ -102,7 +107,9 @@ export async function runRemoteCommand(
   command: RemoteCommandKind,
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<RemoteCommandResult> {
-  if (options?.signal?.aborted) return { ok: false, stdout: '', stderr: '', message: 'cancelled' }
+  if (options?.signal?.aborted) {
+    return { ok: false, stdout: '', stderr: '', message: 'cancelled', commandNotStarted: true }
+  }
   const invocation = buildCanonicalSshInvocation(target, commandStartedMarkerScript(scriptForCommand(command)), [
     '-T',
     '-o',
@@ -111,7 +118,20 @@ export async function runRemoteCommand(
   // Ensure the ControlMaster socket directory exists. ssh will refuse to
   // create a control socket in a missing directory, which on a fresh
   // install manifests as every probe failing before the handshake.
-  await ensureSshControlDirectory()
+  try {
+    await ensureSshControlDirectory()
+  } catch (err) {
+    return {
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: errorMessage(err),
+      commandNotStarted: true,
+    }
+  }
+  if (options?.signal?.aborted) {
+    return { ok: false, stdout: '', stderr: '', message: 'cancelled', commandNotStarted: true }
+  }
   try {
     const { stdout, stderr } = await execa(invocation.command, invocation.args, {
       timeout: options?.timeoutMs ?? SSH_COMMAND_TIMEOUT_MS,
@@ -120,6 +140,16 @@ export async function runRemoteCommand(
       maxBuffer: 2 * 1024 * 1024,
     })
     const parsed = parseRemoteCommandOutput(stdout, stderr)
+    if (!parsed.remoteStarted) {
+      return {
+        ok: false,
+        stdout: parsed.stdout,
+        stderr: parsed.stderr,
+        message: 'remote command execution could not be confirmed',
+        remoteStarted: false,
+        remoteStartUnconfirmed: true,
+      }
+    }
     return { ok: true, stdout: parsed.stdout, stderr: parsed.stderr, remoteStarted: parsed.remoteStarted }
   } catch (err) {
     const e = err as { stdout?: unknown; stderr?: unknown; timedOut?: boolean; isCanceled?: boolean; message?: string }
@@ -149,6 +179,15 @@ export async function runRemoteCommand(
         ...transport,
       }
     }
+    if (err instanceof ExecaError && isProcessStartFailure(err)) {
+      return {
+        ok: false,
+        stdout: parsed.stdout,
+        stderr: parsed.stderr,
+        message: parsed.stderr || parsed.transportStderr || e.message || 'unknown',
+        commandNotStarted: true,
+      }
+    }
     return {
       ok: false,
       stdout: parsed.stdout,
@@ -158,6 +197,15 @@ export async function runRemoteCommand(
       ...transport,
     }
   }
+}
+
+function isProcessStartFailure(error: ExecaError): boolean {
+  if (error.exitCode !== undefined || error.signal !== undefined) return false
+  return error.code === 'ENOENT' || error.code === 'EACCES' || error.code === 'ENOEXEC'
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 function commandStartedMarkerScript(script: string): string {
@@ -480,7 +528,7 @@ function remoteTrashFileScript(worktreePath: string, filePath: string): string {
   return [
     `cd -- ${worktree}`,
     `if [ ! -e ${file} ] && [ ! -L ${file} ]; then printf '%s\\n' 'error.file-not-found' >&2; exit 65; fi`,
-    `if [ -d ${file} ]; then printf '%s\\n' 'error.filetree-delete-directory-unsupported' >&2; exit 66; fi`,
+    `if [ -d ${file} ] && [ ! -L ${file} ]; then printf '%s\\n' 'error.filetree-delete-directory-unsupported' >&2; exit 66; fi`,
     `if command -v gio >/dev/null 2>&1; then exec gio trash -- ${file}; fi`,
     `if command -v trash-put >/dev/null 2>&1; then exec trash-put -- ${file}; fi`,
     `if command -v kioclient6 >/dev/null 2>&1; then exec kioclient6 move ${file} trash:/; fi`,
@@ -503,7 +551,7 @@ function remoteDirectoryChildrenScript(rootPath: string, prefix: string | undefi
     'shift',
     'for entry do',
     '  rel=${entry#"$root"/}',
-    '  if [ -d "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
+    '  if [ -d "$entry" ] && [ ! -L "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
     'done',
     '\' sh "$root" {} +',
   ].join('\n')
@@ -525,7 +573,7 @@ function remoteGitDirectoryChildrenScript(rootPath: string, prefix: string | und
     '  if git -C "$root" check-ignore -q -- "$rel"; then',
     '    git -C "$root" ls-files -- "$rel" | IFS= read -r _tracked || continue',
     '  fi',
-    '  if [ -d "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
+    '  if [ -d "$entry" ] && [ ! -L "$entry" ]; then printf "%s/\\0" "$rel"; else printf "%s\\0" "$rel"; fi',
     'done',
     '\' sh "$root" {} +',
   ].join('\n')
@@ -588,6 +636,10 @@ function remoteBootstrapScript(command: Extract<RemoteCommandKind, { type: 'boot
   ].join('\n')
 }
 
+function bootstrapPatternRequiresGlobstar(pattern: string): boolean {
+  return pattern.split('/').some((segment) => segment === '**')
+}
+
 function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 'bootstrapRemoteWorktree' }>): string {
   const quote = shellQuote
   const copy = command.copy.map(quote).join(' ')
@@ -597,11 +649,17 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
   const setup = command.setup ? quote(command.setup) : "''"
   const sourceRoot = quote(command.sourceRoot)
   const targetRoot = quote(command.targetRoot)
+  const patterns = [...command.copy, ...command.symlink, ...command.hardlink, ...command.exclude]
+  const requiresGlobstar = patterns.some(bootstrapPatternRequiresGlobstar)
 
   const lines: string[] = [
     'set -o pipefail',
     'shopt -s nullglob dotglob',
-    'shopt -s globstar 2>/dev/null || true',
+    ...(requiresGlobstar
+      ? [
+          'shopt -s globstar 2>/dev/null || { printf "%s\\n" "error: remote bash does not support ** glob patterns" >&2; exit 1; }',
+        ]
+      : []),
     '',
     'SOURCE_ROOT=' + sourceRoot,
     'TARGET_ROOT=' + targetRoot,
@@ -901,7 +959,7 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     'copy_item() {',
     '  local rel="$1"',
     '  copy_tree "$rel"',
-    '  printf \'GOBLIN_BOOTSTRAP_COPY %s\\n\' "$rel"',
+    `  printf '%s\\0%s\\0' '${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS.copy}' "$rel"`,
     '}',
     '',
     'symlink_item() {',
@@ -915,7 +973,7 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '  mkdir -p -- "$(dirname "$dst")" || die "failed to symlink $rel"',
     '  if target_parent_has_symlink "$rel"; then die "bootstrap target path uses symlink parent: $SYMLINK_PARENT"; fi',
     '  ln -s -- "$src" "$dst" || die "failed to symlink $rel"',
-    '  printf \'GOBLIN_BOOTSTRAP_SYMLINK %s\\n\' "$rel"',
+    `  printf '%s\\0%s\\0' '${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS.symlink}' "$rel"`,
     '}',
     '',
     'hardlink_item() {',
@@ -930,15 +988,18 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '  mkdir -p -- "$(dirname "$dst")" || die "failed to hardlink $rel"',
     '  if target_parent_has_symlink "$rel"; then die "bootstrap target path uses symlink parent: $SYMLINK_PARENT"; fi',
     '  ln -- "$src" "$dst" || die "failed to hardlink $rel"',
-    '  printf \'GOBLIN_BOOTSTRAP_HARDLINK %s\\n\' "$rel"',
+    `  printf '%s\\0%s\\0' '${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS.hardlink}' "$rel"`,
     '}',
     '',
+    // Publish missing paths only after the whole preflight succeeds. A
+    // preflight error has no materialization side effect, so partial planning
+    // observations are not a bootstrap completion summary.
+    'for rel in "${MISSING_PATHS[@]}"; do',
+    `  printf '%s\\0%s\\0' '${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS.missing}' "$rel"`,
+    'done',
     'for rel in "${READY_COPY_PATHS[@]}"; do copy_item "$rel"; done',
     'for rel in "${READY_SYMLINK_PATHS[@]}"; do symlink_item "$rel"; done',
     'for rel in "${READY_HARDLINK_PATHS[@]}"; do hardlink_item "$rel"; done',
-    'for rel in "${MISSING_PATHS[@]}"; do',
-    '  printf \'GOBLIN_BOOTSTRAP_MISSING %s\\n\' "$rel"',
-    'done',
     '',
     'if [ -n "$SETUP" ]; then',
     '  SETUP_LOG="$(mktemp "${TMPDIR:-/tmp}/goblin-bootstrap-setup.XXXXXX")" || die "failed to create setup log"',
@@ -947,7 +1008,7 @@ function remoteBootstrapInnerScript(command: Extract<RemoteCommandKind, { type: 
     '    tail -c 8192 "$SETUP_LOG" >&2 || true',
     '    exit 1',
     '  fi',
-    '  printf \'GOBLIN_BOOTSTRAP_SETUP %s\\n\' "$SETUP"',
+    `  printf '%s\\0%s\\0' '${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS.setup}' "$SETUP"`,
     'fi',
   ]
   return lines.join('\n')

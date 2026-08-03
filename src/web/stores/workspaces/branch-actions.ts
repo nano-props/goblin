@@ -22,7 +22,7 @@ import {
   isNetworkBranchActionKind,
 } from '#/web/stores/workspaces/branch-action-scheduler.ts'
 import type { RepoEventAction, WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
-import type { ExecResult } from '#/web/types.ts'
+import type { RepoMutationExecResult } from '#/shared/git-types.ts'
 import {
   createRepoWorktree,
   deleteRepoBranch,
@@ -32,6 +32,7 @@ import {
 } from '#/web/repo-client.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
+import { isSilentBranchActionCancellation } from '#/web/stores/workspaces/branch-action-result.ts'
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
 const BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE = 'error.branch-action-wait-timeout'
@@ -137,16 +138,22 @@ function throwIfStale(get: WorkspacesGet, id: WorkspaceId, workspaceRuntimeId: s
   if (get().workspaces[id]?.workspaceRuntimeId !== workspaceRuntimeId) throw new RepoOperationCancelledError()
 }
 
-function branchActionErrorFromResult(result: ExecResult): string | null {
-  return !result.ok && result.message !== 'cancelled' ? result.message : null
+function branchActionErrorFromResult(result: RepoMutationExecResult): string | null {
+  if (result.ok) return null
+  if (isSilentBranchActionCancellation(result)) return null
+  if (result.message !== 'cancelled') return result.message
+  return result.recoveryMessageKeys?.[0] ?? null
 }
 
-function branchActionErrorResult(message: string): ExecResult {
+function branchActionErrorResult(message: string): RepoMutationExecResult {
   return { ok: false, message }
 }
 
-function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: RunBranchActionOptions): boolean {
-  if (result.message === 'cancelled') return true
+function shouldSuppressBranchActionResultMessage(
+  result: RepoMutationExecResult,
+  options?: RunBranchActionOptions,
+): boolean {
+  if (isSilentBranchActionCancellation(result)) return true
   if (options?.deferResultMessages?.includes(result.message)) return true
   return false
 }
@@ -156,7 +163,7 @@ function runBranchActionIpc(
   repoId: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
-): Promise<ExecResult> {
+): Promise<RepoMutationExecResult> {
   switch (action.kind) {
     case 'pull':
       return pullRepoBranch(repoId, workspaceRuntimeId, action.branch, action.worktreePath, signal)
@@ -192,18 +199,11 @@ function runBranchActionIpc(
 
 export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
   return {
-    submitBranchAction(id: WorkspaceId, action: RepoBranchAction, options?: RunBranchActionOptions): void {
-      const repo = get().workspaces[id]
-      const workspaceRuntimeId = options?.workspaceRuntimeId ?? repo?.workspaceRuntimeId
-      if (!repo || repo.workspaceRuntimeId !== workspaceRuntimeId || !isGitWorkspace(repo)) return
-      void get().runBranchAction(id, action, options)
-    },
-
     async runBranchAction(
       id: WorkspaceId,
       action: RepoBranchAction,
       options?: RunBranchActionOptions,
-    ): Promise<ExecResult | null> {
+    ): Promise<RepoMutationExecResult | null> {
       const repoBefore = get().workspaces[id]
       if (!repoBefore || !isGitWorkspace(repoBefore)) return null
       const workspaceRuntimeId = options?.workspaceRuntimeId ?? repoBefore.workspaceRuntimeId
@@ -223,7 +223,7 @@ export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
         get().setLastResult(id, result, workspaceRuntimeId)
         return result
       }
-      const handleResult = async (result: ExecResult) => {
+      const handleResult = async (result: RepoMutationExecResult) => {
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
           get().setLastResult(id, result, workspaceRuntimeId, { action: branchActionEventAction(action) })
         }

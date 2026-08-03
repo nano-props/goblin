@@ -42,4 +42,67 @@ describe('git cancellation decoding', () => {
 
     await expect(git('/tmp/repository', ['status'])).rejects.toBe(failure)
   })
+
+  test('reports an aborted command as not started when cancellation predates invocation', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const { gitCommandResultWithOptions } = await import('#/system/git/git-exec.ts')
+
+    const outcome = await gitCommandResultWithOptions('/tmp/repository', { signal: controller.signal }, 'status')
+
+    expect(outcome).toEqual({
+      result: { ok: false, message: 'cancelled' },
+      execution: { status: 'not-started' },
+    })
+    expect(mocks.execa).not.toHaveBeenCalled()
+  })
+
+  test('reports cancellation observed after process start as cancelled execution', async () => {
+    const controller = new AbortController()
+    mocks.execa.mockImplementationOnce(
+      (_command: string, _args: string[], options: { cancelSignal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options.cancelSignal?.addEventListener('abort', () => reject(new Error('transport closed')), { once: true })
+        }),
+    )
+    const { gitCommandResultWithOptions } = await import('#/system/git/git-exec.ts')
+    const pending = gitCommandResultWithOptions('/tmp/repository', { signal: controller.signal }, 'status')
+    controller.abort()
+
+    await expect(pending).resolves.toEqual({
+      result: { ok: false, message: 'cancelled' },
+      execution: { status: 'cancelled' },
+    })
+  })
+
+  test('reports an ordinary post-start rejection as failed execution', async () => {
+    mocks.execa.mockRejectedValueOnce(new Error('git failed'))
+    const { gitCommandResultWithOptions } = await import('#/system/git/git-exec.ts')
+
+    const outcome = await gitCommandResultWithOptions('/tmp/repository', undefined, 'status')
+
+    expect(outcome).toEqual({
+      result: { ok: false, message: 'git failed' },
+      execution: { status: 'failed' },
+    })
+  })
+
+  test('reports a provable process start failure as not started', async () => {
+    const { ExecaError } = await import('execa')
+    const failure = Object.assign(new ExecaError(), {
+      message: 'git executable was not found',
+      code: 'ENOENT',
+      exitCode: undefined,
+      signal: undefined,
+    })
+    mocks.execa.mockRejectedValueOnce(failure)
+    const { gitCommandResultWithOptions } = await import('#/system/git/git-exec.ts')
+
+    const outcome = await gitCommandResultWithOptions('/tmp/repository', undefined, 'status')
+
+    expect(outcome).toEqual({
+      result: { ok: false, message: 'git executable was not found' },
+      execution: { status: 'not-started' },
+    })
+  })
 })

@@ -35,6 +35,7 @@ const toastMocks = vi.hoisted(() => ({
 const i18nMocks = vi.hoisted(() => ({
   dict: {
     'action.create-worktree-created-title': 'Created worktree',
+    'error.worktree-created-followup-failed': 'The worktree was created, but saving trust failed.',
     'worktree-bootstrap.summary.copy-one': 'Copied {count} path: {paths}{moreSuffix}',
     'worktree-bootstrap.summary.copy-other': 'Copied {count} paths: {paths}{moreSuffix}',
     'worktree-bootstrap.summary.skipped-missing-one': 'Skipped missing {count} path: {paths}{moreSuffix}',
@@ -88,6 +89,37 @@ describe('useRepoToasts', () => {
     expect(String(options.description.props.children)).toContain('Copied 1 path: .env.local')
     expect(String(options.description.props.children)).toContain('Skipped missing 1 path: missing.env')
     expect(String(options.description.props.children)).toContain('Ran setup: bun install')
+  })
+
+  test('shows the recovery message before bootstrap details on create-worktree failure', async () => {
+    const workspaceRuntimeId = seedRepoShellForTest({
+      id: REPO_ID,
+      workspaceProbe: createGitWorkspaceProbeForTest(),
+    }).workspaceRuntimeId
+    useWorkspacesStore.getState().setLastResult(
+      REPO_ID,
+      {
+        ok: false,
+        message: 'setup exited with status 1',
+        recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+        worktreeBootstrap: {
+          copy: { count: 1, paths: ['.env.local'] },
+          symlink: { count: 0, paths: [] },
+          hardlink: { count: 0, paths: [] },
+          skippedMissing: { count: 0, paths: [] },
+        },
+      },
+      workspaceRuntimeId,
+      { action: { kind: 'createWorktree', branch: 'feature/a', worktreePath: '/tmp/worktrees/feature-a' } },
+    )
+
+    renderInJsdom(<Harness repoId={REPO_ID} />)
+
+    expect(toastMocks.error).toHaveBeenCalledTimes(1)
+    const [, options] = toastMocks.error.mock.calls[0]!
+    expect(String(options.description.props.children)).toBe(
+      'setup exited with status 1\nThe worktree was created, but saving trust failed.\nCopied 1 path: .env.local',
+    )
   })
 })
 

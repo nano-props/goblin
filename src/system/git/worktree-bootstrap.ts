@@ -3,13 +3,13 @@ import { constants as fsConstants, promises as fs } from 'node:fs'
 import { execa, ExecaError } from 'execa'
 import { glob, isDynamicPattern } from 'tinyglobby'
 import { getRepoRoot } from '#/system/git/branches.ts'
-import type { ExecResult } from '#/shared/git-types.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
 import {
   compactWorktreeBootstrapPaths,
   formatWorktreeBootstrapSummary,
   hasWorktreeBootstrapSummaryDetails,
   worktreeBootstrapPreviewFromConfig,
+  type WorktreeBootstrapResult,
   type WorktreeBootstrapSummary,
   type WorktreeBootstrapPreviewResult,
 } from '#/shared/worktree-bootstrap-summary.ts'
@@ -19,8 +19,10 @@ import {
   worktreeBootstrapConfigHash,
   type WorktreeBootstrapConfig,
 } from '#/system/git/worktree-bootstrap-config.ts'
+import { copyPath, DestinationPermissionRestoreError } from '#/system/filesystem-copy.ts'
 
 type MaterializationMode = 'copy' | 'symlink' | 'hardlink'
+const MATERIALIZATION_MODES: readonly MaterializationMode[] = ['copy', 'symlink', 'hardlink']
 
 export async function getWorktreeBootstrapPreview(
   sourceCwd: string,
@@ -35,8 +37,6 @@ export async function getWorktreeBootstrapPreview(
     if (loaded.kind === 'none') return { ok: true, preview: worktreeBootstrapPreviewFromConfig(undefined) }
     if (loaded.kind === 'error') return { ok: false, message: loaded.message }
 
-    const valid = validateBootstrapConfigPaths(loaded.config)
-    if (!valid.ok) return { ok: false, message: valid.message }
     return { ok: true, preview: worktreeBootstrapPreviewFromConfig(loaded.config, loaded.configHash) }
   } catch (err) {
     if (options?.signal?.aborted) return { ok: false, message: 'cancelled' }
@@ -58,14 +58,17 @@ interface ReadyMaterialization extends PlannedMaterialization {
   stat: Awaited<ReturnType<typeof fs.lstat>>
 }
 
+type MaterializationResult =
+  | { ok: true; completedOperations: ReadyMaterialization[] }
+  | { ok: false; message: string; completedOperations: ReadyMaterialization[] }
+
 const SETUP_TIMEOUT_MS = 10 * 60_000
-const WINDOWS_ROOTED_PATH_RE = /^(?:[A-Za-z]:|[\\/])/
 
 export async function bootstrapWorktreeAfterCreate(
   sourceCwd: string,
   targetWorktreePath: string,
   options?: { signal?: AbortSignal; expectedConfigHash?: string },
-): Promise<ExecResult> {
+): Promise<WorktreeBootstrapResult> {
   try {
     if (options?.signal?.aborted) return { ok: false, message: 'cancelled' }
     const sourceRepoRoot = await getRepoRoot(sourceCwd, { signal: options?.signal })
@@ -85,7 +88,7 @@ export async function bootstrapWorktreeAfterCreate(
     }
 
     const planned = await planMaterializations(sourceRoot, targetRoot, loaded.config, options?.signal)
-    if (!planned.ok) return bootstrapFailure(planned.message)
+    if (!planned.ok) return bootstrapStepFailure(planned)
 
     const materialized = await materializePlan(
       sourceRoot,
@@ -94,14 +97,20 @@ export async function bootstrapWorktreeAfterCreate(
       planned.excludedPaths,
       options?.signal,
     )
-    if (!materialized.ok) return bootstrapFailure(materialized.message)
+    if (!materialized.ok) {
+      const summary = bootstrapSummary(materialized.completedOperations, planned.missingSources, undefined)
+      return bootstrapStepFailure(materialized, summary)
+    }
 
     if (loaded.config.setup) {
       const setup = await runSetupCommand(targetRoot, loaded.config.setup, options?.signal)
-      if (!setup.ok) return bootstrapFailure(setup.message)
+      if (!setup.ok) {
+        const summary = bootstrapSummary(materialized.completedOperations, planned.missingSources, undefined)
+        return bootstrapStepFailure(setup, summary)
+      }
     }
 
-    const summary = bootstrapSummary(planned.operations, planned.missingSources, loaded.config.setup)
+    const summary = bootstrapSummary(materialized.completedOperations, planned.missingSources, loaded.config.setup)
     return {
       ok: true,
       message: formatWorktreeBootstrapSummary(summary),
@@ -131,22 +140,6 @@ async function loadBootstrapConfig(
   return loaded.kind === 'ready' ? { ...loaded, configHash: worktreeBootstrapConfigHash(raw) } : loaded
 }
 
-export function validateBootstrapConfigPaths(
-  config: WorktreeBootstrapConfig,
-): { ok: true } | { ok: false; message: string } {
-  for (const mode of materializationModes()) {
-    for (const entry of config[mode]) {
-      const valid = validateConfigPath(entry)
-      if (!valid.ok) return valid
-    }
-  }
-  for (const entry of config.exclude) {
-    const valid = validateConfigPath(entry)
-    if (!valid.ok) return valid
-  }
-  return { ok: true }
-}
-
 async function planMaterializations(
   sourceRoot: string,
   targetRoot: string,
@@ -163,7 +156,7 @@ async function planMaterializations(
     hardlink: new Map<string, ConcreteSource>(),
   } satisfies Record<MaterializationMode, Map<string, ConcreteSource>>
 
-  for (const mode of materializationModes()) {
+  for (const mode of MATERIALIZATION_MODES) {
     const result = await expandSources(sourceRoot, config[mode], signal)
     if (!result.ok) return result
     for (const missing of result.missingSources) missingSources.add(missing)
@@ -172,7 +165,7 @@ async function planMaterializations(
 
   const excludes = await expandExcludes(sourceRoot, config.exclude, signal)
   if (!excludes.ok) return excludes
-  for (const mode of materializationModes()) {
+  for (const mode of MATERIALIZATION_MODES) {
     for (const rel of expanded[mode].keys()) {
       if (isExcludedPath(rel, excludes.paths)) expanded[mode].delete(rel)
     }
@@ -182,7 +175,7 @@ async function planMaterializations(
   if (ambiguous) return { ok: false, message: `path matches multiple materialization modes: ${ambiguous}` }
 
   const planned: PlannedMaterialization[] = []
-  for (const mode of materializationModes()) {
+  for (const mode of MATERIALIZATION_MODES) {
     for (const source of expanded[mode].values()) planned.push({ ...source, mode })
   }
 
@@ -210,9 +203,6 @@ async function expandSources(
 
   for (const entry of entries) {
     if (signal?.aborted) return { ok: false, message: 'cancelled' }
-    const valid = validateConfigPath(entry)
-    if (!valid.ok) return valid
-
     if (!isDynamicPattern(entry)) {
       const source = resolveConfigPath(sourceRoot, normalizeRelativePath(entry))
       if (!source.ok) return source
@@ -243,9 +233,6 @@ async function expandExcludes(
   const paths = new Set<string>()
   for (const entry of entries) {
     if (signal?.aborted) return { ok: false, message: 'cancelled' }
-    const valid = validateConfigPath(entry)
-    if (!valid.ok) return valid
-
     if (!isDynamicPattern(entry)) {
       const source = resolveConfigPath(sourceRoot, normalizeRelativePath(entry))
       if (!source.ok) return source
@@ -370,21 +357,19 @@ async function materializePlan(
   operations: ReadyMaterialization[],
   excludedPaths: Set<string>,
   signal: AbortSignal | undefined,
-): Promise<ExecResult> {
+): Promise<MaterializationResult> {
+  const completedOperations: ReadyMaterialization[] = []
   for (const item of operations) {
-    if (signal?.aborted) return { ok: false, message: 'cancelled' }
+    if (signal?.aborted) return { ok: false, message: 'cancelled', completedOperations }
     try {
-      await fs.mkdir(path.dirname(item.dest), { recursive: true })
       const safeDestination = await validateDestinationPathWithinRoot(targetRoot, item.rel)
-      if (!safeDestination.ok) return safeDestination
+      if (!safeDestination.ok) return { ...safeDestination, completedOperations }
+      await fs.mkdir(path.dirname(item.dest), { recursive: true })
       switch (item.mode) {
         case 'copy':
-          await fs.cp(item.abs, item.dest, {
-            recursive: true,
-            force: false,
-            errorOnExist: true,
-            dereference: false,
-            filter: (sourcePath) => shouldCopyPath(sourceRoot, sourcePath, excludedPaths),
+          await copyPath(item.abs, item.dest, {
+            signal,
+            include: (sourcePath) => shouldCopyPath(sourceRoot, sourcePath, excludedPaths),
           })
           break
         case 'symlink':
@@ -394,19 +379,28 @@ async function materializePlan(
           await fs.link(item.abs, item.dest)
           break
       }
+      // Summaries report completed configured operations, not every path that
+      // happened to land inside a failed directory copy. Listing a partial
+      // directory as copied would turn an uncertain follow-up into false success.
+      completedOperations.push(item)
     } catch (err) {
-      if (hasErrorCode(err, 'EEXIST')) return { ok: false, message: `destination already exists: ${item.rel}` }
-      return { ok: false, message: `failed to ${item.mode} ${item.rel}: ${errorMessage(err)}` }
+      if (signal?.aborted && !(err instanceof DestinationPermissionRestoreError)) {
+        return { ok: false, message: 'cancelled', completedOperations }
+      }
+      if (hasErrorCode(err, 'EEXIST')) {
+        return { ok: false, message: `destination already exists: ${item.rel}`, completedOperations }
+      }
+      return { ok: false, message: `failed to ${item.mode} ${item.rel}: ${errorMessage(err)}`, completedOperations }
     }
   }
-  return { ok: true, message: '' }
+  return { ok: true, completedOperations }
 }
 
 async function runSetupCommand(
   targetRoot: string,
   setup: string,
   signal: AbortSignal | undefined,
-): Promise<ExecResult> {
+): Promise<WorktreeBootstrapResult> {
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
   try {
     await fs.access(targetRoot, fsConstants.R_OK | fsConstants.W_OK)
@@ -437,25 +431,6 @@ function buildSetupInvocation(setup: string): { command: string; args: string[] 
   // so tools like bun, nvm, and pnpm resolve without absolute paths.
   if (shell) return { command: shell, args: ['-il', '-c', setup] }
   return { command: '/bin/sh', args: ['-c', setup] }
-}
-
-function materializationModes(): MaterializationMode[] {
-  return ['copy', 'symlink', 'hardlink']
-}
-
-function validateConfigPath(entry: string): { ok: true } | { ok: false; message: string } {
-  if (entry.length === 0) return { ok: false, message: 'bootstrap path must not be empty' }
-  if (/[\0-\x1f\x7f]/.test(entry)) return { ok: false, message: `bootstrap path contains control characters: ${entry}` }
-  if (entry.startsWith('!')) return { ok: false, message: `negative glob patterns are not supported: ${entry}` }
-  if (path.isAbsolute(entry) || WINDOWS_ROOTED_PATH_RE.test(entry))
-    return { ok: false, message: `bootstrap path must be relative: ${entry}` }
-  if (normalizeRelativePath(entry) === '.')
-    return { ok: false, message: `bootstrap path must not target repo root: ${entry}` }
-
-  const segments = entry.replace(/\\/g, '/').split('/').filter(Boolean)
-  if (segments.includes('..')) return { ok: false, message: `bootstrap path escapes repo root: ${entry}` }
-  if (segments.includes('.git')) return { ok: false, message: `bootstrap path must not target .git: ${entry}` }
-  return { ok: true }
 }
 
 function resolveConfigPath(
@@ -507,7 +482,7 @@ function globOptions(sourceRoot: string, signal: AbortSignal | undefined) {
 
 function findAmbiguousSource(expanded: Record<MaterializationMode, Map<string, ConcreteSource>>): string | null {
   const firstModeByPath = new Map<string, MaterializationMode>()
-  for (const mode of materializationModes()) {
+  for (const mode of MATERIALIZATION_MODES) {
     for (const rel of expanded[mode].keys()) {
       const existing = firstModeByPath.get(rel)
       if (existing && existing !== mode) return rel
@@ -573,8 +548,18 @@ function bootstrapSummary(
   }
 }
 
-function bootstrapFailure(message: string): ExecResult {
+function bootstrapFailure(message: string): WorktreeBootstrapResult {
   return { ok: false, message: `Worktree bootstrap failed: ${message}` }
+}
+
+function bootstrapStepFailure(
+  result: WorktreeBootstrapResult,
+  summary?: WorktreeBootstrapSummary,
+): WorktreeBootstrapResult {
+  if (result.ok) return result
+  const failure = result.message === 'cancelled' ? result : bootstrapFailure(result.message)
+  if (!hasWorktreeBootstrapSummaryDetails(summary)) return failure
+  return { ...failure, worktreeBootstrap: summary }
 }
 
 function pathsForMode(operations: ReadyMaterialization[], mode: MaterializationMode): string[] {

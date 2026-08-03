@@ -1,8 +1,11 @@
 import path from 'node:path'
 import { constants as fsConstants, promises as fs } from 'node:fs'
+import { commandMayHaveRun } from '#/system/command-execution.ts'
+import type { CommandExecution } from '#/system/command-execution.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
 import {
+  createRemoteMutationAttempt,
   remoteRuntimeAwareGitRunner,
   resolveRemoteWorkspaceTarget,
   type RepoSourceRuntimeContext,
@@ -15,13 +18,15 @@ import {
   resolveRepoWriteBoundaryForLocator,
 } from '#/server/modules/repo-write-boundary.ts'
 import {
+  appendRepoMutationRecoveryMessageKey,
   localWorktreeRepoIds,
   remoteWorktreeRepoIds,
-  withAffectedRepoIds,
-  withAffectedRepoIdsIfChanged,
+  uniqueRepoMutationRecoveryMessageKeys,
+  withRepoIdsToInvalidate,
   workspaceIdForLocalWorktreePath,
   type RepoMutationResult,
 } from '#/server/modules/repo-mutation-impact.ts'
+import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import {
   deleteBranch,
@@ -53,9 +58,11 @@ import {
 import { getWorktreePatch } from '#/system/git/patch.ts'
 import {
   type ExecResult,
+  type ExecResultRecoveryMessageKey,
   type LogEntry,
   type PullRequestFetchMode,
   type PullRequestInfo,
+  type RepoMutationExecResult,
   type RepoUrlTarget,
   type WorktreeInfo,
   type WorktreeStatus,
@@ -79,10 +86,12 @@ import {
   getRemoteWorktreeBootstrapPreview,
   getRemoteTrackingBranches as getSshRemoteTrackingBranches,
   type RemoteGitRunner,
+  type RemoteWorktreeRemovalResult,
   pullRemoteBranch,
   pushRemoteBranch,
   removeRemoteWorktree,
 } from '#/system/ssh/git.ts'
+import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { getBranchPullRequests, getBranchPullRequestsForRepoRef } from '#/system/git/pull-requests.ts'
 import type { GitUpstream } from '#/system/git/upstream.ts'
 import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
@@ -99,15 +108,26 @@ import {
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
+interface BranchDeleteResult extends ExecResult {
+  branchEffect: 'none' | 'may-have-changed' | 'local-delete-confirmed'
+  failureExecution?: CommandExecution
+}
+
 export type WorkspacePaneTargetIdentity =
   { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
+
+interface RepoMembershipReadOptions {
+  signal?: AbortSignal
+}
+
+type RunRepoMembershipMutation = <T>(mutation: () => Promise<T>) => Promise<T>
 
 export interface RepoSource {
   id: string
   kind: 'local' | 'remote'
-  getSnapshot(signal?: AbortSignal): Promise<RepoSnapshot | null>
-  getWorkspacePaneTargetIdentities(signal?: AbortSignal): Promise<WorkspacePaneTargetIdentity[]>
-  getStatus(signal?: AbortSignal): Promise<WorktreeStatus[]>
+  getSnapshot(options?: RepoMembershipReadOptions): Promise<RepoSnapshot | null>
+  getWorkspacePaneTargetIdentities(options?: RepoMembershipReadOptions): Promise<WorkspacePaneTargetIdentity[]>
+  getStatus(options?: RepoMembershipReadOptions): Promise<WorktreeStatus[]>
   getPullRequests(scope: RepoPullRequestScope, options?: { signal?: AbortSignal }): Promise<PullRequestEntry[] | null>
   getLog(branch: string, options?: { count?: number; skip?: number; signal?: AbortSignal }): Promise<LogEntry[]>
   getRemoteBranches(signal?: AbortSignal): Promise<RemoteTrackingBranchIdentity[]>
@@ -117,8 +137,11 @@ export interface RepoSource {
   getWorktreeBootstrapPreview(signal?: AbortSignal): Promise<WorktreeBootstrapPreviewResult>
   createWorktree(
     input: CreateWorktreeInput,
-    signal?: AbortSignal,
-    options?: { worktreeBootstrap?: WorktreeBootstrapDecision },
+    signal: AbortSignal | undefined,
+    options: {
+      runMembershipMutation: RunRepoMembershipMutation
+      worktreeBootstrap?: WorktreeBootstrapDecision
+    },
   ): Promise<RepoMutationResult>
   deleteBranch(
     branch: string,
@@ -135,6 +158,7 @@ export interface RepoSource {
     },
     signal: AbortSignal | undefined,
     lifecycle: RepoWorktreeRemovalLifecycle,
+    runMembershipMutation: RunRepoMembershipMutation,
   ): Promise<RepoMutationResult>
   getPatch(worktreePath: string, signal?: AbortSignal): Promise<ExecResult>
   getBrowserRepoUrl(target: RepoUrlTarget, signal?: AbortSignal): Promise<string | null>
@@ -268,20 +292,158 @@ function repoWriteExecutionState(capability: RepoWriteExecutionCapability): Repo
   return state
 }
 
-async function readLocalAffectedRepoIds(repoId: string, signal?: AbortSignal): Promise<WorkspaceId[]> {
+async function readLocalRepoIdsToInvalidate(repoId: string, signal?: AbortSignal): Promise<WorkspaceId[]> {
   const worktrees = await readWorktreeMembership(repoId, signal)
   signal?.throwIfAborted()
-  return localWorktreeRepoIds(worktrees)
+  return localRepoIdsToInvalidate(repoId, worktrees)
 }
 
-async function readRemoteAffectedRepoIds(
+function localRepoIdsToInvalidate(repoId: string, worktrees: readonly WorktreeInfo[]): WorkspaceId[] {
+  const repoIdsToInvalidate = localWorktreeRepoIds(worktrees)
+  const sourceRepoId = workspaceIdForLocalWorktreePath(repoId)
+  if (sourceRepoId) repoIdsToInvalidate.unshift(sourceRepoId)
+  return Array.from(new Set(repoIdsToInvalidate))
+}
+
+async function readRemoteRepoIdsToInvalidate(
   target: RemoteWorkspaceTarget,
   signal?: AbortSignal,
   run?: RemoteGitRunner,
 ): Promise<WorkspaceId[]> {
   const worktreePaths = await getRemoteRepoWorktreePaths(target, { signal, run })
   signal?.throwIfAborted()
-  return remoteWorktreeRepoIds(target, worktreePaths)
+  return Array.from(new Set([target.id, ...remoteWorktreeRepoIds(target, worktreePaths)]))
+}
+
+async function runRemoteRepoMutation(
+  repoId: string,
+  target: RemoteWorkspaceTarget,
+  runtime: RepoSourceRuntimeContext | undefined,
+  fallbackRun: RemoteGitRunner | undefined,
+  task: (run: RemoteGitRunner) => Promise<RepoMutationResult>,
+): Promise<RepoMutationResult> {
+  const run = fallbackRun ?? ((command, remoteTarget, options) => runRemoteCommand(remoteTarget, command, options))
+  if (!runtime) return await task(run)
+  const attempt = createRemoteMutationAttempt(repoId, runtime.workspaceRuntimeId, target)
+  try {
+    const mutation = await task(attempt.run)
+    const runtimeFailure = attempt.capturedRuntimeFailure()
+    if (runtimeFailure) throw new RepoMutationRuntimeFailureError(mutation, runtimeFailure)
+    return mutation
+  } catch (error) {
+    if (error instanceof RepoMutationRuntimeFailureError) throw error
+    throw attempt.capturedRuntimeFailure() ?? error
+  }
+}
+
+function remoteMembershipMutationRunner(
+  run: RemoteGitRunner,
+  runMembershipMutation: RunRepoMembershipMutation,
+): RemoteGitRunner {
+  return async (command, target, options) => {
+    if (command.type !== 'gitWorktreeAdd' && command.type !== 'gitWorktreeRemove') {
+      return await run(command, target, options)
+    }
+    return await runMembershipMutation(async () => await run(command, target, options))
+  }
+}
+
+function commandFailureForUser<T extends ExecResult>(result: T, execution: CommandExecution): T {
+  if (result.ok) return result
+  if (execution.status === 'cancelled') return { ...result, message: 'error.git-command-cancelled-check-state' }
+  if (execution.status === 'timed-out') return { ...result, message: 'error.git-command-timeout-check-state' }
+  if (execution.status === 'remote-start-unconfirmed') {
+    return { ...result, message: 'error.ssh-remote-command-start-unconfirmed' }
+  }
+  return result
+}
+
+function withCommandImpact<T extends ExecResult>(
+  result: T,
+  execution: CommandExecution,
+  repoIdsToInvalidate: readonly WorkspaceId[],
+): T & RepoMutationResult {
+  if (!commandMayHaveRun(execution)) return result
+  return withRepoIdsToInvalidate(result, repoIdsToInvalidate)
+}
+
+function worktreeCommandFailureForUser<T extends ExecResult>(
+  result: T,
+  execution: CommandExecution,
+  operation: 'create' | 'remove',
+): T {
+  if (result.ok || !commandMayHaveRun(execution)) return result
+  if (execution.status === 'timed-out') {
+    return { ...result, message: worktreeCommandTimeoutMessage(operation) }
+  }
+  return commandFailureForUser(result, execution)
+}
+
+function worktreeCommandTimeoutMessage(operation: 'create' | 'remove'): string {
+  switch (operation) {
+    case 'create':
+      return 'error.worktree-create-timeout-check-state'
+    case 'remove':
+      return 'error.worktree-remove-timeout-check-state'
+  }
+  const exhaustive: never = operation
+  return exhaustive
+}
+
+function withRecoveryMessage(
+  result: RepoMutationExecResult,
+  recoveryMessage: ExecResultRecoveryMessageKey,
+): RepoMutationExecResult {
+  if (result.ok) return result
+  const recoveryMessageKeys = appendRepoMutationRecoveryMessageKey(result.recoveryMessageKeys, recoveryMessage)
+  return { ...result, recoveryMessageKeys }
+}
+
+function worktreeCreatedFollowupFailureForUser(result: RepoMutationExecResult): RepoMutationExecResult {
+  // The linear create flow consumes its confirmed `worktree add` milestone
+  // here. No `worktreeCreated` authority escapes because no later server owner
+  // needs it for invalidation, settlement, or cleanup.
+  return withRecoveryMessage(result, 'error.worktree-created-followup-failed')
+}
+
+function worktreeRemovedFollowupResult(
+  result: RepoMutationExecResult,
+  branchEffect: BranchDeleteResult['branchEffect'],
+): RepoMutationResult {
+  if (result.ok) return { ok: true, message: result.message }
+  const recoveryMessages: ExecResultRecoveryMessageKey[] = ['error.worktree-removed-followup-failed']
+  if (branchEffect === 'local-delete-confirmed') {
+    recoveryMessages.push('error.local-branch-deleted-followup-failed')
+  }
+  recoveryMessages.push(...(result.recoveryMessageKeys ?? []))
+  const recoveryMessageKeys = uniqueRepoMutationRecoveryMessageKeys(recoveryMessages)
+  return { ok: false, message: result.message, recoveryMessageKeys }
+}
+
+function remoteWorktreeRemovalResultForUser(result: RemoteWorktreeRemovalResult): RepoMutationResult {
+  let message = result.message
+  if (!result.ok && result.failureExecution) {
+    const failure = { ok: false, message: result.message }
+    message =
+      result.failureStage === 'worktree-remove'
+        ? worktreeCommandFailureForUser(failure, result.failureExecution, 'remove').message
+        : commandFailureForUser(failure, result.failureExecution).message
+  }
+  const normalized = { ok: result.ok, message }
+  if (result.worktreeRemoved === true) {
+    return worktreeRemovedFollowupResult(normalized, result.branchEffect ?? 'none')
+  }
+  return normalized
+}
+
+function publicBranchDeleteResult(result: BranchDeleteResult): RepoMutationExecResult {
+  let publicResult: RepoMutationExecResult = result.failureExecution
+    ? commandFailureForUser({ ok: result.ok, message: result.message }, result.failureExecution)
+    : { ok: result.ok, message: result.message }
+  if (!result.ok && result.branchEffect === 'local-delete-confirmed') {
+    publicResult = withRecoveryMessage(publicResult, 'error.local-branch-deleted-followup-failed')
+  }
+  return publicResult
 }
 
 async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
@@ -354,45 +516,74 @@ function createLocalRepoSource(
     options?: { force?: boolean; deleteUpstream?: boolean },
     signal?: AbortSignal,
     gitCwd = repoId,
-  ): Promise<ExecResult> {
-    const deleted = await deleteBranch(gitCwd, branch, { force: options?.force, signal })
-    if (!deleted.ok || options?.deleteUpstream !== true || !upstream?.deleteTarget) return deleted
-    const upstreamDeleted = await deleteUpstreamBranch(
+  ): Promise<BranchDeleteResult> {
+    const { result: localDeleteResult, execution: localDeleteExecution } = await deleteBranch(gitCwd, branch, {
+      force: options?.force,
+      signal,
+    })
+    if (!localDeleteResult.ok) {
+      if (!commandMayHaveRun(localDeleteExecution)) {
+        return {
+          ok: false,
+          message: localDeleteResult.message,
+          branchEffect: 'none',
+          failureExecution: localDeleteExecution,
+        }
+      }
+      return {
+        ok: false,
+        message: localDeleteResult.message,
+        branchEffect: 'may-have-changed',
+        failureExecution: localDeleteExecution,
+      }
+    }
+    if (options?.deleteUpstream !== true || !upstream?.deleteTarget) {
+      return { ok: true, message: localDeleteResult.message, branchEffect: 'local-delete-confirmed' }
+    }
+    const { result: upstreamDeleteResult, execution: upstreamDeleteExecution } = await deleteUpstreamBranch(
       gitCwd,
       upstream.deleteTarget.remote,
       upstream.deleteTarget.branch,
       signal,
     )
-    return upstreamDeleted.ok ? upstreamDeleted : { ...upstreamDeleted, repositoryStateChanged: true }
+    if (upstreamDeleteResult.ok) {
+      return { ok: true, message: upstreamDeleteResult.message, branchEffect: 'local-delete-confirmed' }
+    }
+    return {
+      ok: false,
+      message: upstreamDeleteResult.message,
+      branchEffect: 'local-delete-confirmed',
+      failureExecution: upstreamDeleteExecution,
+    }
   }
 
   return {
     id: repoId,
     kind: 'local',
-    async getSnapshot(signal) {
+    async getSnapshot(options) {
       if (!isValidCwd(repoId)) return null
       const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
-      signal?.throwIfAborted()
-      const membership = await readWorktreeMembership(repoId, signal)
-      const currentBranch = await getCurrentBranch(repoId, { signal })
-      const branches = await getBranches(repoId, membership, currentBranch, { signal })
+      options?.signal?.throwIfAborted()
+      const membership = await readWorktreeMembership(repoId, options?.signal)
+      const currentBranch = await getCurrentBranch(repoId, { signal: options?.signal })
+      const branches = await getBranches(repoId, membership, currentBranch, { signal: options?.signal })
       const current = currentBranch ?? ''
-      const currentHEAD = currentBranch === null ? await getHeadHash(repoId, { signal }) : undefined
-      const remote = await getRemoteInfo(repoId, signal)
-      signal?.throwIfAborted()
+      const currentHEAD = currentBranch === null ? await getHeadHash(repoId, { signal: options?.signal }) : undefined
+      const remote = await getRemoteInfo(repoId, options?.signal)
+      options?.signal?.throwIfAborted()
       return { branches, current, currentHEAD, remote }
     },
-    async getWorkspacePaneTargetIdentities(signal) {
-      const worktrees = await readWorktreeMembership(repoId, signal)
-      signal?.throwIfAborted()
-      return await getBranchWorktreeIdentities(repoId, worktrees, { signal })
+    async getWorkspacePaneTargetIdentities(options) {
+      const worktrees = await readWorktreeMembership(repoId, options?.signal)
+      options?.signal?.throwIfAborted()
+      return await getBranchWorktreeIdentities(repoId, worktrees, { signal: options?.signal })
     },
-    async getStatus(signal) {
+    async getStatus(options) {
       if (!isValidCwd(repoId)) throw new Error('error.invalid-path')
       const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
-      return await getWorkingStatus(repoId, { signal })
+      return await getWorkingStatus(repoId, options)
     },
     async getPullRequests(scope, options) {
       if (!isValidCwd(repoId)) return null
@@ -417,21 +608,21 @@ function createLocalRepoSource(
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const available = await probeGitRepo(repoId)
       if (!available.ok) return available
-      const affectedRepoIds = await readLocalAffectedRepoIds(repoId, signal)
-      const fetched = await fetchAll(repoId, signal)
-      return withAffectedRepoIdsIfChanged(fetched, affectedRepoIds)
+      const repoIdsToInvalidate = await readLocalRepoIdsToInvalidate(repoId, signal)
+      const { result: fetchResult, execution: fetchExecution } = await fetchAll(repoId, signal)
+      return withCommandImpact(commandFailureForUser(fetchResult, fetchExecution), fetchExecution, repoIdsToInvalidate)
     },
     async pull(branch, worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      const affectedRepoIds = await readLocalAffectedRepoIds(repoId, signal)
-      const pulled = await pullBranch(repoId, branch, worktreePath, signal)
-      return withAffectedRepoIdsIfChanged(pulled, affectedRepoIds)
+      const repoIdsToInvalidate = await readLocalRepoIdsToInvalidate(repoId, signal)
+      const { result: pullResult, execution: pullExecution } = await pullBranch(repoId, branch, worktreePath, signal)
+      return withCommandImpact(commandFailureForUser(pullResult, pullExecution), pullExecution, repoIdsToInvalidate)
     },
     async push(branch, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
-      const affectedRepoIds = await readLocalAffectedRepoIds(repoId, signal)
-      const pushed = await pushBranch(repoId, branch, signal)
-      return pushed.ok ? withAffectedRepoIds(pushed, affectedRepoIds) : pushed
+      const repoIdsToInvalidate = await readLocalRepoIdsToInvalidate(repoId, signal)
+      const { result: pushResult, execution: pushExecution } = await pushBranch(repoId, branch, signal)
+      return withCommandImpact(commandFailureForUser(pushResult, pushExecution), pushExecution, repoIdsToInvalidate)
     },
     async getWorktreeBootstrapPreview(signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -446,13 +637,18 @@ function createLocalRepoSource(
         }
       }
       const createdWorkspaceId = workspaceIdForLocalWorktreePath(input.worktreePath)
-      const affectedRepoIds = [
-        ...(await readLocalAffectedRepoIds(repoId, signal)),
+      const repoIdsToInvalidate = [
+        ...(await readLocalRepoIdsToInvalidate(repoId, signal)),
         ...(createdWorkspaceId ? [createdWorkspaceId] : []),
       ]
-      const created = await createWorktree(repoId, input, signal)
-      if (!created.ok) return withAffectedRepoIdsIfChanged(created, affectedRepoIds)
-      if (options?.worktreeBootstrap?.kind !== 'run') return withAffectedRepoIds(created, affectedRepoIds)
+      const { result: created, execution } = await options.runMembershipMutation(
+        async () => await createWorktree(repoId, input, signal),
+      )
+      if (!created.ok) {
+        const failure = worktreeCommandFailureForUser(created, execution, 'create')
+        return withCommandImpact(failure, execution, repoIdsToInvalidate)
+      }
+      if (options?.worktreeBootstrap?.kind !== 'run') return withRepoIdsToInvalidate(created, repoIdsToInvalidate)
       const bootstrapped = await bootstrapWorktreeAfterCreate(repoId, input.worktreePath, {
         signal,
         expectedConfigHash: options.worktreeBootstrap.configHash,
@@ -463,8 +659,8 @@ function createLocalRepoSource(
             message: [created.message, bootstrapped.message].filter(Boolean).join('\n'),
             ...(bootstrapped.worktreeBootstrap ? { worktreeBootstrap: bootstrapped.worktreeBootstrap } : {}),
           }
-        : { ...bootstrapped, repositoryStateChanged: true }
-      return withAffectedRepoIds(result, affectedRepoIds)
+        : worktreeCreatedFollowupFailureForUser(bootstrapped)
+      return withRepoIdsToInvalidate(result, repoIdsToInvalidate)
     },
     async deleteBranch(branch, options, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -480,14 +676,16 @@ function createLocalRepoSource(
         worktrees,
       )
       if (validation) return validation
-      const affectedRepoIds = localWorktreeRepoIds(worktrees)
-      const deleted = await deleteBranchAfterValidation(branch, upstream, options, signal)
-      return withAffectedRepoIdsIfChanged(deleted, affectedRepoIds)
+      const repoIdsToInvalidate = localRepoIdsToInvalidate(repoId, worktrees)
+      const result = await deleteBranchAfterValidation(branch, upstream, options, signal)
+      const branchChanged = result.branchEffect !== 'none'
+      const publicResult = publicBranchDeleteResult(result)
+      return branchChanged ? withRepoIdsToInvalidate(publicResult, repoIdsToInvalidate) : publicResult
     },
-    async removeWorktree(input, signal, lifecycle) {
+    async removeWorktree(input, signal, lifecycle, runMembershipMutation) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const worktrees = await readWorktreeMembership(repoId, signal)
-      const affectedRepoIds = localWorktreeRepoIds(worktrees)
+      const repoIdsToInvalidate = localRepoIdsToInvalidate(repoId, worktrees)
       const mainWorktreePath = worktrees.find((wt) => wt.isPrimary)?.path ?? worktrees[0]?.path ?? ''
       const exactExecution = physicalWorktreeCapability
         ? physicalWorktreeExecutionBinding(physicalWorktreeCapability)
@@ -525,23 +723,34 @@ function createLocalRepoSource(
       }
       const prepared = await lifecycle.beforeRemove()
       if (!prepared.ok) return prepared
-      const removed = await removeWorktree(
-        mutationCwd,
-        exactExecution?.kind === 'local' ? exactExecution.canonicalWorktreePath : removable.target.path,
-        signal,
+      const { result: removed, execution: removeExecution } = await runMembershipMutation(
+        async () =>
+          await removeWorktree(
+            mutationCwd,
+            exactExecution?.kind === 'local' ? exactExecution.canonicalWorktreePath : removable.target.path,
+            signal,
+          ),
       )
-      if (!removed.ok) return removed
+      if (!removed.ok) {
+        const failure = worktreeCommandFailureForUser(removed, removeExecution, 'remove')
+        return withCommandImpact(failure, removeExecution, repoIdsToInvalidate)
+      }
       const finalized = await lifecycle.afterWorktreeRemoved()
-      if (!finalized.ok) return withAffectedRepoIds({ ...finalized, repositoryStateChanged: true }, affectedRepoIds)
-      if (!input.deleteBranch) return withAffectedRepoIds(removed, affectedRepoIds)
-      const deleted = await deleteBranchAfterValidation(
+      if (!finalized.ok) {
+        return withRepoIdsToInvalidate(worktreeRemovedFollowupResult(finalized, 'none'), repoIdsToInvalidate)
+      }
+      if (!input.deleteBranch)
+        return withRepoIdsToInvalidate(worktreeRemovedFollowupResult(removed, 'none'), repoIdsToInvalidate)
+      const deletedWithMilestone = await deleteBranchAfterValidation(
         input.branch,
         upstream,
         { force: input.forceDeleteBranch, deleteUpstream: input.deleteUpstream },
         signal,
         mutationCwd,
       )
-      return withAffectedRepoIds(deleted.ok ? deleted : { ...deleted, repositoryStateChanged: true }, affectedRepoIds)
+      const publicBranchResult = publicBranchDeleteResult(deletedWithMilestone)
+      const removalResult = worktreeRemovedFollowupResult(publicBranchResult, deletedWithMilestone.branchEffect)
+      return withRepoIdsToInvalidate(removalResult, repoIdsToInvalidate)
     },
     async getPatch(worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -572,16 +781,16 @@ async function createRemoteRepoSource(
   return {
     id: repoId,
     kind: 'remote',
-    async getSnapshot(signal) {
-      const remoteSnapshot = await getRemoteSnapshot(target, { signal, run })
-      signal?.throwIfAborted()
+    async getSnapshot(options) {
+      const remoteSnapshot = await getRemoteSnapshot(target, { ...options, run })
+      options?.signal?.throwIfAborted()
       return { branches: remoteSnapshot.branches, current: remoteSnapshot.current, remote: remoteSnapshot.remote }
     },
-    async getWorkspacePaneTargetIdentities(signal) {
-      return await getRemoteWorkspacePaneTargetIdentities(target, { signal, run })
+    async getWorkspacePaneTargetIdentities(options) {
+      return await getRemoteWorkspacePaneTargetIdentities(target, { ...options, run })
     },
-    async getStatus(signal) {
-      return await getRemoteStatus(target, { signal, run })
+    async getStatus(options) {
+      return await getRemoteStatus(target, { ...options, run })
     },
     async getPullRequests(scope, options) {
       const branches = scope.kind === 'branch-detail' ? [scope.branch] : undefined
@@ -602,75 +811,118 @@ async function createRemoteRepoSource(
       return await getSshRemoteTrackingBranches(target, { signal, run })
     },
     async fetch(signal) {
-      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
-      const fetched = await fetchRemoteRepo(target, { signal, run })
-      return withAffectedRepoIdsIfChanged(fetched, affectedRepoIds)
+      return await runRemoteRepoMutation(repoId, target, runtime, run, async (mutationRun) => {
+        const repoIdsToInvalidate = await readRemoteRepoIdsToInvalidate(target, signal, mutationRun)
+        const { result: fetchResult, execution: fetchExecution } = await fetchRemoteRepo(target, {
+          signal,
+          run: mutationRun,
+        })
+        return withCommandImpact(
+          commandFailureForUser(fetchResult, fetchExecution),
+          fetchExecution,
+          repoIdsToInvalidate,
+        )
+      })
     },
     async pull(branch, worktreePath, signal) {
-      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
-      const pulled = await pullRemoteBranch(target, branch, worktreePath, { signal, run })
-      return withAffectedRepoIdsIfChanged(pulled, affectedRepoIds)
+      return await runRemoteRepoMutation(repoId, target, runtime, run, async (mutationRun) => {
+        const repoIdsToInvalidate = await readRemoteRepoIdsToInvalidate(target, signal, mutationRun)
+        const { result: pullResult, execution: pullExecution } = await pullRemoteBranch(target, branch, worktreePath, {
+          signal,
+          run: mutationRun,
+        })
+        return withCommandImpact(commandFailureForUser(pullResult, pullExecution), pullExecution, repoIdsToInvalidate)
+      })
     },
     async push(branch, signal) {
-      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
-      const pushed = await pushRemoteBranch(target, branch, { signal, run })
-      return pushed.ok ? withAffectedRepoIds(pushed, affectedRepoIds) : pushed
+      return await runRemoteRepoMutation(repoId, target, runtime, run, async (mutationRun) => {
+        const repoIdsToInvalidate = await readRemoteRepoIdsToInvalidate(target, signal, mutationRun)
+        const { result: pushResult, execution: pushExecution } = await pushRemoteBranch(target, branch, {
+          signal,
+          run: mutationRun,
+        })
+        return withCommandImpact(commandFailureForUser(pushResult, pushExecution), pushExecution, repoIdsToInvalidate)
+      })
     },
     async getWorktreeBootstrapPreview(signal) {
       return await getRemoteWorktreeBootstrapPreview(target, { signal, run })
     },
     async createWorktree(input, signal, options) {
-      if (input.mode.kind === 'trackRemoteBranch') {
-        const branches = await getSshRemoteTrackingBranches(target, { signal, run })
-        if (!hasRemoteTrackingBranch(branches, input.mode.remote)) {
-          return { ok: false, message: 'error.invalid-arguments' }
+      return await runRemoteRepoMutation(repoId, target, runtime, run, async (mutationRun) => {
+        if (input.mode.kind === 'trackRemoteBranch') {
+          const branches = await getSshRemoteTrackingBranches(target, { signal, run: mutationRun })
+          if (!hasRemoteTrackingBranch(branches, input.mode.remote)) {
+            return { ok: false, message: 'error.invalid-arguments' }
+          }
         }
-      }
-      const existingRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
-      const created = await createRemoteWorktree(target, { ...input, signal, run })
-      const affectedRepoIds = [...existingRepoIds, ...remoteWorktreeRepoIds(target, created.affectedWorktreePaths)]
-      if (!created.ok) return withAffectedRepoIdsIfChanged(created, affectedRepoIds)
-      if (options?.worktreeBootstrap?.kind !== 'run') return withAffectedRepoIds(created, affectedRepoIds)
-      const bootstrapped = await bootstrapRemoteWorktreeAfterCreate(target, input.worktreePath, {
-        signal,
-        run,
-        expectedConfigHash: options.worktreeBootstrap.configHash,
+        const existingRepoIds = await readRemoteRepoIdsToInvalidate(target, signal, mutationRun)
+        const membershipRun = remoteMembershipMutationRunner(mutationRun, options.runMembershipMutation)
+        const { result: created, execution } = await createRemoteWorktree(target, {
+          ...input,
+          signal,
+          run: membershipRun,
+        })
+        const targetRepoIds = remoteWorktreeRepoIds(target, [input.worktreePath])
+        const repoIdsToInvalidate = [...existingRepoIds, ...targetRepoIds]
+        if (!created.ok) {
+          const failure = worktreeCommandFailureForUser(created, execution, 'create')
+          return withCommandImpact(failure, execution, repoIdsToInvalidate)
+        }
+        if (options?.worktreeBootstrap?.kind !== 'run') return withRepoIdsToInvalidate(created, repoIdsToInvalidate)
+        const bootstrapped = await bootstrapRemoteWorktreeAfterCreate(target, input.worktreePath, {
+          signal,
+          run: mutationRun,
+          expectedConfigHash: options.worktreeBootstrap.configHash,
+        })
+        if (!bootstrapped.ok) {
+          return withRepoIdsToInvalidate(worktreeCreatedFollowupFailureForUser(bootstrapped), repoIdsToInvalidate)
+        }
+        return withRepoIdsToInvalidate(
+          {
+            ok: true,
+            message: [created.message, bootstrapped.message].filter(Boolean).join('\n'),
+            ...(bootstrapped.worktreeBootstrap ? { worktreeBootstrap: bootstrapped.worktreeBootstrap } : {}),
+          },
+          repoIdsToInvalidate,
+        )
       })
-      if (!bootstrapped.ok)
-        return withAffectedRepoIds({ ...bootstrapped, repositoryStateChanged: true }, affectedRepoIds)
-      return withAffectedRepoIds(
-        {
-          ok: true,
-          message: [created.message, bootstrapped.message].filter(Boolean).join('\n'),
-          ...(bootstrapped.worktreeBootstrap ? { worktreeBootstrap: bootstrapped.worktreeBootstrap } : {}),
-        },
-        affectedRepoIds,
-      )
     },
     async deleteBranch(branch, options, signal) {
-      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
-      const deleted = await deleteRemoteBranch(target, {
-        branch,
-        force: options?.force,
-        deleteUpstream: options?.deleteUpstream,
-        signal,
-        run,
+      return await runRemoteRepoMutation(repoId, target, runtime, run, async (mutationRun) => {
+        const repoIdsToInvalidate = await readRemoteRepoIdsToInvalidate(target, signal, mutationRun)
+        const result = await deleteRemoteBranch(target, {
+          branch,
+          force: options?.force,
+          deleteUpstream: options?.deleteUpstream,
+          signal,
+          run: mutationRun,
+        })
+        const branchChanged = result.branchEffect !== 'none'
+        const publicResult = publicBranchDeleteResult(result)
+        return branchChanged ? withRepoIdsToInvalidate(publicResult, repoIdsToInvalidate) : publicResult
       })
-      return withAffectedRepoIdsIfChanged(deleted, affectedRepoIds)
     },
-    async removeWorktree(input, signal, lifecycle) {
-      const exactExecution = physicalWorktreeCapability
-        ? physicalWorktreeExecutionBinding(physicalWorktreeCapability)
-        : null
-      const result = await removeRemoteWorktree(target, {
-        ...input,
-        worktreePath: exactExecution?.kind === 'remote' ? exactExecution.canonicalWorktreePath : input.worktreePath,
-        signal,
-        run,
-        beforeRemove: lifecycle.beforeRemove,
-        afterWorktreeRemoved: lifecycle.afterWorktreeRemoved,
+    async removeWorktree(input, signal, lifecycle, runMembershipMutation) {
+      return await runRemoteRepoMutation(repoId, target, runtime, run, async (mutationRun) => {
+        const exactExecution = physicalWorktreeCapability
+          ? physicalWorktreeExecutionBinding(physicalWorktreeCapability)
+          : null
+        const membershipRun = remoteMembershipMutationRunner(mutationRun, runMembershipMutation)
+        const result = await removeRemoteWorktree(target, {
+          ...input,
+          worktreePath: exactExecution?.kind === 'remote' ? exactExecution.canonicalWorktreePath : input.worktreePath,
+          signal,
+          run: membershipRun,
+          beforeRemove: lifecycle.beforeRemove,
+          afterWorktreeRemoved: lifecycle.afterWorktreeRemoved,
+        })
+        const userResult = remoteWorktreeRemovalResultForUser(result)
+        if (!result.worktreePathsToInvalidate?.length && result.worktreeRemoved !== true) return userResult
+        return withRepoIdsToInvalidate(userResult, [
+          target.id,
+          ...remoteWorktreeRepoIds(target, result.worktreePathsToInvalidate),
+        ])
       })
-      return withAffectedRepoIds(result, remoteWorktreeRepoIds(target, result.affectedWorktreePaths))
     },
     async getPatch(worktreePath, signal) {
       return await getRemotePatch(target, worktreePath, { signal, run })

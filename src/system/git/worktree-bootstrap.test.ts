@@ -1,9 +1,12 @@
 import os from 'node:os'
 import path from 'node:path'
-import { mkdir, mkdtemp, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:net'
+import { promises as fs } from 'node:fs'
+import { chmod, mkdir, mkdtemp, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
 import { bootstrapWorktreeAfterCreate, getWorktreeBootstrapPreview } from '#/system/git/worktree-bootstrap.ts'
 import { worktreeBootstrapConfigHash } from '#/system/git/worktree-bootstrap-config.ts'
+import type { ExecResult } from '#/shared/git-types.ts'
 
 const mocks = vi.hoisted(() => ({
   getRepoRoot: vi.fn(),
@@ -29,6 +32,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await rm(tmp, { recursive: true, force: true })
   vi.clearAllMocks()
+  vi.restoreAllMocks()
 })
 
 describe('worktree bootstrap', () => {
@@ -152,6 +156,21 @@ setup = ${JSON.stringify(setupCommand)}
     await expect(readFile(path.join(targetRoot, 'other.env'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
+  test('preserves cancellation through the real setup failure boundary', async () => {
+    const setupCommand = `${JSON.stringify(process.execPath)} -e "setTimeout(() => {}, 10000)"`
+    await writeConfig(`[worktree]\nsetup = ${JSON.stringify(setupCommand)}\n`)
+    const controller = new AbortController()
+    const abort = setTimeout(() => controller.abort(), 100)
+
+    try {
+      await expect(
+        bootstrapWorktreeAfterCreate(sourceRoot, targetRoot, { signal: controller.signal }),
+      ).resolves.toEqual({ ok: false, message: 'cancelled' })
+    } finally {
+      clearTimeout(abort)
+    }
+  })
+
   test('reports missing literal sources without failing create', async () => {
     await writeConfig(`
 [worktree]
@@ -200,6 +219,52 @@ exclude = ["config/*.log", "config/nested"]
     })
   })
 
+  test('copies children before restoring a read-only directory mode', async () => {
+    const sourceDirectory = path.join(sourceRoot, 'readonly-config')
+    await mkdir(sourceDirectory)
+    await writeFile(path.join(sourceDirectory, 'settings.json'), '{"enabled":true}\n')
+    await writeConfig('[worktree]\ncopy = ["readonly-config"]\n')
+    await chmod(sourceDirectory, 0o555)
+
+    try {
+      const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
+
+      expect(result.ok).toBe(true)
+      await expect(readFile(path.join(targetRoot, 'readonly-config', 'settings.json'), 'utf8')).resolves.toBe(
+        '{"enabled":true}\n',
+      )
+      expect((await stat(path.join(targetRoot, 'readonly-config'))).mode & 0o777).toBe(0o555)
+    } finally {
+      await chmod(sourceDirectory, 0o755)
+      await chmod(path.join(targetRoot, 'readonly-config'), 0o755).catch(() => {})
+    }
+  })
+
+  test('does not let cancellation hide an uncertain destination directory mode', async () => {
+    const sourceDirectory = path.join(sourceRoot, 'config')
+    const destinationDirectory = path.join(targetRoot, 'config')
+    await mkdir(sourceDirectory)
+    await writeFile(path.join(sourceDirectory, 'settings.json'), '{"enabled":true}\n')
+    await writeConfig('[worktree]\ncopy = ["config"]\n')
+    const controller = new AbortController()
+    const realChmod = fs.chmod.bind(fs)
+    vi.spyOn(fs, 'chmod').mockImplementation(async (targetPath, mode) => {
+      if (targetPath === destinationDirectory) {
+        controller.abort()
+        throw new Error('chmod failed')
+      }
+      return await realChmod(targetPath, mode)
+    })
+
+    const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot, { signal: controller.signal })
+
+    expect(result).toMatchObject({
+      ok: false,
+      message:
+        'Worktree bootstrap failed: failed to copy config: failed to restore destination permissions: chmod failed',
+    })
+  })
+
   test('removes operations nested under excluded parent paths', async () => {
     await mkdir(path.join(sourceRoot, 'config'), { recursive: true })
     await writeFile(path.join(sourceRoot, 'config', 'app.json'), '{"ok":true}\n')
@@ -243,6 +308,9 @@ copy = ["config"]
     ['path escape', '../secret.env', 'escapes repo root'],
     ['git metadata', '.git/config', 'must not target .git'],
     ['repo root', '.', 'must not target repo root'],
+    ['dot segment', 'config/./app.json', 'must not contain dot segments'],
+    ['brace expansion', 'config/{app,dev}.json', 'unsupported bootstrap glob syntax'],
+    ['extglob', 'config/@(app|dev).json', 'unsupported bootstrap glob syntax'],
     ['windows drive-relative path', 'C:secret.env', 'must be relative'],
     ['windows drive-absolute path', String.raw`C:\secret.env`, 'must be relative'],
     ['windows rooted path', String.raw`\secret.env`, 'must be relative'],
@@ -256,6 +324,20 @@ copy = [${JSON.stringify(entry)}]
 
     expect(result.ok).toBe(false)
     expect(result.message).toContain(message)
+  })
+
+  test('materializes canonical paths after collapsing redundant separators', async () => {
+    await mkdir(path.join(sourceRoot, 'config'))
+    await writeFile(path.join(sourceRoot, 'config', 'app.json'), '{}\n')
+    await writeConfig('[worktree]\ncopy = ["config//app.json/"]\n')
+
+    const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
+
+    expect(result).toMatchObject({
+      ok: true,
+      worktreeBootstrap: { copy: { count: 1, paths: ['config/app.json'] } },
+    })
+    await expect(readFile(path.join(targetRoot, 'config', 'app.json'), 'utf8')).resolves.toBe('{}\n')
   })
 
   test('fails when a destination already exists and does not write later entries', async () => {
@@ -274,6 +356,38 @@ copy = [".env.local", "later.txt"]
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
     })
     await expect(readFile(path.join(targetRoot, 'later.txt'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  test('reports only fully completed materializations before a later failure', async () => {
+    await writeFile(path.join(sourceRoot, 'first.env'), 'first\n')
+    const socketPath = path.join(sourceRoot, 'unsupported.sock')
+    const server = createServer()
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(socketPath, resolve)
+    })
+    await writeConfig(`
+[worktree]
+copy = ["first.env", "unsupported.sock"]
+`)
+
+    let result: ExecResult
+    try {
+      result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot)
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())))
+    }
+
+    expect(result).toEqual({
+      ok: false,
+      message: expect.stringContaining('Worktree bootstrap failed: failed to copy unsupported.sock:'),
+      worktreeBootstrap: {
+        copy: { count: 1, paths: ['first.env'] },
+        symlink: { count: 0, paths: [] },
+        hardlink: { count: 0, paths: [] },
+        skippedMissing: { count: 0, paths: [] },
+      },
+    })
   })
 
   test('fails when one path is matched by multiple materialization modes', async () => {
@@ -350,8 +464,10 @@ ${mode} = ["linked-dir/secret.txt"]
 
   test('fails when setup exits non-zero', async () => {
     const setupCommand = `${JSON.stringify(process.execPath)} -e "process.exit(7)"`
+    await writeFile(path.join(sourceRoot, 'before-setup.env'), 'copied\n')
     await writeConfig(`
 [worktree]
+copy = ["before-setup.env"]
 setup = ${JSON.stringify(setupCommand)}
 `)
 
@@ -359,6 +475,12 @@ setup = ${JSON.stringify(setupCommand)}
 
     expect(result.ok).toBe(false)
     expect(result.message).toContain('Worktree bootstrap failed:')
+    expect(result.worktreeBootstrap).toEqual({
+      copy: { count: 1, paths: ['before-setup.env'] },
+      symlink: { count: 0, paths: [] },
+      hardlink: { count: 0, paths: [] },
+      skippedMissing: { count: 0, paths: [] },
+    })
   })
 
   test('preserves copied symlinks instead of following them outside the repo', async () => {

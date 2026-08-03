@@ -8,7 +8,6 @@ export type {
   StatusEntry,
   WorktreeStatus,
   LogEntry,
-  ExecResult,
   PullRequestInfo,
   PullRequestFetchMode,
   BrowserRemoteProvider,

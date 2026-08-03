@@ -3,10 +3,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
 import { afterEach, describe, expect, test } from 'vitest'
-import { buildRemoteCommandInvocation } from '#/system/ssh/commands.ts'
+import { buildRemoteCommandInvocation, runRemoteCommand } from '#/system/ssh/commands.ts'
 import { buildCanonicalSshConnectionSnapshot, buildRemoteTerminalInvocation } from '#/system/ssh/invocation.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { encodeRemoteWorktreeBootstrapRecord } from '#/test-utils/remote-worktree-bootstrap.ts'
 
 const originalPath = process.env.PATH
 const originalPathExt = process.env.PATHEXT
@@ -21,6 +22,19 @@ afterEach(() => {
 })
 
 describe('remote ssh command builders', () => {
+  test('proves that a command was not started when cancellation predates invocation', async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(runRemoteCommand(target(), { type: 'checkGit' }, { signal: controller.signal })).resolves.toEqual({
+      ok: false,
+      stdout: '',
+      stderr: '',
+      message: 'cancelled',
+      commandNotStarted: true,
+    })
+  })
+
   testPosix('encodes optional upstream as structured NUL fields', async () => {
     const repo = path.join(os.tmpdir(), `goblin-upstream-protocol-${process.pid}-${Date.now()}`)
     tempDirs.push(repo)
@@ -220,6 +234,33 @@ describe('remote ssh command builders', () => {
     expect(invocation.script).not.toContain('check-ignore')
     expect(invocation.script).not.toContain('ls-files -- "$rel"')
     expect(invocation.script).toContain('error.workspace-path-not-found')
+    expect(invocation.script).toContain('[ -d "$entry" ] && [ ! -L "$entry" ]')
+  })
+
+  testPosix('remote trash treats a directory symlink as the link itself', async () => {
+    const root = path.join(os.tmpdir(), `goblin-trash-symlink-${process.pid}-${Date.now()}`)
+    const bin = path.join(root, 'bin')
+    const targetDir = path.join(root, 'target')
+    const link = path.join(root, 'linked-dir')
+    tempDirs.push(root)
+    mkdirSync(bin, { recursive: true })
+    mkdirSync(targetDir)
+    symlinkSync(targetDir, link, 'dir')
+    const gio = path.join(bin, 'gio')
+    writeFileSync(gio, '#!/bin/sh\nprintf "%s\\n" "$*"\n')
+    chmodSync(gio, 0o755)
+    const invocation = buildRemoteCommandInvocation(targetWithPath(root), {
+      type: 'trashFile',
+      path: root,
+      filePath: link,
+    })
+
+    const result = await execa('sh', ['-lc', invocation.script], {
+      env: { ...process.env, PATH: `${bin}:/usr/bin:/bin` },
+      reject: false,
+    })
+
+    expect(result).toMatchObject({ exitCode: 0, stdout: `trash -- ${link}` })
   })
 
   test('bounds remote directory and Git log result counts after flooring', () => {
@@ -316,11 +357,49 @@ describe('remote ssh command builders', () => {
 
     const result = await execa('bash', ['-lc', invocation.script])
 
-    expect(result.stdout.split('\n')).toEqual(['GOBLIN_BOOTSTRAP_COPY foo bar.txt', 'GOBLIN_BOOTSTRAP_COPY config dir'])
+    expect(result.stdout).toBe(
+      encodeRemoteWorktreeBootstrapRecord('copy', 'foo bar.txt') +
+        encodeRemoteWorktreeBootstrapRecord('copy', 'config dir'),
+    )
     expect(readFileSync(path.join(targetRoot, 'foo bar.txt'), 'utf8')).toBe('space\n')
     expect(readFileSync(path.join(targetRoot, 'config dir', 'app.json'), 'utf8')).toBe('ok\n')
     expect(existsSync(path.join(targetRoot, 'config dir', 'debug.log'))).toBe(false)
     expect(existsSync(path.join(targetRoot, 'config dir', '.git', 'config'))).toBe(false)
+  })
+
+  test('remote bootstrap fails fast when required globstar support is unavailable', () => {
+    const withGlobstar = buildRemoteCommandInvocation(target(), {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot: '/srv/repo',
+      targetRoot: '/srv/repo-worktree',
+      copy: ['config/**/*.json'],
+      symlink: [],
+      hardlink: [],
+      exclude: [],
+    })
+    const withoutGlobstar = buildRemoteCommandInvocation(target(), {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot: '/srv/repo',
+      targetRoot: '/srv/repo-worktree',
+      copy: ['config/*.json'],
+      symlink: [],
+      hardlink: [],
+      exclude: [],
+    })
+    const ordinaryDoubleStars = buildRemoteCommandInvocation(target(), {
+      type: 'bootstrapRemoteWorktree',
+      sourceRoot: '/srv/repo',
+      targetRoot: '/srv/repo-worktree',
+      copy: ['config/[**].json', 'config/foo**.json'],
+      symlink: [],
+      hardlink: [],
+      exclude: [],
+    })
+
+    expect(withGlobstar.script).toContain('error: remote bash does not support ** glob patterns')
+    expect(withGlobstar.script).not.toContain('shopt -s globstar 2>/dev/null || true')
+    expect(withoutGlobstar.script).not.toContain('shopt -s globstar')
+    expect(ordinaryDoubleStars.script).not.toContain('shopt -s globstar')
   })
 
   testPosix('remote bootstrap script rejects sources under a symlink parent', async () => {
@@ -419,7 +498,7 @@ describe('remote ssh command builders', () => {
 
     const result = await execa('bash', ['-lc', invocation.script], { env: { SHELL: '/bin/sh' } })
 
-    expect(result.stdout).toBe(`GOBLIN_BOOTSTRAP_SETUP ${setup}`)
+    expect(result.stdout).toBe(encodeRemoteWorktreeBootstrapRecord('setup', setup))
     expect(result.stderr).toBe('')
   })
 
@@ -471,7 +550,7 @@ describe('remote ssh command builders', () => {
 
     const result = await execa('bash', ['-lc', invocation.script])
 
-    expect(result.stdout).toBe('GOBLIN_BOOTSTRAP_COPY config/app.json')
+    expect(result.stdout).toBe(encodeRemoteWorktreeBootstrapRecord('copy', 'config/app.json'))
     expect(readFileSync(path.join(targetRoot, 'config', 'app.json'), 'utf8')).toBe('ok\n')
     expect(existsSync(path.join(targetRoot, 'config', '.git', 'config'))).toBe(false)
   })
@@ -490,7 +569,7 @@ describe('remote ssh command builders', () => {
       type: 'bootstrapRemoteWorktree',
       sourceRoot,
       targetRoot,
-      copy: ['a.txt'],
+      copy: ['missing.txt', 'a.txt'],
       symlink: [],
       hardlink: [],
       exclude: [],
@@ -500,7 +579,7 @@ describe('remote ssh command builders', () => {
       const result = await execa('bash', ['-lc', invocation.script], { reject: false })
 
       expect(result.exitCode).toBe(1)
-      expect(result.stdout).toBe('')
+      expect(result.stdout).toBe(encodeRemoteWorktreeBootstrapRecord('missing', 'missing.txt'))
       expect(result.stderr).toContain('failed to copy a.txt')
       expect(existsSync(path.join(targetRoot, 'a.txt'))).toBe(false)
     } finally {

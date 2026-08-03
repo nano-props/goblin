@@ -96,9 +96,10 @@ describe('settings source', () => {
       entries: [{ target: { kind: 'git-branch', branch: 'main' }, tabs: [] }],
     })
     await mod.addServerRecentWorkspace({ id: REPO_B })
-    await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    await mod.setServerWorkspaceWorktreeBootstrapConfigTrust({
       workspaceId: REPO_B,
       configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      trusted: true,
     })
     unsubscribe()
 
@@ -590,17 +591,20 @@ describe('settings source', () => {
 
     const mod = await import('#/server/modules/settings-source.ts')
 
-    await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    await mod.setServerWorkspaceWorktreeBootstrapConfigTrust({
       workspaceId: REPO_A,
       configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      trusted: true,
     })
-    await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    await mod.setServerWorkspaceWorktreeBootstrapConfigTrust({
       workspaceId: REPO_A,
       configHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      trusted: true,
     })
-    await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    await mod.setServerWorkspaceWorktreeBootstrapConfigTrust({
       workspaceId: REPO_B,
       configHash: 'not-a-hash',
+      trusted: true,
     })
 
     expect(await mod.getServerWorkspaceSettings()).toEqual([
@@ -622,9 +626,10 @@ describe('settings source', () => {
     const mod = await import('#/server/modules/settings-source.ts')
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
-    await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    await mod.setServerWorkspaceWorktreeBootstrapConfigTrust({
       workspaceId: REPO_A,
       configHash,
+      trusted: true,
     })
     await mod.setServerWorkspaceExternalAppRecent({
       workspaceId: REPO_A,
@@ -633,14 +638,15 @@ describe('settings source', () => {
     })
 
     await expect(
-      mod.untrustServerWorkspaceWorktreeBootstrapConfig({
+      mod.setServerWorkspaceWorktreeBootstrapConfigTrust({
         workspaceId: REPO_A,
         configHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        trusted: false,
       }),
     ).resolves.toBe(false)
-    await expect(mod.untrustServerWorkspaceWorktreeBootstrapConfig({ workspaceId: REPO_A, configHash })).resolves.toBe(
-      true,
-    )
+    await expect(
+      mod.setServerWorkspaceWorktreeBootstrapConfigTrust({ workspaceId: REPO_A, configHash, trusted: false }),
+    ).resolves.toBe(true)
 
     expect(await mod.getServerWorkspaceSettings()).toEqual([
       {
@@ -658,14 +664,15 @@ describe('settings source', () => {
     const mod = await import('#/server/modules/settings-source.ts')
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
-    await mod.trustServerWorkspaceWorktreeBootstrapConfig({
+    await mod.setServerWorkspaceWorktreeBootstrapConfigTrust({
       workspaceId: REPO_A,
       configHash,
+      trusted: true,
     })
 
-    await expect(mod.untrustServerWorkspaceWorktreeBootstrapConfig({ workspaceId: REPO_A, configHash })).resolves.toBe(
-      true,
-    )
+    await expect(
+      mod.setServerWorkspaceWorktreeBootstrapConfigTrust({ workspaceId: REPO_A, configHash, trusted: false }),
+    ).resolves.toBe(true)
     expect(await mod.getServerWorkspaceSettings()).toEqual([])
   })
 

@@ -64,7 +64,17 @@ export function useRepoToasts(repoId: WorkspaceId) {
         const actionLabel = repoEventActionSuccessLabel(event.action)
         const resultMessageKey = result.message || 'error.unknown'
         const bootstrapSummary = formatTranslatedWorktreeBootstrapSummary(result.worktreeBootstrap, tRef.current)
-        const descriptionText = bootstrapSummary || tRef.current(resultMessageKey)
+        const translatedResultMessage = tRef.current(resultMessageKey)
+        const translatedRecoveryMessages = (result.recoveryMessageKeys ?? []).map((recoveryMessageKey) =>
+          tRef.current(recoveryMessageKey),
+        )
+        const descriptionText = repoResultDescription(
+          result.ok,
+          result.message,
+          translatedResultMessage,
+          translatedRecoveryMessages,
+          bootstrapSummary,
+        )
         const description =
           (!result.ok || (hasMessage && (!actionLabel || !!bootstrapSummary))) && descriptionText ? (
             <ToastDescription>{descriptionText}</ToastDescription>
@@ -98,6 +108,19 @@ export function useRepoToasts(repoId: WorkspaceId) {
       events.map((event) => event.id),
     )
   }, [events, repoId])
+}
+
+function repoResultDescription(
+  ok: boolean,
+  rawResultMessage: string,
+  translatedResultMessage: string,
+  translatedRecoveryMessages: readonly string[],
+  bootstrapSummary: string,
+): string {
+  if (ok) return bootstrapSummary || translatedResultMessage
+  const resultMessage =
+    rawResultMessage === 'cancelled' && translatedRecoveryMessages.length > 0 ? '' : translatedResultMessage
+  return [resultMessage, ...translatedRecoveryMessages, bootstrapSummary].filter(Boolean).join('\n')
 }
 
 function ToastDescription({ children }: { children: React.ReactNode }) {

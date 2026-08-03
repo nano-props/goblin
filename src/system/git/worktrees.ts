@@ -1,7 +1,9 @@
-import { git, gitResultWithOptions } from '#/system/git/git-exec.ts'
+import { git, gitCommandResultWithOptions } from '#/system/git/git-exec.ts'
 import { parseWorktrees } from '#/system/git/parsers.ts'
-import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
+import type { WorktreeInfo } from '#/shared/git-types.ts'
+import type { CommandOutcome } from '#/system/command-execution.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
+import { WORKTREE_COMMAND_TIMEOUT_MS } from '#/shared/worktree-operation-timeouts.ts'
 
 export async function readWorktreeMembership(cwd: string, signal?: AbortSignal): Promise<WorktreeInfo[]> {
   signal?.throwIfAborted()
@@ -10,21 +12,15 @@ export async function readWorktreeMembership(cwd: string, signal?: AbortSignal):
   return parseWorktrees(output)
 }
 
-/** Worktree create/remove can both touch tens of thousands of files
- *  on large repos (mp-main: 7.8 GB, 91k files, ~22s on a hot SSD).
- *  3 minutes gives ~8× headroom on the largest known repo so a slower
- *  external disk or a busy filesystem still stays inside the budget. */
-const WORKTREE_OP_TIMEOUT_MS = 180_000
-
 /** Plain `git worktree remove` — no `--force`. Git refuses on dirty,
  *  locked, or otherwise non-removable worktrees, which is exactly the
  *  safety net we want; the IPC handler has already pre-checked the
  *  expected cases and surfaced friendlier errors, so anything that
  *  reaches here is a corner case worth showing git's own message for. */
-export async function removeWorktree(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
-  return gitResultWithOptions(
+export async function removeWorktree(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<CommandOutcome> {
+  return gitCommandResultWithOptions(
     cwd,
-    { timeoutMs: WORKTREE_OP_TIMEOUT_MS, signal },
+    { timeoutMs: WORKTREE_COMMAND_TIMEOUT_MS, signal },
     'worktree',
     'remove',
     '--',
@@ -45,10 +41,10 @@ export async function createWorktree(
   cwd: string,
   input: CreateWorktreeInput,
   signal?: AbortSignal,
-): Promise<ExecResult> {
-  return gitResultWithOptions(
+): Promise<CommandOutcome> {
+  return gitCommandResultWithOptions(
     cwd,
-    { timeoutMs: WORKTREE_OP_TIMEOUT_MS, signal },
+    { timeoutMs: WORKTREE_COMMAND_TIMEOUT_MS, signal },
     'worktree',
     'add',
     ...createWorktreeArgs(input),
