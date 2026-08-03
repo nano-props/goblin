@@ -176,10 +176,7 @@ describe('repo branch mutations', () => {
     await expect(pushRepoBranch(repoId, 'feature/a', undefined, { workspaceRuntimeId: 'runtime-test' })).rejects.toBe(
       runtimeFailure,
     )
-    expectRepoMetadataInvalidations(
-      { repoId, domain: 'metadata' },
-      { repoId: linkedRepoId, domain: 'metadata' },
-    )
+    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
   })
 
   test('publishes an established SSH branch milestone before follow-up runtime failure escapes', async () => {
@@ -201,7 +198,7 @@ describe('repo branch mutations', () => {
       new RepoMutationRuntimeFailureError(
         {
           ok: false,
-          message: 'error.local-branch-deleted-upstream-failed-check-state',
+          message: 'upstream connection lost',
           repoIdsToInvalidate: [repoId, linkedRepoId],
         },
         runtimeFailure,
@@ -212,10 +209,7 @@ describe('repo branch mutations', () => {
         workspaceRuntimeId: 'runtime-test',
       }),
     ).rejects.toBe(runtimeFailure)
-    expectRepoMetadataInvalidations(
-      { repoId, domain: 'metadata' },
-      { repoId: linkedRepoId, domain: 'metadata' },
-    )
+    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
   })
 
   test('createRepoWorktree invalidates source and target projections when a failed command may have run', async () => {
@@ -247,7 +241,7 @@ describe('repo branch mutations', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'error.worktree-created-followup-failed',
+      message: 'Worktree bootstrap failed: destination already exists: .env.local',
     })
     expect(mocks.bootstrapWorktreeAfterCreate).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', {
       signal: undefined,
@@ -298,7 +292,7 @@ describe('repo branch mutations', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'error.worktree-created-followup-failed',
+      message: 'Worktree bootstrap failed: destination already exists: .env.local',
     })
     expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
       repoId,
@@ -339,7 +333,7 @@ describe('repo branch mutations', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'error.worktree-created-followup-failed',
+      message: 'Worktree bootstrap failed: destination already exists: .env.local',
     })
     expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).not.toHaveBeenCalled()
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
@@ -381,14 +375,18 @@ describe('repo branch mutations', () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-linked' })
     mocks.getRemoteRepoWorktreePaths.mockResolvedValueOnce(['/srv/repo', '/srv/repo-linked'])
-    mocks.deleteRemoteBranch.mockResolvedValueOnce({ ok: false, message: 'cancelled', localBranchDeleted: true })
+    mocks.deleteRemoteBranch.mockResolvedValueOnce({
+      ok: false,
+      message: 'cancelled',
+      branchStateMayHaveChanged: true,
+    })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await deleteRepoBranch(repoId, 'feature/a', { deleteUpstream: true })
 
     expect(result).toEqual({
       ok: false,
-      message: 'error.local-branch-deleted-upstream-failed-check-state',
+      message: 'error.git-command-cancelled-check-state',
     })
     expect(mocks.deleteRemoteBranch).toHaveBeenCalledWith(expect.objectContaining({ remotePath: '/srv/repo' }), {
       branch: 'feature/a',
@@ -521,7 +519,7 @@ describe('repo branch mutations', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'error.local-branch-deleted-upstream-failed-check-state',
+      message: 'error.git-command-cancelled-check-state',
     })
     expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
   })

@@ -312,9 +312,10 @@ describe('repo-client', () => {
     expect(new URL(String((fetchMock.mock.calls[0] as unknown as [unknown])[0])).pathname).toBe('/api/repo/clone')
   })
 
-  test('gives remove-worktree a multi-step mutation request budget', async () => {
+  test('does not impose a client watchdog on remove-worktree', async () => {
     useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const caller = new AbortController()
     let requestSignal: AbortSignal | undefined
     const requestStarted = Promise.withResolvers<void>()
     mockFetch((_url, init) => {
@@ -326,20 +327,25 @@ describe('repo-client', () => {
     })
 
     const { removeRepoWorktree } = await import('#/web/repo-client.ts')
-    const request = removeRepoWorktree(workspaceId, 'repo-runtime-test', {
-      branch: 'feature/remove',
-      worktreePath: '/tmp/repo-feature-remove',
-      deleteBranch: true,
-      deleteUpstream: true,
-    })
-    const assertion = expect(request).rejects.toThrow('error.request-timeout')
+    const request = removeRepoWorktree(
+      workspaceId,
+      'repo-runtime-test',
+      {
+        branch: 'feature/remove',
+        worktreePath: '/tmp/repo-feature-remove',
+        deleteBranch: true,
+        deleteUpstream: true,
+      },
+      caller.signal,
+    )
 
     await requestStarted.promise
     if (!requestSignal) throw new Error('missing remove-worktree request signal')
-    await vi.advanceTimersByTimeAsync(240_000)
+    await vi.advanceTimersByTimeAsync(10 * 60_000 + 1)
     expect(requestSignal.aborted).toBe(false)
-    await vi.advanceTimersByTimeAsync(360_000)
-    await assertion
+
+    caller.abort(new Error('caller cancelled'))
+    await expect(request).rejects.toThrow('caller cancelled')
   })
 
   test('does not reclassify caller cancellation as a create-worktree timeout', async () => {

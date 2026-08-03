@@ -60,7 +60,7 @@ describe('remote git mutations', () => {
 
     const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', run: run })
 
-    expect(result).toEqual({ ok: true, message: 'Deleted branch feature/test', localBranchDeleted: true })
+    expect(result).toEqual({ ok: true, message: 'Deleted branch feature/test' })
     expect(run).toHaveBeenCalledWith(
       { type: 'gitIsAncestor', path: '/srv/repo', ancestor: 'feature/test', descendant: 'release/1.0' },
       TARGET,
@@ -112,14 +112,14 @@ describe('remote git mutations', () => {
       remote: 'fork',
       upstreamBranch: 'topic/feature-test',
       pushResult: okRemoteResult('deleted upstream'),
-      expected: { ok: true, message: 'deleted upstream', localBranchDeleted: true },
+      expected: { ok: true, message: 'deleted upstream' },
     },
     {
       name: 'reports upstream delete failure after deleting the local branch',
       remote: 'origin',
       upstreamBranch: 'feature/test',
       pushResult: { ...failRemoteResult('remote rejected delete'), remoteStarted: true },
-      expected: { ok: false, message: 'remote rejected delete', localBranchDeleted: true },
+      expected: { ok: false, message: 'remote rejected delete', branchStateMayHaveChanged: true },
     },
   ] as const)('deleteRemoteBranch $name', async ({ remote, upstreamBranch, pushResult, expected }) => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {

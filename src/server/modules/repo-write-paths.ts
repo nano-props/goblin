@@ -70,8 +70,18 @@ async function runMutationWithInvalidations(
   }
 }
 
-function execResultOnly(result: RepoMutationResult & { worktreePathsToInvalidate?: readonly string[] }): ExecResult {
-  return { ok: result.ok, message: result.message }
+function execResultOnly(result: RepoMutationResult): ExecResult {
+  if (result.worktreeBootstrap) {
+    return {
+      ok: result.ok,
+      message: result.message,
+      worktreeBootstrap: result.worktreeBootstrap,
+    }
+  }
+  return {
+    ok: result.ok,
+    message: result.message,
+  }
 }
 
 async function runUserNetworkMutation(
@@ -97,7 +107,8 @@ async function runUserNetworkMutation(
     (_operation, context) => async () => {
       return await runMutationWithInvalidations(cwd, invalidatedDomains, async () => {
         return await context.runWithRepoSource(
-          async (source) => await context.runNetworkOperation(async (networkSignal) => await task(source, networkSignal)),
+          async (source) =>
+            await context.runNetworkOperation(async (networkSignal) => await task(source, networkSignal)),
         )
       })
     },

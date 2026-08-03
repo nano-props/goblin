@@ -103,7 +103,7 @@ import {
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
 interface BranchDeleteResult extends ExecResult {
-  localBranchDeleted?: true
+  /** Failure-only impact: the local delete may have run or preceded a failed upstream delete. */
   branchStateMayHaveChanged?: true
 }
 
@@ -367,21 +367,14 @@ function worktreeCommandTimeoutMessage(operation: 'create' | 'remove'): string {
   return exhaustive
 }
 
-function worktreeRemovalResultForUser(result: RepoMutationResult): RepoMutationResult {
-  if (result.ok) return result
-  if (result.worktreeRemoved) {
-    return { ...result, message: 'error.worktree-removed-followup-failed' }
-  }
-  return result
-}
-
 function branchDeleteResultForUser(result: BranchDeleteResult): BranchDeleteResult {
   if (result.ok) return result
-  if (result.localBranchDeleted) {
-    return { ...result, message: 'error.local-branch-deleted-upstream-failed-check-state' }
-  }
   if (result.branchStateMayHaveChanged && result.message === 'cancelled') {
-    return { ...result, message: 'error.git-command-cancelled-check-state' }
+    return {
+      ok: false,
+      message: 'error.git-command-cancelled-check-state',
+      branchStateMayHaveChanged: true,
+    }
   }
   return result
 }
@@ -470,13 +463,8 @@ function createLocalRepoSource(
       if (!commandMayHaveRun(localDeleteExecution)) return localDeleteResult
       return { ok: false, message: localDeleteResult.message, branchStateMayHaveChanged: true }
     }
-    const localBranchDeleted: BranchDeleteResult = {
-      ok: true,
-      message: localDeleteResult.message,
-      localBranchDeleted: true,
-    }
     if (options?.deleteUpstream !== true || !upstream?.deleteTarget) {
-      return localBranchDeleted
+      return localDeleteResult
     }
     const { result: upstreamDeleteResult } = await deleteUpstreamBranch(
       gitCwd,
@@ -484,10 +472,11 @@ function createLocalRepoSource(
       upstream.deleteTarget.branch,
       signal,
     )
+    if (upstreamDeleteResult.ok) return upstreamDeleteResult
     return {
-      ok: upstreamDeleteResult.ok,
+      ok: false,
       message: upstreamDeleteResult.message,
-      localBranchDeleted: true,
+      branchStateMayHaveChanged: true,
     }
   }
 
@@ -593,7 +582,7 @@ function createLocalRepoSource(
             message: [created.message, bootstrapped.message].filter(Boolean).join('\n'),
             ...(bootstrapped.worktreeBootstrap ? { worktreeBootstrap: bootstrapped.worktreeBootstrap } : {}),
           }
-        : { ...bootstrapped, message: 'error.worktree-created-followup-failed' }
+        : bootstrapped
       return withRepoIdsToInvalidate(result, repoIdsToInvalidate)
     },
     async deleteBranch(branch, options, signal) {
@@ -612,7 +601,7 @@ function createLocalRepoSource(
       if (validation) return validation
       const repoIdsToInvalidate = localRepoIdsToInvalidate(repoId, worktrees)
       const result = await deleteBranchAfterValidation(branch, upstream, options, signal)
-      const branchChanged = result.localBranchDeleted === true || result.branchStateMayHaveChanged === true
+      const branchChanged = result.ok || result.branchStateMayHaveChanged === true
       const publicResult = publicBranchDeleteResult(result)
       return branchChanged ? withRepoIdsToInvalidate(publicResult, repoIdsToInvalidate) : publicResult
     },
@@ -671,10 +660,7 @@ function createLocalRepoSource(
       }
       const finalized = await lifecycle.afterWorktreeRemoved()
       if (!finalized.ok) {
-        return withRepoIdsToInvalidate(
-          { ...finalized, message: 'error.worktree-removed-followup-failed', worktreeRemoved: true },
-          repoIdsToInvalidate,
-        )
+        return withRepoIdsToInvalidate({ ...finalized, worktreeRemoved: true }, repoIdsToInvalidate)
       }
       if (!input.deleteBranch)
         return withRepoIdsToInvalidate({ ...removed, worktreeRemoved: true }, repoIdsToInvalidate)
@@ -687,9 +673,7 @@ function createLocalRepoSource(
       )
       const removalResult: RepoMutationResult = {
         ok: deletedWithMilestone.ok,
-        message: deletedWithMilestone.ok
-          ? deletedWithMilestone.message
-          : 'error.worktree-removed-followup-failed',
+        message: deletedWithMilestone.message,
         worktreeRemoved: true,
       }
       return withRepoIdsToInvalidate(removalResult, repoIdsToInvalidate)
@@ -813,10 +797,7 @@ async function createRemoteRepoSource(
           expectedConfigHash: options.worktreeBootstrap.configHash,
         })
         if (!bootstrapped.ok) {
-          return withRepoIdsToInvalidate(
-            { ...bootstrapped, message: 'error.worktree-created-followup-failed' },
-            repoIdsToInvalidate,
-          )
+          return withRepoIdsToInvalidate(bootstrapped, repoIdsToInvalidate)
         }
         return withRepoIdsToInvalidate(
           {
@@ -838,7 +819,7 @@ async function createRemoteRepoSource(
           signal,
           run: mutationRun,
         })
-        const branchChanged = result.localBranchDeleted === true || result.branchStateMayHaveChanged === true
+        const branchChanged = result.ok || result.branchStateMayHaveChanged === true
         const publicResult = publicBranchDeleteResult(result)
         return branchChanged ? withRepoIdsToInvalidate(publicResult, repoIdsToInvalidate) : publicResult
       })
@@ -858,8 +839,7 @@ async function createRemoteRepoSource(
           runMembershipMutation,
         })
         if (!result.worktreePathsToInvalidate?.length && result.worktreeRemoved !== true) return result
-        const userResult = worktreeRemovalResultForUser(result)
-        return withRepoIdsToInvalidate(userResult, [
+        return withRepoIdsToInvalidate(result, [
           target.id,
           ...remoteWorktreeRepoIds(target, result.worktreePathsToInvalidate),
         ])

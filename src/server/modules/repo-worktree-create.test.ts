@@ -169,6 +169,33 @@ describe('repo worktree creation', () => {
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 
+  test('createRepoWorktree preserves the bootstrap summary in its public result', async () => {
+    mocks.bootstrapWorktreeAfterCreate.mockResolvedValueOnce({
+      ok: true,
+      message: 'Copied 1 path: .env',
+      worktreeBootstrap: {
+        copy: { count: 1, paths: ['.env'] },
+        symlink: { count: 0, paths: [] },
+        hardlink: { count: 0, paths: [] },
+        skippedMissing: { count: 0, paths: [] },
+      },
+    })
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
+
+    expect(result).toEqual({
+      ok: true,
+      message: 'ok\nCopied 1 path: .env',
+      worktreeBootstrap: {
+        copy: { count: 1, paths: ['.env'] },
+        symlink: { count: 0, paths: [] },
+        hardlink: { count: 0, paths: [] },
+        skippedMissing: { count: 0, paths: [] },
+      },
+    })
+  })
+
   test('createRepoWorktree clears existing bootstrap trust when the create request leaves trust unchecked', async () => {
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 

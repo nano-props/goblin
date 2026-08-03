@@ -574,8 +574,6 @@ export const en = {
     'The worktree was created, but a follow-up step failed. Check the worktree and reopen or repair the workspace before continuing.',
   'error.worktree-removed-followup-failed':
     'The worktree was removed, but a follow-up step failed. Reopen or repair the workspace before continuing.',
-  'error.local-branch-deleted-upstream-failed-check-state':
-    'The local branch was deleted, but deleting its upstream did not complete. Refresh and check the remote branch before retrying.',
   'error.branch-action-wait-timeout': 'Timed out waiting for repository refresh to finish.',
   'error.unknown': 'Unknown error',
   'error.cannot-delete-current-branch': 'Cannot delete the current branch',

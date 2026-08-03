@@ -337,7 +337,7 @@ beforeEach(async () => {
   hoistedMocks.deleteBranch.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
   hoistedMocks.deleteUpstreamBranch.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
   hoistedMocks.removeWorktree.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))
-  hoistedMocks.deleteRemoteBranch.mockResolvedValue({ ok: true, message: 'ok', localBranchDeleted: true })
+  hoistedMocks.deleteRemoteBranch.mockResolvedValue({ ok: true, message: 'ok' })
   hoistedMocks.removeRemoteWorktree.mockResolvedValue({ ok: true, message: 'ok', worktreeRemoved: true })
   hoistedMocks.fetchRemoteRepo.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'fetched' }))
   hoistedMocks.pullRemoteBranch.mockResolvedValue(commandOutcomeForTest({ ok: true, message: 'ok' }))

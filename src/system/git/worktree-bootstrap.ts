@@ -19,6 +19,7 @@ import {
   worktreeBootstrapConfigHash,
   type WorktreeBootstrapConfig,
 } from '#/system/git/worktree-bootstrap-config.ts'
+import { copyPath } from '#/system/filesystem-copy.ts'
 
 type MaterializationMode = 'copy' | 'symlink' | 'hardlink'
 
@@ -379,12 +380,9 @@ async function materializePlan(
       if (!safeDestination.ok) return safeDestination
       switch (item.mode) {
         case 'copy':
-          await fs.cp(item.abs, item.dest, {
-            recursive: true,
-            force: false,
-            errorOnExist: true,
-            dereference: false,
-            filter: (sourcePath) => shouldCopyPath(sourceRoot, sourcePath, excludedPaths),
+          await copyPath(item.abs, item.dest, {
+            signal,
+            include: (sourcePath) => shouldCopyPath(sourceRoot, sourcePath, excludedPaths),
           })
           break
         case 'symlink':
@@ -395,6 +393,7 @@ async function materializePlan(
           break
       }
     } catch (err) {
+      if (signal?.aborted) return { ok: false, message: 'cancelled' }
       if (hasErrorCode(err, 'EEXIST')) return { ok: false, message: `destination already exists: ${item.rel}` }
       return { ok: false, message: `failed to ${item.mode} ${item.rel}: ${errorMessage(err)}` }
     }

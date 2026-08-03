@@ -33,7 +33,6 @@ const REPO_REQUEST_TIMEOUT_MS = {
   gitNetwork: 240_000,
   clone: 360_000,
   branchMutation: 240_000,
-  removeWorktree: 10 * 60_000,
   patch: 15 * 60_000,
 } as const
 
@@ -274,7 +273,9 @@ export async function removeRepoWorktree(
     decodeWith(ExecResultResponseSchema),
     {
       signal,
-      timeoutMs: REPO_REQUEST_TIMEOUT_MS.removeWorktree,
+      // Removal is a multi-step server workflow. Its mutation commands own
+      // their deadlines; a client watchdog could cut off confirmed follow-up.
+      timeoutMs: 0,
     },
   )
 }

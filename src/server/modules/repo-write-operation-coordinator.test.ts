@@ -68,7 +68,7 @@ beforeEach(() => {
 })
 
 describe('repo write operation coordinator', () => {
-  test('rejects membership reads that start during or overlap a worktree mutation', async () => {
+  test('rejects successful overlapping reads without replacing a read failure', async () => {
     const boundary = await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
     const releaseRead = Promise.withResolvers<void>()
     const readStarted = Promise.withResolvers<void>()
@@ -120,7 +120,7 @@ describe('repo write operation coordinator', () => {
       domain: 'worktree-status',
     })
     releaseRead.resolve()
-    await expect(overlappingRead).rejects.toThrow('error.repo-membership-changing')
+    await expect(overlappingRead).rejects.toThrow('worktree disappeared while sampling status')
 
     await expect(runWithRepoMembershipReadAdmission(boundary, async () => 'stable')).resolves.toBe('stable')
     releaseFollowup.resolve()

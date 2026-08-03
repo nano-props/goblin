@@ -565,8 +565,6 @@ export const ko: Record<DictKey, string> = {
     '워크트리는 생성되었지만 후속 단계가 실패했습니다. 계속하기 전에 워크트리를 확인하고 작업 공간을 다시 열거나 복구하세요.',
   'error.worktree-removed-followup-failed':
     '워크트리는 삭제되었지만 후속 단계가 실패했습니다. 계속하기 전에 작업 공간을 다시 열거나 복구하세요.',
-  'error.local-branch-deleted-upstream-failed-check-state':
-    '로컬 브랜치는 삭제되었지만 업스트림 브랜치 삭제를 완료하지 못했습니다. 새로 고친 뒤 원격 브랜치를 확인하고 다시 시도하세요.',
   'error.branch-action-wait-timeout': '저장소 새로고침 완료 대기 시간이 초과되었습니다.',
   'error.unknown': '알 수 없는 오류',
   'error.cannot-delete-current-branch': '현재 브랜치는 삭제할 수 없습니다',

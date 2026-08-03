@@ -95,7 +95,7 @@ export interface RemoteWorktreeMutationResult extends ExecResult {
 }
 
 export interface RemoteBranchDeleteResult extends ExecResult {
-  localBranchDeleted?: true
+  /** Failure-only impact: the local delete may have run or preceded a failed upstream delete. */
   branchStateMayHaveChanged?: true
 }
 
@@ -814,14 +814,10 @@ export async function removeRemoteWorktree(
 
   const removeResult = await input.runMembershipMutation(
     async () =>
-      await run(
-        { type: 'gitWorktreeRemove', path: mutationPath, worktreePath: resolved.path },
-        target,
-        {
-          timeoutMs: WORKTREE_COMMAND_TIMEOUT_MS,
-          signal: input.signal,
-        },
-      ),
+      await run({ type: 'gitWorktreeRemove', path: mutationPath, worktreePath: resolved.path }, target, {
+        timeoutMs: WORKTREE_COMMAND_TIMEOUT_MS,
+        signal: input.signal,
+      }),
   )
   const { result: removeCommandResult, execution: removeExecution } = remoteCommandOutcome(removeResult)
   if (!removeCommandResult.ok) {
@@ -939,23 +935,19 @@ export async function deleteRemoteBranch(
     if (!commandMayHaveRun(localDeleteExecution)) return localDeleteResult
     return { ok: false, message: localDeleteResult.message, branchStateMayHaveChanged: true }
   }
-  const localBranchDeleted: RemoteBranchDeleteResult = {
-    ok: true,
-    message: localDeleteResult.message,
-    localBranchDeleted: true,
-  }
   const upstreamDeleteOutcome = await deleteRemoteUpstreamBranch(
     target,
     target.remotePath,
     input.deleteUpstream ? upstream : null,
     { signal: input.signal, run },
   )
-  if (!upstreamDeleteOutcome) return localBranchDeleted
+  if (!upstreamDeleteOutcome) return localDeleteResult
   const { result: upstreamDeleteResult } = upstreamDeleteOutcome
+  if (upstreamDeleteResult.ok) return upstreamDeleteResult
   return {
-    ok: upstreamDeleteResult.ok,
+    ok: false,
     message: upstreamDeleteResult.message,
-    localBranchDeleted: true,
+    branchStateMayHaveChanged: true,
   }
 }
 

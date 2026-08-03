@@ -530,8 +530,8 @@ export async function runWithRepoMembershipReadAdmission<T>(
   group.activeMembershipReads += 1
   try {
     const outcome = await observePromise(read)
-    assertRepoMembershipReadStillAdmitted(group, revision)
     if (!outcome.ok) throw outcome.error
+    assertRepoMembershipReadStillAdmitted(group, revision)
     return outcome.value
   } finally {
     group.activeMembershipReads -= 1

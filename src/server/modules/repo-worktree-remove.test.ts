@@ -165,10 +165,7 @@ describe('repo worktree removal', () => {
       { path: '/tmp/repo-worktree', branch: 'feature/a', isBare: false, isPrimary: false },
     ])
 
-    const result = await removeLocalRepoWorktreeForTest(
-      { deleteBranch: false },
-      successfulRemovalLifecycle,
-    )
+    const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
     expect(result).toEqual({ ok: false, message: 'error.git-command-cancelled-check-state' })
     expectRepoMetadataInvalidations(
@@ -232,10 +229,7 @@ describe('repo worktree removal', () => {
       workspaceId: repoId,
       worktreePath: '/srv/repo-feature',
     })
-    expectRepoMetadataInvalidations(
-      { repoId, domain: 'metadata' },
-      { repoId: linkedRepoId, domain: 'metadata' },
-    )
+    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
   })
 
   test('removeRepoWorktree prunes settings when application finalization fails after removal', async () => {
@@ -257,7 +251,7 @@ describe('repo worktree removal', () => {
       },
     )
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-removed-followup-failed' })
+    expect(result).toEqual({ ok: false, message: 'tabs finalize failed' })
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
@@ -376,7 +370,7 @@ describe('repo worktree removal', () => {
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: true }, successfulRemovalLifecycle)
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-removed-followup-failed' })
+    expect(result).toEqual({ ok: false, message: 'fatal: delete failed' })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
