@@ -355,6 +355,11 @@ function branchDeleteResultForUser(result: BranchDeleteResult): BranchDeleteResu
   return result
 }
 
+function publicBranchDeleteResult(result: BranchDeleteResult): ExecResult {
+  const userResult = branchDeleteResultForUser(result)
+  return { ok: userResult.ok, message: userResult.message }
+}
+
 async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
   try {
     const value = await fs.stat(cwd)
@@ -426,22 +431,33 @@ function createLocalRepoSource(
     signal?: AbortSignal,
     gitCwd = repoId,
   ): Promise<BranchDeleteResult> {
-    const deleted = await deleteBranch(gitCwd, branch, { force: options?.force, signal })
-    if (!deleted.result.ok) {
-      if (!commandMayHaveRun(deleted.execution)) return deleted.result
-      return { ...deleted.result, branchStateMayHaveChanged: true }
+    const { result: localDeleteResult, execution: localDeleteExecution } = await deleteBranch(gitCwd, branch, {
+      force: options?.force,
+      signal,
+    })
+    if (!localDeleteResult.ok) {
+      if (!commandMayHaveRun(localDeleteExecution)) return localDeleteResult
+      return { ok: false, message: localDeleteResult.message, branchStateMayHaveChanged: true }
     }
-    const localBranchDeleted = { ...deleted.result, localBranchDeleted: true as const }
+    const localBranchDeleted: BranchDeleteResult = {
+      ok: true,
+      message: localDeleteResult.message,
+      localBranchDeleted: true,
+    }
     if (options?.deleteUpstream !== true || !upstream?.deleteTarget) {
       return localBranchDeleted
     }
-    const upstreamDeleted = await deleteUpstreamBranch(
+    const { result: upstreamDeleteResult } = await deleteUpstreamBranch(
       gitCwd,
       upstream.deleteTarget.remote,
       upstream.deleteTarget.branch,
       signal,
     )
-    return { ...upstreamDeleted.result, localBranchDeleted: true }
+    return {
+      ok: upstreamDeleteResult.ok,
+      message: upstreamDeleteResult.message,
+      localBranchDeleted: true,
+    }
   }
 
   return {
@@ -566,12 +582,8 @@ function createLocalRepoSource(
       const repoIdsToInvalidate = localRepoIdsToInvalidate(repoId, worktrees)
       const result = await deleteBranchAfterValidation(branch, upstream, options, signal)
       const branchChanged = result.localBranchDeleted === true || result.branchStateMayHaveChanged === true
-      const {
-        localBranchDeleted: _localBranchDeleted,
-        branchStateMayHaveChanged: _branchStateMayHaveChanged,
-        ...deleted
-      } = branchDeleteResultForUser(result)
-      return branchChanged ? withRepoIdsToInvalidate(deleted, repoIdsToInvalidate) : deleted
+      const publicResult = publicBranchDeleteResult(result)
+      return branchChanged ? withRepoIdsToInvalidate(publicResult, repoIdsToInvalidate) : publicResult
     },
     async removeWorktree(input, signal, lifecycle, runMembershipMutation) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -642,13 +654,14 @@ function createLocalRepoSource(
         signal,
         mutationCwd,
       )
-      const {
-        localBranchDeleted: _localBranchDeleted,
-        branchStateMayHaveChanged: _branchStateMayHaveChanged,
-        ...deleted
-      } = deletedWithMilestone
-      const result = deleted.ok ? deleted : { ...deleted, message: 'error.worktree-removed-followup-failed' }
-      return withRepoIdsToInvalidate({ ...result, worktreeRemoved: true }, repoIdsToInvalidate)
+      const removalResult: RepoMutationResult = {
+        ok: deletedWithMilestone.ok,
+        message: deletedWithMilestone.ok
+          ? deletedWithMilestone.message
+          : 'error.worktree-removed-followup-failed',
+        worktreeRemoved: true,
+      }
+      return withRepoIdsToInvalidate(removalResult, repoIdsToInvalidate)
     },
     async getPatch(worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -777,12 +790,8 @@ async function createRemoteRepoSource(
         run,
       })
       const branchChanged = result.localBranchDeleted === true || result.branchStateMayHaveChanged === true
-      const {
-        localBranchDeleted: _localBranchDeleted,
-        branchStateMayHaveChanged: _branchStateMayHaveChanged,
-        ...deleted
-      } = branchDeleteResultForUser(result)
-      return branchChanged ? withRepoIdsToInvalidate(deleted, repoIdsToInvalidate) : deleted
+      const publicResult = publicBranchDeleteResult(result)
+      return branchChanged ? withRepoIdsToInvalidate(publicResult, repoIdsToInvalidate) : publicResult
     },
     async removeWorktree(input, signal, lifecycle, runMembershipMutation) {
       const exactExecution = physicalWorktreeCapability

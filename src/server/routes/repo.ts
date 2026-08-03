@@ -408,7 +408,7 @@ function publishPullFilesystemInvalidations(
   workspaceRuntimeId: string,
   outcome: RepoFilesystemMutationOutcome,
 ) {
-  const { worktreePathsToInvalidate = [], ...result } = outcome
+  const { worktreePathsToInvalidate = [] } = outcome
   const roots = new Set(
     worktreePathsToInvalidate
       .map((worktreePath) => workspaceLocatorForPath(workspaceId, worktreePath))
@@ -419,5 +419,5 @@ function publishPullFilesystemInvalidations(
       target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root },
     })
   }
-  return result
+  return { ok: outcome.ok, message: outcome.message }
 }

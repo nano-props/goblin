@@ -478,9 +478,7 @@ export async function pullRemoteBranch(
       signal: options.signal,
       timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
     })
-    const outcome = remoteCommandOutcome(result)
-    if (!commandMayHaveRun(outcome.execution)) return outcome
-    return { ...outcome, result: { ...outcome.result, worktreePathsToInvalidate: [worktreePath] } }
+    return remoteOutcomeWithWorktreeInvalidation(remoteCommandOutcome(result), worktreePath)
   }
 
   const snapshot = await getRemoteSnapshot(target, { signal: options.signal, run })
@@ -490,9 +488,7 @@ export async function pullRemoteBranch(
       signal: options.signal,
       timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
     })
-    const outcome = remoteCommandOutcome(result)
-    if (!commandMayHaveRun(outcome.execution)) return outcome
-    return { ...outcome, result: { ...outcome.result, worktreePathsToInvalidate: [target.remotePath] } }
+    return remoteOutcomeWithWorktreeInvalidation(remoteCommandOutcome(result), target.remotePath)
   }
 
   const upstream = await getRemoteUpstream(target, branch, { signal: options.signal, run })
@@ -569,14 +565,29 @@ export async function createRemoteWorktree(
         { signal: input.signal, timeoutMs: WORKTREE_COMMAND_TIMEOUT_MS },
       ),
   )
-  const outcome = remoteCommandOutcome(result)
-  let resultWithImpact = outcome.result
-  if (resultWithImpact.ok) {
-    resultWithImpact = withWorktreePathsToInvalidate(resultWithImpact, [normalized.worktreePath])
-  }
+  const { result: createResult, execution } = remoteCommandOutcome(result)
+  const resultWithImpact = createResult.ok
+    ? withWorktreePathsToInvalidate(createResult, [normalized.worktreePath])
+    : createResult
   return {
     result: resultWithImpact,
-    execution: outcome.execution,
+    execution,
+  }
+}
+
+function remoteOutcomeWithWorktreeInvalidation(
+  outcome: CommandOutcome,
+  worktreePath: string,
+): CommandOutcome<RemoteWorktreeMutationResult> {
+  const { result, execution } = outcome
+  if (!commandMayHaveRun(execution)) return outcome
+  return {
+    result: {
+      ok: result.ok,
+      message: result.message,
+      worktreePathsToInvalidate: [worktreePath],
+    },
+    execution,
   }
 }
 
@@ -823,20 +834,23 @@ export async function removeRemoteWorktree(
         },
       ),
   )
-  const removeOutcome = remoteCommandOutcome(removeResult)
-  if (!removeOutcome.result.ok) {
-    let failure = removeOutcome.result
-    if (removeOutcome.execution.status === 'timed-out') {
-      failure = { ...failure, message: 'error.worktree-remove-timeout-check-state' }
+  const { result: removeCommandResult, execution: removeExecution } = remoteCommandOutcome(removeResult)
+  if (!removeCommandResult.ok) {
+    const failure: RemoteWorktreeMutationResult = {
+      ok: false,
+      message:
+        removeExecution.status === 'timed-out'
+          ? 'error.worktree-remove-timeout-check-state'
+          : removeCommandResult.message,
     }
     return withWorktreePathsToInvalidate(failure, worktreePathsToInvalidate)
   }
   const finalized = await input.afterWorktreeRemoved()
   if (!finalized.ok) {
-    return withWorktreePathsToInvalidate({ ...finalized, worktreeRemoved: true }, worktreePathsToInvalidate)
+    return withWorktreePathsToInvalidate(worktreeRemovedResult(finalized), worktreePathsToInvalidate)
   }
   if (!input.deleteBranch) {
-    return withWorktreePathsToInvalidate({ ...removeOutcome.result, worktreeRemoved: true }, worktreePathsToInvalidate)
+    return withWorktreePathsToInvalidate(worktreeRemovedResult(removeCommandResult), worktreePathsToInvalidate)
   }
 
   const deleteResult = await run(
@@ -844,12 +858,9 @@ export async function removeRemoteWorktree(
     target,
     { timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS, signal: input.signal },
   )
-  const localDeleteOutcome = remoteCommandOutcome(deleteResult)
-  if (!localDeleteOutcome.result.ok) {
-    return withWorktreePathsToInvalidate(
-      { ...localDeleteOutcome.result, worktreeRemoved: true },
-      worktreePathsToInvalidate,
-    )
+  const { result: localDeleteResult } = remoteCommandOutcome(deleteResult)
+  if (!localDeleteResult.ok) {
+    return withWorktreePathsToInvalidate(worktreeRemovedResult(localDeleteResult), worktreePathsToInvalidate)
   }
   const upstreamDeleteOutcome = await deleteRemoteUpstreamBranch(
     target,
@@ -860,8 +871,16 @@ export async function removeRemoteWorktree(
       run,
     },
   )
-  const finalDeleteResult = upstreamDeleteOutcome?.result ?? localDeleteOutcome.result
-  return withWorktreePathsToInvalidate({ ...finalDeleteResult, worktreeRemoved: true }, worktreePathsToInvalidate)
+  let finalDeleteResult = localDeleteResult
+  if (upstreamDeleteOutcome) {
+    const { result: upstreamDeleteResult } = upstreamDeleteOutcome
+    finalDeleteResult = upstreamDeleteResult
+  }
+  return withWorktreePathsToInvalidate(worktreeRemovedResult(finalDeleteResult), worktreePathsToInvalidate)
+}
+
+function worktreeRemovedResult(result: ExecResult): RemoteWorktreeMutationResult {
+  return { ok: result.ok, message: result.message, worktreeRemoved: true }
 }
 
 function withWorktreePathsToInvalidate(
@@ -913,12 +932,16 @@ export async function deleteRemoteBranch(
     target,
     { signal: input.signal, timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
   )
-  const localDeleteOutcome = remoteCommandOutcome(result)
-  if (!localDeleteOutcome.result.ok) {
-    if (!commandMayHaveRun(localDeleteOutcome.execution)) return localDeleteOutcome.result
-    return { ...localDeleteOutcome.result, branchStateMayHaveChanged: true }
+  const { result: localDeleteResult, execution: localDeleteExecution } = remoteCommandOutcome(result)
+  if (!localDeleteResult.ok) {
+    if (!commandMayHaveRun(localDeleteExecution)) return localDeleteResult
+    return { ok: false, message: localDeleteResult.message, branchStateMayHaveChanged: true }
   }
-  const localBranchDeleted = { ...localDeleteOutcome.result, localBranchDeleted: true as const }
+  const localBranchDeleted: RemoteBranchDeleteResult = {
+    ok: true,
+    message: localDeleteResult.message,
+    localBranchDeleted: true,
+  }
   const upstreamDeleteOutcome = await deleteRemoteUpstreamBranch(
     target,
     target.remotePath,
@@ -926,7 +949,12 @@ export async function deleteRemoteBranch(
     { signal: input.signal, run },
   )
   if (!upstreamDeleteOutcome) return localBranchDeleted
-  return { ...upstreamDeleteOutcome.result, localBranchDeleted: true }
+  const { result: upstreamDeleteResult } = upstreamDeleteOutcome
+  return {
+    ok: upstreamDeleteResult.ok,
+    message: upstreamDeleteResult.message,
+    localBranchDeleted: true,
+  }
 }
 
 export async function getRemoteBrowserUrl(

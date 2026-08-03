@@ -19,6 +19,10 @@
 - Keep execution facts, domain milestones, projection impact, and user-facing
   messages separate. Extract a helper only when it gives a decision one clear
   name and owner, not merely to hide branching.
+- Destructure a command outcome once when entering its domain flow, then use
+  names such as `localDeleteResult` and `localDeleteExecution`. Construct the
+  domain result explicitly; do not repeatedly traverse `outcome.result` or use
+  rest destructuring to erase internal authority fields.
 
 ## Verification and test data
 

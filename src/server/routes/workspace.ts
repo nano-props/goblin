@@ -294,9 +294,13 @@ async function runTrashFileRequest(input: {
       userId: input.userId,
       run: async () => {
         try {
-          const outcome = await trashWorkspaceFile(input.target, input.filePath, input.signal)
-          mutationMayHaveRun = commandMayHaveRun(outcome.execution)
-          return outcome.result
+          const { result: trashResult, execution: trashExecution } = await trashWorkspaceFile(
+            input.target,
+            input.filePath,
+            input.signal,
+          )
+          mutationMayHaveRun = commandMayHaveRun(trashExecution)
+          return trashResult
         } catch (error) {
           if (!isInvokedCommandError(error)) throw error
           mutationMayHaveRun = true

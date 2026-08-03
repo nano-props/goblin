@@ -1,5 +1,4 @@
 import path from 'node:path'
-import { omit } from 'es-toolkit'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { publishRepoReadInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
@@ -54,7 +53,7 @@ function publishMutationInvalidations(
 }
 
 function execResultOnly(result: RepoMutationResult & { worktreePathsToInvalidate?: readonly string[] }): ExecResult {
-  return omit(result, ['repoIdsToInvalidate', 'worktreePathsToInvalidate', 'worktreeRemoved'])
+  return { ok: result.ok, message: result.message }
 }
 
 async function runUserNetworkMutation(
@@ -91,7 +90,11 @@ export interface RepoFilesystemMutationOutcome extends ExecResult {
 }
 
 function filesystemMutationOutcome(result: RepoMutationResult): RepoFilesystemMutationOutcome {
-  return omit(result, ['repoIdsToInvalidate', 'worktreeRemoved'])
+  return {
+    ok: result.ok,
+    message: result.message,
+    worktreePathsToInvalidate: result.worktreePathsToInvalidate,
+  }
 }
 
 function createWorktreeTargetBranch(input: CreateWorktreeInput): string {

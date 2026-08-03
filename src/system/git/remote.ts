@@ -37,8 +37,12 @@ function withWorktreeInvalidationScope(
   outcome: CommandOutcome,
   worktreePathsToInvalidate: readonly string[],
 ): CommandOutcome<GitPullResult> {
-  if (!commandMayHaveRun(outcome.execution)) return outcome
-  return { ...outcome, result: { ...outcome.result, worktreePathsToInvalidate } }
+  const { result, execution } = outcome
+  if (!commandMayHaveRun(execution)) return outcome
+  return {
+    result: { ok: result.ok, message: result.message, worktreePathsToInvalidate },
+    execution,
+  }
 }
 
 export async function getBrowserRepoUrl(

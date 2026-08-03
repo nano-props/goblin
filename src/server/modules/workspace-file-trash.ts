@@ -48,17 +48,24 @@ function trashNotStarted(result: ExecResult): CommandOutcome {
 }
 
 function trashOutcomeForUser(outcome: CommandOutcome): CommandOutcome {
-  switch (outcome.execution.status) {
+  const { execution } = outcome
+  switch (execution.status) {
     case 'cancelled':
-      return { ...outcome, result: { ...outcome.result, message: 'error.trash-cancelled-check-state' } }
+      return {
+        result: { ok: false, message: 'error.trash-cancelled-check-state' },
+        execution,
+      }
     case 'timed-out':
-      return { ...outcome, result: { ...outcome.result, message: 'error.trash-timeout-check-state' } }
+      return {
+        result: { ok: false, message: 'error.trash-timeout-check-state' },
+        execution,
+      }
     case 'not-started':
     case 'succeeded':
     case 'failed':
       return outcome
   }
-  const exhaustive: never = outcome.execution.status
+  const exhaustive: never = execution.status
   return exhaustive
 }
 
