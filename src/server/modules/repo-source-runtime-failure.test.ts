@@ -82,11 +82,11 @@ describe('repo source runtime failure classification', () => {
       remoteStarted: true,
     }
     mocks.runRemoteCommand.mockResolvedValue(commandResult)
-    const { remoteRepoMutationExecution } = await import('#/server/modules/remote-repo-execution.ts')
-    const execution = remoteRepoMutationExecution(target.id, 'repo-runtime-test', target)
+    const { createRemoteMutationAttempt } = await import('#/server/modules/remote-repo-execution.ts')
+    const attempt = createRemoteMutationAttempt(target.id, 'repo-runtime-test', target)
 
     await expect(
-      execution.run(
+      attempt.run(
         {
           type: 'gitPush',
           path: target.remotePath,
@@ -98,7 +98,7 @@ describe('repo source runtime failure classification', () => {
         target,
       ),
     ).resolves.toBe(commandResult)
-    expect(execution.runtimeFailure()).toMatchObject({
+    expect(attempt.capturedRuntimeFailure()).toMatchObject({
       name: 'RemoteWorkspaceRuntimeFailureError',
       workspaceId: target.id,
       workspaceRuntimeId: 'repo-runtime-test',

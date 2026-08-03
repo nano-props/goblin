@@ -5,7 +5,7 @@ import type { CommandExecution } from '#/system/command-execution.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
 import {
-  remoteRepoMutationExecution,
+  createRemoteMutationAttempt,
   remoteRuntimeAwareGitRunner,
   resolveRemoteWorkspaceTarget,
   type RepoSourceRuntimeContext,
@@ -324,15 +324,15 @@ async function runRemoteRepoMutation(
 ): Promise<RepoMutationResult> {
   const run = fallbackRun ?? ((command, remoteTarget, options) => runRemoteCommand(remoteTarget, command, options))
   if (!runtime) return await task(run)
-  const execution = remoteRepoMutationExecution(repoId, runtime.workspaceRuntimeId, target)
+  const attempt = createRemoteMutationAttempt(repoId, runtime.workspaceRuntimeId, target)
   try {
-    const mutation = await task(execution.run)
-    const runtimeFailure = execution.runtimeFailure()
+    const mutation = await task(attempt.run)
+    const runtimeFailure = attempt.capturedRuntimeFailure()
     if (runtimeFailure) throw new RepoMutationRuntimeFailureError(mutation, runtimeFailure)
     return mutation
   } catch (error) {
     if (error instanceof RepoMutationRuntimeFailureError) throw error
-    throw execution.runtimeFailure() ?? error
+    throw attempt.capturedRuntimeFailure() ?? error
   }
 }
 

@@ -49,22 +49,22 @@ export function remoteRuntimeAwareGitRunner(
   }
 }
 
-interface RemoteRepoMutationExecution {
+interface RemoteMutationAttempt {
   run: RemoteGitRunner
-  runtimeFailure(): RemoteWorkspaceRuntimeFailureError | null
+  capturedRuntimeFailure(): RemoteWorkspaceRuntimeFailureError | null
 }
 
 /**
- * Mutation commands must reach their domain flow before a transport failure
- * escapes. This runner records the runtime failure while returning the raw
- * command result so the caller can first establish execution facts,
- * milestones, and projection impact.
+ * One bounded remote mutation attempt. Commands must reach their domain flow
+ * before a transport failure escapes, so the attempt records the first runtime
+ * failure while returning the raw command result. Its sole caller consumes the
+ * captured failure after establishing execution facts, milestones, and impact.
  */
-export function remoteRepoMutationExecution(
+export function createRemoteMutationAttempt(
   repoRoot: string,
   workspaceRuntimeId: string,
   sourceTarget: RemoteWorkspaceTarget,
-): RemoteRepoMutationExecution {
+): RemoteMutationAttempt {
   let runtimeFailure: RemoteWorkspaceRuntimeFailureError | null = null
   return {
     run: async (command, target, options) => {
@@ -77,6 +77,6 @@ export function remoteRepoMutationExecution(
       })
       return result
     },
-    runtimeFailure: () => runtimeFailure,
+    capturedRuntimeFailure: () => runtimeFailure,
   }
 }
