@@ -12,6 +12,13 @@
 - Runtime `import('…')` is reserved for a real lazy-loading or
   optional-dependency boundary. Keep it local and explain a non-obvious use.
   Refactor circular dependencies instead of hiding them behind dynamic imports.
+- Use object destructuring when the source remains obvious and the binding is
+  short-lived, such as local callbacks, projections, and tuple-like results.
+  Preserve named boundary objects such as `input`, `options`, and `deps` in
+  longer-lived factory, service, runtime, and repository code; access their
+  properties at the usage site so ownership remains visible. Do not forward an
+  object-pattern `...rest` across a boundary; construct the boundary object
+  explicitly. This is a provenance rule, not a blanket ban on destructuring.
 
 ## Verification and test data
 
