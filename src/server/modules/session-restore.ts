@@ -462,30 +462,13 @@ function runtimeSnapshotFromOpened(
   }>,
 ): WorkspaceRuntimeRestoreSnapshot {
   return {
-    workspaces: opened.map(restoredWorkspaceRuntimeFromOpened),
+    workspaces: opened.map((workspace) => {
+      const { lease, ...restored } = workspace
+      void lease
+      return restored
+    }),
     workspacePaneTabs,
     restoredWorkspaceId,
-  }
-}
-
-function restoredWorkspaceRuntimeFromOpened(workspace: OpenedWorkspaceRuntime): RestoredWorkspaceRuntime {
-  const restored = {
-    workspaceId: workspace.workspaceId,
-    workspaceRuntimeId: workspace.workspaceRuntimeId,
-    entry: workspace.entry,
-    transport: workspace.transport,
-  }
-  if (isOpenedSnapshotWorkspace(workspace)) {
-    return {
-      ...restored,
-      workspaceProbe: workspace.workspaceProbe,
-      repoSnapshot: workspace.repoSnapshot,
-    }
-  }
-  return {
-    ...restored,
-    workspaceProbe: workspace.workspaceProbe,
-    repoSnapshot: null,
   }
 }
 

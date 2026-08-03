@@ -18,10 +18,15 @@
   `deps` in longer-lived factory, service, runtime, and repository code when
   that makes ownership clearer. Do not mechanically replace concise local
   destructuring with repeated property chains; use the form that makes both
-  provenance and the surrounding logic easiest to follow. Do not forward an
-  object-pattern `...rest` across a boundary; construct the boundary object
-  explicitly. This is a readability guideline, not a destructuring ban or a
-  static-check requirement.
+  provenance and the surrounding logic easiest to follow. For closed domain or
+  protocol boundaries, do not use object-pattern `...rest` to decide which
+  fields cross the boundary; construct the boundary object explicitly.
+  Open-ended platform adapters may forward their option bag when preserving
+  unknown standard fields is part of the adapter contract. A readability-only
+  refactor preserves the established field set, property-read order, and
+  capture timing; tightening a boundary is a separate behavioral change. This
+  is a readability guideline, not a destructuring ban or a static-check
+  requirement.
 
 ## Verification and test data
 

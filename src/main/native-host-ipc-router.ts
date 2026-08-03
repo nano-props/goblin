@@ -75,8 +75,7 @@ export function wireNativeHostIpc(): void {
 
 function isValidIpcRequest(request: unknown): request is IpcRequest {
   if (!request || typeof request !== 'object') return false
-  const candidate = request as { path?: unknown }
-  const path = candidate.path
+  const path = (request as { path?: unknown }).path
   if (typeof path !== 'string' || path.length === 0 || path.length > MAX_IPC_PROCEDURE_PATH_LENGTH) return false
   const segments = path.split('.')
   if (segments.some((segment) => segment.length === 0)) return false
@@ -97,8 +96,7 @@ function isValidIpcRequestId(value: unknown): value is string {
 
 function abortIpcRequest(input: unknown): boolean {
   if (!input || typeof input !== 'object') return false
-  const candidate = input as { requestId?: unknown }
-  const requestId = candidate.requestId
+  const requestId = (input as { requestId?: unknown }).requestId
   if (!isValidIpcRequestId(requestId)) return false
   const ctrl = activeIpcControllers.get(requestId)
   if (!ctrl) return false
