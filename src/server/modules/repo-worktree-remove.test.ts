@@ -5,9 +5,6 @@ import {
   LINKED_REPO_ID,
   REPO_ID,
   WORKTREE_REPO_ID,
-  expectNoRepoMetadataInvalidations,
-  expectRepoMetadataInvalidations,
-  expectRepoOperationSettledBeforeProjectionInvalidation,
   mocks,
   removeLocalRepoWorktreeForTest,
   removeRepoWorktreeForTest,
@@ -81,7 +78,7 @@ describe('repo worktree removal', () => {
       { ...successfulRemovalLifecycle, beforeRemove, afterWorktreeRemoved },
     )
 
-    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect(beforeRemove).toHaveBeenCalledOnce()
     expect(afterWorktreeRemoved).toHaveBeenCalledOnce()
     expect(beforeRemove.mock.invocationCallOrder[0]).toBeLessThan(mocks.removeWorktree.mock.invocationCallOrder[0]!)
@@ -94,17 +91,7 @@ describe('repo worktree removal', () => {
       phase: 'done',
       target: { branch: 'feature/a', worktreePath: '/tmp/repo-worktree' },
     })
-    expectRepoMetadataInvalidations(
-      {
-        repoId: REPO_ID,
-        domain: 'metadata',
-      },
-      {
-        repoId: WORKTREE_REPO_ID,
-        domain: 'metadata',
-      },
-    )
-    expectRepoOperationSettledBeforeProjectionInvalidation()
+    expect(result.repoIdsToInvalidate).toEqual([WORKTREE_REPO_ID, REPO_ID])
   })
 
   test('removeRepoWorktree returns Git removal failure without finalization', async () => {
@@ -122,16 +109,15 @@ describe('repo worktree removal', () => {
     ])
     const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
 
-    await expect(
-      removeLocalRepoWorktreeForTest({ deleteBranch: false }, { ...successfulRemovalLifecycle, afterWorktreeRemoved }),
-    ).resolves.toEqual({ ok: false, message: 'git remove failed' })
+    const result = await removeLocalRepoWorktreeForTest(
+      { deleteBranch: false },
+      { ...successfulRemovalLifecycle, afterWorktreeRemoved },
+    )
+    expect(result).toMatchObject({ ok: false, message: 'git remove failed' })
 
     expect(afterWorktreeRemoved).not.toHaveBeenCalled()
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
-    expectRepoMetadataInvalidations(
-      { repoId: REPO_ID, domain: 'metadata' },
-      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
-    )
+    expect(result.repoIdsToInvalidate).toEqual([WORKTREE_REPO_ID, REPO_ID])
   })
 
   test('removeRepoWorktree fails fast and invalidates projections after a removal timeout', async () => {
@@ -149,13 +135,10 @@ describe('repo worktree removal', () => {
       { ...successfulRemovalLifecycle, afterWorktreeRemoved },
     )
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-remove-timeout-check-state' })
+    expect(result).toMatchObject({ ok: false, message: 'error.worktree-remove-timeout-check-state' })
     expect(afterWorktreeRemoved).not.toHaveBeenCalled()
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
-    expectRepoMetadataInvalidations(
-      { repoId: REPO_ID, domain: 'metadata' },
-      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
-    )
+    expect(result.repoIdsToInvalidate).toEqual([WORKTREE_REPO_ID, REPO_ID])
   })
 
   test('removeRepoWorktree reports uncertain state when cancellation happened after Git started', async () => {
@@ -167,11 +150,8 @@ describe('repo worktree removal', () => {
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
-    expect(result).toEqual({ ok: false, message: 'error.git-command-cancelled-check-state' })
-    expectRepoMetadataInvalidations(
-      { repoId: REPO_ID, domain: 'metadata' },
-      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
-    )
+    expect(result).toMatchObject({ ok: false, message: 'error.git-command-cancelled-check-state' })
+    expect(result.repoIdsToInvalidate).toEqual([WORKTREE_REPO_ID, REPO_ID])
   })
 
   test('remote removal preflight failure does not publish mutation invalidations', async () => {
@@ -179,8 +159,8 @@ describe('repo worktree removal', () => {
 
     const { result } = await removeRemoteWorktreeForTest()
 
-    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-main-worktree' })
-    expectNoRepoMetadataInvalidations()
+    expect(result).toMatchObject({ ok: false, message: 'error.cannot-remove-main-worktree' })
+    expect(result.repoIdsToInvalidate).toBeUndefined()
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
   })
 
@@ -188,14 +168,16 @@ describe('repo worktree removal', () => {
     const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
     mocks.removeRemoteWorktree.mockResolvedValueOnce({
       ok: false,
-      message: 'error.worktree-remove-timeout-check-state',
+      message: 'timeout',
+      failureExecution: { status: 'timed-out' },
+      failureStage: 'worktree-remove',
       worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
     })
 
     const { repoId, result } = await removeRemoteWorktreeForTest()
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-remove-timeout-check-state' })
-    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
+    expect(result).toMatchObject({ ok: false, message: 'error.worktree-remove-timeout-check-state' })
+    expect(result.repoIdsToInvalidate).toEqual([repoId, linkedRepoId])
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).not.toHaveBeenCalled()
   })
 
@@ -224,12 +206,14 @@ describe('repo worktree removal', () => {
       ),
     )
 
-    await expect(removeRemoteWorktreeForTest()).rejects.toMatchObject({ runtimeFailure })
+    await expect(removeRemoteWorktreeForTest()).rejects.toMatchObject({
+      runtimeFailure,
+      mutation: { repoIdsToInvalidate: [repoId, linkedRepoId] },
+    })
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
       workspaceId: repoId,
       worktreePath: '/srv/repo-feature',
     })
-    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
   })
 
   test('removeRepoWorktree prunes settings when application finalization fails after removal', async () => {
@@ -251,7 +235,7 @@ describe('repo worktree removal', () => {
       },
     )
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'tabs finalize failed',
       recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
@@ -276,7 +260,7 @@ describe('repo worktree removal', () => {
       },
     )
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'cancelled',
       recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
@@ -300,17 +284,8 @@ describe('repo worktree removal', () => {
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: true }, successfulRemovalLifecycle)
 
-    expect(result).toEqual({ ok: true, message: 'ok' })
-    expectRepoMetadataInvalidations(
-      {
-        repoId: REPO_ID,
-        domain: 'metadata',
-      },
-      {
-        repoId: WORKTREE_REPO_ID,
-        domain: 'metadata',
-      },
-    )
+    expect(result).toMatchObject({ ok: true, message: 'ok' })
+    expect(result.repoIdsToInvalidate).toEqual([WORKTREE_REPO_ID, REPO_ID])
   })
 
   test('removeRepoWorktree freezes one upstream read before worktree removal', async () => {
@@ -341,7 +316,7 @@ describe('repo worktree removal', () => {
       successfulRemovalLifecycle,
     )
 
-    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect(mocks.getUpstream).toHaveBeenCalledTimes(1)
     expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'refs/remotes/origin/feature/a', undefined)
     expect(mocks.deleteUpstreamBranch).toHaveBeenCalledWith('/tmp/repo', 'origin', 'feature/a', undefined)
@@ -370,7 +345,7 @@ describe('repo worktree removal', () => {
       successfulRemovalLifecycle,
     )
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'upstream rejected deletion',
       recoveryMessageKeys: ['error.worktree-removed-followup-failed', 'error.local-branch-deleted-followup-failed'],
@@ -400,13 +375,13 @@ describe('repo worktree removal', () => {
       { ...successfulRemovalLifecycle, beforeRemove },
     )
 
-    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-unpushed-worktree' })
+    expect(result).toMatchObject({ ok: false, message: 'error.cannot-remove-unpushed-worktree' })
     expect(mocks.isAncestor).toHaveBeenCalledOnce()
     expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'main', undefined)
     expect(beforeRemove).not.toHaveBeenCalled()
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
-    expectNoRepoMetadataInvalidations()
+    expect(result.repoIdsToInvalidate).toBeUndefined()
   })
 
   test('removeRepoWorktree publishes affected invalidations after branch deletion fails post-removal', async () => {
@@ -426,7 +401,7 @@ describe('repo worktree removal', () => {
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: true }, successfulRemovalLifecycle)
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'fatal: delete failed',
       recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
@@ -436,16 +411,7 @@ describe('repo worktree removal', () => {
       workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
     })
-    expectRepoMetadataInvalidations(
-      {
-        repoId: REPO_ID,
-        domain: 'metadata',
-      },
-      {
-        repoId: WORKTREE_REPO_ID,
-        domain: 'metadata',
-      },
-    )
+    expect(result.repoIdsToInvalidate).toEqual([WORKTREE_REPO_ID, REPO_ID])
   })
 
   test('removeRepoWorktree can remove and delete the currently opened linked worktree', async () => {
@@ -470,20 +436,11 @@ describe('repo worktree removal', () => {
       successfulRemovalLifecycle,
     )
 
-    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect(mocks.getCurrentBranch).toHaveBeenCalledWith('/tmp/repo', { signal: undefined })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked', undefined)
     expect(mocks.deleteBranch).toHaveBeenCalledWith('/tmp/repo', 'feature/a', { force: undefined, signal: undefined })
-    expectRepoMetadataInvalidations(
-      {
-        repoId: LINKED_REPO_ID,
-        domain: 'metadata',
-      },
-      {
-        repoId: REPO_ID,
-        domain: 'metadata',
-      },
-    )
+    expect(result.repoIdsToInvalidate).toEqual([LINKED_REPO_ID, REPO_ID])
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
       workspaceId: LINKED_REPO_ID,
       worktreePath: '/tmp/repo-linked',
@@ -506,7 +463,7 @@ describe('repo worktree removal', () => {
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
-    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect(mocks.pruneServerWorkspaceSettingsForRemovedWorktree).toHaveBeenCalledWith({
       workspaceId: REPO_ID,
       worktreePath: '/tmp/repo-worktree',
@@ -528,7 +485,7 @@ describe('repo worktree removal', () => {
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'settings write failed',
       recoveryMessageKeys: ['error.worktree-removed-followup-failed'],
@@ -551,7 +508,7 @@ describe('repo worktree removal', () => {
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
-    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-locked-worktree' })
+    expect(result).toMatchObject({ ok: false, message: 'error.cannot-remove-locked-worktree' })
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
   })
 

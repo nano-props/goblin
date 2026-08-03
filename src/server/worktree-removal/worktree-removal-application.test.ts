@@ -149,8 +149,21 @@ describe('WorktreeRemovalApplication', () => {
 
   test('aborts before Git remove when terminal quiescence cannot be confirmed', async () => {
     const removeCommit = vi.fn()
+    const broadcastSessionsChanged = vi.fn()
     const application = createApplication({
-      terminalQuiescence: { ok: false, scopes: [], message: 'PTY close timed out' },
+      terminalQuiescence: {
+        ok: false,
+        scopes: [
+          {
+            userId: 'user-a',
+            workspaceId,
+            workspaceRuntimeId: 'runtime-a',
+            scope: 'goblin+file:///repo\0runtime-a',
+          },
+        ],
+        message: 'PTY close timed out',
+      },
+      broadcastSessionsChanged,
     })
 
     await expect(
@@ -165,6 +178,7 @@ describe('WorktreeRemovalApplication', () => {
       }),
     ).resolves.toEqual({ ok: false, message: 'PTY close timed out' })
     expect(removeCommit).not.toHaveBeenCalled()
+    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', workspaceId, 'runtime-a')
   })
 
   test('runtime close cancels an admitted removal before the destructive mutation settles', async () => {
@@ -188,6 +202,28 @@ describe('WorktreeRemovalApplication', () => {
     await entered.promise
     runtime.abort(new Error('error.workspace-runtime-stale'))
     await expect(removal).resolves.toEqual({ ok: false, message: 'error.workspace-runtime-stale' })
+  })
+
+  test('reports caller cancellation without reclassifying the runtime as stale', async () => {
+    const caller = new AbortController()
+    const entered = Promise.withResolvers<void>()
+    const application = createApplication()
+    const removal = application.removeWorktree('user-a', {
+      ...target,
+      signal: caller.signal,
+      async remove(_capability, _lifecycle, signal) {
+        entered.resolve()
+        await new Promise<void>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+        })
+        return { ok: true, message: 'unreachable' }
+      },
+    })
+
+    await entered.promise
+    caller.abort(new DOMException('caller aborted', 'AbortError'))
+
+    await expect(removal).resolves.toEqual({ ok: false, message: 'cancelled' })
   })
 
   test('runtime close cancels a queued removal before its task starts', async () => {
@@ -342,8 +378,7 @@ describe('WorktreeRemovalApplication', () => {
     ).resolves.toEqual({ ok: true, message: '' })
 
     expect(retireTarget).not.toHaveBeenCalled()
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///repo', 'runtime-a')
-    expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///linked-repo', 'runtime-b')
+    expect(broadcastSessionsChanged).not.toHaveBeenCalled()
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///repo')
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', 'goblin+file:///linked-repo')
   })

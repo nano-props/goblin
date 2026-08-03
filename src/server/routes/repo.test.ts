@@ -466,7 +466,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     })
   })
 
-  test('publishes pull filesystem impact carried by a runtime failure before projecting the response', async () => {
+  test('settles runtime failure before publishing repository and filesystem impact', async () => {
     const app = createTestRepoRoutes()
     const repoId = workspaceIdForTest('goblin+ssh://prod/home/example/service')
     const workspaceRuntimeId = await openTestWorkspaceRuntime(repoId)
@@ -479,7 +479,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     })
     mocks.pullRepoBranch.mockRejectedValueOnce(
       new RepoMutationRuntimeFailureError(
-        { ok: false, message: 'connection lost', worktreePathsToInvalidate: [worktreePath] },
+        {
+          ok: false,
+          message: 'connection lost',
+          repoIdsToInvalidate: [repoId],
+          worktreePathsToInvalidate: [worktreePath],
+        },
         runtimeFailure,
       ),
     )
@@ -502,6 +507,11 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         root: workspaceIdForTest('goblin+ssh://prod/home/example/service-worktree'),
       },
     })
+    const lifecycleCall = mocks.publishUserWorkspaceRuntimeInvalidation.mock.invocationCallOrder[0]
+    const repositoryCall = mocks.publishRepoReadInvalidation.mock.invocationCallOrder[0]
+    const filesystemCall = mocks.publishUserWorkspaceFilesystemInvalidation.mock.invocationCallOrder[0]
+    expect(lifecycleCall).toBeLessThan(repositoryCall!)
+    expect(repositoryCall).toBeLessThan(filesystemCall!)
   })
 
   test('publishes filesystem invalidation when a failed pull command may have changed a worktree', async () => {

@@ -27,4 +27,12 @@ describe('remote worktree bootstrap protocol', () => {
     ])
     expect(decodeRemoteWorktreeBootstrapRecords(truncated)).toEqual([])
   })
+
+  test('preserves a complete record when the next tag is truncated', () => {
+    const complete = encodeRemoteWorktreeBootstrapRecord('copy', 'complete.env')
+
+    expect(decodeRemoteWorktreeBootstrapRecords(`${complete}GOBLIN_BOOT`)).toEqual([
+      { kind: 'copy', value: 'complete.env' },
+    ])
+  })
 })

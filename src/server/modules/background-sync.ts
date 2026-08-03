@@ -7,6 +7,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import { publishRepoMutationInvalidations } from '#/server/modules/repo-mutation-invalidation.ts'
 import {
   onWorkspaceRuntimeClosed,
   onWorkspaceRuntimeFailed,
@@ -258,6 +259,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
     state.activeFetch = activeFetch
     const fetchStart = Date.now()
     const result = await fetchRepo(target.workspaceId, 'background', ctrl.signal, target.workspaceRuntimeId)
+    publishRepoMutationInvalidations(target.workspaceId, result, ['metadata'])
     const fetchDuration = Date.now() - fetchStart
     // Log slow fetchs for performance monitoring
     if (fetchDuration > 5000) {
@@ -291,6 +293,9 @@ async function runScheduledFetch(generation: number): Promise<void> {
       recordTargetFetchStartedAt(target, now)
       recordTargetFailure(target, now)
       await settleBackgroundRuntimeFailureOrStop(target, err)
+      if (isRepoMutationRuntimeFailureError(err)) {
+        publishRepoMutationInvalidations(target.workspaceId, err.mutation, ['metadata'])
+      }
     }
     const key = target ? backgroundSyncTargetKey(target) : null
     backgroundSyncLogger.warn(

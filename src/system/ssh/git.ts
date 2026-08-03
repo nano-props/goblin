@@ -98,16 +98,21 @@ export interface RemoteFilesystemMutationResult extends ExecResult {
 export interface RemoteWorktreeRemovalResult extends RemoteFilesystemMutationResult {
   worktreeRemoved?: true
   branchEffect?: 'local-delete-confirmed'
+  failureExecution?: CommandExecution
+  failureStage?: 'worktree-remove' | 'branch-delete'
 }
 
 export type RemoteBranchEffect = 'none' | 'may-have-changed' | 'local-delete-confirmed'
 
 export interface RemoteBranchDeleteResult extends ExecResult {
   branchEffect: RemoteBranchEffect
+  failureExecution?: CommandExecution
 }
 
 interface RemoteBranchMutationStepResult extends ExecResult {
   branchEffect?: 'local-delete-confirmed'
+  failureExecution?: CommandExecution
+  failureStage?: 'branch-delete'
 }
 
 function remoteCommandExecution(result: RemoteCommandResult): CommandExecution {
@@ -847,10 +852,11 @@ export async function removeRemoteWorktree(
   )
   const { result: removeCommandResult, execution: removeExecution } = remoteCommandOutcome(removeResult)
   if (!removeCommandResult.ok) {
-    const failureMessage = worktreeRemoveFailureMessage(removeCommandResult, removeExecution)
     const failure: RemoteWorktreeRemovalResult = {
       ok: false,
-      message: failureMessage,
+      message: removeCommandResult.message,
+      failureExecution: removeExecution,
+      failureStage: 'worktree-remove',
     }
     return withWorktreePathsToInvalidate(failure, worktreePathsToInvalidate)
   }
@@ -867,9 +873,16 @@ export async function removeRemoteWorktree(
     target,
     { timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS, signal: input.signal },
   )
-  const { result: localDeleteResult } = remoteCommandOutcome(deleteResult)
+  const { result: localDeleteResult, execution: localDeleteExecution } = remoteCommandOutcome(deleteResult)
   if (!localDeleteResult.ok) {
-    return withWorktreePathsToInvalidate(worktreeRemovedResult(localDeleteResult), worktreePathsToInvalidate)
+    return withWorktreePathsToInvalidate(
+      worktreeRemovedResult({
+        ...localDeleteResult,
+        failureExecution: localDeleteExecution,
+        failureStage: 'branch-delete',
+      }),
+      worktreePathsToInvalidate,
+    )
   }
   const upstreamDeleteOutcome = await deleteRemoteUpstreamBranch(
     target,
@@ -882,32 +895,26 @@ export async function removeRemoteWorktree(
   )
   let finalDeleteResult: RemoteBranchMutationStepResult = localDeleteResult
   if (upstreamDeleteOutcome) {
-    const { result: upstreamDeleteResult } = upstreamDeleteOutcome
+    const { result: upstreamDeleteResult, execution: upstreamDeleteExecution } = upstreamDeleteOutcome
     if (upstreamDeleteResult.ok) finalDeleteResult = upstreamDeleteResult
-    else finalDeleteResult = { ...upstreamDeleteResult, branchEffect: 'local-delete-confirmed' }
+    else {
+      finalDeleteResult = {
+        ...upstreamDeleteResult,
+        branchEffect: 'local-delete-confirmed',
+        failureExecution: upstreamDeleteExecution,
+        failureStage: 'branch-delete',
+      }
+    }
   }
   return withWorktreePathsToInvalidate(worktreeRemovedResult(finalDeleteResult), worktreePathsToInvalidate)
-}
-
-function worktreeRemoveFailureMessage(result: ExecResult, execution: CommandExecution): string {
-  switch (execution.status) {
-    case 'timed-out':
-      return 'error.worktree-remove-timeout-check-state'
-    case 'cancelled':
-      return 'error.git-command-cancelled-check-state'
-    case 'not-started':
-    case 'succeeded':
-    case 'failed':
-      return result.message
-  }
-  const exhaustive: never = execution.status
-  return exhaustive
 }
 
 function worktreeRemovedResult(result: RemoteBranchMutationStepResult): RemoteWorktreeRemovalResult {
   if (result.ok) return { ok: true, message: result.message, worktreeRemoved: true }
   const removed: RemoteWorktreeRemovalResult = { ok: false, message: result.message, worktreeRemoved: true }
   if (result.branchEffect === 'local-delete-confirmed') removed.branchEffect = result.branchEffect
+  if (result.failureExecution) removed.failureExecution = result.failureExecution
+  if (result.failureStage) removed.failureStage = result.failureStage
   return removed
 }
 
@@ -963,9 +970,19 @@ export async function deleteRemoteBranch(
   const { result: localDeleteResult, execution: localDeleteExecution } = remoteCommandOutcome(result)
   if (!localDeleteResult.ok) {
     if (!commandMayHaveRun(localDeleteExecution)) {
-      return { ok: false, message: localDeleteResult.message, branchEffect: 'none' }
+      return {
+        ok: false,
+        message: localDeleteResult.message,
+        branchEffect: 'none',
+        failureExecution: localDeleteExecution,
+      }
     }
-    return { ok: false, message: localDeleteResult.message, branchEffect: 'may-have-changed' }
+    return {
+      ok: false,
+      message: localDeleteResult.message,
+      branchEffect: 'may-have-changed',
+      failureExecution: localDeleteExecution,
+    }
   }
   const upstreamDeleteOutcome = await deleteRemoteUpstreamBranch(
     target,
@@ -975,7 +992,7 @@ export async function deleteRemoteBranch(
   )
   if (!upstreamDeleteOutcome)
     return { ok: true, message: localDeleteResult.message, branchEffect: 'local-delete-confirmed' }
-  const { result: upstreamDeleteResult } = upstreamDeleteOutcome
+  const { result: upstreamDeleteResult, execution: upstreamDeleteExecution } = upstreamDeleteOutcome
   if (upstreamDeleteResult.ok) {
     return { ok: true, message: upstreamDeleteResult.message, branchEffect: 'local-delete-confirmed' }
   }
@@ -983,6 +1000,7 @@ export async function deleteRemoteBranch(
     ok: false,
     message: upstreamDeleteResult.message,
     branchEffect: 'local-delete-confirmed',
+    failureExecution: upstreamDeleteExecution,
   }
 }
 

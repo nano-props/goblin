@@ -1,4 +1,4 @@
-import type { ExecResult } from '#/shared/git-types.ts'
+import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -17,7 +17,7 @@ export interface ServerWorktreeRemovalHost {
         capability: PhysicalWorktreeExecutionCapability,
         lifecycle: RepoWorktreeRemovalLifecycle,
         signal: AbortSignal,
-      ): Promise<ExecResult>
+      ): Promise<RepoMutationResult>
     },
-  ): Promise<ExecResult>
+  ): Promise<RepoMutationResult>
 }

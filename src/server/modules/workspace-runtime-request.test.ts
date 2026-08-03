@@ -78,6 +78,29 @@ describe('workspace runtime request', () => {
     expect(stopBackgroundSyncRuntimeMock).not.toHaveBeenCalled()
   })
 
+  test('settles a classified runtime failure even when the request is concurrently aborted', async () => {
+    const workspaceId = workspaceIdForTest('goblin+ssh://example.test/repo')
+    const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId,
+      workspaceRuntimeId: 'runtime-read-aborted',
+      reason: 'unreachable',
+    })
+    const request = new AbortController()
+
+    await expect(
+      runGitWorkspaceRuntimeRequest({
+        userId: 'test-user',
+        label: 'snapshot',
+        signal: request.signal,
+        run: async () => {
+          request.abort(new DOMException('request aborted', 'AbortError'))
+          throw runtimeFailure
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
+    expect(settleRemoteWorkspaceRuntimeFailureMock).toHaveBeenCalledWith('test-user', runtimeFailure)
+  })
+
   test('surfaces lifecycle uncertainty and stops automatic sync when runtime settlement fails', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example.test/repo')
     const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({

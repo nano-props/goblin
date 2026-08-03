@@ -101,13 +101,13 @@ async function throwRuntimeRequestError(
     throw new IpcError({ code: 'BAD_REQUEST', message: error.message })
   }
   if (error instanceof OperationCancelledError) throw error
-  if (input.signal?.aborted) throw error
   if (isRemoteWorkspaceRuntimeFailure(error)) {
     const lifecycleSettled = await settleRuntimeFailureAndStopAutomation(input.userId, input.label, error)
     workspaceRuntimeRequestLogger.warn({ err: error, label: input.label }, 'failed')
     const message = lifecycleSettled ? remoteFailureMessage : 'error.workspace-runtime-settlement-failed'
     throw new IpcError({ code: 'BAD_REQUEST', message })
   }
+  if (input.signal?.aborted) throw error
   if (isRepositoryBoundaryUnavailableError(error)) {
     workspaceRuntimeRequestLogger.warn({ err: error, label: input.label }, 'repository boundary unavailable')
     throw new IpcError({ code: 'BAD_REQUEST', message: error.message })

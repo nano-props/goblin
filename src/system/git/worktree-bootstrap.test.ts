@@ -1,6 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 import { createServer } from 'node:net'
+import { promises as fs } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readFile, readlink, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
 import { bootstrapWorktreeAfterCreate, getWorktreeBootstrapPreview } from '#/system/git/worktree-bootstrap.ts'
@@ -31,6 +32,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await rm(tmp, { recursive: true, force: true })
   vi.clearAllMocks()
+  vi.restoreAllMocks()
 })
 
 describe('worktree bootstrap', () => {
@@ -236,6 +238,30 @@ exclude = ["config/*.log", "config/nested"]
       await chmod(sourceDirectory, 0o755)
       await chmod(path.join(targetRoot, 'readonly-config'), 0o755).catch(() => {})
     }
+  })
+
+  test('does not let cancellation hide an uncertain destination directory mode', async () => {
+    const sourceDirectory = path.join(sourceRoot, 'config')
+    const destinationDirectory = path.join(targetRoot, 'config')
+    await mkdir(sourceDirectory)
+    await writeFile(path.join(sourceDirectory, 'settings.json'), '{"enabled":true}\n')
+    await writeConfig('[worktree]\ncopy = ["config"]\n')
+    const controller = new AbortController()
+    const realChmod = fs.chmod.bind(fs)
+    vi.spyOn(fs, 'chmod').mockImplementation(async (targetPath, mode) => {
+      if (targetPath === destinationDirectory) {
+        controller.abort()
+        throw new Error('chmod failed')
+      }
+      return await realChmod(targetPath, mode)
+    })
+
+    const result = await bootstrapWorktreeAfterCreate(sourceRoot, targetRoot, { signal: controller.signal })
+
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'Worktree bootstrap failed: failed to copy config: failed to restore destination permissions: chmod failed',
+    })
   })
 
   test('removes operations nested under excluded parent paths', async () => {

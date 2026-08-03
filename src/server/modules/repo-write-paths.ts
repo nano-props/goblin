@@ -1,7 +1,7 @@
 import path from 'node:path'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { serverLogger } from '#/server/logger.ts'
-import { publishRepoReadInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import {
   captureRepoWriteExecutionFromPhysicalWorktree,
   runWithRepoSource,
@@ -12,7 +12,7 @@ import {
   RepoMutationRuntimeFailureError,
   isRepoMutationRuntimeFailureError,
 } from '#/server/modules/repo-mutation-runtime-failure.ts'
-import { publicRepoMutationResult, type RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
+import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import {
@@ -26,52 +26,20 @@ import {
 import {
   type ExecResult,
   type ExecResultRecoveryMessageKey,
-  type RepoMutationExecResult,
   type RepoUrlTarget,
 } from '#/shared/git-types.ts'
 import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
 import { isValidWorkspaceLocatorInput, toSafeWorkspaceLocator } from '#/shared/input-validation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { RepoReadInvalidationDomain } from '#/shared/repo-read-invalidation.ts'
 import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
 
 const repoWriteLogger = serverLogger.child({ module: 'repo-write-paths' })
 
-function publishMutationInvalidations(
-  workspaceId: WorkspaceId,
-  result: RepoMutationResult,
-  domains: readonly RepoReadInvalidationDomain[],
-): RepoMutationResult {
-  const repoIdsToInvalidate = result.repoIdsToInvalidate ?? []
-  if (repoIdsToInvalidate.length > 0) {
-    const uniqueRepoIds = Array.from(new Set([workspaceId, ...repoIdsToInvalidate]))
-    for (const repoId of uniqueRepoIds) {
-      for (const domain of domains) publishRepoReadInvalidation({ repoId, domain })
-    }
-  }
-  return result
-}
-
-async function runMutationWithInvalidations(
-  workspaceId: WorkspaceId,
-  domains: readonly RepoReadInvalidationDomain[],
-  task: () => Promise<RepoMutationResult>,
-): Promise<RepoMutationResult> {
-  try {
-    return publishMutationInvalidations(workspaceId, await task(), domains)
-  } catch (error) {
-    if (!isRepoMutationRuntimeFailureError(error)) throw error
-    publishMutationInvalidations(workspaceId, error.mutation, domains)
-    throw error
-  }
-}
-
 async function runUserNetworkMutation(
   cwd: WorkspaceId,
   signal: AbortSignal | undefined,
   operationKind: 'pull' | 'push',
-  invalidatedDomains: readonly RepoReadInvalidationDomain[],
   target: { branch?: string; worktreePath?: string } | null,
   task: (source: RepoSource, signal: AbortSignal | undefined) => Promise<RepoMutationResult>,
   options: { workspaceRuntimeId?: string } = {},
@@ -88,28 +56,11 @@ async function runUserNetworkMutation(
       canCancelUnderlying: true,
     },
     (_operation, context) => async () => {
-      return await runMutationWithInvalidations(cwd, invalidatedDomains, async () => {
-        return await context.runWithRepoSource(
-          async (source) =>
-            await context.runNetworkOperation(async (networkSignal) => await task(source, networkSignal)),
-        )
-      })
+      return await context.runWithRepoSource(
+        async (source) => await context.runNetworkOperation(async (networkSignal) => await task(source, networkSignal)),
+      )
     },
   )
-}
-
-export interface RepoFilesystemMutationOutcome extends RepoMutationExecResult {
-  worktreePathsToInvalidate?: readonly string[]
-}
-
-function filesystemMutationOutcome(result: RepoMutationResult): RepoFilesystemMutationOutcome {
-  const outcome: RepoFilesystemMutationOutcome = {
-    ok: result.ok,
-    message: result.message,
-    worktreePathsToInvalidate: result.worktreePathsToInvalidate,
-  }
-  if (result.recoveryMessageKeys?.length) outcome.recoveryMessageKeys = result.recoveryMessageKeys
-  return outcome
 }
 
 function createWorktreeTargetBranch(input: CreateWorktreeInput): string {
@@ -182,15 +133,12 @@ export async function fetchRepo(
   kind: NetworkOpKind = 'user',
   signal?: AbortSignal,
   workspaceRuntimeId?: string,
-): Promise<ExecResult> {
+): Promise<RepoMutationResult> {
   async function runFetch(
     task: (signal: AbortSignal) => Promise<RepoMutationResult>,
     context: RepoWriteOperationContext,
   ) {
-    const result = await runMutationWithInvalidations(cwd, ['metadata'], async () => {
-      return await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
-    })
-    return publicRepoMutationResult(result)
+    return await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
   }
   return await enqueueRepoWriteOperation(
     cwd,
@@ -213,19 +161,16 @@ export async function pullRepoBranch(
   worktreePath?: string,
   signal?: AbortSignal,
   options: { workspaceRuntimeId?: string } = {},
-): Promise<RepoFilesystemMutationOutcome> {
-  return filesystemMutationOutcome(
-    await runUserNetworkMutation(
-      cwd,
-      signal,
-      'pull',
-      ['metadata', 'worktree-status'],
-      { branch, worktreePath },
-      async (source, mergedSignal) => {
-        return await source.pull(branch, worktreePath, mergedSignal)
-      },
-      options,
-    ),
+): Promise<RepoMutationResult> {
+  return await runUserNetworkMutation(
+    cwd,
+    signal,
+    'pull',
+    { branch, worktreePath },
+    async (source, mergedSignal) => {
+      return await source.pull(branch, worktreePath, mergedSignal)
+    },
+    options,
   )
 }
 
@@ -234,19 +179,16 @@ export async function pushRepoBranch(
   branch: string,
   signal?: AbortSignal,
   options: { workspaceRuntimeId?: string } = {},
-): Promise<ExecResult> {
-  return publicRepoMutationResult(
-    await runUserNetworkMutation(
-      cwd,
-      signal,
-      'push',
-      ['metadata'],
-      { branch },
-      async (source, mergedSignal) => {
-        return await source.push(branch, mergedSignal)
-      },
-      options,
-    ),
+): Promise<RepoMutationResult> {
+  return await runUserNetworkMutation(
+    cwd,
+    signal,
+    'push',
+    { branch },
+    async (source, mergedSignal) => {
+      return await source.push(branch, mergedSignal)
+    },
+    options,
   )
 }
 
@@ -255,7 +197,7 @@ export async function createRepoWorktree(
   input: CreateWorktreeInput,
   signal?: AbortSignal,
   options?: { workspaceRuntimeId?: string; worktreeBootstrap?: WorktreeBootstrapDecision },
-): Promise<ExecResult> {
+): Promise<RepoMutationResult> {
   const repoId = toSafeWorkspaceLocator(cwd)
   if (!repoId) return { ok: false, message: 'error.invalid-arguments' }
   const normalized = normalizeCreateWorktreeInput(input)
@@ -264,31 +206,28 @@ export async function createRepoWorktree(
     return { ok: false, message: 'error.invalid-path' }
   }
   const worktreeBootstrap = options?.worktreeBootstrap ?? { kind: 'skip' }
-  const mutation = await runMutationWithInvalidations(cwd, ['metadata', 'worktree-status'], async () => {
-    return await runRepoServerWriteOperation({
-      repoId,
-      workspaceRuntimeId: options?.workspaceRuntimeId,
-      kind: 'create-worktree',
-      target: { branch: createWorktreeTargetBranch(normalized), worktreePath: normalized.worktreePath },
-      signal,
-      task: async (context) => {
-        return await context.runWithRepoSource(async (source) => {
-          const result = await source.createWorktree(normalized, signal, {
-            runMembershipMutation: context.runMembershipMutation,
-            worktreeBootstrap,
-          })
-          if (!result.ok) return result
-          try {
-            await persistWorktreeBootstrapTrustChoice(repoId, worktreeBootstrap)
-          } catch (error) {
-            return worktreeFollowupFailure(result, error, 'error.worktree-created-followup-failed')
-          }
-          return result
+  return await runRepoServerWriteOperation({
+    repoId,
+    workspaceRuntimeId: options?.workspaceRuntimeId,
+    kind: 'create-worktree',
+    target: { branch: createWorktreeTargetBranch(normalized), worktreePath: normalized.worktreePath },
+    signal,
+    task: async (context) => {
+      return await context.runWithRepoSource(async (source) => {
+        const result = await source.createWorktree(normalized, signal, {
+          runMembershipMutation: context.runMembershipMutation,
+          worktreeBootstrap,
         })
-      },
-    })
+        if (!result.ok) return result
+        try {
+          await persistWorktreeBootstrapTrustChoice(repoId, worktreeBootstrap)
+        } catch (error) {
+          return worktreeFollowupFailure(result, error, 'error.worktree-created-followup-failed')
+        }
+        return result
+      })
+    },
   })
-  return publicRepoMutationResult(mutation)
 }
 
 async function persistWorktreeBootstrapTrustChoice(
@@ -326,22 +265,19 @@ export async function deleteRepoBranch(
   options?: { force?: boolean; deleteUpstream?: boolean },
   signal?: AbortSignal,
   runtime?: { workspaceRuntimeId?: string },
-): Promise<ExecResult> {
-  const mutation = await runMutationWithInvalidations(cwd, ['metadata'], async () => {
-    return await runRepoServerWriteOperation({
-      repoId: cwd,
-      workspaceRuntimeId: runtime?.workspaceRuntimeId,
-      kind: 'delete-branch',
-      target: { branch },
-      signal,
-      task: async (context) => {
-        return await context.runWithRepoSource(async (source) => {
-          return await source.deleteBranch(branch, options, signal)
-        })
-      },
-    })
+): Promise<RepoMutationResult> {
+  return await runRepoServerWriteOperation({
+    repoId: cwd,
+    workspaceRuntimeId: runtime?.workspaceRuntimeId,
+    kind: 'delete-branch',
+    target: { branch },
+    signal,
+    task: async (context) => {
+      return await context.runWithRepoSource(async (source) => {
+        return await source.deleteBranch(branch, options, signal)
+      })
+    },
   })
-  return publicRepoMutationResult(mutation)
 }
 
 export async function removeCapturedRepoWorktree(
@@ -357,7 +293,7 @@ export async function removeCapturedRepoWorktree(
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
   signal?: AbortSignal,
   options: { workspaceRuntimeId?: string } = {},
-): Promise<ExecResult> {
+): Promise<RepoMutationResult> {
   return await removeRepoWorktreeWithBinding(cwd, input, lifecycle, signal, physicalWorktreeCapability, options)
 }
 
@@ -374,36 +310,33 @@ async function removeRepoWorktreeWithBinding(
   signal: AbortSignal | undefined,
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
   options: { workspaceRuntimeId?: string } = {},
-): Promise<ExecResult> {
-  const mutation = await runMutationWithInvalidations(cwd, ['metadata', 'worktree-status'], async () => {
-    return await runRepoServerWriteOperation({
-      repoId: cwd,
-      workspaceRuntimeId: options.workspaceRuntimeId,
-      kind: 'remove-worktree',
-      target: { branch: input.branch, worktreePath: input.worktreePath },
-      signal,
-      captureExecution: async (captureSignal) =>
-        await captureRepoWriteExecutionFromPhysicalWorktree(
-          cwd,
-          physicalWorktreeCapability,
-          options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
-          captureSignal,
-        ),
-      task: async (context) => {
-        return await context.runWithRepoSource(async (source) => {
-          try {
-            const mutation = await source.removeWorktree(input, signal, lifecycle, context.runMembershipMutation)
-            return await pruneRemovedWorktreeSettings(cwd, input.worktreePath, mutation)
-          } catch (error) {
-            if (!isRepoMutationRuntimeFailureError(error)) throw error
-            const mutation = await pruneRemovedWorktreeSettings(cwd, input.worktreePath, error.mutation)
-            throw new RepoMutationRuntimeFailureError(mutation, error.runtimeFailure)
-          }
-        })
-      },
-    })
+): Promise<RepoMutationResult> {
+  return await runRepoServerWriteOperation({
+    repoId: cwd,
+    workspaceRuntimeId: options.workspaceRuntimeId,
+    kind: 'remove-worktree',
+    target: { branch: input.branch, worktreePath: input.worktreePath },
+    signal,
+    captureExecution: async (captureSignal) =>
+      await captureRepoWriteExecutionFromPhysicalWorktree(
+        cwd,
+        physicalWorktreeCapability,
+        options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
+        captureSignal,
+      ),
+    task: async (context) => {
+      return await context.runWithRepoSource(async (source) => {
+        try {
+          const mutation = await source.removeWorktree(input, signal, lifecycle, context.runMembershipMutation)
+          return await pruneRemovedWorktreeSettings(cwd, input.worktreePath, mutation)
+        } catch (error) {
+          if (!isRepoMutationRuntimeFailureError(error)) throw error
+          const mutation = await pruneRemovedWorktreeSettings(cwd, input.worktreePath, error.mutation)
+          throw new RepoMutationRuntimeFailureError(mutation, error.runtimeFailure)
+        }
+      })
+    },
   })
-  return publicRepoMutationResult(mutation)
 }
 
 async function pruneRemovedWorktreeSettings(

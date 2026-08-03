@@ -17,7 +17,10 @@ export interface RemoteWorktreeBootstrapRecord {
 export function decodeRemoteWorktreeBootstrapRecords(output: string): RemoteWorktreeBootstrapRecord[] {
   const fields = output.split('\0')
   const records: RemoteWorktreeBootstrapRecord[] = []
-  const completeFieldCount = Math.max(0, fields.length - (output.endsWith('\0') ? 1 : 2))
+  // Every NUL terminates exactly one field. The final split element is always
+  // unterminated (and empty when output ends in NUL), so it cannot participate
+  // in a record. A truncated next tag must not erase preceding complete pairs.
+  const completeFieldCount = Math.max(0, fields.length - 1)
   for (let index = 0; index + 1 < completeFieldCount; index += 2) {
     const tag = fields[index]
     const value = fields[index + 1]

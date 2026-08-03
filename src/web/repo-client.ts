@@ -36,7 +36,6 @@ import {
 const REPO_REQUEST_TIMEOUT_MS = {
   gitNetwork: 240_000,
   clone: 360_000,
-  branchMutation: 240_000,
   patch: 15 * 60_000,
 } as const
 
@@ -260,7 +259,10 @@ export async function deleteRepoBranch(
     '/api/repo/delete-branch',
     { cwd, workspaceRuntimeId, branch, force: options?.force, deleteUpstream: options?.deleteUpstream },
     decodeWith(RepoMutationExecResultResponseSchema),
-    { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.branchMutation },
+    // Local deletion and optional upstream deletion are one server workflow,
+    // each with its own command deadline. Do not let a client watchdog erase
+    // an already-confirmed local deletion milestone.
+    { signal, timeoutMs: 0 },
   )
 }
 

@@ -19,7 +19,7 @@ import {
   worktreeBootstrapConfigHash,
   type WorktreeBootstrapConfig,
 } from '#/system/git/worktree-bootstrap-config.ts'
-import { copyPath } from '#/system/filesystem-copy.ts'
+import { copyPath, DestinationPermissionRestoreError } from '#/system/filesystem-copy.ts'
 
 type MaterializationMode = 'copy' | 'symlink' | 'hardlink'
 
@@ -408,7 +408,9 @@ async function materializePlan(
       // directory as copied would turn an uncertain follow-up into false success.
       completedOperations.push(item)
     } catch (err) {
-      if (signal?.aborted) return { ok: false, message: 'cancelled', completedOperations }
+      if (signal?.aborted && !(err instanceof DestinationPermissionRestoreError)) {
+        return { ok: false, message: 'cancelled', completedOperations }
+      }
       if (hasErrorCode(err, 'EEXIST')) {
         return { ok: false, message: `destination already exists: ${item.rel}`, completedOperations }
       }

@@ -108,6 +108,43 @@ describe('remote git mutations', () => {
     )
   })
 
+  test('deleteRemoteBranch reports an uncertain result after timeout', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      switch (command.type) {
+        case 'gitSnapshot':
+          return okRemoteResult(
+            [
+              '__GOBLIN_REMOTE_CURRENT__',
+              'value release/1.0',
+              '__GOBLIN_REMOTE_DEFAULT__',
+              'value main',
+              '__GOBLIN_REMOTE_BRANCHES__',
+              '',
+            ].join('\n'),
+          )
+        case 'gitWorktreeList':
+          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+        case 'gitUpstream':
+          return okRemoteResult(NUL.repeat(3))
+        case 'gitIsAncestor':
+          return okRemoteResult('true')
+        case 'gitBranchDelete':
+          return { ...failRemoteResult('timeout'), timedOut: true, remoteStarted: true }
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', run })
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'timeout',
+      branchEffect: 'may-have-changed',
+      failureExecution: { status: 'timed-out' },
+    })
+  })
+
   test.each([
     {
       name: 'deletes the configured upstream when requested',
@@ -125,6 +162,7 @@ describe('remote git mutations', () => {
         ok: false,
         message: 'remote rejected delete',
         branchEffect: 'local-delete-confirmed',
+        failureExecution: { status: 'failed' },
       },
     },
   ] as const)('deleteRemoteBranch $name', async ({ remote, upstreamBranch, pushResult, expected }) => {
@@ -395,7 +433,9 @@ describe('remote git mutations', () => {
 
     expect(result).toEqual({
       ok: false,
-      message: 'error.worktree-remove-timeout-check-state',
+      message: 'timeout',
+      failureExecution: { status: 'timed-out' },
+      failureStage: 'worktree-remove',
       worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
     })
     expect(afterWorktreeRemoved).not.toHaveBeenCalled()
@@ -420,6 +460,8 @@ describe('remote git mutations', () => {
     expect(result).toEqual({
       ok: false,
       message: 'connection failed',
+      failureExecution: { status: 'failed' },
+      failureStage: 'worktree-remove',
       worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
     })
   })
@@ -536,6 +578,8 @@ describe('remote git mutations', () => {
       ok: false,
       message: 'cancelled',
       branchEffect: 'local-delete-confirmed',
+      failureExecution: { status: 'cancelled' },
+      failureStage: 'branch-delete',
       worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
       worktreeRemoved: true,
     })

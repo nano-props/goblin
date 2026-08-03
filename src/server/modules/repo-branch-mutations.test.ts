@@ -8,20 +8,20 @@ import {
   WORKTREE_BOOTSTRAP_CONFIG_HASH,
   WORKTREE_REPO_ID,
   createLocalRepoWorktreeWithBootstrap,
-  expectNoRepoMetadataInvalidations,
-  expectRepoMetadataInvalidations,
-  expectRepoOperationSettledBeforeProjectionInvalidation,
-  repoWorktreeStatusInvalidations,
   mocks,
 } from '#/server/test-utils/repo-module.ts'
 
 describe('repo branch mutations', () => {
-  test('deleteRepoBranch settles the write operation before invalidating projections', async () => {
+  test('deleteRepoBranch settles the write operation and returns its projection impact', async () => {
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { listRepoWriteOperationsForRepo } = await import('#/server/modules/repo-write-operation-coordinator.ts')
 
-    await expect(deleteRepoBranch(REPO_ID, 'feature/a')).resolves.toEqual({ ok: true, message: 'ok' })
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
 
-    expectRepoOperationSettledBeforeProjectionInvalidation()
+    expect(result).toMatchObject({ ok: true, message: 'ok', repoIdsToInvalidate: [REPO_ID] })
+    await expect(listRepoWriteOperationsForRepo(REPO_ID, { includeSettled: true })).resolves.toMatchObject([
+      { phase: 'done' },
+    ])
   })
 
   test.each([
@@ -33,9 +33,9 @@ describe('repo branch mutations', () => {
 
     const result = await run(repo)
 
-    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect(name === 'pullRepoBranch' ? mocks.pullBranch : mocks.pushBranch).toHaveBeenCalled()
-    await expect(listRepoWriteOperationsForRepo(REPO_ID, { includeSettled: true })).resolves.toEqual(
+    await expect(listRepoWriteOperationsForRepo(REPO_ID, { includeSettled: true })).resolves.toMatchObject(
       expect.arrayContaining([
         expect.objectContaining({
           id: expect.stringMatching(/^repo-write-op-/),
@@ -60,7 +60,7 @@ describe('repo branch mutations', () => {
 
     const result = await pullRepoBranch(REPO_ID, 'feature/a', '/tmp/repo-worktree')
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       message: 'ok',
       worktreePathsToInvalidate: ['/tmp/repo-worktree'],
@@ -79,8 +79,8 @@ describe('repo branch mutations', () => {
     const result = await repo.pullRepoBranch(REPO_ID, 'feature/a')
 
     expect(result).toMatchObject({ ok: false, message: 'fatal: pull failed' })
-    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
-    expect(repoWorktreeStatusInvalidations()).toEqual([{ repoId: REPO_ID, domain: 'worktree-status' }])
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
+    expect(result.worktreePathsToInvalidate).toEqual(['/tmp/repo'])
   })
 
   test.each([
@@ -107,7 +107,7 @@ describe('repo branch mutations', () => {
     const result = await run(repo)
 
     expect(result).toMatchObject({ ok: false, message: 'error.git-command-timeout-check-state' })
-    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
   })
 
   test.each([
@@ -143,9 +143,9 @@ describe('repo branch mutations', () => {
     setup()
     const repo = await import('#/server/modules/repo-write-paths.ts')
 
-    await run(repo)
+    const result = await run(repo)
 
-    expectNoRepoMetadataInvalidations()
+    expect(result.repoIdsToInvalidate).toBeUndefined()
   })
 
   test('pushRepoBranch invalidates repository projections when a failed command may have run', async () => {
@@ -156,8 +156,8 @@ describe('repo branch mutations', () => {
 
     const result = await pushRepoBranch(REPO_ID, 'feature/a')
 
-    expect(result).toEqual({ ok: false, message: 'fatal: push failed' })
-    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+    expect(result).toMatchObject({ ok: false, message: 'fatal: push failed' })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
   })
 
   test('pushRepoBranch invalidates remote projections when a failed SSH command ran remotely', async () => {
@@ -171,8 +171,8 @@ describe('repo branch mutations', () => {
 
     const result = await pushRepoBranch(repoId, 'feature/a')
 
-    expect(result).toEqual({ ok: false, message: 'connection closed after push' })
-    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
+    expect(result).toMatchObject({ ok: false, message: 'connection closed after push' })
+    expect(result.repoIdsToInvalidate).toEqual([repoId, linkedRepoId])
   })
 
   test('publishes primary SSH mutation impact before the runtime transport failure escapes', async () => {
@@ -202,8 +202,7 @@ describe('repo branch mutations', () => {
     )
     await expect(
       pushRepoBranch(repoId, 'feature/a', undefined, { workspaceRuntimeId: 'runtime-test' }),
-    ).rejects.toMatchObject({ runtimeFailure })
-    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
+    ).rejects.toMatchObject({ runtimeFailure, mutation: { repoIdsToInvalidate: [repoId, linkedRepoId] } })
   })
 
   test('publishes an established SSH branch milestone before follow-up runtime failure escapes', async () => {
@@ -235,8 +234,7 @@ describe('repo branch mutations', () => {
       deleteRepoBranch(repoId, 'feature/a', { deleteUpstream: true }, undefined, {
         workspaceRuntimeId: 'runtime-test',
       }),
-    ).rejects.toMatchObject({ runtimeFailure })
-    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: linkedRepoId, domain: 'metadata' })
+    ).rejects.toMatchObject({ runtimeFailure, mutation: { repoIdsToInvalidate: [repoId, linkedRepoId] } })
   })
 
   test('createRepoWorktree invalidates source and target projections when a failed command may have run', async () => {
@@ -250,11 +248,8 @@ describe('repo branch mutations', () => {
       mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
     })
 
-    expect(result).toEqual({ ok: false, message: 'fatal: worktree failed' })
-    expectRepoMetadataInvalidations(
-      { repoId: REPO_ID, domain: 'metadata' },
-      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
-    )
+    expect(result).toMatchObject({ ok: false, message: 'fatal: worktree failed' })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID, WORKTREE_REPO_ID])
   })
 
   test('createRepoWorktree publishes invalidation when bootstrap fails after git created the worktree', async () => {
@@ -272,7 +267,7 @@ describe('repo branch mutations', () => {
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
       recoveryMessageKeys: ['error.worktree-created-followup-failed'],
@@ -287,14 +282,7 @@ describe('repo branch mutations', () => {
       signal: undefined,
       expectedConfigHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
     })
-    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
-      repoId: REPO_ID,
-      domain: 'metadata',
-    })
-    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
-      repoId: WORKTREE_REPO_ID,
-      domain: 'metadata',
-    })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID, WORKTREE_REPO_ID])
     expect(mocks.setServerWorkspaceWorktreeBootstrapConfigTrust).not.toHaveBeenCalled()
   })
 
@@ -304,15 +292,12 @@ describe('repo branch mutations', () => {
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'cancelled',
       recoveryMessageKeys: ['error.worktree-created-followup-failed'],
     })
-    expectRepoMetadataInvalidations(
-      { repoId: REPO_ID, domain: 'metadata' },
-      { repoId: WORKTREE_REPO_ID, domain: 'metadata' },
-    )
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID, WORKTREE_REPO_ID])
   })
 
   test('createRepoWorktree publishes remote invalidation when bootstrap fails after remote worktree creation', async () => {
@@ -347,19 +332,12 @@ describe('repo branch mutations', () => {
       },
     )
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
       recoveryMessageKeys: ['error.worktree-created-followup-failed'],
     })
-    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
-      repoId,
-      domain: 'metadata',
-    })
-    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
-      repoId: worktreeRepoId,
-      domain: 'metadata',
-    })
+    expect(result.repoIdsToInvalidate).toEqual([repoId, worktreeRepoId])
   })
 
   test('createRepoWorktree surfaces recovery when remote bootstrap is cancelled after creation', async () => {
@@ -391,12 +369,12 @@ describe('repo branch mutations', () => {
       },
     )
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'cancelled',
       recoveryMessageKeys: ['error.worktree-created-followup-failed'],
     })
-    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: worktreeRepoId, domain: 'metadata' })
+    expect(result.repoIdsToInvalidate).toEqual([repoId, worktreeRepoId])
   })
 
   test('createRepoWorktree invalidates the remote source and target after a started SSH timeout', async () => {
@@ -412,8 +390,8 @@ describe('repo branch mutations', () => {
       mode: { kind: 'existingBranch', branch: 'feature/a' },
     })
 
-    expect(result).toEqual({ ok: false, message: 'error.worktree-create-timeout-check-state' })
-    expectRepoMetadataInvalidations({ repoId, domain: 'metadata' }, { repoId: worktreeRepoId, domain: 'metadata' })
+    expect(result).toMatchObject({ ok: false, message: 'error.worktree-create-timeout-check-state' })
+    expect(result.repoIdsToInvalidate).toEqual([repoId, worktreeRepoId])
     expect(mocks.bootstrapRemoteWorktreeAfterCreate).not.toHaveBeenCalled()
   })
 
@@ -426,7 +404,7 @@ describe('repo branch mutations', () => {
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: true })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
       recoveryMessageKeys: ['error.worktree-created-followup-failed'],
@@ -443,9 +421,9 @@ describe('repo branch mutations', () => {
       mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
     })
 
-    expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
+    expect(result).toMatchObject({ ok: false, message: 'error.invalid-path' })
     expect(mocks.createWorktree).not.toHaveBeenCalled()
-    expectNoRepoMetadataInvalidations()
+    expect(result.repoIdsToInvalidate).toBeUndefined()
   })
 
   test('deleteRepoBranch publishes snapshot invalidation after success', async () => {
@@ -454,17 +432,14 @@ describe('repo branch mutations', () => {
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a')
 
-    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual([])
     expect((await readRepoOperationsSnapshot(REPO_ID, { includeSettled: true })).operations[0]).toMatchObject({
       kind: 'delete-branch',
       phase: 'done',
       target: { branch: 'feature/a' },
     })
-    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledWith({
-      repoId: REPO_ID,
-      domain: 'metadata',
-    })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
   })
 
   test('remote deleteRepoBranch forwards upstream deletion and refreshes affected remote worktrees after partial failure', async () => {
@@ -480,7 +455,7 @@ describe('repo branch mutations', () => {
 
     const result = await deleteRepoBranch(repoId, 'feature/a', { deleteUpstream: true })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'cancelled',
       recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
@@ -494,16 +469,7 @@ describe('repo branch mutations', () => {
         signal: undefined,
       }),
     )
-    expectRepoMetadataInvalidations(
-      {
-        repoId,
-        domain: 'metadata',
-      },
-      {
-        repoId: linkedRepoId,
-        domain: 'metadata',
-      },
-    )
+    expect(result.repoIdsToInvalidate).toEqual([repoId, linkedRepoId])
   })
 
   test.each([
@@ -519,17 +485,8 @@ describe('repo branch mutations', () => {
 
     const result = await run(repo)
 
-    expect(result).toEqual({ ok: true, message: 'ok' })
-    expectRepoMetadataInvalidations(
-      {
-        repoId: REPO_ID,
-        domain: 'metadata',
-      },
-      {
-        repoId: LINKED_REPO_ID,
-        domain: 'metadata',
-      },
-    )
+    expect(result).toMatchObject({ ok: true, message: 'ok' })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID, LINKED_REPO_ID])
   })
 
   test('deleteRepoBranch refuses protected branches before touching git', async () => {
@@ -538,9 +495,9 @@ describe('repo branch mutations', () => {
 
     const result = await deleteRepoBranch(REPO_ID, 'main')
 
-    expect(result).toEqual({ ok: false, message: 'error.cannot-delete-protected-branch' })
+    expect(result).toMatchObject({ ok: false, message: 'error.cannot-delete-protected-branch' })
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
-    expectNoRepoMetadataInvalidations()
+    expect(result.repoIdsToInvalidate).toBeUndefined()
   })
 
   test('deleteRepoBranch uses current HEAD semantics for safe deletes', async () => {
@@ -552,7 +509,7 @@ describe('repo branch mutations', () => {
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a')
 
-    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'release/1.0', undefined)
     expect(mocks.deleteBranch).toHaveBeenCalledWith('/tmp/repo', 'feature/a', { force: undefined, signal: undefined })
   })
@@ -570,7 +527,7 @@ describe('repo branch mutations', () => {
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a')
 
-    expect(result).toEqual({ ok: false, message: 'error.branch-not-fully-merged' })
+    expect(result).toMatchObject({ ok: false, message: 'error.branch-not-fully-merged' })
     expect(mocks.isAncestor).toHaveBeenCalledOnce()
     expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'release/1.0', undefined)
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
@@ -595,7 +552,7 @@ describe('repo branch mutations', () => {
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })
 
-    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect(mocks.getUpstream).toHaveBeenCalledTimes(1)
     expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'refs/remotes/origin/feature/a', undefined)
     expect(mocks.deleteUpstreamBranch).toHaveBeenCalledWith('/tmp/repo', 'origin', 'feature/a', undefined)
@@ -617,12 +574,12 @@ describe('repo branch mutations', () => {
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       message: 'cancelled',
       recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
     })
-    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
   })
 
   test('uses a local upstream for merge safety without attempting remote deletion', async () => {
@@ -636,7 +593,7 @@ describe('repo branch mutations', () => {
     })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    await expect(deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })).resolves.toEqual({
+    await expect(deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })).resolves.toMatchObject({
       ok: true,
       message: 'ok',
     })
@@ -650,9 +607,9 @@ describe('repo branch mutations', () => {
     )
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    await deleteRepoBranch(REPO_ID, 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
 
-    expectNoRepoMetadataInvalidations()
+    expect(result.repoIdsToInvalidate).toBeUndefined()
   })
 
   test('deleteRepoBranch reports uncertainty and invalidates when the delete command may have run', async () => {
@@ -663,8 +620,8 @@ describe('repo branch mutations', () => {
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a')
 
-    expect(result).toEqual({ ok: false, message: 'connection closed' })
-    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+    expect(result).toMatchObject({ ok: false, message: 'connection closed' })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
   })
 
   test('deleteRepoBranch surfaces cancellation after the delete command started', async () => {
@@ -673,8 +630,60 @@ describe('repo branch mutations', () => {
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a')
 
-    expect(result).toEqual({ ok: false, message: 'error.git-command-cancelled-check-state' })
-    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+    expect(result).toMatchObject({ ok: false, message: 'error.git-command-cancelled-check-state' })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
+  })
+
+  test('deleteRepoBranch reports an uncertain result after timeout', async () => {
+    mocks.deleteBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'git timed out after 180s' }, 'timed-out'),
+    )
+    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+
+    expect(result).toMatchObject({ ok: false, message: 'error.git-command-timeout-check-state' })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
+  })
+
+  test('deleteRepoBranch reports uncertain upstream timeout after confirmed local deletion', async () => {
+    mocks.getCurrentBranch.mockResolvedValueOnce('release/1.0')
+    mocks.isAncestor.mockResolvedValue(true)
+    mocks.getUpstream.mockResolvedValueOnce({
+      ancestryRef: 'refs/remotes/origin/feature/a',
+      source: { remote: 'origin', branch: 'feature/a' },
+      deleteTarget: { remote: 'origin', branch: 'feature/a' },
+    })
+    mocks.deleteUpstreamBranch.mockResolvedValueOnce(
+      commandOutcomeForTest({ ok: false, message: 'upstream timeout' }, 'timed-out'),
+    )
+    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })
+
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'error.git-command-timeout-check-state',
+      recoveryMessageKeys: ['error.local-branch-deleted-followup-failed'],
+    })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
+  })
+
+  test('remote deleteRepoBranch classifies timeout at the server domain boundary', async () => {
+    const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
+    mocks.getRemoteRepoWorktreePaths.mockResolvedValueOnce(['/srv/repo'])
+    mocks.deleteRemoteBranch.mockResolvedValueOnce({
+      ok: false,
+      message: 'timeout',
+      branchEffect: 'may-have-changed',
+      failureExecution: { status: 'timed-out' },
+    })
+    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await deleteRepoBranch(repoId, 'feature/a')
+
+    expect(result).toMatchObject({ ok: false, message: 'error.git-command-timeout-check-state' })
+    expect(result.repoIdsToInvalidate).toEqual([repoId])
   })
 
   test('deleteRepoBranch preserves an ordinary Git error while conservatively invalidating', async () => {
@@ -685,7 +694,7 @@ describe('repo branch mutations', () => {
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a')
 
-    expect(result).toEqual({ ok: false, message: 'error: branch is not fully merged' })
-    expectRepoMetadataInvalidations({ repoId: REPO_ID, domain: 'metadata' })
+    expect(result).toMatchObject({ ok: false, message: 'error: branch is not fully merged' })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
   })
 })

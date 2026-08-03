@@ -723,6 +723,29 @@ describe('repo write operation coordinator', () => {
     ])
   })
 
+  test('preserves a non-cancellation failure observed after caller abort', async () => {
+    const caller = new AbortController()
+    const taskStarted = Promise.withResolvers<void>()
+    const rejectTask = Promise.withResolvers<never>()
+    const runtimeFailure = new Error('typed runtime failure')
+    const work = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      caller.signal,
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'user' },
+      (_operation, context) => async () =>
+        await context.runNetworkOperation(async () => {
+          taskStarted.resolve()
+          return await rejectTask.promise
+        }),
+    )
+
+    await taskStarted.promise
+    caller.abort(new DOMException('caller aborted', 'AbortError'))
+    rejectTask.reject(runtimeFailure)
+
+    await expect(work).rejects.toBe(runtimeFailure)
+  })
+
   test('retains the write lease until an aborted network operation has drained', async () => {
     const boundary = await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
     const caller = new AbortController()

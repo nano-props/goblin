@@ -13,7 +13,7 @@ vi.mock('node:stream/promises', () => ({
   pipeline: mocks.pipeline,
 }))
 
-import { copyPath } from '#/system/filesystem-copy.ts'
+import { copyPath, DestinationPermissionRestoreError } from '#/system/filesystem-copy.ts'
 
 let temporaryDirectory: string | null = null
 
@@ -51,9 +51,11 @@ test('reports both copy and permission restoration failures', async () => {
   mocks.pipeline.mockRejectedValueOnce(new Error('copy failed'))
   vi.spyOn(fs, 'chmod').mockRejectedValueOnce(new Error('chmod failed'))
 
-  await expect(copyPath(sourcePath, destinationPath)).rejects.toThrow(
+  const copy = copyPath(sourcePath, destinationPath)
+  await expect(copy).rejects.toThrow(
     'copy failed; failed to restore destination permissions: chmod failed',
   )
+  await expect(copy).rejects.toBeInstanceOf(DestinationPermissionRestoreError)
 })
 
 test('uses a destination-relative absolute junction target for Windows directory links', async () => {
@@ -96,4 +98,22 @@ test('passes cancellation to the file-copy stream', async () => {
   })
   expect(mocks.pipeline).toHaveBeenCalledOnce()
   await expect(stat(destinationPath)).rejects.toMatchObject({ code: 'ENOENT' })
+})
+
+test('treats a created symlink as complete when cancellation arrives at its commit point', async () => {
+  temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'filesystem-copy-symlink-cancel-test-'))
+  const sourceTarget = path.join(temporaryDirectory, 'target.txt')
+  const sourcePath = path.join(temporaryDirectory, 'source-link')
+  const destinationPath = path.join(temporaryDirectory, 'destination-link')
+  await writeFile(sourceTarget, 'target')
+  await symlink(sourceTarget, sourcePath)
+  const controller = new AbortController()
+  const realSymlink = fs.symlink.bind(fs)
+  vi.spyOn(fs, 'symlink').mockImplementation(async (...args) => {
+    await realSymlink(...args)
+    controller.abort()
+  })
+
+  await expect(copyPath(sourcePath, destinationPath, { signal: controller.signal })).resolves.toBeUndefined()
+  await expect(fs.readlink(destinationPath)).resolves.toBe(sourceTarget)
 })

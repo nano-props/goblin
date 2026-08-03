@@ -108,6 +108,7 @@ type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
 interface BranchDeleteResult extends ExecResult {
   branchEffect: 'none' | 'may-have-changed' | 'local-delete-confirmed'
+  failureExecution?: CommandExecution
 }
 
 export type WorkspacePaneTargetIdentity =
@@ -415,18 +416,28 @@ function worktreeRemovedFollowupResult(
 }
 
 function remoteWorktreeRemovalResultForUser(result: RemoteWorktreeRemovalResult): RepoMutationResult {
-  if (result.worktreeRemoved === true) return worktreeRemovedFollowupResult(result, result.branchEffect ?? 'none')
-  const publicResult: RepoMutationResult = { ok: result.ok, message: result.message }
+  let message = result.message
+  if (!result.ok && result.failureExecution) {
+    const failure = { ok: false, message: result.message }
+    message =
+      result.failureStage === 'worktree-remove'
+        ? worktreeCommandFailureForUser(failure, result.failureExecution, 'remove').message
+        : commandFailureForUser(failure, result.failureExecution).message
+  }
+  const normalized = { ok: result.ok, message }
+  if (result.worktreeRemoved === true) {
+    return worktreeRemovedFollowupResult(normalized, result.branchEffect ?? 'none')
+  }
+  const publicResult: RepoMutationResult = normalized
   return publicResult
 }
 
 function publicBranchDeleteResult(result: BranchDeleteResult): RepoMutationExecResult {
-  let publicResult: RepoMutationExecResult = { ok: result.ok, message: result.message }
+  let publicResult: RepoMutationExecResult = result.failureExecution
+    ? commandFailureForUser({ ok: result.ok, message: result.message }, result.failureExecution)
+    : { ok: result.ok, message: result.message }
   if (!result.ok && result.branchEffect === 'local-delete-confirmed') {
     publicResult = withRecoveryMessage(publicResult, 'error.local-branch-deleted-followup-failed')
-  }
-  if (!result.ok && result.branchEffect === 'may-have-changed' && result.message === 'cancelled') {
-    publicResult = { ok: false, message: 'error.git-command-cancelled-check-state' }
   }
   return publicResult
 }
@@ -508,14 +519,24 @@ function createLocalRepoSource(
     })
     if (!localDeleteResult.ok) {
       if (!commandMayHaveRun(localDeleteExecution)) {
-        return { ok: false, message: localDeleteResult.message, branchEffect: 'none' }
+        return {
+          ok: false,
+          message: localDeleteResult.message,
+          branchEffect: 'none',
+          failureExecution: localDeleteExecution,
+        }
       }
-      return { ok: false, message: localDeleteResult.message, branchEffect: 'may-have-changed' }
+      return {
+        ok: false,
+        message: localDeleteResult.message,
+        branchEffect: 'may-have-changed',
+        failureExecution: localDeleteExecution,
+      }
     }
     if (options?.deleteUpstream !== true || !upstream?.deleteTarget) {
       return { ok: true, message: localDeleteResult.message, branchEffect: 'local-delete-confirmed' }
     }
-    const { result: upstreamDeleteResult } = await deleteUpstreamBranch(
+    const { result: upstreamDeleteResult, execution: upstreamDeleteExecution } = await deleteUpstreamBranch(
       gitCwd,
       upstream.deleteTarget.remote,
       upstream.deleteTarget.branch,
@@ -528,6 +549,7 @@ function createLocalRepoSource(
       ok: false,
       message: upstreamDeleteResult.message,
       branchEffect: 'local-delete-confirmed',
+      failureExecution: upstreamDeleteExecution,
     }
   }
 

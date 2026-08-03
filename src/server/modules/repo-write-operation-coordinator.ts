@@ -27,6 +27,7 @@ import {
   type RepoWriteOperationListOptions,
 } from '#/server/modules/repo-write-operation-state.ts'
 import { RepoMembershipReadConflictError } from '#/server/modules/repo-membership-read-conflict.ts'
+import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 
 export interface RepoWriteOperationLifecycle {
   id: string
@@ -391,7 +392,7 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
     operation.settle(outcome.value)
     return outcome.value
   }
-  if (callerSignal?.aborted) {
+  if (callerSignal?.aborted && isCancellationError(outcome.error, ctrl.signal)) {
     const result = cancelledRepoWriteResult<T>()
     operation.settle(result)
     return result
@@ -401,6 +402,12 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
     message: outcome.error instanceof Error ? outcome.error.message : String(outcome.error),
   })
   throw outcome.error
+}
+
+function isCancellationError(error: unknown, signal: AbortSignal): boolean {
+  if (error === signal.reason) return true
+  if (error instanceof OperationCancelledError) return true
+  return error instanceof Error && error.name === 'AbortError'
 }
 
 function createRepoWriteOperationContext(

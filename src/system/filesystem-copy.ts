@@ -7,6 +7,22 @@ export interface CopyPathOptions {
   include?: (sourcePath: string) => boolean
 }
 
+export class DestinationPermissionRestoreError extends Error {
+  readonly operationError: unknown
+  readonly restoreError: unknown
+
+  constructor(restoreError: unknown, operationError?: unknown) {
+    const operationFailure = operationError === undefined ? '' : `${filesystemErrorMessage(operationError)}; `
+    super(
+      `${operationFailure}failed to restore destination permissions: ${filesystemErrorMessage(restoreError)}`,
+      operationError === undefined ? undefined : { cause: operationError },
+    )
+    this.name = 'DestinationPermissionRestoreError'
+    this.operationError = operationError
+    this.restoreError = restoreError
+  }
+}
+
 /**
  * Copy one filesystem tree without overwriting existing destinations.
  * Regular files use an abort-aware stream pipeline, so the promise settles
@@ -62,14 +78,15 @@ async function copyDirectory(
     try {
       await fs.chmod(destinationPath, mode)
     } catch (restoreError) {
-      throw new Error(
-        `${filesystemErrorMessage(error)}; failed to restore destination permissions: ${filesystemErrorMessage(restoreError)}`,
-        { cause: error },
-      )
+      throw new DestinationPermissionRestoreError(restoreError, error)
     }
     throw error
   }
-  await fs.chmod(destinationPath, mode)
+  try {
+    await fs.chmod(destinationPath, mode)
+  } catch (restoreError) {
+    throw new DestinationPermissionRestoreError(restoreError)
+  }
 }
 
 function filesystemErrorMessage(error: unknown): string {
@@ -106,7 +123,9 @@ async function copySymbolicLink(
   signal?.throwIfAborted()
   const copied = await copiedSymlink(sourcePath, destinationPath, target)
   await fs.symlink(copied.target, destinationPath, copied.type)
-  signal?.throwIfAborted()
+  // Symlink creation is the atomic commit point for this item. Once it
+  // succeeds, report completion; the caller checks cancellation before the
+  // next item instead of hiding an established destination behind cancelled.
 }
 
 interface CopiedSymlink {
