@@ -30,7 +30,10 @@ import { constrainTerminalSize } from '#/shared/terminal-protocol-constraints.ts
 import type { TerminalSize } from '#/shared/terminal-types.ts'
 import type { TerminalFocusRequest, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 import { installTerminalTouchScroll } from '#/web/components/terminal/terminal-touch-scroll.ts'
-import { installTerminalViewportReveal } from '#/web/components/terminal/terminal-viewport-reveal.ts'
+import {
+  installTerminalViewportReveal,
+  terminalInputRevealRow,
+} from '#/web/components/terminal/terminal-viewport-reveal.ts'
 
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
@@ -334,11 +337,7 @@ export class TerminalSessionView {
         textarea,
         visualViewport,
         getLineHeight: () => this.terminalLineHeight(term),
-        getCursorRow: () => {
-          const buffer = term.buffer.active
-          const cursorRow = buffer.baseY + buffer.cursorY - buffer.viewportY
-          return cursorRow >= 0 && cursorRow < term.rows ? cursorRow : null
-        },
+        getCursorRow: () => terminalInputRevealRow(term.buffer.active, term.rows),
       }),
     )
   }

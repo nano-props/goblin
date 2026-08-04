@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, test, vi } from 'vitest'
-import { installTerminalViewportReveal } from '#/web/components/terminal/terminal-viewport-reveal.ts'
+import {
+  installTerminalViewportReveal,
+  terminalInputRevealRow,
+} from '#/web/components/terminal/terminal-viewport-reveal.ts'
 
 function rect(left: number, top: number, width: number, height: number): DOMRect {
   return {
@@ -113,7 +116,7 @@ test('rearms the reveal when an already focused terminal is pressed again', asyn
   reveal.dispose()
 })
 
-test('delegates nearest reveal with footer space when the terminal is obscured', async () => {
+test('reveals the bottom-page cursor position while normal scrollback is visible', async () => {
   const visualViewport = viewport(500)
   const { element, textarea } = terminalInput()
   const reveal = installTerminalViewportReveal({
@@ -121,7 +124,7 @@ test('delegates nearest reveal with footer space when the terminal is obscured',
     textarea,
     visualViewport,
     getLineHeight: () => 14,
-    getCursorRow: () => 5,
+    getCursorRow: () => terminalInputRevealRow({ type: 'normal', baseY: 100, cursorY: 5, viewportY: 50 }, 30),
   })
   const marker = revealMarker(element)
 
@@ -129,8 +132,17 @@ test('delegates nearest reveal with footer space when the terminal is obscured',
   await nextFrame()
 
   expect(marker.scrollIntoView).toHaveBeenCalledOnce()
+  expect(marker.style.top).toBe('70px')
   expect(marker.style.scrollMarginBlockEnd).toBe('42px')
   reveal.dispose()
+})
+
+test('does not project an invalid alternate-buffer cursor into the viewport', () => {
+  expect(terminalInputRevealRow({ type: 'alternate', baseY: 100, cursorY: 5, viewportY: 50 }, 30)).toBeNull()
+})
+
+test('uses the current viewport row when the cursor is already visible', () => {
+  expect(terminalInputRevealRow({ type: 'normal', baseY: 100, cursorY: 5, viewportY: 90 }, 30)).toBe(15)
 })
 
 test('waits for a visible cursor row and stops after disposal', async () => {

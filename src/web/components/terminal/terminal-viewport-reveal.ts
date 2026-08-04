@@ -6,11 +6,29 @@ interface TerminalViewportRevealOptions {
   getCursorRow: () => number | null
 }
 
+interface TerminalInputBufferPosition {
+  readonly type: 'normal' | 'alternate'
+  readonly baseY: number
+  readonly cursorY: number
+  readonly viewportY: number
+}
+
 const TERMINAL_VIEWPORT_REVEAL_BOTTOM_ROWS = 3
 const SCROLL_INTO_VIEW_OPTIONS: ScrollIntoViewOptions = {
   block: 'nearest',
   inline: 'nearest',
   behavior: 'auto',
+}
+
+export function terminalInputRevealRow(buffer: TerminalInputBufferPosition, rows: number): number | null {
+  const viewportCursorRow = buffer.baseY + buffer.cursorY - buffer.viewportY
+  if (viewportCursorRow >= 0 && viewportCursorRow < rows) return viewportCursorRow
+
+  // Goblin configures xterm with scrollOnUserInput, so normal-buffer input returns to baseY. Project
+  // that authoritative next-input position before the first key arrives instead of waiting for a
+  // later browser viewport event that the internal xterm scroll does not produce.
+  if (buffer.type === 'normal' && viewportCursorRow >= rows) return buffer.cursorY
+  return null
 }
 
 export function installTerminalViewportReveal(options: TerminalViewportRevealOptions): { dispose: () => void } {
