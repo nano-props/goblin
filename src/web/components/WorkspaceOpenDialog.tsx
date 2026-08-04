@@ -14,8 +14,9 @@ export function WorkspaceOpenDialog({ open, onOpenChange }: WorkspaceOpenDialogP
     <OpenWorkspaceDialog
       open={open}
       onClose={() => onOpenChange(false)}
-      onOpen={async (path) => {
+      onOpen={async (path, signal) => {
         const result = await ensureWorkspaceOpen(path)
+        if (signal.aborted) return result
         if (result.ok) navigation.activateWorkspace(result.workspaceId)
         return result
       }}

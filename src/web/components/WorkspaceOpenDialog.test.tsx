@@ -84,6 +84,44 @@ describe('WorkspaceOpenDialog', () => {
     )
     expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(onOpenChange.mock.invocationCallOrder[0]!)
   })
+
+  test('does not activate a workspace that finishes opening after a controlled close', async () => {
+    const opening = Promise.withResolvers<{
+      ok: true
+      workspaceId: ReturnType<typeof workspaceIdForTest>
+    }>()
+    const ensureWorkspaceOpen = vi.fn(() => opening.promise)
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    const activateWorkspace = vi.fn()
+    const navigation = navigationWith({ activateWorkspace })
+    const onOpenChange = vi.fn()
+    const { rerender } = renderInJsdom(
+      <AppNavigationProvider value={navigation}>
+        <WorkspaceOpenDialog open onOpenChange={onOpenChange} />
+      </AppNavigationProvider>,
+    )
+
+    setInputValue('#open-workspace-path', '~/Developer/repo')
+    click('button[type="submit"]')
+    await waitFor(() => expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo'))
+
+    rerender(
+      <AppNavigationProvider value={navigation}>
+        <WorkspaceOpenDialog open={false} onOpenChange={onOpenChange} />
+      </AppNavigationProvider>,
+    )
+    await act(async () => {
+      opening.resolve({
+        ok: true,
+        workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
+      })
+      await opening.promise
+    })
+
+    expect(ensureWorkspaceOpen).toHaveBeenCalledTimes(1)
+    expect(activateWorkspace).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalled()
+  })
 })
 
 function navigationWith(overrides: Partial<Pick<AppNavigationActions, 'activateWorkspace'>>): AppNavigationActions {

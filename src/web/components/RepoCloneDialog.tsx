@@ -18,8 +18,9 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
 
   async function handleClone(input: CloneRepositoryInput, signal: AbortSignal): Promise<CloneRepoResult> {
     const result = await runCloneRepository(input, { signal })
-    if (!result.ok || !result.path) return result
+    if (!result.ok || !result.path || signal.aborted) return result
     const openResult = await ensureWorkspaceOpen(result.path)
+    if (signal.aborted) return result
     if (!openResult.ok) {
       const openErrorMessage = t(openResult.message)
       toast.error(t('drop.open-failed'), {

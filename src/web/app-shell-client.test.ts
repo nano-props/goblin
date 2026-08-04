@@ -147,6 +147,29 @@ describe('app shell client', () => {
     await expect(chooseCloneParentPath()).resolves.toBe('/tmp')
   })
 
+  test('stops waiting for a native directory selection when its caller is cancelled', async () => {
+    const selection = Promise.withResolvers<string | null>()
+    const bridgeModule = await import('#/web/client-bridge.ts')
+    bridgeModule.setClientBridgeForTests(
+      testBridge({
+        host: () => ({
+          openSettingsWindow: vi.fn(),
+          openExternalUrl: vi.fn(),
+          openDirectoryDialog: vi.fn(() => selection.promise),
+          consumeExternalOpenPaths: vi.fn(),
+        }),
+      }),
+    )
+    const { chooseCloneParentPath } = await import('#/web/app-shell-client.ts')
+    const abortController = new AbortController()
+
+    const choosing = chooseCloneParentPath({ signal: abortController.signal })
+    abortController.abort()
+
+    await expect(choosing).rejects.toMatchObject({ name: 'AbortError' })
+    selection.resolve('/tmp/ignored-selection')
+  })
+
   test('saveClipboardFiles forwards paths from the bridge', async () => {
     // Happy path — the resolver relies on the wrapper passing the
     // bridge's response through unchanged so a multi-file paste can

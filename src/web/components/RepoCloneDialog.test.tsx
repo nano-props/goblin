@@ -138,6 +138,88 @@ describe('RepoCloneDialog', () => {
     expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(onOpenChange.mock.invocationCallOrder[0]!)
   })
 
+  test('does not activate or report a workspace that finishes opening after cancellation', async () => {
+    const user = userEvent.setup()
+    const opening = Promise.withResolvers<{
+      ok: true
+      workspaceId: ReturnType<typeof workspaceIdForTest>
+    }>()
+    const ensureWorkspaceOpen = vi.fn(() => opening.promise)
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    const activateWorkspace = vi.fn()
+    const onOpenChange = vi.fn()
+
+    renderInJsdom(
+      <AppNavigationProvider value={navigationWith({ activateWorkspace })}>
+        <RepoCloneDialog open onOpenChange={onOpenChange} />
+      </AppNavigationProvider>,
+    )
+
+    setInputValue('#clone-url', 'https://example.com/repo.git')
+    setInputValue('#clone-directory-name', 'repo')
+    click('button[type="submit"]')
+    await waitFor(() => expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo'))
+
+    await user.click(screen.getByRole('button', { name: 'dialog.cancel' }))
+    expect(onOpenChange).toHaveBeenCalledTimes(1)
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+
+    await act(async () => {
+      opening.resolve({
+        ok: true,
+        workspaceId: workspaceIdForTest('goblin+file:///tmp/cloned-repo'),
+      })
+      await opening.promise
+    })
+
+    expect(ensureWorkspaceOpen).toHaveBeenCalledTimes(1)
+    expect(activateWorkspace).not.toHaveBeenCalled()
+    expect(mocks.toastSuccess).not.toHaveBeenCalled()
+    expect(mocks.toastError).not.toHaveBeenCalled()
+    expect(onOpenChange).toHaveBeenCalledTimes(1)
+  })
+
+  test('does not activate or report a workspace that finishes opening after a controlled close', async () => {
+    const opening = Promise.withResolvers<{
+      ok: true
+      workspaceId: ReturnType<typeof workspaceIdForTest>
+    }>()
+    const ensureWorkspaceOpen = vi.fn(() => opening.promise)
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    const activateWorkspace = vi.fn()
+    const navigation = navigationWith({ activateWorkspace })
+    const onOpenChange = vi.fn()
+
+    const { rerender } = renderInJsdom(
+      <AppNavigationProvider value={navigation}>
+        <RepoCloneDialog open onOpenChange={onOpenChange} />
+      </AppNavigationProvider>,
+    )
+
+    setInputValue('#clone-url', 'https://example.com/repo.git')
+    setInputValue('#clone-directory-name', 'repo')
+    click('button[type="submit"]')
+    await waitFor(() => expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo'))
+
+    rerender(
+      <AppNavigationProvider value={navigation}>
+        <RepoCloneDialog open={false} onOpenChange={onOpenChange} />
+      </AppNavigationProvider>,
+    )
+    await act(async () => {
+      opening.resolve({
+        ok: true,
+        workspaceId: workspaceIdForTest('goblin+file:///tmp/cloned-repo'),
+      })
+      await opening.promise
+    })
+
+    expect(ensureWorkspaceOpen).toHaveBeenCalledTimes(1)
+    expect(activateWorkspace).not.toHaveBeenCalled()
+    expect(mocks.toastSuccess).not.toHaveBeenCalled()
+    expect(mocks.toastError).not.toHaveBeenCalled()
+  })
+
   test('reports post-open effect failures after opening the cloned workspace', async () => {
     const ensureWorkspaceOpen = vi.fn(async () => ({
       ok: true as const,
