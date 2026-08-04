@@ -863,10 +863,6 @@ export class TerminalSessionProjection {
     this.sessions.get(terminalSessionId)?.scrollToBottom()
   }
 
-  scrollLines = (terminalSessionId: string, amount: number): void => {
-    this.sessions.get(terminalSessionId)?.scrollLines(amount)
-  }
-
   closeTerminalByDescriptor = async (terminalSessionId: string, base: TerminalSessionBase): Promise<boolean> => {
     return await this.closeTerminalRuntimeTab(terminalSessionId, base)
   }

@@ -222,10 +222,6 @@ export class TerminalSessionView {
     this.term?.scrollToBottom()
   }
 
-  scrollLines(amount: number): void {
-    this.term?.scrollLines(amount)
-  }
-
   sendVirtualKey(key: TerminalVirtualKey): void {
     const term = this.term
     if (!term) return

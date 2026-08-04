@@ -70,7 +70,6 @@ export function TerminalSessionView({
     clearBell,
     attach,
     detach,
-    scrollLines,
     findNext,
     findPrevious,
     clearSearch,
@@ -131,8 +130,6 @@ export function TerminalSessionView({
     escape: t('terminal.composer-key-escape'),
     ctrlC: t('terminal.composer-key-ctrl-c'),
     ctrlD: t('terminal.composer-key-ctrl-d'),
-    pageUp: t('terminal.composer-key-page-up'),
-    pageDown: t('terminal.composer-key-page-down'),
   }
 
   useLayoutEffect(() => {
@@ -609,7 +606,6 @@ export function TerminalSessionView({
           onDraftReplace={(expectedDraft, draft) => replaceComposerDraft(terminalSessionId, expectedDraft, draft)}
           onResolveFiles={resolveComposerFiles}
           onRequestFocus={() => focusTerminal(terminalSessionId)}
-          onScrollLines={(amount) => scrollLines(terminalSessionId, amount)}
         />
       )}
       {showViewerOverlay && (

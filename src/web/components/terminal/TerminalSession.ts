@@ -490,10 +490,6 @@ export class TerminalSession {
     this.view.scrollToBottom()
   }
 
-  scrollLines(amount: number): void {
-    this.view.scrollLines(amount)
-  }
-
   currentTerminalRuntimeSessionId(): string | null {
     return this.runtime.currentTerminalRuntimeSessionId()
   }

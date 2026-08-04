@@ -427,8 +427,6 @@ export const en = {
   'terminal.composer-key-escape': 'Escape',
   'terminal.composer-key-ctrl-c': 'Ctrl+C',
   'terminal.composer-key-ctrl-d': 'Ctrl+D',
-  'terminal.composer-key-page-up': 'Page up (scroll terminal)',
-  'terminal.composer-key-page-down': 'Page down (scroll terminal)',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
   'worktrees.reveal-title': 'Finder',

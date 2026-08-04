@@ -410,8 +410,6 @@ export const zh: Record<DictKey, string> = {
   'terminal.composer-key-escape': 'Esc',
   'terminal.composer-key-ctrl-c': 'Ctrl+C',
   'terminal.composer-key-ctrl-d': 'Ctrl+D',
-  'terminal.composer-key-page-up': '向上翻页（滚动终端）',
-  'terminal.composer-key-page-down': '向下翻页（滚动终端）',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': '访达',
