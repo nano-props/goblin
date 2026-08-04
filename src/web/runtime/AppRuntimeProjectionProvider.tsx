@@ -118,7 +118,6 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
     const target = { workspaceId: currentWorkspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId }
     const scope = scopeRegistry.scopeFor(target)
     terminalRecovery.begin(scope)
-    terminalRecovery.request(scope, { kind: 'minimum-revision', revision: 0 })
 
     const handleFocus = () => {
       const currentScope = scopeRegistry.scopeFor(target)

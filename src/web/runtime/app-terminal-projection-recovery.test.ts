@@ -10,6 +10,66 @@ const TARGET = {
 }
 
 describe('AppTerminalProjectionRecovery', () => {
+  test('transfers an in-flight initial catalog read to a replacement projection scope', async () => {
+    const catalog = Promise.withResolvers<TerminalSessionsSnapshot>()
+    const recoverSessions = vi.fn(async () => await catalog.promise)
+    const markReady = vi.fn()
+    const recovery = new AppTerminalProjectionRecovery({
+      projection: {
+        reconcileServerSessionsSnapshot: vi.fn(() => true),
+        resynchronizeConnectedViews: vi.fn(),
+        terminalSessionsCatalogCoverageRevision: vi.fn(() => 2),
+      },
+      readClientId: () => 'client-test',
+      recoverSessions,
+      hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase: 'pending' }),
+      beginHydration: vi.fn(),
+      markReady,
+      markFailed: vi.fn(),
+      isFocusRefreshDue: () => true,
+      logFailure: vi.fn(),
+    })
+    const firstScope = new RuntimeProjectionScope(TARGET, () => true)
+    const replacementScope = new RuntimeProjectionScope(TARGET, () => true)
+
+    recovery.begin(firstScope)
+    firstScope.dispose()
+    recovery.begin(replacementScope)
+    catalog.resolve({ revision: 2, sessions: [] })
+
+    await vi.waitFor(() => expect(markReady).toHaveBeenCalledOnce())
+    expect(recoverSessions).toHaveBeenCalledOnce()
+  })
+
+  test('releases the initial read owner after settlement and never absorbs an explicit refresh', async () => {
+    const recoverSessions = vi.fn(async () => ({ revision: 2, sessions: [] }))
+    const markReady = vi.fn()
+    const recovery = new AppTerminalProjectionRecovery({
+      projection: {
+        reconcileServerSessionsSnapshot: vi.fn(() => true),
+        resynchronizeConnectedViews: vi.fn(),
+        terminalSessionsCatalogCoverageRevision: vi.fn(() => 2),
+      },
+      readClientId: () => 'client-test',
+      recoverSessions,
+      hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase: 'ready' }),
+      beginHydration: vi.fn(),
+      markReady,
+      markFailed: vi.fn(),
+      isFocusRefreshDue: () => true,
+      logFailure: vi.fn(),
+    })
+
+    recovery.begin(new RuntimeProjectionScope(TARGET, () => true))
+    await vi.waitFor(() => expect(markReady).toHaveBeenCalledTimes(1))
+    recovery.begin(new RuntimeProjectionScope(TARGET, () => true))
+    await vi.waitFor(() => expect(markReady).toHaveBeenCalledTimes(2))
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'minimum-revision', revision: 2 })
+
+    await vi.waitFor(() => expect(markReady).toHaveBeenCalledTimes(3))
+    expect(recoverSessions).toHaveBeenCalledTimes(3)
+  })
+
   test('accepts a server catalog and marks the active runtime ready', async () => {
     const reconcile = vi.fn(() => true)
     const markReady = vi.fn()

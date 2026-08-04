@@ -1,6 +1,6 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
+import type { RepoPullRequestsResponse, RepoSnapshotResponse } from '#/shared/api-types.ts'
 import {
   getRepoOperationsQueryData,
   getRepoSnapshotQueryData,
@@ -12,12 +12,13 @@ import {
   repoSnapshotQueryKey,
   repoWorktreeStatusQueryKey,
 } from '#/web/repo-query-keys.ts'
-import { repoSnapshotReadModelQueryOptions } from '#/web/repo-query-options.ts'
+import { repoPullRequestsReadModelQueryOptions, repoSnapshotReadModelQueryOptions } from '#/web/repo-query-options.ts'
 import {
   invalidateRepoOperationsQueries,
   invalidateRepoMetadataQueries,
   invalidateRepoWorktreeStatusQueries,
   disposeRepoRuntimeReadState,
+  ensureRepoSnapshotReadModel,
   fetchRepoSnapshotReadModel,
   refreshRepoSnapshotReadModel,
 } from '#/web/repo-query-runtime.ts'
@@ -72,6 +73,31 @@ describe('repository query authorities', () => {
 
     expect(branchA).not.toEqual(branchB)
     expect(branchA).not.toEqual(summary)
+  })
+
+  test('keeps a query-owned pull-request read across an observer replacement', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const read = Promise.withResolvers<RepoPullRequestsResponse>()
+    repoClientMocks.getRepoPullRequests.mockReturnValue(read.promise)
+    const options = repoPullRequestsReadModelQueryOptions(
+      WORKSPACE_ID,
+      'repo-runtime-1',
+      { kind: 'branch-detail', branch: 'main' },
+      true,
+    )
+    const firstObserver = new QueryObserver(client, options)
+    const unsubscribeFirst = firstObserver.subscribe(() => {})
+    await vi.waitFor(() => expect(repoClientMocks.getRepoPullRequests).toHaveBeenCalledOnce())
+
+    unsubscribeFirst()
+    const replacementObserver = new QueryObserver(client, options)
+    const unsubscribeReplacement = replacementObserver.subscribe(() => {})
+    expect(repoClientMocks.getRepoPullRequests).toHaveBeenCalledOnce()
+
+    read.resolve({ pullRequests: null })
+    await vi.waitFor(() => expect(replacementObserver.getCurrentResult().data).toEqual({ pullRequests: null }))
+    expect(repoClientMocks.getRepoPullRequests).toHaveBeenCalledOnce()
+    unsubscribeReplacement()
   })
 
   test('disposes runtime read generations with the runtime query scope', async () => {
@@ -166,6 +192,22 @@ describe('repository query authorities', () => {
 
     await expect(refresh).resolves.toEqual(snapshot('after-refresh'))
     expect(getRepoSnapshotQueryData(WORKSPACE_ID, 'repo-runtime-1', client)?.current).toBe('after-refresh')
+    unsubscribe()
+  })
+
+  test('shares initial snapshot loading with an active observer without invalidating its read', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const read = Promise.withResolvers<RepoSnapshotResponse>()
+    repoClientMocks.getRepoSnapshot.mockReturnValue(read.promise)
+    const observer = new QueryObserver(client, repoSnapshotReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', true))
+    const unsubscribe = observer.subscribe(() => {})
+    await vi.waitFor(() => expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledOnce())
+
+    const initialLoad = ensureRepoSnapshotReadModel(WORKSPACE_ID, 'repo-runtime-1', { queryClient: client })
+    read.resolve(snapshot('main'))
+
+    await expect(initialLoad).resolves.toEqual(snapshot('main'))
+    expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledOnce()
     unsubscribe()
   })
 

@@ -122,14 +122,12 @@ export async function fetchRepoSnapshotReadModel(
   )
 }
 
-export async function fetchRepoPullRequestsReadModel(
+export async function fetchQueryOwnedRepoPullRequestsReadModel(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   scope: RepoPullRequestScope,
-  signal: AbortSignal,
-  client: QueryClient,
 ): Promise<RepoPullRequestsResponse> {
-  return await getRepoPullRequests(repoRoot, workspaceRuntimeId, scope, signal)
+  return await getRepoPullRequests(repoRoot, workspaceRuntimeId, scope)
 }
 
 export async function fetchRepoWorktreeStatusReadModel(
@@ -191,6 +189,23 @@ export async function refreshRepoSnapshotReadModel(
   const sharedRead = client.fetchQuery({
     queryKey,
     staleTime: 0,
+    retry: (_count, error) => isStaleRepoRuntimeReadError(error),
+    retryDelay: 0,
+    queryFn: ({ signal }) => fetchRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, signal, client),
+  })
+  return options.signal ? await waitForPromiseWithSignal(sharedRead, options.signal) : await sharedRead
+}
+
+export async function ensureRepoSnapshotReadModel(
+  repoRoot: WorkspaceId,
+  workspaceRuntimeId: string,
+  options: { signal?: AbortSignal; queryClient?: QueryClient } = {},
+): Promise<RepoSnapshotResponse> {
+  options.signal?.throwIfAborted()
+  const client = options.queryClient ?? appQueryClient
+  const sharedRead = client.fetchQuery({
+    queryKey: repoSnapshotQueryKey(repoRoot, workspaceRuntimeId),
+    staleTime: Number.POSITIVE_INFINITY,
     retry: (_count, error) => isStaleRepoRuntimeReadError(error),
     retryDelay: 0,
     queryFn: ({ signal }) => fetchRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, signal, client),

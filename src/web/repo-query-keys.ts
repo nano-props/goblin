@@ -25,6 +25,10 @@ export function repoWorktreeStatusQueryKey(repoRoot: WorkspaceId | null, workspa
   return ['repo-data', repoRoot, workspaceRuntimeId, 'worktree-status'] as const
 }
 
+export function repoWorktreeBootstrapPreviewQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
+  return ['repo-data', repoRoot, workspaceRuntimeId, 'worktree-bootstrap-preview'] as const
+}
+
 export function repoDataQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
   return ['repo-data', repoRoot, workspaceRuntimeId] as const
 }

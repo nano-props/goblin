@@ -168,6 +168,7 @@ describe('AppRuntimeProjectionProvider', () => {
           phase: 'ready',
         }),
       )
+      expect(recoverSessionsMock).toHaveBeenCalledOnce()
       expect(document.body.textContent).toContain('probe')
     } finally {
       result.unmount()

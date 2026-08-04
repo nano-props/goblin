@@ -1,4 +1,4 @@
-import { refreshRepoSnapshotReadModel } from '#/web/repo-query-runtime.ts'
+import { ensureRepoSnapshotReadModel, refreshRepoSnapshotReadModel } from '#/web/repo-query-runtime.ts'
 import { appendRepoEvent, errorEvent } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { resolveActionWorkspaceRuntimeId } from '#/web/stores/workspaces/refresh-state.ts'
 import { updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'
@@ -23,6 +23,25 @@ export async function requestRepoSnapshotRefresh(
   if (!resolved) return
   try {
     await refreshRepoSnapshotReadModel(id, resolved.workspaceRuntimeId, { signal: options?.signal })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    updateIfFresh(store.set, id, resolved.workspaceRuntimeId, (workspace) => {
+      if (!isGitWorkspace(workspace)) return
+      const git = gitWorkspaceClientState(workspace)
+      git.events = appendRepoEvent(git.events, errorEvent(message))
+    })
+  }
+}
+
+export async function requestInitialRepoSnapshotLoad(
+  store: RepoRefreshStoreAccess,
+  id: WorkspaceId,
+  options?: { workspaceRuntimeId?: string; signal?: AbortSignal },
+): Promise<void> {
+  const resolved = resolveActionWorkspaceRuntimeId(store.get, id, options?.workspaceRuntimeId)
+  if (!resolved) return
+  try {
+    await ensureRepoSnapshotReadModel(id, resolved.workspaceRuntimeId, { signal: options?.signal })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     updateIfFresh(store.set, id, resolved.workspaceRuntimeId, (workspace) => {

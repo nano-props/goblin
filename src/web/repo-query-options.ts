@@ -13,7 +13,7 @@ import {
 import {
   fetchRepoOperationsReadModel,
   fetchRepoMetadataQuery,
-  fetchRepoPullRequestsReadModel,
+  fetchQueryOwnedRepoPullRequestsReadModel,
   fetchRepoSnapshotReadModel,
   fetchRepoWorktreeStatusReadModel,
   isStaleRepoRuntimeReadError,
@@ -102,7 +102,7 @@ export function repoPullRequestsReadModelQueryOptions(
     queryFn:
       repoRoot === null
         ? skipToken
-        : ({ signal, client }) => fetchRepoPullRequestsReadModel(repoRoot, workspaceRuntimeId, scope, signal, client),
+        : () => fetchQueryOwnedRepoPullRequestsReadModel(repoRoot, workspaceRuntimeId, scope),
     retry: false,
     staleTime: (query) =>
       pullRequestCollectionCacheTtlMs(

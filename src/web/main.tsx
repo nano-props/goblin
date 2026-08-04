@@ -1,5 +1,5 @@
 import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, type Root } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { AuthProvider } from '#/web/auth/AuthProvider.tsx'
@@ -17,7 +17,15 @@ const INITIAL_PUBLIC_BOOTSTRAP_TIMEOUT_MS = 15_000
 const rootEl = document.getElementById('root')
 if (!rootEl) throw new Error('root element missing')
 
-const root = createRoot(rootEl, reactRootOptions())
+interface MainHotData {
+  root?: Root
+}
+
+const hotData: MainHotData = import.meta.hot?.data ?? {}
+const root = hotData.root ?? createRoot(rootEl, reactRootOptions())
+import.meta.hot?.dispose((data: MainHotData) => {
+  data.root = root
+})
 
 void boot()
 

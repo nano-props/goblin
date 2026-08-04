@@ -411,6 +411,9 @@ function GitWorkspaceEffects({
 function RoutedWorkspaceNotFound({ workspaceId }: { workspaceId: WorkspaceId }) {
   const t = useT()
   const displayLocation = formatWorkspaceDisplayLocation(workspaceId)
+  // An explicit URL remains navigation authority even when its target was
+  // removed. Render the missing fact until a user command chooses a new route;
+  // effects must not invent fallback navigation from a stale projection.
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="flex flex-1 items-center justify-center p-6 text-center">

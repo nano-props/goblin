@@ -590,6 +590,66 @@ describe('repo write operation coordinator', () => {
     ])
   })
 
+  test('publishes running as the first observable phase when the queue is idle', async () => {
+    const release = Promise.withResolvers<void>()
+    const work = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      { repoId: WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
+      (operation) => async () => {
+        operation.start()
+        await release.promise
+        operation.settle({ ok: true })
+        return { ok: true, message: 'deleted' }
+      },
+    )
+
+    await vi.waitFor(() => expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledTimes(1))
+    await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID)).resolves.toMatchObject([{ phase: 'running' }])
+    release.resolve()
+    await expect(work).resolves.toEqual({ ok: true, message: 'deleted' })
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledTimes(2)
+  })
+
+  test('publishes a queued phase when another operation owns the queue', async () => {
+    const release = Promise.withResolvers<void>()
+    const active = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      (operation) => async () => {
+        operation.start()
+        await release.promise
+        operation.settle({ ok: true })
+        return { ok: true, message: 'fetched' }
+      },
+    )
+    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().runningOperations).toBe(1))
+    mocks.publishRepoReadInvalidation.mockClear()
+
+    const queued = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      { repoId: WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
+      (operation) => async () => {
+        operation.start()
+        operation.settle({ ok: true })
+        return { ok: true, message: 'deleted' }
+      },
+    )
+    await vi.waitFor(() => expect(repoWriteOperationCoordinatorStatsForTests().queuedOperations).toBe(1))
+
+    expect(mocks.publishRepoReadInvalidation).toHaveBeenCalledOnce()
+    await expect(listRepoWriteOperationsForRepo(WORKSPACE_ID)).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'delete-branch', phase: 'queued' })]),
+    )
+    release.resolve()
+    await expect(Promise.all([active, queued])).resolves.toEqual([
+      { ok: true, message: 'fetched' },
+      { ok: true, message: 'deleted' },
+    ])
+  })
+
   test('records successful fetch state before publishing its settled invalidation', async () => {
     await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
     const observedFetchTimes: Array<number | null> = []

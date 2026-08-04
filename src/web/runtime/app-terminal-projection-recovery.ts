@@ -40,6 +40,7 @@ export interface AppTerminalProjectionRecoveryDependencies {
 export class AppTerminalProjectionRecovery implements TerminalProjectionRecoveryActions {
   private readonly dependencies: AppTerminalProjectionRecoveryDependencies
   private readonly reconnectResynchronizationByScope = new WeakMap<RuntimeProjectionScope, number>()
+  private readonly initialRecoveryByTarget = new Map<string, Promise<TerminalSessionsSnapshot>>()
   private nextReconnectResynchronization = 1
 
   constructor(dependencies: AppTerminalProjectionRecoveryDependencies) {
@@ -50,6 +51,11 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
     scope.commit(() => {
       this.dependencies.beginHydration(scope.target.workspaceId, scope.target.workspaceRuntimeId)
     })
+    this.run(
+      scope,
+      { kind: 'minimum-revision', revision: 0 },
+      async () => await this.ensureInitialRecovery(scope.target),
+    )
   }
 
   isFocusRefreshDue(target: RuntimeProjectionTarget): boolean {
@@ -57,6 +63,14 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
   }
 
   request(scope: RuntimeProjectionScope, requirement: TerminalProjectionRecoveryRequirement): void {
+    this.run(scope, requirement, async () => await this.dependencies.recoverSessions(scope.target))
+  }
+
+  private run(
+    scope: RuntimeProjectionScope,
+    requirement: TerminalProjectionRecoveryRequirement,
+    read: () => Promise<TerminalSessionsSnapshot>,
+  ): void {
     const clientId = this.dependencies.readClientId()
     const reconnect = requirement.kind === 'reconnect'
     const minimumRevision = reconnect ? 0 : requirement.revision
@@ -65,7 +79,7 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
       : (this.reconnectResynchronizationByScope.get(scope) ?? null)
     scope.runLatest(
       reconnect ? TERMINAL_PROJECTION_RECONNECT_LANE : TERMINAL_PROJECTION_REFRESH_LANE,
-      async () => await this.dependencies.recoverSessions(scope.target),
+      read,
       (catalog) => {
         if (catalog.revision < minimumRevision) {
           throw new Error(
@@ -93,6 +107,19 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
         )
       },
     )
+  }
+
+  private ensureInitialRecovery(target: RuntimeProjectionTarget): Promise<TerminalSessionsSnapshot> {
+    const key = `${target.workspaceId}\0${target.workspaceRuntimeId}`
+    const current = this.initialRecoveryByTarget.get(key)
+    if (current) return current
+    const recovery = this.dependencies.recoverSessions(target)
+    this.initialRecoveryByTarget.set(key, recovery)
+    const release = () => {
+      if (this.initialRecoveryByTarget.get(key) === recovery) this.initialRecoveryByTarget.delete(key)
+    }
+    void recovery.then(release, release)
+    return recovery
   }
 
   private requireReconnectResynchronization(scope: RuntimeProjectionScope): number {

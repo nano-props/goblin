@@ -1,7 +1,7 @@
 import PQueue from 'p-queue'
 import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspace-capability-refresh.ts'
-import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
+import { requestInitialRepoSnapshotLoad, requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import {
   closeWorkspaceRuntime,
   openWorkspaceRuntime,
@@ -525,7 +525,7 @@ export function refreshInitialWorkspaceState(set: WorkspacesSet, get: Workspaces
   const workspace = get().workspaces[refresh.id]
   if (!workspace || workspace.workspaceRuntimeId !== refresh.workspaceRuntimeId) return
   if (workspace.capability.kind !== 'git') return
-  void requestRepoSnapshotRefresh({ get, set }, refresh.id, {
+  void requestInitialRepoSnapshotLoad({ get, set }, refresh.id, {
     workspaceRuntimeId: refresh.workspaceRuntimeId,
   })
 }

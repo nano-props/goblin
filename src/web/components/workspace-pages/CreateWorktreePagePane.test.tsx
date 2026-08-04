@@ -4,7 +4,7 @@ import { createRepoBranch, seedRepoWithReadModelForTest, resetWorkspacesStore } 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
-import type { ReactElement } from 'react'
+import { StrictMode, type ReactElement } from 'react'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
@@ -498,6 +498,25 @@ describe('CreateWorktreePagePane', () => {
     )
 
     expect(getRepoWorktreeBootstrapPreview).toHaveBeenCalledTimes(1)
+  })
+
+  test('shares the bootstrap preview read across StrictMode effect replay', async () => {
+    const preview = Promise.withResolvers<{
+      ok: false
+      message: string
+    }>()
+    vi.mocked(getRepoWorktreeBootstrapPreview).mockReturnValue(preview.promise)
+
+    const { container } = renderPane(
+      <StrictMode>
+        <CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />
+      </StrictMode>,
+    )
+    await waitFor(() => expect(getRepoWorktreeBootstrapPreview).toHaveBeenCalledOnce())
+
+    await act(async () => preview.resolve({ ok: false, message: 'error.failed-read-repo' }))
+    await waitFor(() => expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull())
+    expect(getRepoWorktreeBootstrapPreview).toHaveBeenCalledOnce()
   })
 
   test('stays on the form when the action fails', async () => {
