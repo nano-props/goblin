@@ -321,7 +321,7 @@ describe('RepoCloneDialog', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  test('preserves clone success when failure projection and logging both throw', async () => {
+  test('preserves clone success when failure presentation throws', async () => {
     const ensureWorkspaceOpen = vi.fn(async () => ({
       ok: false as const,
       message: 'error.workspace-open-failed',
@@ -329,9 +329,6 @@ describe('RepoCloneDialog', () => {
     useWorkspacesStore.setState({ ensureWorkspaceOpen })
     mocks.toastError.mockImplementation(() => {
       throw new Error('toast crashed')
-    })
-    mocks.loggerWarn.mockImplementation(() => {
-      throw new Error('logger crashed')
     })
     const onOpenChange = vi.fn()
 

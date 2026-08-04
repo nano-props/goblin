@@ -35,11 +35,7 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
         description: `${path}\n${getDescription()}`,
       })
     } catch (err) {
-      try {
-        sessionLog.warn('failed to report post-clone workflow failure', { kind, path, err })
-      } catch {
-        // Reporting and logging are both best-effort after the authoritative clone result succeeds.
-      }
+      sessionLog.warn('failed to report post-clone workflow failure', { kind, path, err })
     }
   }
 
