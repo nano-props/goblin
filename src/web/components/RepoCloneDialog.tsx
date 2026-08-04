@@ -16,16 +16,26 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
   const ensureWorkspaceOpen = useWorkspacesStore((s) => s.ensureWorkspaceOpen)
   const navigation = useAppNavigation()
 
+  function reportClonedWorkspaceOpenFailure(path: string, message: string) {
+    toast.error(t('drop.open-failed'), {
+      description: `${path}\n${message}`,
+    })
+  }
+
   async function handleClone(input: CloneRepositoryInput, signal: AbortSignal): Promise<CloneRepoResult> {
     const result = await runCloneRepository(input, { signal })
     if (!result.ok || !result.path || signal.aborted) return result
-    const openResult = await ensureWorkspaceOpen(result.path)
+    let openResult
+    try {
+      openResult = await ensureWorkspaceOpen(result.path)
+    } catch (err) {
+      if (signal.aborted) return result
+      reportClonedWorkspaceOpenFailure(result.path, err instanceof Error ? err.message : t('error.unknown'))
+      return result
+    }
     if (signal.aborted) return result
     if (!openResult.ok) {
-      const openErrorMessage = t(openResult.message)
-      toast.error(t('drop.open-failed'), {
-        description: `${result.path}\n${openErrorMessage}`,
-      })
+      reportClonedWorkspaceOpenFailure(result.path, t(openResult.message))
       return result
     }
     navigation.activateWorkspace(openResult.workspaceId)
