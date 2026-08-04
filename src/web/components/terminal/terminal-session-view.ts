@@ -30,6 +30,7 @@ import { constrainTerminalSize } from '#/shared/terminal-protocol-constraints.ts
 import type { TerminalSize } from '#/shared/terminal-types.ts'
 import type { TerminalFocusRequest, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 import { installTerminalTouchScroll } from '#/web/components/terminal/terminal-touch-scroll.ts'
+import { installTerminalViewportReveal } from '#/web/components/terminal/terminal-viewport-reveal.ts'
 
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
@@ -185,6 +186,7 @@ export class TerminalSessionView {
     this.disposables.push(term.onResize((size) => this.handlers.onResize(size)))
     term.open(this.xtermHost)
     this.installTouchScroll(term)
+    this.installViewportReveal(term)
     this.installFontObserver(term)
     return term
   }
@@ -326,6 +328,14 @@ export class TerminalSessionView {
         scrollLines: (lines) => term.scrollLines(lines),
       }),
     )
+  }
+
+  private installViewportReveal(term: XTermTerminal): void {
+    const element = term.element
+    const textarea = term.textarea
+    const visualViewport = this.frame.ownerDocument.defaultView?.visualViewport
+    if (!element || !textarea || !visualViewport) return
+    this.disposables.push(installTerminalViewportReveal({ element, textarea, visualViewport }))
   }
 
   private installOptionalAddons(term: XTermTerminal): void {
