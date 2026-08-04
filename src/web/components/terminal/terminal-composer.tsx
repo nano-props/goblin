@@ -185,12 +185,11 @@ export function TerminalComposer({
   const fileInsertionRef = useRef({ start: 0, end: 0 })
   const pendingCaretRef = useRef<number | null>(null)
   const pendingFocusRef = useRef<'control' | 'trigger' | null>(null)
-  const updateKeyboardOffsetRef = useRef<() => void>(() => {})
   const [history] = useState(() => new TerminalComposerHistoryCursor())
   const composerId = useId()
 
   const focusComposerControl = () => {
-    if (mode === 'input') inputRef.current?.focus({ preventScroll: true })
+    if (mode === 'input') inputRef.current?.focus()
     else modeToggleRef.current?.focus()
   }
   const requestComposerFocus = () => {
@@ -251,7 +250,7 @@ export function TerminalComposer({
     return () => observer.disconnect()
   }, [expanded, mode])
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const composer = composerRootRef.current
     const visualViewport = window.visualViewport
     const container = containerRef?.current ?? composer?.parentElement
@@ -271,7 +270,6 @@ export function TerminalComposer({
         applyKeyboardOffset()
       })
     }
-    updateKeyboardOffsetRef.current = updateKeyboardOffset
     updateKeyboardOffset()
     visualViewport.addEventListener('resize', updateKeyboardOffset)
     visualViewport.addEventListener('scroll', updateKeyboardOffset)
@@ -280,7 +278,6 @@ export function TerminalComposer({
     containerObserver?.observe(container)
 
     return () => {
-      if (updateKeyboardOffsetRef.current === updateKeyboardOffset) updateKeyboardOffsetRef.current = () => {}
       if (frameId !== null) window.cancelAnimationFrame(frameId)
       visualViewport.removeEventListener('resize', updateKeyboardOffset)
       visualViewport.removeEventListener('scroll', updateKeyboardOffset)
@@ -450,7 +447,6 @@ export function TerminalComposer({
                 onDraftChange(event.target.value)
               }}
               onPointerDown={() => history.leaveBrowsing()}
-              onFocus={() => updateKeyboardOffsetRef.current()}
               onKeyDown={handleDraftKeyDown}
             />
           ) : (
