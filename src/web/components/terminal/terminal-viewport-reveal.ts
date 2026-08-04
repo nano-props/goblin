@@ -3,6 +3,7 @@ interface TerminalViewportRevealOptions {
   textarea: HTMLTextAreaElement
   visualViewport: VisualViewport
   onCursorMove: (listener: () => void) => { dispose: () => void }
+  onTerminalResize: (listener: () => void) => { dispose: () => void }
   getLineHeight: () => number
   getCursorRow: () => number | null
 }
@@ -59,10 +60,6 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
   const applyPending = () => {
     if (!pending || options.textarea.ownerDocument.activeElement !== options.textarea) return
 
-    const visibleBottom = options.visualViewport.offsetTop + options.visualViewport.height
-    const terminalRect = options.element.getBoundingClientRect()
-    if (terminalRect.bottom <= visibleBottom) return
-
     const lineHeight = options.getLineHeight()
     const cursorRow = options.getCursorRow()
     if (!(lineHeight > 0) || !Number.isFinite(lineHeight) || cursorRow === null) return
@@ -72,6 +69,13 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
     revealMarker.style.height = `${lineHeight}px`
     revealMarker.style.scrollMarginBlockEnd = `${revealMargin}px`
     observedCursorRow = cursorRow
+
+    const visibleTop = options.visualViewport.offsetTop
+    const visibleBottom = visibleTop + options.visualViewport.height
+    const cursorTop = options.element.getBoundingClientRect().top + cursorRow * lineHeight
+    const cursorBottom = cursorTop + lineHeight + revealMargin
+    if (cursorTop >= visibleTop && cursorBottom <= visibleBottom) return
+
     pending = false
     revealMarker.scrollIntoView(SCROLL_INTO_VIEW_OPTIONS)
   }
@@ -102,12 +106,14 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
   options.visualViewport.addEventListener('resize', requestRevealWhileFocused)
   options.visualViewport.addEventListener('scroll', schedulePending)
   const cursorMoveSubscription = options.onCursorMove(requestRevealForCursorMove)
+  const terminalResizeSubscription = options.onTerminalResize(requestRevealWhileFocused)
 
   return {
     dispose: () => {
       pending = false
       if (frameId !== null) ownerWindow.cancelAnimationFrame(frameId)
       cursorMoveSubscription.dispose()
+      terminalResizeSubscription.dispose()
       options.textarea.removeEventListener('focus', requestReveal)
       options.textarea.removeEventListener('blur', cancelPending)
       options.element.removeEventListener('pointerdown', requestReveal)

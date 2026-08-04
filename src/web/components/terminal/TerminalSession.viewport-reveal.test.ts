@@ -20,7 +20,7 @@ beforeEach(resetTerminalSessionHarness)
 
 test('reveals later xterm cursor rows through the session view event boundary', async () => {
   const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
-  Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport(500) })
+  Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport(300) })
 
   try {
     const { session, term } = await startOpenControllerSession()
@@ -41,11 +41,17 @@ test('reveals later xterm cursor rows through the session view event boundary', 
       await vi.runAllTimersAsync()
       expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
 
-      session.dispose()
-      term.buffer.active.cursorY = 25
-      term.emitCursorMove()
+      term.buffer.active.cursorY = 26
+      term.resize(term.cols - 1, term.rows)
       await vi.runAllTimersAsync()
-      expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
+      expect(marker.scrollIntoView).toHaveBeenCalledTimes(3)
+
+      session.dispose()
+      term.buffer.active.cursorY = 27
+      term.emitCursorMove()
+      term.resize(term.cols - 1, term.rows)
+      await vi.runAllTimersAsync()
+      expect(marker.scrollIntoView).toHaveBeenCalledTimes(3)
     } finally {
       session.dispose()
     }
