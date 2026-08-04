@@ -36,6 +36,10 @@ test('reveals later xterm cursor rows through the session view event boundary', 
       await vi.runAllTimersAsync()
       expect(marker.scrollIntoView).toHaveBeenCalledOnce()
 
+      term.emitCursorMove()
+      await vi.runAllTimersAsync()
+      expect(marker.scrollIntoView).toHaveBeenCalledOnce()
+
       term.buffer.active.cursorY = 24
       term.emitCursorMove()
       await vi.runAllTimersAsync()

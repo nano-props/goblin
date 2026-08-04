@@ -1,9 +1,11 @@
+type TerminalViewportEventSource = (listener: () => void) => { dispose: () => void }
+
 interface TerminalViewportRevealOptions {
   element: HTMLElement
   textarea: HTMLTextAreaElement
   visualViewport: VisualViewport
-  onCursorMove: (listener: () => void) => { dispose: () => void }
-  onTerminalResize: (listener: () => void) => { dispose: () => void }
+  onCursorMove: TerminalViewportEventSource
+  onTerminalResize: TerminalViewportEventSource
   getLineHeight: () => number
   getCursorRow: () => number | null
 }
@@ -74,7 +76,10 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
     const visibleBottom = visibleTop + options.visualViewport.height
     const cursorTop = options.element.getBoundingClientRect().top + cursorRow * lineHeight
     const cursorBottom = cursorTop + lineHeight + revealMargin
-    if (cursorTop >= visibleTop && cursorBottom <= visibleBottom) return
+    if (cursorTop >= visibleTop && cursorBottom <= visibleBottom) {
+      // Keep the request pending so a later visual-viewport pan rechecks the focused input.
+      return
+    }
 
     pending = false
     revealMarker.scrollIntoView(SCROLL_INTO_VIEW_OPTIONS)
