@@ -102,8 +102,9 @@ export function repoPullRequestsReadModelQueryOptions(
     queryFn:
       repoRoot === null
         ? skipToken
-        : () => fetchQueryOwnedRepoPullRequestsReadModel(repoRoot, workspaceRuntimeId, scope),
-    retry: false,
+        : ({ client }) => fetchQueryOwnedRepoPullRequestsReadModel(repoRoot, workspaceRuntimeId, scope, client),
+    retry: retryStaleRepoRuntimeRead,
+    retryDelay: 0,
     staleTime: (query) =>
       pullRequestCollectionCacheTtlMs(
         scope.kind === 'branch-detail' ? 'full' : 'summary',

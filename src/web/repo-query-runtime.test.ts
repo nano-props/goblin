@@ -29,7 +29,9 @@ import {
   invalidateRepoWorktreeStatusQueries,
   disposeRepoRuntimeReadState,
   ensureRepoSnapshotReadModel,
+  fetchQueryOwnedRepoPullRequestsReadModel,
   fetchQueryOwnedRepoSnapshotReadModel,
+  refreshActiveRepoPullRequestQueries,
   refreshRepoSnapshotReadModel,
 } from '#/web/repo-query-runtime.ts'
 import { repoOperationsForTest, WORKSPACE_ID } from '#/web/test-utils/repo-query-runtime.ts'
@@ -110,6 +112,72 @@ describe('repository query authorities', () => {
     unsubscribeReplacement()
   })
 
+  test('serializes overlapping active pull-request refreshes and commits the latest version', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const scope = { kind: 'branch-detail' as const, branch: 'main' }
+    const key = repoPullRequestsQueryKey(WORKSPACE_ID, 'repo-runtime-1', scope)
+    const reads: Array<PromiseWithResolvers<RepoPullRequestsResponse>> = []
+    let activeReads = 0
+    let maximumActiveReads = 0
+    repoClientMocks.getRepoPullRequests.mockImplementation(() => {
+      const read = Promise.withResolvers<RepoPullRequestsResponse>()
+      reads.push(read)
+      activeReads += 1
+      maximumActiveReads = Math.max(maximumActiveReads, activeReads)
+      return read.promise.finally(() => {
+        activeReads -= 1
+      })
+    })
+    client.setQueryData(key, { pullRequests: null })
+    const observer = new QueryObserver(
+      client,
+      repoPullRequestsReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', scope, true),
+    )
+    const unsubscribe = observer.subscribe(() => {})
+
+    const firstRefresh = refreshActiveRepoPullRequestQueries(WORKSPACE_ID, 'repo-runtime-1', {
+      queryClient: client,
+    })
+    await vi.waitFor(() => expect(reads).toHaveLength(1))
+    const secondRefresh = refreshActiveRepoPullRequestQueries(WORKSPACE_ID, 'repo-runtime-1', {
+      queryClient: client,
+    })
+
+    await Promise.resolve()
+    expect(reads).toHaveLength(1)
+    expect(maximumActiveReads).toBe(1)
+
+    reads[0]!.resolve({ pullRequests: null })
+    await vi.waitFor(() => expect(reads).toHaveLength(2))
+    expect(maximumActiveReads).toBe(1)
+    reads[1]!.resolve({ pullRequests: [] })
+
+    await expect(Promise.all([firstRefresh, secondRefresh])).resolves.toEqual([undefined, undefined])
+    expect(client.getQueryData(key)).toEqual({ pullRequests: [] })
+    expect(maximumActiveReads).toBe(1)
+    unsubscribe()
+  })
+
+  test('does not retry an ordinary pull-request transport failure', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const scope = { kind: 'branch-detail' as const, branch: 'main' }
+    const key = repoPullRequestsQueryKey(WORKSPACE_ID, 'repo-runtime-1', scope)
+    const failure = new Error('pull-request transport unavailable')
+    repoClientMocks.getRepoPullRequests.mockRejectedValue(failure)
+    client.setQueryData(key, { pullRequests: null })
+    const observer = new QueryObserver(
+      client,
+      repoPullRequestsReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', scope, true),
+    )
+    const unsubscribe = observer.subscribe(() => {})
+
+    await refreshActiveRepoPullRequestQueries(WORKSPACE_ID, 'repo-runtime-1', { queryClient: client })
+
+    expect(repoClientMocks.getRepoPullRequests).toHaveBeenCalledOnce()
+    expect(client.getQueryState(key)?.error).toBe(failure)
+    unsubscribe()
+  })
+
   test('keeps an operations read across a StrictMode-style observer replacement', async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const reads: Array<PromiseWithResolvers<RepoOperationsSnapshot>> = []
@@ -178,6 +246,19 @@ describe('repository query authorities', () => {
     read.resolve(snapshot('disposed'))
 
     await expect(pending).resolves.toEqual(snapshot('disposed'))
+  })
+
+  test('disposes pull-request freshness with the runtime query scope', async () => {
+    const client = new QueryClient()
+    const read = Promise.withResolvers<RepoPullRequestsResponse>()
+    const scope = { kind: 'branch-detail' as const, branch: 'main' }
+    repoClientMocks.getRepoPullRequests.mockReturnValue(read.promise)
+    const pending = fetchQueryOwnedRepoPullRequestsReadModel(WORKSPACE_ID, 'repo-runtime-disposed', scope, client)
+    await refreshActiveRepoPullRequestQueries(WORKSPACE_ID, 'repo-runtime-disposed', { queryClient: client })
+    disposeRepoRuntimeReadState(WORKSPACE_ID, 'repo-runtime-disposed', client)
+    read.resolve({ pullRequests: null })
+
+    await expect(pending).resolves.toEqual({ pullRequests: null })
   })
 
   test('keeps snapshot, status, PR, and operations invalidation domains independent', async () => {

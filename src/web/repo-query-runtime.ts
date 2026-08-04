@@ -34,6 +34,7 @@ class MismatchedRepoRuntimeReadError extends Error {
 }
 
 const metadataVersions = new WeakMap<QueryClient, Map<string, number>>()
+const pullRequestVersions = new WeakMap<QueryClient, Map<string, number>>()
 const statusVersions = new WeakMap<QueryClient, Map<string, number>>()
 const operationVersions = new WeakMap<QueryClient, Map<string, number>>()
 
@@ -77,6 +78,7 @@ export function disposeRepoRuntimeReadState(
 ): void {
   const key = scopeKey(repoRoot, workspaceRuntimeId)
   metadataVersions.get(client)?.delete(key)
+  pullRequestVersions.get(client)?.delete(key)
   statusVersions.get(client)?.delete(key)
   operationVersions.get(client)?.delete(key)
 }
@@ -121,8 +123,15 @@ export async function fetchQueryOwnedRepoPullRequestsReadModel(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   scope: RepoPullRequestScope,
+  client: QueryClient,
 ): Promise<RepoPullRequestsResponse> {
-  return await getRepoPullRequests(repoRoot, workspaceRuntimeId, scope)
+  return await currentRead(
+    pullRequestVersions,
+    repoRoot,
+    workspaceRuntimeId,
+    client,
+    async () => await getRepoPullRequests(repoRoot, workspaceRuntimeId, scope),
+  )
 }
 
 export async function fetchQueryOwnedRepoWorktreeStatusReadModel(
@@ -209,10 +218,14 @@ export function refreshActiveRepoPullRequestQueries(
   options: { queryClient?: QueryClient } = {},
 ): Promise<void> {
   const client = options.queryClient ?? appQueryClient
-  return client.refetchQueries({
-    queryKey: repoPullRequestsQueryPrefix(repoRoot, workspaceRuntimeId),
-    type: 'active',
-  })
+  bump(pullRequestVersions, client, repoRoot, workspaceRuntimeId)
+  return client.refetchQueries(
+    {
+      queryKey: repoPullRequestsQueryPrefix(repoRoot, workspaceRuntimeId),
+      type: 'active',
+    },
+    { cancelRefetch: false },
+  )
 }
 
 export async function refreshRepoWorktreeStatusReadModel(
