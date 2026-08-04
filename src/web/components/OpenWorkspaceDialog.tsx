@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
@@ -17,7 +17,7 @@ import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggest
 interface Props {
   open: boolean
   onClose: () => void
-  onOpen: (path: string) => Promise<OpenWorkspaceResult>
+  onOpen: (path: string, signal: AbortSignal) => Promise<OpenWorkspaceResult>
 }
 
 export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
@@ -27,6 +27,7 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [pathSuggestionsOpen, setPathSuggestionsOpen] = useState(false)
   const { pending, reset, runLatest } = useLatestAsyncTask()
+  const dialogAbortRef = useRef<AbortController | null>(null)
 
   const resolvedPath = untildify(path)
   const canSubmit = path.trim().length > 0 && !pending
@@ -38,6 +39,16 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
     prefix: path,
   })
 
+  useLayoutEffect(() => {
+    if (!open) return
+    const abortController = new AbortController()
+    dialogAbortRef.current = abortController
+    return () => {
+      abortController.abort()
+      if (dialogAbortRef.current === abortController) dialogAbortRef.current = null
+    }
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     setPath('')
@@ -47,39 +58,54 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
 
   async function choosePath() {
     if (pending || !canChoosePath) return
+    const signal = dialogAbortRef.current?.signal
+    if (!signal) return
     try {
-      const selected = await chooseLocalWorkspacePath()
+      const selected = await chooseLocalWorkspacePath({ signal })
+      if (signal.aborted) return
       if (selected) {
         setPath(tildify(selected))
         setError(null)
       }
     } catch (err) {
+      if (signal.aborted) return
       setError(err instanceof Error ? err.message : t('error.unknown'))
     }
   }
 
   async function handleSubmit() {
     if (!canSubmit) return
+    const signal = dialogAbortRef.current?.signal
+    if (!signal) return
     setError(null)
     try {
-      const result = await runLatest(() => onOpen(resolvedPath))
-      if (result.status === 'stale') return
+      const result = await runLatest(() => onOpen(resolvedPath, signal))
+      if (signal.aborted || result.status === 'stale') return
       if (result.value.ok) {
         reportOpenWorkspacePostOpenEffects(result.value, t)
         onClose()
         return
       }
-      setError(t(result.value.message))
+      const messageKey = result.value.message
+      setError(t(messageKey))
     } catch (err) {
+      if (signal.aborted) return
       setError(err instanceof Error ? err.message : t('error.unknown'))
     }
+  }
+
+  function handleCancel() {
+    const abortController = dialogAbortRef.current
+    dialogAbortRef.current = null
+    abortController?.abort()
+    onClose()
   }
 
   return (
     <FormDialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && !pending) onClose()
+        if (!nextOpen && !pending) handleCancel()
       }}
       showCloseButton={!pending}
       title={t('workspace-picker.open-title')}
@@ -137,7 +163,7 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
             variant="outline"
             className={cn(compact && 'w-full')}
             disabled={pending}
-            onClick={onClose}
+            onClick={handleCancel}
           >
             {t('dialog.cancel')}
           </Button>

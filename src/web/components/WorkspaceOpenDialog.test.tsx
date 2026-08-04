@@ -9,10 +9,19 @@ import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { WorkspaceMembershipActions } from '#/web/stores/workspaces/types.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
+
+const mocks = vi.hoisted(() => ({
+  toastError: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { error: mocks.toastError },
+}))
 
 const testWindow = window as unknown as {
   goblinNative?: unknown
@@ -20,6 +29,7 @@ const testWindow = window as unknown as {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks()
   resetWorkspacesStore()
   setClientBridgeForTests(null)
   // The bootstrap is the source of truth for the tiny client
@@ -63,18 +73,9 @@ describe('WorkspaceOpenDialog', () => {
       ok: true as const,
       workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
     }))
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
-
-    renderInJsdom(
-      <AppNavigationProvider value={navigationWith({ activateWorkspace })}>
-        <WorkspaceOpenDialog open onOpenChange={onOpenChange} />
-      </AppNavigationProvider>,
-    )
-
-    setInputValue('#open-workspace-path', '~/Developer/repo')
-    click('button[type="submit"]')
+    renderAndSubmitWorkspaceOpen(ensureWorkspaceOpen, activateWorkspace, onOpenChange)
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo')
@@ -84,6 +85,54 @@ describe('WorkspaceOpenDialog', () => {
     )
     expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(onOpenChange.mock.invocationCallOrder[0]!)
   })
+
+  test('does not activate a workspace that finishes opening after a controlled close', async () => {
+    const opening = Promise.withResolvers<{
+      ok: true
+      workspaceId: ReturnType<typeof workspaceIdForTest>
+    }>()
+    const ensureWorkspaceOpen = vi.fn(() => opening.promise)
+    const activateWorkspace = vi.fn()
+    const onOpenChange = vi.fn()
+    const { navigation, rerender } = renderAndSubmitWorkspaceOpen(ensureWorkspaceOpen, activateWorkspace, onOpenChange)
+    await waitFor(() => expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo'))
+
+    rerender(
+      <AppNavigationProvider value={navigation}>
+        <WorkspaceOpenDialog open={false} onOpenChange={onOpenChange} />
+      </AppNavigationProvider>,
+    )
+    await act(async () => {
+      opening.resolve({
+        ok: true,
+        workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
+      })
+      await opening.promise
+    })
+
+    expect(ensureWorkspaceOpen).toHaveBeenCalledTimes(1)
+    expect(activateWorkspace).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalled()
+  })
+
+  test('keeps workspace-open success when activation presentation fails', async () => {
+    const ensureWorkspaceOpen = vi.fn(async () => ({
+      ok: true as const,
+      workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
+    }))
+    const activateWorkspace = vi.fn(() => {
+      throw new Error('workspace activation crashed')
+    })
+    const onOpenChange = vi.fn()
+    renderAndSubmitWorkspaceOpen(ensureWorkspaceOpen, activateWorkspace, onOpenChange)
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+
+    expect(ensureWorkspaceOpen).toHaveBeenCalledOnce()
+    expect(activateWorkspace).toHaveBeenCalledOnce()
+    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.open-presentation-failed', {
+      description: 'workspace activation crashed',
+    })
+  })
 })
 
 function navigationWith(overrides: Partial<Pick<AppNavigationActions, 'activateWorkspace'>>): AppNavigationActions {
@@ -91,6 +140,23 @@ function navigationWith(overrides: Partial<Pick<AppNavigationActions, 'activateW
     activateWorkspace: () => {},
     ...overrides,
   })
+}
+
+function renderAndSubmitWorkspaceOpen(
+  ensureWorkspaceOpen: WorkspaceMembershipActions['ensureWorkspaceOpen'],
+  activateWorkspace: AppNavigationActions['activateWorkspace'],
+  onOpenChange: (open: boolean) => void,
+) {
+  useWorkspacesStore.setState({ ensureWorkspaceOpen })
+  const navigation = navigationWith({ activateWorkspace })
+  const { rerender } = renderInJsdom(
+    <AppNavigationProvider value={navigation}>
+      <WorkspaceOpenDialog open onOpenChange={onOpenChange} />
+    </AppNavigationProvider>,
+  )
+  setInputValue('#open-workspace-path', '~/Developer/repo')
+  click('button[type="submit"]')
+  return { navigation, rerender }
 }
 
 function input(selector: string): HTMLInputElement {

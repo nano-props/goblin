@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
@@ -32,7 +32,7 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
   const [directoryTouched, setDirectoryTouched] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const cloneAbortRef = useRef<AbortController | null>(null)
+  const dialogAbortRef = useRef<AbortController | null>(null)
 
   const urlTrimmed = url.trim()
   const parentPathTrimmed = untildify(parentPath.trim())
@@ -49,19 +49,24 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
   const canSubmit = !!urlTrimmed && !!parentPathTrimmed && !!directoryNameTrimmed && !directoryError && !pending
   const canChooseParentPath = hasNativeDirectoryPicker()
 
-  useEffect(() => {
-    if (!open) {
-      cloneAbortRef.current?.abort()
-      cloneAbortRef.current = null
-      return
+  useLayoutEffect(() => {
+    if (!open) return
+    const abortController = new AbortController()
+    dialogAbortRef.current = abortController
+    return () => {
+      abortController.abort()
+      if (dialogAbortRef.current === abortController) dialogAbortRef.current = null
     }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
     setUrl('')
     setParentPath(tildify(defaultCloneParentPath()))
     setDirectoryName('')
     setDirectoryTouched(false)
     setPending(false)
     setError(null)
-    cloneAbortRef.current = null
   }, [open])
 
   useEffect(() => {
@@ -71,18 +76,22 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
 
   async function chooseParentPath() {
     if (pending || !canChooseParentPath) return
+    const signal = dialogAbortRef.current?.signal
+    if (!signal) return
     try {
-      const selected = await chooseCloneParentPath()
+      const selected = await chooseCloneParentPath({ signal })
+      if (signal.aborted) return
       if (selected) setParentPath(tildify(selected))
     } catch (err) {
+      if (signal.aborted) return
       setError(err instanceof Error ? err.message : t('error.unknown'))
     }
   }
 
   async function handleSubmit() {
     if (!canSubmit) return
-    const abortController = new AbortController()
-    cloneAbortRef.current = abortController
+    const abortController = dialogAbortRef.current
+    if (!abortController) return
     setPending(true)
     setError(null)
     let result: CloneRepoResult
@@ -96,13 +105,12 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
         abortController.signal,
       )
     } catch (err) {
-      if (cloneAbortRef.current !== abortController) return
+      if (abortController.signal.aborted) return
       setPending(false)
       setError(err instanceof Error ? err.message : t('error.unknown'))
       return
     }
-    if (cloneAbortRef.current !== abortController) return
-    cloneAbortRef.current = null
+    if (abortController.signal.aborted) return
     if (result.ok) {
       setPending(false)
       onClose()
@@ -113,13 +121,11 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
     setError(t(errorMessageKey))
   }
 
-  async function handleCancel() {
-    const abortController = cloneAbortRef.current
-    cloneAbortRef.current = null
-    if (pending && abortController) {
-      abortController.abort()
-      setPending(false)
-    }
+  function handleCancel() {
+    const abortController = dialogAbortRef.current
+    dialogAbortRef.current = null
+    abortController?.abort()
+    if (pending) setPending(false)
     onClose()
   }
 
@@ -127,7 +133,7 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
     <FormDialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && !pending) void handleCancel()
+        if (!nextOpen && !pending) handleCancel()
       }}
       showCloseButton={!pending}
       className="sm:max-w-xl"

@@ -143,6 +143,31 @@ describe('CloneRepositoryDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  test('does not apply a parent path selected for an earlier open cycle', async () => {
+    const selection = Promise.withResolvers<string | null>()
+    testWindow.goblinNative = currentNativeBridge({
+      host: {
+        openSettingsWindow: async () => true,
+        openExternalUrl: async ({ url }) => ({ ok: true, message: url }),
+        openDirectoryDialog: () => selection.promise,
+        consumeExternalOpenPaths: async () => [],
+      },
+    })
+    const onClose = vi.fn()
+    const onClone = vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))
+    const { rerender } = renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+
+    clickButtonByText('workspace-picker.clone-parent-choose')
+    selection.resolve('/tmp/old-selection')
+    rerender(<CloneRepositoryDialog open={false} onClose={onClose} onClone={onClone} />)
+    rerender(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+    await act(async () => {
+      await selection.promise
+    })
+
+    expect(input('#clone-parent-path').value).toBe('~/Developer')
+  })
+
   test('hides native parent picker button when no Electron bridge exists', () => {
     delete testWindow.goblinNative
     setClientBridgeForTests(null)

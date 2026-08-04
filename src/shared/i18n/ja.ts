@@ -92,6 +92,8 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.open-path-label': 'フォルダのパス',
   'workspace-picker.open-path-placeholder': '~/Developer/repo',
   'workspace-picker.open-path-no-matches': '一致するフォルダがありません',
+  'workspace-picker.open-presentation-failed':
+    'ワークスペースを開きましたが、画面をそのワークスペースに切り替えられませんでした',
   'workspace-picker.open-path-choose': '選択…',
   'workspace-picker.open-local-confirm': 'ワークスペースを開く',
   'workspace-picker.open-opening': '開いています…',
@@ -109,6 +111,8 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.clone-confirm': 'クローンして開く',
   'workspace-picker.clone-cloning': 'クローン中…',
   'workspace-picker.clone-opened': 'リポジトリをクローンしました',
+  'workspace-picker.clone-follow-up-failed':
+    'リポジトリをクローンしましたが、その後の自動処理を完全には実行できませんでした',
   'workspace-picker.open-remote-title': 'リモートワークスペースを開く',
   'workspace-picker.open-remote-description': 'SSH エイリアスを選び、ワークスペースのパスを入力します。',
   'workspace-picker.open-remote-host-label': 'ホスト',

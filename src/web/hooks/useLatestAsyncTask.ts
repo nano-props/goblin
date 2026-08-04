@@ -15,12 +15,12 @@ export function useLatestAsyncTask() {
   const currentTaskIdRef = useRef(0)
   const mountedRef = useRef(true)
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
       mountedRef.current = false
-    },
-    [],
-  )
+    }
+  }, [])
 
   // Locally supersede any in-flight task and clear pending UI state. This does
   // not abort the underlying async work; it only invalidates its eventual

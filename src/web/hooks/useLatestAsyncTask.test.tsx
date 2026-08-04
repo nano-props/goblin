@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, waitFor } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { StrictMode, type ReactNode } from 'react'
 import { describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useLatestAsyncTask, type LatestAsyncTaskResult } from '#/web/hooks/useLatestAsyncTask.ts'
@@ -77,6 +77,45 @@ describe('useLatestAsyncTask', () => {
       result = await pendingPromise
     })
     expect(result).toEqual({ status: 'stale' })
+  })
+
+  test('clears pending state after StrictMode replays the mount effect', async () => {
+    const first = Promise.withResolvers<string>()
+    const second = Promise.withResolvers<string>()
+    let latestTask: ReturnType<typeof useLatestAsyncTask> | undefined
+
+    function HookHost() {
+      latestTask = useLatestAsyncTask()
+      return null
+    }
+
+    render(
+      <StrictMode>
+        <HookHost />
+      </StrictMode>,
+    )
+
+    let firstPromise!: Promise<LatestAsyncTaskResult<string>>
+    act(() => {
+      firstPromise = latestTask!.runLatest(() => first.promise)
+    })
+    await waitFor(() => expect(latestTask!.pending).toBe(true))
+
+    act(() => latestTask!.reset())
+    expect(latestTask!.pending).toBe(false)
+
+    let secondPromise!: Promise<LatestAsyncTaskResult<string>>
+    act(() => {
+      secondPromise = latestTask!.runLatest(() => second.promise)
+    })
+    await waitFor(() => expect(latestTask!.pending).toBe(true))
+
+    await act(async () => {
+      first.resolve('stale')
+      second.resolve('current')
+      await Promise.all([firstPromise, secondPromise])
+    })
+    expect(latestTask!.pending).toBe(false)
   })
 })
 

@@ -1,8 +1,13 @@
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { getClientBridge } from '#/web/client-bridge.ts'
+import { waitForPromiseWithSignal } from '#/web/lib/abort.ts'
 import { homeDirectory as hostInfoHomeDirectory } from '#/web/stores/host-info.ts'
 const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
+
+interface DirectoryPickerOptions {
+  signal?: AbortSignal
+}
 
 function nativeHost() {
   return getClientBridge().host()
@@ -87,12 +92,18 @@ export async function openExternalUrl(url: string): Promise<ExecResult> {
   return await openExternalUrlWithPolicy(url, true)
 }
 
-export async function chooseLocalWorkspacePath(): Promise<string | null> {
-  return await requiredNativeHost().openDirectoryDialog({ title: 'Open Workspace' })
+export async function chooseLocalWorkspacePath(options: DirectoryPickerOptions = {}): Promise<string | null> {
+  return await chooseDirectoryPath('Open Workspace', options)
 }
 
-export async function chooseCloneParentPath(): Promise<string | null> {
-  return await requiredNativeHost().openDirectoryDialog({ title: 'Choose Clone Destination' })
+export async function chooseCloneParentPath(options: DirectoryPickerOptions = {}): Promise<string | null> {
+  return await chooseDirectoryPath('Choose Clone Destination', options)
+}
+
+async function chooseDirectoryPath(title: string, options: DirectoryPickerOptions): Promise<string | null> {
+  options.signal?.throwIfAborted()
+  const selection = requiredNativeHost().openDirectoryDialog({ title })
+  return options.signal ? await waitForPromiseWithSignal(selection, options.signal) : await selection
 }
 
 export async function consumeExternalOpenPaths(): Promise<string[]> {
