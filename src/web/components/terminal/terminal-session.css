@@ -112,6 +112,11 @@
   width: 100%;
   height: 100%;
   overflow-anchor: none;
+  /* Vertical touch movement is translated to xterm scrollback by
+     TerminalSessionView. Leave horizontal gestures and pinch zoom to the
+     browser so workspace navigation and viewport zoom keep their ownership. */
+  touch-action: pan-x pinch-zoom;
+  overscroll-behavior-y: contain;
 }
 
 .goblin-managed-terminal-host .xterm-viewport {

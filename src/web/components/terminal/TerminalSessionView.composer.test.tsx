@@ -27,11 +27,11 @@ function openComposerInput(container: HTMLElement) {
 }
 
 describe('TerminalSessionView composer', () => {
-  test('keeps the floating composer above the mobile visual viewport', async () => {
+  test('keeps the floating composer above the mobile visual viewport on its first programmatic focus', async () => {
     const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
     const visualViewport = new EventTarget()
     Object.defineProperties(visualViewport, {
-      height: { configurable: true, value: 500 },
+      height: { configurable: true, value: 800 },
       offsetTop: { configurable: true, value: 0 },
     })
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: visualViewport })
@@ -52,7 +52,16 @@ describe('TerminalSessionView composer', () => {
         y: 0,
         toJSON: () => ({}),
       })
+      const input = composerInput(rendered.container)
+      const focus = vi.spyOn(input, 'focus')
 
+      act(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
+      await vi.waitFor(() =>
+        expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('0px'),
+      )
+      expect(focus).toHaveBeenCalledWith({ preventScroll: true })
+
+      Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
       act(() => visualViewport.dispatchEvent(new Event('resize')))
       await vi.waitFor(() =>
         expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('300px'),
