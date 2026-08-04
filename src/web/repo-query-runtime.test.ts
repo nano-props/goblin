@@ -1,6 +1,11 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { RepoPullRequestsResponse, RepoSnapshotResponse } from '#/shared/api-types.ts'
+import type {
+  RepoOperationsSnapshot,
+  RepoPullRequestsResponse,
+  RepoSnapshotResponse,
+  RepoWorktreeStatusSnapshot,
+} from '#/shared/api-types.ts'
 import {
   getRepoOperationsQueryData,
   getRepoSnapshotQueryData,
@@ -12,14 +17,19 @@ import {
   repoSnapshotQueryKey,
   repoWorktreeStatusQueryKey,
 } from '#/web/repo-query-keys.ts'
-import { repoPullRequestsReadModelQueryOptions, repoSnapshotReadModelQueryOptions } from '#/web/repo-query-options.ts'
+import {
+  repoOperationsReadModelQueryOptions,
+  repoPullRequestsReadModelQueryOptions,
+  repoSnapshotReadModelQueryOptions,
+  repoWorktreeStatusReadModelQueryOptions,
+} from '#/web/repo-query-options.ts'
 import {
   invalidateRepoOperationsQueries,
   invalidateRepoMetadataQueries,
   invalidateRepoWorktreeStatusQueries,
   disposeRepoRuntimeReadState,
   ensureRepoSnapshotReadModel,
-  fetchRepoSnapshotReadModel,
+  fetchQueryOwnedRepoSnapshotReadModel,
   refreshRepoSnapshotReadModel,
 } from '#/web/repo-query-runtime.ts'
 import { repoOperationsForTest, WORKSPACE_ID } from '#/web/test-utils/repo-query-runtime.ts'
@@ -100,16 +110,69 @@ describe('repository query authorities', () => {
     unsubscribeReplacement()
   })
 
+  test('keeps an operations read across a StrictMode-style observer replacement', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const reads: Array<PromiseWithResolvers<RepoOperationsSnapshot>> = []
+    let aborts = 0
+    repoClientMocks.getRepoOperations.mockImplementation((_repoId, _runtimeId, options: { signal?: AbortSignal }) => {
+      const read = Promise.withResolvers<RepoOperationsSnapshot>()
+      reads.push(read)
+      options.signal?.addEventListener('abort', () => {
+        aborts += 1
+        read.reject(options.signal?.reason)
+      })
+      return read.promise
+    })
+    const options = repoOperationsReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1')
+    const firstObserver = new QueryObserver(client, options)
+    const unsubscribeFirst = firstObserver.subscribe(() => {})
+    await vi.waitFor(() => expect(reads).toHaveLength(1))
+
+    unsubscribeFirst()
+    const replacementObserver = new QueryObserver(client, options)
+    const unsubscribeReplacement = replacementObserver.subscribe(() => {})
+    await vi.waitFor(() => expect(reads).toHaveLength(1))
+    reads[0]!.resolve(repoOperationsForTest(1))
+
+    await vi.waitFor(() => expect(replacementObserver.getCurrentResult().status).toBe('success'))
+    expect(aborts).toBe(0)
+    unsubscribeReplacement()
+  })
+
+  test('keeps a worktree status read across a StrictMode-style observer replacement', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const reads: Array<PromiseWithResolvers<RepoWorktreeStatusSnapshot>> = []
+    let aborts = 0
+    repoClientMocks.getRepoWorktreeStatus.mockImplementation((_repoId, _runtimeId, signal?: AbortSignal) => {
+      const read = Promise.withResolvers<RepoWorktreeStatusSnapshot>()
+      reads.push(read)
+      signal?.addEventListener('abort', () => {
+        aborts += 1
+        read.reject(signal?.reason)
+      })
+      return read.promise
+    })
+    const options = repoWorktreeStatusReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', true)
+    const firstObserver = new QueryObserver(client, options)
+    const unsubscribeFirst = firstObserver.subscribe(() => {})
+    await vi.waitFor(() => expect(reads).toHaveLength(1))
+
+    unsubscribeFirst()
+    const replacementObserver = new QueryObserver(client, options)
+    const unsubscribeReplacement = replacementObserver.subscribe(() => {})
+    await vi.waitFor(() => expect(reads).toHaveLength(1))
+    reads[0]!.resolve({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
+
+    await vi.waitFor(() => expect(replacementObserver.getCurrentResult().status).toBe('success'))
+    expect(aborts).toBe(0)
+    unsubscribeReplacement()
+  })
+
   test('disposes runtime read generations with the runtime query scope', async () => {
     const client = new QueryClient()
     const read = Promise.withResolvers<RepoSnapshotResponse>()
     repoClientMocks.getRepoSnapshot.mockReturnValue(read.promise)
-    const pending = fetchRepoSnapshotReadModel(
-      WORKSPACE_ID,
-      'repo-runtime-disposed',
-      new AbortController().signal,
-      client,
-    )
+    const pending = fetchQueryOwnedRepoSnapshotReadModel(WORKSPACE_ID, 'repo-runtime-disposed', client)
     invalidateRepoMetadataQueries(WORKSPACE_ID, 'repo-runtime-disposed', client)
     disposeRepoRuntimeReadState(WORKSPACE_ID, 'repo-runtime-disposed', client)
     read.resolve(snapshot('disposed'))
@@ -195,37 +258,49 @@ describe('repository query authorities', () => {
     unsubscribe()
   })
 
-  test('shares initial snapshot loading with an active observer without invalidating its read', async () => {
+  test('keeps an imperative initial snapshot read across StrictMode-style observer replacement', async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const read = Promise.withResolvers<RepoSnapshotResponse>()
-    repoClientMocks.getRepoSnapshot.mockReturnValue(read.promise)
-    const observer = new QueryObserver(client, repoSnapshotReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', true))
-    const unsubscribe = observer.subscribe(() => {})
-    await vi.waitFor(() => expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledOnce())
+    let aborts = 0
+    repoClientMocks.getRepoSnapshot.mockImplementation((_repoId, _runtimeId, signal) => {
+      signal?.addEventListener('abort', () => {
+        aborts += 1
+      })
+      return read.promise
+    })
 
     const initialLoad = ensureRepoSnapshotReadModel(WORKSPACE_ID, 'repo-runtime-1', { queryClient: client })
+    await vi.waitFor(() => expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledOnce())
+    const options = repoSnapshotReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', true)
+    const firstObserver = new QueryObserver(client, options)
+    const unsubscribeFirst = firstObserver.subscribe(() => {})
+    unsubscribeFirst()
+    const replacementObserver = new QueryObserver(client, options)
+    const unsubscribeReplacement = replacementObserver.subscribe(() => {})
+
     read.resolve(snapshot('main'))
 
     await expect(initialLoad).resolves.toEqual(snapshot('main'))
+    await vi.waitFor(() => expect(replacementObserver.getCurrentResult().data).toEqual(snapshot('main')))
     expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledOnce()
-    unsubscribe()
+    expect(aborts).toBe(0)
+    unsubscribeReplacement()
   })
 
-  test('forwards caller cancellation to an imperative cold snapshot refresh', async () => {
+  test('caller cancellation stops waiting without aborting the query-owned snapshot read', async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    repoClientMocks.getRepoSnapshot.mockImplementation(
-      (_repoId: string, _runtimeId: string, signal: AbortSignal) =>
-        new Promise((_resolve, reject) => {
-          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
-        }),
-    )
+    const read = Promise.withResolvers<RepoSnapshotResponse>()
+    repoClientMocks.getRepoSnapshot.mockReturnValue(read.promise)
     const controller = new AbortController()
     const refresh = refreshRepoSnapshotReadModel(WORKSPACE_ID, 'repo-runtime-1', {
       queryClient: client,
       signal: controller.signal,
     })
+    await vi.waitFor(() => expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledOnce())
     controller.abort(new Error('caller cancelled'))
     await expect(refresh).rejects.toThrow('caller cancelled')
+    expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledWith(WORKSPACE_ID, 'repo-runtime-1')
+    read.resolve(snapshot('main'))
   })
 
   test('does not expose retained operations data after its query enters an error state', () => {

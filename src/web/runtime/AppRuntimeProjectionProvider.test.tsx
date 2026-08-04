@@ -387,6 +387,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await vi.waitFor(() => {
         expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce()
+        expect(recoverSessionsMock).toHaveBeenCalledOnce()
         expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenLastCalledWith(
           { workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId },
           {

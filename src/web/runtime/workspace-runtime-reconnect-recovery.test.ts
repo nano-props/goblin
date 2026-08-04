@@ -15,7 +15,7 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
     const scopeRegistry = createRuntimeProjectionScopeRegistry(() => true)
     const terminalRecovery = {
       begin: vi.fn(() => order.push('terminal-begin')),
-      request: vi.fn(() => order.push('terminal-recover')),
+      request: vi.fn(),
     }
     const workspaceTabsRecovery = { request: vi.fn(() => order.push('tabs-recover')) }
     const recovery = new WorkspaceRuntimeReconnectRecovery({
@@ -33,7 +33,9 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
     recovery.request()
 
     await vi.waitFor(() => expect(workspaceTabsRecovery.request).toHaveBeenCalled())
-    expect(order).toEqual(['membership', 'terminal-begin', 'terminal-recover', 'tabs-recover'])
+    expect(order).toEqual(['membership', 'terminal-begin', 'tabs-recover'])
+    expect(terminalRecovery.begin).toHaveBeenCalledWith(expect.anything(), { kind: 'reconnect' })
+    expect(terminalRecovery.request).not.toHaveBeenCalled()
   })
 
   test('drops a membership result invalidated while it was in flight', async () => {

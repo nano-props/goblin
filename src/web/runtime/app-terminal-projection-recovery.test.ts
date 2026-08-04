@@ -32,9 +32,9 @@ describe('AppTerminalProjectionRecovery', () => {
     const firstScope = new RuntimeProjectionScope(TARGET, () => true)
     const replacementScope = new RuntimeProjectionScope(TARGET, () => true)
 
-    recovery.begin(firstScope)
+    recovery.begin(firstScope, { kind: 'initial' })
     firstScope.dispose()
-    recovery.begin(replacementScope)
+    recovery.begin(replacementScope, { kind: 'initial' })
     catalog.resolve({ revision: 2, sessions: [] })
 
     await vi.waitFor(() => expect(markReady).toHaveBeenCalledOnce())
@@ -60,9 +60,9 @@ describe('AppTerminalProjectionRecovery', () => {
       logFailure: vi.fn(),
     })
 
-    recovery.begin(new RuntimeProjectionScope(TARGET, () => true))
+    recovery.begin(new RuntimeProjectionScope(TARGET, () => true), { kind: 'initial' })
     await vi.waitFor(() => expect(markReady).toHaveBeenCalledTimes(1))
-    recovery.begin(new RuntimeProjectionScope(TARGET, () => true))
+    recovery.begin(new RuntimeProjectionScope(TARGET, () => true), { kind: 'initial' })
     await vi.waitFor(() => expect(markReady).toHaveBeenCalledTimes(2))
     recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'minimum-revision', revision: 2 })
 
@@ -219,7 +219,7 @@ describe('AppTerminalProjectionRecovery', () => {
       logFailure: vi.fn(),
     })
 
-    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'reconnect' })
+    recovery.begin(new RuntimeProjectionScope(TARGET, () => true), { kind: 'reconnect' })
 
     await vi.waitFor(() =>
       expect(resynchronizeConnectedViews).toHaveBeenCalledWith(TARGET.workspaceId, TARGET.workspaceRuntimeId),
@@ -249,7 +249,7 @@ describe('AppTerminalProjectionRecovery', () => {
     })
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    recovery.request(scope, { kind: 'reconnect' })
+    recovery.begin(scope, { kind: 'reconnect' })
     await vi.waitFor(() => expect(logFailure).toHaveBeenCalledOnce())
     expect(resynchronizeConnectedViews).not.toHaveBeenCalled()
 
@@ -283,7 +283,7 @@ describe('AppTerminalProjectionRecovery', () => {
     })
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    recovery.request(scope, { kind: 'reconnect' })
+    recovery.begin(scope, { kind: 'reconnect' })
     recovery.request(scope, { kind: 'minimum-revision', revision: 2 })
     refresh.resolve({ revision: 2, sessions: [] })
 
@@ -317,7 +317,7 @@ describe('AppTerminalProjectionRecovery', () => {
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
     recovery.request(scope, { kind: 'minimum-revision', revision: 0 })
-    recovery.request(scope, { kind: 'reconnect' })
+    recovery.begin(scope, { kind: 'reconnect' })
     refresh.resolve({ revision: 2, sessions: [] })
 
     await vi.waitFor(() => expect(recoverSessions).toHaveBeenCalledTimes(2))
@@ -350,7 +350,7 @@ describe('AppTerminalProjectionRecovery', () => {
     })
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    recovery.request(scope, { kind: 'reconnect' })
+    recovery.begin(scope, { kind: 'reconnect' })
     await vi.waitFor(() => expect(logFailure).toHaveBeenCalledWith(viewFailure))
 
     recovery.request(scope, { kind: 'minimum-revision', revision: 2 })
@@ -383,8 +383,8 @@ describe('AppTerminalProjectionRecovery', () => {
     })
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    recovery.request(scope, { kind: 'reconnect' })
-    recovery.request(scope, { kind: 'reconnect' })
+    recovery.begin(scope, { kind: 'reconnect' })
+    recovery.begin(scope, { kind: 'reconnect' })
     firstReconnect.resolve({ revision: 1, sessions: [] })
 
     await vi.waitFor(() => expect(recoverSessions).toHaveBeenCalledTimes(2))

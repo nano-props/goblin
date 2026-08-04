@@ -11,11 +11,11 @@ import {
   repoWorktreeStatusQueryKey,
 } from '#/web/repo-query-keys.ts'
 import {
-  fetchRepoOperationsReadModel,
-  fetchRepoMetadataQuery,
+  fetchQueryOwnedRepoOperationsReadModel,
+  fetchQueryOwnedRepoMetadataQuery,
   fetchQueryOwnedRepoPullRequestsReadModel,
-  fetchRepoSnapshotReadModel,
-  fetchRepoWorktreeStatusReadModel,
+  fetchQueryOwnedRepoSnapshotReadModel,
+  fetchQueryOwnedRepoWorktreeStatusReadModel,
   isStaleRepoRuntimeReadError,
 } from '#/web/repo-query-runtime.ts'
 import { getRepoLog, getRepoRemoteBranches } from '#/web/repo-client.ts'
@@ -34,7 +34,7 @@ function refetchStatusWhenFirstObserverMounts<TQueryFnData, TError, TData, TQuer
 export function repoSnapshotQueryOptions(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
   return queryOptions({
     queryKey: repoSnapshotQueryKey(repoRoot, workspaceRuntimeId),
-    queryFn: ({ signal, client }) => fetchRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, signal, client),
+    queryFn: ({ client }) => fetchQueryOwnedRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     staleTime: Number.POSITIVE_INFINITY,
@@ -44,7 +44,7 @@ export function repoSnapshotQueryOptions(repoRoot: WorkspaceId, workspaceRuntime
 export function repoWorktreeStatusQueryOptions(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
   return queryOptions({
     queryKey: repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
-    queryFn: ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
+    queryFn: ({ client }) => fetchQueryOwnedRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     refetchOnMount: refetchStatusWhenFirstObserverMounts,
@@ -61,8 +61,8 @@ export function repoOperationsQueryOptions(
   const includeSettled = options.includeSettled === true
   return queryOptions({
     queryKey: repoOperationsQueryKey(repoRoot, workspaceRuntimeId, includeSettled),
-    queryFn: ({ signal, client }) =>
-      fetchRepoOperationsReadModel(repoRoot, workspaceRuntimeId, includeSettled, signal, client),
+    queryFn: ({ client }) =>
+      fetchQueryOwnedRepoOperationsReadModel(repoRoot, workspaceRuntimeId, includeSettled, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     enabled: options.enabled,
@@ -81,7 +81,7 @@ export function repoSnapshotReadModelQueryOptions(
     queryFn:
       repoRoot === null
         ? skipToken
-        : ({ signal, client }) => fetchRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, signal, client),
+        : ({ client }) => fetchQueryOwnedRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     staleTime: Number.POSITIVE_INFINITY,
@@ -127,7 +127,7 @@ export function repoWorktreeStatusReadModelQueryOptions(
     queryFn:
       repoRoot === null
         ? skipToken
-        : ({ signal, client }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
+        : ({ client }) => fetchQueryOwnedRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     refetchOnMount: refetchStatusWhenFirstObserverMounts,
@@ -148,9 +148,9 @@ export function repoLogQueryOptions(
   const skip = options.skip ?? 0
   return queryOptions({
     queryKey: repoLogQueryKey(repoRoot, workspaceRuntimeId, branch, count, skip),
-    queryFn: ({ signal, client }) =>
-      fetchRepoMetadataQuery(repoRoot, workspaceRuntimeId, signal, client, () =>
-        getRepoLog(repoRoot, workspaceRuntimeId, branch, { count, skip, signal }),
+    queryFn: ({ client }) =>
+      fetchQueryOwnedRepoMetadataQuery(repoRoot, workspaceRuntimeId, client, () =>
+        getRepoLog(repoRoot, workspaceRuntimeId, branch, { count, skip }),
       ),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
@@ -165,9 +165,9 @@ export function repoRemoteBranchesQueryOptions(
 ) {
   return queryOptions({
     queryKey: repoRemoteBranchesQueryKey(repoRoot, workspaceRuntimeId),
-    queryFn: ({ signal, client }) =>
-      fetchRepoMetadataQuery(repoRoot, workspaceRuntimeId, signal, client, () =>
-        getRepoRemoteBranches(repoRoot, workspaceRuntimeId, signal),
+    queryFn: ({ client }) =>
+      fetchQueryOwnedRepoMetadataQuery(repoRoot, workspaceRuntimeId, client, () =>
+        getRepoRemoteBranches(repoRoot, workspaceRuntimeId),
       ),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
@@ -187,8 +187,7 @@ export function repoOperationsReadModelQueryOptions(
     queryFn:
       repoRoot === null
         ? skipToken
-        : ({ signal, client }) =>
-            fetchRepoOperationsReadModel(repoRoot, workspaceRuntimeId, includeSettled, signal, client),
+        : ({ client }) => fetchQueryOwnedRepoOperationsReadModel(repoRoot, workspaceRuntimeId, includeSettled, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     staleTime: Number.POSITIVE_INFINITY,

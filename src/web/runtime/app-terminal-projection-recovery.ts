@@ -17,11 +17,11 @@ interface TerminalProjectionRecoveryProjection {
   terminalSessionsCatalogCoverageRevision: TerminalSessionProjection['terminalSessionsCatalogCoverageRevision']
 }
 
-export type TerminalProjectionRecoveryRequirement =
-  { kind: 'minimum-revision'; revision: number } | { kind: 'reconnect' }
+export type TerminalProjectionRecoveryRequirement = { kind: 'minimum-revision'; revision: number }
+export type TerminalProjectionRecoveryStart = { kind: 'initial' } | { kind: 'reconnect' }
 
 export interface TerminalProjectionRecoveryActions {
-  begin(scope: RuntimeProjectionScope): void
+  begin(scope: RuntimeProjectionScope, start: TerminalProjectionRecoveryStart): void
   request(scope: RuntimeProjectionScope, requirement: TerminalProjectionRecoveryRequirement): void
 }
 
@@ -47,10 +47,14 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
     this.dependencies = dependencies
   }
 
-  begin(scope: RuntimeProjectionScope): void {
+  begin(scope: RuntimeProjectionScope, start: TerminalProjectionRecoveryStart): void {
     scope.commit(() => {
       this.dependencies.beginHydration(scope.target.workspaceId, scope.target.workspaceRuntimeId)
     })
+    if (start.kind === 'reconnect') {
+      this.run(scope, start, async () => await this.dependencies.recoverSessions(scope.target))
+      return
+    }
     this.run(
       scope,
       { kind: 'minimum-revision', revision: 0 },
@@ -68,7 +72,7 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
 
   private run(
     scope: RuntimeProjectionScope,
-    requirement: TerminalProjectionRecoveryRequirement,
+    requirement: TerminalProjectionRecoveryRequirement | { kind: 'reconnect' },
     read: () => Promise<TerminalSessionsSnapshot>,
   ): void {
     const clientId = this.dependencies.readClientId()

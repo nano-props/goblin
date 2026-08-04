@@ -85,18 +85,15 @@ async function currentRead<T>(
   owner: WeakMap<QueryClient, Map<string, number>>,
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  signal: AbortSignal,
   client: QueryClient,
   read: () => Promise<T>,
 ): Promise<T> {
   const started = version(owner, client, repoRoot, workspaceRuntimeId)
   try {
     const result = await read()
-    signal.throwIfAborted()
     if (started < version(owner, client, repoRoot, workspaceRuntimeId)) throw new StaleRepoRuntimeReadError()
     return result
   } catch (error) {
-    signal.throwIfAborted()
     if (started < version(owner, client, repoRoot, workspaceRuntimeId)) throw new StaleRepoRuntimeReadError()
     throw error
   }
@@ -106,19 +103,17 @@ export function isStaleRepoRuntimeReadError(error: unknown): boolean {
   return error instanceof StaleRepoRuntimeReadError
 }
 
-export async function fetchRepoSnapshotReadModel(
+export async function fetchQueryOwnedRepoSnapshotReadModel(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  signal: AbortSignal,
   client: QueryClient,
 ): Promise<RepoSnapshotResponse> {
   return await currentRead(
     metadataVersions,
     repoRoot,
     workspaceRuntimeId,
-    signal,
     client,
-    async () => await getRepoSnapshot(repoRoot, workspaceRuntimeId, signal),
+    async () => await getRepoSnapshot(repoRoot, workspaceRuntimeId),
   )
 }
 
@@ -130,49 +125,44 @@ export async function fetchQueryOwnedRepoPullRequestsReadModel(
   return await getRepoPullRequests(repoRoot, workspaceRuntimeId, scope)
 }
 
-export async function fetchRepoWorktreeStatusReadModel(
+export async function fetchQueryOwnedRepoWorktreeStatusReadModel(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  signal: AbortSignal,
   client: QueryClient,
 ): Promise<RepoWorktreeStatusSnapshot> {
   const snapshot = await currentRead(
     statusVersions,
     repoRoot,
     workspaceRuntimeId,
-    signal,
     client,
-    async () => await getRepoWorktreeStatus(repoRoot, workspaceRuntimeId, signal),
+    async () => await getRepoWorktreeStatus(repoRoot, workspaceRuntimeId),
   )
   if (snapshot.workspaceRuntimeId !== workspaceRuntimeId) throw new MismatchedRepoRuntimeReadError()
   return snapshot
 }
 
-export async function fetchRepoOperationsReadModel(
+export async function fetchQueryOwnedRepoOperationsReadModel(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   includeSettled: boolean,
-  signal: AbortSignal,
   client: QueryClient,
 ): Promise<RepoOperationsSnapshot> {
   return await currentRead(
     operationVersions,
     repoRoot,
     workspaceRuntimeId,
-    signal,
     client,
-    async () => await getRepoOperations(repoRoot, workspaceRuntimeId, { includeSettled, signal }),
+    async () => await getRepoOperations(repoRoot, workspaceRuntimeId, { includeSettled }),
   )
 }
 
-export async function fetchRepoMetadataQuery<T>(
+export async function fetchQueryOwnedRepoMetadataQuery<T>(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  signal: AbortSignal,
   client: QueryClient,
   read: () => Promise<T>,
 ): Promise<T> {
-  return await currentRead(metadataVersions, repoRoot, workspaceRuntimeId, signal, client, read)
+  return await currentRead(metadataVersions, repoRoot, workspaceRuntimeId, client, read)
 }
 
 export async function refreshRepoSnapshotReadModel(
@@ -191,7 +181,7 @@ export async function refreshRepoSnapshotReadModel(
     staleTime: 0,
     retry: (_count, error) => isStaleRepoRuntimeReadError(error),
     retryDelay: 0,
-    queryFn: ({ signal }) => fetchRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, signal, client),
+    queryFn: () => fetchQueryOwnedRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, client),
   })
   return options.signal ? await waitForPromiseWithSignal(sharedRead, options.signal) : await sharedRead
 }
@@ -208,7 +198,7 @@ export async function ensureRepoSnapshotReadModel(
     staleTime: Number.POSITIVE_INFINITY,
     retry: (_count, error) => isStaleRepoRuntimeReadError(error),
     retryDelay: 0,
-    queryFn: ({ signal }) => fetchRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, signal, client),
+    queryFn: () => fetchQueryOwnedRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, client),
   })
   return options.signal ? await waitForPromiseWithSignal(sharedRead, options.signal) : await sharedRead
 }
@@ -241,7 +231,7 @@ export async function refreshRepoWorktreeStatusReadModel(
     staleTime: 0,
     retry: (_count, error) => isStaleRepoRuntimeReadError(error),
     retryDelay: 0,
-    queryFn: ({ signal }) => fetchRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, signal, client),
+    queryFn: () => fetchQueryOwnedRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, client),
   })
   return options.signal ? await waitForPromiseWithSignal(sharedRead, options.signal) : await sharedRead
 }

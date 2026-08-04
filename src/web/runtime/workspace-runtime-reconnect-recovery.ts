@@ -42,8 +42,7 @@ export class WorkspaceRuntimeReconnectRecovery {
       for (const target of recovery.targets) {
         if (this.dependencies.currentWorkspaceRuntimeId(target.workspaceId) !== target.workspaceRuntimeId) continue
         const scope = this.dependencies.scopeRegistry.scopeFor(target)
-        this.dependencies.terminalRecovery.begin(scope)
-        this.dependencies.terminalRecovery.request(scope, { kind: 'reconnect' })
+        this.dependencies.terminalRecovery.begin(scope, { kind: 'reconnect' })
         this.dependencies.workspaceTabsRecovery.request(scope)
       }
     } catch (error) {
