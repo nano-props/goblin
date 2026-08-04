@@ -43,7 +43,6 @@ import {
 import { installTerminalComposerViewport } from '#/web/components/terminal/terminal-composer-viewport.ts'
 import type { TerminalComposerViewportHandle } from '#/web/components/terminal/terminal-composer-viewport.ts'
 import type { TerminalComposerMode, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
-import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 
 export interface TerminalComposerLabels {
   composer: string
@@ -153,10 +152,6 @@ function isImeCompositionEvent(event: KeyboardEvent<HTMLElement>) {
 
 function visualViewportForElement(element: HTMLElement): VisualViewport | null {
   return element.ownerDocument.defaultView?.visualViewport ?? null
-}
-
-function isTerminalTouchFocusHandoff(element: HTMLElement, pointerType: string): boolean {
-  return pointerType === 'touch' && visualViewportForElement(element) !== null && terminalHasKeyboardFocus()
 }
 
 function focusComposerInput(input: HTMLTextAreaElement): void {
@@ -379,13 +374,6 @@ export function TerminalComposer({
     event.target.value = ''
     await resolveFilesIntoDraft(files, fileInsertionRef.current)
   }
-  const handleDraftPointerDown = (event: PointerEvent<HTMLTextAreaElement>) => {
-    if (isTerminalTouchFocusHandoff(event.currentTarget, event.pointerType)) {
-      event.currentTarget.focus({ preventScroll: true })
-    }
-    history.leaveBrowsing()
-  }
-
   return (
     <div
       ref={composerRootRef}
@@ -466,7 +454,7 @@ export function TerminalComposer({
                 onDraftChange(event.target.value)
               }}
               onFocus={revealTerminalBottom}
-              onPointerDown={handleDraftPointerDown}
+              onPointerDown={() => history.leaveBrowsing()}
               onKeyDown={handleDraftKeyDown}
             />
           ) : (

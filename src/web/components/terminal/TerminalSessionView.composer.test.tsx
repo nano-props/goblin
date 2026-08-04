@@ -173,25 +173,13 @@ describe('TerminalSessionView composer', () => {
       expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('300px')
 
       expect(fireEvent.pointerDown(input, { pointerType: 'touch' })).toBe(true)
-
+      expect(document.activeElement).toBe(terminalInput)
+      input.focus()
       expect(document.activeElement).toBe(input)
-      expect(focus).toHaveBeenLastCalledWith({ preventScroll: true })
+      expect(focus).toHaveBeenLastCalledWith()
       expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('0px')
       expect(scrollIntoView).toHaveBeenCalledTimes(2)
       expect(composer.scrollIntoView).not.toHaveBeenCalled()
-
-      input.blur()
-      expect(fireEvent.pointerDown(input, { pointerType: 'touch' })).toBe(true)
-      expect(scrollIntoView).toHaveBeenCalledTimes(2)
-
-      input.focus()
-      expect(scrollIntoView).toHaveBeenCalledTimes(3)
-
-      Object.defineProperty(visualViewport, 'height', { configurable: true, value: 800 })
-      Object.defineProperty(visualViewport, 'offsetTop', { configurable: true, value: 0 })
-      terminalInput.focus()
-      expect(fireEvent.pointerDown(input, { pointerType: 'mouse' })).toBe(true)
-      expect(scrollIntoView).toHaveBeenCalledTimes(3)
     } finally {
       await rendered.cleanup()
       if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
