@@ -164,9 +164,11 @@ export class WorktreeRemovalApplication {
   > {
     const targets = this.deps.workspaceTabs.physicalWorktreeTargets(physicalWorktreeCapability)
     const terminal = await this.deps.terminalSessions.closeSessionsForPhysicalWorktree(physicalWorktreeCapability)
-    const terminalScopes = terminal.scopes.map(({ workspaceId, ...item }) => ({
-      ...item,
-      repoRoot: workspaceId,
+    const terminalScopes = terminal.scopes.map((terminalScope) => ({
+      userId: terminalScope.userId,
+      repoRoot: terminalScope.workspaceId,
+      workspaceRuntimeId: terminalScope.workspaceRuntimeId,
+      scope: terminalScope.scope,
       worktreePath,
     }))
     // Terminal closure is authoritative even when a later closure, caller

@@ -1,5 +1,4 @@
 import type { Hono } from 'hono'
-import { omit } from 'es-toolkit'
 import { createApp, type ServerAppOptions } from '#/server/app-factory.ts'
 import { stopBackgroundSync } from '#/server/modules/background-sync.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
@@ -71,15 +70,6 @@ function hasAnyServerRuntimeInjectedHost(options: ServerRuntimeOptions): boolean
 }
 
 export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntime {
-  const appRuntimeOptions = omit(options, [
-    'appRealtimeHost',
-    'workspacePaneTabsHost',
-    'worktreeRemovalApplication',
-    'workspaceCapabilityTransitionHost',
-    'ptySupervisor',
-  ])
-  const { gCommandEntry, gCommandBinDir, gCommandNodePath, serverHost, serverPort, ...appOptions } = appRuntimeOptions
-
   let terminalRuntime: ReturnType<typeof createServerTerminalRuntime> | null = null
   let hosts: ServerRuntimeInjectedHosts
   if (isServerRuntimeInjectedHosts(options)) {
@@ -95,13 +85,13 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
     }
     terminalRuntime = createServerTerminalRuntime({
       ptySupervisor: options.ptySupervisor,
-      gCommand: gCommandEntry
+      gCommand: options.gCommandEntry
         ? {
-            serverUrl: formatServerUrl(serverHost, serverPort),
-            accessToken: appOptions.accessToken,
-            entryPath: gCommandEntry,
-            binDir: gCommandBinDir,
-            nodePath: gCommandNodePath,
+            serverUrl: formatServerUrl(options.serverHost, options.serverPort),
+            accessToken: options.accessToken,
+            entryPath: options.gCommandEntry,
+            binDir: options.gCommandBinDir,
+            nodePath: options.gCommandNodePath,
           }
         : undefined,
     })
@@ -113,13 +103,13 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
     }
   }
 
-  // `appOptions` carries `accessToken` (renamed from the pre-PR
-  // `internalSecret`); it's forwarded straight to `createApp`.
   const app = createApp({
-    ...appOptions,
+    version: options.version,
+    startedAt: options.startedAt,
+    accessToken: options.accessToken,
     ...hosts,
-    serverHost,
-    serverPort,
+    serverHost: options.serverHost,
+    serverPort: options.serverPort,
   })
   let stopped = false
   return {

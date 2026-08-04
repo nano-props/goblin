@@ -2,7 +2,7 @@
 import { act, waitFor } from '@testing-library/react'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { CloneRepositoryDialog, type CloneRepositoryRequest } from '#/web/components/CloneRepositoryDialog.tsx'
+import { CloneRepositoryDialog, type CloneRepositoryInput } from '#/web/components/CloneRepositoryDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
@@ -78,7 +78,7 @@ describe('CloneRepositoryDialog', () => {
   test('waits for clone success before closing and hides the close button while pending', async () => {
     const deferred = Promise.withResolvers<CloneRepoResult>()
     const onClose = vi.fn()
-    const onClone = vi.fn((_request: CloneRepositoryRequest) => deferred.promise)
+    const onClone = vi.fn((_input: CloneRepositoryInput, _signal: AbortSignal) => deferred.promise)
 
     renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
@@ -86,12 +86,14 @@ describe('CloneRepositoryDialog', () => {
     setInputValue('#clone-directory-name', 'repo')
     click('button[type="submit"]')
 
-    expect(onClone).toHaveBeenCalledWith({
-      url: 'https://example.com/repo.git',
-      parentPath: '/Users/tester/Developer',
-      directoryName: 'repo',
-      signal: expect.any(AbortSignal),
-    })
+    expect(onClone).toHaveBeenCalledWith(
+      {
+        url: 'https://example.com/repo.git',
+        parentPath: '/Users/tester/Developer',
+        directoryName: 'repo',
+      },
+      expect.any(AbortSignal),
+    )
     expect(onClose).not.toHaveBeenCalled()
     expect(buttonByText('dialog.cancel').disabled).toBe(false)
     expect(queryButtonByText('Close')).toBeNull()
@@ -121,18 +123,18 @@ describe('CloneRepositoryDialog', () => {
   test('cancel aborts an in-flight clone and closes the dialog', async () => {
     const deferred = Promise.withResolvers<CloneRepoResult>()
     const onClose = vi.fn()
-    const onClone = vi.fn((_request: CloneRepositoryRequest) => deferred.promise)
+    const onClone = vi.fn((_input: CloneRepositoryInput, _signal: AbortSignal) => deferred.promise)
 
     renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
     setInputValue('#clone-url', 'https://example.com/repo.git')
     setInputValue('#clone-directory-name', 'repo')
     click('button[type="submit"]')
-    const request = onClone.mock.calls[0]?.[0]
+    const signal = onClone.mock.calls[0]?.[1]
     clickButtonByText('dialog.cancel')
 
     expect(onClose).toHaveBeenCalledTimes(1)
-    expect(request?.signal.aborted).toBe(true)
+    expect(signal?.aborted).toBe(true)
 
     await act(async () => {
       deferred.resolve({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' })

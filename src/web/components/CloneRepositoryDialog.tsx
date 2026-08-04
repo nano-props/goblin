@@ -11,17 +11,16 @@ import { useT } from '#/web/stores/i18n.ts'
 import { joinPath, tildify, untildify } from '#/web/lib/paths.ts'
 import { cn } from '#/web/lib/cn.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
-export interface CloneRepositoryRequest {
+export interface CloneRepositoryInput {
   url: string
   parentPath: string
   directoryName: string
-  signal: AbortSignal
 }
 
 interface Props {
   open: boolean
   onClose: () => void
-  onClone: (request: CloneRepositoryRequest) => Promise<CloneRepoResult>
+  onClone: (input: CloneRepositoryInput, signal: AbortSignal) => Promise<CloneRepoResult>
 }
 
 export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
@@ -88,12 +87,14 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
     setError(null)
     let result: CloneRepoResult
     try {
-      result = await onClone({
-        url: urlTrimmed,
-        parentPath: parentPathTrimmed,
-        directoryName: directoryNameTrimmed,
-        signal: abortController.signal,
-      })
+      result = await onClone(
+        {
+          url: urlTrimmed,
+          parentPath: parentPathTrimmed,
+          directoryName: directoryNameTrimmed,
+        },
+        abortController.signal,
+      )
     } catch (err) {
       if (cloneAbortRef.current !== abortController) return
       setPending(false)

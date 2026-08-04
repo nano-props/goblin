@@ -12,6 +12,22 @@
 - Runtime `import('…')` is reserved for a real lazy-loading or
   optional-dependency boundary. Keep it local and explain a non-obvious use.
   Refactor circular dependencies instead of hiding them behind dynamic imports.
+- Use object destructuring when the source remains obvious and the binding is
+  short-lived, such as local callbacks, projections, and small local results.
+  Array and tuple destructuring remain appropriate for positional contracts.
+  Prefer retaining named boundary objects such as `input`, `options`, and
+  `deps` in longer-lived factory, service, runtime, and repository code when
+  that makes ownership clearer. Do not mechanically replace concise local
+  destructuring with repeated property chains; use the form that makes both
+  provenance and the surrounding logic easiest to follow. For closed domain or
+  protocol boundaries, do not use object-pattern `...rest` to decide which
+  fields cross the boundary; construct the boundary object explicitly.
+  Open-ended platform adapters may forward their option bag when preserving
+  unknown standard fields is part of the adapter contract. Refactors must
+  preserve declared protocol fields and business behavior; an intentional
+  boundary tightening should be reviewed separately from mechanical cleanup.
+  This is a readability guideline, not a destructuring ban or a static-check
+  requirement.
 
 ## Verification and test data
 
