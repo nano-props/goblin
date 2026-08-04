@@ -151,8 +151,7 @@ describe('RepoCloneDialog', () => {
     expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(onOpenChange.mock.invocationCallOrder[0]!)
   })
 
-  test('does not activate or report a workspace that finishes opening after cancellation', async () => {
-    const user = userEvent.setup()
+  test('closes after clone success while the accepted automatic open continues independently', async () => {
     const opening = Promise.withResolvers<{
       ok: true
       workspaceId: ReturnType<typeof workspaceIdForTest>
@@ -171,11 +170,8 @@ describe('RepoCloneDialog', () => {
     setInputValue('#clone-url', 'https://example.com/repo.git')
     setInputValue('#clone-directory-name', 'repo')
     click('button[type="submit"]')
-    await waitFor(() => expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo'))
-
-    await user.click(screen.getByRole('button', { name: 'dialog.cancel' }))
-    expect(onOpenChange).toHaveBeenCalledTimes(1)
-    expect(onOpenChange).toHaveBeenCalledWith(false)
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+    expect(activateWorkspace).not.toHaveBeenCalled()
 
     await act(async () => {
       opening.resolve({
@@ -186,51 +182,12 @@ describe('RepoCloneDialog', () => {
     })
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledTimes(1)
-    expect(activateWorkspace).not.toHaveBeenCalled()
-    expect(mocks.toastSuccess).not.toHaveBeenCalled()
+    expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/cloned-repo')
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('workspace-picker.clone-opened', {
+      description: '/tmp/cloned-repo',
+    })
     expect(mocks.toastError).not.toHaveBeenCalled()
     expect(onOpenChange).toHaveBeenCalledTimes(1)
-  })
-
-  test('does not activate or report a workspace that finishes opening after a controlled close', async () => {
-    const opening = Promise.withResolvers<{
-      ok: true
-      workspaceId: ReturnType<typeof workspaceIdForTest>
-    }>()
-    const ensureWorkspaceOpen = vi.fn(() => opening.promise)
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
-    const activateWorkspace = vi.fn()
-    const navigation = navigationWith({ activateWorkspace })
-    const onOpenChange = vi.fn()
-
-    const { rerender } = renderInJsdom(
-      <AppNavigationProvider value={navigation}>
-        <RepoCloneDialog open onOpenChange={onOpenChange} />
-      </AppNavigationProvider>,
-    )
-
-    setInputValue('#clone-url', 'https://example.com/repo.git')
-    setInputValue('#clone-directory-name', 'repo')
-    click('button[type="submit"]')
-    await waitFor(() => expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo'))
-
-    rerender(
-      <AppNavigationProvider value={navigation}>
-        <RepoCloneDialog open={false} onOpenChange={onOpenChange} />
-      </AppNavigationProvider>,
-    )
-    await act(async () => {
-      opening.resolve({
-        ok: true,
-        workspaceId: workspaceIdForTest('goblin+file:///tmp/cloned-repo'),
-      })
-      await opening.promise
-    })
-
-    expect(ensureWorkspaceOpen).toHaveBeenCalledTimes(1)
-    expect(activateWorkspace).not.toHaveBeenCalled()
-    expect(mocks.toastSuccess).not.toHaveBeenCalled()
-    expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
   test('preserves clone success when the cloned workspace cannot be opened', async () => {
@@ -255,7 +212,7 @@ describe('RepoCloneDialog', () => {
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
     expect(activateWorkspace).not.toHaveBeenCalled()
-    expect(mocks.toastError).toHaveBeenCalledWith('drop.open-failed', {
+    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-auto-open-failed', {
       description: '/tmp/cloned-repo\nerror.workspace-open-failed',
     })
     expect(mocks.toastSuccess).not.toHaveBeenCalled()
@@ -283,7 +240,7 @@ describe('RepoCloneDialog', () => {
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
     expect(activateWorkspace).not.toHaveBeenCalled()
-    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-open-uncertain', {
+    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-auto-open-failed', {
       description: '/tmp/cloned-repo\nworkspace open crashed',
     })
     expect(mocks.toastSuccess).not.toHaveBeenCalled()
@@ -314,10 +271,12 @@ describe('RepoCloneDialog', () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
     expect(mocks.loggerWarn).toHaveBeenCalledWith(
-      'failed to report post-clone workflow failure',
-      expect.objectContaining({ kind: 'open-failed' }),
+      'failed to open cloned workspace automatically',
+      expect.objectContaining({ path: '/tmp/cloned-repo' }),
     )
-    expect(mocks.toastError).not.toHaveBeenCalled()
+    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-auto-open-failed', {
+      description: '/tmp/cloned-repo\ntranslation crashed',
+    })
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
@@ -343,10 +302,13 @@ describe('RepoCloneDialog', () => {
     click('button[type="submit"]')
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
-    expect(mocks.toastError).toHaveBeenCalledWith('drop.open-failed', {
+    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-auto-open-failed', {
       description: '/tmp/cloned-repo\nerror.workspace-open-failed',
     })
-    expect(mocks.loggerWarn).toHaveBeenCalledOnce()
+    expect(mocks.loggerWarn).toHaveBeenCalledWith(
+      'failed to report automatic cloned-workspace opening failure',
+      expect.objectContaining({ path: '/tmp/cloned-repo' }),
+    )
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
@@ -374,7 +336,7 @@ describe('RepoCloneDialog', () => {
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
     expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/cloned-repo')
-    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-presentation-failed', {
+    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-auto-open-failed', {
       description: '/tmp/cloned-repo\nworkspace presentation crashed',
     })
     expect(mocks.toastSuccess).not.toHaveBeenCalled()

@@ -109,9 +109,7 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.clone-confirm': 'クローンして開く',
   'workspace-picker.clone-cloning': 'クローン中…',
   'workspace-picker.clone-opened': 'リポジトリをクローンしました',
-  'workspace-picker.clone-open-uncertain': 'リポジトリをクローンしましたが、ワークスペースを開けたか確認できません',
-  'workspace-picker.clone-presentation-failed':
-    'リポジトリをクローンしてワークスペースを開きましたが、画面を完全に更新できませんでした',
+  'workspace-picker.clone-auto-open-failed': 'リポジトリをクローンしましたが、ワークスペースを自動で開けませんでした',
   'workspace-picker.open-remote-title': 'リモートワークスペースを開く',
   'workspace-picker.open-remote-description': 'SSH エイリアスを選び、ワークスペースのパスを入力します。',
   'workspace-picker.open-remote-host-label': 'ホスト',
