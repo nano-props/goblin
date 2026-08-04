@@ -5,7 +5,7 @@ import { installTerminalTouchScroll } from '#/web/components/terminal/terminal-t
 
 function dispatchTouches(
   target: EventTarget,
-  type: 'touchstart' | 'touchmove',
+  type: 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel',
   touches: Array<{ identifier: number; clientX: number; clientY: number }>,
 ) {
   const event = new Event(type, { bubbles: true, cancelable: true })
@@ -31,6 +31,17 @@ test('translates vertical touch movement into accumulated terminal lines', () =>
   expect(firstMove.defaultPrevented).toBe(true)
   expect(secondMove.defaultPrevented).toBe(true)
   expect(scrollLines.mock.calls).toEqual([[1], [1]])
+})
+
+test('preserves the direction of downward movement', () => {
+  const element = document.createElement('div')
+  const scrollLines = vi.fn()
+  installTerminalTouchScroll({ element, shouldHandle: () => true, getLineHeight: () => 14, scrollLines })
+
+  dispatchTouches(element, 'touchstart', [{ identifier: 1, clientX: 100, clientY: 100 }])
+  dispatchTouches(element, 'touchmove', [{ identifier: 1, clientX: 100, clientY: 130 }])
+
+  expect(scrollLines).toHaveBeenCalledWith(-2)
 })
 
 test('leaves horizontal gestures untouched', () => {
@@ -71,6 +82,36 @@ test('leaves gestures untouched when touch scrolling should not be handled', () 
   const move = dispatchTouches(element, 'touchmove', [{ identifier: 4, clientX: 100, clientY: 160 }])
 
   expect(move.defaultPrevented).toBe(false)
+  expect(scrollLines).not.toHaveBeenCalled()
+})
+
+test.each(['touchend', 'touchcancel'] as const)('resets a gesture on %s', (endEvent) => {
+  const element = document.createElement('div')
+  const scrollLines = vi.fn()
+  installTerminalTouchScroll({ element, shouldHandle: () => true, getLineHeight: () => 14, scrollLines })
+
+  dispatchTouches(element, 'touchstart', [{ identifier: 4, clientX: 100, clientY: 200 }])
+  dispatchTouches(element, endEvent, [])
+  const move = dispatchTouches(element, 'touchmove', [{ identifier: 4, clientX: 100, clientY: 160 }])
+
+  expect(move.defaultPrevented).toBe(false)
+  expect(scrollLines).not.toHaveBeenCalled()
+})
+
+test('stops an active gesture when handling ownership changes', () => {
+  const element = document.createElement('div')
+  const scrollLines = vi.fn()
+  let shouldHandle = true
+  installTerminalTouchScroll({ element, shouldHandle: () => shouldHandle, getLineHeight: () => 14, scrollLines })
+
+  dispatchTouches(element, 'touchstart', [{ identifier: 4, clientX: 100, clientY: 200 }])
+  shouldHandle = false
+  const rejectedMove = dispatchTouches(element, 'touchmove', [{ identifier: 4, clientX: 100, clientY: 160 }])
+  shouldHandle = true
+  const resumedMove = dispatchTouches(element, 'touchmove', [{ identifier: 4, clientX: 100, clientY: 120 }])
+
+  expect(rejectedMove.defaultPrevented).toBe(false)
+  expect(resumedMove.defaultPrevented).toBe(false)
   expect(scrollLines).not.toHaveBeenCalled()
 })
 

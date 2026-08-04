@@ -334,6 +334,11 @@ export class TerminalSessionView {
         textarea,
         visualViewport,
         getLineHeight: () => this.terminalLineHeight(term),
+        getCursorRow: () => {
+          const buffer = term.buffer.active
+          const cursorRow = buffer.baseY + buffer.cursorY - buffer.viewportY
+          return cursorRow >= 0 && cursorRow < term.rows ? cursorRow : null
+        },
       }),
     )
   }

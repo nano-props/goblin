@@ -3,6 +3,7 @@ interface TerminalViewportRevealOptions {
   textarea: HTMLTextAreaElement
   visualViewport: VisualViewport
   getLineHeight: () => number
+  getCursorRow: () => number | null
 }
 
 const TERMINAL_VIEWPORT_REVEAL_BOTTOM_ROWS = 3
@@ -16,7 +17,19 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
   const ownerWindow = options.textarea.ownerDocument.defaultView
   if (!ownerWindow) return { dispose: () => {} }
 
-  const originalScrollMarginBlockEnd = options.textarea.style.scrollMarginBlockEnd
+  // xterm's textarea position can lag behind resize and scrollback changes. Keep focus ownership there,
+  // but derive page-reveal geometry from current public buffer state through this app-owned marker.
+  const revealMarker = options.textarea.ownerDocument.createElement('span')
+  revealMarker.setAttribute('aria-hidden', 'true')
+  Object.assign(revealMarker.style, {
+    position: 'absolute',
+    left: '0',
+    width: '1px',
+    opacity: '0',
+    pointerEvents: 'none',
+  })
+  options.element.appendChild(revealMarker)
+
   let pending = false
   let frameId: number | null = null
   const cancelPending = () => {
@@ -29,22 +42,16 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
     const terminalRect = options.element.getBoundingClientRect()
     if (terminalRect.bottom <= visibleBottom) return
 
-    // xterm keeps the textarea far offscreen until it synchronizes it with the rendered cursor.
-    if (!options.textarea.style.left || !options.textarea.style.top || !options.textarea.style.height) return
-    const cursorRect = options.textarea.getBoundingClientRect()
-    if (!(cursorRect.height > 0) || cursorRect.right <= terminalRect.left || cursorRect.left >= terminalRect.right) {
-      return
-    }
-
     const lineHeight = options.getLineHeight()
-    const revealMargin = Number.isFinite(lineHeight)
-      ? Math.max(0, Math.round(lineHeight * TERMINAL_VIEWPORT_REVEAL_BOTTOM_ROWS))
-      : 0
+    const cursorRow = options.getCursorRow()
+    if (!(lineHeight > 0) || !Number.isFinite(lineHeight) || cursorRow === null) return
+
+    const revealMargin = Math.round(lineHeight * TERMINAL_VIEWPORT_REVEAL_BOTTOM_ROWS)
+    revealMarker.style.top = `${cursorRow * lineHeight}px`
+    revealMarker.style.height = `${lineHeight}px`
+    revealMarker.style.scrollMarginBlockEnd = `${revealMargin}px`
     pending = false
-    if (cursorRect.bottom + revealMargin > visibleBottom) {
-      if (revealMargin > 0) options.textarea.style.scrollMarginBlockEnd = `${revealMargin}px`
-      options.textarea.scrollIntoView(SCROLL_INTO_VIEW_OPTIONS)
-    }
+    revealMarker.scrollIntoView(SCROLL_INTO_VIEW_OPTIONS)
   }
   const schedulePending = () => {
     if (!pending || frameId !== null) return
@@ -76,7 +83,7 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
       options.element.removeEventListener('pointerdown', rearmReveal)
       options.visualViewport.removeEventListener('resize', schedulePending)
       options.visualViewport.removeEventListener('scroll', schedulePending)
-      options.textarea.style.scrollMarginBlockEnd = originalScrollMarginBlockEnd
+      revealMarker.remove()
     },
   }
 }

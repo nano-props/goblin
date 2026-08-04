@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { expect, test, vi } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { installTerminalViewportReveal } from '#/web/components/terminal/terminal-viewport-reveal.ts'
 
 function rect(left: number, top: number, width: number, height: number): DOMRect {
@@ -26,103 +26,139 @@ function viewport(height: number): VisualViewport {
   return target as VisualViewport
 }
 
-function synchronizedTerminalInput() {
+function terminalInput() {
   const element = document.createElement('div')
   const textarea = document.createElement('textarea')
-  textarea.style.left = '100px'
-  textarea.style.top = '680px'
-  textarea.style.height = '20px'
   element.appendChild(textarea)
   document.body.appendChild(element)
   vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(rect(0, 0, 400, 800))
-  vi.spyOn(textarea, 'getBoundingClientRect').mockReturnValue(rect(100, 680, 10, 20))
-  textarea.scrollIntoView = vi.fn()
   return { element, textarea }
+}
+
+function revealMarker(element: HTMLElement): HTMLElement {
+  const marker = element.querySelector<HTMLElement>('[aria-hidden="true"]')
+  if (!marker) throw new Error('terminal reveal marker was not installed')
+  marker.scrollIntoView = vi.fn()
+  return marker
 }
 
 async function nextFrame() {
   await new Promise((resolve) => requestAnimationFrame(resolve))
 }
 
-test('reveals a synchronized focused cursor once when the keyboard obscures it', async () => {
+afterEach(() => {
+  document.body.replaceChildren()
+})
+
+test('reveals the current focused cursor once when the keyboard obscures the terminal', async () => {
   const visualViewport = viewport(800)
-  const { element, textarea } = synchronizedTerminalInput()
-  textarea.style.scrollMarginBlockEnd = '5px'
-  const reveal = installTerminalViewportReveal({ element, textarea, visualViewport, getLineHeight: () => 14 })
+  const { element, textarea } = terminalInput()
+  let cursorRow = 12
+  const reveal = installTerminalViewportReveal({
+    element,
+    textarea,
+    visualViewport,
+    getLineHeight: () => 14,
+    getCursorRow: () => cursorRow,
+  })
+  const marker = revealMarker(element)
 
   textarea.focus()
   await nextFrame()
-  expect(textarea.scrollIntoView).not.toHaveBeenCalled()
+  expect(marker.scrollIntoView).not.toHaveBeenCalled()
 
+  cursorRow = 20
   Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
   visualViewport.dispatchEvent(new Event('resize'))
   await nextFrame()
-  expect(textarea.scrollIntoView).toHaveBeenCalledOnce()
-  expect(textarea.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
-  expect(textarea.style.scrollMarginBlockEnd).toBe('42px')
+  expect(marker.scrollIntoView).toHaveBeenCalledOnce()
+  expect(marker.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
+  expect(marker.style.top).toBe('280px')
+  expect(marker.style.height).toBe('14px')
+  expect(marker.style.scrollMarginBlockEnd).toBe('42px')
 
   visualViewport.dispatchEvent(new Event('scroll'))
   await nextFrame()
-  expect(textarea.scrollIntoView).toHaveBeenCalledOnce()
+  expect(marker.scrollIntoView).toHaveBeenCalledOnce()
   reveal.dispose()
-  expect(textarea.style.scrollMarginBlockEnd).toBe('5px')
 })
 
 test('rearms the reveal when an already focused terminal is pressed again', async () => {
   const visualViewport = viewport(500)
-  const { element, textarea } = synchronizedTerminalInput()
-  const reveal = installTerminalViewportReveal({ element, textarea, visualViewport, getLineHeight: () => 14 })
+  const { element, textarea } = terminalInput()
+  const reveal = installTerminalViewportReveal({
+    element,
+    textarea,
+    visualViewport,
+    getLineHeight: () => 14,
+    getCursorRow: () => 20,
+  })
+  const marker = revealMarker(element)
 
   textarea.focus()
   await nextFrame()
-  expect(textarea.scrollIntoView).toHaveBeenCalledOnce()
+  expect(marker.scrollIntoView).toHaveBeenCalledOnce()
 
   Object.defineProperty(visualViewport, 'height', { configurable: true, value: 800 })
   visualViewport.dispatchEvent(new Event('resize'))
   await nextFrame()
   element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
   await nextFrame()
-  expect(textarea.scrollIntoView).toHaveBeenCalledOnce()
+  expect(marker.scrollIntoView).toHaveBeenCalledOnce()
 
   Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
   visualViewport.dispatchEvent(new Event('resize'))
   await nextFrame()
-  expect(textarea.scrollIntoView).toHaveBeenCalledTimes(2)
+  expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
   reveal.dispose()
 })
 
-test('reveals footer rows when the cursor itself is already visible', async () => {
+test('delegates nearest reveal with footer space when the terminal is obscured', async () => {
   const visualViewport = viewport(500)
-  const { element, textarea } = synchronizedTerminalInput()
-  vi.mocked(textarea.getBoundingClientRect).mockReturnValue(rect(100, 460, 10, 20))
-  const reveal = installTerminalViewportReveal({ element, textarea, visualViewport, getLineHeight: () => 14 })
+  const { element, textarea } = terminalInput()
+  const reveal = installTerminalViewportReveal({
+    element,
+    textarea,
+    visualViewport,
+    getLineHeight: () => 14,
+    getCursorRow: () => 5,
+  })
+  const marker = revealMarker(element)
 
   textarea.focus()
   await nextFrame()
 
-  expect(textarea.scrollIntoView).toHaveBeenCalledOnce()
-  expect(textarea.style.scrollMarginBlockEnd).toBe('42px')
+  expect(marker.scrollIntoView).toHaveBeenCalledOnce()
+  expect(marker.style.scrollMarginBlockEnd).toBe('42px')
   reveal.dispose()
 })
 
-test('does not reveal on an unobscured viewport or before xterm synchronizes the textarea', async () => {
-  const visualViewport = viewport(800)
-  const { element, textarea } = synchronizedTerminalInput()
-  const reveal = installTerminalViewportReveal({ element, textarea, visualViewport, getLineHeight: () => 14 })
+test('waits for a visible cursor row and stops after disposal', async () => {
+  const visualViewport = viewport(500)
+  const { element, textarea } = terminalInput()
+  let cursorRow: number | null = null
+  const reveal = installTerminalViewportReveal({
+    element,
+    textarea,
+    visualViewport,
+    getLineHeight: () => 14,
+    getCursorRow: () => cursorRow,
+  })
+  const marker = revealMarker(element)
 
   textarea.focus()
   await nextFrame()
-  expect(textarea.scrollIntoView).not.toHaveBeenCalled()
+  expect(marker.scrollIntoView).not.toHaveBeenCalled()
 
-  textarea.style.left = ''
-  Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
-  visualViewport.dispatchEvent(new Event('resize'))
-  await nextFrame()
-  expect(textarea.scrollIntoView).not.toHaveBeenCalled()
-
-  reveal.dispose()
-  textarea.style.left = '100px'
+  cursorRow = 20
   visualViewport.dispatchEvent(new Event('scroll'))
   await nextFrame()
-  expect(textarea.scrollIntoView).not.toHaveBeenCalled()
+  expect(marker.scrollIntoView).toHaveBeenCalledOnce()
+
+  reveal.dispose()
+  expect(marker.isConnected).toBe(false)
+  element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+  visualViewport.dispatchEvent(new Event('resize'))
+  await nextFrame()
+  expect(marker.scrollIntoView).toHaveBeenCalledOnce()
 })
