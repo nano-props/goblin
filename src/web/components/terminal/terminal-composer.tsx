@@ -40,6 +40,8 @@ import {
   textareaOffsetToDraftOffset,
   terminalComposerEditCommandForEvent,
 } from '#/web/components/terminal/terminal-composer-editing.ts'
+import { installTerminalComposerViewport } from '#/web/components/terminal/terminal-composer-viewport.ts'
+import type { TerminalComposerViewportHandle } from '#/web/components/terminal/terminal-composer-viewport.ts'
 import type { TerminalComposerMode, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 
 export interface TerminalComposerLabels {
@@ -148,6 +150,18 @@ function isImeCompositionEvent(event: KeyboardEvent<HTMLElement>) {
   return isImeOwnedKeyboardEvent(event.nativeEvent)
 }
 
+function visualViewportForElement(element: HTMLElement): VisualViewport | null {
+  return element.ownerDocument.defaultView?.visualViewport ?? null
+}
+
+function focusComposerInput(input: HTMLTextAreaElement): void {
+  if (visualViewportForElement(input)) {
+    input.focus({ preventScroll: true })
+    return
+  }
+  input.focus()
+}
+
 export function TerminalComposer({
   ref,
   containerRef,
@@ -170,6 +184,8 @@ export function TerminalComposer({
 }: TerminalComposerProps) {
   const [resolvingFiles, setResolvingFiles] = useState(false)
   const composerRootRef = useRef<HTMLDivElement | null>(null)
+  const terminalBottomMarkerRef = useRef<HTMLSpanElement | null>(null)
+  const composerViewportHandleRef = useRef<TerminalComposerViewportHandle | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const modeToggleRef = useRef<HTMLButtonElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -177,19 +193,20 @@ export function TerminalComposer({
   const fileInsertionRef = useRef({ start: 0, end: 0 })
   const pendingCaretRef = useRef<number | null>(null)
   const pendingFocusRef = useRef<'control' | 'trigger' | null>(null)
-  const pendingViewportRevealRef = useRef(false)
   const [history] = useState(() => new TerminalComposerHistoryCursor())
   const composerId = useId()
+
+  const revealTerminalBottom = () => {
+    composerViewportHandleRef.current?.revealTerminalBottom()
+  }
 
   const focusComposerControl = () => {
     if (mode === 'input') {
       const input = inputRef.current
       if (!input) return
-      pendingViewportRevealRef.current = true
-      input.focus()
+      focusComposerInput(input)
       return
     }
-    pendingViewportRevealRef.current = false
     modeToggleRef.current?.focus()
   }
   const requestComposerFocus = () => {
@@ -202,7 +219,6 @@ export function TerminalComposer({
     pendingFocusRef.current = 'control'
   }
   const requestTriggerFocus = () => {
-    pendingViewportRevealRef.current = false
     pendingFocusRef.current = 'trigger'
     if (expanded) return
     pendingFocusRef.current = null
@@ -222,7 +238,7 @@ export function TerminalComposer({
     const pendingCaret = pendingCaretRef.current
     if (pendingCaret !== null) {
       pendingCaretRef.current = null
-      input.focus()
+      focusComposerInput(input)
       input.setSelectionRange(pendingCaret, pendingCaret)
     }
   }, [draft, expanded, mode])
@@ -230,7 +246,6 @@ export function TerminalComposer({
   useLayoutEffect(() => {
     if (hidden) {
       pendingFocusRef.current = null
-      pendingViewportRevealRef.current = false
       return
     }
     if (pendingFocusRef.current === 'control' && expanded) {
@@ -254,49 +269,22 @@ export function TerminalComposer({
 
   useEffect(() => {
     const composer = composerRootRef.current
+    const terminalBottomMarker = terminalBottomMarkerRef.current
     const visualViewport = window.visualViewport
     const container = containerRef?.current ?? composer?.parentElement
-    if (!composer || !container || !visualViewport) return
+    if (!composer || !container || !terminalBottomMarker || !visualViewport) return
 
-    let frameId: number | null = null
-    const applyKeyboardOffset = () => {
-      const visibleBottom = visualViewport.offsetTop + visualViewport.height
-      const obscuredHeight = Math.max(0, container.getBoundingClientRect().bottom - visibleBottom)
-      const input = inputRef.current
-      if (
-        obscuredHeight > 0 &&
-        pendingViewportRevealRef.current &&
-        input &&
-        input === input.ownerDocument.activeElement
-      ) {
-        pendingViewportRevealRef.current = false
-        // Reveal from the pre-offset page position so nearest still pans the document; applying the
-        // keyboard offset first can make the target appear visible and suppress that pan. The input
-        // owns focus, but the complete Composer surface is the page-reveal boundary.
-        composer.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
-      }
-      const nextOffset = Math.round(obscuredHeight)
-      composer.style.setProperty('--goblin-terminal-composer-keyboard-offset', `${nextOffset}px`)
-    }
-    const updateKeyboardOffset = () => {
-      if (frameId !== null) return
-      frameId = window.requestAnimationFrame(() => {
-        frameId = null
-        applyKeyboardOffset()
-      })
-    }
-    updateKeyboardOffset()
-    visualViewport.addEventListener('resize', updateKeyboardOffset)
-    visualViewport.addEventListener('scroll', updateKeyboardOffset)
-    const containerObserver =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => updateKeyboardOffset())
-    containerObserver?.observe(container)
-
+    const composerViewportHandle = installTerminalComposerViewport({
+      composer,
+      container,
+      terminalBottomMarker,
+      visualViewport,
+      getComposerInput: () => inputRef.current,
+    })
+    composerViewportHandleRef.current = composerViewportHandle
     return () => {
-      if (frameId !== null) window.cancelAnimationFrame(frameId)
-      visualViewport.removeEventListener('resize', updateKeyboardOffset)
-      visualViewport.removeEventListener('scroll', updateKeyboardOffset)
-      containerObserver?.disconnect()
+      if (composerViewportHandleRef.current === composerViewportHandle) composerViewportHandleRef.current = null
+      composerViewportHandle.dispose()
     }
   }, [containerRef])
 
@@ -386,7 +374,6 @@ export function TerminalComposer({
     event.target.value = ''
     await resolveFilesIntoDraft(files, fileInsertionRef.current)
   }
-
   return (
     <div
       ref={composerRootRef}
@@ -409,6 +396,11 @@ export function TerminalComposer({
         closeComposer()
       }}
     >
+      <span
+        ref={terminalBottomMarkerRef}
+        className="goblin-terminal-composer__terminal-bottom-marker"
+        aria-hidden="true"
+      />
       <ComposerButton
         buttonRef={triggerRef}
         className="goblin-terminal-composer__toggle"
@@ -461,10 +453,8 @@ export function TerminalComposer({
                 history.leaveBrowsing()
                 onDraftChange(event.target.value)
               }}
-              onPointerDown={() => {
-                pendingViewportRevealRef.current = false
-                history.leaveBrowsing()
-              }}
+              onFocus={revealTerminalBottom}
+              onPointerDown={() => history.leaveBrowsing()}
               onKeyDown={handleDraftKeyDown}
             />
           ) : (

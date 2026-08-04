@@ -27,12 +27,13 @@ function openComposerInput(container: HTMLElement) {
 }
 
 describe('TerminalSessionView composer', () => {
-  test('reveals the complete Composer once when the keyboard opens after the first programmatic focus', async () => {
+  test('reveals the complete Composer as the keyboard visual viewport resizes after programmatic focus', async () => {
     const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
     const visualViewport = new EventTarget()
     Object.defineProperties(visualViewport, {
       height: { configurable: true, value: 800 },
       offsetTop: { configurable: true, value: 0 },
+      scale: { configurable: true, value: 1 },
     })
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: visualViewport })
     const rendered = await renderTerminalSession()
@@ -40,8 +41,13 @@ describe('TerminalSessionView composer', () => {
     try {
       const session = rendered.container.querySelector<HTMLElement>('.goblin-terminal-session')
       const composer = rendered.container.querySelector<HTMLElement>('.goblin-terminal-composer--floating')
+      const terminalBottomMarker = rendered.container.querySelector<HTMLElement>(
+        '.goblin-terminal-composer__terminal-bottom-marker',
+      )
       const input = composerInput(rendered.container)
-      if (!session || !composer) throw new Error('expected terminal session with a floating composer')
+      if (!session || !composer || !terminalBottomMarker) {
+        throw new Error('expected terminal session with a floating composer terminal-bottom marker')
+      }
       vi.spyOn(session, 'getBoundingClientRect').mockReturnValue({
         bottom: 800,
         height: 800,
@@ -57,25 +63,30 @@ describe('TerminalSessionView composer', () => {
       const scrollIntoView = vi.fn(() => {
         offsetsAtReveal.push(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset'))
       })
-      composer.scrollIntoView = scrollIntoView
+      terminalBottomMarker.scrollIntoView = scrollIntoView
+      composer.scrollIntoView = vi.fn()
+      const focus = vi.spyOn(input, 'focus')
 
       act(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
       expect(document.activeElement).toBe(input)
-      expect(scrollIntoView).not.toHaveBeenCalled()
+      expect(focus).toHaveBeenLastCalledWith({ preventScroll: true })
+      expect(scrollIntoView).toHaveBeenCalledOnce()
 
       Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
       act(() => visualViewport.dispatchEvent(new Event('resize')))
-      await vi.waitFor(() =>
-        expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('300px'),
-      )
-      expect(scrollIntoView).toHaveBeenCalledOnce()
+      expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('300px')
+      expect(scrollIntoView).toHaveBeenCalledTimes(2)
       expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
-      expect(offsetsAtReveal).toHaveLength(1)
-      expect(offsetsAtReveal[0]).not.toBe('300px')
+      expect(offsetsAtReveal[1]).not.toBe('300px')
+      expect(composer.scrollIntoView).not.toHaveBeenCalled()
 
+      act(() => visualViewport.dispatchEvent(new Event('scroll')))
+      expect(scrollIntoView).toHaveBeenCalledTimes(2)
+
+      Object.defineProperty(visualViewport, 'height', { configurable: true, value: 450 })
       act(() => visualViewport.dispatchEvent(new Event('resize')))
-      await new Promise((resolve) => requestAnimationFrame(resolve))
-      expect(scrollIntoView).toHaveBeenCalledOnce()
+      expect(scrollIntoView).toHaveBeenCalledTimes(3)
+      expect(offsetsAtReveal[2]).not.toBe('350px')
     } finally {
       await rendered.cleanup()
       if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
@@ -83,12 +94,13 @@ describe('TerminalSessionView composer', () => {
     }
   })
 
-  test('leaves later pointer focus scrolling to the browser', async () => {
+  test('reveals the same terminal bottom whenever Composer gains focus above an open keyboard', async () => {
     const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
     const visualViewport = new EventTarget()
     Object.defineProperties(visualViewport, {
       height: { configurable: true, value: 800 },
       offsetTop: { configurable: true, value: 0 },
+      scale: { configurable: true, value: 1 },
     })
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: visualViewport })
     const rendered = await renderTerminalSession()
@@ -96,8 +108,13 @@ describe('TerminalSessionView composer', () => {
     try {
       const session = rendered.container.querySelector<HTMLElement>('.goblin-terminal-session')
       const composer = rendered.container.querySelector<HTMLElement>('.goblin-terminal-composer--floating')
+      const terminalBottomMarker = rendered.container.querySelector<HTMLElement>(
+        '.goblin-terminal-composer__terminal-bottom-marker',
+      )
       const input = composerInput(rendered.container)
-      if (!session || !composer) throw new Error('expected terminal session with a floating composer')
+      if (!session || !composer || !terminalBottomMarker) {
+        throw new Error('expected terminal session with a floating composer terminal-bottom marker')
+      }
       vi.spyOn(session, 'getBoundingClientRect').mockReturnValue({
         bottom: 800,
         height: 800,
@@ -109,21 +126,48 @@ describe('TerminalSessionView composer', () => {
         y: 0,
         toJSON: () => ({}),
       })
-      const scrollIntoView = vi.fn()
-      composer.scrollIntoView = scrollIntoView
-
-      act(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
-      input.blur()
-      fireEvent.pointerDown(input)
-      input.focus()
+      const scrollIntoView = vi.fn(() => {
+        Object.defineProperty(visualViewport, 'offsetTop', { configurable: true, value: 300 })
+      })
+      terminalBottomMarker.scrollIntoView = scrollIntoView
+      composer.scrollIntoView = vi.fn()
+      const focus = vi.spyOn(input, 'focus')
+      const terminalHost = document.createElement('div')
+      terminalHost.className = 'goblin-managed-terminal-host'
+      const terminalInput = document.createElement('textarea')
+      terminalHost.appendChild(terminalInput)
+      rendered.sessionRoot.appendChild(terminalHost)
 
       Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
       act(() => visualViewport.dispatchEvent(new Event('resize')))
-      await vi.waitFor(() =>
-        expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('300px'),
-      )
+      expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('300px')
+      terminalInput.focus()
+
+      const trigger = buttonByLabel(rendered.container, 'terminal.composer-open')
+      expect(fireEvent.pointerDown(trigger, { pointerType: 'touch' })).toBe(true)
+      trigger.focus()
+      fireEvent.click(trigger)
+
       expect(document.activeElement).toBe(input)
-      expect(scrollIntoView).not.toHaveBeenCalled()
+      expect(focus).toHaveBeenLastCalledWith({ preventScroll: true })
+      expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('0px')
+      expect(scrollIntoView).toHaveBeenCalledOnce()
+      expect(composer.scrollIntoView).not.toHaveBeenCalled()
+
+      Object.defineProperty(visualViewport, 'offsetTop', { configurable: true, value: 0 })
+      act(() => visualViewport.dispatchEvent(new Event('scroll')))
+      terminalInput.focus()
+      expect(document.activeElement).toBe(terminalInput)
+      expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('300px')
+
+      expect(fireEvent.pointerDown(input, { pointerType: 'touch' })).toBe(true)
+      expect(document.activeElement).toBe(terminalInput)
+      input.focus()
+      expect(document.activeElement).toBe(input)
+      expect(focus).toHaveBeenLastCalledWith()
+      expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('0px')
+      expect(scrollIntoView).toHaveBeenCalledTimes(2)
+      expect(composer.scrollIntoView).not.toHaveBeenCalled()
     } finally {
       await rendered.cleanup()
       if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
@@ -137,6 +181,7 @@ describe('TerminalSessionView composer', () => {
     Object.defineProperties(visualViewport, {
       height: { configurable: true, value: 500 },
       offsetTop: { configurable: true, value: 0 },
+      scale: { configurable: true, value: 1 },
     })
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: visualViewport })
     const rendered = await renderTerminalSession()
@@ -158,15 +203,27 @@ describe('TerminalSessionView composer', () => {
       })
 
       act(() => visualViewport.dispatchEvent(new Event('resize')))
-      await vi.waitFor(() =>
-        expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('300px'),
-      )
+      expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('300px')
 
+      const terminalBottomMarker = rendered.container.querySelector<HTMLElement>(
+        '.goblin-terminal-composer__terminal-bottom-marker',
+      )
+      if (!terminalBottomMarker) throw new Error('expected a floating composer terminal-bottom marker')
+      const scrollIntoView = vi.fn()
+      terminalBottomMarker.scrollIntoView = scrollIntoView
+      openComposerInput(rendered.container)
+      scrollIntoView.mockClear()
+
+      Object.defineProperty(visualViewport, 'height', { configurable: true, value: 400 })
+      Object.defineProperty(visualViewport, 'scale', { configurable: true, value: 2 })
+      act(() => visualViewport.dispatchEvent(new Event('resize')))
+      expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('400px')
+      expect(scrollIntoView).not.toHaveBeenCalled()
+
+      Object.defineProperty(visualViewport, 'scale', { configurable: true, value: 1 })
       Object.defineProperty(visualViewport, 'height', { configurable: true, value: 800 })
       act(() => visualViewport.dispatchEvent(new Event('resize')))
-      await vi.waitFor(() =>
-        expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('0px'),
-      )
+      expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('0px')
     } finally {
       await rendered.cleanup()
       if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
@@ -174,7 +231,7 @@ describe('TerminalSessionView composer', () => {
     }
   })
 
-  test('keeps the original bottom positioning when visual viewport APIs are unavailable', async () => {
+  test('uses native focus and pointer behavior when visual viewport APIs are unavailable', async () => {
     const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
     Reflect.deleteProperty(window, 'visualViewport')
     const rendered = await renderTerminalSession()
@@ -183,6 +240,19 @@ describe('TerminalSessionView composer', () => {
       const composer = rendered.container.querySelector<HTMLElement>('.goblin-terminal-composer--floating')
       if (!composer) throw new Error('expected a floating composer')
       expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('')
+
+      const input = composerInput(rendered.container)
+      const focus = vi.spyOn(input, 'focus')
+      act(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
+      expect(focus).toHaveBeenLastCalledWith()
+
+      const terminalHost = document.createElement('div')
+      terminalHost.className = 'goblin-managed-terminal-host'
+      const terminalInput = document.createElement('textarea')
+      terminalHost.appendChild(terminalInput)
+      rendered.sessionRoot.appendChild(terminalHost)
+      terminalInput.focus()
+      expect(fireEvent.pointerDown(input, { pointerType: 'touch' })).toBe(true)
     } finally {
       await rendered.cleanup()
       if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
