@@ -381,7 +381,6 @@ export function TerminalComposer({
   }
   const handleDraftPointerDown = (event: PointerEvent<HTMLTextAreaElement>) => {
     if (isTerminalTouchFocusHandoff(event.currentTarget, event.pointerType)) {
-      event.preventDefault()
       event.currentTarget.focus({ preventScroll: true })
     }
     history.leaveBrowsing()

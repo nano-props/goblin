@@ -172,7 +172,7 @@ describe('TerminalSessionView composer', () => {
       expect(document.activeElement).toBe(terminalInput)
       expect(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset')).toBe('300px')
 
-      expect(fireEvent.pointerDown(input, { pointerType: 'touch' })).toBe(false)
+      expect(fireEvent.pointerDown(input, { pointerType: 'touch' })).toBe(true)
 
       expect(document.activeElement).toBe(input)
       expect(focus).toHaveBeenLastCalledWith({ preventScroll: true })
