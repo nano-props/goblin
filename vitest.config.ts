@@ -29,6 +29,12 @@ const alias = {
 const sharedTestOptions = {
   mockReset: true,
   restoreMocks: true,
+  // Keep teardown hooks in reverse registration order. `vitest.setup.ts`
+  // registers the jsdom host-timer drain before each test file is collected,
+  // so stack ordering makes that drain run after the file's own `afterAll`
+  // hooks and immediately before Vitest tears down the environment. This is
+  // part of the temporary Radix FocusScope workaround documented there.
+  sequence: { hooks: 'stack' as const },
   // 10s per test. Most of the suite finishes in milliseconds; the
   // ceiling is for the rare test that starts a real timer / IPC
   // and would otherwise hang the worker indefinitely. Keep it tight

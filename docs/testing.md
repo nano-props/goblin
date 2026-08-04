@@ -263,6 +263,10 @@ path` warning (process startup, before any test code runs).
    implement it).
 6. Restore jsdom's real `Window` before every test so narrow host facades
    cannot leak browser lifecycle methods across tests.
+7. Before jsdom environment teardown, cross one real host timer turn so
+   zero-delay Radix FocusScope callbacks already queued by component cleanup
+   cannot observe removed DOM globals. This is a temporary workaround for
+   issue #374 and does not advance Vitest's fake clock.
 
 Tests do not redefine these. If a test needs to bypass a shim (e.g. spy
 on `canvas.getContext`), install the spy inside the test body so it runs
