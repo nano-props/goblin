@@ -197,7 +197,7 @@ function deps(currentWorkspaceId: string | null, currentBranchName = 'feature/wo
     openCreateWorktree: vi.fn(),
     isOverlayOpen: () => false,
     isWorkspaceShortcutSuppressed: () => false,
-    ensureWorkspaceOpen: vi.fn(async (input: string | { id: string }) => ({
+    openWorkspaceMembership: vi.fn(async (input: string | { id: string }) => ({
       ok: true as const,
       workspaceId: workspaceIdForTest(typeof input === 'string' ? input : input.id),
     })),

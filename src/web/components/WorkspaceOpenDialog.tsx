@@ -10,7 +10,7 @@ interface WorkspaceOpenDialogProps {
 
 export function WorkspaceOpenDialog({ open, onOpenChange }: WorkspaceOpenDialogProps) {
   const t = useT()
-  const ensureWorkspaceOpen = useWorkspacesStore((s) => s.ensureWorkspaceOpen)
+  const openWorkspaceMembership = useWorkspacesStore((s) => s.openWorkspaceMembership)
   const navigation = useAppNavigation()
 
   return (
@@ -18,7 +18,7 @@ export function WorkspaceOpenDialog({ open, onOpenChange }: WorkspaceOpenDialogP
       open={open}
       onClose={() => onOpenChange(false)}
       onOpen={async (path, signal) => {
-        const result = await ensureWorkspaceOpen(path)
+        const result = await openWorkspaceMembership(path)
         if (signal.aborted) return result
         if (result.ok) {
           try {

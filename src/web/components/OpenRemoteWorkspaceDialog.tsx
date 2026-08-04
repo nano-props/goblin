@@ -133,7 +133,7 @@ export function OpenRemoteWorkspaceDialog({ open, onOpenChange }: Props) {
       }
       const openResult = await useWorkspacesStore
         .getState()
-        .ensureWorkspaceOpen(remoteWorkspaceSessionEntry(nextTarget))
+        .openWorkspaceMembership(remoteWorkspaceSessionEntry(nextTarget))
       if (!openResult.ok) {
         setActionError(formatRemoteDialogError(t, openResult.message))
         return

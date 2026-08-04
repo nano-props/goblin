@@ -16,7 +16,7 @@ interface RepoCloneDialogProps {
 
 export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
   const t = useT()
-  const ensureWorkspaceOpen = useWorkspacesStore((s) => s.ensureWorkspaceOpen)
+  const openWorkspaceMembership = useWorkspacesStore((s) => s.openWorkspaceMembership)
   const navigation = useAppNavigation()
 
   function reportAutomaticOpenFailure(path: string, message: string) {
@@ -26,7 +26,7 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
   }
 
   async function openClonedWorkspace(path: string, signal: AbortSignal): Promise<OpenWorkspaceResult> {
-    const openResult = await ensureWorkspaceOpen(path)
+    const openResult = await openWorkspaceMembership(path)
     if (signal.aborted || !openResult.ok) return openResult
     navigation.activateWorkspace(openResult.workspaceId)
     reportOpenWorkspacePostOpenEffects(openResult, t, { descriptionPrefix: path })

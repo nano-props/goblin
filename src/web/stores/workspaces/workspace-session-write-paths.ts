@@ -532,7 +532,7 @@ export function refreshInitialWorkspaceState(set: WorkspacesSet, get: Workspaces
 
 export function createWorkspaceLifecycleActions(set: WorkspacesSet, get: WorkspacesGet): WorkspaceMembershipActions {
   return {
-    async ensureWorkspaceOpen(pathOrEntry: string | WorkspaceSessionEntry): Promise<OpenWorkspaceResult> {
+    async openWorkspaceMembership(pathOrEntry: string | WorkspaceSessionEntry): Promise<OpenWorkspaceResult> {
       const admission = workspaceAdmissionFromInput(pathOrEntry)
       if (admission.kind === 'workspace-entry' && isRemoteWorkspaceId(admission.entry.id)) {
         return await openRemoteWorkspace(set, get, admission.entry)

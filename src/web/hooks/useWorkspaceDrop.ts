@@ -24,7 +24,7 @@ function isDropBlocked(blocked: boolean): boolean {
 }
 
 export function useWorkspaceDrop({ blocked }: Options) {
-  const ensureWorkspaceOpen = useWorkspacesStore((s) => s.ensureWorkspaceOpen)
+  const openWorkspaceMembership = useWorkspacesStore((s) => s.openWorkspaceMembership)
   const navigation = useAppNavigation()
   const t = useT()
   const tRef = useRef(t)
@@ -80,7 +80,7 @@ export function useWorkspaceDrop({ blocked }: Options) {
     if (paths.length === 0) return
     void (async () => {
       await openWorkspacePaths(paths, {
-        ensureWorkspaceOpen,
+        openWorkspaceMembership,
         activateWorkspace: navigation.activateWorkspace,
         onOpenFailed: (_path, message) => {
           toast.error(tRef.current('drop.open-failed'), {

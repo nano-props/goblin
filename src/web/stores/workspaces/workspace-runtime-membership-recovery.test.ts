@@ -441,7 +441,7 @@ describe('workspace runtime membership recovery', () => {
       }),
     })
 
-    const opening = useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_ROOT)
+    const opening = useWorkspacesStore.getState().openWorkspaceMembership(REPO_ROOT)
     const recovery = reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
 
     await expect(opening).resolves.toMatchObject({ ok: true, workspaceId: REPO_ROOT })

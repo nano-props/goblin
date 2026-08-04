@@ -54,14 +54,14 @@ interface SharedClientIntentDeps {
   openCreateWorktree: () => void
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
-  ensureWorkspaceOpen: (input: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
+  openWorkspaceMembership: (input: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
   resetLayout: () => void
   toggleZenMode: () => void
   t: (key: string) => string
 }
 
 interface ExternalOpenIntentDrainerDeps {
-  ensureWorkspaceOpen: (path: string) => Promise<OpenWorkspaceResult>
+  openWorkspaceMembership: (path: string) => Promise<OpenWorkspaceResult>
   activateWorkspace: (workspaceId: WorkspaceId) => void
   t: (key: string) => string
 }
@@ -123,7 +123,7 @@ export async function handleAppLevelClientIntent(
       await clearRecentWorkspaceHistory()
       return true
     case 'ensure-recent-workspace-open': {
-      const result = await deps.ensureWorkspaceOpen(plan.entry)
+      const result = await deps.openWorkspaceMembership(plan.entry)
       if (result.ok) {
         reportOpenWorkspacePostOpenEffects(result, deps.t)
         deps.navigation.activateWorkspace(result.workspaceId)
@@ -161,7 +161,7 @@ export async function handleWorkspaceClientIntent(
       return true
     case 'open-workspace':
       await openWorkspaceFromDialog({
-        ensureWorkspaceOpen: deps.ensureWorkspaceOpen,
+        openWorkspaceMembership: deps.openWorkspaceMembership,
         activateWorkspace: deps.navigation.activateWorkspace,
         openWorkspacePathDialog: deps.openWorkspacePathDialog,
         t: deps.t,
@@ -281,7 +281,7 @@ export function createExternalOpenIntentDrainer(deps: ExternalOpenIntentDrainerD
           const paths = await consumeExternalOpenPaths()
           if (paths.length === 0) break
           await openWorkspacePaths(paths, {
-            ensureWorkspaceOpen: deps.ensureWorkspaceOpen,
+            openWorkspaceMembership: deps.openWorkspaceMembership,
             activateWorkspace: deps.activateWorkspace,
             onOpenFailed: (path, messageKey) => {
               const openErrorMessage = deps.t(messageKey)

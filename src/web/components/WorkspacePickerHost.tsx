@@ -82,11 +82,11 @@ export function WorkspacePickerHost({
   )
   const currentWorkspacePickerId = currentWorkspaceId
   const navigation = useAppNavigation()
-  const { ensureWorkspaceOpen } = useWorkspacesStore(useShallow(workspacePickerStoreActionsFromStore))
+  const { openWorkspaceMembership } = useWorkspacesStore(useShallow(workspacePickerStoreActionsFromStore))
 
   async function handleOpenLocal() {
     await openWorkspaceFromDialog({
-      ensureWorkspaceOpen,
+      openWorkspaceMembership,
       activateWorkspace: navigation.activateWorkspace,
       openWorkspacePathDialog: onOpenWorkspacePathDialog,
       t,

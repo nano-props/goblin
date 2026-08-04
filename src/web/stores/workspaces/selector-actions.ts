@@ -12,7 +12,7 @@ interface RestorableWorkspaceLayoutStoreActions {
 interface RestorableWorkspaceLayoutPreferenceStoreActions extends RestorableWorkspaceLayoutStoreActions {}
 
 interface RuntimeCoherentWorkspaceOpenStoreActions {
-  ensureWorkspaceOpen: WorkspaceMembershipActions['ensureWorkspaceOpen']
+  openWorkspaceMembership: WorkspaceMembershipActions['openWorkspaceMembership']
 }
 
 interface RuntimeCoherentWorkspaceNavigationStoreActions {
@@ -36,7 +36,7 @@ export function runtimeCoherentWorkspaceOpenStoreActionsFromStore(
   state: RuntimeCoherentWorkspaceOpenStoreActions,
 ): RuntimeCoherentWorkspaceOpenStoreActions {
   return {
-    ensureWorkspaceOpen: state.ensureWorkspaceOpen,
+    openWorkspaceMembership: state.openWorkspaceMembership,
   }
 }
 
@@ -69,12 +69,14 @@ export function restorableWorkspaceLayoutPreferenceStoreActionsFromStore(
 export function runtimeCoherentWorkspaceProjectionStoreActionsFromStore(
   state: RuntimeCoherentWorkspaceProjectionStoreActions,
 ): RuntimeCoherentWorkspaceProjectionStoreActions {
-  const open = runtimeCoherentWorkspaceOpenStoreActionsFromStore({ ensureWorkspaceOpen: state.ensureWorkspaceOpen })
+  const open = runtimeCoherentWorkspaceOpenStoreActionsFromStore({
+    openWorkspaceMembership: state.openWorkspaceMembership,
+  })
   const navigation = runtimeCoherentWorkspaceNavigationStoreActionsFromStore({
     closeWorkspace: state.closeWorkspace,
   })
   return {
-    ensureWorkspaceOpen: open.ensureWorkspaceOpen,
+    openWorkspaceMembership: open.openWorkspaceMembership,
     closeWorkspace: navigation.closeWorkspace,
   }
 }
@@ -89,10 +91,10 @@ export function appNavigationStoreActionsFromStore(state: AppNavigationStoreActi
 
 export function workspacePickerStoreActionsFromStore(state: WorkspacePickerStoreActions): WorkspacePickerStoreActions {
   const runtimeCoherent = runtimeCoherentWorkspaceOpenStoreActionsFromStore({
-    ensureWorkspaceOpen: state.ensureWorkspaceOpen,
+    openWorkspaceMembership: state.openWorkspaceMembership,
   })
   return {
-    ensureWorkspaceOpen: runtimeCoherent.ensureWorkspaceOpen,
+    openWorkspaceMembership: runtimeCoherent.openWorkspaceMembership,
   }
 }
 
@@ -100,10 +102,10 @@ export function clientEffectIntentStoreActionsFromStore(
   state: ClientEffectIntentStoreActions,
 ): ClientEffectIntentStoreActions {
   const runtimeCoherent = runtimeCoherentWorkspaceOpenStoreActionsFromStore({
-    ensureWorkspaceOpen: state.ensureWorkspaceOpen,
+    openWorkspaceMembership: state.openWorkspaceMembership,
   })
   return {
-    ensureWorkspaceOpen: runtimeCoherent.ensureWorkspaceOpen,
+    openWorkspaceMembership: runtimeCoherent.openWorkspaceMembership,
     resetLayout: state.resetLayout,
     toggleZenMode: state.toggleZenMode,
   }

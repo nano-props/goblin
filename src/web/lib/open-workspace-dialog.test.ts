@@ -23,19 +23,19 @@ describe('openWorkspaceFromDialog', () => {
     installGoblinTestBridge({
       'workspace.openDialog': () => '/tmp/repo',
     })
-    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
+    const openWorkspaceMembership = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
       ok: true,
       workspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
     }))
     const activateWorkspace = vi.fn()
 
     await openWorkspaceFromDialog({
-      ensureWorkspaceOpen,
+      openWorkspaceMembership,
       activateWorkspace,
       t: (key) => key,
     })
 
-    expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo')
+    expect(openWorkspaceMembership).toHaveBeenCalledWith('/tmp/repo')
     expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/repo')
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
@@ -44,7 +44,7 @@ describe('openWorkspaceFromDialog', () => {
     installGoblinTestBridge({
       'workspace.openDialog': () => '/tmp/repo',
     })
-    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
+    const openWorkspaceMembership = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
       ok: true,
       workspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
       postOpenEffects: Promise.resolve([{ kind: 'recent-workspace', message: 'recent write failed' }]),
@@ -52,7 +52,7 @@ describe('openWorkspaceFromDialog', () => {
     const activateWorkspace = vi.fn()
 
     await openWorkspaceFromDialog({
-      ensureWorkspaceOpen,
+      openWorkspaceMembership,
       activateWorkspace,
       t: (key) => key,
     })
@@ -68,19 +68,19 @@ describe('openWorkspaceFromDialog', () => {
     installGoblinTestBridge({
       'workspace.openDialog': () => '/tmp/repo',
     })
-    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
+    const openWorkspaceMembership = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
       ok: false,
       message: 'error.workspace-git-unavailable',
     }))
     const activateWorkspace = vi.fn()
 
     await openWorkspaceFromDialog({
-      ensureWorkspaceOpen,
+      openWorkspaceMembership,
       activateWorkspace,
       t: (key) => key,
     })
 
-    expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/repo')
+    expect(openWorkspaceMembership).toHaveBeenCalledWith('/tmp/repo')
     expect(activateWorkspace).not.toHaveBeenCalled()
     expect(mocks.toastError).toHaveBeenCalledWith('drop.open-failed', {
       description: 'error.workspace-git-unavailable',
@@ -91,16 +91,16 @@ describe('openWorkspaceFromDialog', () => {
     installGoblinTestBridge({
       'workspace.openDialog': () => null,
     })
-    const ensureWorkspaceOpen = vi.fn()
+    const openWorkspaceMembership = vi.fn()
     const activateWorkspace = vi.fn()
 
     await openWorkspaceFromDialog({
-      ensureWorkspaceOpen,
+      openWorkspaceMembership,
       activateWorkspace,
       t: (key) => key,
     })
 
-    expect(ensureWorkspaceOpen).not.toHaveBeenCalled()
+    expect(openWorkspaceMembership).not.toHaveBeenCalled()
     expect(activateWorkspace).not.toHaveBeenCalled()
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
@@ -124,19 +124,19 @@ describe('openWorkspaceFromDialog', () => {
         },
       },
     })
-    const ensureWorkspaceOpen = vi.fn()
+    const openWorkspaceMembership = vi.fn()
     const activateWorkspace = vi.fn()
     const openWorkspacePathDialog = vi.fn()
 
     await openWorkspaceFromDialog({
-      ensureWorkspaceOpen,
+      openWorkspaceMembership,
       activateWorkspace,
       openWorkspacePathDialog,
       t: (key) => key,
     })
 
     expect(openWorkspacePathDialog).toHaveBeenCalledTimes(1)
-    expect(ensureWorkspaceOpen).not.toHaveBeenCalled()
+    expect(openWorkspaceMembership).not.toHaveBeenCalled()
     expect(activateWorkspace).not.toHaveBeenCalled()
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
