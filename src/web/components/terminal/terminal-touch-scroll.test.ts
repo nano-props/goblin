@@ -33,25 +33,44 @@ test('translates vertical touch movement into accumulated terminal lines', () =>
   expect(scrollLines.mock.calls).toEqual([[1], [1]])
 })
 
-test('leaves horizontal, multi-touch, and unavailable-buffer gestures untouched', () => {
+test('leaves horizontal gestures untouched', () => {
   const element = document.createElement('div')
   const scrollLines = vi.fn()
-  let canScroll = true
-  installTerminalTouchScroll({ element, canScroll: () => canScroll, getLineHeight: () => 14, scrollLines })
+  installTerminalTouchScroll({ element, canScroll: () => true, getLineHeight: () => 14, scrollLines })
 
   dispatchTouches(element, 'touchstart', [{ identifier: 1, clientX: 100, clientY: 200 }])
   const horizontalMove = dispatchTouches(element, 'touchmove', [{ identifier: 1, clientX: 140, clientY: 205 }])
-  expect(horizontalMove.defaultPrevented).toBe(false)
 
-  dispatchTouches(element, 'touchstart', [
+  expect(horizontalMove.defaultPrevented).toBe(false)
+  expect(scrollLines).not.toHaveBeenCalled()
+})
+
+test('stops handling a gesture when another touch is added', () => {
+  const element = document.createElement('div')
+  const scrollLines = vi.fn()
+  installTerminalTouchScroll({ element, canScroll: () => true, getLineHeight: () => 14, scrollLines })
+
+  dispatchTouches(element, 'touchstart', [{ identifier: 2, clientX: 100, clientY: 200 }])
+  const multiTouchMove = dispatchTouches(element, 'touchmove', [
     { identifier: 2, clientX: 100, clientY: 200 },
     { identifier: 3, clientX: 120, clientY: 200 },
   ])
-  canScroll = false
-  dispatchTouches(element, 'touchstart', [{ identifier: 4, clientX: 100, clientY: 200 }])
-  const unavailableMove = dispatchTouches(element, 'touchmove', [{ identifier: 4, clientX: 100, clientY: 160 }])
+  const resumedSingleTouchMove = dispatchTouches(element, 'touchmove', [{ identifier: 2, clientX: 100, clientY: 160 }])
 
-  expect(unavailableMove.defaultPrevented).toBe(false)
+  expect(multiTouchMove.defaultPrevented).toBe(false)
+  expect(resumedSingleTouchMove.defaultPrevented).toBe(false)
+  expect(scrollLines).not.toHaveBeenCalled()
+})
+
+test('leaves gestures untouched when the terminal cannot scroll', () => {
+  const element = document.createElement('div')
+  const scrollLines = vi.fn()
+  installTerminalTouchScroll({ element, canScroll: () => false, getLineHeight: () => 14, scrollLines })
+
+  dispatchTouches(element, 'touchstart', [{ identifier: 4, clientX: 100, clientY: 200 }])
+  const move = dispatchTouches(element, 'touchmove', [{ identifier: 4, clientX: 100, clientY: 160 }])
+
+  expect(move.defaultPrevented).toBe(false)
   expect(scrollLines).not.toHaveBeenCalled()
 })
 
