@@ -65,7 +65,10 @@ const xtermMocks = vi.hoisted(() => {
       scrollOnUserInput?: boolean
     }
     element: HTMLDivElement | null = null
-    modes = { applicationCursorKeysMode: false, bracketedPasteMode: false }
+    buffer = {
+      active: { type: 'normal', baseY: 0, cursorY: 0, viewportY: 0 },
+    }
+    modes = { applicationCursorKeysMode: false, bracketedPasteMode: false, mouseTrackingMode: 'none' }
     private renderHandlers: Array<(range: { start: number; end: number }) => void> = []
     refresh = vi.fn((start: number, end: number) => {
       requestAnimationFrame(() => {
@@ -92,6 +95,7 @@ const xtermMocks = vi.hoisted(() => {
       this.emitData(this.modes.bracketedPasteMode ? `\x1b[200~${normalized}\x1b[201~` : normalized)
     })
     scrollToBottom = vi.fn()
+    scrollLines = vi.fn()
     dispose = vi.fn()
     focus = vi.fn(() => this.textarea?.focus())
     customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null

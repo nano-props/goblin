@@ -185,12 +185,20 @@ export function TerminalComposer({
   const fileInsertionRef = useRef({ start: 0, end: 0 })
   const pendingCaretRef = useRef<number | null>(null)
   const pendingFocusRef = useRef<'control' | 'trigger' | null>(null)
+  const pendingViewportRevealRef = useRef(false)
   const [history] = useState(() => new TerminalComposerHistoryCursor())
   const composerId = useId()
 
   const focusComposerControl = () => {
-    if (mode === 'input') inputRef.current?.focus()
-    else modeToggleRef.current?.focus()
+    if (mode === 'input') {
+      const input = inputRef.current
+      if (!input) return
+      pendingViewportRevealRef.current = true
+      input.focus()
+      return
+    }
+    pendingViewportRevealRef.current = false
+    modeToggleRef.current?.focus()
   }
   const requestComposerFocus = () => {
     pendingFocusRef.current = 'control'
@@ -202,6 +210,7 @@ export function TerminalComposer({
     pendingFocusRef.current = 'control'
   }
   const requestTriggerFocus = () => {
+    pendingViewportRevealRef.current = false
     pendingFocusRef.current = 'trigger'
     if (expanded) return
     pendingFocusRef.current = null
@@ -229,6 +238,7 @@ export function TerminalComposer({
   useLayoutEffect(() => {
     if (hidden) {
       pendingFocusRef.current = null
+      pendingViewportRevealRef.current = false
       return
     }
     if (pendingFocusRef.current === 'control' && expanded) {
@@ -260,6 +270,19 @@ export function TerminalComposer({
     const applyKeyboardOffset = () => {
       const visibleBottom = visualViewport.offsetTop + visualViewport.height
       const obscuredHeight = Math.max(0, container.getBoundingClientRect().bottom - visibleBottom)
+      const input = inputRef.current
+      if (
+        obscuredHeight > 0 &&
+        pendingViewportRevealRef.current &&
+        input &&
+        input === input.ownerDocument.activeElement
+      ) {
+        pendingViewportRevealRef.current = false
+        // Reveal from the pre-offset page position so nearest still pans the document; applying the
+        // keyboard offset first can make the target appear visible and suppress that pan. The input
+        // owns focus, but the complete Composer surface is the page-reveal boundary.
+        composer.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
+      }
       const nextOffset = Math.round(obscuredHeight)
       composer.style.setProperty('--goblin-terminal-composer-keyboard-offset', `${nextOffset}px`)
     }
@@ -446,7 +469,10 @@ export function TerminalComposer({
                 history.leaveBrowsing()
                 onDraftChange(event.target.value)
               }}
-              onPointerDown={() => history.leaveBrowsing()}
+              onPointerDown={() => {
+                pendingViewportRevealRef.current = false
+                history.leaveBrowsing()
+              }}
               onKeyDown={handleDraftKeyDown}
             />
           ) : (

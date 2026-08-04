@@ -9,7 +9,11 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import type { ILinkHandler, ITheme } from '@xterm/xterm'
 import type { Terminal as XTermTerminal } from '@xterm/xterm'
 import { Terminal } from '@xterm/xterm'
-import { createTerminalSizingOptions } from '#/web/components/terminal/terminal-geometry.ts'
+import {
+  TERMINAL_FONT_SIZE,
+  TERMINAL_LINE_HEIGHT,
+  createTerminalSizingOptions,
+} from '#/web/components/terminal/terminal-geometry.ts'
 import {
   observeTerminalTheme,
   terminalSearchDecorationsForCurrentDocument,
@@ -25,6 +29,11 @@ import { terminalLog } from '#/web/logger.ts'
 import { constrainTerminalSize } from '#/shared/terminal-protocol-constraints.ts'
 import type { TerminalSize } from '#/shared/terminal-types.ts'
 import type { TerminalFocusRequest, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
+import { installTerminalTouchScroll } from '#/web/components/terminal/terminal-touch-scroll.ts'
+import {
+  installTerminalViewportReveal,
+  terminalInputRevealRow,
+} from '#/web/components/terminal/terminal-viewport-reveal.ts'
 
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
@@ -179,6 +188,8 @@ export class TerminalSessionView {
     this.disposables.push(term.onBinary((data) => this.handlers.onInput(data)))
     this.disposables.push(term.onResize((size) => this.handlers.onResize(size)))
     term.open(this.xtermHost)
+    this.installTouchScroll(term)
+    this.installViewportReveal(term)
     this.installFontObserver(term)
     return term
   }
@@ -300,6 +311,44 @@ export class TerminalSessionView {
       }
       return true
     })
+  }
+
+  private installTouchScroll(term: XTermTerminal): void {
+    const element = term.element
+    if (!element) return
+    this.disposables.push(
+      installTerminalTouchScroll({
+        element,
+        shouldHandle: () => term.buffer.active.type === 'normal' && term.modes.mouseTrackingMode === 'none',
+        getLineHeight: () => this.terminalLineHeight(term),
+        scrollLines: (lines) => term.scrollLines(lines),
+      }),
+    )
+  }
+
+  private installViewportReveal(term: XTermTerminal): void {
+    const element = term.element
+    const textarea = term.textarea
+    const visualViewport = this.frame.ownerDocument.defaultView?.visualViewport
+    if (!element || !textarea || !visualViewport) return
+    this.disposables.push(
+      installTerminalViewportReveal({
+        element,
+        textarea,
+        visualViewport,
+        getLineHeight: () => this.terminalLineHeight(term),
+        getCursorRow: () => terminalInputRevealRow(term.buffer.active, term.rows),
+      }),
+    )
+  }
+
+  private terminalLineHeight(term: XTermTerminal): number {
+    // xterm does not expose rendered cell height through its public API. Use the fitted host as a stable
+    // approximation for touch sensitivity and reveal spacing instead of depending on private DOM structure.
+    const measuredLineHeight = this.xtermHost.getBoundingClientRect().height / term.rows
+    const fallbackLineHeight =
+      (term.options.fontSize ?? TERMINAL_FONT_SIZE) * (term.options.lineHeight ?? TERMINAL_LINE_HEIGHT)
+    return measuredLineHeight > 0 ? measuredLineHeight : fallbackLineHeight
   }
 
   private installOptionalAddons(term: XTermTerminal): void {
