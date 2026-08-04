@@ -9,6 +9,7 @@ import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navi
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -55,6 +56,11 @@ beforeEach(() => {
     configurable: true,
     value: currentNativeBridge(),
   })
+  useHostInfoStore.setState({
+    snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
+    status: 'ready',
+    error: null,
+  })
 })
 
 afterEach(() => {
@@ -64,6 +70,44 @@ afterEach(() => {
 })
 
 describe('RepoCloneDialog', () => {
+  test('forwards the exact clone payload and aborts the fetch when cancelled', async () => {
+    let requestSignal: AbortSignal | undefined
+    fetchMock.mockImplementationOnce((_url, init) => {
+      requestSignal = (init as RequestInit | undefined)?.signal ?? undefined
+      return new Promise((_resolve, reject) => {
+        requestSignal?.addEventListener('abort', () => reject(requestSignal?.reason), { once: true })
+      })
+    })
+    const onOpenChange = vi.fn()
+
+    renderInJsdom(
+      <AppNavigationProvider value={navigationWith({})}>
+        <RepoCloneDialog open onOpenChange={onOpenChange} />
+      </AppNavigationProvider>,
+    )
+
+    setInputValue('#clone-url', 'https://example.com/repo.git')
+    setInputValue('#clone-directory-name', 'repo')
+    click('button[type="submit"]')
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined
+    expect(requestInit?.body).toEqual(expect.any(String))
+    expect(JSON.parse(String(requestInit?.body))).toEqual({
+      url: 'https://example.com/repo.git',
+      parentPath: '/Users/tester/Developer',
+      directoryName: 'repo',
+    })
+    expect(requestSignal?.aborted).toBe(false)
+
+    clickButtonByText('dialog.cancel')
+
+    await waitFor(() => {
+      expect(requestSignal?.aborted).toBe(true)
+      expect(onOpenChange).toHaveBeenCalledWith(false)
+    })
+  })
+
   test('ensures the cloned workspace is open before delegating activation to navigation', async () => {
     const ensureWorkspaceOpen = vi.fn(async () => ({
       ok: true as const,
@@ -149,6 +193,16 @@ function setInputValue(selector: string, value: string) {
 
 function click(selector: string) {
   const element = button(selector)
+  act(() => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  })
+}
+
+function clickButtonByText(text: string) {
+  const element = [...document.body.querySelectorAll('button')].find(
+    (candidate) => candidate.textContent?.trim() === text,
+  )
+  if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing button text: ${text}`)
   act(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
