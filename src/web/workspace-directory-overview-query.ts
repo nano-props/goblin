@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { getWorkspaceDirectoryOverview } from '#/web/workspace-client.ts'
 
@@ -6,12 +6,22 @@ export function workspaceDirectoryOverviewQueryKey(workspaceId: WorkspaceId, wor
   return ['workspace-directory-overview', workspaceId, workspaceRuntimeId] as const
 }
 
-export function useWorkspaceDirectoryOverview(workspaceId: WorkspaceId, workspaceRuntimeId: string, enabled: boolean) {
-  return useQuery({
+export function workspaceDirectoryOverviewQueryOptions(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  enabled: boolean,
+) {
+  return queryOptions({
     queryKey: workspaceDirectoryOverviewQueryKey(workspaceId, workspaceRuntimeId),
-    queryFn: ({ signal }) => getWorkspaceDirectoryOverview(workspaceId, workspaceRuntimeId, signal),
+    // The query promise owns this bounded read. A transient observer teardown (including
+    // StrictMode replay) may stop observing it, but must not cancel and restart the HTTP request.
+    queryFn: () => getWorkspaceDirectoryOverview(workspaceId, workspaceRuntimeId),
     staleTime: 30_000,
     enabled,
     subscribed: enabled,
   })
+}
+
+export function useWorkspaceDirectoryOverview(workspaceId: WorkspaceId, workspaceRuntimeId: string, enabled: boolean) {
+  return useQuery(workspaceDirectoryOverviewQueryOptions(workspaceId, workspaceRuntimeId, enabled))
 }

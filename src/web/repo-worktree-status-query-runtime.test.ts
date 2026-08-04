@@ -80,7 +80,7 @@ describe('repo worktree status query data', () => {
 
   test('shares one status refetch across repeated focus activation without cancelling it', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const signals: AbortSignal[] = []
+    const signals: Array<AbortSignal | undefined> = []
     const releases: Array<(snapshot: RepoWorktreeStatusSnapshot) => void> = []
     setRepoWorktreeStatusQueryData(
       WORKSPACE_ID,
@@ -115,7 +115,7 @@ describe('repo worktree status query data', () => {
       focusManager.setFocused(true)
 
       expect(releases).toHaveLength(2)
-      expect(signals[1]?.aborted).toBe(false)
+      expect(signals[1]).toBeUndefined()
       releases[1]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 3 })
       await vi.waitFor(() =>
         expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)?.loadedAt).toBe(3),
@@ -237,7 +237,7 @@ describe('repo worktree status query data', () => {
   test('caller cancellation does not abort a shared status read', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const controller = new AbortController()
-    const transportSignals: AbortSignal[] = []
+    const transportSignals: Array<AbortSignal | undefined> = []
     const reads: Array<PromiseWithResolvers<RepoWorktreeStatusSnapshot>> = []
     repoClientMocks.getRepoWorktreeStatus.mockImplementation((_repoRoot, _repoRuntimeId, signal) => {
       transportSignals.push(signal)
@@ -255,7 +255,7 @@ describe('repo worktree status query data', () => {
     controller.abort(new Error('caller stopped'))
 
     await expect(first).rejects.toThrow('caller stopped')
-    expect(transportSignals[0]?.aborted).toBe(false)
+    expect(transportSignals[0]).toBeUndefined()
     reads[0]!.resolve({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
     await vi.waitFor(() => expect(reads).toHaveLength(2))
     reads[1]!.resolve({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 2 })

@@ -224,7 +224,11 @@ function beginRepoWriteOperation(
   }
   runtime.operations.set(operation.id, operation)
   registerRepoWriteOperationBoundaryRepoId(runtime, operation.repoId)
-  publishRepoRuntimeInvalidation(runtime, operation)
+  // An idle PQueue admits the task synchronously, so publishing `queued`
+  // would trigger a read that can only observe the immediately following
+  // `running` state. A busy queue has a durable queued projection and must
+  // publish it before the preceding task releases admission.
+  if (runtime.queue.pending > 0 || runtime.queue.size > 0) publishRepoRuntimeInvalidation(runtime, operation)
   return {
     id: operation.id,
     start() {

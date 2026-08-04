@@ -45,10 +45,13 @@ describe('manual workspace refresh', () => {
     expect(fetch).not.toHaveBeenCalled()
     expect(snapshot).toHaveBeenCalledOnce()
     expect(status).toHaveBeenCalledOnce()
-    expect(refetchPullRequests).toHaveBeenCalledWith({
-      queryKey: repoPullRequestsQueryPrefix(REPO_ID, repo.workspaceRuntimeId),
-      type: 'active',
-    })
+    expect(refetchPullRequests).toHaveBeenCalledWith(
+      {
+        queryKey: repoPullRequestsQueryPrefix(REPO_ID, repo.workspaceRuntimeId),
+        type: 'active',
+      },
+      { cancelRefetch: false },
+    )
     expect(getRepoSnapshotQueryData(REPO_ID, repo.workspaceRuntimeId)?.branches).toHaveLength(2)
     expect(getRepoWorktreeStatusQueryData(REPO_ID, repo.workspaceRuntimeId)?.status).toHaveLength(1)
   })

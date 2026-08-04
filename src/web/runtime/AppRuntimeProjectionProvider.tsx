@@ -117,8 +117,7 @@ export function AppRuntimeProjectionProvider({ children, currentWorkspaceId }: A
     if (!workspaceMembershipReady || !currentWorkspaceId || !currentWorkspaceRuntimeId) return
     const target = { workspaceId: currentWorkspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId }
     const scope = scopeRegistry.scopeFor(target)
-    terminalRecovery.begin(scope)
-    terminalRecovery.request(scope, { kind: 'minimum-revision', revision: 0 })
+    terminalRecovery.begin(scope, { kind: 'initial' })
 
     const handleFocus = () => {
       const currentScope = scopeRegistry.scopeFor(target)

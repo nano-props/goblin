@@ -1,5 +1,5 @@
 import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, type Root } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { AuthProvider } from '#/web/auth/AuthProvider.tsx'
@@ -11,54 +11,46 @@ import { bootstrapLog } from '#/web/logger.ts'
 import { reactRootOptions } from '#/web/react-root-options.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { createWebBootstrapOwner, startWebBootstrap } from '#/web/web-bootstrap.ts'
 
 const INITIAL_PUBLIC_BOOTSTRAP_TIMEOUT_MS = 15_000
 
 const rootEl = document.getElementById('root')
 if (!rootEl) throw new Error('root element missing')
 
-const root = createRoot(rootEl, reactRootOptions())
+interface MainHotData {
+  root?: Root
+  nextBootstrapGeneration?: number
+}
 
-void boot()
+const hotData: MainHotData = import.meta.hot?.data ?? {}
+const root = hotData.root ?? createRoot(rootEl, reactRootOptions())
+const bootstrapOwner = createWebBootstrapOwner(hotData.nextBootstrapGeneration ?? 1)
+import.meta.hot?.dispose((data: MainHotData) => {
+  data.root = root
+  data.nextBootstrapGeneration = bootstrapOwner.generation + 1
+  bootstrapOwner.dispose()
+})
 
-async function boot(): Promise<void> {
-  root.render(<BootLoading />)
-  const timeout = createTimeoutController(INITIAL_PUBLIC_BOOTSTRAP_TIMEOUT_MS)
-  try {
+startWebBootstrap({
+  owner: bootstrapOwner,
+  timeoutMs: INITIAL_PUBLIC_BOOTSTRAP_TIMEOUT_MS,
+  hydrate: async (signal) => {
     await Promise.all([
-      useI18nStore.getState().hydrate({ subscribe: false, signal: timeout.signal }),
-      useHostInfoStore.getState().hydrate({ signal: timeout.signal }),
+      useI18nStore.getState().hydrate({ subscribe: false, signal }),
+      useHostInfoStore.getState().hydrate({ signal }),
     ])
-  } catch (err) {
-    timeout.abort(err)
-    bootstrapLog.warn('initial public bootstrap failed', { err })
-    root.render(<BootError onRetry={() => void boot()} />)
-    return
-  } finally {
-    timeout.dispose()
-  }
-  root.render(
-    <StrictMode>
-      <AppRoot />
-    </StrictMode>,
-  )
-}
-
-function createTimeoutController(ms: number): {
-  signal: AbortSignal
-  abort: (reason: unknown) => void
-  dispose: () => void
-} {
-  const controller = new AbortController()
-  const id = window.setTimeout(() => {
-    controller.abort(new Error(`initial public bootstrap timed out after ${ms}ms`))
-  }, ms)
-  return {
-    signal: controller.signal,
-    abort: (reason) => controller.abort(reason),
-    dispose: () => window.clearTimeout(id),
-  }
-}
+  },
+  renderLoading: () => root.render(<BootLoading />),
+  renderError: (retry) => root.render(<BootError onRetry={retry} />),
+  renderApp: () =>
+    root.render(
+      <StrictMode>
+        <AppRoot />
+      </StrictMode>,
+    ),
+  logFailure: (err) => bootstrapLog.warn('initial public bootstrap failed', { err }),
+})
 
 function AppRoot() {
   return (

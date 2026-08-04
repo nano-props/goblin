@@ -17,6 +17,7 @@ import {
 import { useLoadingVisibility } from '#/web/hooks/useLoadingVisibility.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
+import { repoWorktreeBootstrapPreviewQueryKey } from '#/web/repo-query-keys.ts'
 import { useRepoOperationsReadModel, useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
 import { settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
 import { waitForPromiseWithSignal } from '#/web/lib/abort.ts'
@@ -87,6 +88,15 @@ export function CreateWorktreePagePane({
     void loadBootstrap(repoId, workspaceRuntimeId, controller.signal)
       .then((load) => {
         if (!ignore) setBootstrapLoad(load)
+      })
+      .catch(() => {
+        if (ignore) return
+        setBootstrapLoad({
+          repoId,
+          workspaceRuntimeId,
+          previewResult: { ok: false, message: 'error.failed-read-repo' },
+          settingsError: false,
+        })
       })
       .finally(() => {
         if (!ignore) setBootstrapLoading(false)
@@ -291,9 +301,16 @@ async function loadBootstrap(
   workspaceRuntimeId: string,
   signal: AbortSignal,
 ): Promise<BootstrapLoad> {
-  const previewResult = await getRepoWorktreeBootstrapPreview(repoId, workspaceRuntimeId, signal).catch(
-    (): WorktreeBootstrapPreviewResult => ({ ok: false, message: 'error.failed-read-repo' }),
-  )
+  const previewRead = appQueryClient.fetchQuery({
+    queryKey: repoWorktreeBootstrapPreviewQueryKey(repoId, workspaceRuntimeId),
+    queryFn: () =>
+      getRepoWorktreeBootstrapPreview(repoId, workspaceRuntimeId).catch((): WorktreeBootstrapPreviewResult => ({
+        ok: false,
+        message: 'error.failed-read-repo',
+      })),
+    staleTime: 0,
+  })
+  const previewResult = await waitForPromiseWithSignal(previewRead, signal)
   let settingsSnapshot: SettingsSnapshot | undefined
   let settingsError = false
 
