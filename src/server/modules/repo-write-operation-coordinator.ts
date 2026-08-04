@@ -138,7 +138,12 @@ function registerWorkspaceRuntime(
   workspaceRuntimeId: string | null | undefined,
 ): WorkspaceRuntimeBoundaryRegistration | null {
   if (!workspaceRuntimeId) return null
-  ensureRepoRuntimeCloseSubscription()
+  workspaceRuntimeCloseSubscription ??= onWorkspaceRuntimeClosed((event) => {
+    unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId, event.workspaceRuntimeId)
+  })
+  workspaceRuntimeFailureSubscription ??= onWorkspaceRuntimeFailed((event) => {
+    unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId, event.workspaceRuntimeId)
+  })
   let registrations = workspaceRuntimeRegistrationsByRepoId.get(repoId)
   if (!registrations) {
     registrations = new Map()
@@ -293,7 +298,6 @@ function registerRepoWriteOperationBoundaryRepoId(
   group: RepoWriteBoundaryGroup,
   repoId: WorkspaceId | null | undefined,
 ): void {
-  ensureRepoRuntimeCloseSubscription()
   if (!repoId) return
   const previousGroup = boundaryGroupByRepoId.get(repoId)
   if (previousGroup === group) return
@@ -333,19 +337,6 @@ function deleteBoundaryGroupIfIdle(group: RepoWriteBoundaryGroup): void {
   boundaryGroups.delete(group)
   if (boundaryGroupByDescriptor.get(group.descriptor) === group) boundaryGroupByDescriptor.delete(group.descriptor)
   boundaryGroupByHandle.delete(group)
-}
-
-function ensureRepoRuntimeCloseSubscription(): void {
-  if (!workspaceRuntimeCloseSubscription) {
-    workspaceRuntimeCloseSubscription = onWorkspaceRuntimeClosed((event) => {
-      unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId, event.workspaceRuntimeId)
-    })
-  }
-  if (!workspaceRuntimeFailureSubscription) {
-    workspaceRuntimeFailureSubscription = onWorkspaceRuntimeFailed((event) => {
-      unregisterRepoWriteOperationBoundaryRepoId(event.workspaceId, event.workspaceRuntimeId)
-    })
-  }
 }
 
 function cancelledRepoWriteResult<T extends ExecResult>(): T {
@@ -634,7 +625,6 @@ export async function resolveRepoWriteBoundaryForRead(
 ): Promise<RepoWriteBoundaryHandle> {
   const runtimeRegistration = registerWorkspaceRuntime(repoId, options.workspaceRuntimeId)
   const group = await resolveRepoWriteBoundaryGroup(repoId, options.signal, runtimeRegistration)
-  registerRepoWriteOperationBoundaryRepoId(group, repoId)
   return group
 }
 

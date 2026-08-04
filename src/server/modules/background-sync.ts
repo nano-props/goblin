@@ -107,7 +107,7 @@ function stopBackgroundSyncJob(): void {
   state.job = null
 }
 
-function ensureBackgroundSyncJob(generation: number): void {
+function reconcileBackgroundSyncSchedule(generation: number): void {
   stopBackgroundSyncJob()
   syncQueue.clear()
   state.pendingScheduleGeneration = null
@@ -153,7 +153,7 @@ async function initializeBackgroundSyncSettings(generation: number): Promise<voi
   state.intervalMs = intervalMs
   settingsSubscription = subscribeServerFetchInterval((sec) => {
     state.intervalMs = sec * 1000
-    ensureBackgroundSyncJob(state.generation)
+    reconcileBackgroundSyncSchedule(state.generation)
   })
 }
 
@@ -395,7 +395,7 @@ function applyBackgroundSyncTargets(nextTargets: RegisteredGitBackgroundSyncTarg
   }
   state.targets = nextTargets
   if (state.nextTargetIndex >= state.targets.length) state.nextTargetIndex = 0
-  ensureBackgroundSyncJob(state.generation)
+  reconcileBackgroundSyncSchedule(state.generation)
 }
 
 export function stopBackgroundSync(): void {
