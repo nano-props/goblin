@@ -8,7 +8,8 @@ import {
   createPullRequest,
 } from '#/web/test-utils/repo-store.ts'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { cleanup } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -21,6 +22,7 @@ import type * as RepoClient from '#/web/repo-client.ts'
 const repoClientMocks = vi.hoisted(() => ({
   getRepoSnapshot: vi.fn(),
   getRepoWorktreeStatus: vi.fn(),
+  getRepoPullRequests: vi.fn(),
 }))
 
 vi.mock('#/web/repo-client.ts', async (importOriginal) => {
@@ -29,6 +31,7 @@ vi.mock('#/web/repo-client.ts', async (importOriginal) => {
     ...actual,
     getRepoSnapshot: repoClientMocks.getRepoSnapshot,
     getRepoWorktreeStatus: repoClientMocks.getRepoWorktreeStatus,
+    getRepoPullRequests: repoClientMocks.getRepoPullRequests,
   }
 })
 
@@ -39,11 +42,13 @@ beforeEach(() => {
   resetWorkspacesStore()
   repoClientMocks.getRepoWorktreeStatus.mockReset()
   repoClientMocks.getRepoSnapshot.mockReset()
+  repoClientMocks.getRepoPullRequests.mockReset()
   repoClientMocks.getRepoWorktreeStatus.mockImplementation(async (_workspaceId, workspaceRuntimeId) => ({
     workspaceRuntimeId,
     status: [],
     loadedAt: 1,
   }))
+  repoClientMocks.getRepoPullRequests.mockResolvedValue({ pullRequests: [] })
 })
 
 afterEach(() => {
@@ -135,6 +140,8 @@ describe('WorkspaceDashboardPane', () => {
     )
 
     await vi.waitFor(() => expect(container.textContent).toContain('status failed'))
+    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(container.textContent).not.toContain('status.stale-title')
     expect(container.textContent).toContain('error.try-again')
     expect(container.textContent).not.toContain('dashboard.loading')
     expect(container.textContent).toContain('dashboard.metric.branches')
@@ -158,6 +165,29 @@ describe('WorkspaceDashboardPane', () => {
     expect(container.textContent).not.toContain('dashboard.loading')
   })
 
+  test('does not describe an initial pull request failure as stale snapshot data', async () => {
+    const workspace = seedRepoWithReadModelForTest({
+      id: WORKSPACE_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    appQueryClient.removeQueries({
+      queryKey: repoPullRequestsQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, { kind: 'repository-summary' }),
+    })
+    repoClientMocks.getRepoPullRequests.mockRejectedValue(new Error('pull requests failed'))
+
+    const { container } = renderInJsdom(
+      <QueryClientProvider client={appQueryClient}>
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
+      </QueryClientProvider>,
+    )
+
+    await vi.waitFor(() => expect(container.textContent).toContain('pull requests failed'))
+    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(container.textContent).not.toContain('status.stale-title')
+    expect(container.textContent).toContain('dashboard.metric.branches')
+  })
+
   test('keeps accepted dashboard data visible with a stale warning after status refresh fails', async () => {
     const mainBranch = createRepoBranch('main')
     const workspace = seedRepoWithReadModelForTest({
@@ -177,8 +207,58 @@ describe('WorkspaceDashboardPane', () => {
 
     await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
     await vi.waitFor(() => expect(container.textContent).toContain('status.stale-title'))
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1)
     expect(container.textContent).toContain('error.try-again')
     expect(container.textContent).toContain('dashboard.metric.branches')
+  })
+
+  test('combines simultaneous stale reads and retries each idle query once', async () => {
+    const workspace = seedRepoWithReadModelForTest({
+      id: WORKSPACE_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    const pullRequestsQueryKey = repoPullRequestsQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, {
+      kind: 'repository-summary',
+    })
+    appQueryClient.setQueryData(pullRequestsQueryKey, { pullRequests: [] })
+    repoClientMocks.getRepoSnapshot.mockRejectedValue(new Error('snapshot failed'))
+    repoClientMocks.getRepoWorktreeStatus.mockRejectedValue(new Error('status failed'))
+    repoClientMocks.getRepoPullRequests.mockRejectedValue(new Error('pull requests failed'))
+    await Promise.all([
+      appQueryClient.invalidateQueries({
+        queryKey: repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
+        exact: true,
+        refetchType: 'none',
+      }),
+      appQueryClient.invalidateQueries({
+        queryKey: repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
+        exact: true,
+        refetchType: 'none',
+      }),
+      appQueryClient.invalidateQueries({ queryKey: pullRequestsQueryKey, exact: true, refetchType: 'none' }),
+    ])
+
+    const { container } = renderInJsdom(
+      <QueryClientProvider client={appQueryClient}>
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
+      </QueryClientProvider>,
+    )
+
+    await vi.waitFor(() => {
+      expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledOnce()
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
+      expect(repoClientMocks.getRepoPullRequests).toHaveBeenCalledOnce()
+    })
+    await vi.waitFor(() => expect(container.querySelectorAll('[role="status"]')).toHaveLength(1))
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'error.try-again' }))
+    await vi.waitFor(() => {
+      expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledTimes(2)
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
+      expect(repoClientMocks.getRepoPullRequests).toHaveBeenCalledTimes(2)
+    })
   })
 
   test('hides the attention section when no branch needs attention', () => {

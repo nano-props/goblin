@@ -15,12 +15,10 @@ import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/w
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
-import {
-  RepoReadFailureNotice,
-  RepoStatusFailureView,
-  RepoStatusStaleNotice,
-} from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoReadNotice } from '#/web/components/RepoReadNotice.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
+import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
 
 interface Props {
   repoId: WorkspaceId
@@ -76,8 +74,6 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
     : 'branches.empty'
 
   const highlightedBranch = currentBranchName ?? null
-  const statusError = statusReadModel.error
-  const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
   const retryStatus = () => {
     if (!workspaceRuntimeId) return
     void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, repoId, workspaceRuntimeId)
@@ -99,30 +95,14 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
 
   if (!repo) return <BranchNavigatorSkeleton />
 
+  const readFailures = [
+    repoQueryReadFailure(snapshotReadModel, () => void snapshotReadModel.refetch()),
+    repoQueryReadFailure(statusReadModel, retryStatus),
+  ].filter((failure) => failure !== null)
+
   return (
     <>
-      {snapshotReadModel.isError && snapshotErrorKey && (
-        <RepoStatusStaleNotice
-          messageKey={snapshotErrorKey}
-          retrying={snapshotReadModel.isFetching}
-          onRetry={() => void snapshotReadModel.refetch()}
-        />
-      )}
-      {statusReadModel.isError &&
-        statusErrorKey &&
-        (statusReadModel.data ? (
-          <RepoStatusStaleNotice
-            messageKey={statusErrorKey}
-            retrying={statusReadModel.isFetching}
-            onRetry={retryStatus}
-          />
-        ) : (
-          <RepoReadFailureNotice
-            messageKey={statusErrorKey}
-            retrying={statusReadModel.isFetching}
-            onRetry={retryStatus}
-          />
-        ))}
+      <RepoReadNotice failures={readFailures} />
       <BranchList
         repo={repo}
         branches={branches}

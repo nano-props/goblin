@@ -7,7 +7,8 @@ import {
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
-import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { repoQueryReadFailure, type RepoReadFailure } from '#/web/repo-read-failure.ts'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
 import type {
   GitWorkspacePaneShell,
@@ -113,18 +114,11 @@ export function GitWorkspacePane({
       pullRequests: pullRequestsReadModel.isPending || pullRequestsReadModel.isFetching,
     },
   }
+  const snapshotReadFailure = repoQueryReadFailure(snapshotReadModel, () => void snapshotReadModel.refetch())
+  const snapshotReadFailures = snapshotReadFailure ? [snapshotReadFailure] : []
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
-      {snapshotReadModel.isError && (
-        <RepoStatusStaleNotice
-          messageKey={
-            snapshotReadModel.error instanceof Error ? snapshotReadModel.error.message : String(snapshotReadModel.error)
-          }
-          retrying={snapshotReadModel.isFetching}
-          onRetry={() => void snapshotReadModel.refetch()}
-        />
-      )}
       {detail.branch ? (
         <GitBranchActionWorkspacePane
           repo={gitWorkspacePaneProjection}
@@ -135,6 +129,7 @@ export function GitWorkspacePane({
           shortcutsEnabled={shortcutsEnabled}
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
           onBackToBranchNavigator={onBackToBranchNavigator}
+          readFailures={snapshotReadFailures}
         />
       ) : (
         <GitWorkspacePaneSurface
@@ -144,6 +139,7 @@ export function GitWorkspacePane({
           workspacePaneId={workspacePaneId}
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
           onBackToBranchNavigator={onBackToBranchNavigator}
+          readFailures={snapshotReadFailures}
         />
       )}
     </section>
@@ -157,6 +153,7 @@ interface GitWorkspacePaneSurfaceProps {
   workspacePaneId: string
   toolbarTrafficLightOffset?: boolean
   onBackToBranchNavigator?: () => void
+  readFailures: RepoReadFailure[]
 }
 
 function GitWorkspacePaneSurface({
@@ -166,6 +163,7 @@ function GitWorkspacePaneSurface({
   workspacePaneId,
   toolbarTrafficLightOffset = false,
   onBackToBranchNavigator,
+  readFailures,
 }: GitWorkspacePaneSurfaceProps) {
   const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : undefined
   const routeControllerRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : null
@@ -195,6 +193,7 @@ function GitWorkspacePaneSurface({
         detail={detail}
         workspacePaneId={workspacePaneId}
         workspacePaneTabModel={workspacePaneTabModel}
+        readFailures={readFailures}
         onBackToBranchNavigator={onBackToBranchNavigator}
         onRetryStatus={() => {
           void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, repo.id, repo.workspaceRuntimeId)
@@ -213,6 +212,7 @@ interface GitBranchActionWorkspacePaneProps {
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset?: boolean
   onBackToBranchNavigator?: () => void
+  readFailures: RepoReadFailure[]
 }
 
 function GitBranchActionWorkspacePane({
@@ -224,6 +224,7 @@ function GitBranchActionWorkspacePane({
   shortcutsEnabled,
   toolbarTrafficLightOffset = false,
   onBackToBranchNavigator,
+  readFailures,
 }: GitBranchActionWorkspacePaneProps) {
   const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : undefined
   const branchActions = useBranchActions(repo, branch)
@@ -239,6 +240,7 @@ function GitBranchActionWorkspacePane({
         workspacePaneId={workspacePaneId}
         toolbarTrafficLightOffset={toolbarTrafficLightOffset}
         onBackToBranchNavigator={onBackToBranchNavigator}
+        readFailures={readFailures}
       />
     </BranchActionSurfaceContext>
   )

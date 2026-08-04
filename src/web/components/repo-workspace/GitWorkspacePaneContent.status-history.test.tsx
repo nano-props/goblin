@@ -553,7 +553,7 @@ describe('GitWorkspacePaneContent status-history', () => {
     expect(panel?.querySelector('[aria-label="src/beta.ts"]')).not.toBeNull()
   })
 
-  test('keeps stale changes visible and retries status from the query owner callback', () => {
+  test('keeps stale changes visible and combines snapshot and status retry into one notice', () => {
     const worktreePath = '/tmp/stale-changes-panel-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -588,6 +588,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       { state: 'empty', stale: false, error: null, retrying: false, retry: vi.fn() },
     )
     const onRetryStatus = vi.fn()
+    const onRetrySnapshot = vi.fn()
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -596,15 +597,24 @@ describe('GitWorkspacePaneContent status-history', () => {
             repo={presentationRepo}
             detail={detail}
             workspacePaneId="workspace"
+            readFailures={[
+              {
+                message: 'snapshot failed',
+                stale: true,
+                retrying: false,
+                retry: onRetrySnapshot,
+              },
+            ]}
             onRetryStatus={onRetryStatus}
           />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
 
-    expect(container.textContent).toContain('status.stale-title')
+    expect(screen.getAllByText('status.stale-title')).toHaveLength(1)
     expect(container.querySelector('[aria-label="src/stale.ts"]')).not.toBeNull()
     act(() => screen.getByRole('button', { name: 'error.try-again' }).click())
+    expect(onRetrySnapshot).toHaveBeenCalledOnce()
     expect(onRetryStatus).toHaveBeenCalledOnce()
   })
 

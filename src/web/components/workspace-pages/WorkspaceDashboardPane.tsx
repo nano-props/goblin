@@ -17,15 +17,13 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import {
-  RepoReadFailureNotice,
-  RepoStatusFailureView,
-  RepoStatusStaleNotice,
-} from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoReadNotice } from '#/web/components/RepoReadNotice.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { DirectoryOverviewContent } from '#/web/components/workspace-pages/DirectoryOverviewContent.tsx'
 import { DASHBOARD_CARD_CLASS_NAME } from '#/web/components/workspace-pages/dashboard-ui.tsx'
 import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
+import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
 import {
   DashboardAttention,
   DashboardHeader,
@@ -112,18 +110,17 @@ export function WorkspaceDashboardPane({
     [branchModel, pullRequestEntries],
   )
   const hasAttentionBranches = !!summary?.attentionBranches.length
-  const statusError = statusReadModel.error
-  const statusErrorKey = statusError instanceof Error ? statusError.message : String(statusError)
-  const statusStale = !!statusReadModel.data && statusReadModel.isError
   const snapshotError = snapshotReadModel.error
   const snapshotErrorKey = snapshotError instanceof Error ? snapshotError.message : String(snapshotError)
-  const pullRequestError = pullRequestsReadModel.error
-  const pullRequestErrorKey =
-    pullRequestError instanceof Error ? pullRequestError.message : pullRequestError ? String(pullRequestError) : null
   const retryStatus = () => {
     if (!workspace) return
     void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, workspace.id, workspace.workspaceRuntimeId)
   }
+  const readFailures = [
+    repoQueryReadFailure(snapshotReadModel, () => void snapshotReadModel.refetch()),
+    repoQueryReadFailure(statusReadModel, retryStatus),
+    repoQueryReadFailure(pullRequestsReadModel, () => void pullRequestsReadModel.refetch()),
+  ].filter((failure) => failure !== null)
 
   return (
     <WorkspacePagePane
@@ -149,41 +146,7 @@ export function WorkspaceDashboardPane({
             />
           ) : workspace && workspace.capability.kind === 'git' && branchModel && summary ? (
             <>
-              {snapshotReadModel.isError && (
-                <RepoStatusStaleNotice
-                  messageKey={snapshotErrorKey || 'error.failed-read-repo'}
-                  retrying={snapshotReadModel.isFetching}
-                  onRetry={() => void snapshotReadModel.refetch()}
-                />
-              )}
-              {statusReadModel.isError &&
-                (statusStale ? (
-                  <RepoStatusStaleNotice
-                    messageKey={statusErrorKey}
-                    retrying={statusReadModel.isFetching}
-                    onRetry={retryStatus}
-                  />
-                ) : (
-                  <RepoReadFailureNotice
-                    messageKey={statusErrorKey || 'error.failed-read-repo'}
-                    retrying={statusReadModel.isFetching}
-                    onRetry={retryStatus}
-                  />
-                ))}
-              {pullRequestState === 'error' && (
-                <RepoReadFailureNotice
-                  messageKey={pullRequestErrorKey || 'error.failed-read-repo'}
-                  retrying={pullRequestsReadModel.isFetching}
-                  onRetry={() => void pullRequestsReadModel.refetch()}
-                />
-              )}
-              {pullRequestState === 'stale' && pullRequestErrorKey && (
-                <RepoStatusStaleNotice
-                  messageKey={pullRequestErrorKey}
-                  retrying={pullRequestsReadModel.isFetching}
-                  onRetry={() => void pullRequestsReadModel.refetch()}
-                />
-              )}
+              <RepoReadNotice failures={readFailures} />
               <DashboardHeader
                 workspace={workspace}
                 remote={branchModel.snapshot.remote}
