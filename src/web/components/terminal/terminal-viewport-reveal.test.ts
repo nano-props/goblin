@@ -47,7 +47,8 @@ async function nextFrame() {
 test('reveals a synchronized focused cursor once when the keyboard obscures it', async () => {
   const visualViewport = viewport(800)
   const { element, textarea } = synchronizedTerminalInput()
-  const reveal = installTerminalViewportReveal({ element, textarea, visualViewport })
+  textarea.style.scrollMarginBlockEnd = '5px'
+  const reveal = installTerminalViewportReveal({ element, textarea, visualViewport, getLineHeight: () => 14 })
 
   textarea.focus()
   await nextFrame()
@@ -58,17 +59,19 @@ test('reveals a synchronized focused cursor once when the keyboard obscures it',
   await nextFrame()
   expect(textarea.scrollIntoView).toHaveBeenCalledOnce()
   expect(textarea.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
+  expect(textarea.style.scrollMarginBlockEnd).toBe('42px')
 
   visualViewport.dispatchEvent(new Event('scroll'))
   await nextFrame()
   expect(textarea.scrollIntoView).toHaveBeenCalledOnce()
   reveal.dispose()
+  expect(textarea.style.scrollMarginBlockEnd).toBe('5px')
 })
 
 test('rearms the reveal when an already focused terminal is pressed again', async () => {
   const visualViewport = viewport(500)
   const { element, textarea } = synchronizedTerminalInput()
-  const reveal = installTerminalViewportReveal({ element, textarea, visualViewport })
+  const reveal = installTerminalViewportReveal({ element, textarea, visualViewport, getLineHeight: () => 14 })
 
   textarea.focus()
   await nextFrame()
@@ -88,10 +91,24 @@ test('rearms the reveal when an already focused terminal is pressed again', asyn
   reveal.dispose()
 })
 
+test('reveals footer rows when the cursor itself is already visible', async () => {
+  const visualViewport = viewport(500)
+  const { element, textarea } = synchronizedTerminalInput()
+  vi.mocked(textarea.getBoundingClientRect).mockReturnValue(rect(100, 460, 10, 20))
+  const reveal = installTerminalViewportReveal({ element, textarea, visualViewport, getLineHeight: () => 14 })
+
+  textarea.focus()
+  await nextFrame()
+
+  expect(textarea.scrollIntoView).toHaveBeenCalledOnce()
+  expect(textarea.style.scrollMarginBlockEnd).toBe('42px')
+  reveal.dispose()
+})
+
 test('does not reveal on an unobscured viewport or before xterm synchronizes the textarea', async () => {
   const visualViewport = viewport(800)
   const { element, textarea } = synchronizedTerminalInput()
-  const reveal = installTerminalViewportReveal({ element, textarea, visualViewport })
+  const reveal = installTerminalViewportReveal({ element, textarea, visualViewport, getLineHeight: () => 14 })
 
   textarea.focus()
   await nextFrame()

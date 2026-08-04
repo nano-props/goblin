@@ -317,14 +317,7 @@ export class TerminalSessionView {
       installTerminalTouchScroll({
         element,
         shouldHandle: () => term.buffer.active.type === 'normal' && term.modes.mouseTrackingMode === 'none',
-        getLineHeight: () => {
-          // xterm does not expose rendered cell height through its public API. Use the fitted host as a stable
-          // approximation for touch sensitivity instead of depending on private `.xterm-screen` DOM structure.
-          const measuredLineHeight = this.xtermHost.getBoundingClientRect().height / term.rows
-          const fallbackLineHeight =
-            (term.options.fontSize ?? TERMINAL_FONT_SIZE) * (term.options.lineHeight ?? TERMINAL_LINE_HEIGHT)
-          return measuredLineHeight > 0 ? measuredLineHeight : fallbackLineHeight
-        },
+        getLineHeight: () => this.terminalLineHeight(term),
         scrollLines: (lines) => term.scrollLines(lines),
       }),
     )
@@ -335,7 +328,23 @@ export class TerminalSessionView {
     const textarea = term.textarea
     const visualViewport = this.frame.ownerDocument.defaultView?.visualViewport
     if (!element || !textarea || !visualViewport) return
-    this.disposables.push(installTerminalViewportReveal({ element, textarea, visualViewport }))
+    this.disposables.push(
+      installTerminalViewportReveal({
+        element,
+        textarea,
+        visualViewport,
+        getLineHeight: () => this.terminalLineHeight(term),
+      }),
+    )
+  }
+
+  private terminalLineHeight(term: XTermTerminal): number {
+    // xterm does not expose rendered cell height through its public API. Use the fitted host as a stable
+    // approximation for touch sensitivity and reveal spacing instead of depending on private DOM structure.
+    const measuredLineHeight = this.xtermHost.getBoundingClientRect().height / term.rows
+    const fallbackLineHeight =
+      (term.options.fontSize ?? TERMINAL_FONT_SIZE) * (term.options.lineHeight ?? TERMINAL_LINE_HEIGHT)
+    return measuredLineHeight > 0 ? measuredLineHeight : fallbackLineHeight
   }
 
   private installOptionalAddons(term: XTermTerminal): void {
