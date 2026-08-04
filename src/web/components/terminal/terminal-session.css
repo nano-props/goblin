@@ -333,11 +333,22 @@
   display: none;
 }
 
+.goblin-terminal-composer__terminal-bottom-marker {
+  position: absolute;
+  right: 0;
+  /* Cancel the parent offset so page reveal always targets the terminal's logical bottom. */
+  bottom: calc(-1 * var(--goblin-terminal-composer-keyboard-offset));
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  scroll-margin-block-end: var(--goblin-terminal-float-offset);
+}
+
 .goblin-terminal-composer--floating {
   position: absolute;
   right: var(--goblin-terminal-float-offset);
   bottom: calc(var(--goblin-terminal-float-offset) + var(--goblin-terminal-composer-keyboard-offset));
-  scroll-margin-block-end: var(--goblin-terminal-float-offset);
   z-index: 2;
 }
 
