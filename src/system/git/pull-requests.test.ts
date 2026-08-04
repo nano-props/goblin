@@ -328,18 +328,10 @@ describe('getBranchPullRequests request coordination', () => {
     const summary = await getBranchPullRequests(repo, undefined, { mode: 'summary' })
     expect(summary?.get('cached')?.number).toBe(3)
 
-    // Spy on the pino child logger so the test exercises the real
-    // production warn path (and the defensive `try { ... } catch {}`
-    // around it). After the migration a
-    // `console.warn` spy would never observe calls.
-    vi.spyOn(pullRequestsNodeLog, 'warn').mockImplementation(() => {
-      throw new Error('logger unavailable')
-    })
     execaMock.mockRejectedValueOnce(Object.assign(new Error('server down'), { stderr: 'gh: server down (HTTP 500)' }))
     await expect(getBranchPullRequests(repo, undefined, { mode: 'full' })).rejects.toThrow(
       'GoblinPullRequests failed on github.com: HTTP_ERROR HTTP 500 (retryable) - gh: server down (HTTP 500)',
     )
-    vi.mocked(pullRequestsNodeLog.warn).mockRestore()
     const cached = await getBranchPullRequests(repo, undefined, { mode: 'summary' })
 
     expect(cached?.get('cached')?.number).toBe(3)

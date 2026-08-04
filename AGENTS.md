@@ -66,6 +66,9 @@
   risk: likelihood, severity, data integrity, and whether the user can retry
   immediately. Missing frequency data does not make a reproducible defect
   harmless.
+- Do not add second-stage handling for translation, Toast, or logger failures.
+  Avoid nested catches, retries, and dedicated tests unless a concrete resource
+  ownership, data integrity, or safety invariant requires them.
 - Passive ordering, focus, selection, animation, or navigation effects that do
   not complete an accepted user action may be best-effort only when
   authoritative state is preserved and correction is immediate. Evaluate

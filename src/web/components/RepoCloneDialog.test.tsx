@@ -17,7 +17,6 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 const mocks = vi.hoisted(() => ({
-  loggerWarn: vi.fn(),
   t: vi.fn((key: string) => key),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
@@ -28,10 +27,6 @@ const CLONED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/cloned-repo')
 
 vi.mock('#/web/stores/i18n.ts', () => ({
   useT: () => mocks.t,
-}))
-
-vi.mock('#/web/logger.ts', () => ({
-  sessionLog: { warn: mocks.loggerWarn },
 }))
 
 vi.mock('sonner', () => ({
@@ -55,7 +50,6 @@ const fetchMock = mockFetch(async (input: RequestInfo | URL) => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.loggerWarn.mockImplementation(() => {})
   mocks.t.mockImplementation((key: string) => key)
   mocks.toastError.mockImplementation(() => {})
   resetWorkspacesStore()
@@ -203,63 +197,11 @@ describe('RepoCloneDialog', () => {
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
     expect(activateWorkspace).not.toHaveBeenCalled()
+    expect(mocks.toastError).toHaveBeenCalledOnce()
     expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-follow-up-failed', {
       description: `/tmp/cloned-repo\n${message}`,
     })
     expect(mocks.toastSuccess).not.toHaveBeenCalled()
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-  })
-
-  test('preserves a definite workspace-open failure when translating its message throws', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({
-      ok: false as const,
-      message: 'error.workspace-open-failed',
-    }))
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
-    mocks.t.mockImplementation((key: string) => {
-      if (key === 'error.workspace-open-failed') throw new Error('translation crashed')
-      return key
-    })
-    const onOpenChange = vi.fn()
-
-    renderRepoCloneDialog(vi.fn(), onOpenChange)
-
-    submitClone()
-    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
-
-    expect(mocks.loggerWarn).toHaveBeenCalledWith(
-      'failed to open cloned workspace automatically',
-      expect.objectContaining({ path: '/tmp/cloned-repo' }),
-    )
-    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-follow-up-failed', {
-      description: '/tmp/cloned-repo\ntranslation crashed',
-    })
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-  })
-
-  test('preserves clone success when failure presentation throws', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({
-      ok: false as const,
-      message: 'error.workspace-open-failed',
-    }))
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
-    mocks.toastError.mockImplementation(() => {
-      throw new Error('toast crashed')
-    })
-    const onOpenChange = vi.fn()
-
-    renderRepoCloneDialog(vi.fn(), onOpenChange)
-
-    submitClone()
-    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
-
-    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-follow-up-failed', {
-      description: '/tmp/cloned-repo\nerror.workspace-open-failed',
-    })
-    expect(mocks.loggerWarn).toHaveBeenCalledWith(
-      'failed to report automatic cloned-workspace opening failure',
-      expect.objectContaining({ path: '/tmp/cloned-repo' }),
-    )
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 

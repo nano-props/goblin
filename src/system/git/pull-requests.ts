@@ -324,9 +324,7 @@ function logGraphqlError(error: GraphqlRequestError): void {
   const lastLoggedAt = loggedGraphqlErrors.get(key) ?? 0
   if (Date.now() - lastLoggedAt < PULL_REQUEST_CACHE_TTL_MS) return
   loggedGraphqlErrors.set(key, Date.now())
-  try {
-    pullRequestsNodeLog.warn(formatGraphqlError(error))
-  } catch {}
+  pullRequestsNodeLog.warn(formatGraphqlError(error))
 }
 
 async function queryRepoPullRequests(
