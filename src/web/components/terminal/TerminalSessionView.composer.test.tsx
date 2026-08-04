@@ -27,7 +27,7 @@ function openComposerInput(container: HTMLElement) {
 }
 
 describe('TerminalSessionView composer', () => {
-  test('reveals the input once when the keyboard opens after the first programmatic focus', async () => {
+  test('reveals the complete Composer once when the keyboard opens after the first programmatic focus', async () => {
     const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
     const visualViewport = new EventTarget()
     Object.defineProperties(visualViewport, {
@@ -54,7 +54,7 @@ describe('TerminalSessionView composer', () => {
         toJSON: () => ({}),
       })
       const scrollIntoView = vi.fn()
-      input.scrollIntoView = scrollIntoView
+      composer.scrollIntoView = scrollIntoView
 
       act(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
       expect(document.activeElement).toBe(input)

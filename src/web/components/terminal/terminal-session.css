@@ -337,6 +337,7 @@
   position: absolute;
   right: var(--goblin-terminal-float-offset);
   bottom: calc(var(--goblin-terminal-float-offset) + var(--goblin-terminal-composer-keyboard-offset));
+  scroll-margin-block-end: var(--goblin-terminal-float-offset);
   z-index: 2;
 }
 

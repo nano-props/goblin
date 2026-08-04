@@ -278,7 +278,8 @@ export function TerminalComposer({
         input === input.ownerDocument.activeElement
       ) {
         pendingViewportRevealRef.current = false
-        input.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
+        // The input owns focus, but the complete Composer surface is the page-reveal boundary.
+        composer.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
       }
       const nextOffset = Math.round(obscuredHeight)
       composer.style.setProperty('--goblin-terminal-composer-keyboard-offset', `${nextOffset}px`)
