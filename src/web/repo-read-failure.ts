@@ -5,21 +5,18 @@ export interface RepoReadFailure {
   retry?: () => void
 }
 
-interface RepoReadFailureSource {
+interface RepoQueryReadFailureSource {
   isError: boolean
   error: unknown
   isFetching: boolean
+  data: unknown
 }
 
-export function repoReadFailure(
-  source: RepoReadFailureSource,
-  stale: boolean,
-  retry?: () => void,
-): RepoReadFailure | null {
+export function repoQueryReadFailure(source: RepoQueryReadFailureSource, retry?: () => void): RepoReadFailure | null {
   if (!source.isError) return null
   return {
     messageKey: source.error instanceof Error ? source.error.message : String(source.error || 'error.failed-read-repo'),
-    stale,
+    stale: source.data !== undefined,
     retrying: source.isFetching,
     retry,
   }

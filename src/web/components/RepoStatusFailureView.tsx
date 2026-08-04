@@ -9,9 +9,10 @@ export function RepoReadNotice({ failures }: { failures: RepoReadFailure[] }) {
   if (failures.length === 0) return null
   const messageKeys = new Set(failures.map(({ messageKey }) => messageKey))
   const messageKey = messageKeys.size === 1 ? failures[0]!.messageKey : 'error.failed-read-repo'
-  const retrying = failures.some((failure) => failure.retrying)
-  const retries = failures.flatMap(({ retry }) => (retry ? [retry] : []))
-  const onRetry = retries.length > 0 ? () => retries.forEach((retry) => retry()) : undefined
+  const hasRetry = failures.some(({ retry }) => retry !== undefined)
+  const idleRetries = failures.flatMap(({ retry, retrying }) => (retry && !retrying ? [retry] : []))
+  const retrying = hasRetry && idleRetries.length === 0
+  const onRetry = hasRetry ? () => idleRetries.forEach((retry) => retry()) : undefined
   return failures.every((failure) => failure.stale) ? (
     <RepoStatusStaleNotice messageKey={messageKey} retrying={retrying} onRetry={onRetry} />
   ) : (

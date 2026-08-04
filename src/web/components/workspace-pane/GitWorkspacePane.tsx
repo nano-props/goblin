@@ -8,7 +8,7 @@ import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWork
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
-import { repoReadFailure, repoReadFailures, type RepoReadFailure } from '#/web/repo-read-failure.ts'
+import { repoQueryReadFailure, repoReadFailures, type RepoReadFailure } from '#/web/repo-read-failure.ts'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
 import type {
   GitWorkspacePaneShell,
@@ -115,7 +115,7 @@ export function GitWorkspacePane({
     },
   }
   const snapshotReadFailures = repoReadFailures(
-    repoReadFailure(snapshotReadModel, true, () => void snapshotReadModel.refetch()),
+    repoQueryReadFailure(snapshotReadModel, () => void snapshotReadModel.refetch()),
   )
 
   return (

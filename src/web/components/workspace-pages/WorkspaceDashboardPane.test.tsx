@@ -21,6 +21,7 @@ import type * as RepoClient from '#/web/repo-client.ts'
 const repoClientMocks = vi.hoisted(() => ({
   getRepoSnapshot: vi.fn(),
   getRepoWorktreeStatus: vi.fn(),
+  getRepoPullRequests: vi.fn(),
 }))
 
 vi.mock('#/web/repo-client.ts', async (importOriginal) => {
@@ -29,6 +30,7 @@ vi.mock('#/web/repo-client.ts', async (importOriginal) => {
     ...actual,
     getRepoSnapshot: repoClientMocks.getRepoSnapshot,
     getRepoWorktreeStatus: repoClientMocks.getRepoWorktreeStatus,
+    getRepoPullRequests: repoClientMocks.getRepoPullRequests,
   }
 })
 
@@ -39,11 +41,13 @@ beforeEach(() => {
   resetWorkspacesStore()
   repoClientMocks.getRepoWorktreeStatus.mockReset()
   repoClientMocks.getRepoSnapshot.mockReset()
+  repoClientMocks.getRepoPullRequests.mockReset()
   repoClientMocks.getRepoWorktreeStatus.mockImplementation(async (_workspaceId, workspaceRuntimeId) => ({
     workspaceRuntimeId,
     status: [],
     loadedAt: 1,
   }))
+  repoClientMocks.getRepoPullRequests.mockResolvedValue({ pullRequests: [] })
 })
 
 afterEach(() => {
@@ -134,8 +138,9 @@ describe('WorkspaceDashboardPane', () => {
       </QueryClientProvider>,
     )
 
-    await vi.waitFor(() => expect(container.textContent).toContain('status.stale-title'))
-    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1)
+    await vi.waitFor(() => expect(container.textContent).toContain('status failed'))
+    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(container.textContent).not.toContain('status.stale-title')
     expect(container.textContent).toContain('error.try-again')
     expect(container.textContent).not.toContain('dashboard.loading')
     expect(container.textContent).toContain('dashboard.metric.branches')
@@ -157,6 +162,29 @@ describe('WorkspaceDashboardPane', () => {
     await vi.waitFor(() => expect(container.textContent).toContain('snapshot failed'))
     expect(container.textContent).toContain('error.try-again')
     expect(container.textContent).not.toContain('dashboard.loading')
+  })
+
+  test('does not describe an initial pull request failure as stale snapshot data', async () => {
+    const workspace = seedRepoWithReadModelForTest({
+      id: WORKSPACE_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    appQueryClient.removeQueries({
+      queryKey: repoPullRequestsQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, { kind: 'repository-summary' }),
+    })
+    repoClientMocks.getRepoPullRequests.mockRejectedValue(new Error('pull requests failed'))
+
+    const { container } = renderInJsdom(
+      <QueryClientProvider client={appQueryClient}>
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
+      </QueryClientProvider>,
+    )
+
+    await vi.waitFor(() => expect(container.textContent).toContain('pull requests failed'))
+    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    expect(container.textContent).not.toContain('status.stale-title')
+    expect(container.textContent).toContain('dashboard.metric.branches')
   })
 
   test('keeps accepted dashboard data visible with a stale warning after status refresh fails', async () => {

@@ -17,7 +17,7 @@ import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import { RepoReadNotice, RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
-import { repoReadFailure, repoReadFailures } from '#/web/repo-read-failure.ts'
+import { repoQueryReadFailure, repoReadFailures } from '#/web/repo-read-failure.ts'
 
 interface Props {
   repoId: WorkspaceId
@@ -97,8 +97,8 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
   if (!repo) return <BranchNavigatorSkeleton />
 
   const readFailures = repoReadFailures(
-    repoReadFailure(snapshotReadModel, true, () => void snapshotReadModel.refetch()),
-    repoReadFailure(statusReadModel, !!statusReadModel.data, retryStatus),
+    repoQueryReadFailure(snapshotReadModel, () => void snapshotReadModel.refetch()),
+    repoQueryReadFailure(statusReadModel, retryStatus),
   )
 
   return (

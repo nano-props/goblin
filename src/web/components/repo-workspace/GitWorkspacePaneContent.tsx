@@ -18,7 +18,7 @@ import {
 } from '#/web/workspace-pane/tab-providers.ts'
 import { renderGitWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 import { RepoReadNotice } from '#/web/components/RepoStatusFailureView.tsx'
-import { repoReadFailure, repoReadFailures, type RepoReadFailure } from '#/web/repo-read-failure.ts'
+import { repoReadFailures, type RepoReadFailure } from '#/web/repo-read-failure.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 
 interface Props {
@@ -50,15 +50,16 @@ export function GitWorkspacePaneContent({
   const { branch } = detail
   const selection = workspacePaneTabModel.selection
   const renderedTab = selection?.tab ?? null
-  const statusRead = {
-    isError: (renderedTab === 'status' || renderedTab === 'changes') && !!detail.errors.status,
-    error: detail.errors.status,
-    isFetching: detail.loading.status,
-  }
-  const visibleReadFailures = [
-    ...readFailures,
-    ...repoReadFailures(repoReadFailure(statusRead, detail.stale.status, onRetryStatus)),
-  ]
+  const statusFailure: RepoReadFailure | null =
+    (renderedTab === 'status' || renderedTab === 'changes') && detail.errors.status
+      ? {
+          messageKey: detail.errors.status,
+          stale: detail.stale.status,
+          retrying: detail.loading.status,
+          retry: onRetryStatus,
+        }
+      : null
+  const visibleReadFailures = repoReadFailures(...readFailures, statusFailure)
   const panelLabel = workspacePanePanelLabel({
     selection,
     tabs: workspacePaneTabModel.tabs,

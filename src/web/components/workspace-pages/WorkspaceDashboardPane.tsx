@@ -22,7 +22,7 @@ import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-stat
 import { DirectoryOverviewContent } from '#/web/components/workspace-pages/DirectoryOverviewContent.tsx'
 import { DASHBOARD_CARD_CLASS_NAME } from '#/web/components/workspace-pages/dashboard-ui.tsx'
 import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
-import { repoReadFailure, repoReadFailures } from '#/web/repo-read-failure.ts'
+import { repoQueryReadFailure, repoReadFailures } from '#/web/repo-read-failure.ts'
 import {
   DashboardAttention,
   DashboardHeader,
@@ -116,9 +116,9 @@ export function WorkspaceDashboardPane({
     void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, workspace.id, workspace.workspaceRuntimeId)
   }
   const readFailures = repoReadFailures(
-    repoReadFailure(snapshotReadModel, !!snapshot, () => void snapshotReadModel.refetch()),
-    repoReadFailure(statusReadModel, !!snapshot, retryStatus),
-    repoReadFailure(pullRequestsReadModel, !!snapshot, () => void pullRequestsReadModel.refetch()),
+    repoQueryReadFailure(snapshotReadModel, () => void snapshotReadModel.refetch()),
+    repoQueryReadFailure(statusReadModel, retryStatus),
+    repoQueryReadFailure(pullRequestsReadModel, () => void pullRequestsReadModel.refetch()),
   )
 
   return (
