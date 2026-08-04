@@ -105,12 +105,12 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
         abortController.signal,
       )
     } catch (err) {
-      if (dialogAbortRef.current !== abortController) return
+      if (abortController.signal.aborted) return
       setPending(false)
       setError(err instanceof Error ? err.message : t('error.unknown'))
       return
     }
-    if (dialogAbortRef.current !== abortController) return
+    if (abortController.signal.aborted) return
     if (result.ok) {
       setPending(false)
       onClose()
@@ -121,7 +121,7 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
     setError(t(errorMessageKey))
   }
 
-  async function handleCancel() {
+  function handleCancel() {
     const abortController = dialogAbortRef.current
     dialogAbortRef.current = null
     abortController?.abort()
@@ -133,7 +133,7 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
     <FormDialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && !pending) void handleCancel()
+        if (!nextOpen && !pending) handleCancel()
       }}
       showCloseButton={!pending}
       className="sm:max-w-xl"
