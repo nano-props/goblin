@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { act, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -71,6 +72,7 @@ afterEach(() => {
 
 describe('RepoCloneDialog', () => {
   test('forwards the exact clone payload and aborts the fetch when cancelled', async () => {
+    const user = userEvent.setup()
     let requestSignal: AbortSignal | undefined
     fetchMock.mockImplementationOnce((_url, init) => {
       requestSignal = (init as RequestInit | undefined)?.signal ?? undefined
@@ -100,7 +102,7 @@ describe('RepoCloneDialog', () => {
     })
     expect(requestSignal?.aborted).toBe(false)
 
-    clickButtonByText('dialog.cancel')
+    await user.click(screen.getByRole('button', { name: 'dialog.cancel' }))
 
     await waitFor(() => {
       expect(requestSignal?.aborted).toBe(true)
@@ -193,16 +195,6 @@ function setInputValue(selector: string, value: string) {
 
 function click(selector: string) {
   const element = button(selector)
-  act(() => {
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
-}
-
-function clickButtonByText(text: string) {
-  const element = [...document.body.querySelectorAll('button')].find(
-    (candidate) => candidate.textContent?.trim() === text,
-  )
-  if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing button text: ${text}`)
   act(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })

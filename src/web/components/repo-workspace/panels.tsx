@@ -39,7 +39,7 @@ export interface WorkspacePanePanelRenderInput {
   runtimeTabStateByType: WorkspacePaneRuntimeTabStateByType
 }
 
-interface WorkspacePanePanelProps extends Omit<WorkspacePanePanelRenderInput, 'type' | 'selection'> {}
+type WorkspacePanePanelProps = Pick<WorkspacePanePanelRenderInput, 'repo' | 'detail' | 'workspacePaneId' | 'panelLabel'>
 
 type GitWorkspacePaneBranch = NonNullable<CurrentGitWorkspacePanePresentation['branch']>
 type WorkspacePaneStaticPanelComponent = (props: WorkspacePanePanelProps) => ReactNode
@@ -52,9 +52,8 @@ const REPO_WORKSPACE_STATIC_PANEL_BY_TYPE: Record<WorkspacePaneStaticTabType, Wo
 }
 
 export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
-  const { type, selection, ...panelProps } = input
-  if (isWorkspacePaneRuntimeTabType(type)) {
-    const runtimeState = input.runtimeTabStateByType[type]
+  if (isWorkspacePaneRuntimeTabType(input.type)) {
+    const runtimeState = input.runtimeTabStateByType[input.type]
     const branch = input.detail.branch
     if (!branch?.worktree?.path) return null
     const branchName = branch.name
@@ -63,10 +62,10 @@ export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput
     const runtimeTarget = tabsTarget ? runtimeWorkspacePaneTarget(tabsTarget, input.repo.workspaceRuntimeId) : null
     if (!runtimeTarget || !worktreePath) return null
     return renderWorkspacePaneRuntimeTabPanel({
-      type,
+      type: input.type,
       workspacePaneId: input.workspacePaneId,
       panelLabel: input.panelLabel,
-      selectedSessionId: selectedRuntimeSessionId(selection, type),
+      selectedSessionId: selectedRuntimeSessionId(input.selection, input.type),
       target: {
         routeTarget: { kind: 'git-branch', workspaceId: input.repo.id, branchName },
         runtimeTarget,
@@ -78,8 +77,15 @@ export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput
       },
     })
   }
-  const Panel = REPO_WORKSPACE_STATIC_PANEL_BY_TYPE[type]
-  return <Panel {...panelProps} />
+  const Panel = REPO_WORKSPACE_STATIC_PANEL_BY_TYPE[input.type]
+  return (
+    <Panel
+      repo={input.repo}
+      detail={input.detail}
+      workspacePaneId={input.workspacePaneId}
+      panelLabel={input.panelLabel}
+    />
+  )
 }
 
 function selectedRuntimeSessionId(selection: WorkspacePaneSelection, type: WorkspacePaneTabType): string | null {
