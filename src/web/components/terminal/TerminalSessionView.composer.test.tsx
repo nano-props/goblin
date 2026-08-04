@@ -59,17 +59,6 @@ describe('TerminalSessionView composer', () => {
         y: 0,
         toJSON: () => ({}),
       })
-      vi.spyOn(composer, 'getBoundingClientRect').mockReturnValue({
-        bottom: 790,
-        height: 54,
-        left: 0,
-        right: 400,
-        top: 736,
-        width: 400,
-        x: 0,
-        y: 736,
-        toJSON: () => ({}),
-      })
       const offsetsAtReveal: string[] = []
       const scrollIntoView = vi.fn(() => {
         offsetsAtReveal.push(composer.style.getPropertyValue('--goblin-terminal-composer-keyboard-offset'))
@@ -89,7 +78,6 @@ describe('TerminalSessionView composer', () => {
       expect(scrollIntoView).toHaveBeenCalledTimes(2)
       expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
       expect(offsetsAtReveal[1]).not.toBe('300px')
-      expect(terminalBottomMarker.style.scrollMarginBlockStart).toBe('54px')
       expect(composer.scrollIntoView).not.toHaveBeenCalled()
 
       act(() => visualViewport.dispatchEvent(new Event('scroll')))

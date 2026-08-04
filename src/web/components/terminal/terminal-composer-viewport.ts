@@ -21,8 +21,7 @@ const SCROLL_INTO_VIEW_OPTIONS: ScrollIntoViewOptions = {
   behavior: 'auto',
 }
 
-function scrollTerminalBottomIntoView(marker: HTMLElement, composer: HTMLElement): void {
-  marker.style.scrollMarginBlockStart = `${Math.ceil(composer.getBoundingClientRect().height)}px`
+function scrollTerminalBottomIntoView(marker: HTMLElement): void {
   marker.scrollIntoView(SCROLL_INTO_VIEW_OPTIONS)
 }
 
@@ -36,7 +35,7 @@ export function installTerminalComposerViewport(
     options.composer.style.setProperty('--goblin-terminal-composer-keyboard-offset', `${Math.round(obscuredHeight)}px`)
   }
   const revealTerminalBottom = () => {
-    scrollTerminalBottomIntoView(options.terminalBottomMarker, options.composer)
+    scrollTerminalBottomIntoView(options.terminalBottomMarker)
     updateComposerPlacement()
   }
   const updateForViewportResize = () => {
