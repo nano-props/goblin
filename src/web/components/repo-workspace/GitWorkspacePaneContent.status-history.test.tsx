@@ -599,7 +599,7 @@ describe('GitWorkspacePaneContent status-history', () => {
             workspacePaneId="workspace"
             readFailures={[
               {
-                messageKey: 'snapshot failed',
+                message: 'snapshot failed',
                 stale: true,
                 retrying: false,
                 retry: onRetrySnapshot,

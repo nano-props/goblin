@@ -3,22 +3,6 @@ import { REPO_MEMBERSHIP_READ_CONFLICT_KEY } from '#/shared/repo-membership-read
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useT } from '#/web/stores/i18n.ts'
-import type { RepoReadFailure } from '#/web/repo-read-failure.ts'
-
-export function RepoReadNotice({ failures }: { failures: RepoReadFailure[] }) {
-  if (failures.length === 0) return null
-  const messageKeys = new Set(failures.map(({ messageKey }) => messageKey))
-  const messageKey = messageKeys.size === 1 ? failures[0]!.messageKey : 'error.failed-read-repo'
-  const hasRetry = failures.some(({ retry }) => retry !== undefined)
-  const idleRetries = failures.flatMap(({ retry, retrying }) => (retry && !retrying ? [retry] : []))
-  const retrying = hasRetry && idleRetries.length === 0
-  const onRetry = hasRetry ? () => idleRetries.forEach((retry) => retry()) : undefined
-  return failures.every((failure) => failure.stale) ? (
-    <RepoStatusStaleNotice messageKey={messageKey} retrying={retrying} onRetry={onRetry} />
-  ) : (
-    <RepoReadFailureNotice messageKey={messageKey} retrying={retrying} onRetry={onRetry} />
-  )
-}
 
 export function RepoStatusFailureView({
   messageKey,

@@ -16,7 +16,7 @@ import {
 } from '#/web/components/terminal/terminal-session-context.ts'
 import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoPullRequestsQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
   REPO_ID,
@@ -234,7 +234,7 @@ describe('WorkspacePane status presentation', () => {
     expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).not.toBeNull()
   })
 
-  test('keeps the last accepted status visible after a background refresh fails', () => {
+  test('keeps the last accepted status visible with one notice when snapshot and status refreshes fail', async () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-stale'
     const branch = createBranchSnapshot('feature/stale', {
       worktree: { path: worktreePath, isPrimary: false, isLocked: false },
@@ -260,7 +260,10 @@ describe('WorkspacePane status presentation', () => {
       queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
       exact: true,
     })!
-    statusQuery.setState({ ...statusQuery.state, status: 'error', error: new Error('status failed') })
+    const snapshotQuery = appQueryClient.getQueryCache().find({
+      queryKey: repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId),
+      exact: true,
+    })!
 
     render(
       <QueryClientProvider client={appQueryClient}>
@@ -278,9 +281,24 @@ describe('WorkspacePane status presentation', () => {
       </QueryClientProvider>,
     )
 
+    await Promise.all([
+      appQueryClient.cancelQueries({
+        queryKey: repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId),
+        exact: true,
+      }),
+      appQueryClient.cancelQueries({
+        queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
+        exact: true,
+      }),
+    ])
+    act(() => {
+      snapshotQuery.setState({ ...snapshotQuery.state, status: 'error', error: new Error('snapshot failed') })
+      statusQuery.setState({ ...statusQuery.state, status: 'error', error: new Error('status failed') })
+    })
+
     expect(screen.getByLabelText('changed.ts')).toBeTruthy()
-    expect(screen.getByText('status.stale-title')).toBeTruthy()
-    expect(screen.getByText(/status failed/)).toBeTruthy()
+    await vi.waitFor(() => expect(screen.getAllByText('status.stale-title')).toHaveLength(1))
+    expect(screen.getByText(/error.failed-read-repo/)).toBeTruthy()
   })
 
   test('uses the React Query snapshot for workspace branch presentation when available', () => {

@@ -8,7 +8,8 @@ import {
   createPullRequest,
 } from '#/web/test-utils/repo-store.ts'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { cleanup } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -209,6 +210,55 @@ describe('WorkspaceDashboardPane', () => {
     expect(container.querySelectorAll('[role="status"]')).toHaveLength(1)
     expect(container.textContent).toContain('error.try-again')
     expect(container.textContent).toContain('dashboard.metric.branches')
+  })
+
+  test('combines simultaneous stale reads and retries each idle query once', async () => {
+    const workspace = seedRepoWithReadModelForTest({
+      id: WORKSPACE_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    const pullRequestsQueryKey = repoPullRequestsQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, {
+      kind: 'repository-summary',
+    })
+    appQueryClient.setQueryData(pullRequestsQueryKey, { pullRequests: [] })
+    repoClientMocks.getRepoSnapshot.mockRejectedValue(new Error('snapshot failed'))
+    repoClientMocks.getRepoWorktreeStatus.mockRejectedValue(new Error('status failed'))
+    repoClientMocks.getRepoPullRequests.mockRejectedValue(new Error('pull requests failed'))
+    await Promise.all([
+      appQueryClient.invalidateQueries({
+        queryKey: repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
+        exact: true,
+        refetchType: 'none',
+      }),
+      appQueryClient.invalidateQueries({
+        queryKey: repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId),
+        exact: true,
+        refetchType: 'none',
+      }),
+      appQueryClient.invalidateQueries({ queryKey: pullRequestsQueryKey, exact: true, refetchType: 'none' }),
+    ])
+
+    const { container } = renderInJsdom(
+      <QueryClientProvider client={appQueryClient}>
+        <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
+      </QueryClientProvider>,
+    )
+
+    await vi.waitFor(() => {
+      expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledOnce()
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
+      expect(repoClientMocks.getRepoPullRequests).toHaveBeenCalledOnce()
+    })
+    await vi.waitFor(() => expect(container.querySelectorAll('[role="status"]')).toHaveLength(1))
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'error.try-again' }))
+    await vi.waitFor(() => {
+      expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledTimes(2)
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
+      expect(repoClientMocks.getRepoPullRequests).toHaveBeenCalledTimes(2)
+    })
   })
 
   test('hides the attention section when no branch needs attention', () => {

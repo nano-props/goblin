@@ -15,9 +15,10 @@ import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/w
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
-import { RepoReadNotice, RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoReadNotice } from '#/web/components/RepoReadNotice.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
-import { repoQueryReadFailure, repoReadFailures } from '#/web/repo-read-failure.ts'
+import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
 
 interface Props {
   repoId: WorkspaceId
@@ -96,10 +97,10 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
 
   if (!repo) return <BranchNavigatorSkeleton />
 
-  const readFailures = repoReadFailures(
+  const readFailures = [
     repoQueryReadFailure(snapshotReadModel, () => void snapshotReadModel.refetch()),
     repoQueryReadFailure(statusReadModel, retryStatus),
-  )
+  ].filter((failure) => failure !== null)
 
   return (
     <>

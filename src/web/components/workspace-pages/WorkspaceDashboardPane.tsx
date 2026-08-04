@@ -17,12 +17,13 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { RepoReadNotice, RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoReadNotice } from '#/web/components/RepoReadNotice.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { DirectoryOverviewContent } from '#/web/components/workspace-pages/DirectoryOverviewContent.tsx'
 import { DASHBOARD_CARD_CLASS_NAME } from '#/web/components/workspace-pages/dashboard-ui.tsx'
 import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
-import { repoQueryReadFailure, repoReadFailures } from '#/web/repo-read-failure.ts'
+import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
 import {
   DashboardAttention,
   DashboardHeader,
@@ -115,11 +116,11 @@ export function WorkspaceDashboardPane({
     if (!workspace) return
     void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, workspace.id, workspace.workspaceRuntimeId)
   }
-  const readFailures = repoReadFailures(
+  const readFailures = [
     repoQueryReadFailure(snapshotReadModel, () => void snapshotReadModel.refetch()),
     repoQueryReadFailure(statusReadModel, retryStatus),
     repoQueryReadFailure(pullRequestsReadModel, () => void pullRequestsReadModel.refetch()),
-  )
+  ].filter((failure) => failure !== null)
 
   return (
     <WorkspacePagePane
