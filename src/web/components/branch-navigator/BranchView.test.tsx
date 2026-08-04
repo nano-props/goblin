@@ -17,7 +17,7 @@ import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navi
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
-import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -271,6 +271,42 @@ describe('BranchView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'error.try-again' }))
     await vi.waitFor(() => expect(readStatus).toHaveBeenCalledTimes(2))
     await vi.waitFor(() => expect(screen.queryByText('status.stale-title')).toBeNull())
+  })
+
+  test('presents simultaneous snapshot and status failures as one retryable notice', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+    const readSnapshot = vi.fn(async () => {
+      throw new Error('snapshot failed')
+    })
+    const readStatus = vi.fn(async () => {
+      throw new Error('status failed')
+    })
+    installGoblinTestBridge({
+      'repo.snapshot': readSnapshot,
+      'repo.worktreeStatus': readStatus,
+    })
+    await appQueryClient.invalidateQueries({
+      queryKey: repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId),
+      exact: true,
+      refetchType: 'none',
+    })
+
+    renderBranchView()
+
+    await vi.waitFor(() => {
+      expect(readSnapshot).toHaveBeenCalledOnce()
+      expect(readStatus).toHaveBeenCalledOnce()
+    })
+    expect(await screen.findAllByText('status.stale-title')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'error.try-again' }))
+    await vi.waitFor(() => {
+      expect(readSnapshot).toHaveBeenCalledTimes(2)
+      expect(readStatus).toHaveBeenCalledTimes(2)
+    })
   })
 
   test('keeps the last accepted projection with a neutral retry while worktree membership changes', async () => {

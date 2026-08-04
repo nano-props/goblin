@@ -15,12 +15,9 @@ import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/w
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
-import {
-  RepoReadFailureNotice,
-  RepoStatusFailureView,
-  RepoStatusStaleNotice,
-} from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoReadNotice, RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
+import { repoReadFailure, repoReadFailures } from '#/web/repo-read-failure.ts'
 
 interface Props {
   repoId: WorkspaceId
@@ -99,30 +96,14 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
 
   if (!repo) return <BranchNavigatorSkeleton />
 
+  const readFailures = repoReadFailures(
+    repoReadFailure(snapshotReadModel, true, () => void snapshotReadModel.refetch()),
+    repoReadFailure(statusReadModel, !!statusReadModel.data, retryStatus),
+  )
+
   return (
     <>
-      {snapshotReadModel.isError && snapshotErrorKey && (
-        <RepoStatusStaleNotice
-          messageKey={snapshotErrorKey}
-          retrying={snapshotReadModel.isFetching}
-          onRetry={() => void snapshotReadModel.refetch()}
-        />
-      )}
-      {statusReadModel.isError &&
-        statusErrorKey &&
-        (statusReadModel.data ? (
-          <RepoStatusStaleNotice
-            messageKey={statusErrorKey}
-            retrying={statusReadModel.isFetching}
-            onRetry={retryStatus}
-          />
-        ) : (
-          <RepoReadFailureNotice
-            messageKey={statusErrorKey}
-            retrying={statusReadModel.isFetching}
-            onRetry={retryStatus}
-          />
-        ))}
+      <RepoReadNotice failures={readFailures} />
       <BranchList
         repo={repo}
         branches={branches}

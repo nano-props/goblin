@@ -17,7 +17,8 @@ import {
   type WorkspacePanePanelLabel,
 } from '#/web/workspace-pane/tab-providers.ts'
 import { renderGitWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
-import { RepoReadFailureNotice, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoReadNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import { repoReadFailure, repoReadFailures, type RepoReadFailure } from '#/web/repo-read-failure.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 
 interface Props {
@@ -25,6 +26,7 @@ interface Props {
   detail: CurrentGitWorkspacePanePresentation
   workspacePaneId: string
   workspacePaneTabModel: WorkspacePaneTabModel
+  readFailures?: RepoReadFailure[]
   onRetryStatus?: () => void
   onBackToBranchNavigator?: () => void
 }
@@ -39,6 +41,7 @@ export function GitWorkspacePaneContent({
   detail,
   workspacePaneId,
   workspacePaneTabModel,
+  readFailures = [],
   onRetryStatus,
   onBackToBranchNavigator,
 }: Props) {
@@ -47,6 +50,15 @@ export function GitWorkspacePaneContent({
   const { branch } = detail
   const selection = workspacePaneTabModel.selection
   const renderedTab = selection?.tab ?? null
+  const statusRead = {
+    isError: (renderedTab === 'status' || renderedTab === 'changes') && !!detail.errors.status,
+    error: detail.errors.status,
+    isFetching: detail.loading.status,
+  }
+  const visibleReadFailures = [
+    ...readFailures,
+    ...repoReadFailures(repoReadFailure(statusRead, detail.stale.status, onRetryStatus)),
+  ]
   const panelLabel = workspacePanePanelLabel({
     selection,
     tabs: workspacePaneTabModel.tabs,
@@ -58,22 +70,26 @@ export function GitWorkspacePaneContent({
   if (!branch) {
     const missingRoutedBranch = repo.ui.currentBranchName !== null
     return (
-      <EmptyState
-        title={t(missingRoutedBranch ? 'branches.missing' : 'branches.empty')}
-        body={
-          compact && missingRoutedBranch && onBackToBranchNavigator ? (
-            <Button type="button" variant="outline" size="sm" onClick={onBackToBranchNavigator}>
-              {t('branches.back-to-list')}
-            </Button>
-          ) : undefined
-        }
-      />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <RepoReadNotice failures={visibleReadFailures} />
+        <EmptyState
+          title={t(missingRoutedBranch ? 'branches.missing' : 'branches.empty')}
+          body={
+            compact && missingRoutedBranch && onBackToBranchNavigator ? (
+              <Button type="button" variant="outline" size="sm" onClick={onBackToBranchNavigator}>
+                {t('branches.back-to-list')}
+              </Button>
+            ) : undefined
+          }
+        />
+      </div>
     )
   }
 
   if (!selection) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
+        <RepoReadNotice failures={visibleReadFailures} />
         <EmptyState title={t('workspace-pane-tabs.empty')} />
       </div>
     )
@@ -81,21 +97,7 @@ export function GitWorkspacePaneContent({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {(renderedTab === 'status' || renderedTab === 'changes') &&
-        detail.errors.status &&
-        (detail.stale.status ? (
-          <RepoStatusStaleNotice
-            messageKey={detail.errors.status}
-            retrying={detail.loading.status}
-            onRetry={onRetryStatus}
-          />
-        ) : (
-          <RepoReadFailureNotice
-            messageKey={detail.errors.status}
-            retrying={detail.loading.status}
-            onRetry={onRetryStatus}
-          />
-        ))}
+      <RepoReadNotice failures={visibleReadFailures} />
       {renderedTab
         ? renderGitWorkspacePanePanel({
             type: renderedTab,

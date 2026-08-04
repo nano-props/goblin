@@ -134,7 +134,8 @@ describe('WorkspaceDashboardPane', () => {
       </QueryClientProvider>,
     )
 
-    await vi.waitFor(() => expect(container.textContent).toContain('status failed'))
+    await vi.waitFor(() => expect(container.textContent).toContain('status.stale-title'))
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1)
     expect(container.textContent).toContain('error.try-again')
     expect(container.textContent).not.toContain('dashboard.loading')
     expect(container.textContent).toContain('dashboard.metric.branches')
@@ -177,6 +178,7 @@ describe('WorkspaceDashboardPane', () => {
 
     await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
     await vi.waitFor(() => expect(container.textContent).toContain('status.stale-title'))
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1)
     expect(container.textContent).toContain('error.try-again')
     expect(container.textContent).toContain('dashboard.metric.branches')
   })
