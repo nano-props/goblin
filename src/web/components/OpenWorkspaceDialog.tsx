@@ -86,7 +86,8 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
         onClose()
         return
       }
-      setError(t(result.value.message))
+      const messageKey = result.value.message
+      setError(t(messageKey))
     } catch (err) {
       if (signal.aborted) return
       setError(err instanceof Error ? err.message : t('error.unknown'))

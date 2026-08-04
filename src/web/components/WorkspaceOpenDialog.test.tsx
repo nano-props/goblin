@@ -14,12 +14,21 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 
+const mocks = vi.hoisted(() => ({
+  toastError: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { error: mocks.toastError },
+}))
+
 const testWindow = window as unknown as {
   goblinNative?: unknown
   __GOBLIN_BOOTSTRAP__?: unknown
 }
 
 beforeEach(() => {
+  vi.clearAllMocks()
   resetWorkspacesStore()
   setClientBridgeForTests(null)
   // The bootstrap is the source of truth for the tiny client
@@ -121,6 +130,34 @@ describe('WorkspaceOpenDialog', () => {
     expect(ensureWorkspaceOpen).toHaveBeenCalledTimes(1)
     expect(activateWorkspace).not.toHaveBeenCalled()
     expect(onOpenChange).not.toHaveBeenCalled()
+  })
+
+  test('keeps workspace-open success when activation presentation fails', async () => {
+    const ensureWorkspaceOpen = vi.fn(async () => ({
+      ok: true as const,
+      workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
+    }))
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    const activateWorkspace = vi.fn(() => {
+      throw new Error('workspace activation crashed')
+    })
+    const onOpenChange = vi.fn()
+
+    renderInJsdom(
+      <AppNavigationProvider value={navigationWith({ activateWorkspace })}>
+        <WorkspaceOpenDialog open onOpenChange={onOpenChange} />
+      </AppNavigationProvider>,
+    )
+
+    setInputValue('#open-workspace-path', '~/Developer/repo')
+    click('button[type="submit"]')
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+
+    expect(ensureWorkspaceOpen).toHaveBeenCalledOnce()
+    expect(activateWorkspace).toHaveBeenCalledOnce()
+    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.open-presentation-failed', {
+      description: 'workspace activation crashed',
+    })
   })
 })
 

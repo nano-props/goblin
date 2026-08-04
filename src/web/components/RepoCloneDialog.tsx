@@ -20,7 +20,7 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
 
   function reportAutomaticOpenFailure(path: string, message: string) {
     try {
-      toast.error(t('workspace-picker.clone-auto-open-failed'), {
+      toast.error(t('workspace-picker.clone-follow-up-failed'), {
         description: `${path}\n${message}`,
       })
     } catch (err) {
@@ -28,8 +28,9 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
     }
   }
 
-  async function openClonedWorkspace(path: string): Promise<void> {
+  async function openClonedWorkspace(path: string, signal: AbortSignal): Promise<void> {
     const openResult = await ensureWorkspaceOpen(path)
+    if (signal.aborted) return
     if (!openResult.ok) {
       const messageKey = openResult.message
       reportAutomaticOpenFailure(path, t(messageKey))
@@ -44,11 +45,14 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
     const result = await runCloneRepository(input, { signal })
     if (!result.ok || !result.path || signal.aborted) return result
     const path = result.path
-    void openClonedWorkspace(path).catch((err) => {
+    try {
+      await openClonedWorkspace(path, signal)
+    } catch (err) {
+      if (signal.aborted) return result
       const message = err instanceof Error ? err.message : t('error.unknown')
       sessionLog.warn('failed to open cloned workspace automatically', { path, err })
       reportAutomaticOpenFailure(path, message)
-    })
+    }
     return result
   }
 
