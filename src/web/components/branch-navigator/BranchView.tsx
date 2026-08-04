@@ -74,8 +74,6 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
     : 'branches.empty'
 
   const highlightedBranch = currentBranchName ?? null
-  const statusError = statusReadModel.error
-  const statusErrorKey = statusError instanceof Error ? statusError.message : statusError ? String(statusError) : null
   const retryStatus = () => {
     if (!workspaceRuntimeId) return
     void refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, repoId, workspaceRuntimeId)
