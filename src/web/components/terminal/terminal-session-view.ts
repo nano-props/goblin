@@ -316,6 +316,8 @@ export class TerminalSessionView {
         element,
         shouldHandle: () => term.buffer.active.type === 'normal' && term.modes.mouseTrackingMode === 'none',
         getLineHeight: () => {
+          // xterm does not expose rendered cell height through its public API. Use the fitted host as a stable
+          // approximation for touch sensitivity instead of depending on private `.xterm-screen` DOM structure.
           const measuredLineHeight = this.xtermHost.getBoundingClientRect().height / term.rows
           const fallbackLineHeight =
             (term.options.fontSize ?? TERMINAL_FONT_SIZE) * (term.options.lineHeight ?? TERMINAL_LINE_HEIGHT)
