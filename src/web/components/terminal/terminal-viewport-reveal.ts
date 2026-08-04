@@ -17,7 +17,7 @@ interface TerminalInputBufferPosition {
   readonly viewportY: number
 }
 
-const TERMINAL_VIEWPORT_REVEAL_BOTTOM_ROWS = 3
+const TERMINAL_VIEWPORT_REVEAL_BOTTOM_ROWS = 4
 const SCROLL_INTO_VIEW_OPTIONS: ScrollIntoViewOptions = {
   block: 'nearest',
   inline: 'nearest',

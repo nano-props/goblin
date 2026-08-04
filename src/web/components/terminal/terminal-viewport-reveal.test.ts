@@ -106,7 +106,7 @@ test('reveals the current focused cursor once when the keyboard obscures the ter
   expect(marker.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
   expect(marker.style.top).toBe('280px')
   expect(marker.style.height).toBe('14px')
-  expect(marker.style.scrollMarginBlockEnd).toBe('42px')
+  expect(marker.style.scrollMarginBlockEnd).toBe('56px')
 
   visualViewport.dispatchEvent(new Event('scroll'))
   await nextFrame()
@@ -300,7 +300,7 @@ test('reveals the bottom-page cursor position while normal scrollback is visible
 
   expect(marker.scrollIntoView).toHaveBeenCalledOnce()
   expect(marker.style.top).toBe('70px')
-  expect(marker.style.scrollMarginBlockEnd).toBe('42px')
+  expect(marker.style.scrollMarginBlockEnd).toBe('56px')
   reveal.dispose()
 })
 
