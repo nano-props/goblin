@@ -29,6 +29,21 @@ function viewport(height: number): VisualViewport {
   return target as VisualViewport
 }
 
+function cursorMoveSource() {
+  let listener: (() => void) | null = null
+  return {
+    onCursorMove: (next: () => void) => {
+      listener = next
+      return {
+        dispose: () => {
+          if (listener === next) listener = null
+        },
+      }
+    },
+    emit: () => listener?.(),
+  }
+}
+
 function terminalInput() {
   const element = document.createElement('div')
   const textarea = document.createElement('textarea')
@@ -55,12 +70,14 @@ afterEach(() => {
 
 test('reveals the current focused cursor once when the keyboard obscures the terminal', async () => {
   const visualViewport = viewport(800)
+  const cursorMoves = cursorMoveSource()
   const { element, textarea } = terminalInput()
   let cursorRow = 12
   const reveal = installTerminalViewportReveal({
     element,
     textarea,
     visualViewport,
+    onCursorMove: cursorMoves.onCursorMove,
     getLineHeight: () => 14,
     getCursorRow: () => cursorRow,
   })
@@ -86,13 +103,15 @@ test('reveals the current focused cursor once when the keyboard obscures the ter
   reveal.dispose()
 })
 
-test('rearms the reveal when an already focused terminal is pressed again', async () => {
+test('reveals an already focused terminal when pressed before or after the keyboard opens', async () => {
   const visualViewport = viewport(500)
+  const cursorMoves = cursorMoveSource()
   const { element, textarea } = terminalInput()
   const reveal = installTerminalViewportReveal({
     element,
     textarea,
     visualViewport,
+    onCursorMove: cursorMoves.onCursorMove,
     getLineHeight: () => 14,
     getCursorRow: () => 20,
   })
@@ -102,14 +121,94 @@ test('rearms the reveal when an already focused terminal is pressed again', asyn
   await nextFrame()
   expect(marker.scrollIntoView).toHaveBeenCalledOnce()
 
+  element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+  await nextFrame()
+  expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
+
   Object.defineProperty(visualViewport, 'height', { configurable: true, value: 800 })
   visualViewport.dispatchEvent(new Event('resize'))
   await nextFrame()
   element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
   await nextFrame()
-  expect(marker.scrollIntoView).toHaveBeenCalledOnce()
+  expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
 
   Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
+  visualViewport.dispatchEvent(new Event('resize'))
+  await nextFrame()
+  expect(marker.scrollIntoView).toHaveBeenCalledTimes(3)
+  reveal.dispose()
+})
+
+test('reveals a moved cursor while the keyboard remains open', async () => {
+  const visualViewport = viewport(500)
+  const cursorMoves = cursorMoveSource()
+  const { element, textarea } = terminalInput()
+  let cursorRow = 20
+  const reveal = installTerminalViewportReveal({
+    element,
+    textarea,
+    visualViewport,
+    onCursorMove: cursorMoves.onCursorMove,
+    getLineHeight: () => 14,
+    getCursorRow: () => cursorRow,
+  })
+  const marker = revealMarker(element)
+
+  textarea.focus()
+  await nextFrame()
+  expect(marker.scrollIntoView).toHaveBeenCalledOnce()
+
+  cursorMoves.emit()
+  await nextFrame()
+  expect(marker.scrollIntoView).toHaveBeenCalledOnce()
+
+  cursorRow = 24
+  cursorMoves.emit()
+  cursorMoves.emit()
+  await nextFrame()
+  expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
+  expect(marker.style.top).toBe('336px')
+
+  cursorRow = 28
+  Object.defineProperty(visualViewport, 'height', { configurable: true, value: 450 })
+  visualViewport.dispatchEvent(new Event('resize'))
+  await nextFrame()
+  expect(marker.scrollIntoView).toHaveBeenCalledTimes(3)
+  expect(marker.style.top).toBe('392px')
+
+  cursorRow = 24
+  cursorMoves.emit()
+  await nextFrame()
+  expect(marker.scrollIntoView).toHaveBeenCalledTimes(4)
+  expect(marker.style.top).toBe('336px')
+
+  textarea.blur()
+  cursorRow = 25
+  cursorMoves.emit()
+  await nextFrame()
+  expect(marker.scrollIntoView).toHaveBeenCalledTimes(4)
+  reveal.dispose()
+})
+
+test('rechecks the focused cursor when the visible viewport shrinks again', async () => {
+  const visualViewport = viewport(500)
+  const cursorMoves = cursorMoveSource()
+  const { element, textarea } = terminalInput()
+  const reveal = installTerminalViewportReveal({
+    element,
+    textarea,
+    visualViewport,
+    onCursorMove: cursorMoves.onCursorMove,
+    getLineHeight: () => 14,
+    getCursorRow: () => 20,
+  })
+  const marker = revealMarker(element)
+
+  textarea.focus()
+  await nextFrame()
+  expect(marker.scrollIntoView).toHaveBeenCalledOnce()
+
+  Object.defineProperty(visualViewport, 'height', { configurable: true, value: 450 })
   visualViewport.dispatchEvent(new Event('resize'))
   await nextFrame()
   expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
@@ -118,11 +217,13 @@ test('rearms the reveal when an already focused terminal is pressed again', asyn
 
 test('reveals the bottom-page cursor position while normal scrollback is visible', async () => {
   const visualViewport = viewport(500)
+  const cursorMoves = cursorMoveSource()
   const { element, textarea } = terminalInput()
   const reveal = installTerminalViewportReveal({
     element,
     textarea,
     visualViewport,
+    onCursorMove: cursorMoves.onCursorMove,
     getLineHeight: () => 14,
     getCursorRow: () => terminalInputRevealRow({ type: 'normal', baseY: 100, cursorY: 5, viewportY: 50 }, 30),
   })
@@ -147,12 +248,14 @@ test('uses the current viewport row when the cursor is already visible', () => {
 
 test('waits for a visible cursor row and stops after disposal', async () => {
   const visualViewport = viewport(500)
+  const cursorMoves = cursorMoveSource()
   const { element, textarea } = terminalInput()
   let cursorRow: number | null = null
   const reveal = installTerminalViewportReveal({
     element,
     textarea,
     visualViewport,
+    onCursorMove: cursorMoves.onCursorMove,
     getLineHeight: () => 14,
     getCursorRow: () => cursorRow,
   })
@@ -169,6 +272,7 @@ test('waits for a visible cursor row and stops after disposal', async () => {
 
   reveal.dispose()
   expect(marker.isConnected).toBe(false)
+  cursorMoves.emit()
   element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
   visualViewport.dispatchEvent(new Event('resize'))
   await nextFrame()
