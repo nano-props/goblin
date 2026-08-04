@@ -403,11 +403,11 @@ describe('OpenRemoteWorkspaceDialog', () => {
   })
 
   test('ensures the remote workspace is open before delegating activation to navigation', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({
+    const openWorkspaceMembership = vi.fn(async () => ({
       ok: true as const,
       workspaceId: workspaceIdForTest(target.id),
     }))
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    useWorkspacesStore.setState({ openWorkspaceMembership })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
@@ -423,18 +423,18 @@ describe('OpenRemoteWorkspaceDialog', () => {
     click('button[type="submit"]')
     await flush()
 
-    expect(ensureWorkspaceOpen).toHaveBeenCalledWith({ id: target.id })
+    expect(openWorkspaceMembership).toHaveBeenCalledWith({ id: target.id })
     expect(activateWorkspace).toHaveBeenCalledWith(target.id)
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   test('reports post-open effect failures after opening a remote workspace', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({
+    const openWorkspaceMembership = vi.fn(async () => ({
       ok: true as const,
       workspaceId: workspaceIdForTest(target.id),
       postOpenEffects: Promise.resolve([{ kind: 'recent-workspace' as const, message: 'recent write failed' }]),
     }))
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    useWorkspacesStore.setState({ openWorkspaceMembership })
 
     render(
       <AppNavigationProvider value={navigationWith({})}>

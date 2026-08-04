@@ -85,10 +85,10 @@ describe('workspace selectors', () => {
     })
     expect(
       runtimeCoherentWorkspaceOpenStoreActionsFromStore({
-        ensureWorkspaceOpen: fnA as never,
+        openWorkspaceMembership: fnA as never,
       }),
     ).toEqual({
-      ensureWorkspaceOpen: fnA,
+      openWorkspaceMembership: fnA,
     })
     expect(
       runtimeCoherentWorkspaceNavigationStoreActionsFromStore({
@@ -99,11 +99,11 @@ describe('workspace selectors', () => {
     })
     expect(
       runtimeCoherentWorkspaceProjectionStoreActionsFromStore({
-        ensureWorkspaceOpen: fnA as never,
+        openWorkspaceMembership: fnA as never,
         closeWorkspace: fnA as never,
       }),
     ).toEqual({
-      ensureWorkspaceOpen: fnA,
+      openWorkspaceMembership: fnA,
       closeWorkspace: fnA,
     })
     expect(
@@ -119,19 +119,19 @@ describe('workspace selectors', () => {
     })
     expect(
       workspacePickerStoreActionsFromStore({
-        ensureWorkspaceOpen: fnA as never,
+        openWorkspaceMembership: fnA as never,
       }),
     ).toEqual({
-      ensureWorkspaceOpen: fnA,
+      openWorkspaceMembership: fnA,
     })
     expect(
       clientEffectIntentStoreActionsFromStore({
-        ensureWorkspaceOpen: fnA as never,
+        openWorkspaceMembership: fnA as never,
         resetLayout: fnA as never,
         toggleZenMode: fnA as never,
       }),
     ).toEqual({
-      ensureWorkspaceOpen: fnA,
+      openWorkspaceMembership: fnA,
       resetLayout: fnA,
       toggleZenMode: fnA,
     })

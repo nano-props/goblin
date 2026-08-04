@@ -242,9 +242,9 @@ export interface RestorableWorkspaceActions {
 }
 
 export interface WorkspaceMembershipActions {
-  /** Ensure a workspace belongs to the open workspace set without implying
-   *  anything about the current active selection. */
-  ensureWorkspaceOpen: (path: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
+  /** Opens authoritative workspace membership without implying anything about
+   *  the current active selection. */
+  openWorkspaceMembership: (path: string | WorkspaceSessionEntry) => Promise<OpenWorkspaceResult>
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   /**
    * Explicitly re-probe a remote workspace lifecycle for the user-facing

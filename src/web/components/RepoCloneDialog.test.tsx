@@ -115,11 +115,11 @@ describe('RepoCloneDialog', () => {
   })
 
   test('ensures the cloned workspace is open before delegating activation to navigation', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({
+    const openWorkspaceMembership = vi.fn(async () => ({
       ok: true as const,
       workspaceId: CLONED_WORKSPACE_ID,
     }))
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    useWorkspacesStore.setState({ openWorkspaceMembership })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
@@ -128,9 +128,9 @@ describe('RepoCloneDialog', () => {
     submitClone()
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
-    expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
+    expect(openWorkspaceMembership).toHaveBeenCalledWith('/tmp/cloned-repo')
     expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/cloned-repo')
-    expect(ensureWorkspaceOpen.mock.invocationCallOrder[0]!).toBeLessThan(
+    expect(openWorkspaceMembership.mock.invocationCallOrder[0]!).toBeLessThan(
       activateWorkspace.mock.invocationCallOrder[0]!,
     )
     expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(onOpenChange.mock.invocationCallOrder[0]!)
@@ -142,15 +142,15 @@ describe('RepoCloneDialog', () => {
       ok: true
       workspaceId: ReturnType<typeof workspaceIdForTest>
     }>()
-    const ensureWorkspaceOpen = vi.fn(() => opening.promise)
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    const openWorkspaceMembership = vi.fn(() => opening.promise)
+    useWorkspacesStore.setState({ openWorkspaceMembership })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
     renderRepoCloneDialog(activateWorkspace, onOpenChange)
 
     submitClone()
-    await waitFor(() => expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo'))
+    await waitFor(() => expect(openWorkspaceMembership).toHaveBeenCalledWith('/tmp/cloned-repo'))
 
     await user.click(screen.getByRole('button', { name: 'dialog.cancel' }))
     expect(onOpenChange).toHaveBeenCalledTimes(1)
@@ -164,7 +164,7 @@ describe('RepoCloneDialog', () => {
       await opening.promise
     })
 
-    expect(ensureWorkspaceOpen).toHaveBeenCalledTimes(1)
+    expect(openWorkspaceMembership).toHaveBeenCalledTimes(1)
     expect(activateWorkspace).not.toHaveBeenCalled()
     expect(mocks.toastSuccess).not.toHaveBeenCalled()
     expect(mocks.toastError).not.toHaveBeenCalled()
@@ -185,8 +185,8 @@ describe('RepoCloneDialog', () => {
       message: 'workspace open crashed',
     },
   ])('preserves clone success $name', async ({ open, message }) => {
-    const ensureWorkspaceOpen = vi.fn(open)
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    const openWorkspaceMembership = vi.fn(open)
+    useWorkspacesStore.setState({ openWorkspaceMembership })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
@@ -195,7 +195,7 @@ describe('RepoCloneDialog', () => {
     submitClone()
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
-    expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
+    expect(openWorkspaceMembership).toHaveBeenCalledWith('/tmp/cloned-repo')
     expect(activateWorkspace).not.toHaveBeenCalled()
     expect(mocks.toastError).toHaveBeenCalledOnce()
     expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-follow-up-failed', {
@@ -206,11 +206,11 @@ describe('RepoCloneDialog', () => {
   })
 
   test('preserves clone and workspace-open success when presentation throws', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({
+    const openWorkspaceMembership = vi.fn(async () => ({
       ok: true as const,
       workspaceId: CLONED_WORKSPACE_ID,
     }))
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    useWorkspacesStore.setState({ openWorkspaceMembership })
     const activateWorkspace = vi.fn(() => {
       throw new Error('workspace presentation crashed')
     })
@@ -221,7 +221,7 @@ describe('RepoCloneDialog', () => {
     submitClone()
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
-    expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
+    expect(openWorkspaceMembership).toHaveBeenCalledWith('/tmp/cloned-repo')
     expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/cloned-repo')
     expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.clone-follow-up-failed', {
       description: '/tmp/cloned-repo\nworkspace presentation crashed',
@@ -231,12 +231,12 @@ describe('RepoCloneDialog', () => {
   })
 
   test('reports post-open effect failures after opening the cloned workspace', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({
+    const openWorkspaceMembership = vi.fn(async () => ({
       ok: true as const,
       workspaceId: CLONED_WORKSPACE_ID,
       postOpenEffects: Promise.resolve([{ kind: 'recent-workspace' as const, message: 'recent write failed' }]),
     }))
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    useWorkspacesStore.setState({ openWorkspaceMembership })
 
     renderRepoCloneDialog()
 

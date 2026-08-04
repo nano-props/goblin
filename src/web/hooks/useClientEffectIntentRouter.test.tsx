@@ -478,7 +478,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('open-recent-workspace opens without store activation and then delegates activation to navigation', async () => {
     useWorkspacesStore.setState({
-      ensureWorkspaceOpen: vi.fn(async () => ({
+      openWorkspaceMembership: vi.fn(async () => ({
         ok: true as const,
         workspaceId: workspaceIdForTest('goblin+file:///tmp/recent-workspace'),
       })),
@@ -496,7 +496,7 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     await waitFor(() => {
-      expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith({
+      expect(useWorkspacesStore.getState().openWorkspaceMembership).toHaveBeenCalledWith({
         id: 'goblin+file:///tmp/recent-workspace',
       })
       expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/recent-workspace')
@@ -683,7 +683,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('drains externally opened repo paths through the centralized intent router', async () => {
     useWorkspacesStore.setState({
-      ensureWorkspaceOpen: vi.fn(async (path: string | { id: string }) => ({
+      openWorkspaceMembership: vi.fn(async (path: string | { id: string }) => ({
         ok: true as const,
         workspaceId: workspaceIdForTest(typeof path === 'string' ? path : path.id),
       })),
@@ -698,8 +698,8 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     await waitFor(() => {
-      expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
-      expect(useWorkspacesStore.getState().ensureWorkspaceOpen).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
+      expect(useWorkspacesStore.getState().openWorkspaceMembership).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
+      expect(useWorkspacesStore.getState().openWorkspaceMembership).toHaveBeenCalledWith('goblin+file:///tmp/repo-b')
       expect(activateWorkspaceSpy).toHaveBeenCalledWith('goblin+file:///tmp/repo-a')
     })
   })

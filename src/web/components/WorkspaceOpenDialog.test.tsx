@@ -69,18 +69,18 @@ afterEach(() => {
 
 describe('WorkspaceOpenDialog', () => {
   test('ensures the workspace is open before delegating activation to navigation', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({
+    const openWorkspaceMembership = vi.fn(async () => ({
       ok: true as const,
       workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
     }))
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
-    renderAndSubmitWorkspaceOpen(ensureWorkspaceOpen, activateWorkspace, onOpenChange)
+    renderAndSubmitWorkspaceOpen(openWorkspaceMembership, activateWorkspace, onOpenChange)
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
-    expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo')
+    expect(openWorkspaceMembership).toHaveBeenCalledWith('/Users/tester/Developer/repo')
     expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///Users/tester/Developer/repo')
-    expect(ensureWorkspaceOpen.mock.invocationCallOrder[0]!).toBeLessThan(
+    expect(openWorkspaceMembership.mock.invocationCallOrder[0]!).toBeLessThan(
       activateWorkspace.mock.invocationCallOrder[0]!,
     )
     expect(activateWorkspace.mock.invocationCallOrder[0]!).toBeLessThan(onOpenChange.mock.invocationCallOrder[0]!)
@@ -91,11 +91,15 @@ describe('WorkspaceOpenDialog', () => {
       ok: true
       workspaceId: ReturnType<typeof workspaceIdForTest>
     }>()
-    const ensureWorkspaceOpen = vi.fn(() => opening.promise)
+    const openWorkspaceMembership = vi.fn(() => opening.promise)
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
-    const { navigation, rerender } = renderAndSubmitWorkspaceOpen(ensureWorkspaceOpen, activateWorkspace, onOpenChange)
-    await waitFor(() => expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo'))
+    const { navigation, rerender } = renderAndSubmitWorkspaceOpen(
+      openWorkspaceMembership,
+      activateWorkspace,
+      onOpenChange,
+    )
+    await waitFor(() => expect(openWorkspaceMembership).toHaveBeenCalledWith('/Users/tester/Developer/repo'))
 
     rerender(
       <AppNavigationProvider value={navigation}>
@@ -110,13 +114,13 @@ describe('WorkspaceOpenDialog', () => {
       await opening.promise
     })
 
-    expect(ensureWorkspaceOpen).toHaveBeenCalledTimes(1)
+    expect(openWorkspaceMembership).toHaveBeenCalledTimes(1)
     expect(activateWorkspace).not.toHaveBeenCalled()
     expect(onOpenChange).not.toHaveBeenCalled()
   })
 
   test('keeps workspace-open success when activation presentation fails', async () => {
-    const ensureWorkspaceOpen = vi.fn(async () => ({
+    const openWorkspaceMembership = vi.fn(async () => ({
       ok: true as const,
       workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
     }))
@@ -124,10 +128,10 @@ describe('WorkspaceOpenDialog', () => {
       throw new Error('workspace activation crashed')
     })
     const onOpenChange = vi.fn()
-    renderAndSubmitWorkspaceOpen(ensureWorkspaceOpen, activateWorkspace, onOpenChange)
+    renderAndSubmitWorkspaceOpen(openWorkspaceMembership, activateWorkspace, onOpenChange)
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
-    expect(ensureWorkspaceOpen).toHaveBeenCalledOnce()
+    expect(openWorkspaceMembership).toHaveBeenCalledOnce()
     expect(activateWorkspace).toHaveBeenCalledOnce()
     expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.open-presentation-failed', {
       description: 'workspace activation crashed',
@@ -143,11 +147,11 @@ function navigationWith(overrides: Partial<Pick<AppNavigationActions, 'activateW
 }
 
 function renderAndSubmitWorkspaceOpen(
-  ensureWorkspaceOpen: WorkspaceMembershipActions['ensureWorkspaceOpen'],
+  openWorkspaceMembership: WorkspaceMembershipActions['openWorkspaceMembership'],
   activateWorkspace: AppNavigationActions['activateWorkspace'],
   onOpenChange: (open: boolean) => void,
 ) {
-  useWorkspacesStore.setState({ ensureWorkspaceOpen })
+  useWorkspacesStore.setState({ openWorkspaceMembership })
   const navigation = navigationWith({ activateWorkspace })
   const { rerender } = renderInJsdom(
     <AppNavigationProvider value={navigation}>

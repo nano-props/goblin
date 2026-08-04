@@ -4,14 +4,14 @@ import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 interface Options {
-  ensureWorkspaceOpen: (path: string) => Promise<OpenWorkspaceResult>
+  openWorkspaceMembership: (path: string) => Promise<OpenWorkspaceResult>
   activateWorkspace?: (workspaceId: WorkspaceId) => void
   openWorkspacePathDialog?: () => void
   t: (key: string) => string
 }
 
 export async function openWorkspaceFromDialog({
-  ensureWorkspaceOpen,
+  openWorkspaceMembership,
   activateWorkspace,
   openWorkspacePathDialog,
   t,
@@ -22,7 +22,7 @@ export async function openWorkspaceFromDialog({
   }
   const path = await chooseLocalWorkspacePath()
   if (!path) return
-  const result = await ensureWorkspaceOpen(path)
+  const result = await openWorkspaceMembership(path)
   if (!result.ok) {
     toast.error(t('drop.open-failed'), {
       description: t(result.message),

@@ -47,7 +47,7 @@ export function useClientEffectIntentRouter({
   // This hook is the single client-side subscription point for native effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
-  const { ensureWorkspaceOpen, resetLayout, toggleZenMode } = useWorkspacesStore(
+  const { openWorkspaceMembership, resetLayout, toggleZenMode } = useWorkspacesStore(
     useShallow(clientEffectIntentStoreActionsFromStore),
   )
   const t = useT()
@@ -62,7 +62,7 @@ export function useClientEffectIntentRouter({
     openCreateWorktree,
     isOverlayOpen,
     isWorkspaceShortcutSuppressed,
-    ensureWorkspaceOpen: async (input: string | WorkspaceSessionEntry) => await ensureWorkspaceOpen(input),
+    openWorkspaceMembership: async (input: string | WorkspaceSessionEntry) => await openWorkspaceMembership(input),
     resetLayout,
     toggleZenMode,
     t: (key: string) => t(key),
@@ -70,7 +70,7 @@ export function useClientEffectIntentRouter({
 
   useEffect(() => {
     const externalOpenDrainer = createExternalOpenIntentDrainer({
-      ensureWorkspaceOpen: async (path) => await readCommittedDeps().ensureWorkspaceOpen(path),
+      openWorkspaceMembership: async (path) => await readCommittedDeps().openWorkspaceMembership(path),
       activateWorkspace: (workspaceId) => readCommittedDeps().navigation.activateWorkspace(workspaceId),
       t: (key) => readCommittedDeps().t(key),
     })

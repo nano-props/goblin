@@ -95,10 +95,10 @@ describe('repo lifecycle', () => {
     expect(requireRemoteAdmissionForTest(result.workspaces[target.id]).lifecycle).toEqual({ kind: 'ready', target })
   })
 
-  test('ensureWorkspaceOpen opens the resolved repo, records it as recent, and starts initial local refresh', async () => {
+  test('openWorkspaceMembership opens the resolved repo, records it as recent, and starts initial local refresh', async () => {
     const calls = installGoblin()
 
-    const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const result = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     if (result.ok) useWorkspacesStore.setState({ restoredWorkspaceId: result.workspaceId })
     if (result.ok) await result.postOpenEffects
 
@@ -111,10 +111,10 @@ describe('repo lifecycle', () => {
     })
   })
 
-  test('ensureWorkspaceOpen writes server runtime membership into the query cache', async () => {
+  test('openWorkspaceMembership writes server runtime membership into the query cache', async () => {
     installGoblin()
 
-    const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const result = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
 
     expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
     const cached = appQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())
@@ -127,14 +127,14 @@ describe('repo lifecycle', () => {
     ])
   })
 
-  test('ensureWorkspaceOpen rolls back a newly opened runtime when shared membership persistence fails', async () => {
+  test('openWorkspaceMembership rolls back a newly opened runtime when shared membership persistence fails', async () => {
     installGoblin({
       'settings.addWorkspaceEntry': () => {
         throw new Error('workspace write failed')
       },
     })
 
-    await expect(useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)).resolves.toEqual({
+    await expect(useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)).resolves.toEqual({
       ok: false,
       message: 'error.workspace-open-failed',
     })
@@ -148,7 +148,7 @@ describe('repo lifecycle', () => {
         throw new Error('workspace write failed')
       },
     })
-    await expect(useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)).resolves.toMatchObject({ ok: true })
+    await expect(useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)).resolves.toMatchObject({ ok: true })
     const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_A]!.workspaceRuntimeId
 
     await expect(useWorkspacesStore.getState().closeWorkspace(REPO_A)).resolves.toEqual({
@@ -195,7 +195,7 @@ describe('repo lifecycle', () => {
       'settings.removeWorkspaceEntry': removeWorkspaceEntry,
     })
 
-    const opening = useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const opening = useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     await vi.waitFor(() => expect(useWorkspacesStore.getState().workspaces[REPO_A]).toBeUndefined())
     const closing = useWorkspacesStore.getState().closeWorkspace(REPO_A)
     expect(removeWorkspaceEntry).not.toHaveBeenCalled()
@@ -223,11 +223,11 @@ describe('repo lifecycle', () => {
         return { openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} }
       },
     })
-    await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     blockRemove = true
 
     const closing = useWorkspacesStore.getState().closeWorkspace(REPO_A)
-    const reopening = useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const reopening = useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     releaseRemove.resolve()
 
     await expect(closing).resolves.toEqual({ ok: true })
@@ -236,14 +236,14 @@ describe('repo lifecycle', () => {
     expect(useWorkspacesStore.getState().workspaces[REPO_A]).toBeDefined()
   })
 
-  test('ensureWorkspaceOpen reports recent-history write failures without rolling back the opened repo', async () => {
+  test('openWorkspaceMembership reports recent-history write failures without rolling back the opened repo', async () => {
     installGoblin({
       'settings.addRecentWorkspace': () => {
         throw new Error('recent write failed')
       },
     })
 
-    const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const result = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
 
     expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
     expect(result.ok ? await result.postOpenEffects : null).toEqual([
@@ -260,12 +260,12 @@ describe('repo lifecycle', () => {
     ])
   })
 
-  test('ensureWorkspaceOpen adds a repo to the open set without changing the active selection', async () => {
+  test('openWorkspaceMembership adds a repo to the open set without changing the active selection', async () => {
     const calls = installGoblin()
 
-    const first = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const first = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     if (first.ok) useWorkspacesStore.setState({ restoredWorkspaceId: first.workspaceId })
-    const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_B)
+    const result = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_B)
 
     expect(result).toMatchObject({ ok: true, workspaceId: REPO_B })
     expect(useWorkspacesStore.getState().workspaceOrder).toEqual([REPO_A, REPO_B])
@@ -275,12 +275,12 @@ describe('repo lifecycle', () => {
     })
   })
 
-  test('ensureWorkspaceOpen opens without changing the restored repo', async () => {
+  test('openWorkspaceMembership opens without changing the restored repo', async () => {
     const calls = installGoblin()
 
-    const first = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const first = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     if (first.ok) useWorkspacesStore.setState({ restoredWorkspaceId: first.workspaceId })
-    await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_B)
+    await useWorkspacesStore.getState().openWorkspaceMembership(REPO_B)
 
     expect(useWorkspacesStore.getState().workspaceOrder).toEqual([REPO_A, REPO_B])
     expect(useWorkspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
@@ -289,28 +289,28 @@ describe('repo lifecycle', () => {
     })
   })
 
-  test('ensureWorkspaceOpen still ensures the workspace is added to the open set', async () => {
+  test('openWorkspaceMembership still ensures the workspace is added to the open set', async () => {
     installGoblin()
 
-    const first = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const first = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     if (first.ok) useWorkspacesStore.setState({ restoredWorkspaceId: first.workspaceId })
-    await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_B)
+    await useWorkspacesStore.getState().openWorkspaceMembership(REPO_B)
 
     expect(Object.keys(useWorkspacesStore.getState().workspaces)).toEqual([REPO_A, REPO_B])
     expect(useWorkspacesStore.getState().workspaceOrder).toEqual([REPO_A, REPO_B])
     expect(useWorkspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
   })
 
-  test('ensureWorkspaceOpen does not re-refresh an already-open repo with unchanged target', async () => {
+  test('openWorkspaceMembership does not re-refresh an already-open repo with unchanged target', async () => {
     const calls = installGoblin()
 
-    const first = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const first = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     if (first.ok) useWorkspacesStore.setState({ restoredWorkspaceId: first.workspaceId })
-    const second = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_B)
+    const second = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_B)
     if (second.ok) useWorkspacesStore.setState({ restoredWorkspaceId: second.workspaceId })
     // Opening REPO_A again is a focus action: the repo is already
     // resolved and its data is coherent, so we skip the runtime snapshot read.
-    const third = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const third = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     if (third.ok) useWorkspacesStore.setState({ restoredWorkspaceId: third.workspaceId })
 
     expect(useWorkspacesStore.getState().workspaceOrder).toEqual([REPO_A, REPO_B])
@@ -353,14 +353,14 @@ describe('repo lifecycle', () => {
         }),
     })
 
-    const first = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const first = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     if (first.ok) useWorkspacesStore.setState({ restoredWorkspaceId: first.workspaceId })
     await vi.waitFor(() => {
       expect(snapshotResolvers).toHaveLength(1)
     })
     const firstToken = useWorkspacesStore.getState().workspaces[REPO_A]?.workspaceRuntimeId
     await useWorkspacesStore.getState().closeWorkspace(REPO_A)
-    const second = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const second = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     if (second.ok) useWorkspacesStore.setState({ restoredWorkspaceId: second.workspaceId })
     const secondToken = useWorkspacesStore.getState().workspaces[REPO_A]?.workspaceRuntimeId
     await vi.waitFor(() => {
@@ -388,7 +388,7 @@ describe('repo lifecycle', () => {
   test('closeWorkspace removes the closed server runtime membership from the query cache', async () => {
     installGoblin()
 
-    const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const result = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
     const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_A]!.workspaceRuntimeId
 
@@ -402,7 +402,7 @@ describe('repo lifecycle', () => {
   test('runtime membership cache reconciles from the server when local removal misses', async () => {
     installGoblin()
 
-    const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(REPO_A)
+    const result = await useWorkspacesStore.getState().openWorkspaceMembership(REPO_A)
     expect(result).toMatchObject({ ok: true, workspaceId: REPO_A })
     const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_A]!.workspaceRuntimeId
     appQueryClient.setQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey(), {
@@ -422,7 +422,7 @@ describe('repo lifecycle', () => {
     ])
   })
 
-  test('ensureWorkspaceOpen preserves remote target metadata for recent repos and later actions', async () => {
+  test('openWorkspaceMembership preserves remote target metadata for recent repos and later actions', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -433,7 +433,7 @@ describe('repo lifecycle', () => {
     expect(target).not.toBeNull()
     const calls = installGoblin()
 
-    const result = await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
+    const result = await useWorkspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target!))
     if (result.ok) await result.postOpenEffects
 
     expect(result).toMatchObject({ ok: true, workspaceId: target!.id })
@@ -460,7 +460,7 @@ describe('repo lifecycle', () => {
     })
 
     await expect(
-      useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!)),
+      useWorkspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target!)),
     ).resolves.toMatchObject({
       ok: true,
       workspaceId: target!.id,
@@ -494,7 +494,7 @@ describe('repo lifecycle', () => {
     }>()
     const calls = installGoblin({ 'remote.lifecycle': () => lifecycle.promise })
 
-    const opening = useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
+    const opening = useWorkspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target!))
     await vi.waitFor(() => expect(calls.workspaceEntries).toEqual([remoteWorkspaceSessionEntry(target!)]))
     await expect(useWorkspacesStore.getState().closeWorkspace(target!.id)).resolves.toEqual({ ok: true })
     lifecycle.resolve({
@@ -531,7 +531,7 @@ describe('repo lifecycle', () => {
         throw new Error('offline')
       },
     })
-    await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(target!))
+    await useWorkspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target!))
 
     await expect(useWorkspacesStore.getState().retryRemoteWorkspaceConnection(target!.id)).resolves.toEqual({
       ok: false,
@@ -539,7 +539,7 @@ describe('repo lifecycle', () => {
     })
   })
 
-  test('ensureWorkspaceOpen refreshes when a remote target changes between opens', async () => {
+  test('openWorkspaceMembership refreshes when a remote target changes between opens', async () => {
     const oldTarget = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -568,7 +568,7 @@ describe('repo lifecycle', () => {
       },
     })
 
-    const first = await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(oldTarget!))
+    const first = await useWorkspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(oldTarget!))
     expect(first).toMatchObject({ ok: true, workspaceId: oldTarget!.id })
     expect(requireRemoteAdmissionForTest(useWorkspacesStore.getState().workspaces[oldTarget!.id]).lifecycle).toEqual({
       kind: 'ready',
@@ -581,7 +581,7 @@ describe('repo lifecycle', () => {
     const calls = installGoblin({
       'remote.resolveTarget': () => ({ target: newTarget }),
     })
-    const second = await useWorkspacesStore.getState().ensureWorkspaceOpen(remoteWorkspaceSessionEntry(newTarget!))
+    const second = await useWorkspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(newTarget!))
     expect(second).toMatchObject({ ok: true, workspaceId: newTarget!.id })
     expect(requireRemoteAdmissionForTest(useWorkspacesStore.getState().workspaces[newTarget!.id]).lifecycle).toEqual({
       kind: 'ready',
