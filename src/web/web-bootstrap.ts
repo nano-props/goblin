@@ -1,7 +1,11 @@
-export interface WebBootstrapOwner {
-  readonly generation: number
+export interface WebBootstrapAttempt {
   readonly signal: AbortSignal
   commit(action: () => void): boolean
+}
+
+export interface WebBootstrapOwner {
+  readonly generation: number
+  beginAttempt(): WebBootstrapAttempt | null
   dispose(): void
 }
 
@@ -16,34 +20,55 @@ export interface WebBootstrapDependencies {
 }
 
 export function createWebBootstrapOwner(generation: number): WebBootstrapOwner {
-  const controller = new AbortController()
+  const ownerController = new AbortController()
+  let nextAttemptGeneration = 1
+  let currentAttempt: { attempt: WebBootstrapAttempt; controller: AbortController } | null = null
+
   return {
     generation,
-    signal: controller.signal,
-    commit(action) {
-      if (controller.signal.aborted) return false
-      action()
-      return true
+    beginAttempt() {
+      if (ownerController.signal.aborted) return null
+
+      const attemptGeneration = nextAttemptGeneration++
+      currentAttempt?.controller.abort(
+        new Error(`Web bootstrap generation ${generation} attempt ${attemptGeneration - 1} was replaced`),
+      )
+
+      const controller = new AbortController()
+      const signal = AbortSignal.any([ownerController.signal, controller.signal])
+      const attempt: WebBootstrapAttempt = {
+        signal,
+        commit(action) {
+          if (signal.aborted || currentAttempt?.attempt !== attempt) return false
+          action()
+          return true
+        },
+      }
+      currentAttempt = { attempt, controller }
+      return attempt
     },
     dispose() {
-      controller.abort(new Error(`Web bootstrap generation ${generation} was replaced`))
+      ownerController.abort(new Error(`Web bootstrap generation ${generation} was replaced`))
+      currentAttempt = null
     },
   }
 }
 
 export function startWebBootstrap(dependencies: WebBootstrapDependencies): void {
-  if (!dependencies.owner.commit(dependencies.renderLoading)) return
-  void runWebBootstrap(dependencies)
+  const attempt = dependencies.owner.beginAttempt()
+  if (!attempt?.commit(dependencies.renderLoading)) return
+  void runWebBootstrap(dependencies, attempt)
 }
 
-async function runWebBootstrap(dependencies: WebBootstrapDependencies): Promise<void> {
+async function runWebBootstrap(dependencies: WebBootstrapDependencies, attempt: WebBootstrapAttempt): Promise<void> {
   const timeout = createTimeoutController(dependencies.timeoutMs)
-  const signal = AbortSignal.any([dependencies.owner.signal, timeout.signal])
+  const signal = AbortSignal.any([attempt.signal, timeout.signal])
   try {
     await dependencies.hydrate(signal)
+    signal.throwIfAborted()
   } catch (error) {
     timeout.abort(error)
-    dependencies.owner.commit(() => {
+    attempt.commit(() => {
       dependencies.logFailure(error)
       dependencies.renderError(() => startWebBootstrap(dependencies))
     })
@@ -51,7 +76,7 @@ async function runWebBootstrap(dependencies: WebBootstrapDependencies): Promise<
   } finally {
     timeout.dispose()
   }
-  dependencies.owner.commit(dependencies.renderApp)
+  attempt.commit(dependencies.renderApp)
 }
 
 function createTimeoutController(ms: number): {
