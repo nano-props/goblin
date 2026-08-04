@@ -314,7 +314,7 @@ export class TerminalSessionView {
     this.disposables.push(
       installTerminalTouchScroll({
         element,
-        canScroll: () => term.buffer.active.type === 'normal' && term.modes.mouseTrackingMode === 'none',
+        shouldHandle: () => term.buffer.active.type === 'normal' && term.modes.mouseTrackingMode === 'none',
         getLineHeight: () => {
           const measuredLineHeight = this.xtermHost.getBoundingClientRect().height / term.rows
           const fallbackLineHeight =

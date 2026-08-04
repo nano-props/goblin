@@ -11,7 +11,7 @@ interface TouchScrollGesture {
 
 interface TerminalTouchScrollOptions {
   element: HTMLElement
-  canScroll: () => boolean
+  shouldHandle: () => boolean
   getLineHeight: () => number
   scrollLines: (lines: number) => void
 }
@@ -29,7 +29,7 @@ export function installTerminalTouchScroll(options: TerminalTouchScrollOptions):
     return null
   }
   const handleTouchStart = (event: TouchEvent) => {
-    if (event.touches.length !== 1 || !options.canScroll()) {
+    if (event.touches.length !== 1 || !options.shouldHandle()) {
       resetGesture()
       return
     }
@@ -45,7 +45,7 @@ export function installTerminalTouchScroll(options: TerminalTouchScrollOptions):
     }
   }
   const handleTouchMove = (event: TouchEvent) => {
-    if (!gesture || event.touches.length !== 1 || !options.canScroll()) {
+    if (!gesture || event.touches.length !== 1 || !options.shouldHandle()) {
       resetGesture()
       return
     }

@@ -22,7 +22,7 @@ function dispatchTouches(
 test('translates vertical touch movement into accumulated terminal lines', () => {
   const element = document.createElement('div')
   const scrollLines = vi.fn()
-  installTerminalTouchScroll({ element, canScroll: () => true, getLineHeight: () => 14, scrollLines })
+  installTerminalTouchScroll({ element, shouldHandle: () => true, getLineHeight: () => 14, scrollLines })
 
   dispatchTouches(element, 'touchstart', [{ identifier: 1, clientX: 100, clientY: 200 }])
   const firstMove = dispatchTouches(element, 'touchmove', [{ identifier: 1, clientX: 102, clientY: 180 }])
@@ -36,7 +36,7 @@ test('translates vertical touch movement into accumulated terminal lines', () =>
 test('leaves horizontal gestures untouched', () => {
   const element = document.createElement('div')
   const scrollLines = vi.fn()
-  installTerminalTouchScroll({ element, canScroll: () => true, getLineHeight: () => 14, scrollLines })
+  installTerminalTouchScroll({ element, shouldHandle: () => true, getLineHeight: () => 14, scrollLines })
 
   dispatchTouches(element, 'touchstart', [{ identifier: 1, clientX: 100, clientY: 200 }])
   const horizontalMove = dispatchTouches(element, 'touchmove', [{ identifier: 1, clientX: 140, clientY: 205 }])
@@ -48,7 +48,7 @@ test('leaves horizontal gestures untouched', () => {
 test('stops handling a gesture when another touch is added', () => {
   const element = document.createElement('div')
   const scrollLines = vi.fn()
-  installTerminalTouchScroll({ element, canScroll: () => true, getLineHeight: () => 14, scrollLines })
+  installTerminalTouchScroll({ element, shouldHandle: () => true, getLineHeight: () => 14, scrollLines })
 
   dispatchTouches(element, 'touchstart', [{ identifier: 2, clientX: 100, clientY: 200 }])
   const multiTouchMove = dispatchTouches(element, 'touchmove', [
@@ -62,10 +62,10 @@ test('stops handling a gesture when another touch is added', () => {
   expect(scrollLines).not.toHaveBeenCalled()
 })
 
-test('leaves gestures untouched when the terminal cannot scroll', () => {
+test('leaves gestures untouched when touch scrolling should not be handled', () => {
   const element = document.createElement('div')
   const scrollLines = vi.fn()
-  installTerminalTouchScroll({ element, canScroll: () => false, getLineHeight: () => 14, scrollLines })
+  installTerminalTouchScroll({ element, shouldHandle: () => false, getLineHeight: () => 14, scrollLines })
 
   dispatchTouches(element, 'touchstart', [{ identifier: 4, clientX: 100, clientY: 200 }])
   const move = dispatchTouches(element, 'touchmove', [{ identifier: 4, clientX: 100, clientY: 160 }])
@@ -79,7 +79,7 @@ test('removes its listeners when disposed', () => {
   const scrollLines = vi.fn()
   const touchScroll = installTerminalTouchScroll({
     element,
-    canScroll: () => true,
+    shouldHandle: () => true,
     getLineHeight: () => 14,
     scrollLines,
   })
