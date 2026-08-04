@@ -239,6 +239,34 @@ describe('OpenWorkspaceDialog', () => {
     expect(input('#open-workspace-path').value).toBe('')
   })
 
+  test('immediately revokes the open cycle when cancelled', async () => {
+    const selection = Promise.withResolvers<string | null>()
+    testWindow.goblinNative = currentNativeBridge({
+      host: {
+        openSettingsWindow: async () => true,
+        openExternalUrl: async ({ url }) => ({ ok: true, message: url }),
+        openDirectoryDialog: () => selection.promise,
+        consumeExternalOpenPaths: async () => [],
+      },
+    })
+    const onClose = vi.fn()
+    const onOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
+      ok: true,
+      workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
+    }))
+    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
+
+    await clickButtonByText('workspace-picker.open-path-choose')
+    await clickButtonByText('dialog.cancel')
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      selection.resolve('/tmp/old-selection')
+      await selection.promise
+    })
+    expect(input('#open-workspace-path').value).toBe('')
+  })
+
   test('allows retry after an unexpected open error', async () => {
     const onClose = vi.fn()
     const onOpen = vi

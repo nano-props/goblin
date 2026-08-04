@@ -93,11 +93,18 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
     }
   }
 
+  function handleCancel() {
+    const abortController = dialogAbortRef.current
+    dialogAbortRef.current = null
+    abortController?.abort()
+    onClose()
+  }
+
   return (
     <FormDialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen && !pending) onClose()
+        if (!nextOpen && !pending) handleCancel()
       }}
       showCloseButton={!pending}
       title={t('workspace-picker.open-title')}
@@ -155,7 +162,7 @@ export function OpenWorkspaceDialog({ open, onClose, onOpen }: Props) {
             variant="outline"
             className={cn(compact && 'w-full')}
             disabled={pending}
-            onClick={onClose}
+            onClick={handleCancel}
           >
             {t('dialog.cancel')}
           </Button>

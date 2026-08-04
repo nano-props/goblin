@@ -101,6 +101,7 @@ export async function chooseCloneParentPath(options: DirectoryPickerOptions = {}
 }
 
 async function chooseDirectoryPath(title: string, options: DirectoryPickerOptions): Promise<string | null> {
+  options.signal?.throwIfAborted()
   const selection = requiredNativeHost().openDirectoryDialog({ title })
   return options.signal ? await waitForPromiseWithSignal(selection, options.signal) : await selection
 }
