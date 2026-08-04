@@ -278,7 +278,9 @@ export function TerminalComposer({
         input === input.ownerDocument.activeElement
       ) {
         pendingViewportRevealRef.current = false
-        // The input owns focus, but the complete Composer surface is the page-reveal boundary.
+        // Reveal from the pre-offset page position so nearest still pans the document; applying the
+        // keyboard offset first can make the target appear visible and suppress that pan. The input
+        // owns focus, but the complete Composer surface is the page-reveal boundary.
         composer.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
       }
       const nextOffset = Math.round(obscuredHeight)
