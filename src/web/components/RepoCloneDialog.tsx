@@ -27,16 +27,19 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
   function reportPostCloneFailure(
     kind: 'open-failed' | 'open-uncertain' | 'presentation-failed',
     path: string,
-    message: string | null,
+    getDescription: () => string,
   ) {
     const titleKey = POST_CLONE_FAILURE_TITLE_KEYS[kind]
     try {
-      const descriptionMessage = message ?? t('error.unknown')
       toast.error(t(titleKey), {
-        description: `${path}\n${descriptionMessage}`,
+        description: `${path}\n${getDescription()}`,
       })
     } catch (err) {
-      sessionLog.warn('failed to report post-clone workflow failure', { kind, path, message, err })
+      try {
+        sessionLog.warn('failed to report post-clone workflow failure', { kind, path, err })
+      } catch {
+        // Reporting and logging are both best-effort after the authoritative clone result succeeds.
+      }
     }
   }
 
@@ -46,7 +49,8 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
       const openResult = await ensureWorkspaceOpen(path)
       if (signal.aborted) return
       if (!openResult.ok) {
-        reportPostCloneFailure('open-failed', path, t(openResult.message))
+        const messageKey = openResult.message
+        reportPostCloneFailure('open-failed', path, () => t(messageKey))
         return
       }
       phase = 'presentation'
@@ -55,10 +59,11 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
       toast.success(t('workspace-picker.clone-opened'), { description: path })
     } catch (err) {
       if (signal.aborted) return
+      const message = err instanceof Error ? err.message : null
       reportPostCloneFailure(
         phase === 'open' ? 'open-uncertain' : 'presentation-failed',
         path,
-        err instanceof Error ? err.message : null,
+        () => message ?? t('error.unknown'),
       )
     }
   }
