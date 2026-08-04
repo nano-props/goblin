@@ -9,6 +9,7 @@ import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { WorkspaceMembershipActions } from '#/web/stores/workspaces/types.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
@@ -72,18 +73,9 @@ describe('WorkspaceOpenDialog', () => {
       ok: true as const,
       workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
     }))
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
-
-    renderInJsdom(
-      <AppNavigationProvider value={navigationWith({ activateWorkspace })}>
-        <WorkspaceOpenDialog open onOpenChange={onOpenChange} />
-      </AppNavigationProvider>,
-    )
-
-    setInputValue('#open-workspace-path', '~/Developer/repo')
-    click('button[type="submit"]')
+    renderAndSubmitWorkspaceOpen(ensureWorkspaceOpen, activateWorkspace, onOpenChange)
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo')
@@ -100,18 +92,9 @@ describe('WorkspaceOpenDialog', () => {
       workspaceId: ReturnType<typeof workspaceIdForTest>
     }>()
     const ensureWorkspaceOpen = vi.fn(() => opening.promise)
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
     const activateWorkspace = vi.fn()
-    const navigation = navigationWith({ activateWorkspace })
     const onOpenChange = vi.fn()
-    const { rerender } = renderInJsdom(
-      <AppNavigationProvider value={navigation}>
-        <WorkspaceOpenDialog open onOpenChange={onOpenChange} />
-      </AppNavigationProvider>,
-    )
-
-    setInputValue('#open-workspace-path', '~/Developer/repo')
-    click('button[type="submit"]')
+    const { navigation, rerender } = renderAndSubmitWorkspaceOpen(ensureWorkspaceOpen, activateWorkspace, onOpenChange)
     await waitFor(() => expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/Users/tester/Developer/repo'))
 
     rerender(
@@ -137,20 +120,11 @@ describe('WorkspaceOpenDialog', () => {
       ok: true as const,
       workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
     }))
-    useWorkspacesStore.setState({ ensureWorkspaceOpen })
     const activateWorkspace = vi.fn(() => {
       throw new Error('workspace activation crashed')
     })
     const onOpenChange = vi.fn()
-
-    renderInJsdom(
-      <AppNavigationProvider value={navigationWith({ activateWorkspace })}>
-        <WorkspaceOpenDialog open onOpenChange={onOpenChange} />
-      </AppNavigationProvider>,
-    )
-
-    setInputValue('#open-workspace-path', '~/Developer/repo')
-    click('button[type="submit"]')
+    renderAndSubmitWorkspaceOpen(ensureWorkspaceOpen, activateWorkspace, onOpenChange)
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
     expect(ensureWorkspaceOpen).toHaveBeenCalledOnce()
@@ -166,6 +140,23 @@ function navigationWith(overrides: Partial<Pick<AppNavigationActions, 'activateW
     activateWorkspace: () => {},
     ...overrides,
   })
+}
+
+function renderAndSubmitWorkspaceOpen(
+  ensureWorkspaceOpen: WorkspaceMembershipActions['ensureWorkspaceOpen'],
+  activateWorkspace: AppNavigationActions['activateWorkspace'],
+  onOpenChange: (open: boolean) => void,
+) {
+  useWorkspacesStore.setState({ ensureWorkspaceOpen })
+  const navigation = navigationWith({ activateWorkspace })
+  const { rerender } = renderInJsdom(
+    <AppNavigationProvider value={navigation}>
+      <WorkspaceOpenDialog open onOpenChange={onOpenChange} />
+    </AppNavigationProvider>,
+  )
+  setInputValue('#open-workspace-path', '~/Developer/repo')
+  click('button[type="submit"]')
+  return { navigation, rerender }
 }
 
 function input(selector: string): HTMLInputElement {
