@@ -17,6 +17,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
+  ArrowRightToLine,
   ArrowUp,
   CornerDownLeft,
   Delete,
@@ -121,6 +122,7 @@ const PRIMARY_KEY_ACTIONS: PrimaryKeyAction[] = [
 ]
 
 const COMMAND_KEY_ICONS: Partial<Record<TerminalComposerCommandLabelKey, ReactNode>> = {
+  tab: <ArrowRightToLine className="size-4" />,
   enter: <CornerDownLeft className="size-4" />,
   backspace: <Delete className="size-4" />,
 }

@@ -1,4 +1,4 @@
-import { Ellipsis, Upload, X } from 'lucide-react'
+import { Delete, Ellipsis, Upload, X } from 'lucide-react'
 import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
@@ -85,7 +85,13 @@ export function TerminalComposerMenu({
           ) : (
             TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS.map((action) => (
               <ComposerMenuItem key={action.key} onClick={() => sendVirtualKey(action.key)} closeMenu={closeMenu}>
-                <Keycap>{action.keycap}</Keycap>
+                {action.key === 'backspace' ? (
+                  <span aria-hidden="true" className="inline-flex w-6 shrink-0 items-center justify-center">
+                    <Delete className="size-4" />
+                  </span>
+                ) : (
+                  <Keycap>{action.keycap}</Keycap>
+                )}
                 {labels[action.labelKey]}
               </ComposerMenuItem>
             ))

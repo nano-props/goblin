@@ -786,6 +786,8 @@ describe('TerminalComposer', () => {
       container.querySelectorAll<HTMLButtonElement>('.goblin-terminal-composer__key-row button'),
     ).map((button) => button.querySelector('.sr-only')?.textContent)
     expect(keyRowLabels).toEqual([...optionalCommandLabels, ...pinnedCommandLabels, ...directionLabels])
+    expect(buttonByAccessibleName(container, LABELS.tab).querySelector('.lucide-arrow-right-to-line')).not.toBeNull()
+    expect(buttonByAccessibleName(container, LABELS.backspace).querySelector('.lucide-delete')).not.toBeNull()
 
     for (const name of [...pinnedCommandLabels, ...directionLabels]) {
       act(() => buttonByAccessibleName(container, name).click())
@@ -820,7 +822,8 @@ describe('TerminalComposer', () => {
         if (!menu) throw new Error('expected Composer menu')
         expect(
           Array.from(menu.querySelectorAll('[data-terminal-composer-keycap]')).map((keycap) => keycap.textContent),
-        ).toEqual(['⌫', 'Esc', '^C', '^D'])
+        ).toEqual(['Esc', '^C', '^D'])
+        expect(menu.querySelector('.lucide-delete')).not.toBeNull()
         expect(within(menu).queryByRole('button', { name: LABELS.enter })).toBeNull()
         expect(within(menu).queryByRole('button', { name: LABELS.tab })).toBeNull()
         expect(menu.querySelectorAll('[data-slot="separator"]')).toHaveLength(1)
