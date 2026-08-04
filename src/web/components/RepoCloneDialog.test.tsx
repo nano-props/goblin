@@ -220,6 +220,35 @@ describe('RepoCloneDialog', () => {
     expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
+  test('preserves clone success when the cloned workspace cannot be opened', async () => {
+    const ensureWorkspaceOpen = vi.fn(async () => ({
+      ok: false as const,
+      message: 'error.workspace-open-failed',
+    }))
+    useWorkspacesStore.setState({ ensureWorkspaceOpen })
+    const activateWorkspace = vi.fn()
+    const onOpenChange = vi.fn()
+
+    renderInJsdom(
+      <AppNavigationProvider value={navigationWith({ activateWorkspace })}>
+        <RepoCloneDialog open onOpenChange={onOpenChange} />
+      </AppNavigationProvider>,
+    )
+
+    setInputValue('#clone-url', 'https://example.com/repo.git')
+    setInputValue('#clone-directory-name', 'repo')
+    click('button[type="submit"]')
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
+
+    expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
+    expect(activateWorkspace).not.toHaveBeenCalled()
+    expect(mocks.toastError).toHaveBeenCalledWith('drop.open-failed', {
+      description: '/tmp/cloned-repo\nerror.workspace-open-failed',
+    })
+    expect(mocks.toastSuccess).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   test('reports post-open effect failures after opening the cloned workspace', async () => {
     const ensureWorkspaceOpen = vi.fn(async () => ({
       ok: true as const,
