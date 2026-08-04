@@ -1,16 +1,16 @@
 import { Ellipsis, Upload, X } from 'lucide-react'
-import { Fragment, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Separator } from '#/web/components/ui/separator.tsx'
 import {
-  TERMINAL_COMPOSER_COMMAND_KEY_GROUPS,
-  type TerminalComposerCommandKeyName,
-  type TerminalComposerCommandLabelKey,
+  TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS,
+  type TerminalComposerMenuCommandKeyName,
+  type TerminalComposerMenuCommandLabelKey,
 } from '#/web/components/terminal/terminal-composer-command-keys.ts'
 
-type TerminalComposerMenuLabels = Record<TerminalComposerCommandLabelKey, string> & {
+type TerminalComposerMenuLabels = Record<TerminalComposerMenuCommandLabelKey, string> & {
   more: string
   uploadFiles: string
   close: string
@@ -21,7 +21,7 @@ interface TerminalComposerMenuProps {
   mode: 'input' | 'keys'
   resolvingFiles: boolean
   onUpload: () => void
-  onVirtualKey: (key: TerminalComposerCommandKeyName) => void
+  onVirtualKey: (key: TerminalComposerMenuCommandKeyName) => void
   onRequestTerminalFocus: () => void
   onClose: () => void
   onRestoreComposerTriggerFocus: () => void
@@ -39,7 +39,7 @@ export function TerminalComposerMenu({
 }: TerminalComposerMenuProps) {
   const focusTargetRef = useRef<'composer-trigger' | 'terminal' | null>(null)
   const [open, setOpen] = useState(false)
-  const sendVirtualKey = (key: TerminalComposerCommandKeyName) => {
+  const sendVirtualKey = (key: TerminalComposerMenuCommandKeyName) => {
     focusTargetRef.current = 'terminal'
     onVirtualKey(key)
   }
@@ -83,19 +83,12 @@ export function TerminalComposerMenu({
               {labels.uploadFiles}
             </ComposerMenuItem>
           ) : (
-            <>
-              {TERMINAL_COMPOSER_COMMAND_KEY_GROUPS.map((group, groupIndex) => (
-                <Fragment key={group.id}>
-                  {groupIndex > 0 && <Separator className="-mx-1 my-1 w-auto" />}
-                  {group.keys.map((action) => (
-                    <ComposerMenuItem key={action.key} onClick={() => sendVirtualKey(action.key)} closeMenu={closeMenu}>
-                      <Keycap>{action.keycap}</Keycap>
-                      {labels[action.labelKey]}
-                    </ComposerMenuItem>
-                  ))}
-                </Fragment>
-              ))}
-            </>
+            TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS.map((action) => (
+              <ComposerMenuItem key={action.key} onClick={() => sendVirtualKey(action.key)} closeMenu={closeMenu}>
+                <Keycap>{action.keycap}</Keycap>
+                {labels[action.labelKey]}
+              </ComposerMenuItem>
+            ))
           )}
           <Separator className="-mx-1 my-1 w-auto" />
           <ComposerMenuItem

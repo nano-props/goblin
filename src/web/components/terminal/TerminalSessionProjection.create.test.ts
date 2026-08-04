@@ -77,7 +77,6 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     }
     clearSearch(): void {}
     scrollToBottom(): void {}
-    scrollLines(): void {}
     captureInputWriter(): null {
       return null
     }

@@ -227,7 +227,6 @@ function terminalCommandContextWith(overrides: Partial<TerminalSessionContextVal
     createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
-    scrollLines: vi.fn(),
     clearBell: vi.fn(() => false),
     closeTerminalByDescriptor: vi.fn(async () => true),
     attach: vi.fn(),

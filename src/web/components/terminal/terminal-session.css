@@ -112,9 +112,9 @@
   width: 100%;
   height: 100%;
   overflow-anchor: none;
-  /* Vertical touch movement is translated to xterm scrollback by
-     TerminalSessionView. Leave horizontal gestures and pinch zoom to the
-  browser so workspace navigation and viewport zoom keep their ownership. */
+  /* Normal-buffer vertical touch movement is translated to xterm scrollback by TerminalSessionView.
+     Vertical dragging is intentionally unsupported in the alternate buffer and mouse-tracking modes;
+     horizontal gestures and pinch zoom remain browser-owned. */
   touch-action: pan-x pinch-zoom;
 }
 
@@ -440,9 +440,7 @@
 .goblin-terminal-composer__key-action--optional-1,
 .goblin-terminal-composer__key-action--optional-2,
 .goblin-terminal-composer__key-action--optional-3,
-.goblin-terminal-composer__key-action--optional-4,
-.goblin-terminal-composer__key-action--optional-5,
-.goblin-terminal-composer__key-action--optional-6 {
+.goblin-terminal-composer__key-action--optional-4 {
   display: none;
 }
 
@@ -466,18 +464,6 @@
 
 @container goblin-terminal-session (min-width: 564px) {
   .goblin-terminal-composer__key-action--optional-4 {
-    display: inline-flex;
-  }
-}
-
-@container goblin-terminal-session (min-width: 608px) {
-  .goblin-terminal-composer__key-action--optional-5 {
-    display: inline-flex;
-  }
-}
-
-@container goblin-terminal-session (min-width: 652px) {
-  .goblin-terminal-composer__key-action--optional-6 {
     display: inline-flex;
   }
 }

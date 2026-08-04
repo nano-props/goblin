@@ -29,8 +29,6 @@ const LABELS: TerminalComposerLabels = {
   escape: 'Escape',
   ctrlC: 'Ctrl+C',
   ctrlD: 'Ctrl+D',
-  pageUp: 'Page Up (scroll up)',
-  pageDown: 'Page Down (scroll down)',
 }
 
 function render(
@@ -39,7 +37,6 @@ function render(
     onSendText?: (text: string) => Promise<boolean>
     onResolveFiles?: (files: File[]) => Promise<string | null>
     onRequestFocus?: () => void
-    onScrollLines?: (amount: number) => void
     initialMode?: TerminalComposerMode
     initialDraft?: string
     draftReplaceAccepted?: boolean
@@ -86,7 +83,6 @@ function render(
         }}
         onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
         onRequestFocus={props.onRequestFocus ?? vi.fn()}
-        onScrollLines={props.onScrollLines ?? vi.fn()}
       />
     )
   }
@@ -150,7 +146,6 @@ function ExpandedComposerForTest({
       }}
       onResolveFiles={vi.fn(async () => null)}
       onRequestFocus={vi.fn()}
-      onScrollLines={vi.fn()}
     />
   )
 }
@@ -773,10 +768,9 @@ describe('TerminalComposer', () => {
     expect(textarea.hasAttribute('aria-busy')).toBe(false)
   })
 
-  test('sends terminal-mode-aware key intents and scroll actions', () => {
+  test('sends terminal-mode-aware key intents', () => {
     const onVirtualKey = vi.fn()
-    const onScrollLines = vi.fn()
-    const { container } = render({ onVirtualKey, onScrollLines })
+    const { container } = render({ onVirtualKey })
     expand(container)
 
     expect(container.querySelector('textarea')).toBeNull()
@@ -785,60 +779,51 @@ describe('TerminalComposer', () => {
     ).not.toBeNull()
     expect(buttonByAccessibleName(container, LABELS.more).querySelector('.lucide-ellipsis')).not.toBeNull()
 
-    for (const name of [LABELS.arrowUp, LABELS.arrowDown, LABELS.arrowLeft, LABELS.arrowRight]) {
+    const optionalCommandLabels = [LABELS.backspace, LABELS.escape, LABELS.ctrlC, LABELS.ctrlD]
+    const pinnedCommandLabels = [LABELS.tab, LABELS.enter]
+    const directionLabels = [LABELS.arrowLeft, LABELS.arrowDown, LABELS.arrowUp, LABELS.arrowRight]
+    const keyRowLabels = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.goblin-terminal-composer__key-row button'),
+    ).map((button) => button.querySelector('.sr-only')?.textContent)
+    expect(keyRowLabels).toEqual([...optionalCommandLabels, ...pinnedCommandLabels, ...directionLabels])
+
+    for (const name of [...pinnedCommandLabels, ...directionLabels]) {
       act(() => buttonByAccessibleName(container, name).click())
     }
-    expect(onVirtualKey.mock.calls.map(([key]) => key)).toEqual(['arrow-up', 'arrow-down', 'arrow-left', 'arrow-right'])
-    act(() => buttonByAccessibleName(container, LABELS.pageUp).click())
-    act(() => buttonByAccessibleName(container, LABELS.pageDown).click())
-    expect(onScrollLines).toHaveBeenNthCalledWith(1, -12)
-    expect(onScrollLines).toHaveBeenNthCalledWith(2, 12)
+    expect(onVirtualKey.mock.calls.map(([key]) => key)).toEqual([
+      'tab',
+      'enter',
+      'arrow-left',
+      'arrow-down',
+      'arrow-up',
+      'arrow-right',
+    ])
 
     const optionalActions = Array.from(
       container.querySelectorAll<HTMLButtonElement>('[class*="goblin-terminal-composer__key-action--optional-"]'),
     )
-    expect(optionalActions.map((button) => button.querySelector('.sr-only')?.textContent)).toEqual([
-      LABELS.enter,
-      LABELS.backspace,
-      LABELS.tab,
-      LABELS.escape,
-      LABELS.ctrlC,
-      LABELS.ctrlD,
-    ])
-    const keyRowLabels = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('.goblin-terminal-composer__key-row button'),
-    ).map((button) => button.querySelector('.sr-only')?.textContent)
-    expect(keyRowLabels.slice(0, 6)).toEqual([
-      LABELS.enter,
-      LABELS.backspace,
-      LABELS.tab,
-      LABELS.escape,
-      LABELS.ctrlC,
-      LABELS.ctrlD,
-    ])
+    expect(optionalActions.map((button) => button.querySelector('.sr-only')?.textContent)).toEqual(
+      optionalCommandLabels,
+    )
     for (const button of optionalActions) act(() => button.click())
-    expect(onVirtualKey.mock.calls.slice(-6).map(([key]) => key)).toEqual([
-      'enter',
-      'backspace',
-      'tab',
-      'escape',
-      'interrupt',
-      'eof',
-    ])
+    expect(onVirtualKey.mock.calls.slice(-4).map(([key]) => key)).toEqual(['backspace', 'escape', 'interrupt', 'eof'])
 
     for (const [label, key] of [
-      [LABELS.enter, 'enter'],
       [LABELS.backspace, 'backspace'],
-      [LABELS.tab, 'tab'],
       [LABELS.escape, 'escape'],
       [LABELS.ctrlC, 'interrupt'],
       [LABELS.ctrlD, 'eof'],
     ] as const) {
       openMoreMenu(container)
-      if (key === 'enter') {
+      if (key === 'backspace') {
+        const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
+        if (!menu) throw new Error('expected Composer menu')
         expect(
-          Array.from(document.querySelectorAll('[data-terminal-composer-keycap]')).map((keycap) => keycap.textContent),
-        ).toEqual(['↵', '⌫', '⇥', 'Esc', '^C', '^D'])
+          Array.from(menu.querySelectorAll('[data-terminal-composer-keycap]')).map((keycap) => keycap.textContent),
+        ).toEqual(['⌫', 'Esc', '^C', '^D'])
+        expect(within(menu).queryByRole('button', { name: LABELS.enter })).toBeNull()
+        expect(within(menu).queryByRole('button', { name: LABELS.tab })).toBeNull()
+        expect(menu.querySelectorAll('[data-slot="separator"]')).toHaveLength(1)
       }
       act(() => menuItemByText(label).click())
       expect(onVirtualKey).toHaveBeenLastCalledWith(key)

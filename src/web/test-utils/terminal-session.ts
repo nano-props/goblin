@@ -101,6 +101,7 @@ const xtermMocks = vi.hoisted(() => {
     customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null
     private textarea: HTMLTextAreaElement | null = null
     private resizeHandlers: Array<(size: { cols: number; rows: number }) => void> = []
+    private cursorMoveHandlers: Array<() => void> = []
     private dataHandlers: Array<(data: string) => void> = []
     private binaryHandlers: Array<(data: string) => void> = []
     private keyHandlers: Array<(event: { key: string; domEvent: KeyboardEvent }) => void> = []
@@ -171,6 +172,17 @@ const xtermMocks = vi.hoisted(() => {
     onResize(cb: (size: { cols: number; rows: number }) => void) {
       this.resizeHandlers.push(cb)
       return { dispose: vi.fn(() => (this.resizeHandlers = this.resizeHandlers.filter((handler) => handler !== cb))) }
+    }
+
+    onCursorMove = (cb: () => void) => {
+      this.cursorMoveHandlers.push(cb)
+      return {
+        dispose: vi.fn(() => (this.cursorMoveHandlers = this.cursorMoveHandlers.filter((handler) => handler !== cb))),
+      }
+    }
+
+    emitCursorMove() {
+      for (const handler of this.cursorMoveHandlers) handler()
     }
 
     onRender(cb: (range: { start: number; end: number }) => void) {

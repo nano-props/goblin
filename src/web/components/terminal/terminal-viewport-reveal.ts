@@ -1,7 +1,11 @@
+type TerminalViewportEventSource = (listener: () => void) => { dispose: () => void }
+
 interface TerminalViewportRevealOptions {
   element: HTMLElement
   textarea: HTMLTextAreaElement
   visualViewport: VisualViewport
+  onCursorMove: TerminalViewportEventSource
+  onTerminalResize: TerminalViewportEventSource
   getLineHeight: () => number
   getCursorRow: () => number | null
 }
@@ -50,15 +54,13 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
 
   let pending = false
   let frameId: number | null = null
+  // Horizontal cursor movement cannot change page reveal geometry.
+  let observedCursorRow = options.getCursorRow()
   const cancelPending = () => {
     pending = false
   }
   const applyPending = () => {
     if (!pending || options.textarea.ownerDocument.activeElement !== options.textarea) return
-
-    const visibleBottom = options.visualViewport.offsetTop + options.visualViewport.height
-    const terminalRect = options.element.getBoundingClientRect()
-    if (terminalRect.bottom <= visibleBottom) return
 
     const lineHeight = options.getLineHeight()
     const cursorRow = options.getCursorRow()
@@ -68,6 +70,17 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
     revealMarker.style.top = `${cursorRow * lineHeight}px`
     revealMarker.style.height = `${lineHeight}px`
     revealMarker.style.scrollMarginBlockEnd = `${revealMargin}px`
+    observedCursorRow = cursorRow
+
+    const visibleTop = options.visualViewport.offsetTop
+    const visibleBottom = visibleTop + options.visualViewport.height
+    const cursorTop = options.element.getBoundingClientRect().top + cursorRow * lineHeight
+    const cursorBottom = cursorTop + lineHeight + revealMargin
+    if (cursorTop >= visibleTop && cursorBottom <= visibleBottom) {
+      // Keep the request pending so a later visual-viewport pan rechecks the focused input.
+      return
+    }
+
     pending = false
     revealMarker.scrollIntoView(SCROLL_INTO_VIEW_OPTIONS)
   }
@@ -82,24 +95,34 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
     pending = true
     schedulePending()
   }
-  const rearmReveal = () => {
-    pending = true
+  const requestRevealWhileFocused = () => {
+    if (options.textarea.ownerDocument.activeElement === options.textarea) requestReveal()
+  }
+  const requestRevealForCursorMove = () => {
+    const nextCursorRow = options.getCursorRow()
+    if (nextCursorRow === observedCursorRow) return
+    observedCursorRow = nextCursorRow
+    requestRevealWhileFocused()
   }
 
   options.textarea.addEventListener('focus', requestReveal)
   options.textarea.addEventListener('blur', cancelPending)
-  options.element.addEventListener('pointerdown', rearmReveal, { passive: true })
-  options.visualViewport.addEventListener('resize', schedulePending)
+  options.element.addEventListener('pointerdown', requestReveal, { passive: true })
+  options.visualViewport.addEventListener('resize', requestRevealWhileFocused)
   options.visualViewport.addEventListener('scroll', schedulePending)
+  const cursorMoveSubscription = options.onCursorMove(requestRevealForCursorMove)
+  const terminalResizeSubscription = options.onTerminalResize(requestRevealWhileFocused)
 
   return {
     dispose: () => {
       pending = false
       if (frameId !== null) ownerWindow.cancelAnimationFrame(frameId)
+      cursorMoveSubscription.dispose()
+      terminalResizeSubscription.dispose()
       options.textarea.removeEventListener('focus', requestReveal)
       options.textarea.removeEventListener('blur', cancelPending)
-      options.element.removeEventListener('pointerdown', rearmReveal)
-      options.visualViewport.removeEventListener('resize', schedulePending)
+      options.element.removeEventListener('pointerdown', requestReveal)
+      options.visualViewport.removeEventListener('resize', requestRevealWhileFocused)
       options.visualViewport.removeEventListener('scroll', schedulePending)
       revealMarker.remove()
     },

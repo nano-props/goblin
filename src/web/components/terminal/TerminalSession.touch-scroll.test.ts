@@ -26,7 +26,7 @@ function scrollGesture(element: HTMLElement, identifier: number) {
 
 beforeEach(resetTerminalSessionHarness)
 
-test('delegates touch scroll only while xterm owns normal-buffer scrolling', async () => {
+test('supports vertical touch scrolling only in the normal buffer without mouse tracking', async () => {
   const { session, term } = await startOpenControllerSession()
   const element = term.element!
 

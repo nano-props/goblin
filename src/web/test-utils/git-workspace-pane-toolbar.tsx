@@ -390,7 +390,6 @@ export function renderToolbar(options: {
     createTerminal,
     selectTerminal,
     scrollToBottom,
-    scrollLines: vi.fn(),
     clearBell: vi.fn(() => false),
     closeTerminalByDescriptor,
     attach: vi.fn(),

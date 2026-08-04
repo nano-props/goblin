@@ -18,8 +18,6 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  ChevronsDown,
-  ChevronsUp,
   CornerDownLeft,
   Delete,
   Keyboard,
@@ -31,7 +29,8 @@ import { cn } from '#/web/lib/cn.ts'
 import { TerminalComposerMenu } from '#/web/components/terminal/terminal-composer-menu.tsx'
 import { TerminalComposerHistoryCursor } from '#/web/components/terminal/terminal-composer-history-cursor.ts'
 import {
-  TERMINAL_COMPOSER_COMMAND_KEYS,
+  TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS,
+  TERMINAL_COMPOSER_PINNED_COMMAND_KEYS,
   type TerminalComposerCommandLabelKey,
 } from '#/web/components/terminal/terminal-composer-command-keys.ts'
 import { isDesktopMacNavigatorPlatform, isImeOwnedKeyboardEvent } from '#/web/components/terminal/terminal-keyboard.ts'
@@ -62,8 +61,6 @@ export interface TerminalComposerLabels {
   escape: string
   ctrlC: string
   ctrlD: string
-  pageUp: string
-  pageDown: string
 }
 
 interface TerminalComposerProps {
@@ -83,7 +80,6 @@ interface TerminalComposerProps {
   onDraftReplace: (expectedDraft: string, draft: string) => boolean
   onResolveFiles: (files: File[]) => Promise<string | null>
   onRequestFocus: () => void
-  onScrollLines: (amount: number) => void
   hidden?: boolean
   className?: string
 }
@@ -96,33 +92,30 @@ type AccessibleName = Exclude<
   keyof TerminalComposerLabels,
   'composer' | 'open' | 'close' | 'inputPlaceholder' | 'more' | 'uploadFiles' | 'showKeys' | 'showInput'
 >
-type PrimaryKeyAction = { accessibleName: AccessibleName } & (
-  | { type: 'virtual-key'; icon: ReactNode; key: TerminalVirtualKey }
-  | { type: 'scroll'; icon: ReactNode; amount: number }
-)
+
+interface PrimaryKeyAction {
+  accessibleName: AccessibleName
+  icon: ReactNode
+  key: TerminalVirtualKey
+}
 
 const PRIMARY_KEY_ACTIONS: PrimaryKeyAction[] = [
-  { type: 'virtual-key', icon: <ArrowUp className="size-4" />, key: 'arrow-up', accessibleName: 'arrowUp' },
   {
-    type: 'virtual-key',
-    icon: <ArrowDown className="size-4" />,
-    key: 'arrow-down',
-    accessibleName: 'arrowDown',
-  },
-  {
-    type: 'virtual-key',
     icon: <ArrowLeft className="size-4" />,
     key: 'arrow-left',
     accessibleName: 'arrowLeft',
   },
   {
-    type: 'virtual-key',
+    icon: <ArrowDown className="size-4" />,
+    key: 'arrow-down',
+    accessibleName: 'arrowDown',
+  },
+  { icon: <ArrowUp className="size-4" />, key: 'arrow-up', accessibleName: 'arrowUp' },
+  {
     icon: <ArrowRight className="size-4" />,
     key: 'arrow-right',
     accessibleName: 'arrowRight',
   },
-  { type: 'scroll', icon: <ChevronsUp className="size-4" />, amount: -12, accessibleName: 'pageUp' },
-  { type: 'scroll', icon: <ChevronsDown className="size-4" />, amount: 12, accessibleName: 'pageDown' },
 ]
 
 const COMMAND_KEY_ICONS: Partial<Record<TerminalComposerCommandLabelKey, ReactNode>> = {
@@ -172,7 +165,6 @@ export function TerminalComposer({
   onDraftReplace,
   onResolveFiles,
   onRequestFocus,
-  onScrollLines,
   hidden,
   className,
 }: TerminalComposerProps) {
@@ -482,10 +474,20 @@ export function TerminalComposer({
               className="goblin-terminal-composer__key-scroll"
             >
               <div className="goblin-terminal-composer__key-row">
-                {TERMINAL_COMPOSER_COMMAND_KEYS.map((key, index) => (
+                {TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS.map((key, index) => (
                   <ComposerButton
                     key={key.key}
                     className={`goblin-terminal-composer__key-action--optional-${index + 1}`}
+                    accessibleName={labels[key.labelKey]}
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={(event) => handleVirtualKeyClick(event, key.key)}
+                  >
+                    {COMMAND_KEY_ICONS[key.labelKey] ?? key.keycap}
+                  </ComposerButton>
+                ))}
+                {TERMINAL_COMPOSER_PINNED_COMMAND_KEYS.map((key) => (
+                  <ComposerButton
+                    key={key.key}
                     accessibleName={labels[key.labelKey]}
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={(event) => handleVirtualKeyClick(event, key.key)}
@@ -498,13 +500,7 @@ export function TerminalComposer({
                     key={key.accessibleName}
                     accessibleName={labels[key.accessibleName]}
                     onPointerDown={(event) => event.preventDefault()}
-                    onClick={(event) => {
-                      if (key.type === 'scroll') {
-                        onScrollLines(key.amount)
-                        return
-                      }
-                      handleVirtualKeyClick(event, key.key)
-                    }}
+                    onClick={(event) => handleVirtualKeyClick(event, key.key)}
                   >
                     {key.icon}
                   </ComposerButton>

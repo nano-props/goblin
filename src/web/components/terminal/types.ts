@@ -212,7 +212,6 @@ export interface TerminalSessionContextValue {
   ) => Promise<TerminalCreateAdmissionResult>
   selectTerminal: (terminalFilesystemTargetKey: string, terminalSessionId: string) => void
   scrollToBottom: (terminalSessionId: string) => void
-  scrollLines: (terminalSessionId: string, amount: number) => void
   clearBell: (terminalSessionId: string) => boolean
   closeTerminalByDescriptor: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void

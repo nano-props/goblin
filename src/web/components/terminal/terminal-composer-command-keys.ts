@@ -6,24 +6,20 @@ interface TerminalComposerCommandKey {
   keycap: string
 }
 
-const EDITING_COMMAND_KEYS = [
-  { key: 'enter', labelKey: 'enter', keycap: '↵' },
-  { key: 'backspace', labelKey: 'backspace', keycap: '⌫' },
+export const TERMINAL_COMPOSER_PINNED_COMMAND_KEYS = [
   { key: 'tab', labelKey: 'tab', keycap: '⇥' },
+  { key: 'enter', labelKey: 'enter', keycap: '↵' },
 ] as const satisfies readonly TerminalComposerCommandKey[]
 
-const CONTROL_COMMAND_KEYS = [
+export const TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS = [
+  { key: 'backspace', labelKey: 'backspace', keycap: '⌫' },
   { key: 'escape', labelKey: 'escape', keycap: 'Esc' },
   { key: 'interrupt', labelKey: 'ctrlC', keycap: '^C' },
   { key: 'eof', labelKey: 'ctrlD', keycap: '^D' },
 ] as const satisfies readonly TerminalComposerCommandKey[]
 
-export const TERMINAL_COMPOSER_COMMAND_KEY_GROUPS = [
-  { id: 'editing', keys: EDITING_COMMAND_KEYS },
-  { id: 'control', keys: CONTROL_COMMAND_KEYS },
-] as const
-
-export const TERMINAL_COMPOSER_COMMAND_KEYS = [...EDITING_COMMAND_KEYS, ...CONTROL_COMMAND_KEYS] as const
-
-export type TerminalComposerCommandLabelKey = (typeof TERMINAL_COMPOSER_COMMAND_KEYS)[number]['labelKey']
-export type TerminalComposerCommandKeyName = (typeof TERMINAL_COMPOSER_COMMAND_KEYS)[number]['key']
+export type TerminalComposerCommandLabelKey =
+  | (typeof TERMINAL_COMPOSER_PINNED_COMMAND_KEYS)[number]['labelKey']
+  | (typeof TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS)[number]['labelKey']
+export type TerminalComposerMenuCommandLabelKey = (typeof TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS)[number]['labelKey']
+export type TerminalComposerMenuCommandKeyName = (typeof TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS)[number]['key']

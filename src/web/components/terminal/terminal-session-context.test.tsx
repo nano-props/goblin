@@ -41,7 +41,6 @@ function makeCommandContext(overrides: Partial<TerminalSessionContextValue> = {}
     })) as TerminalSessionContextValue['createTerminalWithAdmission'],
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
-    scrollLines: vi.fn(),
     clearBell: vi.fn(() => false),
     closeTerminalByDescriptor: vi.fn(async () => false),
     attach: vi.fn(),

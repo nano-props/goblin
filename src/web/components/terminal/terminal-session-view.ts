@@ -222,10 +222,6 @@ export class TerminalSessionView {
     this.term?.scrollToBottom()
   }
 
-  scrollLines(amount: number): void {
-    this.term?.scrollLines(amount)
-  }
-
   sendVirtualKey(key: TerminalVirtualKey): void {
     const term = this.term
     if (!term) return
@@ -336,6 +332,8 @@ export class TerminalSessionView {
         element,
         textarea,
         visualViewport,
+        onCursorMove: (listener) => term.onCursorMove(listener),
+        onTerminalResize: (listener) => term.onResize(listener),
         getLineHeight: () => this.terminalLineHeight(term),
         getCursorRow: () => terminalInputRevealRow(term.buffer.active, term.rows),
       }),

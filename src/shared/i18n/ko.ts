@@ -418,8 +418,6 @@ export const ko: Record<DictKey, string> = {
   'terminal.composer-key-escape': 'Esc',
   'terminal.composer-key-ctrl-c': 'Ctrl+C',
   'terminal.composer-key-ctrl-d': 'Ctrl+D',
-  'terminal.composer-key-page-up': '위로 페이지 이동(터미널 스크롤)',
-  'terminal.composer-key-page-down': '아래로 페이지 이동(터미널 스크롤)',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder',
