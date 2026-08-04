@@ -112,6 +112,9 @@ export const en = {
   'workspace-picker.clone-confirm': 'Clone and open',
   'workspace-picker.clone-cloning': 'Cloning…',
   'workspace-picker.clone-opened': 'Repository cloned',
+  'workspace-picker.clone-open-uncertain': 'Repository cloned, but workspace open status is uncertain',
+  'workspace-picker.clone-presentation-failed':
+    'Repository cloned and workspace opened, but the interface could not be updated completely',
   'workspace-picker.open-remote-title': 'Open Remote Workspace',
   'workspace-picker.open-remote-description': 'Select an SSH alias and enter the workspace path.',
   'workspace-picker.open-remote-host-label': 'Host',

@@ -101,6 +101,8 @@ export const zh: Record<DictKey, string> = {
   'workspace-picker.clone-confirm': '克隆并打开',
   'workspace-picker.clone-cloning': '正在克隆…',
   'workspace-picker.clone-opened': '仓库已克隆',
+  'workspace-picker.clone-open-uncertain': '仓库已克隆，但工作区是否成功打开尚不确定',
+  'workspace-picker.clone-presentation-failed': '仓库已克隆且工作区已打开，但界面未能完整更新',
   'workspace-picker.open-remote-title': '打开远程工作区',
   'workspace-picker.open-remote-description': '选择一个 SSH 别名并填写工作区路径。',
   'workspace-picker.open-remote-host-label': '主机',

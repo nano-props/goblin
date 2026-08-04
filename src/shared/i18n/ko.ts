@@ -102,6 +102,9 @@ export const ko: Record<DictKey, string> = {
   'workspace-picker.clone-confirm': '클론 후 열기',
   'workspace-picker.clone-cloning': '클론 중…',
   'workspace-picker.clone-opened': '리포지토리를 클론했습니다',
+  'workspace-picker.clone-open-uncertain': '리포지토리를 클론했지만 작업 공간이 열렸는지 확인할 수 없습니다',
+  'workspace-picker.clone-presentation-failed':
+    '리포지토리를 클론하고 작업 공간을 열었지만 화면을 완전히 업데이트하지 못했습니다',
   'workspace-picker.open-remote-title': '원격 작업 공간 열기',
   'workspace-picker.open-remote-description': 'SSH 별칭을 고르고 작업 공간 경로를 입력하세요.',
   'workspace-picker.open-remote-host-label': '호스트',
