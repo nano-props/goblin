@@ -224,7 +224,8 @@ export interface TerminalSessionContextValue {
   clearSearch: (terminalSessionId: string) => void
   captureInputWriter: (terminalSessionId: string) => TerminalInputWriter | null
   sendVirtualKey: (terminalSessionId: string, key: TerminalVirtualKey) => void
-  setComposerExpanded: (terminalSessionId: string, expanded: boolean) => boolean
+  openComposer: (terminalSessionId: string) => boolean
+  closeComposer: (terminalSessionId: string) => boolean
   setComposerMode: (terminalSessionId: string, mode: TerminalComposerMode) => boolean
   setComposerDraft: (terminalSessionId: string, draft: string) => boolean
   /** Replaces the draft only when it still matches expectedDraft. Returns whether the replacement was applied. */

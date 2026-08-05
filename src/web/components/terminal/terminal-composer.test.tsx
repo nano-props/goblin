@@ -40,7 +40,6 @@ function render(
     initialMode?: TerminalComposerMode
     initialDraft?: string
     draftReplaceAccepted?: boolean
-    onInputBlur?: () => void
   } = {},
 ) {
   function ControlledComposer() {
@@ -65,8 +64,13 @@ function render(
         shortcut="Control+Shift+Enter"
         onVirtualKey={props.onVirtualKey ?? vi.fn()}
         onSendText={sendText}
-        onExpandedChange={(next) => {
-          setExpanded(next)
+        onOpen={() => {
+          setExpanded(true)
+          setMode('input')
+          return true
+        }}
+        onClose={() => {
+          setExpanded(false)
           return true
         }}
         onModeChange={(next) => {
@@ -84,7 +88,6 @@ function render(
         }}
         onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
         onRequestFocus={props.onRequestFocus ?? vi.fn()}
-        onInputBlur={props.onInputBlur}
       />
     )
   }
@@ -100,7 +103,8 @@ function expand(container: HTMLElement) {
 }
 
 function showInput(container: HTMLElement) {
-  act(() => buttonByAccessibleName(container, LABELS.showInput).click())
+  const button = within(container).queryByRole('button', { name: LABELS.showInput })
+  if (button) act(() => button.click())
 }
 
 function openMoreMenu(container: HTMLElement) {
@@ -135,7 +139,8 @@ function ExpandedComposerForTest({
       shortcut="Control+Shift+Enter"
       onVirtualKey={vi.fn()}
       onSendText={vi.fn(async () => true)}
-      onExpandedChange={vi.fn(() => true)}
+      onOpen={vi.fn(() => true)}
+      onClose={vi.fn(() => true)}
       onModeChange={vi.fn(() => true)}
       onDraftChange={(next) => {
         setDraft(next)
@@ -448,9 +453,9 @@ describe('TerminalComposer', () => {
     expect(surface?.getAttribute('aria-hidden')).toBe('false')
     expect(surface?.hasAttribute('inert')).toBe(false)
     const modeRow = container.querySelector('.goblin-terminal-composer__mode-row')
-    const showInputButton = buttonByAccessibleName(container, LABELS.showInput)
+    const showKeysButton = buttonByAccessibleName(container, LABELS.showKeys)
     const more = buttonByAccessibleName(container, LABELS.more)
-    expect(showInputButton.parentElement).toBe(modeRow)
+    expect(showKeysButton.parentElement).toBe(modeRow)
     expect(more.parentElement).toBe(modeRow)
     expect(more.querySelector('.lucide-ellipsis')).not.toBeNull()
     expect(container.querySelector('.goblin-terminal-composer--expanded')).not.toBeNull()
@@ -459,19 +464,19 @@ describe('TerminalComposer', () => {
     act(() => menuItemByText(LABELS.close).click())
     expect(surface?.getAttribute('aria-hidden')).toBe('true')
     expect(surface?.hasAttribute('inert')).toBe(true)
-    expect(container.querySelector('textarea')).toBeNull()
+    expect(container.querySelector('textarea')).not.toBeNull()
     await vi.waitFor(() => expect(document.activeElement).toBe(openButton))
   })
 
-  test('moves keyboard focus into keys mode when expanded', async () => {
+  test('opens in input mode even when the retained mode was keys', async () => {
     const user = userEvent.setup()
     const { container } = render()
     const openButton = buttonByAccessibleName(container, LABELS.open)
-    openButton.focus()
 
-    await user.keyboard('{Enter}')
+    await user.click(openButton)
 
-    expect(document.activeElement).toBe(buttonByAccessibleName(container, LABELS.showInput))
+    expect(document.activeElement).toBe(container.querySelector('textarea'))
+    expect(container.querySelector('textarea')).not.toBeNull()
   })
 
   test('moves keyboard focus into input mode when expanded by clicking the trigger', async () => {
@@ -481,18 +486,6 @@ describe('TerminalComposer', () => {
     await user.click(buttonByAccessibleName(container, LABELS.open))
 
     expect(document.activeElement).toBe(container.querySelector('textarea'))
-  })
-
-  test('releases input focus ownership when the Composer instance unmounts', async () => {
-    const user = userEvent.setup()
-    const onInputBlur = vi.fn()
-    const rendered = render({ initialMode: 'input', onInputBlur })
-
-    await user.click(buttonByAccessibleName(rendered.container, LABELS.open))
-    onInputBlur.mockClear()
-    rendered.unmount()
-
-    expect(onInputBlur).toHaveBeenCalledOnce()
   })
 
   test('collapses on a physical Escape and restores the trigger focus', async () => {
@@ -511,6 +504,7 @@ describe('TerminalComposer', () => {
     const onVirtualKey = vi.fn()
     const { container } = render({ onVirtualKey })
     expand(container)
+    act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
     const modeToggle = buttonByAccessibleName(container, LABELS.showInput)
     const composer = container.querySelector('.goblin-terminal-composer')
 
@@ -786,6 +780,7 @@ describe('TerminalComposer', () => {
     const onVirtualKey = vi.fn()
     const { container } = render({ onVirtualKey })
     expand(container)
+    act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
 
     expect(container.querySelector('textarea')).toBeNull()
     expect(
@@ -871,10 +866,10 @@ describe('TerminalComposer', () => {
     expect(buttonByAccessibleName(container, LABELS.showKeys).querySelector('.lucide-keyboard')).not.toBeNull()
   })
 
-  test('restores the last mode after collapsing and reopening', async () => {
+  test('reopens in input mode instead of restoring keys mode', async () => {
     const { container } = render()
     expand(container)
-    showInput(container)
+    act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
     openMoreMenu(container)
     act(() => menuItemByText(LABELS.close).click())
     await vi.waitFor(() =>

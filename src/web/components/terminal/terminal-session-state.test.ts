@@ -20,11 +20,12 @@ describe('TerminalSessionState', () => {
     const state = new TerminalSessionState()
     const initialHistory = state.snapshot(null).composer.historyEntries
 
-    expect(state.setComposerExpanded(false)).toBe(false)
-    expect(state.setComposerExpanded(true)).toBe(true)
+    expect(state.closeComposer()).toBe(false)
+    expect(state.openComposer()).toBe(true)
     expect(state.setComposerMode('input')).toBe(false)
     expect(state.setComposerMode('keys')).toBe(true)
-    expect(state.setComposerMode('input')).toBe(true)
+    expect(state.openComposer()).toBe(true)
+    expect(state.openComposer()).toBe(false)
     expect(state.setComposerDraft('line one\r\nline two')).toBe(true)
     expect(state.setComposerDraft('line one\r\nline two')).toBe(false)
     expect(state.replaceComposerDraft('different draft', '')).toBe(false)
@@ -52,7 +53,7 @@ describe('TerminalSessionState', () => {
     const first = new TerminalSessionState()
     const second = new TerminalSessionState()
 
-    first.setComposerExpanded(true)
+    first.openComposer()
     first.setComposerMode('keys')
     first.setComposerDraft('first session draft')
     first.recordComposerHistory('first session only')
@@ -64,6 +65,29 @@ describe('TerminalSessionState', () => {
       historyEntries: ['first session only'],
     })
     expect(second.snapshot(null).composer).toEqual(DEFAULT_COMPOSER)
+  })
+
+  test('closes without replacing retained state and reopens in input mode', () => {
+    const state = new TerminalSessionState()
+    state.openComposer()
+    state.setComposerMode('keys')
+    state.setComposerDraft('retained draft')
+
+    expect(state.closeComposer()).toBe(true)
+    expect(state.closeComposer()).toBe(false)
+    expect(state.snapshot(null).composer).toEqual({
+      expanded: false,
+      mode: 'keys',
+      draft: 'retained draft',
+      historyEntries: [],
+    })
+    expect(state.openComposer()).toBe(true)
+    expect(state.snapshot(null).composer).toEqual({
+      expanded: true,
+      mode: 'input',
+      draft: 'retained draft',
+      historyEntries: [],
+    })
   })
 
   test('initial state has the opening phase, default process name, and no attachment', () => {
@@ -298,7 +322,7 @@ describe('TerminalSessionState', () => {
     })
     state.setSearchResult({ resultIndex: 0, resultCount: 1, found: true })
     state.setProgress(1, 10)
-    state.setComposerExpanded(true)
+    state.openComposer()
     state.setComposerMode('input')
     state.recordComposerHistory('kept command')
 

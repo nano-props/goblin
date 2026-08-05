@@ -8,7 +8,8 @@ type TestTerminalSessionContextValue = Omit<
   | 'sendVirtualKey'
   | 'submitText'
   | 'retryPresentation'
-  | 'setComposerExpanded'
+  | 'openComposer'
+  | 'closeComposer'
   | 'setComposerMode'
   | 'setComposerDraft'
   | 'replaceComposerDraft'
@@ -21,7 +22,8 @@ type TestTerminalSessionContextValue = Omit<
       | 'sendVirtualKey'
       | 'submitText'
       | 'retryPresentation'
-      | 'setComposerExpanded'
+      | 'openComposer'
+      | 'closeComposer'
       | 'setComposerMode'
       | 'setComposerDraft'
       | 'replaceComposerDraft'
@@ -54,7 +56,8 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
   const sendVirtualKey = context.sendVirtualKey ?? unexpectedContextCapability('sendVirtualKey')
   const submitText = context.submitText ?? unexpectedContextCapability('submitText')
   const retryPresentation = context.retryPresentation ?? unexpectedContextCapability('retryPresentation')
-  const setComposerExpanded = context.setComposerExpanded ?? unexpectedContextCapability('setComposerExpanded')
+  const openComposer = context.openComposer ?? unexpectedContextCapability('openComposer')
+  const closeComposer = context.closeComposer ?? unexpectedContextCapability('closeComposer')
   const setComposerMode = context.setComposerMode ?? unexpectedContextCapability('setComposerMode')
   const setComposerDraft = context.setComposerDraft ?? unexpectedContextCapability('setComposerDraft')
   const replaceComposerDraft = context.replaceComposerDraft ?? unexpectedContextCapability('replaceComposerDraft')
@@ -65,7 +68,8 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
     sendVirtualKey,
     submitText,
     retryPresentation,
-    setComposerExpanded,
+    openComposer,
+    closeComposer,
     setComposerMode,
     setComposerDraft,
     replaceComposerDraft,

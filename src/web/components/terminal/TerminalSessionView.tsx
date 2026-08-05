@@ -8,6 +8,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
 } from 'react'
+import { flushSync } from 'react-dom'
 import { toast } from 'sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -28,8 +29,6 @@ import {
   useTerminalSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { TerminalComposer, type TerminalComposerHandle } from '#/web/components/terminal/terminal-composer.tsx'
-import { installTerminalComposerViewport } from '#/web/components/terminal/terminal-composer-viewport.ts'
-import type { TerminalComposerViewportHandle } from '#/web/components/terminal/terminal-composer-viewport.ts'
 import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
@@ -65,13 +64,6 @@ export function TerminalSessionView({
   const hostRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const composerRef = useRef<TerminalComposerHandle | null>(null)
-  const composerViewportRef = useRef<TerminalComposerViewportHandle | null>(null)
-  const activateComposerViewport = useCallback((input: HTMLTextAreaElement) => {
-    composerViewportRef.current?.activate(input)
-  }, [])
-  const resetComposerViewport = useCallback(() => {
-    composerViewportRef.current?.reset()
-  }, [])
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const context = useTerminalSessionContext()
@@ -84,7 +76,8 @@ export function TerminalSessionView({
     clearSearch,
     captureInputWriter,
     sendVirtualKey,
-    setComposerExpanded,
+    openComposer,
+    closeComposer,
     setComposerMode,
     setComposerDraft,
     replaceComposerDraft,
@@ -171,19 +164,6 @@ export function TerminalSessionView({
   useEffect(() => {
     if (searchOpen) searchInputRef.current?.focus({ preventScroll: true })
   }, [searchOpen])
-
-  useLayoutEffect(() => {
-    const container = sessionRootRef.current
-    const visualViewport = window.visualViewport
-    if (!container || !visualViewport) return
-
-    const composerViewport = installTerminalComposerViewport({ container, visualViewport })
-    composerViewportRef.current = composerViewport
-    return () => {
-      if (composerViewportRef.current === composerViewport) composerViewportRef.current = null
-      composerViewport.dispose()
-    }
-  }, [])
 
   useEffect(() => {
     return () => {
@@ -293,24 +273,6 @@ export function TerminalSessionView({
   // Keep controller-owned Composer state mounted during a local presentation
   // recovery, but do not expose controls until the xterm is available again.
   const composerHidden = searchOpen || presentationRecovery !== undefined
-  useLayoutEffect(() => {
-    if (
-      !terminalSessionId ||
-      !isController ||
-      composerHidden ||
-      !snapshot.composer.expanded ||
-      snapshot.composer.mode !== 'input'
-    ) {
-      resetComposerViewport()
-    }
-  }, [
-    composerHidden,
-    isController,
-    resetComposerViewport,
-    snapshot.composer.expanded,
-    snapshot.composer.mode,
-    terminalSessionId,
-  ])
   const showViewerOverlay = sessionPhase === 'open-viewer' && attachment?.role === 'viewer' && !presentationRecovery
   const showUnownedOverlay = sessionPhase === 'open-viewer' && attachment?.role === 'unowned' && !presentationRecovery
   const showErrorChip = sessionPhase === 'error-controller' || sessionPhase === 'error-viewer'
@@ -330,15 +292,14 @@ export function TerminalSessionView({
   const handleKeyDownCapture = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (isTerminalComposerShortcut(event)) {
-        if (
-          !terminalSessionId ||
-          !isController ||
-          presentationRecovery ||
-          isImeOwnedKeyboardEvent(event.nativeEvent) ||
-          !setComposerExpanded(terminalSessionId, true)
-        ) {
+        let opened = false
+        if (!terminalSessionId || !isController || presentationRecovery || isImeOwnedKeyboardEvent(event.nativeEvent)) {
           return
         }
+        flushSync(() => {
+          opened = openComposer(terminalSessionId)
+        })
+        if (!opened) return
         event.preventDefault()
         event.stopPropagation()
         cancelTerminalAutoFocus()
@@ -354,7 +315,7 @@ export function TerminalSessionView({
       isController,
       presentationRecovery,
       searchOpen,
-      setComposerExpanded,
+      openComposer,
       terminalSessionId,
     ],
   )
@@ -620,101 +581,98 @@ export function TerminalSessionView({
           </Button>
         </div>
       )}
-      <div className="goblin-terminal-session__presentation">
-        <div
-          ref={hostRef}
-          className={cn('goblin-terminal-session__host', hideTerminalHost && 'goblin-terminal-session__host--hidden')}
-          aria-readonly={(!isController && hasSessions) || undefined}
+      <div
+        ref={hostRef}
+        className={cn('goblin-terminal-session__host', hideTerminalHost && 'goblin-terminal-session__host--hidden')}
+        aria-readonly={(!isController && hasSessions) || undefined}
+      />
+      {isController && terminalSessionId && (
+        <TerminalComposer
+          ref={composerRef}
+          key={terminalSessionId}
+          className="goblin-terminal-composer--floating"
+          hidden={composerHidden}
+          labels={terminalComposerLabels}
+          expanded={snapshot.composer.expanded}
+          mode={snapshot.composer.mode}
+          draft={snapshot.composer.draft}
+          historyEntries={snapshot.composer.historyEntries}
+          shortcut={terminalComposerShortcut}
+          onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
+          onSendText={handleComposerSend}
+          onOpen={() => openComposer(terminalSessionId)}
+          onClose={() => closeComposer(terminalSessionId)}
+          onModeChange={(mode) => setComposerMode(terminalSessionId, mode)}
+          onDraftChange={(draft) => setComposerDraft(terminalSessionId, draft)}
+          onDraftReplace={(expectedDraft, draft) => replaceComposerDraft(terminalSessionId, expectedDraft, draft)}
+          onResolveFiles={resolveComposerFiles}
+          onRequestFocus={() => focusTerminal(terminalSessionId)}
         />
-        {isController && terminalSessionId && (
-          <TerminalComposer
-            ref={composerRef}
-            key={terminalSessionId}
-            className="goblin-terminal-composer--floating"
-            hidden={composerHidden}
-            labels={terminalComposerLabels}
-            expanded={snapshot.composer.expanded}
-            mode={snapshot.composer.mode}
-            draft={snapshot.composer.draft}
-            historyEntries={snapshot.composer.historyEntries}
-            shortcut={terminalComposerShortcut}
-            onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
-            onSendText={handleComposerSend}
-            onExpandedChange={(expanded) => setComposerExpanded(terminalSessionId, expanded)}
-            onModeChange={(mode) => setComposerMode(terminalSessionId, mode)}
-            onDraftChange={(draft) => setComposerDraft(terminalSessionId, draft)}
-            onDraftReplace={(expectedDraft, draft) => replaceComposerDraft(terminalSessionId, expectedDraft, draft)}
-            onResolveFiles={resolveComposerFiles}
-            onRequestFocus={() => focusTerminal(terminalSessionId)}
-            onInputFocus={activateComposerViewport}
-            onInputBlur={resetComposerViewport}
-          />
-        )}
-        {showViewerOverlay && (
-          <AttachmentOverlay
-            badge={readonlyBadge}
-            snapshot={snapshot}
-            takeover={{
-              label: t('terminal.takeover'),
-              pendingLabel: t('terminal.taking-over'),
-              terminalSessionId,
-              pending: snapshot.takeoverPending,
-              run: (takeoverSessionId) => {
-                // A negative result is authoritative; a rejected request still
-                // carries its delivery classification to this feedback boundary.
-                void takeover(takeoverSessionId).then(
-                  (ok) => {
-                    if (!ok) showTerminalTakeoverFailure(null, t)
-                  },
-                  (error: unknown) => showTerminalTakeoverFailure(error, t),
-                )
-              },
-            }}
-          />
-        )}
-        {showUnownedOverlay && <AttachmentOverlay badge={t('terminal.unowned')} snapshot={snapshot} />}
-        {/* Stable mount — see the constants block above for the aria-live rationale. */}
-        {showStatusOverlay && <StatusOverlay label={statusOverlayLabel} />}
-        {showProjectionRecoveryFailure && <PresentationFailureOverlay label={projectionFailureLabel} />}
-        {showPresentationFailure && (
-          <PresentationFailureOverlay
-            label={t('terminal.restore-failed')}
-            retryLabel={t('error.try-again')}
-            onRetry={() => terminalSessionId && retryPresentation(terminalSessionId)}
-          />
-        )}
-        {showEmptyCta && (
-          // Empty state: the worktree has no terminals yet. The bare
-          // host <div> renders a featureless black box otherwise, which
-          // is what the user reported as "blank screen" on the first
-          // click. Render an explicit CTA so the affordance is
-          // discoverable. The button is disabled while the create is
-          // in flight (we await `createTerminal`'s returned terminalSessionId to
-          // keep double-clicks idempotent — the registry dedupes by
-          // worktree via the pending-create queue, but a visible
-          // loading state is still the right user signal).
-          <EmptyTerminalCta
-            onCreate={async () => {
-              await createTerminalForSlot(base)
-            }}
-            emptyLabel={t('terminal.empty')}
-            newTerminalLabel={t('terminal.new')}
-          />
-        )}
-        {/* A retained error binding stays visible to every attachment. Only
+      )}
+      {showViewerOverlay && (
+        <AttachmentOverlay
+          badge={readonlyBadge}
+          snapshot={snapshot}
+          takeover={{
+            label: t('terminal.takeover'),
+            pendingLabel: t('terminal.taking-over'),
+            terminalSessionId,
+            pending: snapshot.takeoverPending,
+            run: (takeoverSessionId) => {
+              // A negative result is authoritative; a rejected request still
+              // carries its delivery classification to this feedback boundary.
+              void takeover(takeoverSessionId).then(
+                (ok) => {
+                  if (!ok) showTerminalTakeoverFailure(null, t)
+                },
+                (error: unknown) => showTerminalTakeoverFailure(error, t),
+              )
+            },
+          }}
+        />
+      )}
+      {showUnownedOverlay && <AttachmentOverlay badge={t('terminal.unowned')} snapshot={snapshot} />}
+      {/* Stable mount — see the constants block above for the aria-live rationale. */}
+      {showStatusOverlay && <StatusOverlay label={statusOverlayLabel} />}
+      {showProjectionRecoveryFailure && <PresentationFailureOverlay label={projectionFailureLabel} />}
+      {showPresentationFailure && (
+        <PresentationFailureOverlay
+          label={t('terminal.restore-failed')}
+          retryLabel={t('error.try-again')}
+          onRetry={() => terminalSessionId && retryPresentation(terminalSessionId)}
+        />
+      )}
+      {showEmptyCta && (
+        // Empty state: the worktree has no terminals yet. The bare
+        // host <div> renders a featureless black box otherwise, which
+        // is what the user reported as "blank screen" on the first
+        // click. Render an explicit CTA so the affordance is
+        // discoverable. The button is disabled while the create is
+        // in flight (we await `createTerminal`'s returned terminalSessionId to
+        // keep double-clicks idempotent — the registry dedupes by
+        // worktree via the pending-create queue, but a visible
+        // loading state is still the right user signal).
+        <EmptyTerminalCta
+          onCreate={async () => {
+            await createTerminalForSlot(base)
+          }}
+          emptyLabel={t('terminal.empty')}
+          newTerminalLabel={t('terminal.new')}
+        />
+      )}
+      {/* A retained error binding stays visible to every attachment. Only
           its controller can restart it; the existing takeover protocol is
           intentionally unavailable once the PTY is no longer open. */}
-        {showErrorChip && snapshot.message !== 'terminal.empty' && (
-          <div className="goblin-terminal-session__status-overlay goblin-terminal-session__status-overlay--error">
-            <span>{t(terminalErrorMessageKey)}</span>
-            {terminalSessionId && canRestart && (
-              <Button type="button" size="sm" variant="ghost" onClick={() => restart(terminalSessionId)}>
-                {t('terminal.restart')}
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+      {showErrorChip && snapshot.message !== 'terminal.empty' && (
+        <div className="goblin-terminal-session__status-overlay goblin-terminal-session__status-overlay--error">
+          <span>{t(terminalErrorMessageKey)}</span>
+          {terminalSessionId && canRestart && (
+            <Button type="button" size="sm" variant="ghost" onClick={() => restart(terminalSessionId)}>
+              {t('terminal.restart')}
+            </Button>
+          )}
+        </div>
+      )}
       {dragOver && (
         <div className="goblin-terminal-session__drop-overlay">
           <span>{t('terminal.drop-hint')}</span>
