@@ -5,6 +5,10 @@
 - The project runs TypeScript in Node.js strip-only mode. Do not use enums,
   runtime namespaces, parameter properties, or import aliases.
 - Pin new package versions exactly in `package.json`; do not add range prefixes.
+- Before adding a package or writing custom code, inspect and reuse suitable
+  capabilities in existing dependencies.
+- Prefer mature, actively maintained libraries. Build custom infrastructure
+  only when no suitable library exists or a concrete constraint requires it.
 - Use repo-alias imports with explicit `.ts` or `.tsx` extensions. Import the
   canonical module directly; do not add re-export shims.
 - Type dependencies use top-level `import type` declarations, never inline
@@ -28,6 +32,27 @@
   boundary tightening should be reviewed separately from mechanical cleanup.
   This is a readability guideline, not a destructuring ban or a static-check
   requirement.
+
+## Engineering approach
+
+- Do not preserve backward compatibility unless currently required. Replace
+  owned APIs, formats, behaviors, and paths atomically: update callers and
+  delete obsolete code without adapters, dual paths, migrations, or fallbacks.
+- Use the simplest implementation that fully satisfies current requirements and
+  invariants. Avoid speculative abstractions, extension points, policy flags,
+  and configuration for hypothetical needs.
+- Grow systems in small, complete end-to-end slices. Start with the minimum
+  working path and keep every increment coherent and usable. Do not dismantle a
+  working path for an unfinished replacement; finish the replacement, then
+  remove the old path.
+- Keep components modular and separate concerns at stable ownership and data
+  boundaries. Follow `docs/layering.md`: organize by feature, add only needed
+  layers, and split when it clarifies control, authority, or read/write flow.
+- Make architectural decisions for long-term ownership. Reject knowingly
+  temporary designs; every incremental slice must fit the durable architecture.
+- Before inventing a product interaction or architecture pattern, study mature
+  products and established systems solving the same problem. Prefer applicable
+  proven patterns; deviate only for a concrete project-specific reason.
 
 ## Verification and test data
 
