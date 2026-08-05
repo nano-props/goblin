@@ -17,7 +17,6 @@
   --goblin-terminal-composer-key-size: 40px;
   --goblin-terminal-composer-key-gap: 4px;
   --goblin-terminal-composer-max-width: 960px;
-  --goblin-terminal-keyboard-inset: 0px;
   --goblin-terminal-presentation-transform: none;
 }
 
@@ -551,11 +550,8 @@
   }
 }
 
-/* The fully grown surface needs 184px: 160px input, 12px vertical
-   surface padding, 2px border, and the 10px floating offset. Disable the
-   Composer in layouts that cannot present it intact. Keep this as a
-   presentation-only fast-fail for the extreme compact case; do not add a
-   second React height state or keyboard admission protocol for it. */
+/* The fully grown surface needs 184px. This CSS guard is sufficient for the
+   compact edge case; preserve Composer state until the panel can show it again. */
 @container goblin-terminal-session (max-height: 183px) {
   .goblin-terminal-composer {
     display: none;

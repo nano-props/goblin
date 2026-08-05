@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useEffectEvent,
   useId,
   useImperativeHandle,
   useLayoutEffect,
@@ -220,10 +221,11 @@ export function TerminalComposer({
   }
 
   useImperativeHandle(ref, () => ({ focus: requestComposerFocus }))
+  const releaseInputFocus = useEffectEvent(() => onInputBlur?.())
 
   useLayoutEffect(() => {
-    return () => onInputBlur?.()
-  }, [onInputBlur])
+    return () => releaseInputFocus()
+  }, [])
 
   useLayoutEffect(() => {
     history.updateEntries(historyEntries)

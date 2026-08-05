@@ -9,7 +9,6 @@ export interface TerminalComposerViewportHandle {
   dispose(): void
 }
 
-const KEYBOARD_INSET_PROPERTY = '--goblin-terminal-keyboard-inset'
 const PRESENTATION_TRANSFORM_PROPERTY = '--goblin-terminal-presentation-transform'
 
 export function installTerminalComposerViewport(
@@ -23,7 +22,6 @@ export function installTerminalComposerViewport(
   const setInset = (inset: string) => {
     if (appliedInset === inset) return
     appliedInset = inset
-    options.container.style.setProperty(KEYBOARD_INSET_PROPERTY, inset)
     options.container.style.setProperty(
       PRESENTATION_TRANSFORM_PROPERTY,
       inset === '0px' ? 'none' : `translateY(-${inset})`,

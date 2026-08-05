@@ -60,30 +60,27 @@ describe('TerminalSessionView composer', () => {
       act(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
       expect(document.activeElement).toBe(input)
       expect(focus).toHaveBeenLastCalledWith({ preventScroll: true })
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('0px')
       expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
       expect(rendered.container.querySelector('.goblin-terminal-session__host')?.parentElement).toBe(presentation)
       expect(rendered.container.querySelector('.goblin-terminal-composer')?.parentElement).toBe(presentation)
 
       Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
       act(() => visualViewport.dispatchEvent(new Event('resize')))
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('300px')
       expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
 
       containerBottom = 700
       const scrollAncestor = rendered.sessionRoot.parentElement
       if (!scrollAncestor) throw new Error('expected a session scroll ancestor')
       act(() => scrollAncestor.dispatchEvent(new Event('scroll', { bubbles: false })))
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('200px')
+      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-200px)')
 
       containerBottom = 800
       Object.defineProperty(visualViewport, 'offsetTop', { configurable: true, value: 100 })
       act(() => visualViewport.dispatchEvent(new Event('scroll')))
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('200px')
+      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-200px)')
 
       Object.defineProperty(visualViewport, 'height', { configurable: true, value: 450 })
       act(() => visualViewport.dispatchEvent(new Event('resize')))
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('250px')
       expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-250px)')
     } finally {
       await rendered.cleanup()
@@ -126,7 +123,7 @@ describe('TerminalSessionView composer', () => {
 
       Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
       act(() => visualViewport.dispatchEvent(new Event('resize')))
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('0px')
+      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
       terminalInput.focus()
 
       const trigger = buttonByLabel(rendered.container, 'terminal.composer-open')
@@ -136,12 +133,10 @@ describe('TerminalSessionView composer', () => {
 
       expect(document.activeElement).toBe(input)
       expect(focus).toHaveBeenLastCalledWith({ preventScroll: true })
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('300px')
       expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
 
       terminalInput.focus()
       expect(document.activeElement).toBe(terminalInput)
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('0px')
       expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
 
       expect(fireEvent.pointerDown(input, { pointerType: 'touch' })).toBe(true)
@@ -149,16 +144,14 @@ describe('TerminalSessionView composer', () => {
       input.focus()
       expect(document.activeElement).toBe(input)
       expect(focus).toHaveBeenLastCalledWith()
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('300px')
+      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
 
       Object.defineProperty(visualViewport, 'offsetTop', { configurable: true, value: 300 })
       act(() => visualViewport.dispatchEvent(new Event('scroll')))
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('0px')
       expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
 
       Object.defineProperty(visualViewport, 'offsetTop', { configurable: true, value: 0 })
       act(() => visualViewport.dispatchEvent(new Event('scroll')))
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('300px')
       expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
       await rendered.publishSnapshot({
         phase: 'open',
@@ -168,7 +161,7 @@ describe('TerminalSessionView composer', () => {
         attachment: { role: 'viewer' },
       })
       expect(rendered.container.querySelector('.goblin-terminal-composer')).toBeNull()
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('0px')
+      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
     } finally {
       await rendered.cleanup()
       if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
@@ -204,22 +197,22 @@ describe('TerminalSessionView composer', () => {
       })
 
       openComposerInput(rendered.container)
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('300px')
+      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
 
       Object.defineProperty(visualViewport, 'height', { configurable: true, value: 400 })
       Object.defineProperty(visualViewport, 'scale', { configurable: true, value: 2 })
       act(() => visualViewport.dispatchEvent(new Event('resize')))
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('0px')
+      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
 
       Object.defineProperty(visualViewport, 'scale', { configurable: true, value: 1 })
       Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
       act(() => visualViewport.dispatchEvent(new Event('resize')))
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('300px')
+      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
 
       rect.mockClear()
       await rendered.cleanup()
       unmounted = true
-      expect(session.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('0px')
+      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
       act(() => visualViewport.dispatchEvent(new Event('resize')))
       expect(rect).not.toHaveBeenCalled()
     } finally {
@@ -237,7 +230,7 @@ describe('TerminalSessionView composer', () => {
     try {
       const composer = rendered.container.querySelector<HTMLElement>('.goblin-terminal-composer--floating')
       if (!composer) throw new Error('expected a floating composer')
-      expect(rendered.sessionRoot.style.getPropertyValue('--goblin-terminal-keyboard-inset')).toBe('')
+      expect(rendered.sessionRoot.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('')
 
       const input = composerInput(rendered.container)
       const focus = vi.spyOn(input, 'focus')

@@ -4,22 +4,15 @@ import { describe, expect, test, vi } from 'vitest'
 import { installTerminalComposerViewport } from '#/web/components/terminal/terminal-composer-viewport.ts'
 
 describe('terminal Composer viewport lifecycle', () => {
-  test('removes active viewport resources when disposed', () => {
-    const originalResizeObserver = Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver')
+  test('observes the active container and releases viewport resources when disposed', () => {
+    const observe = vi.fn()
     const disconnect = vi.fn()
     const observerState: { callback: ResizeObserverCallback | null } = { callback: null }
-    class TestResizeObserver {
-      observe = vi.fn()
-      disconnect = disconnect
-
-      constructor(callback: ResizeObserverCallback) {
-        observerState.callback = callback
-      }
-    }
-    Object.defineProperty(globalThis, 'ResizeObserver', {
-      configurable: true,
-      writable: true,
-      value: TestResizeObserver,
+    const resizeObserver = vi.spyOn(globalThis, 'ResizeObserver').mockImplementation(function TestResizeObserver(
+      callback: ResizeObserverCallback,
+    ): ResizeObserver {
+      observerState.callback = callback
+      return { observe, disconnect, unobserve: vi.fn() }
     })
 
     const visualViewport = new EventTarget() as VisualViewport
@@ -36,8 +29,9 @@ describe('terminal Composer viewport lifecycle', () => {
     const removeViewportListener = vi.spyOn(visualViewport, 'removeEventListener')
     const addWindowListener = vi.spyOn(window, 'addEventListener')
     const removeWindowListener = vi.spyOn(window, 'removeEventListener')
-    const rect = vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
-      bottom: 800,
+    let containerBottom = 800
+    const rect = vi.spyOn(container, 'getBoundingClientRect').mockImplementation(() => ({
+      bottom: containerBottom,
       height: 800,
       left: 0,
       right: 400,
@@ -46,7 +40,7 @@ describe('terminal Composer viewport lifecycle', () => {
       x: 0,
       y: 0,
       toJSON: () => ({}),
-    })
+    }))
     const viewport = installTerminalComposerViewport({
       container,
       visualViewport,
@@ -56,27 +50,35 @@ describe('terminal Composer viewport lifecycle', () => {
       input.focus()
       viewport.activate(input)
 
-      expect(addViewportListener).toHaveBeenCalledWith('resize', expect.any(Function))
-      expect(addViewportListener).toHaveBeenCalledWith('scroll', expect.any(Function))
-      expect(addWindowListener).toHaveBeenCalledWith('scroll', expect.any(Function), true)
+      const resizeListener = addViewportListener.mock.calls.find(([type]) => type === 'resize')?.[1]
+      const viewportScrollListener = addViewportListener.mock.calls.find(([type]) => type === 'scroll')?.[1]
+      const windowScrollListener = addWindowListener.mock.calls.find(([type]) => type === 'scroll')?.[1]
+      if (!resizeListener || !viewportScrollListener || !windowScrollListener || !observerState.callback) {
+        throw new Error('expected active viewport resources')
+      }
+      expect(observe).toHaveBeenCalledWith(container)
+      expect(container.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
+
+      containerBottom = 700
       rect.mockClear()
-      observerState.callback?.([], {} as ResizeObserver)
+      observerState.callback([], {} as ResizeObserver)
       expect(rect).toHaveBeenCalledOnce()
+      expect(container.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-200px)')
 
       rect.mockClear()
       viewport.dispose()
 
-      expect(removeViewportListener).toHaveBeenCalledWith('resize', expect.any(Function))
-      expect(removeViewportListener).toHaveBeenCalledWith('scroll', expect.any(Function))
-      expect(removeWindowListener).toHaveBeenCalledWith('scroll', expect.any(Function), true)
+      expect(removeViewportListener).toHaveBeenCalledWith('resize', resizeListener)
+      expect(removeViewportListener).toHaveBeenCalledWith('scroll', viewportScrollListener)
+      expect(removeWindowListener).toHaveBeenCalledWith('scroll', windowScrollListener, true)
       expect(disconnect).toHaveBeenCalledOnce()
-      observerState.callback?.([], {} as ResizeObserver)
+      observerState.callback([], {} as ResizeObserver)
       expect(rect).not.toHaveBeenCalled()
+      expect(container.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
     } finally {
       viewport.dispose()
       container.remove()
-      if (originalResizeObserver) Object.defineProperty(globalThis, 'ResizeObserver', originalResizeObserver)
-      else Reflect.deleteProperty(globalThis, 'ResizeObserver')
+      resizeObserver.mockRestore()
     }
   })
 })
