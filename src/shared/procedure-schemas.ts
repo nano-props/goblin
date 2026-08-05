@@ -110,6 +110,10 @@ export const WORKSPACE_PROCEDURE_SCHEMAS = {
     target: WorkspacePaneFilesystemExecutionTargetSchema,
     path: WorkspaceFilesystemPathSchema,
   }),
+  downloadFile: v.object({
+    target: WorkspacePaneFilesystemExecutionTargetSchema,
+    path: WorkspaceFilesystemPathSchema,
+  }),
   fileViewer: v.object({ target: WorkspacePaneFilesystemExecutionTargetSchema }),
   openTerminal: v.object({
     target: WorkspacePaneFilesystemExecutionTargetSchema,

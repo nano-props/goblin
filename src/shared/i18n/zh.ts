@@ -347,6 +347,7 @@ export const zh: Record<DictKey, string> = {
   'filetree.truncated': '文件树已截断 — 缩小范围后可查看更多。',
   'filetree.error': '无法读取文件树。',
   'filetree.stale-title': '正在显示旧的文件树',
+  'filetree.download': '下载',
   'filetree.confirm-trash-title': '移到废纸篓？',
   'filetree.confirm-trash-body': '将会把此文件移到系统废纸篓：',
   'filetree.confirm-trash-confirm': '移到废纸篓',

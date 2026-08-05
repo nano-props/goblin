@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   readWorkspaceFileViewer: vi.fn(),
   readWorkspaceDirectoryOverview: vi.fn(),
   trashWorkspaceFile: vi.fn(),
+  openWorkspaceFileDownload: vi.fn(),
   openWorkspaceTerminal: vi.fn(),
   openWorkspaceEditor: vi.fn(),
   openWorkspaceInFinder: vi.fn(),
@@ -46,6 +47,9 @@ vi.mock('#/server/modules/workspace-directory-overview.ts', () => ({
   readWorkspaceDirectoryOverview: mocks.readWorkspaceDirectoryOverview,
 }))
 vi.mock('#/server/modules/workspace-file-trash.ts', () => ({ trashWorkspaceFile: mocks.trashWorkspaceFile }))
+vi.mock('#/server/modules/workspace-file-download.ts', () => ({
+  openWorkspaceFileDownload: mocks.openWorkspaceFileDownload,
+}))
 vi.mock('#/server/modules/workspace-external-apps.ts', () => ({
   openWorkspaceTerminal: mocks.openWorkspaceTerminal,
   openWorkspaceEditor: mocks.openWorkspaceEditor,
@@ -92,6 +96,10 @@ describe('workspace routes', () => {
       totalSizeBytes: 128,
     })
     mocks.trashWorkspaceFile.mockResolvedValue({ ok: true, message: '' })
+    mocks.openWorkspaceFileDownload.mockResolvedValue({
+      filename: 'example.bin',
+      stream: new Blob([new Uint8Array([0, 255, 1, 2])]).stream(),
+    })
     mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
     mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
     mocks.openWorkspaceInFinder.mockResolvedValue({ ok: true, message: '' })
@@ -375,6 +383,27 @@ describe('workspace routes', () => {
     expect(mocks.openWorkspaceInFinder).toHaveBeenCalledWith(target, expect.any(AbortSignal))
     expect(mocks.publishUserWorkspaceFilesystemInvalidation).toHaveBeenCalledWith(USER_ID, { target })
     expect(mocks.publishUserRepoReadInvalidation).not.toHaveBeenCalled()
+  })
+
+  test('serves a runtime-bound file from a browser-addressable URL', async () => {
+    const app = createTestWorkspaceRoutes()
+    const workspaceRuntimeId = await openWorkspaceRuntime(app, WORKSPACE_ID)
+    const target = workspaceRootTarget(WORKSPACE_ID, workspaceRuntimeId)
+    const query = new URLSearchParams({
+      kind: target.kind,
+      workspaceId: target.workspaceId,
+      workspaceRuntimeId: target.workspaceRuntimeId,
+      path: 'src/example.bin',
+    })
+
+    const response = await app.request(`/download-file?${query}`)
+
+    expect(response.status).toBe(200)
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array([0, 255, 1, 2]))
+    expect(response.headers.get('content-disposition')).toBe(
+      `attachment; filename="example.bin"; filename*=UTF-8''example.bin`,
+    )
+    expect(mocks.openWorkspaceFileDownload).toHaveBeenCalledWith(target, 'src/example.bin', expect.any(AbortSignal))
   })
 
   test('publishes Git projection invalidation only for a Git worktree trash mutation', async () => {

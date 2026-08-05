@@ -20,6 +20,7 @@ import {
   useFiletreeInteractionStore,
 } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import { getWorkspaceFileViewer } from '#/web/workspace-filesystem-client.ts'
+import { downloadWorkspaceFile } from '#/web/file-download.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
@@ -218,6 +219,9 @@ function ExecutionTargetFilesystemTabPanel({
             }
           : undefined
       }
+      onDownloadFile={(node) => {
+        if (node.kind === 'file') downloadWorkspaceFile(executionTarget, node.path)
+      }}
       onRequestTrashFile={target.capabilities.files.write ? requestTrashFile : undefined}
     />
   )
