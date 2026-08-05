@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useEffectEvent,
   useId,
   useImperativeHandle,
   useLayoutEffect,
@@ -11,7 +12,6 @@ import {
   type PointerEvent,
   type ReactNode,
   type Ref,
-  type RefObject,
 } from 'react'
 import {
   ArrowDown,
@@ -41,8 +41,6 @@ import {
   textareaOffsetToDraftOffset,
   terminalComposerEditCommandForEvent,
 } from '#/web/components/terminal/terminal-composer-editing.ts'
-import { installTerminalComposerViewport } from '#/web/components/terminal/terminal-composer-viewport.ts'
-import type { TerminalComposerViewportHandle } from '#/web/components/terminal/terminal-composer-viewport.ts'
 import type { TerminalComposerMode, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
 
 export interface TerminalComposerLabels {
@@ -68,7 +66,6 @@ export interface TerminalComposerLabels {
 
 interface TerminalComposerProps {
   ref?: Ref<TerminalComposerHandle>
-  containerRef?: RefObject<HTMLElement | null>
   labels: TerminalComposerLabels
   expanded: boolean
   mode: TerminalComposerMode
@@ -83,6 +80,8 @@ interface TerminalComposerProps {
   onDraftReplace: (expectedDraft: string, draft: string) => boolean
   onResolveFiles: (files: File[]) => Promise<string | null>
   onRequestFocus: () => void
+  onInputFocus?: (input: HTMLTextAreaElement) => void
+  onInputBlur?: () => void
   hidden?: boolean
   className?: string
 }
@@ -166,7 +165,6 @@ function focusComposerInput(input: HTMLTextAreaElement): void {
 
 export function TerminalComposer({
   ref,
-  containerRef,
   labels,
   expanded,
   mode,
@@ -181,13 +179,12 @@ export function TerminalComposer({
   onDraftReplace,
   onResolveFiles,
   onRequestFocus,
+  onInputFocus,
+  onInputBlur,
   hidden,
   className,
 }: TerminalComposerProps) {
   const [resolvingFiles, setResolvingFiles] = useState(false)
-  const composerRootRef = useRef<HTMLDivElement | null>(null)
-  const terminalBottomMarkerRef = useRef<HTMLSpanElement | null>(null)
-  const composerViewportHandleRef = useRef<TerminalComposerViewportHandle | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const modeToggleRef = useRef<HTMLButtonElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -197,10 +194,6 @@ export function TerminalComposer({
   const pendingFocusRef = useRef<'control' | 'trigger' | null>(null)
   const [history] = useState(() => new TerminalComposerHistoryCursor())
   const composerId = useId()
-
-  const revealTerminalBottom = () => {
-    composerViewportHandleRef.current?.revealTerminalBottom()
-  }
 
   const focusComposerControl = () => {
     if (mode === 'input') {
@@ -228,6 +221,11 @@ export function TerminalComposer({
   }
 
   useImperativeHandle(ref, () => ({ focus: requestComposerFocus }))
+  const releaseInputFocus = useEffectEvent(() => onInputBlur?.())
+
+  useLayoutEffect(() => {
+    return () => releaseInputFocus()
+  }, [])
 
   useLayoutEffect(() => {
     history.updateEntries(historyEntries)
@@ -268,27 +266,6 @@ export function TerminalComposer({
     observer.observe(input)
     return () => observer.disconnect()
   }, [expanded, mode])
-
-  useEffect(() => {
-    const composer = composerRootRef.current
-    const terminalBottomMarker = terminalBottomMarkerRef.current
-    const visualViewport = window.visualViewport
-    const container = containerRef?.current ?? composer?.parentElement
-    if (!composer || !container || !terminalBottomMarker || !visualViewport) return
-
-    const composerViewportHandle = installTerminalComposerViewport({
-      composer,
-      container,
-      terminalBottomMarker,
-      visualViewport,
-      getComposerInput: () => inputRef.current,
-    })
-    composerViewportHandleRef.current = composerViewportHandle
-    return () => {
-      if (composerViewportHandleRef.current === composerViewportHandle) composerViewportHandleRef.current = null
-      composerViewportHandle.dispose()
-    }
-  }, [containerRef])
 
   const submitDraft = async () => {
     if (!draft || resolvingFiles) return
@@ -378,7 +355,6 @@ export function TerminalComposer({
   }
   return (
     <div
-      ref={composerRootRef}
       className={cn('goblin-terminal-composer', expanded && 'goblin-terminal-composer--expanded', className)}
       data-expanded={expanded}
       hidden={hidden}
@@ -398,11 +374,6 @@ export function TerminalComposer({
         closeComposer()
       }}
     >
-      <span
-        ref={terminalBottomMarkerRef}
-        className="goblin-terminal-composer__terminal-bottom-marker"
-        aria-hidden="true"
-      />
       <ComposerButton
         buttonRef={triggerRef}
         className="goblin-terminal-composer__toggle"
@@ -455,7 +426,8 @@ export function TerminalComposer({
                 history.leaveBrowsing()
                 onDraftChange(event.target.value)
               }}
-              onFocus={revealTerminalBottom}
+              onFocus={(event) => onInputFocus?.(event.currentTarget)}
+              onBlur={onInputBlur}
               onPointerDown={() => history.leaveBrowsing()}
               onKeyDown={handleDraftKeyDown}
             />

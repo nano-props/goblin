@@ -17,7 +17,18 @@
   --goblin-terminal-composer-key-size: 40px;
   --goblin-terminal-composer-key-gap: 4px;
   --goblin-terminal-composer-max-width: 960px;
-  --goblin-terminal-composer-keyboard-offset: 0px;
+  --goblin-terminal-presentation-transform: none;
+}
+
+.goblin-terminal-session__presentation {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  width: 100%;
+  flex: 1;
+  flex-direction: column;
+  /* Keep keyboard adaptation paint-only so xterm's layout box, fit dimensions, and PTY rows stay unchanged. */
+  transform: var(--goblin-terminal-presentation-transform);
 }
 
 .goblin-terminal-session__host {
@@ -333,22 +344,10 @@
   display: none;
 }
 
-.goblin-terminal-composer__terminal-bottom-marker {
-  position: absolute;
-  right: 0;
-  /* Cancel the parent offset so page reveal always targets the terminal's logical bottom. */
-  bottom: calc(-1 * var(--goblin-terminal-composer-keyboard-offset));
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-  scroll-margin-block-end: var(--goblin-terminal-float-offset);
-}
-
 .goblin-terminal-composer--floating {
   position: absolute;
   right: var(--goblin-terminal-float-offset);
-  bottom: calc(var(--goblin-terminal-float-offset) + var(--goblin-terminal-composer-keyboard-offset));
+  bottom: var(--goblin-terminal-float-offset);
   z-index: 2;
 }
 
@@ -551,11 +550,10 @@
   }
 }
 
-/* The fully grown surface needs 184px: 160px input, 12px vertical
-   surface padding, 2px border, and the 10px floating offset. Keep the
-   unopened entry point out of layouts that cannot present it intact. */
+/* The fully grown surface needs 184px. This CSS guard is sufficient for the
+   compact edge case; preserve Composer state until the panel can show it again. */
 @container goblin-terminal-session (max-height: 183px) {
-  .goblin-terminal-composer:not([data-expanded='true']) {
+  .goblin-terminal-composer {
     display: none;
   }
 }
