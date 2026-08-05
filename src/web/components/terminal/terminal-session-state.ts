@@ -137,10 +137,17 @@ export class TerminalSessionState {
     return this.setPhaseAndMessage('error', message)
   }
 
-  setComposerExpanded(expanded: boolean): boolean {
-    if (this.composerState.expanded === expanded) return false
-    this.composerState.expanded = expanded
+  closeComposer(): boolean {
+    if (!this.composerState.expanded) return false
+    this.composerState.expanded = false
     return true
+  }
+
+  openComposer(): boolean {
+    const changed = !this.composerState.expanded || this.composerState.mode !== 'input'
+    this.composerState.expanded = true
+    this.composerState.mode = 'input'
+    return changed
   }
 
   setComposerMode(mode: TerminalComposerMode): boolean {

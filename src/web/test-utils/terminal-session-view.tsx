@@ -191,11 +191,14 @@ export async function renderTerminalSession(
     findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
     clearSearch: vi.fn(),
-    setComposerExpanded: (terminalSessionId, expanded) => {
+    openComposer: (terminalSessionId) => {
       if (terminalSessionId !== descriptor.terminalSessionId) return false
-      if (snapshot.composer.expanded !== expanded) {
-        updateComposer({ ...snapshot.composer, expanded })
-      }
+      updateComposer({ ...snapshot.composer, expanded: true, mode: 'input' })
+      return true
+    },
+    closeComposer: (terminalSessionId) => {
+      if (terminalSessionId !== descriptor.terminalSessionId) return false
+      if (snapshot.composer.expanded) updateComposer({ ...snapshot.composer, expanded: false })
       return true
     },
     setComposerMode: (terminalSessionId, mode) => {

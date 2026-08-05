@@ -31,12 +31,12 @@ describe('TerminalSession input, resize, and controller authority', () => {
     const notify = vi.fn()
     const session = new TerminalSession(descriptor, notify)
 
-    expect(session.setComposerExpanded(false)).toBe(true)
+    expect(session.closeComposer()).toBe(true)
     expect(session.setComposerMode('input')).toBe(true)
     expect(session.setComposerDraft('')).toBe(true)
     expect(notify).not.toHaveBeenCalled()
 
-    expect(session.setComposerExpanded(true)).toBe(true)
+    expect(session.openComposer()).toBe(true)
     expect(session.setComposerMode('keys')).toBe(true)
     expect(session.setComposerDraft('draft')).toBe(true)
     expect(session.replaceComposerDraft('stale draft', 'replacement')).toBe(false)
@@ -44,7 +44,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     expect(notify.mock.calls).toEqual([['snapshot'], ['snapshot'], ['snapshot'], ['snapshot']])
 
     session.dispose()
-    expect(session.setComposerExpanded(false)).toBe(false)
+    expect(session.closeComposer()).toBe(false)
     expect(session.setComposerMode('input')).toBe(false)
     expect(session.setComposerDraft('disposed')).toBe(false)
     expect(session.replaceComposerDraft('replacement', '')).toBe(false)
@@ -54,7 +54,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
   test('retains Composer session facts through presentation detach and runtime restart', async () => {
     const session = new TerminalSession(descriptor, vi.fn())
     const { host } = await startOpenControllerSession(session)
-    session.setComposerExpanded(true)
+    session.openComposer()
     session.setComposerMode('input')
     session.setComposerDraft('retained draft\r\nverbatim')
     await expect(session.submitText('retained command')).resolves.toBe(true)

@@ -27,7 +27,7 @@ function openComposerInput(container: HTMLElement) {
 }
 
 describe('TerminalSessionView composer', () => {
-  test('projects the keyboard inset onto the shared terminal presentation layer', async () => {
+  test('leaves keyboard reveal to native focus when VisualViewport is available', async () => {
     const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
     const visualViewport = new EventTarget()
     Object.defineProperties(visualViewport, {
@@ -39,190 +39,29 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession()
 
     try {
-      const session = rendered.container.querySelector<HTMLElement>('.goblin-terminal-session')
-      const presentation = rendered.container.querySelector<HTMLElement>('.goblin-terminal-session__presentation')
       const input = composerInput(rendered.container)
-      if (!session || !presentation) throw new Error('expected terminal session presentation layer')
-      let containerBottom = 800
-      vi.spyOn(session, 'getBoundingClientRect').mockImplementation(() => ({
-        bottom: containerBottom,
-        height: 800,
-        left: 0,
-        right: 400,
-        top: 0,
-        width: 400,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }))
       const focus = vi.spyOn(input, 'focus')
 
       act(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
       expect(document.activeElement).toBe(input)
-      expect(focus).toHaveBeenLastCalledWith({ preventScroll: true })
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
-      expect(rendered.container.querySelector('.goblin-terminal-session__host')?.parentElement).toBe(presentation)
-      expect(rendered.container.querySelector('.goblin-terminal-composer')?.parentElement).toBe(presentation)
-
-      Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
-      act(() => visualViewport.dispatchEvent(new Event('resize')))
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
-
-      containerBottom = 700
-      const scrollAncestor = rendered.sessionRoot.parentElement
-      if (!scrollAncestor) throw new Error('expected a session scroll ancestor')
-      act(() => scrollAncestor.dispatchEvent(new Event('scroll', { bubbles: false })))
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-200px)')
-
-      containerBottom = 800
-      Object.defineProperty(visualViewport, 'offsetTop', { configurable: true, value: 100 })
-      act(() => visualViewport.dispatchEvent(new Event('scroll')))
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-200px)')
-
-      Object.defineProperty(visualViewport, 'height', { configurable: true, value: 450 })
-      act(() => visualViewport.dispatchEvent(new Event('resize')))
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-250px)')
-    } finally {
-      await rendered.cleanup()
-      if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
-      else Reflect.deleteProperty(window, 'visualViewport')
-    }
-  })
-
-  test('activates the shared inset only while the Composer input owns focus', async () => {
-    const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
-    const visualViewport = new EventTarget()
-    Object.defineProperties(visualViewport, {
-      height: { configurable: true, value: 800 },
-      offsetTop: { configurable: true, value: 0 },
-      scale: { configurable: true, value: 1 },
-    })
-    Object.defineProperty(window, 'visualViewport', { configurable: true, value: visualViewport })
-    const rendered = await renderTerminalSession()
-
-    try {
-      const session = rendered.container.querySelector<HTMLElement>('.goblin-terminal-session')
-      const input = composerInput(rendered.container)
-      if (!session) throw new Error('expected terminal session')
-      vi.spyOn(session, 'getBoundingClientRect').mockReturnValue({
-        bottom: 800,
-        height: 800,
-        left: 0,
-        right: 400,
-        top: 0,
-        width: 400,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      })
-      const focus = vi.spyOn(input, 'focus')
-      const terminalHost = rendered.container.querySelector<HTMLElement>('.goblin-terminal-session__host')
-      if (!terminalHost) throw new Error('expected terminal host in the presentation layer')
-      const terminalInput = document.createElement('textarea')
-      terminalHost.appendChild(terminalInput)
-
-      Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
-      act(() => visualViewport.dispatchEvent(new Event('resize')))
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
-      terminalInput.focus()
-
-      const trigger = buttonByLabel(rendered.container, 'terminal.composer-open')
-      expect(fireEvent.pointerDown(trigger, { pointerType: 'touch' })).toBe(true)
-      trigger.focus()
-      fireEvent.click(trigger)
-
-      expect(document.activeElement).toBe(input)
-      expect(focus).toHaveBeenLastCalledWith({ preventScroll: true })
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
-
-      terminalInput.focus()
-      expect(document.activeElement).toBe(terminalInput)
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
-
-      expect(fireEvent.pointerDown(input, { pointerType: 'touch' })).toBe(true)
-      expect(document.activeElement).toBe(terminalInput)
-      input.focus()
-      expect(document.activeElement).toBe(input)
       expect(focus).toHaveBeenLastCalledWith()
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
+      expect(rendered.container.querySelector('.goblin-terminal-session__host')?.parentElement).toBe(
+        rendered.sessionRoot,
+      )
+      expect(rendered.container.querySelector('.goblin-terminal-composer')?.parentElement).toBe(rendered.sessionRoot)
 
-      Object.defineProperty(visualViewport, 'offsetTop', { configurable: true, value: 300 })
-      act(() => visualViewport.dispatchEvent(new Event('scroll')))
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
-
-      Object.defineProperty(visualViewport, 'offsetTop', { configurable: true, value: 0 })
-      act(() => visualViewport.dispatchEvent(new Event('scroll')))
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
-      await rendered.publishSnapshot({
-        phase: 'open',
-        message: null,
-        processName: 'zsh',
-        composer: { expanded: true, mode: 'input', draft: '', historyEntries: [] },
-        attachment: { role: 'viewer' },
-      })
-      expect(rendered.container.querySelector('.goblin-terminal-composer')).toBeNull()
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
-    } finally {
-      await rendered.cleanup()
-      if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
-      else Reflect.deleteProperty(window, 'visualViewport')
-    }
-  })
-
-  test('leaves pinch zoom browser-owned and restores keyboard projection afterward', async () => {
-    const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
-    const visualViewport = new EventTarget()
-    Object.defineProperties(visualViewport, {
-      height: { configurable: true, value: 500 },
-      offsetTop: { configurable: true, value: 0 },
-      scale: { configurable: true, value: 1 },
-    })
-    Object.defineProperty(window, 'visualViewport', { configurable: true, value: visualViewport })
-    const rendered = await renderTerminalSession()
-    let unmounted = false
-
-    try {
-      const session = rendered.container.querySelector<HTMLElement>('.goblin-terminal-session')
-      if (!session) throw new Error('expected terminal session')
-      const rect = vi.spyOn(session, 'getBoundingClientRect').mockReturnValue({
-        bottom: 800,
-        height: 800,
-        left: 0,
-        right: 400,
-        top: 0,
-        width: 400,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      })
-
-      openComposerInput(rendered.container)
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
-
-      Object.defineProperty(visualViewport, 'height', { configurable: true, value: 400 })
-      Object.defineProperty(visualViewport, 'scale', { configurable: true, value: 2 })
-      act(() => visualViewport.dispatchEvent(new Event('resize')))
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
-
-      Object.defineProperty(visualViewport, 'scale', { configurable: true, value: 1 })
       Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
       act(() => visualViewport.dispatchEvent(new Event('resize')))
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('translateY(-300px)')
-
-      rect.mockClear()
-      await rendered.cleanup()
-      unmounted = true
-      expect(session.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('none')
-      act(() => visualViewport.dispatchEvent(new Event('resize')))
-      expect(rect).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(input)
+      expect(focus).toHaveBeenCalledOnce()
     } finally {
-      if (!unmounted) await rendered.cleanup()
+      await rendered.cleanup()
       if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
       else Reflect.deleteProperty(window, 'visualViewport')
     }
   })
 
-  test('uses native focus and pointer behavior when visual viewport APIs are unavailable', async () => {
+  test('uses the same native focus behavior without VisualViewport', async () => {
     const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
     Reflect.deleteProperty(window, 'visualViewport')
     const rendered = await renderTerminalSession()
@@ -230,8 +69,6 @@ describe('TerminalSessionView composer', () => {
     try {
       const composer = rendered.container.querySelector<HTMLElement>('.goblin-terminal-composer--floating')
       if (!composer) throw new Error('expected a floating composer')
-      expect(rendered.sessionRoot.style.getPropertyValue('--goblin-terminal-presentation-transform')).toBe('')
-
       const input = composerInput(rendered.container)
       const focus = vi.spyOn(input, 'focus')
       act(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
@@ -369,10 +206,10 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('hides the Composer and does not consume its shortcut during presentation recovery', async () => {
-    const setComposerExpanded = vi.fn(() => true)
+    const openComposer = vi.fn(() => true)
     const composerState = { expanded: false, mode: 'input' as const, draft: 'preserved draft', historyEntries: [] }
     const rendered = await renderTerminalSession(
-      { setComposerExpanded },
+      { openComposer },
       {
         snapshot: {
           phase: 'open',
@@ -400,7 +237,7 @@ describe('TerminalSessionView composer', () => {
       act(() => rendered.sessionRoot.dispatchEvent(shortcut))
 
       expect(shortcut.defaultPrevented).toBe(false)
-      expect(setComposerExpanded).not.toHaveBeenCalled()
+      expect(openComposer).not.toHaveBeenCalled()
 
       await rendered.publishSnapshot({
         phase: 'open',
@@ -428,9 +265,9 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('does not consume unsupported Composer shortcut variants or viewer input', async () => {
-    const setComposerExpanded = vi.fn(() => true)
+    const openComposer = vi.fn(() => true)
     const rendered = await renderTerminalSession(
-      { setComposerExpanded },
+      { openComposer },
       {
         snapshot: {
           phase: 'open',
@@ -452,7 +289,7 @@ describe('TerminalSessionView composer', () => {
       })
       act(() => rendered.sessionRoot.dispatchEvent(event))
       expect(event.defaultPrevented).toBe(false)
-      expect(setComposerExpanded).not.toHaveBeenCalled()
+      expect(openComposer).not.toHaveBeenCalled()
     } finally {
       await rendered.cleanup()
     }

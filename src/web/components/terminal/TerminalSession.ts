@@ -214,9 +214,15 @@ export class TerminalSession {
     this.notify('metadata')
   }
 
-  setComposerExpanded(expanded: boolean): boolean {
+  closeComposer(): boolean {
     if (this.disposed) return false
-    if (this.runtime.setComposerExpanded(expanded)) this.notify('snapshot')
+    if (this.runtime.closeComposer()) this.notify('snapshot')
+    return true
+  }
+
+  openComposer(): boolean {
+    if (this.disposed) return false
+    if (this.runtime.openComposer()) this.notify('snapshot')
     return true
   }
 

@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useEffectEvent,
   useId,
   useImperativeHandle,
   useLayoutEffect,
@@ -13,6 +12,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
+import { flushSync } from 'react-dom'
 import {
   ArrowDown,
   ArrowLeft,
@@ -74,14 +74,13 @@ interface TerminalComposerProps {
   shortcut: string
   onVirtualKey: (key: TerminalVirtualKey) => void
   onSendText: (text: string) => Promise<boolean>
-  onExpandedChange: (expanded: boolean) => boolean
+  onOpen: () => boolean
+  onClose: () => boolean
   onModeChange: (mode: TerminalComposerMode) => boolean
   onDraftChange: (draft: string) => boolean
   onDraftReplace: (expectedDraft: string, draft: string) => boolean
   onResolveFiles: (files: File[]) => Promise<string | null>
   onRequestFocus: () => void
-  onInputFocus?: (input: HTMLTextAreaElement) => void
-  onInputBlur?: () => void
   hidden?: boolean
   className?: string
 }
@@ -151,15 +150,7 @@ function isImeCompositionEvent(event: KeyboardEvent<HTMLElement>) {
   return isImeOwnedKeyboardEvent(event.nativeEvent)
 }
 
-function visualViewportForElement(element: HTMLElement): VisualViewport | null {
-  return element.ownerDocument.defaultView?.visualViewport ?? null
-}
-
 function focusComposerInput(input: HTMLTextAreaElement): void {
-  if (visualViewportForElement(input)) {
-    input.focus({ preventScroll: true })
-    return
-  }
   input.focus()
 }
 
@@ -173,14 +164,13 @@ export function TerminalComposer({
   shortcut,
   onVirtualKey,
   onSendText,
-  onExpandedChange,
+  onOpen,
+  onClose,
   onModeChange,
   onDraftChange,
   onDraftReplace,
   onResolveFiles,
   onRequestFocus,
-  onInputFocus,
-  onInputBlur,
   hidden,
   className,
 }: TerminalComposerProps) {
@@ -210,9 +200,6 @@ export function TerminalComposer({
     pendingFocusRef.current = null
     focusComposerControl()
   }
-  const requestComposerFocusAfterUpdate = () => {
-    pendingFocusRef.current = 'control'
-  }
   const requestTriggerFocus = () => {
     pendingFocusRef.current = 'trigger'
     if (expanded) return
@@ -221,11 +208,6 @@ export function TerminalComposer({
   }
 
   useImperativeHandle(ref, () => ({ focus: requestComposerFocus }))
-  const releaseInputFocus = useEffectEvent(() => onInputBlur?.())
-
-  useLayoutEffect(() => {
-    return () => releaseInputFocus()
-  }, [])
 
   useLayoutEffect(() => {
     history.updateEntries(historyEntries)
@@ -317,8 +299,32 @@ export function TerminalComposer({
     if (event.detail > 0) onRequestFocus()
   }
   const closeComposer = () => {
-    if (!onExpandedChange(false)) return
+    if (!onClose()) return
     requestTriggerFocus()
+  }
+
+  const openComposer = () => {
+    let accepted = false
+    flushSync(() => {
+      accepted = onOpen()
+    })
+    if (!accepted) return
+    pendingFocusRef.current = null
+    const input = inputRef.current
+    if (input) focusComposerInput(input)
+  }
+  const switchMode = (nextMode: TerminalComposerMode) => {
+    let accepted = false
+    flushSync(() => {
+      accepted = onModeChange(nextMode)
+    })
+    if (!accepted) return
+    if (nextMode === 'input') {
+      const input = inputRef.current
+      if (input) focusComposerInput(input)
+      return
+    }
+    modeToggleRef.current?.focus()
   }
   const currentFileInsertion = () => {
     const input = inputRef.current
@@ -383,10 +389,7 @@ export function TerminalComposer({
         ariaHidden={expanded}
         ariaKeyShortcuts={shortcut}
         tabIndex={expanded ? -1 : undefined}
-        onClick={() => {
-          if (!onExpandedChange(true)) return
-          requestComposerFocus()
-        }}
+        onClick={openComposer}
       >
         <Keyboard className="size-5" />
       </ComposerButton>
@@ -402,8 +405,7 @@ export function TerminalComposer({
             accessibleName={mode === 'input' ? labels.showKeys : labels.showInput}
             onClick={() => {
               const nextMode = mode === 'input' ? 'keys' : 'input'
-              if (!onModeChange(nextMode)) return
-              requestComposerFocusAfterUpdate()
+              switchMode(nextMode)
             }}
           >
             {mode === 'input' ? <Keyboard className="size-4" /> : <TextCursorInput className="size-4" />}
@@ -426,8 +428,6 @@ export function TerminalComposer({
                 history.leaveBrowsing()
                 onDraftChange(event.target.value)
               }}
-              onFocus={(event) => onInputFocus?.(event.currentTarget)}
-              onBlur={onInputBlur}
               onPointerDown={() => history.leaveBrowsing()}
               onKeyDown={handleDraftKeyDown}
             />

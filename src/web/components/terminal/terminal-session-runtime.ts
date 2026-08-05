@@ -387,8 +387,12 @@ export class TerminalSessionRuntime {
     return this.state.resetTransientState()
   }
 
-  setComposerExpanded(expanded: boolean): boolean {
-    return this.state.setComposerExpanded(expanded)
+  closeComposer(): boolean {
+    return this.state.closeComposer()
+  }
+
+  openComposer(): boolean {
+    return this.state.openComposer()
   }
 
   setComposerMode(mode: TerminalComposerMode): boolean {

@@ -17,18 +17,6 @@
   --goblin-terminal-composer-key-size: 40px;
   --goblin-terminal-composer-key-gap: 4px;
   --goblin-terminal-composer-max-width: 960px;
-  --goblin-terminal-presentation-transform: none;
-}
-
-.goblin-terminal-session__presentation {
-  position: relative;
-  display: flex;
-  min-height: 0;
-  width: 100%;
-  flex: 1;
-  flex-direction: column;
-  /* Keep keyboard adaptation paint-only so xterm's layout box, fit dimensions, and PTY rows stay unchanged. */
-  transform: var(--goblin-terminal-presentation-transform);
 }
 
 .goblin-terminal-session__host {
@@ -333,11 +321,11 @@
 
 .goblin-terminal-composer {
   display: flex;
+  /* iOS focus must see the textarea at its final layout width during the trigger activation. */
   width: var(--goblin-terminal-composer-key-size);
   max-width: calc(100% - 2 * var(--goblin-terminal-float-offset));
   justify-content: flex-end;
   pointer-events: none;
-  transition: width 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .goblin-terminal-composer[hidden] {
@@ -367,8 +355,8 @@
   box-shadow: var(--shadow-md);
   opacity: 0;
   pointer-events: none;
-  transform: translateX(10px) scale(0.98);
-  transform-origin: right bottom;
+  transform: translateY(8px) scale(0.98);
+  transform-origin: center bottom;
   visibility: hidden;
   transition:
     opacity 130ms ease,
@@ -379,7 +367,7 @@
 .goblin-terminal-composer[data-expanded='true'] .goblin-terminal-composer__surface {
   opacity: 1;
   pointer-events: auto;
-  transform: translateX(0) scale(1);
+  transform: translateY(0) scale(1);
   visibility: visible;
   transition-delay: 0s;
 }
@@ -533,12 +521,14 @@
   .goblin-terminal-composer__surface {
     width: min(var(--goblin-terminal-composer-max-width), 100%);
     margin-inline: auto;
-    transform: translateY(8px) scale(0.98);
-    transform-origin: center bottom;
   }
+}
 
-  .goblin-terminal-composer[data-expanded='true'] .goblin-terminal-composer__surface {
-    transform: translateY(0) scale(1);
+/* Touch-capable browsers can reject the soft-keyboard focus request while the
+   textarea's presentation is still transitioning. */
+@media (any-pointer: coarse) {
+  .goblin-terminal-composer__surface {
+    transition: none;
   }
 }
 

@@ -936,8 +936,12 @@ export class TerminalSessionProjection {
     this.sessions.get(terminalSessionId)?.sendVirtualKey(key)
   }
 
-  setComposerExpanded = (terminalSessionId: string, expanded: boolean): boolean => {
-    return this.sessions.get(terminalSessionId)?.setComposerExpanded(expanded) ?? false
+  closeComposer = (terminalSessionId: string): boolean => {
+    return this.sessions.get(terminalSessionId)?.closeComposer() ?? false
+  }
+
+  openComposer = (terminalSessionId: string): boolean => {
+    return this.sessions.get(terminalSessionId)?.openComposer() ?? false
   }
 
   setComposerMode = (terminalSessionId: string, mode: TerminalComposerMode): boolean => {
