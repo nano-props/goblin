@@ -14,9 +14,9 @@ import type * as WorkspaceExternalAppClient from '#/web/workspace-external-app-c
 import { workspaceExternalAppRecentKey, workspaceExternalAppTargetForWorktree } from '#/shared/workspace-settings.ts'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
 import {
-  WorkspaceOpenExternallyMenuContent,
-  useWorkspaceOpenExternallyItems,
-} from '#/web/components/workspace-pane/WorkspaceOpenExternallyMenu.tsx'
+  WorkspaceExternalAppLauncher,
+  useWorkspaceExternalAppItems,
+} from '#/web/components/workspace-pane/WorkspaceExternalAppLauncher.tsx'
 import {
   gitWorktreePaneFilesystemTarget,
   type WorkspacePaneFilesystemTarget,
@@ -236,9 +236,9 @@ afterEach(() => {
   setTerminalSessionCommandBridge(null)
 })
 
-export function WorkspaceOpenExternallyMenu({ target }: { target: WorkspacePaneFilesystemTarget }) {
-  const items = useWorkspaceOpenExternallyItems(target)
-  return items.length > 0 ? <WorkspaceOpenExternallyMenuContent target={target} items={items} /> : null
+export function WorkspaceExternalAppLauncherHarness({ target }: { target: WorkspacePaneFilesystemTarget }) {
+  const items = useWorkspaceExternalAppItems(target)
+  return items.length > 0 ? <WorkspaceExternalAppLauncher target={target} items={items} /> : null
 }
 
 export function renderToolbar(options: {
@@ -262,7 +262,7 @@ export function renderToolbar(options: {
   loading?: boolean
   /**
    * Pre-seed the settings snapshot's `workspaceSettings` field so the
-   * workspace external app menu reads from server-backed state
+   * workspace external app launcher reads from server-backed state
    * without an HTTP round trip. Defaults to an empty array.
    */
   seedWorkspaceSettings?: WorkspaceSettingsEntry[]
@@ -657,7 +657,7 @@ export function externalAppTargetKey(worktreePath: string): string {
 /**
  * Build a fresh `QueryClient` whose settings snapshot cache already
  * contains the given `workspaceSettings`. Used by the worktree-scope test
- * which renders `WorkspaceOpenExternallyMenu` directly (it doesn't go
+ * which renders `WorkspaceExternalAppLauncherHarness` directly (it doesn't go
  * through `renderToolbar`).
  */
 export function seededQueryClientWithWorkspaceSettings(workspaceSettings: WorkspaceSettingsEntry[]): QueryClient {
@@ -666,7 +666,7 @@ export function seededQueryClientWithWorkspaceSettings(workspaceSettings: Worksp
   return queryClient
 }
 
-export function externalMenuTarget(repo: WorkspaceState, worktreePath: string) {
+export function externalAppLauncherTarget(repo: WorkspaceState, worktreePath: string) {
   const projection = gitWorkspacePaneProjection(repo)
   if (projection.probe.status !== 'ready') throw new Error('expected ready Git workspace fixture')
   return gitWorktreePaneFilesystemTarget({

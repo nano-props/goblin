@@ -28,7 +28,7 @@ interface Props {
   target: WorkspacePaneFilesystemTarget
 }
 
-export function useWorkspaceOpenExternallyItems(
+export function useWorkspaceExternalAppItems(
   target: WorkspacePaneFilesystemTarget,
 ): readonly WorkspaceExternalAppItem[] {
   const externalApps = useExternalAppSettings()
@@ -43,7 +43,7 @@ export function useWorkspaceOpenExternallyItems(
   }, [externalApps, hostPlatform, target])
 }
 
-export function WorkspaceOpenExternallyMenuContent({
+export function WorkspaceExternalAppLauncher({
   target,
   items,
 }: Props & { items: readonly WorkspaceExternalAppItem[] }) {
@@ -69,7 +69,7 @@ export function WorkspaceOpenExternallyMenuContent({
   if (items.length === 0) return null
 
   const busy = pending !== null
-  const menuLabel = t('workspace.open-externally.open')
+  const launcherLabel = t('workspace.open-externally.open')
 
   function runLocalItem(item: WorkspaceExternalAppItem) {
     if (busy) return
@@ -126,13 +126,13 @@ export function WorkspaceOpenExternallyMenuContent({
         <PopoverTrigger asChild>
           <button
             type="button"
-            data-testid="workspace-open-externally-menu-trigger"
+            data-testid="workspace-external-app-launcher-trigger"
             className={cn(
               'flex h-full w-6 cursor-pointer items-center justify-center text-muted-foreground outline-none transition-colors duration-100 hover:bg-control-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-3.5 [&_svg]:shrink-0',
               focusRing,
             )}
-            title={menuLabel}
-            aria-label={menuLabel}
+            title={launcherLabel}
+            aria-label={launcherLabel}
             aria-busy={busy ? true : undefined}
             disabled={busy}
           >
@@ -156,7 +156,7 @@ export function WorkspaceOpenExternallyMenuContent({
             <div className="space-y-0.5 p-1">
               {items.map((item) => (
                 <div key={item.id} role="listitem">
-                  <WorkspaceOpenExternallyItem
+                  <WorkspaceExternalAppLauncherItem
                     item={item}
                     pending={pending}
                     disabled={busy}
@@ -188,7 +188,7 @@ function PrimaryButton({
   return (
     <button
       type="button"
-      data-testid="workspace-open-externally-menu-primary"
+      data-testid="workspace-external-app-launcher-primary"
       className={cn(
         'flex h-full w-8 cursor-pointer items-center justify-center outline-none transition-colors duration-100 hover:bg-control-hover disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
         focusRing,
@@ -204,7 +204,7 @@ function PrimaryButton({
   )
 }
 
-function WorkspaceOpenExternallyItem({
+function WorkspaceExternalAppLauncherItem({
   item,
   pending,
   disabled,

@@ -38,10 +38,11 @@ import {
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import {
-  WorkspaceOpenExternallyMenuContent,
-  useWorkspaceOpenExternallyItems,
-} from '#/web/components/workspace-pane/WorkspaceOpenExternallyMenu.tsx'
+  WorkspaceExternalAppLauncher,
+  useWorkspaceExternalAppItems,
+} from '#/web/components/workspace-pane/WorkspaceExternalAppLauncher.tsx'
 import type { WorkspaceExternalAppItem } from '#/web/external-workspace-apps.tsx'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 
 interface WorkspacePaneTargetToolbarProps {
   target: WorkspacePaneSurfaceTarget
@@ -60,15 +61,15 @@ type WorkspacePaneFilesystemTargetToolbarProps = Omit<WorkspacePaneTargetToolbar
 
 export function WorkspacePaneTargetToolbar(props: WorkspacePaneTargetToolbarProps) {
   return props.target.kind === 'git-branch' ? (
-    <WorkspacePaneTargetToolbarContent {...props} externalItems={[]} />
+    <WorkspacePaneTargetToolbarContent {...props} externalAppItems={[]} />
   ) : (
     <WorkspacePaneFilesystemTargetToolbar {...props} target={props.target} />
   )
 }
 
 function WorkspacePaneFilesystemTargetToolbar(props: WorkspacePaneFilesystemTargetToolbarProps) {
-  const externalItems = useWorkspaceOpenExternallyItems(props.target)
-  return <WorkspacePaneTargetToolbarContent {...props} externalItems={externalItems} />
+  const externalAppItems = useWorkspaceExternalAppItems(props.target)
+  return <WorkspacePaneTargetToolbarContent {...props} externalAppItems={externalAppItems} />
 }
 
 function WorkspacePaneTargetToolbarContent({
@@ -80,13 +81,15 @@ function WorkspacePaneTargetToolbarContent({
   trafficLightOffset = false,
   onBackToNavigator,
   staticTabAvailable,
-  externalItems,
-}: WorkspacePaneTargetToolbarProps & { externalItems: readonly WorkspaceExternalAppItem[] }) {
+  externalAppItems,
+}: WorkspacePaneTargetToolbarProps & { externalAppItems: readonly WorkspaceExternalAppItem[] }) {
   const t = useT()
+  const compact = useIsCompactUi()
   const navigation = useAppNavigation()
   const { scrollToBottom } = useTerminalSessionContext()
   const branchName = model.branchName
   const filesystemTarget = target.kind === 'git-branch' ? null : target
+  const showExternalAppLauncher = !compact && filesystemTarget !== null && externalAppItems.length > 0
   const routeTarget = requiredWorkspacePaneModelTarget(model.routeTarget, 'route')
   const persistenceTarget = requiredWorkspacePaneModelTarget(model.paneTarget, 'persistence')
   const commandTarget = workspacePaneCommandTargetForSurface(routeTarget, target, workspacePaneRoute)
@@ -191,8 +194,8 @@ function WorkspacePaneTargetToolbarContent({
       trafficLightOffset={trafficLightOffset}
       onBackToNavigator={onBackToNavigator}
       trailingActions={
-        filesystemTarget && externalItems.length > 0 ? (
-          <WorkspaceOpenExternallyMenuContent target={filesystemTarget} items={externalItems} />
+        showExternalAppLauncher ? (
+          <WorkspaceExternalAppLauncher target={filesystemTarget} items={externalAppItems} />
         ) : null
       }
       onSelect={(item) => selectItem(item, false)}

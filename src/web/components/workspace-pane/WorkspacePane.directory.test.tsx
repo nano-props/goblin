@@ -145,8 +145,8 @@ describe('WorkspacePane directory workspaces', () => {
       </QueryClientProvider>,
     )
 
-    expect(container.querySelector('[data-testid="workspace-open-externally-menu-primary"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="workspace-open-externally-menu-trigger"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-external-app-launcher-primary"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="workspace-external-app-launcher-trigger"]')).not.toBeNull()
   })
 
   test('keeps the selected workspace-root pane when Git capability becomes available', async () => {

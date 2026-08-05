@@ -16,10 +16,10 @@ import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import {
   REPO_ID,
   WORKTREE_PATH,
-  WorkspaceOpenExternallyMenu,
+  WorkspaceExternalAppLauncherHarness,
   defaultRuntimeExternalAppSettings,
   externalAppTargetKey,
-  externalMenuTarget,
+  externalAppLauncherTarget,
   flush,
   gitWorkspacePaneProjection,
   installRecentAppFetch,
@@ -45,8 +45,8 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
       navigation: navigationWith({}),
     })
 
-    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
-    if (!trigger) throw new Error('missing external app menu trigger')
+    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-trigger"]')
+    if (!trigger) throw new Error('missing external app launcher trigger')
     const trailingActions = c.querySelector('[data-workspace-toolbar-trailing-actions]')
     expect(trailingActions).not.toBeNull()
     expect(trailingActions?.contains(trigger)).toBe(true)
@@ -77,11 +77,11 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     })
     const { container } = renderInJsdom(
       <QueryClientProvider client={seededQueryClientWithWorkspaceSettings([])}>
-        <WorkspaceOpenExternallyMenu target={target} />
+        <WorkspaceExternalAppLauncherHarness target={target} />
       </QueryClientProvider>,
     )
 
-    const primary = container.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-primary"]')
+    const primary = container.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-primary"]')
     if (!primary) throw new Error('missing external app primary action')
     act(() => {
       primary.click()
@@ -119,11 +119,11 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     })
     const { container } = renderInJsdom(
       <QueryClientProvider client={seededQueryClientWithWorkspaceSettings([])}>
-        <WorkspaceOpenExternallyMenu target={target} />
+        <WorkspaceExternalAppLauncherHarness target={target} />
       </QueryClientProvider>,
     )
 
-    const primary = container.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-primary"]')
+    const primary = container.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-primary"]')
     if (!primary) throw new Error('missing external app primary action')
     act(() => {
       primary.click()
@@ -149,8 +149,8 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
       worktree: false,
     })
 
-    expect(container.querySelector('[data-testid="workspace-open-externally-menu-primary"]')).toBeNull()
-    expect(container.querySelector('[data-testid="workspace-open-externally-menu-trigger"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-external-app-launcher-primary"]')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-external-app-launcher-trigger"]')).toBeNull()
     expect(container.querySelector('[data-workspace-toolbar-trailing-actions]')).toBeNull()
   })
 
@@ -167,12 +167,12 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     })
     const { container } = renderInJsdom(
       <QueryClientProvider client={seededQueryClientWithWorkspaceSettings([])}>
-        <WorkspaceOpenExternallyMenu target={target} />
+        <WorkspaceExternalAppLauncherHarness target={target} />
       </QueryClientProvider>,
     )
 
-    const trigger = container.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
-    if (!trigger) throw new Error('missing external app menu trigger')
+    const trigger = container.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-trigger"]')
+    if (!trigger) throw new Error('missing external app launcher trigger')
     openPopover(trigger)
 
     const labels = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="listitem"] button')).map(
@@ -182,7 +182,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     expect(labels).not.toContain('worktrees.reveal-title')
   })
 
-  test('hides the open-externally menu when no local external apps are available', async () => {
+  test('hides the external app launcher when no local external apps are available', async () => {
     useHostInfoStore.setState({
       snapshot: { homeDir: '/Users/tester', platform: 'win32', hostname: 'test-host', pid: 1 },
       status: 'ready',
@@ -200,8 +200,8 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
       remote: { hasBrowserRemote: true, browserRemoteProvider: 'github' },
     })
 
-    const primary = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-primary"]')
-    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
+    const primary = c.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-primary"]')
+    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-trigger"]')
     expect(primary).toBeNull()
     expect(trigger).toBeNull()
     expect(c.querySelector('[data-workspace-toolbar-trailing-actions]')).toBeNull()
@@ -225,8 +225,8 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
       navigation: navigationWith({}),
     })
 
-    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
-    if (!trigger) throw new Error('missing external app menu trigger')
+    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-trigger"]')
+    if (!trigger) throw new Error('missing external app launcher trigger')
 
     openPopover(trigger)
 
@@ -295,8 +295,8 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
       navigation: navigationWith({}),
     })
 
-    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-open-externally-menu-trigger"]')
-    if (!trigger) throw new Error('missing external app menu trigger')
+    const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-trigger"]')
+    if (!trigger) throw new Error('missing external app launcher trigger')
 
     openPopover(trigger)
 
@@ -347,7 +347,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
           },
         ])}
       >
-        <WorkspaceOpenExternallyMenu target={externalMenuTarget(repo, WORKTREE_PATH)} />
+        <WorkspaceExternalAppLauncherHarness target={externalAppLauncherTarget(repo, WORKTREE_PATH)} />
       </QueryClientProvider>,
     )
 
@@ -367,7 +367,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
           },
         ])}
       >
-        <WorkspaceOpenExternallyMenu target={externalMenuTarget(repo, nextWorktreePath)} />
+        <WorkspaceExternalAppLauncherHarness target={externalAppLauncherTarget(repo, nextWorktreePath)} />
       </QueryClientProvider>,
     )
 
@@ -375,7 +375,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).toBeNull()
   })
 
-  test('keeps the external app launcher available in compact filesystem toolbars', () => {
+  test('hides the external app launcher in compact filesystem toolbars', () => {
     toolbarResponsiveMocks.compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 1,
@@ -384,7 +384,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     })
 
     const trigger = c.querySelector<HTMLButtonElement>('button[aria-label="workspace.open-externally.open"]')
-    expect(trigger).not.toBeNull()
-    expect(c.querySelector('[data-workspace-toolbar-trailing-actions]')?.contains(trigger)).toBe(true)
+    expect(trigger).toBeNull()
+    expect(c.querySelector('[data-workspace-toolbar-trailing-actions]')).toBeNull()
   })
 })
