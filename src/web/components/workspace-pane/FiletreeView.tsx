@@ -33,6 +33,7 @@ export interface FiletreeViewProps {
   readonly onSelect?: (node: WorkspaceFilesystemNode) => void
   readonly onActivate?: (node: WorkspaceFilesystemNode) => void
   readonly onOpenFile?: (node: WorkspaceFilesystemNode) => void
+  readonly onDownloadFile?: (node: WorkspaceFilesystemNode) => void
   readonly onRequestTrashFile?: (node: WorkspaceFilesystemNode) => void
   readonly selectedKeys: ReadonlySet<Key>
   readonly expandedKeys: ReadonlySet<Key>
@@ -64,6 +65,7 @@ export function FiletreeView({
   onSelect,
   onActivate,
   onOpenFile,
+  onDownloadFile,
   onRequestTrashFile,
   selectedKeys,
   expandedKeys,
@@ -271,6 +273,7 @@ export function FiletreeView({
                 onToggleDirectory={onDirectoryRowToggle}
                 onSelect={selectNode}
                 onOpenFile={onOpenFile || onActivate ? handleOpenFile : undefined}
+                onDownloadFile={onDownloadFile}
                 onRequestTrashFile={onRequestTrashFile}
               />
             )

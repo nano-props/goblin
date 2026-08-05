@@ -116,11 +116,25 @@ export function configureTrustedBrowserWindow(win: BrowserWindow): void {
     if (!isTrustedAppUrlForWebContents(win.webContents.id, nextUrl)) event.preventDefault()
   })
   win.webContents.setWindowOpenHandler(({ url: nextUrl }) => {
+    if (isWorkspaceFileDownloadUrl(win.webContents.id, nextUrl)) {
+      // Keep the request in this webContents session so Electron attaches the
+      // embedded-server auth cookie. The response's Content-Disposition owns
+      // the native save behavior; no popup window is created. downloadURL does
+      // not expose the HTTP response, so failures intentionally remain in
+      // Chromium's download flow instead of adding a preflight or fallback.
+      win.webContents.downloadURL(nextUrl)
+      return { action: 'deny' }
+    }
     void openHttpExternal(nextUrl).catch((err) => {
       windowNodeLog.warn({ err }, 'failed to open external window URL')
     })
     return { action: 'deny' }
   })
+}
+
+function isWorkspaceFileDownloadUrl(webContentsId: number, value: string): boolean {
+  if (!isTrustedAppUrlForWebContents(webContentsId, value)) return false
+  return new URL(value).pathname === '/api/workspace/download-file'
 }
 
 export function allowBrowserWindowEntryUrl(win: BrowserWindow, value: string): void {

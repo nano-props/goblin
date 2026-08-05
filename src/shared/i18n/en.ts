@@ -362,6 +362,7 @@ export const en = {
   'filetree.truncated': 'Tree truncated — refine the search to see more.',
   'filetree.error': 'Could not read the file tree.',
   'filetree.stale-title': 'Showing a stale file tree',
+  'filetree.download': 'Download',
   'filetree.confirm-trash-title': 'Move file to Trash?',
   'filetree.confirm-trash-body': 'This will move the file to the system Trash:',
   'filetree.confirm-trash-confirm': 'Move to Trash',

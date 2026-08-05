@@ -1,4 +1,4 @@
-import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
+import { createRouteApp, parseHttpBody, parseHttpInput } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import {
   acquireWorkspaceRuntime,
@@ -13,6 +13,7 @@ import { readWorkspaceFilesystemTree } from '#/server/modules/workspace-filesyst
 import { readWorkspaceFileViewer } from '#/server/modules/workspace-file-viewer.ts'
 import { readWorkspaceDirectoryOverview } from '#/server/modules/workspace-directory-overview.ts'
 import { trashWorkspaceFile } from '#/server/modules/workspace-file-trash.ts'
+import { openWorkspaceFileDownload } from '#/server/modules/workspace-file-download.ts'
 import {
   openWorkspaceEditor,
   openWorkspaceInFinder,
@@ -231,6 +232,41 @@ export function createWorkspaceRoutes(options: {
     }
   })
 
+  app.get('/download-file', async (c) => {
+    const input = parseHttpInput(WORKSPACE_PROCEDURE_SCHEMAS.downloadFile, {
+      target:
+        c.req.query('kind') === 'git-worktree'
+          ? {
+              kind: 'git-worktree',
+              workspaceId: c.req.query('workspaceId'),
+              workspaceRuntimeId: c.req.query('workspaceRuntimeId'),
+              root: c.req.query('root'),
+            }
+          : {
+              kind: c.req.query('kind'),
+              workspaceId: c.req.query('workspaceId'),
+              workspaceRuntimeId: c.req.query('workspaceRuntimeId'),
+            },
+      path: c.req.query('path'),
+    })
+    const target = requiredFilesystemExecutionTarget(input.target)
+    const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), target.workspaceId, target.workspaceRuntimeId)
+    const download = await runWorkspaceRuntimeRequest({
+      userId,
+      run: () => openWorkspaceFileDownload(target, input.path, c.req.raw.signal),
+      label: 'download-file',
+      signal: c.req.raw.signal,
+    })
+    return new Response(download.stream, {
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': workspaceFileContentDisposition(download.filename),
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    })
+  })
+
   app.post('/open-terminal', async (c) => {
     const { target, app: terminalApp } = await parseHttpBody(WORKSPACE_PROCEDURE_SCHEMAS.openTerminal, c)
     const executionTarget = requiredFilesystemExecutionTarget(target)
@@ -291,6 +327,16 @@ export function createWorkspaceRoutes(options: {
 function requireUserId(userId: string | null | undefined): string {
   if (!userId) throw new IpcError({ code: 'UNAUTHORIZED', message: 'Unauthorized' })
   return userId
+}
+
+function workspaceFileContentDisposition(filename: string): string {
+  const wellFormedFilename = filename.toWellFormed()
+  const fallback = wellFormedFilename.replace(/[^\x20-\x7E]|["\\]/gu, '_') || 'download'
+  const encoded = encodeURIComponent(wellFormedFilename).replace(
+    /[!'()*]/gu,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`
 }
 
 function requiredFilesystemExecutionTarget(target: RuntimeWorkspacePaneTarget): WorkspacePaneFilesystemExecutionTarget {

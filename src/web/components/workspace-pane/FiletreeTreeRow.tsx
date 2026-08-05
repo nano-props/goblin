@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent, type MouseEvent } from 'react'
-import { ChevronRight, File, Folder, Loader2, Trash2 } from 'lucide-react'
+import { ChevronRight, Download, File, FileTerminal, Folder, Loader2, Trash2 } from 'lucide-react'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import type { FiletreeRow } from '#/web/components/workspace-pane/filetree-collection.ts'
@@ -9,6 +9,7 @@ import { useT } from '#/web/stores/i18n.ts'
 
 const FILETREE_ROW_I18N_KEYS = {
   open: 'app-chrome.open',
+  download: 'filetree.download',
   delete: 'menu.edit.delete',
   actionMenu: 'action.menu',
 } as const satisfies Record<string, string>
@@ -28,6 +29,7 @@ export function FiletreeTreeRow({
   onToggleDirectory,
   onSelect,
   onOpenFile,
+  onDownloadFile,
   onRequestTrashFile,
 }: {
   readonly row: FiletreeRow
@@ -44,6 +46,7 @@ export function FiletreeTreeRow({
   readonly onToggleDirectory: (key: string, expanded: boolean) => void
   readonly onSelect: (node: WorkspaceFilesystemNode) => void
   readonly onOpenFile?: (node: WorkspaceFilesystemNode) => void
+  readonly onDownloadFile?: (node: WorkspaceFilesystemNode) => void
   readonly onRequestTrashFile?: (node: WorkspaceFilesystemNode) => void
 }) {
   const { node, level } = row
@@ -106,7 +109,7 @@ export function FiletreeTreeRow({
           {isDirectory ? <Folder size={12} aria-hidden /> : <File size={12} aria-hidden />}
         </span>
         <span className="min-w-0 flex-1 truncate text-current">{node.name}</span>
-        {!isDirectory && (onOpenFile || onRequestTrashFile) ? (
+        {!isDirectory && (onOpenFile || onDownloadFile || onRequestTrashFile) ? (
           <FiletreeActionMenu
             node={node}
             busy={isOpeningFile}
@@ -118,6 +121,7 @@ export function FiletreeTreeRow({
                   }
                 : undefined
             }
+            onDownloadFile={onDownloadFile}
             onRequestTrashFile={onRequestTrashFile}
           />
         ) : null}
@@ -154,11 +158,13 @@ function FiletreeActionMenu({
   node,
   busy,
   onOpenFile,
+  onDownloadFile,
   onRequestTrashFile,
 }: {
   readonly node: WorkspaceFilesystemNode
   readonly busy: boolean
   readonly onOpenFile?: (node: WorkspaceFilesystemNode) => void
+  readonly onDownloadFile?: (node: WorkspaceFilesystemNode) => void
   readonly onRequestTrashFile?: (node: WorkspaceFilesystemNode) => void
 }) {
   const t = useT()
@@ -183,19 +189,34 @@ function FiletreeActionMenu({
     >
       {({ close }) => (
         <div role="list">
-          {onOpenFile ? (
+          {onOpenFile || onDownloadFile ? (
             <div className="space-y-0.5 p-1" role="group">
-              <div role="listitem">
-                <ActionPopoverItem
-                  label={t(FILETREE_ROW_I18N_KEYS.open)}
-                  disabled={busy}
-                  busy={busy}
-                  onSelect={() => {
-                    close()
-                    onOpenFile(node)
-                  }}
-                />
-              </div>
+              {onOpenFile ? (
+                <div role="listitem">
+                  <ActionPopoverItem
+                    label={t(FILETREE_ROW_I18N_KEYS.open)}
+                    icon={<FileTerminal />}
+                    disabled={busy}
+                    busy={busy}
+                    onSelect={() => {
+                      close()
+                      onOpenFile(node)
+                    }}
+                  />
+                </div>
+              ) : null}
+              {onDownloadFile ? (
+                <div role="listitem">
+                  <ActionPopoverItem
+                    label={t(FILETREE_ROW_I18N_KEYS.download)}
+                    icon={<Download />}
+                    onSelect={() => {
+                      close()
+                      onDownloadFile(node)
+                    }}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : null}
           {onRequestTrashFile ? (

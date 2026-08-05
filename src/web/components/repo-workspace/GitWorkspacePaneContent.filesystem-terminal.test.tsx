@@ -606,7 +606,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     )
   })
 
-  test('does not expose terminal-open or trash actions without filesystem capabilities', async () => {
+  test('only exposes download without terminal-open or trash capabilities', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/read-only-filetree-workspace')
     const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
     filetreeClientMocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({
@@ -646,7 +646,12 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     )
 
     const row = await screen.findByRole('treeitem', { name: 'README.md' })
-    expect(row.querySelector('[data-action-popover-trigger]')).toBeNull()
+    const actionButton = row.querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
+    expect(actionButton).toBeTruthy()
+    await act(async () => actionButton?.click())
+    expect(document.body.textContent).toContain('filetree.download')
+    expect(document.body.textContent).not.toContain('app-chrome.open')
+    expect(document.body.textContent).not.toContain('menu.edit.delete')
     row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
     expect(createTerminalWithAdmission).not.toHaveBeenCalled()
   })

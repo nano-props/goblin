@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
     windowOptions: [] as BrowserWindowConstructorOptions[],
     webContentsOn: vi.fn(),
     setWindowOpenHandler: vi.fn(),
+    downloadURL: vi.fn(),
     windowOn: vi.fn(),
     windowOnce: vi.fn(),
     loadURL: vi.fn(),
@@ -43,6 +44,7 @@ const mocks = vi.hoisted(() => {
           id: 1,
           on: state.webContentsOn,
           setWindowOpenHandler: state.setWindowOpenHandler,
+          downloadURL: state.downloadURL,
           isDestroyed: () => false,
           once: vi.fn(),
           // Mirror Electron's per-window session shape so the
@@ -153,6 +155,7 @@ describe('primary window navigation boundaries', () => {
     mocks.loadWindowState.mockReturnValue(Promise.resolve({ windowBounds: null }))
     mocks.cookieSetMock.mockReset()
     mocks.cookieSetMock.mockResolvedValue(undefined)
+    mocks.downloadURL.mockReset()
   })
 
   test('prevents client navigation away from the packaged app page', async () => {
@@ -178,6 +181,20 @@ describe('primary window navigation boundaries', () => {
     expect(handler({ url: 'https://example.com/' })).toEqual({ action: 'deny' })
     expect(mocks.openHttpExternal).toHaveBeenCalledWith('https://example.com/')
     expect(handler({ url: 'file:///tmp/other.html' })).toEqual({ action: 'deny' })
+  })
+
+  test('downloads trusted workspace file URLs in the Electron session without opening a window', async () => {
+    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+
+    const handler = mocks.setWindowOpenHandler.mock.calls[0]?.[0]
+    expect(handler).toBeTypeOf('function')
+    const downloadUrl = 'http://127.0.0.1:32100/api/workspace/download-file?kind=workspace-root&path=README.md'
+
+    expect(handler({ url: downloadUrl })).toEqual({ action: 'deny' })
+    expect(mocks.downloadURL).toHaveBeenCalledOnce()
+    expect(mocks.downloadURL).toHaveBeenCalledWith(downloadUrl)
+    expect(mocks.openHttpExternal).not.toHaveBeenCalled()
   })
 
   test('coalesces concurrent primary window creation', async () => {
