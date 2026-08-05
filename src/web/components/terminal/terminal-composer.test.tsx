@@ -40,6 +40,7 @@ function render(
     initialMode?: TerminalComposerMode
     initialDraft?: string
     draftReplaceAccepted?: boolean
+    onInputBlur?: () => void
   } = {},
 ) {
   function ControlledComposer() {
@@ -83,6 +84,7 @@ function render(
         }}
         onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
         onRequestFocus={props.onRequestFocus ?? vi.fn()}
+        onInputBlur={props.onInputBlur}
       />
     )
   }
@@ -479,6 +481,18 @@ describe('TerminalComposer', () => {
     await user.click(buttonByAccessibleName(container, LABELS.open))
 
     expect(document.activeElement).toBe(container.querySelector('textarea'))
+  })
+
+  test('releases input focus ownership when the Composer instance unmounts', async () => {
+    const user = userEvent.setup()
+    const onInputBlur = vi.fn()
+    const rendered = render({ initialMode: 'input', onInputBlur })
+
+    await user.click(buttonByAccessibleName(rendered.container, LABELS.open))
+    onInputBlur.mockClear()
+    rendered.unmount()
+
+    expect(onInputBlur).toHaveBeenCalledOnce()
   })
 
   test('collapses on a physical Escape and restores the trigger focus', async () => {
