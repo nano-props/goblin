@@ -1,5 +1,12 @@
 import { Copy, Delete, Ellipsis, Upload, X } from 'lucide-react'
-import { useRef, useState, type MouseEventHandler, type ReactNode } from 'react'
+import {
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type MouseEventHandler,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
@@ -26,8 +33,18 @@ interface TerminalComposerMenuProps {
   onUpload: () => void
   onVirtualKey: (key: TerminalComposerOptionalVirtualKey) => void
   onCopyContent: () => void
-  onClose: () => void
+  onClose: () => boolean
   onRestoreComposerTriggerFocus: () => void
+}
+
+type ComposerMenuCloseFocusIntent = 'popover-default' | 'preserve-existing' | 'composer-trigger'
+
+function preventPointerFocus(event: ReactPointerEvent<HTMLElement>): void {
+  event.preventDefault()
+}
+
+function preventMouseFocus(event: ReactMouseEvent<HTMLElement>): void {
+  event.preventDefault()
 }
 
 export function TerminalComposerMenu({
@@ -41,17 +58,39 @@ export function TerminalComposerMenu({
   onClose,
   onRestoreComposerTriggerFocus,
 }: TerminalComposerMenuProps) {
-  const restoreComposerTriggerFocusRef = useRef(false)
+  const closeFocusIntentRef = useRef<ComposerMenuCloseFocusIntent>('popover-default')
   const [open, setOpen] = useState(false)
   const sendVirtualKey = (key: TerminalComposerOptionalVirtualKey) => {
     onVirtualKey(key)
   }
   const closeMenu = () => setOpen(false)
+  const handleMoreClickCapture: MouseEventHandler<HTMLButtonElement> = (event) => {
+    if (event.detail > 0) closeFocusIntentRef.current = 'preserve-existing'
+  }
+  const handleCloseAutoFocus = (event: Event) => {
+    const intent = closeFocusIntentRef.current
+    closeFocusIntentRef.current = 'popover-default'
+    if (intent === 'popover-default') return
+
+    event.preventDefault()
+    if (intent === 'composer-trigger') onRestoreComposerTriggerFocus()
+  }
+  const collapseComposer = () => {
+    closeFocusIntentRef.current = onClose() ? 'composer-trigger' : 'preserve-existing'
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" size="icon" variant="secondary" className="goblin-terminal-composer__btn">
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          className="goblin-terminal-composer__btn"
+          onPointerDown={preventPointerFocus}
+          onMouseDown={preventMouseFocus}
+          onClickCapture={handleMoreClickCapture}
+        >
           <span aria-hidden="true">
             <Ellipsis className="size-4" />
           </span>
@@ -63,12 +102,7 @@ export function TerminalComposerMenu({
         align="end"
         className="w-max min-w-32 max-w-72 overflow-hidden p-0"
         onOpenAutoFocus={(event) => event.preventDefault()}
-        onCloseAutoFocus={(event) => {
-          if (!restoreComposerTriggerFocusRef.current) return
-          restoreComposerTriggerFocusRef.current = false
-          event.preventDefault()
-          onRestoreComposerTriggerFocus()
-        }}
+        onCloseAutoFocus={handleCloseAutoFocus}
       >
         <ScrollArea
           className="max-h-(--radix-popover-content-available-height)"
@@ -106,13 +140,7 @@ export function TerminalComposerMenu({
             ))
           )}
           <Separator className="-mx-1 my-1 w-auto" />
-          <ComposerMenuItem
-            onClick={() => {
-              restoreComposerTriggerFocusRef.current = true
-              onClose()
-            }}
-            closeMenu={closeMenu}
-          >
+          <ComposerMenuItem onClick={collapseComposer} closeMenu={closeMenu}>
             <X className="size-4" />
             {labels.close}
           </ComposerMenuItem>
@@ -142,6 +170,8 @@ function ComposerMenuItem({
     <button
       type="button"
       {...buttonProps}
+      onPointerDown={preventPointerFocus}
+      onMouseDown={preventMouseFocus}
       onClick={handleClick}
       className="group relative flex h-8 w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
     >

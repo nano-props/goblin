@@ -42,6 +42,7 @@ function render(
     initialMode?: TerminalComposerMode
     initialDraft?: string
     draftReplaceAccepted?: boolean
+    closeAccepted?: boolean
   } = {},
 ) {
   function ControlledComposer() {
@@ -73,6 +74,7 @@ function render(
           return true
         }}
         onClose={() => {
+          if (props.closeAccepted === false) return false
           setExpanded(false)
           return true
         }}
@@ -795,6 +797,81 @@ describe('TerminalComposer', () => {
     const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
     if (!menu) throw new Error('expected Composer menu')
     expectComposerMenuLayout(menu, [LABELS.copyContent, LABELS.uploadFiles, LABELS.close])
+  })
+
+  test('pointer More and copy actions preserve the focused Composer input', async () => {
+    const user = userEvent.setup()
+    const onCopyContent = vi.fn(async () => {})
+    const { container } = render({ onCopyContent })
+    expand(container)
+    const input = container.querySelector('textarea')
+    if (!input) throw new Error('expected command input')
+    expect(document.activeElement).toBe(input)
+
+    const more = buttonByAccessibleName(container, LABELS.more)
+    expect(fireEvent.mouseDown(more)).toBe(false)
+    await user.click(more)
+    expect(document.activeElement).toBe(input)
+
+    const copy = menuItemByText(LABELS.copyContent)
+    await user.click(copy)
+
+    expect(onCopyContent).toHaveBeenCalledOnce()
+    expect(document.querySelector('[data-slot="popover-content"]')).toBeNull()
+    expect(document.activeElement).toBe(input)
+  })
+
+  test('pointer upload preserves input focus until the native file picker takes ownership', async () => {
+    const user = userEvent.setup()
+    const { container } = render()
+    expand(container)
+    const input = container.querySelector('textarea')
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
+    if (!input || !fileInput) throw new Error('expected Composer inputs')
+    const openFilePicker = vi.spyOn(fileInput, 'click')
+
+    const more = buttonByAccessibleName(container, LABELS.more)
+    expect(fireEvent.mouseDown(more)).toBe(false)
+    await user.click(more)
+    const upload = menuItemByText(LABELS.uploadFiles)
+    await user.click(upload)
+
+    expect(openFilePicker).toHaveBeenCalledOnce()
+    expect(document.activeElement).toBe(input)
+  })
+
+  test('pointer collapse ends Composer input focus and restores the trigger', async () => {
+    const user = userEvent.setup()
+    const { container } = render()
+    expand(container)
+    const input = container.querySelector('textarea')
+    if (!input) throw new Error('expected command input')
+
+    const more = buttonByAccessibleName(container, LABELS.more)
+    await user.click(more)
+    const close = menuItemByText(LABELS.close)
+    await user.click(close)
+
+    const trigger = buttonByAccessibleName(container, LABELS.open)
+    await vi.waitFor(() => expect(document.activeElement).toBe(trigger))
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  test('does not request trigger focus when Composer close is rejected', async () => {
+    const user = userEvent.setup()
+    const { container } = render({ closeAccepted: false })
+    expand(container)
+    const input = container.querySelector('textarea')
+    if (!input) throw new Error('expected command input')
+    expect(document.activeElement).toBe(input)
+
+    const more = buttonByAccessibleName(container, LABELS.more)
+    await user.click(more)
+    await user.click(menuItemByText(LABELS.close))
+
+    expect(container.querySelector('.goblin-terminal-composer')?.getAttribute('data-expanded')).toBe('true')
+    expect(document.querySelector('[data-slot="popover-content"]')).toBeNull()
+    expect(document.activeElement).toBe(input)
   })
 
   test('renders terminal-mode-aware key actions in their visual order', () => {
