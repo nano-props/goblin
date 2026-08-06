@@ -75,7 +75,7 @@ export function TerminalSessionView({
     findPrevious,
     clearSearch,
     captureInputWriter,
-    readVisibleText,
+    readCopyText,
     sendVirtualKey,
     openComposer,
     closeComposer,
@@ -121,7 +121,7 @@ export function TerminalSessionView({
     inputPlaceholder: t('terminal.composer-input-placeholder'),
     more: t('terminal.composer-more'),
     uploadFiles: t('terminal.composer-upload-files'),
-    copyVisible: t('terminal.composer-copy-visible'),
+    copyContent: t('terminal.composer-copy-content'),
     showKeys: t('terminal.composer-show-keys'),
     showInput: t('terminal.composer-show-input'),
     enter: t('terminal.composer-key-enter'),
@@ -137,12 +137,12 @@ export function TerminalSessionView({
     ctrlD: t('terminal.composer-key-ctrl-d'),
   }
 
-  const copyVisibleContent = async () => {
+  const copyContent = async () => {
     if (!terminalSessionId) return
     try {
-      const text = readVisibleText(terminalSessionId)
+      const text = readCopyText(terminalSessionId)
       if (!text) {
-        toast.error(t('terminal.composer-copy-visible-empty'))
+        toast.error(t('terminal.composer-copy-content-empty'))
         return
       }
       await navigator.clipboard.writeText(text)
@@ -619,7 +619,7 @@ export function TerminalSessionView({
           historyEntries={snapshot.composer.historyEntries}
           shortcut={terminalComposerShortcut}
           onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
-          onCopyVisibleContent={copyVisibleContent}
+          onCopyContent={copyContent}
           onSendText={handleComposerSend}
           onOpen={() => openComposer(terminalSessionId)}
           onClose={() => closeComposer(terminalSessionId)}

@@ -14,7 +14,7 @@ import {
 type TerminalComposerMenuLabels = Record<TerminalComposerOptionalActionLabelKey, string> & {
   more: string
   uploadFiles: string
-  copyVisible: string
+  copyContent: string
   close: string
 }
 
@@ -22,10 +22,10 @@ interface TerminalComposerMenuProps {
   labels: TerminalComposerMenuLabels
   mode: 'input' | 'keys'
   resolvingFiles: boolean
-  copyingVisibleContent: boolean
+  copyingContent: boolean
   onUpload: () => void
   onVirtualKey: (key: TerminalComposerOptionalVirtualKey) => void
-  onCopyVisibleContent: () => void
+  onCopyContent: () => void
   onClose: () => void
   onRestoreComposerTriggerFocus: () => void
 }
@@ -34,10 +34,10 @@ export function TerminalComposerMenu({
   labels,
   mode,
   resolvingFiles,
-  copyingVisibleContent,
+  copyingContent,
   onUpload,
   onVirtualKey,
-  onCopyVisibleContent,
+  onCopyContent,
   onClose,
   onRestoreComposerTriggerFocus,
 }: TerminalComposerMenuProps) {
@@ -75,7 +75,7 @@ export function TerminalComposerMenu({
           viewportClassName="p-1"
           scrollbarMode="compact"
         >
-          <ComposerMenuItem disabled={copyingVisibleContent} onClick={onCopyVisibleContent} closeMenu={closeMenu}>
+          <ComposerMenuItem disabled={copyingContent} onClick={onCopyContent} closeMenu={closeMenu}>
             <span aria-hidden="true" className="inline-flex w-6 shrink-0 items-center justify-center">
               <Copy className="size-4" />
             </span>

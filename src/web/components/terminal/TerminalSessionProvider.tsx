@@ -96,7 +96,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       createTerminalWithAdmission: projection.createTerminalWithAdmission,
       selectTerminal: projection.selectTerminal,
       scrollToBottom: projection.scrollToBottom,
-      readVisibleText: projection.readVisibleText,
+      readCopyText: projection.readCopyText,
       clearBell: projection.clearBell,
       closeTerminalByDescriptor: projection.closeTerminalByDescriptor,
       attach: projection.attach,

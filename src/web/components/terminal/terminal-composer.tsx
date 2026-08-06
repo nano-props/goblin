@@ -66,7 +66,7 @@ export interface TerminalComposerLabels {
   ctrlL: string
   ctrlC: string
   ctrlD: string
-  copyVisible: string
+  copyContent: string
 }
 
 interface TerminalComposerProps {
@@ -78,7 +78,7 @@ interface TerminalComposerProps {
   historyEntries: readonly string[]
   shortcut: string
   onVirtualKey: (key: TerminalVirtualKey) => void
-  onCopyVisibleContent: () => Promise<void>
+  onCopyContent: () => Promise<void>
   onSendText: (text: string) => Promise<boolean>
   onOpen: () => boolean
   onClose: () => boolean
@@ -168,7 +168,7 @@ export function TerminalComposer({
   historyEntries,
   shortcut,
   onVirtualKey,
-  onCopyVisibleContent,
+  onCopyContent,
   onSendText,
   onOpen,
   onClose,
@@ -180,7 +180,7 @@ export function TerminalComposer({
   className,
 }: TerminalComposerProps) {
   const [resolvingFiles, setResolvingFiles] = useState(false)
-  const [copyingVisibleContent, setCopyingVisibleContent] = useState(false)
+  const [copyingContent, setCopyingContent] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const modeToggleRef = useRef<HTMLButtonElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -361,13 +361,13 @@ export function TerminalComposer({
     event.target.value = ''
     await resolveFilesIntoDraft(files, fileInsertionRef.current)
   }
-  const copyVisibleContent = async () => {
-    if (copyingVisibleContent) return
-    setCopyingVisibleContent(true)
+  const copyContent = async () => {
+    if (copyingContent) return
+    setCopyingContent(true)
     try {
-      await onCopyVisibleContent()
+      await onCopyContent()
     } finally {
-      setCopyingVisibleContent(false)
+      setCopyingContent(false)
     }
   }
   return (
@@ -452,10 +452,10 @@ export function TerminalComposer({
                 <ComposerButton
                   className="goblin-terminal-composer__key-action--optional-6"
                   accessibleName={labels[TERMINAL_COMPOSER_COPY_ACTION.labelKey]}
-                  disabled={copyingVisibleContent}
-                  aria-busy={copyingVisibleContent || undefined}
+                  disabled={copyingContent}
+                  aria-busy={copyingContent || undefined}
                   onPointerDown={(event) => event.preventDefault()}
-                  onClick={() => void copyVisibleContent()}
+                  onClick={() => void copyContent()}
                 >
                   <Copy className="size-4" />
                 </ComposerButton>
@@ -506,10 +506,10 @@ export function TerminalComposer({
             labels={labels}
             mode={mode}
             resolvingFiles={resolvingFiles}
-            copyingVisibleContent={copyingVisibleContent}
+            copyingContent={copyingContent}
             onUpload={openFilePicker}
             onVirtualKey={onVirtualKey}
-            onCopyVisibleContent={() => void copyVisibleContent()}
+            onCopyContent={() => void copyContent()}
             onClose={closeComposer}
             onRestoreComposerTriggerFocus={requestTriggerFocus}
           />

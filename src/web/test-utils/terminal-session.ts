@@ -96,6 +96,8 @@ const xtermMocks = vi.hoisted(() => {
     })
     scrollToBottom = vi.fn()
     scrollLines = vi.fn()
+    hasSelection = vi.fn(() => this.selection.length > 0)
+    getSelection = vi.fn(() => this.selection)
     dispose = vi.fn()
     focus = vi.fn(() => this.textarea?.focus())
     customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null
@@ -106,6 +108,7 @@ const xtermMocks = vi.hoisted(() => {
     private binaryHandlers: Array<(data: string) => void> = []
     private keyHandlers: Array<(event: { key: string; domEvent: KeyboardEvent }) => void> = []
     private titleHandlers: Array<(title: string) => void> = []
+    private selection = ''
 
     constructor(options: {
       allowProposedApi?: boolean
@@ -217,6 +220,10 @@ const xtermMocks = vi.hoisted(() => {
       const domEvent = keyboardEventForTest('keydown')
       for (const handler of this.keyHandlers) handler({ key: data, domEvent })
       this.emitData(data)
+    }
+
+    setSelection(selection: string) {
+      this.selection = selection
     }
 
     emitTitleChange(title: string) {

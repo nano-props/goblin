@@ -27,29 +27,29 @@ function openComposerInput(container: HTMLElement) {
   return composerInput(container)
 }
 
-function copyVisibleContent(container: HTMLElement) {
+function copyContent(container: HTMLElement) {
   act(() => buttonByLabel(container, 'terminal.composer-open').click())
   act(() => buttonByLabel(container, 'terminal.composer-show-keys').click())
   act(() => buttonByLabel(container, 'terminal.composer-more').click())
   const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
   if (!menu) throw new Error('expected open Composer menu')
-  act(() => within(menu).getByRole('button', { name: 'terminal.composer-copy-visible' }).click())
+  act(() => within(menu).getByRole('button', { name: 'terminal.composer-copy-content' }).click())
 }
 
 describe('TerminalSessionView composer', () => {
-  test('copies the captured visible terminal text and confirms success', async () => {
+  test('copies the terminal copy text and confirms success', async () => {
     vi.clearAllMocks()
     const writeText = vi.fn(async () => {})
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
     try {
-      const readVisibleText = vi.fn(() => 'command\nerror')
-      const rendered = await renderTerminalSession({ readVisibleText })
+      const readCopyText = vi.fn(() => 'command\nerror')
+      const rendered = await renderTerminalSession({ readCopyText })
 
-      copyVisibleContent(rendered.container)
+      copyContent(rendered.container)
       await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('command\nerror'))
 
-      expect(readVisibleText).toHaveBeenCalledWith('term-111111111111111111111')
+      expect(readCopyText).toHaveBeenCalledWith('term-111111111111111111111')
       expect(terminalSessionViewToastForTest().success).toHaveBeenCalledWith('branch-status.copied')
       await rendered.cleanup()
     } finally {
@@ -58,18 +58,18 @@ describe('TerminalSessionView composer', () => {
     }
   })
 
-  test('does not overwrite the clipboard when the visible viewport is empty', async () => {
+  test('does not overwrite the clipboard when there is no content to copy', async () => {
     vi.clearAllMocks()
     const writeText = vi.fn(async () => {})
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
     try {
-      const rendered = await renderTerminalSession({ readVisibleText: vi.fn(() => '') })
+      const rendered = await renderTerminalSession({ readCopyText: vi.fn(() => '') })
 
-      copyVisibleContent(rendered.container)
+      copyContent(rendered.container)
 
       expect(writeText).not.toHaveBeenCalled()
-      expect(terminalSessionViewToastForTest().error).toHaveBeenCalledWith('terminal.composer-copy-visible-empty')
+      expect(terminalSessionViewToastForTest().error).toHaveBeenCalledWith('terminal.composer-copy-content-empty')
       await rendered.cleanup()
     } finally {
       if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
@@ -86,9 +86,9 @@ describe('TerminalSessionView composer', () => {
       value: { writeText: vi.fn(async () => Promise.reject(error)) },
     })
     try {
-      const rendered = await renderTerminalSession({ readVisibleText: vi.fn(() => 'output') })
+      const rendered = await renderTerminalSession({ readCopyText: vi.fn(() => 'output') })
 
-      copyVisibleContent(rendered.container)
+      copyContent(rendered.container)
       await vi.waitFor(() =>
         expect(terminalSessionViewToastForTest().error).toHaveBeenCalledWith('action.result-error', {
           description: 'Clipboard permission denied',

@@ -58,6 +58,28 @@ describe('TerminalSession attachment and presentation', () => {
     expect(terminalCalls.restart).not.toHaveBeenCalled()
   })
 
+  test('reads the xterm selection instead of the visible viewport for copying', async () => {
+    const { session, term } = await startOpenControllerSession()
+    term.setSelection('selected output')
+
+    expect(session.readCopyText()).toBe('selected output')
+    expect(term.hasSelection).toHaveBeenCalled()
+    expect(term.getSelection).toHaveBeenCalled()
+  })
+
+  test('reads the visible viewport for copying when xterm has no selection', async () => {
+    const { session, term } = await startOpenControllerSession()
+    const lines = [
+      { isWrapped: false, translateToString: vi.fn(() => 'command') },
+      { isWrapped: false, translateToString: vi.fn(() => 'output') },
+    ]
+    term.buffer.active.getLine = vi.fn((index: number) => lines[index])
+
+    expect(session.readCopyText()).toBe('command\noutput')
+    expect(term.hasSelection).toHaveReturnedWith(false)
+    expect(term.getSelection).not.toHaveBeenCalled()
+  })
+
   test('does not open xterm until authoritative hydration supplies an addressable binding', async () => {
     const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())

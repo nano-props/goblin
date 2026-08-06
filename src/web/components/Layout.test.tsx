@@ -100,7 +100,7 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     })) as TerminalSessionContextValue['createTerminalWithAdmission'],
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
-    readVisibleText: vi.fn(() => null),
+    readCopyText: vi.fn(() => null),
     openComposer: vi.fn(() => true),
     closeComposer: vi.fn(() => true),
     setComposerMode: vi.fn(() => true),

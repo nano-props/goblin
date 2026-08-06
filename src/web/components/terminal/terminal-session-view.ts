@@ -223,9 +223,10 @@ export class TerminalSessionView {
     this.term?.scrollToBottom()
   }
 
-  readVisibleText(): string | null {
+  readCopyText(): string | null {
     const term = this.term
     if (!term || !this.isPresented()) return null
+    if (term.hasSelection()) return term.getSelection()
     return terminalViewportText({ buffer: term.buffer.active, rows: term.rows, cols: term.cols })
   }
 

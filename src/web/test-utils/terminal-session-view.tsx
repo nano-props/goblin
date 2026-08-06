@@ -192,7 +192,7 @@ export async function renderTerminalSession(
     createTerminal: async () => 'term-111111111111111111111',
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
-    readVisibleText: vi.fn(() => null),
+    readCopyText: vi.fn(() => null),
     clearBell: vi.fn(() => false),
     closeTerminalByDescriptor: vi.fn(async () => true),
     attach: vi.fn(),

@@ -863,8 +863,8 @@ export class TerminalSessionProjection {
     this.sessions.get(terminalSessionId)?.scrollToBottom()
   }
 
-  readVisibleText = (terminalSessionId: string): string | null => {
-    return this.sessions.get(terminalSessionId)?.readVisibleText() ?? null
+  readCopyText = (terminalSessionId: string): string | null => {
+    return this.sessions.get(terminalSessionId)?.readCopyText() ?? null
   }
 
   closeTerminalByDescriptor = async (terminalSessionId: string, base: TerminalSessionBase): Promise<boolean> => {

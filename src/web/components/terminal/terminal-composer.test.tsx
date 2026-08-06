@@ -17,7 +17,7 @@ const LABELS: TerminalComposerLabels = {
   inputPlaceholder: 'Enter a terminal command',
   more: 'More actions',
   uploadFiles: 'Upload',
-  copyVisible: 'Copy visible terminal content',
+  copyContent: 'Copy terminal content',
   showKeys: 'Show terminal keys',
   showInput: 'Show text input',
   enter: 'Enter',
@@ -38,7 +38,7 @@ function render(
     onVirtualKey?: (key: TerminalVirtualKey) => void
     onSendText?: (text: string) => Promise<boolean>
     onResolveFiles?: (files: File[]) => Promise<string | null>
-    onCopyVisibleContent?: () => Promise<void>
+    onCopyContent?: () => Promise<void>
     initialMode?: TerminalComposerMode
     initialDraft?: string
     draftReplaceAccepted?: boolean
@@ -65,7 +65,7 @@ function render(
         historyEntries={historyEntries}
         shortcut="Control+Shift+Enter"
         onVirtualKey={props.onVirtualKey ?? vi.fn()}
-        onCopyVisibleContent={props.onCopyVisibleContent ?? vi.fn(async () => {})}
+        onCopyContent={props.onCopyContent ?? vi.fn(async () => {})}
         onSendText={sendText}
         onOpen={() => {
           setExpanded(true)
@@ -140,7 +140,7 @@ function ExpandedComposerForTest({
       historyEntries={historyEntries}
       shortcut="Control+Shift+Enter"
       onVirtualKey={vi.fn()}
-      onCopyVisibleContent={vi.fn(async () => {})}
+      onCopyContent={vi.fn(async () => {})}
       onSendText={vi.fn(async () => true)}
       onOpen={vi.fn(() => true)}
       onClose={vi.fn(() => true)}
@@ -794,7 +794,7 @@ describe('TerminalComposer', () => {
 
     const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
     if (!menu) throw new Error('expected Composer menu')
-    expectComposerMenuLayout(menu, [LABELS.copyVisible, LABELS.uploadFiles, LABELS.close])
+    expectComposerMenuLayout(menu, [LABELS.copyContent, LABELS.uploadFiles, LABELS.close])
   })
 
   test('renders terminal-mode-aware key actions in their visual order', () => {
@@ -815,7 +815,7 @@ describe('TerminalComposer', () => {
       LABELS.ctrlC,
       LABELS.ctrlD,
     ]
-    const responsiveActionLabels = [LABELS.copyVisible, ...optionalKeyLabels]
+    const responsiveActionLabels = [LABELS.copyContent, ...optionalKeyLabels]
     const pinnedCommandLabels = [LABELS.tab, LABELS.enter]
     const directionLabels = [LABELS.arrowLeft, LABELS.arrowDown, LABELS.arrowUp, LABELS.arrowRight]
     const keyRowLabels = Array.from(
@@ -824,13 +824,13 @@ describe('TerminalComposer', () => {
     expect(keyRowLabels).toEqual([...responsiveActionLabels, ...pinnedCommandLabels, ...directionLabels])
     expect(buttonByAccessibleName(container, LABELS.tab).querySelector('.lucide-arrow-right-to-line')).not.toBeNull()
     expect(buttonByAccessibleName(container, LABELS.backspace).querySelector('.lucide-delete')).not.toBeNull()
-    expect(buttonByAccessibleName(container, LABELS.copyVisible).querySelector('.lucide-copy')).not.toBeNull()
+    expect(buttonByAccessibleName(container, LABELS.copyContent).querySelector('.lucide-copy')).not.toBeNull()
   })
 
   test('sends key-row actions to their respective boundaries', async () => {
     const onVirtualKey = vi.fn()
-    const onCopyVisibleContent = vi.fn(async () => {})
-    const { container } = render({ onVirtualKey, onCopyVisibleContent })
+    const onCopyContent = vi.fn(async () => {})
+    const { container } = render({ onVirtualKey, onCopyContent })
     expand(container)
     act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
     const pinnedCommandLabels = [LABELS.tab, LABELS.enter]
@@ -853,7 +853,7 @@ describe('TerminalComposer', () => {
       container.querySelectorAll<HTMLButtonElement>('[class*="goblin-terminal-composer__key-action--optional-"]'),
     )
     expect(optionalActions.map((button) => button.querySelector('.sr-only')?.textContent)).toEqual([
-      LABELS.copyVisible,
+      LABELS.copyContent,
       ...optionalKeyLabels,
     ])
     for (const button of optionalActions.slice(1)) act(() => button.click())
@@ -864,14 +864,14 @@ describe('TerminalComposer', () => {
       'interrupt',
       'eof',
     ])
-    await act(async () => buttonByAccessibleName(container, LABELS.copyVisible).click())
-    expect(onCopyVisibleContent).toHaveBeenCalledOnce()
+    await act(async () => buttonByAccessibleName(container, LABELS.copyContent).click())
+    expect(onCopyContent).toHaveBeenCalledOnce()
   })
 
   test('groups and sends key-mode menu actions', async () => {
     const onVirtualKey = vi.fn()
-    const onCopyVisibleContent = vi.fn(async () => {})
-    const { container } = render({ onVirtualKey, onCopyVisibleContent })
+    const onCopyContent = vi.fn(async () => {})
+    const { container } = render({ onVirtualKey, onCopyContent })
     expand(container)
     act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
     const optionalKeyLabels = [LABELS.backspace, LABELS.escape, LABELS.ctrlL, LABELS.ctrlC, LABELS.ctrlD]
@@ -895,7 +895,7 @@ describe('TerminalComposer', () => {
         expect(menu.querySelector('.lucide-copy')).not.toBeNull()
         expect(within(menu).queryByRole('button', { name: LABELS.enter })).toBeNull()
         expect(within(menu).queryByRole('button', { name: LABELS.tab })).toBeNull()
-        expectComposerMenuLayout(menu, [LABELS.copyVisible, ...optionalKeyLabels, LABELS.close])
+        expectComposerMenuLayout(menu, [LABELS.copyContent, ...optionalKeyLabels, LABELS.close])
       }
       act(() => menuItemByText(label).click())
       expect(onVirtualKey).toHaveBeenLastCalledWith(key)
@@ -904,17 +904,17 @@ describe('TerminalComposer', () => {
     }
 
     openMoreMenu(container)
-    await act(async () => menuItemByText(LABELS.copyVisible).click())
-    expect(onCopyVisibleContent).toHaveBeenCalledOnce()
-    expect(onVirtualKey).not.toHaveBeenCalledWith('copy-visible-content')
+    await act(async () => menuItemByText(LABELS.copyContent).click())
+    expect(onCopyContent).toHaveBeenCalledOnce()
+    expect(onVirtualKey).not.toHaveBeenCalledWith('copy-content')
   })
 
-  test('disables the visible-content action while a copy is pending', async () => {
+  test('disables the copy-content action while a copy is pending', async () => {
     const copy = Promise.withResolvers<void>()
-    const { container } = render({ onCopyVisibleContent: () => copy.promise })
+    const { container } = render({ onCopyContent: () => copy.promise })
     expand(container)
     act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
-    const copyButton = buttonByAccessibleName(container, LABELS.copyVisible)
+    const copyButton = buttonByAccessibleName(container, LABELS.copyContent)
 
     act(() => copyButton.click())
 

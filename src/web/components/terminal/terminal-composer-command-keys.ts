@@ -13,8 +13,8 @@ export const TERMINAL_COMPOSER_PINNED_COMMAND_KEYS = [
 ] as const satisfies readonly TerminalComposerCommandKey[]
 
 export const TERMINAL_COMPOSER_COPY_ACTION = {
-  kind: 'copy-visible-content',
-  labelKey: 'copyVisible',
+  kind: 'copy-content',
+  labelKey: 'copyContent',
 } as const
 
 export const TERMINAL_COMPOSER_OPTIONAL_ACTIONS = [
