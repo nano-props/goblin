@@ -12,6 +12,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { fetchServerJson } from '#/web/lib/server-fetch.ts'
 import { decodeWith } from '#/shared/http-response-schema.ts'
 import { AccessTokenResponseSchema } from '#/shared/web-bootstrap-response-schema.ts'
+import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 
 /**
  * Settings page for everything related to the embedded / standalone
@@ -68,13 +69,13 @@ export function WebSettings() {
   }, [bootstrapToken])
   const accessToken = fetchedToken
 
-  const copyToClipboard = async (
+  const copySettingValue = async (
     value: string,
     copiedKey: 'settings.web.token-copied' | 'settings.web.url-copied',
     copyFailedKey: 'settings.web.token-copy-failed' | 'settings.web.url-copy-failed',
   ) => {
     try {
-      await navigator.clipboard.writeText(value)
+      await copyToClipboard(value)
       toast.success(t(copiedKey))
     } catch {
       toast.error(t(copyFailedKey))
@@ -83,11 +84,11 @@ export function WebSettings() {
 
   const handleCopyToken = async () => {
     if (!accessToken) return
-    await copyToClipboard(accessToken, 'settings.web.token-copied', 'settings.web.token-copy-failed')
+    await copySettingValue(accessToken, 'settings.web.token-copied', 'settings.web.token-copy-failed')
   }
 
   const handleCopyUrl = (url: string) => {
-    return copyToClipboard(url, 'settings.web.url-copied', 'settings.web.url-copy-failed')
+    return copySettingValue(url, 'settings.web.url-copied', 'settings.web.url-copy-failed')
   }
 
   const handleRotate = async () => {

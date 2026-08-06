@@ -350,6 +350,7 @@ export const en = {
   'status.copy-patch-label': 'Copy patch',
   'status.copy-patch-title': 'Copy patch',
   'status.copy-patch-ok': 'Patch copied to clipboard',
+  'status.copy-patch-secure-context-required': 'Copying a generated patch requires HTTPS in this browser',
   'status.copy-patch-empty': 'Nothing to copy — worktree is clean',
   'status.copy-patch-success': 'Copied',
 

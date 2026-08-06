@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'
 import { IconCopyButton } from '#/web/components/IconCopyButton.tsx'
 import { useActionFeedback } from '#/web/hooks/useActionFeedback.ts'
+import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 
 type CopyButtonProps = Omit<
   ComponentPropsWithoutRef<typeof IconCopyButton>,
@@ -40,8 +41,7 @@ export function CopyButton({ value, copyLabel, copiedLabel, className, disabled,
     requestIdRef.current = requestId
     const copiedValue = value
     setCopying(true)
-    void navigator.clipboard
-      .writeText(copiedValue)
+    void copyToClipboard(copiedValue)
       .then(() => {
         if (requestIdRef.current !== requestId || valueRef.current !== copiedValue) return
         trigger(() => true)

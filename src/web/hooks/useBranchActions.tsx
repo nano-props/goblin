@@ -13,6 +13,7 @@ import {
   openWorkspaceTerminal,
 } from '#/web/workspace-external-app-client.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
+import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 import { branchWorktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
 import { dispatchRepoBranchAction, isPushProtected } from '#/web/stores/workspaces/branch-action-write-paths.ts'
 import { dispatchWorkspaceUiAction } from '#/web/stores/workspaces/workspace-ui-action.ts'
@@ -146,12 +147,22 @@ export function useBranchActions(repo: BranchActionRepo, branch: BranchSnapshotI
   function copyPatch(): Promise<boolean> {
     const worktreePath = branch.worktree?.path
     if (!worktreePath) return Promise.resolve(false)
+    if (!globalThis.navigator?.clipboard?.writeText) {
+      if (guardBusy()) return Promise.resolve(false)
+      setLastResult(
+        repo.id,
+        { ok: false, message: 'status.copy-patch-secure-context-required' },
+        repo.workspaceRuntimeId,
+      )
+      return Promise.resolve(false)
+    }
+
     return runUiAction('copyPatch', async () => {
       const result = await copyPatchMutation.mutateAsync(worktreePath)
       if (!result.ok) return { ok: false, message: result.message }
       if (!result.message) return { ok: false, message: 'status.copy-patch-empty' }
       try {
-        await navigator.clipboard.writeText(result.message)
+        await copyToClipboard(result.message)
       } catch (err) {
         return { ok: false, message: err instanceof Error ? err.message : String(err) }
       }

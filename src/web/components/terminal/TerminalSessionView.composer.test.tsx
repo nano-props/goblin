@@ -47,10 +47,12 @@ describe('TerminalSessionView composer', () => {
       const rendered = await renderTerminalSession({ readCopyText })
 
       copyContent(rendered.container)
-      await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('command\nerror'))
+      await vi.waitFor(() => {
+        expect(writeText).toHaveBeenCalledWith('command\nerror')
+        expect(terminalSessionViewToastForTest().success).toHaveBeenCalledWith('branch-status.copied')
+      })
 
       expect(readCopyText).toHaveBeenCalledWith('term-111111111111111111111')
-      expect(terminalSessionViewToastForTest().success).toHaveBeenCalledWith('branch-status.copied')
       await rendered.cleanup()
     } finally {
       if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
@@ -81,17 +83,19 @@ describe('TerminalSessionView composer', () => {
     vi.clearAllMocks()
     const error = new Error('Clipboard permission denied')
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    const execCommandDescriptor = Object.getOwnPropertyDescriptor(document, 'execCommand')
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: { writeText: vi.fn(async () => Promise.reject(error)) },
     })
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: vi.fn(() => false) })
     try {
       const rendered = await renderTerminalSession({ readCopyText: vi.fn(() => 'output') })
 
       copyContent(rendered.container)
       await vi.waitFor(() =>
         expect(terminalSessionViewToastForTest().error).toHaveBeenCalledWith('action.result-error', {
-          description: 'Clipboard permission denied',
+          description: 'NotAllowedError: The request is not allowed',
         }),
       )
 
@@ -100,6 +104,8 @@ describe('TerminalSessionView composer', () => {
     } finally {
       if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
       else Reflect.deleteProperty(navigator, 'clipboard')
+      if (execCommandDescriptor) Object.defineProperty(document, 'execCommand', execCommandDescriptor)
+      else Reflect.deleteProperty(document, 'execCommand')
     }
   })
 

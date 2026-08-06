@@ -335,6 +335,7 @@ export const zh: Record<DictKey, string> = {
   'status.copy-patch-label': '复制补丁',
   'status.copy-patch-title': '复制补丁',
   'status.copy-patch-ok': '补丁已复制到剪贴板',
+  'status.copy-patch-secure-context-required': '此浏览器需要通过 HTTPS 才能复制生成的补丁',
   'status.copy-patch-empty': '无需复制 — 工作树是干净的',
   'status.copy-patch-success': '已复制',
 

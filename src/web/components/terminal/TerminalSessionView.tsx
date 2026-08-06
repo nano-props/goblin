@@ -16,6 +16,7 @@ import { collectClipboardFiles, isNonPlaceholderClipboardFile } from '#/web/clip
 import { previewPaste, processDrop } from '#/web/clipboard/process.ts'
 import { resolvePastedFiles } from '#/web/clipboard/resolver.ts'
 import { planTerminalPathWrite } from '#/web/clipboard/terminal-path-write.ts'
+import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 import type { PasteResolution } from '#/web/clipboard/resolver.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { terminalLog } from '#/web/logger.ts'
@@ -145,7 +146,7 @@ export function TerminalSessionView({
         toast.error(t('terminal.composer-copy-content-empty'))
         return
       }
-      await navigator.clipboard.writeText(text)
+      await copyToClipboard(text)
       toast.success(t('branch-status.copied'))
     } catch (error) {
       toast.error(t('action.result-error'), {

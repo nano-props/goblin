@@ -350,6 +350,7 @@ export const ja: Record<DictKey, string> = {
   'status.copy-patch-label': 'パッチをコピー',
   'status.copy-patch-title': 'パッチをコピー',
   'status.copy-patch-ok': 'パッチをクリップボードにコピーしました',
+  'status.copy-patch-secure-context-required': 'このブラウザで生成したパッチをコピーするには HTTPS が必要です',
   'status.copy-patch-empty': 'コピー対象なし — ワークツリーはクリーンです',
   'status.copy-patch-success': 'コピーしました',
 

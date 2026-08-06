@@ -341,6 +341,7 @@ export const ko: Record<DictKey, string> = {
   'status.copy-patch-label': '패치 복사',
   'status.copy-patch-title': '패치 복사',
   'status.copy-patch-ok': '패치를 클립보드에 복사했습니다',
+  'status.copy-patch-secure-context-required': '이 브라우저에서 생성된 패치를 복사하려면 HTTPS가 필요합니다',
   'status.copy-patch-empty': '복사할 내용 없음 — 워크트리가 깨끗합니다',
   'status.copy-patch-success': '복사됨',
 

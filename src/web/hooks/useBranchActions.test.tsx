@@ -19,6 +19,8 @@ import type { ExecResult } from '#/shared/git-types.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { requireGitWorkspaceClientState } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 
 const mocks = vi.hoisted(() => ({
   getRepoPatch: vi.fn(),
@@ -130,6 +132,42 @@ describe('useBranchActions', () => {
     expect(result).toBe(true)
     expect(mocks.getRepoPatch).toHaveBeenCalledWith(REPO_ID, repo.workspaceRuntimeId, '/tmp/local-feature')
     expect(writeText).toHaveBeenCalledWith('diff --git a/file.ts b/file.ts')
+  })
+
+  test('fails before reading a patch when the browser cannot copy an asynchronous result', async () => {
+    const branch = createRepoBranch('feature/local', {
+      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
+    })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [branch],
+    })
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Reflect.deleteProperty(navigator, 'clipboard')
+
+    try {
+      let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
+      renderInJsdom(
+        <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
+      )
+
+      let copied = true
+      await act(async () => {
+        copied = (await actions?.copyPatch()) ?? true
+      })
+
+      expect(copied).toBe(false)
+      expect(mocks.getRepoPatch).not.toHaveBeenCalled()
+      expect(
+        requireGitWorkspaceClientState(useWorkspacesStore.getState().workspaces[REPO_ID]!).events.at(-1),
+      ).toMatchObject({
+        kind: 'result',
+        result: { ok: false, message: 'status.copy-patch-secure-context-required' },
+      })
+    } finally {
+      if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+    }
   })
 
   test('openEditor routes to the remote IPC for remote repos', async () => {

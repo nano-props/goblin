@@ -3,6 +3,7 @@ import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
 import { failedDiagnosticsCategory } from '#/web/lib/remote-diagnostics.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { RemoteDiagnosticCategory, RemoteDiagnosticsResult } from '#/shared/remote-workspace.ts'
+import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 
 interface Props {
   diagnostics: RemoteDiagnosticsResult | null
@@ -17,7 +18,7 @@ export function RemoteDiagnosticsPanel({ diagnostics, error, loading, idleText }
 
   async function copyText(value: string) {
     try {
-      await navigator.clipboard.writeText(value)
+      await copyToClipboard(value)
       toast.success(t('branch-status.copied'))
     } catch (err) {
       toast.error(t('action.result-error'), {
