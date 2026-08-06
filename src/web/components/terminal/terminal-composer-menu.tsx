@@ -22,7 +22,6 @@ interface TerminalComposerMenuProps {
   resolvingFiles: boolean
   onUpload: () => void
   onVirtualKey: (key: TerminalComposerMenuCommandKeyName) => void
-  onRequestTerminalFocus: () => void
   onClose: () => void
   onRestoreComposerTriggerFocus: () => void
 }
@@ -33,14 +32,12 @@ export function TerminalComposerMenu({
   resolvingFiles,
   onUpload,
   onVirtualKey,
-  onRequestTerminalFocus,
   onClose,
   onRestoreComposerTriggerFocus,
 }: TerminalComposerMenuProps) {
-  const focusTargetRef = useRef<'composer-trigger' | 'terminal' | null>(null)
+  const restoreComposerTriggerFocusRef = useRef(false)
   const [open, setOpen] = useState(false)
   const sendVirtualKey = (key: TerminalComposerMenuCommandKeyName) => {
-    focusTargetRef.current = 'terminal'
     onVirtualKey(key)
   }
   const closeMenu = () => setOpen(false)
@@ -61,14 +58,9 @@ export function TerminalComposerMenu({
         className="w-max min-w-32 max-w-72 overflow-hidden p-0"
         onOpenAutoFocus={(event) => event.preventDefault()}
         onCloseAutoFocus={(event) => {
-          const focusTarget = focusTargetRef.current
-          if (!focusTarget) return
-          focusTargetRef.current = null
+          if (!restoreComposerTriggerFocusRef.current) return
+          restoreComposerTriggerFocusRef.current = false
           event.preventDefault()
-          if (focusTarget === 'terminal') {
-            onRequestTerminalFocus()
-            return
-          }
           onRestoreComposerTriggerFocus()
         }}
       >
@@ -99,7 +91,7 @@ export function TerminalComposerMenu({
           <Separator className="-mx-1 my-1 w-auto" />
           <ComposerMenuItem
             onClick={() => {
-              focusTargetRef.current = 'composer-trigger'
+              restoreComposerTriggerFocusRef.current = true
               onClose()
             }}
             closeMenu={closeMenu}

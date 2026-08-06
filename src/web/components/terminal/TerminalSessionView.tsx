@@ -606,7 +606,6 @@ export function TerminalSessionView({
           onDraftChange={(draft) => setComposerDraft(terminalSessionId, draft)}
           onDraftReplace={(expectedDraft, draft) => replaceComposerDraft(terminalSessionId, expectedDraft, draft)}
           onResolveFiles={resolveComposerFiles}
-          onRequestFocus={() => focusTerminal(terminalSessionId)}
         />
       )}
       {showViewerOverlay && (

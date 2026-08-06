@@ -80,7 +80,6 @@ interface TerminalComposerProps {
   onDraftChange: (draft: string) => boolean
   onDraftReplace: (expectedDraft: string, draft: string) => boolean
   onResolveFiles: (files: File[]) => Promise<string | null>
-  onRequestFocus: () => void
   hidden?: boolean
   className?: string
 }
@@ -170,7 +169,6 @@ export function TerminalComposer({
   onDraftChange,
   onDraftReplace,
   onResolveFiles,
-  onRequestFocus,
   hidden,
   className,
 }: TerminalComposerProps) {
@@ -293,10 +291,6 @@ export function TerminalComposer({
     if (event.key !== 'Enter' || event.shiftKey) return
     event.preventDefault()
     void submitDraft()
-  }
-  const handleVirtualKeyClick = (event: MouseEvent<HTMLButtonElement>, key: TerminalVirtualKey) => {
-    onVirtualKey(key)
-    if (event.detail > 0) onRequestFocus()
   }
   const closeComposer = () => {
     if (!onClose()) return
@@ -444,7 +438,7 @@ export function TerminalComposer({
                     className={`goblin-terminal-composer__key-action--optional-${index + 1}`}
                     accessibleName={labels[key.labelKey]}
                     onPointerDown={(event) => event.preventDefault()}
-                    onClick={(event) => handleVirtualKeyClick(event, key.key)}
+                    onClick={() => onVirtualKey(key.key)}
                   >
                     {COMMAND_KEY_ICONS[key.labelKey] ?? key.keycap}
                   </ComposerButton>
@@ -454,7 +448,7 @@ export function TerminalComposer({
                     key={key.key}
                     accessibleName={labels[key.labelKey]}
                     onPointerDown={(event) => event.preventDefault()}
-                    onClick={(event) => handleVirtualKeyClick(event, key.key)}
+                    onClick={() => onVirtualKey(key.key)}
                   >
                     {COMMAND_KEY_ICONS[key.labelKey] ?? key.keycap}
                   </ComposerButton>
@@ -464,7 +458,7 @@ export function TerminalComposer({
                     key={key.accessibleName}
                     accessibleName={labels[key.accessibleName]}
                     onPointerDown={(event) => event.preventDefault()}
-                    onClick={(event) => handleVirtualKeyClick(event, key.key)}
+                    onClick={() => onVirtualKey(key.key)}
                   >
                     {key.icon}
                   </ComposerButton>
@@ -487,7 +481,6 @@ export function TerminalComposer({
             resolvingFiles={resolvingFiles}
             onUpload={openFilePicker}
             onVirtualKey={onVirtualKey}
-            onRequestTerminalFocus={onRequestFocus}
             onClose={closeComposer}
             onRestoreComposerTriggerFocus={requestTriggerFocus}
           />

@@ -36,7 +36,6 @@ function render(
     onVirtualKey?: (key: TerminalVirtualKey) => void
     onSendText?: (text: string) => Promise<boolean>
     onResolveFiles?: (files: File[]) => Promise<string | null>
-    onRequestFocus?: () => void
     initialMode?: TerminalComposerMode
     initialDraft?: string
     draftReplaceAccepted?: boolean
@@ -87,7 +86,6 @@ function render(
           return true
         }}
         onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
-        onRequestFocus={props.onRequestFocus ?? vi.fn()}
       />
     )
   }
@@ -152,7 +150,6 @@ function ExpandedComposerForTest({
         return true
       }}
       onResolveFiles={vi.fn(async () => null)}
-      onRequestFocus={vi.fn()}
     />
   )
 }
@@ -825,6 +822,7 @@ describe('TerminalComposer', () => {
       [LABELS.ctrlC, 'interrupt'],
       [LABELS.ctrlD, 'eof'],
     ] as const) {
+      const more = buttonByAccessibleName(container, LABELS.more)
       openMoreMenu(container)
       if (key === 'backspace') {
         const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
@@ -839,12 +837,13 @@ describe('TerminalComposer', () => {
       }
       act(() => menuItemByText(label).click())
       expect(onVirtualKey).toHaveBeenLastCalledWith(key)
+      expect(document.querySelector('[data-slot="popover-content"]')).toBeNull()
+      expect(document.activeElement).toBe(more)
     }
   })
 
-  test('mode toggle preserves the draft and virtual keys restore terminal focus only for pointer input', () => {
-    const onRequestFocus = vi.fn()
-    const { container } = render({ onRequestFocus })
+  test('mode toggle preserves the draft and pointer keys preserve composer focus', () => {
+    const { container } = render()
     expand(container)
     showInput(container)
     const input = container.querySelector('textarea')
@@ -852,12 +851,13 @@ describe('TerminalComposer', () => {
     fireEvent.change(input, { target: { value: 'draft command' } })
     act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
     const arrowUp = buttonByAccessibleName(container, LABELS.arrowUp)
+    const modeToggle = buttonByAccessibleName(container, LABELS.showInput)
 
     expect(fireEvent.pointerDown(arrowUp)).toBe(false)
     act(() => arrowUp.click())
-    expect(onRequestFocus).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(modeToggle)
     fireEvent.click(arrowUp, { detail: 1 })
-    expect(onRequestFocus).toHaveBeenCalledOnce()
+    expect(document.activeElement).toBe(modeToggle)
 
     act(() => buttonByAccessibleName(container, LABELS.showInput).click())
     expect(container.querySelector('textarea')?.value).toBe('draft command')
