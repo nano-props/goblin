@@ -121,7 +121,8 @@
 .goblin-terminal-composer__key-action--optional-2,
 .goblin-terminal-composer__key-action--optional-3,
 .goblin-terminal-composer__key-action--optional-4,
-.goblin-terminal-composer__key-action--optional-5 {
+.goblin-terminal-composer__key-action--optional-5,
+.goblin-terminal-composer__key-action--optional-6 {
   display: none;
 }
 
@@ -151,6 +152,12 @@
 
 @container goblin-terminal-session (min-width: 608px) {
   .goblin-terminal-composer__key-action--optional-5 {
+    display: inline-flex;
+  }
+}
+
+@container goblin-terminal-session (min-width: 652px) {
+  .goblin-terminal-composer__key-action--optional-6 {
     display: inline-flex;
   }
 }

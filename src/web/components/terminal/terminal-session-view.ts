@@ -34,6 +34,7 @@ import {
   installTerminalViewportReveal,
   terminalInputRevealRow,
 } from '#/web/components/terminal/terminal-viewport-reveal.ts'
+import { terminalViewportText } from '#/web/components/terminal/terminal-viewport-text.ts'
 
 export class TerminalSessionView {
   private readonly frame: HTMLDivElement
@@ -220,6 +221,12 @@ export class TerminalSessionView {
 
   scrollToBottom(): void {
     this.term?.scrollToBottom()
+  }
+
+  readVisibleText(): string | null {
+    const term = this.term
+    if (!term || !this.isPresented()) return null
+    return terminalViewportText({ buffer: term.buffer.active, rows: term.rows, cols: term.cols })
   }
 
   sendVirtualKey(key: TerminalVirtualKey): void {

@@ -416,6 +416,8 @@ export const en = {
   'terminal.composer-input-placeholder': 'Send a message to the terminal',
   'terminal.composer-more': 'More actions',
   'terminal.composer-upload-files': 'Upload',
+  'terminal.composer-copy-visible': 'Copy visible terminal content',
+  'terminal.composer-copy-visible-empty': 'There is no visible terminal content to copy.',
   'terminal.composer-show-keys': 'Show terminal keys',
   'terminal.composer-show-input': 'Show text input',
   'terminal.composer-key-enter': 'Enter',

@@ -407,6 +407,8 @@ export const ko: Record<DictKey, string> = {
   'terminal.composer-input-placeholder': '터미널에 메시지 보내기',
   'terminal.composer-more': '추가 작업',
   'terminal.composer-upload-files': '업로드',
+  'terminal.composer-copy-visible': '현재 보이는 터미널 내용 복사',
+  'terminal.composer-copy-visible-empty': '복사할 수 있는 현재 터미널 내용이 없습니다.',
   'terminal.composer-show-keys': '터미널 키 표시',
   'terminal.composer-show-input': '텍스트 입력 표시',
   'terminal.composer-key-enter': 'Enter',
