@@ -42,6 +42,8 @@ export function terminalInputForVirtualKey(key: TerminalVirtualKey, applicationC
       return '\t'
     case 'escape':
       return '\x1b'
+    case 'clear-screen':
+      return '\x0c'
     case 'interrupt':
       return '\x03'
     case 'eof':

@@ -117,6 +117,7 @@ export type TerminalVirtualKey =
   | 'arrow-left'
   | 'arrow-right'
   | 'escape'
+  | 'clear-screen'
   | 'interrupt'
   | 'eof'
 

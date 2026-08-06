@@ -14,6 +14,7 @@ export const TERMINAL_COMPOSER_PINNED_COMMAND_KEYS = [
 export const TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS = [
   { key: 'backspace', labelKey: 'backspace', keycap: '⌫' },
   { key: 'escape', labelKey: 'escape', keycap: 'Esc' },
+  { key: 'clear-screen', labelKey: 'ctrlL', keycap: '^L' },
   { key: 'interrupt', labelKey: 'ctrlC', keycap: '^C' },
   { key: 'eof', labelKey: 'ctrlD', keycap: '^D' },
 ] as const satisfies readonly TerminalComposerCommandKey[]

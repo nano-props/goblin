@@ -27,6 +27,7 @@ const LABELS: TerminalComposerLabels = {
   arrowLeft: 'Arrow Left',
   arrowRight: 'Arrow Right',
   escape: 'Escape',
+  ctrlL: 'Ctrl+L',
   ctrlC: 'Ctrl+C',
   ctrlD: 'Ctrl+D',
 }
@@ -785,7 +786,7 @@ describe('TerminalComposer', () => {
     ).not.toBeNull()
     expect(buttonByAccessibleName(container, LABELS.more).querySelector('.lucide-ellipsis')).not.toBeNull()
 
-    const optionalCommandLabels = [LABELS.backspace, LABELS.escape, LABELS.ctrlC, LABELS.ctrlD]
+    const optionalCommandLabels = [LABELS.backspace, LABELS.escape, LABELS.ctrlL, LABELS.ctrlC, LABELS.ctrlD]
     const pinnedCommandLabels = [LABELS.tab, LABELS.enter]
     const directionLabels = [LABELS.arrowLeft, LABELS.arrowDown, LABELS.arrowUp, LABELS.arrowRight]
     const keyRowLabels = Array.from(
@@ -814,11 +815,18 @@ describe('TerminalComposer', () => {
       optionalCommandLabels,
     )
     for (const button of optionalActions) act(() => button.click())
-    expect(onVirtualKey.mock.calls.slice(-4).map(([key]) => key)).toEqual(['backspace', 'escape', 'interrupt', 'eof'])
+    expect(onVirtualKey.mock.calls.slice(-5).map(([key]) => key)).toEqual([
+      'backspace',
+      'escape',
+      'clear-screen',
+      'interrupt',
+      'eof',
+    ])
 
     for (const [label, key] of [
       [LABELS.backspace, 'backspace'],
       [LABELS.escape, 'escape'],
+      [LABELS.ctrlL, 'clear-screen'],
       [LABELS.ctrlC, 'interrupt'],
       [LABELS.ctrlD, 'eof'],
     ] as const) {
@@ -829,7 +837,7 @@ describe('TerminalComposer', () => {
         if (!menu) throw new Error('expected Composer menu')
         expect(
           Array.from(menu.querySelectorAll('[data-terminal-composer-keycap]')).map((keycap) => keycap.textContent),
-        ).toEqual(['Esc', '^C', '^D'])
+        ).toEqual(['Esc', '^L', '^C', '^D'])
         expect(menu.querySelector('.lucide-delete')).not.toBeNull()
         expect(within(menu).queryByRole('button', { name: LABELS.enter })).toBeNull()
         expect(within(menu).queryByRole('button', { name: LABELS.tab })).toBeNull()

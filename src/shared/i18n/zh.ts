@@ -409,6 +409,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.composer-key-arrow-left': '向左方向键',
   'terminal.composer-key-arrow-right': '向右方向键',
   'terminal.composer-key-escape': 'Esc',
+  'terminal.composer-key-ctrl-l': 'Ctrl+L',
   'terminal.composer-key-ctrl-c': 'Ctrl+C',
   'terminal.composer-key-ctrl-d': 'Ctrl+D',
 

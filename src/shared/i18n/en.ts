@@ -426,6 +426,7 @@ export const en = {
   'terminal.composer-key-arrow-left': 'Arrow left',
   'terminal.composer-key-arrow-right': 'Arrow right',
   'terminal.composer-key-escape': 'Escape',
+  'terminal.composer-key-ctrl-l': 'Ctrl+L',
   'terminal.composer-key-ctrl-c': 'Ctrl+C',
   'terminal.composer-key-ctrl-d': 'Ctrl+D',
 

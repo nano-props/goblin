@@ -427,6 +427,7 @@ export const ja: Record<DictKey, string> = {
   'terminal.composer-key-arrow-left': '左矢印キー',
   'terminal.composer-key-arrow-right': '右矢印キー',
   'terminal.composer-key-escape': 'Esc',
+  'terminal.composer-key-ctrl-l': 'Ctrl+L',
   'terminal.composer-key-ctrl-c': 'Ctrl+C',
   'terminal.composer-key-ctrl-d': 'Ctrl+D',
 

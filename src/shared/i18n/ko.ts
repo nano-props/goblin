@@ -417,6 +417,7 @@ export const ko: Record<DictKey, string> = {
   'terminal.composer-key-arrow-left': '왼쪽 화살표 키',
   'terminal.composer-key-arrow-right': '오른쪽 화살표 키',
   'terminal.composer-key-escape': 'Esc',
+  'terminal.composer-key-ctrl-l': 'Ctrl+L',
   'terminal.composer-key-ctrl-c': 'Ctrl+C',
   'terminal.composer-key-ctrl-d': 'Ctrl+D',
 

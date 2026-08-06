@@ -1,3 +1,4 @@
+import '#/web/components/terminal/terminal-composer.css'
 import {
   useEffect,
   useId,
@@ -60,6 +61,7 @@ export interface TerminalComposerLabels {
   arrowLeft: string
   arrowRight: string
   escape: string
+  ctrlL: string
   ctrlC: string
   ctrlD: string
 }

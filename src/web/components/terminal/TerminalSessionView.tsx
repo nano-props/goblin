@@ -130,6 +130,7 @@ export function TerminalSessionView({
     arrowLeft: t('terminal.composer-key-arrow-left'),
     arrowRight: t('terminal.composer-key-arrow-right'),
     escape: t('terminal.composer-key-escape'),
+    ctrlL: t('terminal.composer-key-ctrl-l'),
     ctrlC: t('terminal.composer-key-ctrl-c'),
     ctrlD: t('terminal.composer-key-ctrl-d'),
   }

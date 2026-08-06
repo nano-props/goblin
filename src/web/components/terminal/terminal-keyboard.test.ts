@@ -209,6 +209,7 @@ describe('terminalInputForVirtualKey', () => {
     ['backspace', '\x7f'],
     ['tab', '\t'],
     ['escape', '\x1b'],
+    ['clear-screen', '\x0c'],
     ['interrupt', '\x03'],
     ['eof', '\x04'],
   ] as const)('encodes %s', (key, expected) => {
