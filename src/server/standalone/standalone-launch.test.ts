@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -36,6 +37,8 @@ import { launchStandaloneServer } from '#/server/standalone/standalone-launch.ts
 
 const repoRoot = path.resolve(import.meta.dirname, '../../..')
 const runtimeEntryDir = path.join(repoRoot, 'src/server/entrypoints')
+const packageVersion = (JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as { version: string })
+  .version
 const originalCwd = process.cwd()
 const environmentKeys = [
   'GOBLIN_SERVER_HOST',
@@ -98,7 +101,7 @@ describe('standalone server launch boundary', () => {
     expect(process.cwd()).toBe(repoRoot)
     expect(process.env.GOBLIN_SERVER_DATA_DIR).toBe('/tmp/goblin-test-data')
     expect(process.env.GOBLIN_SERVER_ACCESS_TOKEN).toBe('generic-explicit-token')
-    expect(process.env.npm_package_version).toBe('0.3.1')
+    expect(process.env.npm_package_version).toBe(packageVersion)
     expect(mocks.prepareNodePtyDarwinRuntime).toHaveBeenCalledWith({
       packageRoot: path.join(repoRoot, 'node_modules/node-pty'),
     })
