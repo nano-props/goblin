@@ -28,9 +28,18 @@ vi.mock('#/web/app-shell-client.ts', () => ({
   saveClipboardFiles: vi.fn(() => Promise.resolve([])),
 }))
 
-vi.mock('sonner', () => ({
-  toast: { error: vi.fn(), warning: vi.fn(), success: vi.fn(), message: vi.fn() },
+const terminalSessionViewToast = vi.hoisted(() => ({
+  error: vi.fn(),
+  warning: vi.fn(),
+  success: vi.fn(),
+  message: vi.fn(),
 }))
+
+vi.mock('sonner', () => ({ toast: terminalSessionViewToast }))
+
+export function terminalSessionViewToastForTest() {
+  return terminalSessionViewToast
+}
 
 // No testing-library fixture models this context/read-model plus clipboard and drop boundary.
 // Keep the DOM harness shared while each suite owns one observable TerminalSessionView behavior.
@@ -183,6 +192,7 @@ export async function renderTerminalSession(
     createTerminal: async () => 'term-111111111111111111111',
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
+    readVisibleText: vi.fn(() => null),
     clearBell: vi.fn(() => false),
     closeTerminalByDescriptor: vi.fn(async () => true),
     attach: vi.fn(),

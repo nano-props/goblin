@@ -417,6 +417,8 @@ export const ja: Record<DictKey, string> = {
   'terminal.composer-input-placeholder': 'ターミナルにメッセージを送信',
   'terminal.composer-more': 'その他の操作',
   'terminal.composer-upload-files': 'アップロード',
+  'terminal.composer-copy-visible': '表示中のターミナル内容をコピー',
+  'terminal.composer-copy-visible-empty': 'コピーできる表示中のターミナル内容がありません。',
   'terminal.composer-show-keys': 'ターミナルキーを表示',
   'terminal.composer-show-input': 'テキスト入力を表示',
   'terminal.composer-key-enter': 'Enter',

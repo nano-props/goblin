@@ -5,6 +5,7 @@ type TestTerminalSessionContextValue = Omit<
   TerminalSessionContextValue,
   | 'createTerminalWithAdmission'
   | 'captureInputWriter'
+  | 'readVisibleText'
   | 'sendVirtualKey'
   | 'submitText'
   | 'retryPresentation'
@@ -19,6 +20,7 @@ type TestTerminalSessionContextValue = Omit<
       TerminalSessionContextValue,
       | 'createTerminalWithAdmission'
       | 'captureInputWriter'
+      | 'readVisibleText'
       | 'sendVirtualKey'
       | 'submitText'
       | 'retryPresentation'
@@ -53,6 +55,7 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
   const createTerminalWithAdmission =
     context.createTerminalWithAdmission ?? unexpectedContextCapability('createTerminalWithAdmission')
   const captureInputWriter = context.captureInputWriter ?? unexpectedContextCapability('captureInputWriter')
+  const readVisibleText = context.readVisibleText ?? unexpectedContextCapability('readVisibleText')
   const sendVirtualKey = context.sendVirtualKey ?? unexpectedContextCapability('sendVirtualKey')
   const submitText = context.submitText ?? unexpectedContextCapability('submitText')
   const retryPresentation = context.retryPresentation ?? unexpectedContextCapability('retryPresentation')
@@ -65,6 +68,7 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
     ...context,
     createTerminalWithAdmission,
     captureInputWriter,
+    readVisibleText,
     sendVirtualKey,
     submitText,
     retryPresentation,

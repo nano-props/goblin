@@ -496,6 +496,11 @@ export class TerminalSession {
     this.view.scrollToBottom()
   }
 
+  readVisibleText(): string | null {
+    if (this.disposed || !this.runtime.isController()) return null
+    return this.view.readVisibleText()
+  }
+
   currentTerminalRuntimeSessionId(): string | null {
     return this.runtime.currentTerminalRuntimeSessionId()
   }

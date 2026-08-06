@@ -81,7 +81,9 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
       </QueryClientProvider>,
     )
 
-    const primary = container.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-primary"]')
+    const primary = container.querySelector<HTMLButtonElement>(
+      '[data-testid="workspace-external-app-launcher-primary"]',
+    )
     if (!primary) throw new Error('missing external app primary action')
     act(() => {
       primary.click()
@@ -123,7 +125,9 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
       </QueryClientProvider>,
     )
 
-    const primary = container.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-primary"]')
+    const primary = container.querySelector<HTMLButtonElement>(
+      '[data-testid="workspace-external-app-launcher-primary"]',
+    )
     if (!primary) throw new Error('missing external app primary action')
     act(() => {
       primary.click()
@@ -171,7 +175,9 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
       </QueryClientProvider>,
     )
 
-    const trigger = container.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-trigger"]')
+    const trigger = container.querySelector<HTMLButtonElement>(
+      '[data-testid="workspace-external-app-launcher-trigger"]',
+    )
     if (!trigger) throw new Error('missing external app launcher trigger')
     openPopover(trigger)
 

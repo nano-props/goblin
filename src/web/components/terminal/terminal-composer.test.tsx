@@ -17,6 +17,7 @@ const LABELS: TerminalComposerLabels = {
   inputPlaceholder: 'Enter a terminal command',
   more: 'More actions',
   uploadFiles: 'Upload',
+  copyVisible: 'Copy visible terminal content',
   showKeys: 'Show terminal keys',
   showInput: 'Show text input',
   enter: 'Enter',
@@ -37,6 +38,7 @@ function render(
     onVirtualKey?: (key: TerminalVirtualKey) => void
     onSendText?: (text: string) => Promise<boolean>
     onResolveFiles?: (files: File[]) => Promise<string | null>
+    onCopyVisibleContent?: () => Promise<void>
     initialMode?: TerminalComposerMode
     initialDraft?: string
     draftReplaceAccepted?: boolean
@@ -63,6 +65,7 @@ function render(
         historyEntries={historyEntries}
         shortcut="Control+Shift+Enter"
         onVirtualKey={props.onVirtualKey ?? vi.fn()}
+        onCopyVisibleContent={props.onCopyVisibleContent ?? vi.fn(async () => {})}
         onSendText={sendText}
         onOpen={() => {
           setExpanded(true)
@@ -137,6 +140,7 @@ function ExpandedComposerForTest({
       historyEntries={historyEntries}
       shortcut="Control+Shift+Enter"
       onVirtualKey={vi.fn()}
+      onCopyVisibleContent={vi.fn(async () => {})}
       onSendText={vi.fn(async () => true)}
       onOpen={vi.fn(() => true)}
       onClose={vi.fn(() => true)}
@@ -774,9 +778,10 @@ describe('TerminalComposer', () => {
     expect(textarea.hasAttribute('aria-busy')).toBe(false)
   })
 
-  test('sends terminal-mode-aware key intents', () => {
+  test('sends terminal-mode-aware key intents', async () => {
     const onVirtualKey = vi.fn()
-    const { container } = render({ onVirtualKey })
+    const onCopyVisibleContent = vi.fn(async () => {})
+    const { container } = render({ onVirtualKey, onCopyVisibleContent })
     expand(container)
     act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
 
@@ -786,15 +791,23 @@ describe('TerminalComposer', () => {
     ).not.toBeNull()
     expect(buttonByAccessibleName(container, LABELS.more).querySelector('.lucide-ellipsis')).not.toBeNull()
 
-    const optionalCommandLabels = [LABELS.backspace, LABELS.escape, LABELS.ctrlL, LABELS.ctrlC, LABELS.ctrlD]
+    const optionalActionLabels = [
+      LABELS.backspace,
+      LABELS.escape,
+      LABELS.ctrlL,
+      LABELS.ctrlC,
+      LABELS.ctrlD,
+      LABELS.copyVisible,
+    ]
     const pinnedCommandLabels = [LABELS.tab, LABELS.enter]
     const directionLabels = [LABELS.arrowLeft, LABELS.arrowDown, LABELS.arrowUp, LABELS.arrowRight]
     const keyRowLabels = Array.from(
       container.querySelectorAll<HTMLButtonElement>('.goblin-terminal-composer__key-row button'),
     ).map((button) => button.querySelector('.sr-only')?.textContent)
-    expect(keyRowLabels).toEqual([...optionalCommandLabels, ...pinnedCommandLabels, ...directionLabels])
+    expect(keyRowLabels).toEqual([...optionalActionLabels, ...pinnedCommandLabels, ...directionLabels])
     expect(buttonByAccessibleName(container, LABELS.tab).querySelector('.lucide-arrow-right-to-line')).not.toBeNull()
     expect(buttonByAccessibleName(container, LABELS.backspace).querySelector('.lucide-delete')).not.toBeNull()
+    expect(buttonByAccessibleName(container, LABELS.copyVisible).querySelector('.lucide-copy')).not.toBeNull()
 
     for (const name of [...pinnedCommandLabels, ...directionLabels]) {
       act(() => buttonByAccessibleName(container, name).click())
@@ -811,10 +824,8 @@ describe('TerminalComposer', () => {
     const optionalActions = Array.from(
       container.querySelectorAll<HTMLButtonElement>('[class*="goblin-terminal-composer__key-action--optional-"]'),
     )
-    expect(optionalActions.map((button) => button.querySelector('.sr-only')?.textContent)).toEqual(
-      optionalCommandLabels,
-    )
-    for (const button of optionalActions) act(() => button.click())
+    expect(optionalActions.map((button) => button.querySelector('.sr-only')?.textContent)).toEqual(optionalActionLabels)
+    for (const button of optionalActions.slice(0, -1)) act(() => button.click())
     expect(onVirtualKey.mock.calls.slice(-5).map(([key]) => key)).toEqual([
       'backspace',
       'escape',
@@ -822,6 +833,8 @@ describe('TerminalComposer', () => {
       'interrupt',
       'eof',
     ])
+    await act(async () => buttonByAccessibleName(container, LABELS.copyVisible).click())
+    expect(onCopyVisibleContent).toHaveBeenCalledOnce()
 
     for (const [label, key] of [
       [LABELS.backspace, 'backspace'],
@@ -839,6 +852,7 @@ describe('TerminalComposer', () => {
           Array.from(menu.querySelectorAll('[data-terminal-composer-keycap]')).map((keycap) => keycap.textContent),
         ).toEqual(['Esc', '^L', '^C', '^D'])
         expect(menu.querySelector('.lucide-delete')).not.toBeNull()
+        expect(menu.querySelector('.lucide-copy')).not.toBeNull()
         expect(within(menu).queryByRole('button', { name: LABELS.enter })).toBeNull()
         expect(within(menu).queryByRole('button', { name: LABELS.tab })).toBeNull()
         expect(menu.querySelectorAll('[data-slot="separator"]')).toHaveLength(1)
@@ -848,6 +862,27 @@ describe('TerminalComposer', () => {
       expect(document.querySelector('[data-slot="popover-content"]')).toBeNull()
       expect(document.activeElement).toBe(more)
     }
+
+    openMoreMenu(container)
+    await act(async () => menuItemByText(LABELS.copyVisible).click())
+    expect(onCopyVisibleContent).toHaveBeenCalledTimes(2)
+    expect(onVirtualKey).not.toHaveBeenCalledWith('copy-visible-content')
+  })
+
+  test('disables the visible-content action while a copy is pending', async () => {
+    const copy = Promise.withResolvers<void>()
+    const { container } = render({ onCopyVisibleContent: () => copy.promise })
+    expand(container)
+    act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
+    const copyButton = buttonByAccessibleName(container, LABELS.copyVisible)
+
+    act(() => copyButton.click())
+
+    expect(copyButton.hasAttribute('disabled')).toBe(true)
+    expect(copyButton.getAttribute('aria-busy')).toBe('true')
+    await act(async () => copy.resolve())
+    expect(copyButton.hasAttribute('disabled')).toBe(false)
+    expect(copyButton.hasAttribute('aria-busy')).toBe(false)
   })
 
   test('mode toggle preserves the draft and pointer keys preserve composer focus', () => {

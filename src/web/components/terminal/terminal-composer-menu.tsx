@@ -1,16 +1,16 @@
-import { Delete, Ellipsis, Upload, X } from 'lucide-react'
-import { useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { Copy, Delete, Ellipsis, Upload, X } from 'lucide-react'
+import { useRef, useState, type MouseEventHandler, type ReactNode } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Separator } from '#/web/components/ui/separator.tsx'
 import {
-  TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS,
-  type TerminalComposerMenuCommandKeyName,
-  type TerminalComposerMenuCommandLabelKey,
+  TERMINAL_COMPOSER_OPTIONAL_ACTIONS,
+  type TerminalComposerOptionalActionLabelKey,
+  type TerminalComposerOptionalVirtualKey,
 } from '#/web/components/terminal/terminal-composer-command-keys.ts'
 
-type TerminalComposerMenuLabels = Record<TerminalComposerMenuCommandLabelKey, string> & {
+type TerminalComposerMenuLabels = Record<TerminalComposerOptionalActionLabelKey, string> & {
   more: string
   uploadFiles: string
   close: string
@@ -20,8 +20,10 @@ interface TerminalComposerMenuProps {
   labels: TerminalComposerMenuLabels
   mode: 'input' | 'keys'
   resolvingFiles: boolean
+  copyingVisibleContent: boolean
   onUpload: () => void
-  onVirtualKey: (key: TerminalComposerMenuCommandKeyName) => void
+  onVirtualKey: (key: TerminalComposerOptionalVirtualKey) => void
+  onCopyVisibleContent: () => void
   onClose: () => void
   onRestoreComposerTriggerFocus: () => void
 }
@@ -30,14 +32,16 @@ export function TerminalComposerMenu({
   labels,
   mode,
   resolvingFiles,
+  copyingVisibleContent,
   onUpload,
   onVirtualKey,
+  onCopyVisibleContent,
   onClose,
   onRestoreComposerTriggerFocus,
 }: TerminalComposerMenuProps) {
   const restoreComposerTriggerFocusRef = useRef(false)
   const [open, setOpen] = useState(false)
-  const sendVirtualKey = (key: TerminalComposerMenuCommandKeyName) => {
+  const sendVirtualKey = (key: TerminalComposerOptionalVirtualKey) => {
     onVirtualKey(key)
   }
   const closeMenu = () => setOpen(false)
@@ -75,9 +79,21 @@ export function TerminalComposerMenu({
               {labels.uploadFiles}
             </ComposerMenuItem>
           ) : (
-            TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS.map((action) => (
-              <ComposerMenuItem key={action.key} onClick={() => sendVirtualKey(action.key)} closeMenu={closeMenu}>
-                {action.key === 'backspace' ? (
+            TERMINAL_COMPOSER_OPTIONAL_ACTIONS.map((action) => (
+              <ComposerMenuItem
+                key={action.kind === 'virtual-key' ? action.key : action.kind}
+                disabled={action.kind === 'copy-visible-content' && copyingVisibleContent}
+                onClick={() => {
+                  if (action.kind === 'copy-visible-content') onCopyVisibleContent()
+                  else sendVirtualKey(action.key)
+                }}
+                closeMenu={closeMenu}
+              >
+                {action.kind === 'copy-visible-content' ? (
+                  <span aria-hidden="true" className="inline-flex w-6 shrink-0 items-center justify-center">
+                    <Copy className="size-4" />
+                  </span>
+                ) : action.key === 'backspace' ? (
                   <span aria-hidden="true" className="inline-flex w-6 shrink-0 items-center justify-center">
                     <Delete className="size-4" />
                   </span>
@@ -109,22 +125,22 @@ function ComposerMenuItem({
   children,
   closeMenu,
   onClick,
-  disabled,
+  ...buttonProps
 }: {
   children: ReactNode
   closeMenu: () => void
-  onClick: () => void
   disabled?: boolean
+  onClick: MouseEventHandler<HTMLButtonElement>
 }) {
-  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+  const handleClick: MouseEventHandler<HTMLButtonElement> = (event) => {
     event.stopPropagation()
     closeMenu()
-    onClick()
+    onClick(event)
   }
   return (
     <button
       type="button"
-      disabled={disabled}
+      {...buttonProps}
       onClick={handleClick}
       className="group relative flex h-8 w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
     >

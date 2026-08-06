@@ -7,6 +7,7 @@ import {
   clipboardDataWithFiles,
   dropDataWithFiles,
   renderTerminalSession,
+  terminalSessionViewToastForTest,
 } from '#/web/test-utils/terminal-session-view.tsx'
 
 function buttonByLabel(container: HTMLElement, label: string) {
@@ -26,7 +27,82 @@ function openComposerInput(container: HTMLElement) {
   return composerInput(container)
 }
 
+function copyVisibleContent(container: HTMLElement) {
+  act(() => buttonByLabel(container, 'terminal.composer-open').click())
+  act(() => buttonByLabel(container, 'terminal.composer-show-keys').click())
+  act(() => buttonByLabel(container, 'terminal.composer-more').click())
+  const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
+  if (!menu) throw new Error('expected open Composer menu')
+  act(() => within(menu).getByRole('button', { name: 'terminal.composer-copy-visible' }).click())
+}
+
 describe('TerminalSessionView composer', () => {
+  test('copies the captured visible terminal text and confirms success', async () => {
+    vi.clearAllMocks()
+    const writeText = vi.fn(async () => {})
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    try {
+      const readVisibleText = vi.fn(() => 'command\nerror')
+      const rendered = await renderTerminalSession({ readVisibleText })
+
+      copyVisibleContent(rendered.container)
+      await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith('command\nerror'))
+
+      expect(readVisibleText).toHaveBeenCalledWith('term-111111111111111111111')
+      expect(terminalSessionViewToastForTest().success).toHaveBeenCalledWith('branch-status.copied')
+      await rendered.cleanup()
+    } finally {
+      if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
+  test('does not overwrite the clipboard when the visible viewport is empty', async () => {
+    vi.clearAllMocks()
+    const writeText = vi.fn(async () => {})
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    try {
+      const rendered = await renderTerminalSession({ readVisibleText: vi.fn(() => '') })
+
+      copyVisibleContent(rendered.container)
+
+      expect(writeText).not.toHaveBeenCalled()
+      expect(terminalSessionViewToastForTest().error).toHaveBeenCalledWith('terminal.composer-copy-visible-empty')
+      await rendered.cleanup()
+    } finally {
+      if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
+  test('surfaces clipboard rejection without reporting success', async () => {
+    vi.clearAllMocks()
+    const error = new Error('Clipboard permission denied')
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn(async () => Promise.reject(error)) },
+    })
+    try {
+      const rendered = await renderTerminalSession({ readVisibleText: vi.fn(() => 'output') })
+
+      copyVisibleContent(rendered.container)
+      await vi.waitFor(() =>
+        expect(terminalSessionViewToastForTest().error).toHaveBeenCalledWith('action.result-error', {
+          description: 'Clipboard permission denied',
+        }),
+      )
+
+      expect(terminalSessionViewToastForTest().success).not.toHaveBeenCalled()
+      await rendered.cleanup()
+    } finally {
+      if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
   test('leaves keyboard reveal to native focus when VisualViewport is available', async () => {
     const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
     const visualViewport = new EventTarget()

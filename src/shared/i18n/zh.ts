@@ -399,6 +399,8 @@ export const zh: Record<DictKey, string> = {
   'terminal.composer-input-placeholder': '发消息给终端',
   'terminal.composer-more': '更多操作',
   'terminal.composer-upload-files': '上传',
+  'terminal.composer-copy-visible': '复制当前屏幕内容',
+  'terminal.composer-copy-visible-empty': '当前屏幕没有可复制的终端内容。',
   'terminal.composer-show-keys': '显示终端按键',
   'terminal.composer-show-input': '显示文字输入',
   'terminal.composer-key-enter': 'Enter',

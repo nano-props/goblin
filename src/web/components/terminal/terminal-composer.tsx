@@ -7,9 +7,9 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ButtonHTMLAttributes,
   type KeyboardEvent,
-  type MouseEvent,
-  type PointerEvent,
+  type MouseEventHandler,
   type ReactNode,
   type Ref,
 } from 'react'
@@ -21,6 +21,7 @@ import {
   ArrowRightToLine,
   ArrowUp,
   CornerDownLeft,
+  Copy,
   Delete,
   Keyboard,
   TextCursorInput,
@@ -31,9 +32,9 @@ import { cn } from '#/web/lib/cn.ts'
 import { TerminalComposerMenu } from '#/web/components/terminal/terminal-composer-menu.tsx'
 import { TerminalComposerHistoryCursor } from '#/web/components/terminal/terminal-composer-history-cursor.ts'
 import {
-  TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS,
+  TERMINAL_COMPOSER_OPTIONAL_ACTIONS,
   TERMINAL_COMPOSER_PINNED_COMMAND_KEYS,
-  type TerminalComposerCommandLabelKey,
+  type TerminalComposerActionLabelKey,
 } from '#/web/components/terminal/terminal-composer-command-keys.ts'
 import { isDesktopMacNavigatorPlatform, isImeOwnedKeyboardEvent } from '#/web/components/terminal/terminal-keyboard.ts'
 import {
@@ -64,6 +65,7 @@ export interface TerminalComposerLabels {
   ctrlL: string
   ctrlC: string
   ctrlD: string
+  copyVisible: string
 }
 
 interface TerminalComposerProps {
@@ -75,6 +77,7 @@ interface TerminalComposerProps {
   historyEntries: readonly string[]
   shortcut: string
   onVirtualKey: (key: TerminalVirtualKey) => void
+  onCopyVisibleContent: () => Promise<void>
   onSendText: (text: string) => Promise<boolean>
   onOpen: () => boolean
   onClose: () => boolean
@@ -120,7 +123,7 @@ const PRIMARY_KEY_ACTIONS: PrimaryKeyAction[] = [
   },
 ]
 
-const COMMAND_KEY_ICONS: Partial<Record<TerminalComposerCommandLabelKey, ReactNode>> = {
+const COMMAND_KEY_ICONS: Partial<Record<TerminalComposerActionLabelKey, ReactNode>> = {
   tab: <ArrowRightToLine className="size-4" />,
   enter: <CornerDownLeft className="size-4" />,
   backspace: <Delete className="size-4" />,
@@ -164,6 +167,7 @@ export function TerminalComposer({
   historyEntries,
   shortcut,
   onVirtualKey,
+  onCopyVisibleContent,
   onSendText,
   onOpen,
   onClose,
@@ -175,6 +179,7 @@ export function TerminalComposer({
   className,
 }: TerminalComposerProps) {
   const [resolvingFiles, setResolvingFiles] = useState(false)
+  const [copyingVisibleContent, setCopyingVisibleContent] = useState(false)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const modeToggleRef = useRef<HTMLButtonElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -355,6 +360,15 @@ export function TerminalComposer({
     event.target.value = ''
     await resolveFilesIntoDraft(files, fileInsertionRef.current)
   }
+  const copyVisibleContent = async () => {
+    if (copyingVisibleContent) return
+    setCopyingVisibleContent(true)
+    try {
+      await onCopyVisibleContent()
+    } finally {
+      setCopyingVisibleContent(false)
+    }
+  }
   return (
     <div
       className={cn('goblin-terminal-composer', expanded && 'goblin-terminal-composer--expanded', className)}
@@ -380,10 +394,10 @@ export function TerminalComposer({
         buttonRef={triggerRef}
         className="goblin-terminal-composer__toggle"
         accessibleName={labels.open}
-        ariaExpanded={expanded}
-        ariaControls={composerId}
-        ariaHidden={expanded}
-        ariaKeyShortcuts={shortcut}
+        aria-expanded={expanded}
+        aria-controls={composerId}
+        aria-hidden={expanded}
+        aria-keyshortcuts={shortcut}
         tabIndex={expanded ? -1 : undefined}
         onClick={openComposer}
       >
@@ -434,15 +448,27 @@ export function TerminalComposer({
               className="goblin-terminal-composer__key-scroll"
             >
               <div className="goblin-terminal-composer__key-row">
-                {TERMINAL_COMPOSER_OPTIONAL_COMMAND_KEYS.map((key, index) => (
+                {TERMINAL_COMPOSER_OPTIONAL_ACTIONS.map((action, index) => (
                   <ComposerButton
-                    key={key.key}
+                    key={action.kind === 'virtual-key' ? action.key : action.kind}
                     className={`goblin-terminal-composer__key-action--optional-${index + 1}`}
-                    accessibleName={labels[key.labelKey]}
+                    accessibleName={labels[action.labelKey]}
+                    disabled={action.kind === 'copy-visible-content' && copyingVisibleContent}
+                    aria-busy={action.kind === 'copy-visible-content' && copyingVisibleContent ? true : undefined}
                     onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => onVirtualKey(key.key)}
+                    onClick={() => {
+                      if (action.kind === 'copy-visible-content') {
+                        void copyVisibleContent()
+                      } else {
+                        onVirtualKey(action.key)
+                      }
+                    }}
                   >
-                    {COMMAND_KEY_ICONS[key.labelKey] ?? key.keycap}
+                    {action.kind === 'copy-visible-content' ? (
+                      <Copy className="size-4" />
+                    ) : (
+                      (COMMAND_KEY_ICONS[action.labelKey] ?? action.keycap)
+                    )}
                   </ComposerButton>
                 ))}
                 {TERMINAL_COMPOSER_PINNED_COMMAND_KEYS.map((key) => (
@@ -481,8 +507,10 @@ export function TerminalComposer({
             labels={labels}
             mode={mode}
             resolvingFiles={resolvingFiles}
+            copyingVisibleContent={copyingVisibleContent}
             onUpload={openFilePicker}
             onVirtualKey={onVirtualKey}
+            onCopyVisibleContent={() => void copyVisibleContent()}
             onClose={closeComposer}
             onRestoreComposerTriggerFocus={requestTriggerFocus}
           />
@@ -492,47 +520,22 @@ export function TerminalComposer({
   )
 }
 
-interface ComposerButtonProps {
+interface ComposerButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   accessibleName: string
   children: ReactNode
   buttonRef?: Ref<HTMLButtonElement>
-  className?: string
-  ariaExpanded?: boolean
-  ariaControls?: string
-  ariaHidden?: boolean
-  ariaKeyShortcuts?: string
-  tabIndex?: number
-  onClick: (event: MouseEvent<HTMLButtonElement>) => void
-  onPointerDown?: (event: PointerEvent<HTMLButtonElement>) => void
+  onClick: MouseEventHandler<HTMLButtonElement>
 }
 
-function ComposerButton({
-  accessibleName,
-  children,
-  buttonRef,
-  className,
-  ariaExpanded,
-  ariaControls,
-  ariaHidden,
-  ariaKeyShortcuts,
-  tabIndex,
-  onClick,
-  onPointerDown,
-}: ComposerButtonProps) {
+function ComposerButton({ accessibleName, children, buttonRef, className, ...buttonProps }: ComposerButtonProps) {
   return (
     <Button
+      {...buttonProps}
       ref={buttonRef}
       type="button"
       size="icon"
       variant="secondary"
-      aria-expanded={ariaExpanded}
-      aria-controls={ariaControls}
-      aria-hidden={ariaHidden}
-      aria-keyshortcuts={ariaKeyShortcuts}
-      tabIndex={tabIndex}
       className={cn('goblin-terminal-composer__btn', className)}
-      onPointerDown={onPointerDown}
-      onClick={onClick}
     >
       <span aria-hidden="true">{children}</span>
       <span className="sr-only">{accessibleName}</span>

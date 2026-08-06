@@ -75,6 +75,7 @@ export function TerminalSessionView({
     findPrevious,
     clearSearch,
     captureInputWriter,
+    readVisibleText,
     sendVirtualKey,
     openComposer,
     closeComposer,
@@ -120,6 +121,7 @@ export function TerminalSessionView({
     inputPlaceholder: t('terminal.composer-input-placeholder'),
     more: t('terminal.composer-more'),
     uploadFiles: t('terminal.composer-upload-files'),
+    copyVisible: t('terminal.composer-copy-visible'),
     showKeys: t('terminal.composer-show-keys'),
     showInput: t('terminal.composer-show-input'),
     enter: t('terminal.composer-key-enter'),
@@ -133,6 +135,23 @@ export function TerminalSessionView({
     ctrlL: t('terminal.composer-key-ctrl-l'),
     ctrlC: t('terminal.composer-key-ctrl-c'),
     ctrlD: t('terminal.composer-key-ctrl-d'),
+  }
+
+  const copyVisibleContent = async () => {
+    if (!terminalSessionId) return
+    try {
+      const text = readVisibleText(terminalSessionId)
+      if (!text) {
+        toast.error(t('terminal.composer-copy-visible-empty'))
+        return
+      }
+      await navigator.clipboard.writeText(text)
+      toast.success(t('branch-status.copied'))
+    } catch (error) {
+      toast.error(t('action.result-error'), {
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
   }
 
   useLayoutEffect(() => {
@@ -600,6 +619,7 @@ export function TerminalSessionView({
           historyEntries={snapshot.composer.historyEntries}
           shortcut={terminalComposerShortcut}
           onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
+          onCopyVisibleContent={copyVisibleContent}
           onSendText={handleComposerSend}
           onOpen={() => openComposer(terminalSessionId)}
           onClose={() => closeComposer(terminalSessionId)}
