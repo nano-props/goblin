@@ -301,8 +301,9 @@ export function TerminalComposer({
     void submitDraft()
   }
   const closeComposer = () => {
-    if (!onClose()) return
+    if (!onClose()) return false
     requestTriggerFocus()
+    return true
   }
 
   const openComposer = () => {
