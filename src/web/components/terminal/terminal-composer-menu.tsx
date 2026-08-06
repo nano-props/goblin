@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/pop
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Separator } from '#/web/components/ui/separator.tsx'
 import {
+  TERMINAL_COMPOSER_COPY_ACTION,
   TERMINAL_COMPOSER_OPTIONAL_ACTIONS,
   type TerminalComposerOptionalActionLabelKey,
   type TerminalComposerOptionalVirtualKey,
@@ -13,6 +14,7 @@ import {
 type TerminalComposerMenuLabels = Record<TerminalComposerOptionalActionLabelKey, string> & {
   more: string
   uploadFiles: string
+  copyVisible: string
   close: string
 }
 
@@ -73,6 +75,13 @@ export function TerminalComposerMenu({
           viewportClassName="p-1"
           scrollbarMode="compact"
         >
+          <ComposerMenuItem disabled={copyingVisibleContent} onClick={onCopyVisibleContent} closeMenu={closeMenu}>
+            <span aria-hidden="true" className="inline-flex w-6 shrink-0 items-center justify-center">
+              <Copy className="size-4" />
+            </span>
+            {labels[TERMINAL_COMPOSER_COPY_ACTION.labelKey]}
+          </ComposerMenuItem>
+          <Separator className="-mx-1 my-1 w-auto" />
           {mode === 'input' ? (
             <ComposerMenuItem disabled={resolvingFiles} onClick={onUpload} closeMenu={closeMenu}>
               <Upload className="size-4" />
@@ -81,19 +90,11 @@ export function TerminalComposerMenu({
           ) : (
             TERMINAL_COMPOSER_OPTIONAL_ACTIONS.map((action) => (
               <ComposerMenuItem
-                key={action.kind === 'virtual-key' ? action.key : action.kind}
-                disabled={action.kind === 'copy-visible-content' && copyingVisibleContent}
-                onClick={() => {
-                  if (action.kind === 'copy-visible-content') onCopyVisibleContent()
-                  else sendVirtualKey(action.key)
-                }}
+                key={action.key}
+                onClick={() => sendVirtualKey(action.key)}
                 closeMenu={closeMenu}
               >
-                {action.kind === 'copy-visible-content' ? (
-                  <span aria-hidden="true" className="inline-flex w-6 shrink-0 items-center justify-center">
-                    <Copy className="size-4" />
-                  </span>
-                ) : action.key === 'backspace' ? (
+                {action.key === 'backspace' ? (
                   <span aria-hidden="true" className="inline-flex w-6 shrink-0 items-center justify-center">
                     <Delete className="size-4" />
                   </span>

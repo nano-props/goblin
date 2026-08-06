@@ -778,10 +778,27 @@ describe('TerminalComposer', () => {
     expect(textarea.hasAttribute('aria-busy')).toBe(false)
   })
 
-  test('sends terminal-mode-aware key intents', async () => {
-    const onVirtualKey = vi.fn()
-    const onCopyVisibleContent = vi.fn(async () => {})
-    const { container } = render({ onVirtualKey, onCopyVisibleContent })
+  function expectComposerMenuLayout(menu: HTMLElement, labels: readonly string[]) {
+    const menuItems = within(menu).getAllByRole('button')
+    expect(menuItems).toHaveLength(labels.length)
+    for (const [index, label] of labels.entries()) {
+      expect(menuItems[index]).toBe(within(menu).getByRole('button', { name: label }))
+    }
+    expect(menu.querySelectorAll('[data-slot="separator"]')).toHaveLength(2)
+  }
+
+  test('groups global and input-mode menu actions', () => {
+    const { container } = render()
+    expand(container)
+    openMoreMenu(container)
+
+    const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
+    if (!menu) throw new Error('expected Composer menu')
+    expectComposerMenuLayout(menu, [LABELS.copyVisible, LABELS.uploadFiles, LABELS.close])
+  })
+
+  test('renders terminal-mode-aware key actions in their visual order', () => {
+    const { container } = render()
     expand(container)
     act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
 
@@ -791,23 +808,33 @@ describe('TerminalComposer', () => {
     ).not.toBeNull()
     expect(buttonByAccessibleName(container, LABELS.more).querySelector('.lucide-ellipsis')).not.toBeNull()
 
-    const optionalActionLabels = [
+    const optionalKeyLabels = [
       LABELS.backspace,
       LABELS.escape,
       LABELS.ctrlL,
       LABELS.ctrlC,
       LABELS.ctrlD,
-      LABELS.copyVisible,
     ]
+    const responsiveActionLabels = [LABELS.copyVisible, ...optionalKeyLabels]
     const pinnedCommandLabels = [LABELS.tab, LABELS.enter]
     const directionLabels = [LABELS.arrowLeft, LABELS.arrowDown, LABELS.arrowUp, LABELS.arrowRight]
     const keyRowLabels = Array.from(
       container.querySelectorAll<HTMLButtonElement>('.goblin-terminal-composer__key-row button'),
     ).map((button) => button.querySelector('.sr-only')?.textContent)
-    expect(keyRowLabels).toEqual([...optionalActionLabels, ...pinnedCommandLabels, ...directionLabels])
+    expect(keyRowLabels).toEqual([...responsiveActionLabels, ...pinnedCommandLabels, ...directionLabels])
     expect(buttonByAccessibleName(container, LABELS.tab).querySelector('.lucide-arrow-right-to-line')).not.toBeNull()
     expect(buttonByAccessibleName(container, LABELS.backspace).querySelector('.lucide-delete')).not.toBeNull()
     expect(buttonByAccessibleName(container, LABELS.copyVisible).querySelector('.lucide-copy')).not.toBeNull()
+  })
+
+  test('sends key-row actions to their respective boundaries', async () => {
+    const onVirtualKey = vi.fn()
+    const onCopyVisibleContent = vi.fn(async () => {})
+    const { container } = render({ onVirtualKey, onCopyVisibleContent })
+    expand(container)
+    act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
+    const pinnedCommandLabels = [LABELS.tab, LABELS.enter]
+    const directionLabels = [LABELS.arrowLeft, LABELS.arrowDown, LABELS.arrowUp, LABELS.arrowRight]
 
     for (const name of [...pinnedCommandLabels, ...directionLabels]) {
       act(() => buttonByAccessibleName(container, name).click())
@@ -821,11 +848,15 @@ describe('TerminalComposer', () => {
       'arrow-right',
     ])
 
+    const optionalKeyLabels = [LABELS.backspace, LABELS.escape, LABELS.ctrlL, LABELS.ctrlC, LABELS.ctrlD]
     const optionalActions = Array.from(
       container.querySelectorAll<HTMLButtonElement>('[class*="goblin-terminal-composer__key-action--optional-"]'),
     )
-    expect(optionalActions.map((button) => button.querySelector('.sr-only')?.textContent)).toEqual(optionalActionLabels)
-    for (const button of optionalActions.slice(0, -1)) act(() => button.click())
+    expect(optionalActions.map((button) => button.querySelector('.sr-only')?.textContent)).toEqual([
+      LABELS.copyVisible,
+      ...optionalKeyLabels,
+    ])
+    for (const button of optionalActions.slice(1)) act(() => button.click())
     expect(onVirtualKey.mock.calls.slice(-5).map(([key]) => key)).toEqual([
       'backspace',
       'escape',
@@ -835,6 +866,15 @@ describe('TerminalComposer', () => {
     ])
     await act(async () => buttonByAccessibleName(container, LABELS.copyVisible).click())
     expect(onCopyVisibleContent).toHaveBeenCalledOnce()
+  })
+
+  test('groups and sends key-mode menu actions', async () => {
+    const onVirtualKey = vi.fn()
+    const onCopyVisibleContent = vi.fn(async () => {})
+    const { container } = render({ onVirtualKey, onCopyVisibleContent })
+    expand(container)
+    act(() => buttonByAccessibleName(container, LABELS.showKeys).click())
+    const optionalKeyLabels = [LABELS.backspace, LABELS.escape, LABELS.ctrlL, LABELS.ctrlC, LABELS.ctrlD]
 
     for (const [label, key] of [
       [LABELS.backspace, 'backspace'],
@@ -855,7 +895,7 @@ describe('TerminalComposer', () => {
         expect(menu.querySelector('.lucide-copy')).not.toBeNull()
         expect(within(menu).queryByRole('button', { name: LABELS.enter })).toBeNull()
         expect(within(menu).queryByRole('button', { name: LABELS.tab })).toBeNull()
-        expect(menu.querySelectorAll('[data-slot="separator"]')).toHaveLength(1)
+        expectComposerMenuLayout(menu, [LABELS.copyVisible, ...optionalKeyLabels, LABELS.close])
       }
       act(() => menuItemByText(label).click())
       expect(onVirtualKey).toHaveBeenLastCalledWith(key)
@@ -865,7 +905,7 @@ describe('TerminalComposer', () => {
 
     openMoreMenu(container)
     await act(async () => menuItemByText(LABELS.copyVisible).click())
-    expect(onCopyVisibleContent).toHaveBeenCalledTimes(2)
+    expect(onCopyVisibleContent).toHaveBeenCalledOnce()
     expect(onVirtualKey).not.toHaveBeenCalledWith('copy-visible-content')
   })
 

@@ -32,6 +32,7 @@ import { cn } from '#/web/lib/cn.ts'
 import { TerminalComposerMenu } from '#/web/components/terminal/terminal-composer-menu.tsx'
 import { TerminalComposerHistoryCursor } from '#/web/components/terminal/terminal-composer-history-cursor.ts'
 import {
+  TERMINAL_COMPOSER_COPY_ACTION,
   TERMINAL_COMPOSER_OPTIONAL_ACTIONS,
   TERMINAL_COMPOSER_PINNED_COMMAND_KEYS,
   type TerminalComposerActionLabelKey,
@@ -448,27 +449,25 @@ export function TerminalComposer({
               className="goblin-terminal-composer__key-scroll"
             >
               <div className="goblin-terminal-composer__key-row">
+                <ComposerButton
+                  className="goblin-terminal-composer__key-action--optional-6"
+                  accessibleName={labels[TERMINAL_COMPOSER_COPY_ACTION.labelKey]}
+                  disabled={copyingVisibleContent}
+                  aria-busy={copyingVisibleContent || undefined}
+                  onPointerDown={(event) => event.preventDefault()}
+                  onClick={() => void copyVisibleContent()}
+                >
+                  <Copy className="size-4" />
+                </ComposerButton>
                 {TERMINAL_COMPOSER_OPTIONAL_ACTIONS.map((action, index) => (
                   <ComposerButton
-                    key={action.kind === 'virtual-key' ? action.key : action.kind}
+                    key={action.key}
                     className={`goblin-terminal-composer__key-action--optional-${index + 1}`}
                     accessibleName={labels[action.labelKey]}
-                    disabled={action.kind === 'copy-visible-content' && copyingVisibleContent}
-                    aria-busy={action.kind === 'copy-visible-content' && copyingVisibleContent ? true : undefined}
                     onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => {
-                      if (action.kind === 'copy-visible-content') {
-                        void copyVisibleContent()
-                      } else {
-                        onVirtualKey(action.key)
-                      }
-                    }}
+                    onClick={() => onVirtualKey(action.key)}
                   >
-                    {action.kind === 'copy-visible-content' ? (
-                      <Copy className="size-4" />
-                    ) : (
-                      (COMMAND_KEY_ICONS[action.labelKey] ?? action.keycap)
-                    )}
+                    {COMMAND_KEY_ICONS[action.labelKey] ?? action.keycap}
                   </ComposerButton>
                 ))}
                 {TERMINAL_COMPOSER_PINNED_COMMAND_KEYS.map((key) => (
