@@ -340,7 +340,6 @@ export class TerminalSessionView {
         element,
         textarea,
         visualViewport,
-        onCursorMove: (listener) => term.onCursorMove(listener),
         onTerminalResize: (listener) => term.onResize(listener),
         getLineHeight: () => this.terminalLineHeight(term),
         getCursorRow: () => terminalInputRevealRow(term.buffer.active, term.rows),

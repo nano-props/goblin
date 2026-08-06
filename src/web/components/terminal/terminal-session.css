@@ -4,7 +4,8 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  overflow: hidden;
+  /* Product-surface clipping belongs here, but this layer must never become a scroll owner. */
+  overflow: clip;
   container-name: goblin-terminal-session;
   container-type: size;
   background: var(--color-background);
@@ -21,7 +22,6 @@
   position: relative;
   min-height: 0;
   flex: 1;
-  overflow: hidden;
 }
 
 .goblin-terminal-session__empty {
@@ -94,14 +94,14 @@
   height: 100%;
   min-height: 0;
   padding: 6px;
-  overflow: hidden;
 }
 
 .goblin-managed-terminal-host {
   width: 100%;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  /* Bound xterm's internal layers without admitting programmatic ancestor scrolling. */
+  overflow: clip;
 }
 
 .goblin-managed-terminal-host .xterm {

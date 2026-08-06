@@ -4,7 +4,6 @@ interface TerminalViewportRevealOptions {
   element: HTMLElement
   textarea: HTMLTextAreaElement
   visualViewport: VisualViewport
-  onCursorMove: TerminalViewportEventSource
   onTerminalResize: TerminalViewportEventSource
   getLineHeight: () => number
   getCursorRow: () => number | null
@@ -54,8 +53,6 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
 
   let pending = false
   let frameId: number | null = null
-  // Horizontal cursor movement cannot change page reveal geometry.
-  let observedCursorRow = options.getCursorRow()
   const cancelPending = () => {
     pending = false
   }
@@ -70,7 +67,6 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
     revealMarker.style.top = `${cursorRow * lineHeight}px`
     revealMarker.style.height = `${lineHeight}px`
     revealMarker.style.scrollMarginBlockEnd = `${revealMargin}px`
-    observedCursorRow = cursorRow
 
     const visibleTop = options.visualViewport.offsetTop
     const visibleBottom = visibleTop + options.visualViewport.height
@@ -82,6 +78,8 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
     }
 
     pending = false
+    // This browser-owned reveal is limited to explicit focus, pointer, visual-viewport, and
+    // terminal-geometry requests. Terminal output cannot request it through cursor movement.
     revealMarker.scrollIntoView(SCROLL_INTO_VIEW_OPTIONS)
   }
   const schedulePending = () => {
@@ -98,26 +96,21 @@ export function installTerminalViewportReveal(options: TerminalViewportRevealOpt
   const requestRevealWhileFocused = () => {
     if (options.textarea.ownerDocument.activeElement === options.textarea) requestReveal()
   }
-  const requestRevealForCursorMove = () => {
-    const nextCursorRow = options.getCursorRow()
-    if (nextCursorRow === observedCursorRow) return
-    observedCursorRow = nextCursorRow
-    requestRevealWhileFocused()
-  }
 
+  // Cursor movement is intentionally excluded: xterm also emits it for output parsing and redraws.
+  // Only direct input intent and viewport geometry changes may request page reveal. A long wrapped
+  // input can outgrow the four-row margin until the next explicit focus, pointer, or geometry event.
   options.textarea.addEventListener('focus', requestReveal)
   options.textarea.addEventListener('blur', cancelPending)
   options.element.addEventListener('pointerdown', requestReveal, { passive: true })
   options.visualViewport.addEventListener('resize', requestRevealWhileFocused)
   options.visualViewport.addEventListener('scroll', schedulePending)
-  const cursorMoveSubscription = options.onCursorMove(requestRevealForCursorMove)
   const terminalResizeSubscription = options.onTerminalResize(requestRevealWhileFocused)
 
   return {
     dispose: () => {
       pending = false
       if (frameId !== null) ownerWindow.cancelAnimationFrame(frameId)
-      cursorMoveSubscription.dispose()
       terminalResizeSubscription.dispose()
       options.textarea.removeEventListener('focus', requestReveal)
       options.textarea.removeEventListener('blur', cancelPending)

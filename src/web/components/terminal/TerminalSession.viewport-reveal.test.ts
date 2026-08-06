@@ -18,7 +18,7 @@ function viewport(height: number): VisualViewport {
 
 beforeEach(resetTerminalSessionHarness)
 
-test('reveals later xterm cursor rows through the session view event boundary', async () => {
+test('does not reveal output-side cursor movement through the session view event boundary', async () => {
   const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport')
   Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport(300) })
 
@@ -43,19 +43,19 @@ test('reveals later xterm cursor rows through the session view event boundary', 
       term.buffer.active.cursorY = 24
       term.emitCursorMove()
       await vi.runAllTimersAsync()
-      expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
+      expect(marker.scrollIntoView).toHaveBeenCalledOnce()
 
       term.buffer.active.cursorY = 26
       term.resize(term.cols - 1, term.rows)
       await vi.runAllTimersAsync()
-      expect(marker.scrollIntoView).toHaveBeenCalledTimes(3)
+      expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
 
       session.dispose()
       term.buffer.active.cursorY = 27
       term.emitCursorMove()
       term.resize(term.cols - 1, term.rows)
       await vi.runAllTimersAsync()
-      expect(marker.scrollIntoView).toHaveBeenCalledTimes(3)
+      expect(marker.scrollIntoView).toHaveBeenCalledTimes(2)
     } finally {
       session.dispose()
     }
