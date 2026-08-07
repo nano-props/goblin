@@ -19,7 +19,8 @@ vi.mock('node:fs/promises', () => ({
   mkdir: mocks.mkdir,
 }))
 
-import { runRemoteCommand } from '#/system/ssh/commands.ts'
+import { REMOTE_UNSUPPORTED_PLATFORM_MARKER, runRemoteCommand } from '#/system/ssh/commands.ts'
+import { classifySshFailure } from '#/system/ssh/diagnostics.ts'
 
 const REMOTE_COMMAND_STARTED_MARKER = '__GOBLIN_REMOTE_COMMAND_STARTED__'
 const REMOTE_COMMAND_STDERR_BEGIN_MARKER = '__GOBLIN_REMOTE_COMMAND_STDERR_BEGIN__'
@@ -129,6 +130,23 @@ describe('runRemoteCommand', () => {
       remoteStarted: true,
       transportStderr: '',
     })
+  })
+
+  test('preserves an unsupported platform marker through runner framing', async () => {
+    mocks.execa.mockRejectedValueOnce({
+      stdout: `${REMOTE_COMMAND_STARTED_MARKER}\n${REMOTE_UNSUPPORTED_PLATFORM_MARKER}Darwin\n`,
+      stderr: [REMOTE_COMMAND_STDERR_BEGIN_MARKER, REMOTE_COMMAND_STDERR_END_MARKER, ''].join('\n'),
+      message: 'Command failed',
+    })
+
+    const result = await runRemoteCommand(target(), { type: 'checkShell' })
+
+    expect(result).toMatchObject({
+      ok: false,
+      stdout: `${REMOTE_UNSUPPORTED_PLATFORM_MARKER}Darwin`,
+      remoteStarted: true,
+    })
+    expect(classifySshFailure(result)).toBe('unsupported-platform')
   })
 
   test('keeps post-start SSH client diagnostics separate from remote command stderr', async () => {

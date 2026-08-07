@@ -287,6 +287,7 @@ describe('remote lifecycle write path', () => {
   test.each([
     ['path-missing', 'error.workspace-path-not-found'],
     ['unreachable', 'error.workspace-transport-unavailable'],
+    ['unsupported-platform', 'error.workspace-transport-unavailable'],
   ] as const)('commits initial remote failure %s as unavailable probe state', async (reason, expected) => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     mocks.resolveConnection.mockResolvedValue({
@@ -302,6 +303,7 @@ describe('remote lifecycle write path', () => {
     })
 
     expect(listWorkspaceRuntimes(userId)[0]?.workspaceProbe).toEqual({ status: 'unavailable', reason: expected })
+    expect(listWorkspaceRuntimes(userId)[0]?.remoteLifecycle).toMatchObject({ kind: 'failed', reason })
   })
 
   test('keeps reopen in the same epoch while a remote capability transition is committing', async () => {

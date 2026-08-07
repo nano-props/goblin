@@ -105,7 +105,8 @@ export const ko: Record<DictKey, string> = {
   'workspace-picker.clone-opened': '리포지토리를 클론했습니다',
   'workspace-picker.clone-follow-up-failed': '리포지토리를 클론했지만 후속 자동 작업을 완전히 마치지 못했습니다',
   'workspace-picker.open-remote-title': '원격 작업 공간 열기',
-  'workspace-picker.open-remote-description': 'SSH 별칭을 고르고 작업 공간 경로를 입력하세요.',
+  'workspace-picker.open-remote-description':
+    'SSH 별칭을 고르고 작업 공간 경로를 입력하세요. 원격 호스트는 최신 주요 Linux 배포판을 실행해야 합니다.',
   'workspace-picker.open-remote-host-label': '호스트',
   'workspace-picker.open-remote-host-alias-label': 'SSH 별칭',
   'workspace-picker.open-remote-host-placeholder': 'example.com',
@@ -131,6 +132,7 @@ export const ko: Record<DictKey, string> = {
   'workspace-picker.open-remote-diagnostics-category-unreachable': '호스트에 연결할 수 없음',
   'workspace-picker.open-remote-diagnostics-category-handshake-failed': 'SSH 핸드셰이크 실패',
   'workspace-picker.open-remote-diagnostics-category-shell-failed': '셸을 사용할 수 없음',
+  'workspace-picker.open-remote-diagnostics-category-unsupported-platform': '지원되지 않는 원격 운영 체제',
   'workspace-picker.open-remote-diagnostics-category-git-missing': 'Git 을 찾을 수 없음',
   'workspace-picker.open-remote-diagnostics-category-path-missing': '경로를 찾을 수 없음',
   'workspace-picker.open-remote-diagnostics-category-not-a-repo': 'Git 리포지토리가 아님',
@@ -175,6 +177,8 @@ export const ko: Record<DictKey, string> = {
     'Goblin 이 이 SSH 워크스페이스에 다시 연결하지 못했습니다. SSH 별칭, 네트워크 연결, 원격 경로를 확인한 뒤 다시 시도하세요.',
   'workspace-unavailable.remote-connect-failed':
     'Goblin 이 이 리포지토리에 사용할 수 있는 SSH 세션을 만들지 못했습니다. 인증, 호스트 연결 상태, 호스트 키 신뢰를 확인한 뒤 다시 시도하세요.',
+  'workspace-unavailable.remote-platform-unsupported':
+    '이 SSH 작업 공간은 지원되지 않는 운영 체제에서 실행 중입니다. 최신 주요 Linux 호스트를 사용해 다시 연결하세요.',
   'workspace-unavailable.remote-config-changed':
     '저장된 SSH 별칭을 현재 SSH 설정에서 더 이상 해석할 수 없습니다. 별칭 설정을 확인한 뒤 다시 연결하세요.',
   'workspace-unavailable.remote-home-unavailable':
@@ -738,7 +742,7 @@ export const ko: Record<DictKey, string> = {
   'settings.fetch.5m': '5 분',
   'settings.fetch.15m': '15 분',
   'settings.ssh.title': 'SSH',
-  'settings.ssh.body': '~/.ssh/config 의 Host 별칭으로 원격 작업 공간을 엽니다.',
+  'settings.ssh.body': '~/.ssh/config 의 Host 별칭을 사용하여 최신 주요 Linux 배포판의 원격 작업 공간을 엽니다.',
   'settings.ssh.config-file-label': '구성 파일',
   'settings.ssh.config-file-hint': 'Goblin 은 여기서 SSH 별칭을 읽습니다.',
   'settings.ssh.path-format-label': '경로 형식',

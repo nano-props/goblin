@@ -1,8 +1,12 @@
-import { runRemoteCommand, type RemoteCommandKind, type RemoteCommandResult } from '#/system/ssh/commands.ts'
+import {
+  REMOTE_UNSUPPORTED_PLATFORM_MARKER,
+  runRemoteCommand,
+  type RemoteCommandKind,
+  type RemoteCommandResult,
+} from '#/system/ssh/commands.ts'
 import type {
   RemoteDiagnosticCategory,
   RemoteDiagnosticStage,
-  RemoteDiagnosticStageName,
   RemoteDiagnosticsResult,
   RemoteWorkspaceTarget,
 } from '#/shared/remote-workspace.ts'
@@ -24,14 +28,18 @@ export async function testRemoteWorkspace(
   // runRemoteCommand falls back to the full SSH_COMMAND_TIMEOUT_MS.
   const runOptions = { signal: options.signal, timeoutMs: options.timeoutMs }
 
-  // Stage 0/1: ssh handshake + shell sanity ("ok" marker). One ssh
+  // Stages 0/1: ssh handshake + shell sanity ("ok" marker). One ssh
   // invocation covers both: any successful ssh call proves stage 0,
   // and the checkShell script prints 'ok' on stdout to mark stage 1.
   // These two have to be sequential because the shell check rides on
   // top of the ssh connection — and the stage is sequential, so a
   // failure here genuinely skips every downstream stage.
   const shell = await run({ type: 'checkShell' }, target, runOptions)
-  if (!shell.ok) return failDiagnosticAt(target, stages, 0, classifySshFailure(shell), shell)
+  if (!shell.ok) {
+    const failedIndex = shell.remoteStarted ? 1 : 0
+    if (failedIndex === 1) stages[0] = { ...stages[0]!, status: 'passed' }
+    return failDiagnosticAt(target, stages, failedIndex, classifySshFailure(shell), shell)
+  }
   stages[0] = { ...stages[0]!, status: 'passed' }
   if (!hasOkMarker(shell.stdout)) {
     return failDiagnosticAt(target, stages, 1, 'shell-failed', { ...shell, message: 'shell-failed' })
@@ -55,7 +63,7 @@ export async function testRemoteWorkspace(
     { result: pathResult, fallback: 'path-missing' },
     { result: repoResult, fallback: 'not-a-repo' },
   ]
-  let primary: { index: number; category: RemoteDiagnosticCategory; result: RemoteCommandResult } | null = null
+  let primary: { category: RemoteDiagnosticCategory; result: RemoteCommandResult } | null = null
   for (let i = 0; i < stageResults.length; i += 1) {
     const { result, fallback } = stageResults[i]!
     if (!result.ok) {
@@ -67,7 +75,7 @@ export async function testRemoteWorkspace(
         message: category,
         details: detailsFromResult(result),
       }
-      if (!primary) primary = { index: 2 + i, category, result }
+      if (!primary) primary = { category, result }
     } else {
       stages[2 + i] = { ...stages[2 + i]!, status: 'passed' }
     }
@@ -98,6 +106,9 @@ export function classifySshFailure(result: RemoteCommandResult): RemoteDiagnosti
   if (result.message === 'cancelled') return 'cancelled'
   if (result.timedOut || result.message === 'timeout') return 'timeout'
   if (result.remoteStartUnconfirmed) return 'shell-failed'
+  if (result.stdout.split(/\r?\n/u).some((line) => line.startsWith(REMOTE_UNSUPPORTED_PLATFORM_MARKER))) {
+    return 'unsupported-platform'
+  }
   const text = `${result.stderr}\n${result.stdout}\n${result.message ?? ''}`.toLowerCase()
   if (text.includes('host key verification failed') || text.includes('remote host identification has changed'))
     return 'host-key'
@@ -133,7 +144,7 @@ function classifyCommandFailure(
 }
 
 function createStages(): RemoteDiagnosticStage[] {
-  return (['ssh', 'shell', 'git', 'path', 'repo'] as RemoteDiagnosticStageName[]).map((name) => ({
+  return (['ssh', 'shell', 'git', 'path', 'repo'] as const).map((name) => ({
     name,
     label: name,
     status: 'pending',
@@ -141,7 +152,11 @@ function createStages(): RemoteDiagnosticStage[] {
 }
 
 function hasOkMarker(stdout: string): boolean {
-  return stdout.split(/\r?\n/).some((line) => line.trim() === 'ok')
+  return hasLineMarker(stdout, 'ok')
+}
+
+function hasLineMarker(stdout: string, marker: string): boolean {
+  return stdout.split(/\r?\n/).some((line) => line.trim() === marker)
 }
 
 /** Mark `stages[failedIndex]` as failed with the given category and
@@ -180,13 +195,11 @@ export function makeUnresolvedTargetDiagnostic(
   category: RemoteDiagnosticCategory,
   message: string,
 ): RemoteDiagnosticsResult {
-  const stages: RemoteDiagnosticStage[] = (['ssh', 'shell', 'git', 'path', 'repo'] as RemoteDiagnosticStageName[]).map(
-    (name) => ({
-      name,
-      label: name,
-      status: 'skipped',
-    }),
-  )
+  const stages: RemoteDiagnosticStage[] = (['ssh', 'shell', 'git', 'path', 'repo'] as const).map((name) => ({
+    name,
+    label: name,
+    status: 'skipped',
+  }))
   stages[0] = {
     name: 'ssh',
     label: 'ssh',

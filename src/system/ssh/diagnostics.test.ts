@@ -1,6 +1,10 @@
 import { describe, expect, test, vi } from 'vitest'
 import { classifySshFailure, testRemoteWorkspace } from '#/system/ssh/diagnostics.ts'
-import type { RemoteCommandKind, RemoteCommandResult } from '#/system/ssh/commands.ts'
+import {
+  REMOTE_UNSUPPORTED_PLATFORM_MARKER,
+  type RemoteCommandKind,
+  type RemoteCommandResult,
+} from '#/system/ssh/commands.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -123,5 +127,36 @@ describe('testRemoteWorkspace parallel stages', () => {
     })
 
     await expect(testRemoteWorkspace(target, { run })).resolves.toMatchObject({ ok: true, gitAtWorkspaceRoot: false })
+  })
+
+  test('fast-fails an unsupported remote platform before Git and path probes', async () => {
+    const run = vi.fn<(command: RemoteCommandKind) => Promise<RemoteCommandResult>>(async (command) => {
+      if (command.type === 'checkShell') {
+        return {
+          ok: false,
+          stdout: `${REMOTE_UNSUPPORTED_PLATFORM_MARKER}Darwin`,
+          stderr: '',
+          message: 'Command failed with exit code 1',
+          timedOut: false,
+          remoteStarted: true,
+        }
+      }
+      return { ok: false, stdout: '', stderr: '', message: 'unexpected', timedOut: false }
+    })
+
+    const result = await testRemoteWorkspace(target, { run })
+
+    expect(result).toMatchObject({
+      ok: false,
+      category: 'unsupported-platform',
+      stages: [
+        { name: 'ssh', status: 'passed' },
+        { name: 'shell', status: 'failed', category: 'unsupported-platform' },
+        { name: 'git', status: 'skipped' },
+        { name: 'path', status: 'skipped' },
+        { name: 'repo', status: 'skipped' },
+      ],
+    })
+    expect(run.mock.calls.map(([command]) => command.type)).toEqual(['checkShell'])
   })
 })

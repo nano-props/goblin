@@ -114,7 +114,8 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.clone-follow-up-failed':
     'リポジトリをクローンしましたが、その後の自動処理を完全には実行できませんでした',
   'workspace-picker.open-remote-title': 'リモートワークスペースを開く',
-  'workspace-picker.open-remote-description': 'SSH エイリアスを選び、ワークスペースのパスを入力します。',
+  'workspace-picker.open-remote-description':
+    'SSH エイリアスを選び、ワークスペースのパスを入力します。リモートホストは最新の主要な Linux ディストリビューションを実行している必要があります。',
   'workspace-picker.open-remote-host-label': 'ホスト',
   'workspace-picker.open-remote-host-alias-label': 'SSH エイリアス',
   'workspace-picker.open-remote-host-placeholder': 'example.com',
@@ -140,6 +141,7 @@ export const ja: Record<DictKey, string> = {
   'workspace-picker.open-remote-diagnostics-category-unreachable': 'ホストに到達できません',
   'workspace-picker.open-remote-diagnostics-category-handshake-failed': 'SSH ハンドシェイクに失敗しました',
   'workspace-picker.open-remote-diagnostics-category-shell-failed': 'シェルを利用できません',
+  'workspace-picker.open-remote-diagnostics-category-unsupported-platform': 'リモート OS はサポートされていません',
   'workspace-picker.open-remote-diagnostics-category-git-missing': 'Git が見つかりません',
   'workspace-picker.open-remote-diagnostics-category-path-missing': 'パスが見つかりません',
   'workspace-picker.open-remote-diagnostics-category-not-a-repo': 'Git リポジトリではありません',
@@ -184,6 +186,8 @@ export const ja: Record<DictKey, string> = {
     'Goblin はこの SSH ワークスペースに再接続できませんでした。SSH エイリアス、ネットワーク接続、リモートパスを確認してから再試行してください。',
   'workspace-unavailable.remote-connect-failed':
     'Goblin はこのリポジトリに使える SSH セッションを確立できませんでした。認証、ホストへの到達性、ホストキーの信頼設定を確認してから再試行してください。',
+  'workspace-unavailable.remote-platform-unsupported':
+    'この SSH ワークスペースはサポート対象外の OS で実行されています。最新の主要な Linux ホストを使用して再接続してください。',
   'workspace-unavailable.remote-config-changed':
     '保存済みの SSH エイリアスを現在の SSH 設定から解決できなくなりました。エイリアス設定を確認してから再接続してください。',
   'workspace-unavailable.remote-home-unavailable':
@@ -750,7 +754,8 @@ export const ja: Record<DictKey, string> = {
   'settings.fetch.5m': '5 分',
   'settings.fetch.15m': '15 分',
   'settings.ssh.title': 'SSH',
-  'settings.ssh.body': '~/.ssh/config の Host 別名でリモートワークスペースを開きます。',
+  'settings.ssh.body':
+    '~/.ssh/config の Host 別名を使用して、最新の主要な Linux ディストリビューション上のリモートワークスペースを開きます。',
   'settings.ssh.config-file-label': '設定ファイル',
   'settings.ssh.config-file-hint': 'Goblin はこのファイルから SSH 別名を読み取ります。',
   'settings.ssh.path-format-label': 'パス形式',

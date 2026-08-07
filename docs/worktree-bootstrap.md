@@ -53,7 +53,7 @@ setup = "bun install"
 - `symlink`: create a symbolic link back to the source path.
 - `hardlink`: create a hard link for files only; directory hardlinks are invalid.
 - `exclude`: removes matches from all materialization sets.
-- `setup`: a single shell command string, executed once in the new worktree root after materialization. It runs through the user's interactive login shell (`$SHELL -il -c`) so tools available in the normal terminal PATH work without absolute paths. For remote repos the bootstrap command is executed on the remote host via SSH, so the remote host must have `bash` available.
+- `setup`: a single shell command string, executed once in the new worktree root after materialization. It runs through the user's interactive login shell (`$SHELL -il -c`) so tools available in the normal terminal PATH work without absolute paths. For remote repos the bootstrap command is executed on the remote host via SSH, so the remote host must satisfy the [supported-host contract](ssh-remote.md) and have `bash` available.
 
 ## Constraints
 

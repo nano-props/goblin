@@ -115,7 +115,8 @@ export const en = {
   'workspace-picker.clone-opened': 'Repository cloned',
   'workspace-picker.clone-follow-up-failed': 'Repository cloned, but the automatic follow-up did not fully complete',
   'workspace-picker.open-remote-title': 'Open Remote Workspace',
-  'workspace-picker.open-remote-description': 'Select an SSH alias and enter the workspace path.',
+  'workspace-picker.open-remote-description':
+    'Select an SSH alias and enter the workspace path. The remote host must run a modern, mainstream Linux distribution.',
   'workspace-picker.open-remote-host-label': 'Host',
   'workspace-picker.open-remote-host-alias-label': 'SSH alias',
   'workspace-picker.open-remote-host-placeholder': 'example.com',
@@ -141,6 +142,7 @@ export const en = {
   'workspace-picker.open-remote-diagnostics-category-unreachable': 'Host unreachable',
   'workspace-picker.open-remote-diagnostics-category-handshake-failed': 'SSH handshake failed',
   'workspace-picker.open-remote-diagnostics-category-shell-failed': 'Shell unavailable',
+  'workspace-picker.open-remote-diagnostics-category-unsupported-platform': 'Unsupported remote operating system',
   'workspace-picker.open-remote-diagnostics-category-git-missing': 'Git not found',
   'workspace-picker.open-remote-diagnostics-category-path-missing': 'Path not found',
   'workspace-picker.open-remote-diagnostics-category-not-a-repo': 'Not a Git repository',
@@ -184,6 +186,8 @@ export const en = {
     'Goblin could not reconnect to this SSH workspace. Verify the SSH alias, network access, and remote path, then retry.',
   'workspace-unavailable.remote-connect-failed':
     'Goblin could not establish a usable SSH session for this workspace. Verify authentication, host reachability, and host key trust, then retry.',
+  'workspace-unavailable.remote-platform-unsupported':
+    'This SSH workspace runs on an unsupported operating system. Use a modern, mainstream Linux host, then reconnect.',
   'workspace-unavailable.remote-config-changed':
     'The saved SSH alias can no longer be resolved from your current SSH config. Review the alias and reconnect.',
   'workspace-unavailable.remote-home-unavailable':
@@ -747,7 +751,8 @@ export const en = {
   'settings.fetch.5m': '5 min',
   'settings.fetch.15m': '15 min',
   'settings.ssh.title': 'SSH',
-  'settings.ssh.body': 'Use Host aliases from ~/.ssh/config to open remote workspaces.',
+  'settings.ssh.body':
+    'Use Host aliases from ~/.ssh/config to open remote workspaces on modern, mainstream Linux distributions.',
   'settings.ssh.config-file-label': 'Configuration file',
   'settings.ssh.config-file-hint': 'Goblin reads SSH aliases from this file.',
   'settings.ssh.path-format-label': 'Path format',

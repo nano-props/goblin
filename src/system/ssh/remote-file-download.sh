@@ -15,9 +15,8 @@ fail() {
 [ -n "$MARKER" ] || fail error.file-download-protocol-invalid 65
 cd -- "$ROOT_PATH" || fail error.workspace-path-not-found 66
 
-# Unlike the local adapter, portable POSIX shell cannot canonically resolve
-# each link target and prove root containment at open time. Remote downloads
-# therefore reject links directly instead of adding a compatibility path.
+# Reject every symlinked segment so the opened file cannot escape the
+# authoritative workspace root between validation and read.
 while [ "$#" -gt 1 ]; do
   ENTRY=$1
   [ ! -L "$ENTRY" ] || fail error.file-download-symlink-unsupported 68

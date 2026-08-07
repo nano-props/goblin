@@ -1,6 +1,7 @@
 import {
   chmodSync,
   existsSync,
+  mkdtempSync,
   mkdirSync,
   readFileSync,
   realpathSync,
@@ -14,16 +15,27 @@ import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
 import { afterEach, describe, expect, test } from 'vitest'
-import { buildRemoteCommandInvocation, runRemoteCommand } from '#/system/ssh/commands.ts'
+import {
+  REMOTE_UNSUPPORTED_PLATFORM_MARKER,
+  buildRemoteCommandInvocation,
+  runRemoteCommand,
+} from '#/system/ssh/commands.ts'
 import { buildCanonicalSshConnectionSnapshot, buildRemoteTerminalInvocation } from '#/system/ssh/invocation.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { encodeRemoteWorktreeBootstrapRecord } from '#/test-utils/remote-worktree-bootstrap.ts'
+import { installLinuxStatShim } from '#/test-utils/linux-stat-shim.ts'
 
 const originalPath = process.env.PATH
 const originalPathExt = process.env.PATHEXT
 const tempDirs: string[] = []
 const testPosix = process.platform === 'win32' ? test.skip : test
+
+function linuxStatEnv(): NodeJS.ProcessEnv {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'goblin-linux-stat-'))
+  tempDirs.push(root)
+  return installLinuxStatShim(root)
+}
 
 afterEach(() => {
   if (originalPath === undefined) delete process.env.PATH
@@ -34,6 +46,17 @@ afterEach(() => {
 })
 
 describe('remote ssh command builders', () => {
+  testPosix('admits Linux and rejects other remote operating systems', async () => {
+    const invocation = buildRemoteCommandInvocation(target(), { type: 'checkShell' })
+    const linux = await execa('sh', ['-c', `uname() { printf '%s\\n' Linux; }\n${invocation.script}`])
+    const darwin = await execa('sh', ['-c', `uname() { printf '%s\\n' Darwin; }\n${invocation.script}`], {
+      reject: false,
+    })
+
+    expect(linux.stdout).toBe('ok')
+    expect(darwin).toMatchObject({ exitCode: 1, stdout: `${REMOTE_UNSUPPORTED_PLATFORM_MARKER}Darwin` })
+  })
+
   test('proves that a command was not started when cancellation predates invocation', async () => {
     const controller = new AbortController()
     controller.abort()
@@ -113,7 +136,7 @@ describe('remote ssh command builders', () => {
       path: root,
     })
 
-    const result = await execa('sh', ['-lc', invocation.script])
+    const result = await execa('sh', ['-c', invocation.script], { env: linuxStatEnv() })
 
     const overviewFields = result.stdout.trim().split('\n').at(-1)?.split('\t')
     expect(overviewFields?.slice(0, 2)).toEqual(['2', '1'])
@@ -133,7 +156,9 @@ describe('remote ssh command builders', () => {
     await expect(execa('sh', ['-lc', admission.script])).resolves.toMatchObject({ stdout: realpathSync(root) })
 
     const overview = buildRemoteCommandInvocation(targetWithPath(link), { type: 'directoryOverview', path: link })
-    await expect(execa('sh', ['-lc', overview.script])).resolves.toMatchObject({ stdout: '1\t0\t1700000000' })
+    await expect(execa('sh', ['-c', overview.script], { env: linuxStatEnv() })).resolves.toMatchObject({
+      stdout: '1\t0\t1700000000',
+    })
   })
 
   testPosix('recognizes a Git workspace root through a symbolic link', async () => {
@@ -378,7 +403,7 @@ describe('remote ssh command builders', () => {
       exclude: ['config dir/*.log'],
     })
 
-    const result = await execa('bash', ['-lc', invocation.script])
+    const result = await execa('bash', ['-c', invocation.script], { env: linuxStatEnv() })
 
     expect(result.stdout).toBe(
       encodeRemoteWorktreeBootstrapRecord('copy', 'foo bar.txt') +
@@ -415,7 +440,9 @@ describe('remote ssh command builders', () => {
 
     const targetReadonly = path.join(targetRoot, 'config', 'readonly')
     try {
-      const result = await execa('bash', ['-lc', `umask 0077\n${invocation.script}`])
+      const result = await execa('bash', ['-c', `umask 0077\n${invocation.script}`], {
+        env: linuxStatEnv(),
+      })
 
       expect(result.stdout).toBe(encodeRemoteWorktreeBootstrapRecord('copy', 'config'))
       expect(readFileSync(path.join(targetReadonly, 'settings.json'), 'utf8')).toBe('{}\n')
@@ -452,8 +479,8 @@ describe('remote ssh command builders', () => {
     })
 
     try {
-      const result = await execa('bash', ['-lc', invocation.script], {
-        env: { BASH_ENV: bashEnv },
+      const result = await execa('bash', ['-c', invocation.script], {
+        env: { ...linuxStatEnv(), BASH_ENV: bashEnv },
         reject: false,
       })
 
@@ -465,58 +492,6 @@ describe('remote ssh command builders', () => {
       chmodSync(sourceConfig, 0o755)
       if (existsSync(targetConfig)) chmodSync(targetConfig, 0o755)
     }
-  })
-
-  testPosix('remote bootstrap fails fast when required globstar support is unavailable', async () => {
-    const dir = path.join(os.tmpdir(), `goblin-remote-bootstrap-test-${Date.now()}-${process.pid}`)
-    tempDirs.push(dir)
-    const sourceRoot = path.join(dir, 'repo')
-    const targetRoot = path.join(dir, 'worktree')
-    const bashEnv = path.join(dir, 'bash-env')
-    mkdirSync(sourceRoot, { recursive: true })
-    mkdirSync(targetRoot, { recursive: true })
-    writeFileSync(
-      bashEnv,
-      'shopt() {\n  if [ "$1" = "-s" ] && [ "$2" = "globstar" ]; then return 1; fi\n  builtin shopt "$@"\n}\n',
-    )
-    const withGlobstar = buildRemoteCommandInvocation(target(), {
-      type: 'bootstrapRemoteWorktree',
-      sourceRoot,
-      targetRoot,
-      copy: ['config/**/*.json'],
-      symlink: [],
-      hardlink: [],
-      exclude: [],
-    })
-    const withoutGlobstar = buildRemoteCommandInvocation(target(), {
-      type: 'bootstrapRemoteWorktree',
-      sourceRoot,
-      targetRoot,
-      copy: ['config/*.json'],
-      symlink: [],
-      hardlink: [],
-      exclude: [],
-    })
-    const ordinaryDoubleStars = buildRemoteCommandInvocation(target(), {
-      type: 'bootstrapRemoteWorktree',
-      sourceRoot,
-      targetRoot,
-      copy: ['config/[**].json', 'config/foo**.json'],
-      symlink: [],
-      hardlink: [],
-      exclude: [],
-    })
-
-    const [withGlobstarResult, withoutGlobstarResult, ordinaryDoubleStarsResult] = await Promise.all([
-      execa('bash', ['-lc', withGlobstar.script], { env: { BASH_ENV: bashEnv }, reject: false }),
-      execa('bash', ['-lc', withoutGlobstar.script], { env: { BASH_ENV: bashEnv }, reject: false }),
-      execa('bash', ['-lc', ordinaryDoubleStars.script], { env: { BASH_ENV: bashEnv }, reject: false }),
-    ])
-
-    expect(withGlobstarResult.exitCode).toBe(1)
-    expect(withGlobstarResult.stderr).toContain('error: remote bash does not support ** glob patterns')
-    expect(withoutGlobstarResult.exitCode).toBe(0)
-    expect(ordinaryDoubleStarsResult.exitCode).toBe(0)
   })
 
   testPosix('remote bootstrap script rejects sources under a symlink parent', async () => {

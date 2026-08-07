@@ -8,6 +8,12 @@ Remote workspaces use a **local-decision, remote-execution** model:
 - The remote host only executes the command that was sent to it.
 - Keep business logic on the local side unless the data exists only remotely.
 
+## Supported remote hosts
+
+SSH remote workspaces officially support remote hosts running modern, mainstream Linux distributions. Legacy Linux releases, non-mainstream Linux variants, and other operating systems are outside the compatibility contract, even when individual commands happen to work.
+
+The remote host must provide a POSIX-compatible non-interactive shell and standard Linux command-line utilities, including a `stat` implementation with the `-c` interface. Git is optional for directory workspaces and required only for Git capabilities. Individual features may declare additional requirements, such as the `bash` requirement for remote worktree bootstrap.
+
 ## Operations
 
 Each operation becomes one self-contained shell script sent over SSH. The script is generated from a typed descriptor, with all user input validated and single-quoted. The local side interprets stdout/stderr; the remote side only runs the script.

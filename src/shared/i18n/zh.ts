@@ -104,7 +104,8 @@ export const zh: Record<DictKey, string> = {
   'workspace-picker.clone-opened': '仓库已克隆',
   'workspace-picker.clone-follow-up-failed': '仓库已克隆，但后续自动操作未能完整完成',
   'workspace-picker.open-remote-title': '打开远程工作区',
-  'workspace-picker.open-remote-description': '选择一个 SSH 别名并填写工作区路径。',
+  'workspace-picker.open-remote-description':
+    '选择一个 SSH 别名并填写工作区路径。远程主机须运行现代主流 Linux 发行版。',
   'workspace-picker.open-remote-host-label': '主机',
   'workspace-picker.open-remote-host-alias-label': 'SSH 别名',
   'workspace-picker.open-remote-host-placeholder': 'example.com',
@@ -130,6 +131,7 @@ export const zh: Record<DictKey, string> = {
   'workspace-picker.open-remote-diagnostics-category-unreachable': '主机不可达',
   'workspace-picker.open-remote-diagnostics-category-handshake-failed': 'SSH 握手失败',
   'workspace-picker.open-remote-diagnostics-category-shell-failed': 'Shell 不可用',
+  'workspace-picker.open-remote-diagnostics-category-unsupported-platform': '不支持远程操作系统',
   'workspace-picker.open-remote-diagnostics-category-git-missing': '未找到 Git',
   'workspace-picker.open-remote-diagnostics-category-path-missing': '路径不存在',
   'workspace-picker.open-remote-diagnostics-category-not-a-repo': '不是 Git 仓库',
@@ -169,6 +171,8 @@ export const zh: Record<DictKey, string> = {
     'Goblin 无法重新连接这个 SSH 工作区。请检查 SSH 别名、网络连通性和远端路径后再试。',
   'workspace-unavailable.remote-connect-failed':
     'Goblin 无法建立可用的 SSH 会话。请检查认证、主机连通性和主机密钥信任后再试。',
+  'workspace-unavailable.remote-platform-unsupported':
+    '此 SSH 工作区运行在不受支持的操作系统上。请改用现代主流 Linux 主机后重新连接。',
   'workspace-unavailable.remote-config-changed':
     '已保存的 SSH 别名无法再从当前 SSH 配置中解析。请检查别名设置后重新连接。',
   'workspace-unavailable.remote-home-unavailable':
@@ -710,7 +714,7 @@ export const zh: Record<DictKey, string> = {
   'settings.fetch.5m': '5 分钟',
   'settings.fetch.15m': '15 分钟',
   'settings.ssh.title': 'SSH',
-  'settings.ssh.body': '使用 ~/.ssh/config 中的 Host 别名连接远程工作区。',
+  'settings.ssh.body': '使用 ~/.ssh/config 中的 Host 别名连接运行现代主流 Linux 发行版的远程工作区。',
   'settings.ssh.config-file-label': '配置文件',
   'settings.ssh.config-file-hint': 'Goblin 从这里读取 SSH 别名。',
   'settings.ssh.path-format-label': '路径格式',

@@ -22,6 +22,7 @@ describe('remote diagnostics helpers', () => {
       'workspace-unavailable.remote-home-unavailable',
     )
     expect(unavailableBodyKey(true, 'path-missing')).toBe('workspace-unavailable.remote-path-missing')
+    expect(unavailableBodyKey(true, 'unsupported-platform')).toBe('workspace-unavailable.remote-platform-unsupported')
     expect(unavailableBodyKey(true, 'unreachable')).toBe('workspace-unavailable.remote-connect-failed')
   })
 

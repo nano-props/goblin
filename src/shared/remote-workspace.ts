@@ -60,6 +60,7 @@ export type RemoteDiagnosticCategory =
   | 'unreachable'
   | 'handshake-failed'
   | 'shell-failed'
+  | 'unsupported-platform'
   | 'git-missing'
   | 'path-missing'
   | 'not-a-repo'
@@ -78,6 +79,7 @@ export const REMOTE_DIAGNOSTIC_CATEGORIES: readonly RemoteDiagnosticCategory[] =
   'unreachable',
   'handshake-failed',
   'shell-failed',
+  'unsupported-platform',
   'git-missing',
   'path-missing',
   'not-a-repo',
@@ -124,6 +126,7 @@ export type RemoteWorkspaceFailureReason =
   | 'host-key'
   | 'unreachable'
   | 'handshake-failed'
+  | 'unsupported-platform'
   | 'path-missing'
   | 'timeout'
   | 'unknown'
@@ -134,6 +137,7 @@ export const REMOTE_WORKSPACE_FAILURE_REASONS: readonly RemoteWorkspaceFailureRe
   'host-key',
   'unreachable',
   'handshake-failed',
+  'unsupported-platform',
   'path-missing',
   'timeout',
   'unknown',

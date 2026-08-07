@@ -36,7 +36,7 @@ describe('remote lifecycle route', () => {
     mocks.runLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       workspaceId: REMOTE_ID,
-      lifecycle: { kind: 'failed', attemptId: 1, reason: 'unreachable' },
+      lifecycle: { kind: 'failed', attemptId: 1, reason: 'unsupported-platform' },
       workspaceProbe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
     })
 
@@ -65,7 +65,10 @@ describe('remote lifecycle route', () => {
       },
       { beforeCapabilityCommit: expect.any(Function) },
     )
-    expect(await response.json()).toMatchObject({ kind: 'settled', workspaceId: 'goblin+ssh://example/repo' })
+    expect(await response.json()).toMatchObject({
+      kind: 'settled',
+      lifecycle: { reason: 'unsupported-platform' },
+    })
   })
 
   test('uses only alias and prefix for remote directory suggestions', async () => {

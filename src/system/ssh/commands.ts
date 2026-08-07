@@ -23,6 +23,7 @@ export const SSH_BOOT_PROBE_TIMEOUT_MS = 10_000
 export const REMOTE_SNAPSHOT_CURRENT_MARKER = '__GOBLIN_REMOTE_CURRENT__'
 export const REMOTE_SNAPSHOT_DEFAULT_MARKER = '__GOBLIN_REMOTE_DEFAULT__'
 export const REMOTE_SNAPSHOT_BRANCHES_MARKER = '__GOBLIN_REMOTE_BRANCHES__'
+export const REMOTE_UNSUPPORTED_PLATFORM_MARKER = '__GOBLIN_UNSUPPORTED_PLATFORM__:'
 
 export type RemoteCommandKind =
   | { type: 'printHome' }
@@ -218,12 +219,7 @@ function commandStartedMarkerScript(script: string): string {
     `printf '%s\n' ${shellQuote(REMOTE_COMMAND_STARTED_MARKER)}`,
     'goblin_old_umask=$(umask)',
     'umask 077',
-    'if command -v mktemp >/dev/null 2>&1; then',
-    '  goblin_stderr_dir=$(mktemp -d "${TMPDIR:-/tmp}/goblin-stderr.XXXXXX") || exit 125',
-    'else',
-    '  goblin_stderr_dir="${TMPDIR:-/tmp}/goblin-stderr.$$"',
-    '  mkdir -m 700 -- "$goblin_stderr_dir" || exit 125',
-    'fi',
+    'goblin_stderr_dir=$(mktemp -d "${TMPDIR:-/tmp}/goblin-stderr.XXXXXX") || exit 125',
     'goblin_stderr="$goblin_stderr_dir/stderr"',
     `trap 'rm -rf -- "$goblin_stderr_dir"' EXIT`,
     ': >"$goblin_stderr" || exit 125',
@@ -292,7 +288,14 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'printHome':
       return `printf '%s\n' "$HOME"`
     case 'checkShell':
-      return `printf '%s\n' ok`
+      return [
+        'platform=$(uname -s 2>/dev/null) || exit 1',
+        '[ "$platform" = Linux ] || {',
+        `  printf '%s%s\\n' ${shellQuote(REMOTE_UNSUPPORTED_PLATFORM_MARKER)} "$platform"`,
+        '  exit 1',
+        '}',
+        `printf '%s\\n' ok`,
+      ].join('\n')
     case 'checkGit':
       return 'command -v git'
     case 'testDirectory':
@@ -312,13 +315,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `  if [ ! -e "$entry" ] || [ -L "$entry" ]; then continue; fi`,
         `  if [ -f "$entry" ]; then files=$((files + 1)); elif [ -d "$entry" ]; then directories=$((directories + 1)); fi`,
         `done`,
-        `if modified=$(stat -c '%Y' . 2>/dev/null); then`,
-        `  :`,
-        `elif modified=$(stat -f '%m' . 2>/dev/null); then`,
-        `  :`,
-        `else`,
-        `  exit 1`,
-        `fi`,
+        `modified=$(stat -c '%Y' . 2>/dev/null) || exit 1`,
         `printf '%s\\t%s\\t%s\\n' "$files" "$directories" "$modified"`,
       ].join('\n')
     }
@@ -469,7 +466,7 @@ function remotePhysicalWorktreeIdentityScript(worktreePath: string): string {
     '  [ ! -L "$runtime_dir" ] || exit 1',
     '  mkdir -p -- "$runtime_dir" || exit 1',
     'fi',
-    'owner=$(stat -c %u "$runtime_dir" 2>/dev/null || stat -f %u "$runtime_dir" 2>/dev/null) || exit 1',
+    'owner=$(stat -c %u "$runtime_dir" 2>/dev/null) || exit 1',
     '[ "$owner" = "$uid" ] || exit 1',
     'chmod 700 -- "$runtime_dir" || exit 1',
     'state_dir="$runtime_dir/goblin"',
@@ -488,21 +485,10 @@ function remotePhysicalWorktreeIdentityScript(worktreePath: string): string {
     'runtime_token=$(cat -- "$identity_file")',
     'case "$runtime_token" in (*[!0-9a-f]*) exit 1;; esac',
     '[ "${#runtime_token}" -eq 32 ] || exit 1',
-    'machine_fact=',
-    'for machine_id_file in /etc/machine-id /var/lib/dbus/machine-id; do',
-    '  [ -r "$machine_id_file" ] || continue',
-    '  machine_fact=$(tr -cd "A-Za-z0-9._:-" < "$machine_id_file" | head -c 128)',
-    '  [ -n "$machine_fact" ] && break',
-    'done',
-    'if [ -z "$machine_fact" ]; then',
-    '  machine_fact=$(uname -n 2>/dev/null | tr -cd "A-Za-z0-9._:-" | head -c 128)',
-    'fi',
+    '[ -r /etc/machine-id ] || exit 1',
+    'machine_fact=$(tr -cd "A-Za-z0-9._:-" < /etc/machine-id | head -c 128)',
     '[ -n "$machine_fact" ] || exit 1',
     'root_namespace_fact=$(readlink /proc/self/ns/mnt 2>/dev/null | tr -cd "A-Za-z0-9._:-" | head -c 128)',
-    'if [ -z "$root_namespace_fact" ]; then',
-    '  root_namespace_fact=$(stat -c "%d:%i" / 2>/dev/null || stat -f "%d:%i" / 2>/dev/null)',
-    '  root_namespace_fact=$(printf "%s" "$root_namespace_fact" | tr -cd "A-Za-z0-9._:-" | head -c 128)',
-    'fi',
     '[ -n "$root_namespace_fact" ] || exit 1',
     `canonical=$(cd -- ${shellQuote(worktreePath)} && pwd -P) || exit 1`,
     'printf \'%s\\0%s\\0%s\\0%s\\0\' "$runtime_token" "$machine_fact" "$root_namespace_fact" "$canonical"',

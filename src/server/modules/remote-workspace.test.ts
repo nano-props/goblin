@@ -97,6 +97,27 @@ describe('server remote target resolution', () => {
     ).rejects.toThrow('remote workspace connection requires an SSH workspace id')
   })
 
+  test('preserves an unsupported remote platform as the lifecycle failure reason', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'prod',
+      host: 'example.test',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/workspace',
+    })!
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
+
+    await expect(
+      resolveServerRemoteWorkspaceConnection({ workspaceId: target.id }, undefined, {
+        resolveTarget: async () => ({ target }),
+        probeRemote: async () => ({ ok: false, category: 'unsupported-platform' }),
+      }),
+    ).resolves.toEqual({
+      kind: 'failed',
+      lifecycle: { kind: 'failed', reason: 'unsupported-platform', target },
+    })
+  })
+
   test('keeps a readable directory ready when Git enrichment times out', async () => {
     const target = normalizeRemoteTarget({
       alias: 'prod',

@@ -31,10 +31,7 @@ shift
 EXCLUDE_PATTERNS=("${@:1:EXCLUDE_COUNT}")
 
 if [ "$REQUIRES_GLOBSTAR" -eq 1 ]; then
-  shopt -s globstar 2>/dev/null || {
-    printf "%s\n" "error: remote bash does not support ** glob patterns" >&2
-    exit 1
-  }
+  shopt -s globstar || exit 1
 fi
 
 SETUP_LOG=
@@ -312,11 +309,7 @@ done
 
 directory_mode() {
   local path="$1" mode
-  if mode="$(stat -c '%a' -- "$path" 2>/dev/null)"; then
-    :
-  elif mode="$(stat -f '%Lp' "$path" 2>/dev/null)"; then
-    :
-  else
+  if ! mode="$(stat -c '%a' -- "$path" 2>/dev/null)"; then
     return 1
   fi
   [[ "$mode" =~ ^[0-7]{3,4}$ ]] || return 1
