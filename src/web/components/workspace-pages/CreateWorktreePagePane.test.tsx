@@ -115,15 +115,6 @@ function renderPane(element: ReactElement) {
   return renderInJsdom(<QueryClientProvider client={appQueryClient}>{element}</QueryClientProvider>)
 }
 
-async function renderPaneInAct(element: ReactElement): Promise<ReturnType<typeof renderPane>> {
-  let result: ReturnType<typeof renderPane> | undefined
-  await act(async () => {
-    result = renderPane(element)
-  })
-  if (!result) throw new Error('render did not complete')
-  return result
-}
-
 describe('CreateWorktreePagePane', () => {
   test('does not start a worktree-status query for the create form', async () => {
     appQueryClient.removeQueries({
@@ -212,9 +203,7 @@ describe('CreateWorktreePagePane', () => {
         }),
     )
 
-    const { container } = await renderPaneInAct(
-      <CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />,
-    )
+    const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
 
     expect(container.textContent).toContain('action.create-worktree-title')
     expect(container.querySelector('[data-testid="workspace-page-quiet-loading"]')).not.toBeNull()
@@ -249,9 +238,7 @@ describe('CreateWorktreePagePane', () => {
         }),
     )
 
-    const { container } = await renderPaneInAct(
-      <CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />,
-    )
+    const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
 
     expect(container.querySelector('[data-testid="workspace-page-quiet-loading"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="workspace-page-loading"]')).toBeNull()

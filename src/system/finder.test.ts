@@ -13,10 +13,10 @@ const { openInFinder } = await import('#/system/finder.ts')
 
 const originalPlatform = process.platform
 
-function withPlatform<T>(platform: NodeJS.Platform, run: () => T): T {
+async function withPlatform(platform: NodeJS.Platform, run: () => Promise<void>): Promise<void> {
   Object.defineProperty(process, 'platform', { value: platform, configurable: true })
   try {
-    return run()
+    await run()
   } finally {
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   }

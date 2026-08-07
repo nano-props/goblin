@@ -1,7 +1,7 @@
-import { chmodSync, existsSync, mkdtempDisposableSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempDisposableSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 
 const execaMock = vi.hoisted(() => vi.fn())
 
@@ -14,12 +14,22 @@ const { isWindowsTerminalInstalled, openInWindowsTerminal } = await import('#/sy
 
 const originalPath = process.env.PATH
 const originalPathExt = process.env.PATHEXT
+const originalLocalAppData = process.env.LOCALAPPDATA
 const originalPlatform = process.platform
 
 function withPlatform<T>(platform: NodeJS.Platform, run: () => T): T {
   Object.defineProperty(process, 'platform', { value: platform, configurable: true })
   try {
     return run()
+  } finally {
+    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
+  }
+}
+
+async function withPlatformAsync(platform: NodeJS.Platform, run: () => Promise<void>): Promise<void> {
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+  try {
+    await run()
   } finally {
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   }
@@ -36,9 +46,12 @@ function makeFakeWindowsTerminal(dir: string): string {
 }
 
 afterEach(() => {
-  process.env.PATH = originalPath
+  if (originalPath === undefined) delete process.env.PATH
+  else process.env.PATH = originalPath
   if (originalPathExt === undefined) delete process.env.PATHEXT
   else process.env.PATHEXT = originalPathExt
+  if (originalLocalAppData === undefined) delete process.env.LOCALAPPDATA
+  else process.env.LOCALAPPDATA = originalLocalAppData
   execaMock.mockReset()
 })
 
@@ -61,12 +74,11 @@ describe('isWindowsTerminalInstalled', () => {
     withPlatform('win32', () => {
       using temporaryDirectory = makeTempDir()
       const dir = temporaryDirectory.path
-      const fake = makeFakeWindowsTerminal(dir)
+      makeFakeWindowsTerminal(dir)
       process.env.PATH = dir
       process.env.PATHEXT = '.EXE'
 
       expect(isWindowsTerminalInstalled()).toBe(true)
-      expect(existsSync(fake)).toBe(true)
     })
   })
 
@@ -102,7 +114,7 @@ describe('isWindowsTerminalInstalled', () => {
 
 describe('openInWindowsTerminal', () => {
   test('rejects relative paths', async () => {
-    withPlatform('win32', async () => {
+    await withPlatformAsync('win32', async () => {
       const result = await openInWindowsTerminal('relative/path')
       expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
       expect(execaMock).not.toHaveBeenCalled()
@@ -110,7 +122,7 @@ describe('openInWindowsTerminal', () => {
   })
 
   test('rejects paths containing NUL bytes', async () => {
-    withPlatform('win32', async () => {
+    await withPlatformAsync('win32', async () => {
       const result = await openInWindowsTerminal('C:/valid\0/evil')
       expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
       expect(execaMock).not.toHaveBeenCalled()
@@ -118,7 +130,7 @@ describe('openInWindowsTerminal', () => {
   })
 
   test('rejects paths that do not exist on disk', async () => {
-    withPlatform('win32', async () => {
+    await withPlatformAsync('win32', async () => {
       const result = await openInWindowsTerminal('C:/definitely/does/not/exist-' + Date.now())
       expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
       expect(execaMock).not.toHaveBeenCalled()
@@ -126,7 +138,7 @@ describe('openInWindowsTerminal', () => {
   })
 
   test('returns not-installed when wt.exe cannot be found', async () => {
-    withPlatform('win32', async () => {
+    await withPlatformAsync('win32', async () => {
       using temporaryDirectory = makeTempDir()
       const dir = temporaryDirectory.path
       process.env.PATH = dir
@@ -144,7 +156,7 @@ describe('openInWindowsTerminal', () => {
   })
 
   test('spawns wt.exe with -d <path> on success', async () => {
-    withPlatform('win32', async () => {
+    await withPlatformAsync('win32', async () => {
       using temporaryDirectory = makeTempDir()
       const dir = temporaryDirectory.path
       const fake = makeFakeWindowsTerminal(dir)
@@ -171,7 +183,7 @@ describe('openInWindowsTerminal', () => {
   })
 
   test('returns the error message when wt.exe fails to spawn', async () => {
-    withPlatform('win32', async () => {
+    await withPlatformAsync('win32', async () => {
       using temporaryDirectory = makeTempDir()
       const dir = temporaryDirectory.path
       makeFakeWindowsTerminal(dir)
@@ -185,22 +197,4 @@ describe('openInWindowsTerminal', () => {
       expect(result).toEqual({ ok: false, message: 'permission denied' })
     })
   })
-})
-
-// Sanity: an os.tmpdir() entry is an absolute directory, so we use it
-// to drive the absolute + isDirectory check without mocking statSync.
-// Previously this block asserted on process.cwd(), which is the bun
-// test runner's CWD — its exact path / whether it's a symlink varies
-// between macOS sandboxes, Linux runners, and Windows CI, so we
-// switched to os.tmpdir() which is stable across hosts.
-describe('os.tmpdir() round-trip', () => {
-  test('os.tmpdir() is an absolute directory on every platform', () => {
-    expect(path.isAbsolute(os.tmpdir())).toBe(true)
-    expect(statSync(os.tmpdir()).isDirectory()).toBe(true)
-  })
-})
-
-beforeEach(() => {
-  // Make sure we start each test from a clean execa mock.
-  execaMock.mockReset()
 })

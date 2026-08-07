@@ -10,8 +10,7 @@ import type { RepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
 import { act } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import React from 'react'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import type { ReactNode } from 'react'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -21,6 +20,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { requireGitWorkspaceClientState } from '#/web/stores/workspaces/git-workspace-client-state.ts'
+import { renderHookInJsdom } from '#/test-utils/render.tsx'
 
 const mocks = vi.hoisted(() => ({
   getRepoPatch: vi.fn(),
@@ -89,13 +89,10 @@ describe('useBranchActions', () => {
     })
     mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
 
-    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(
-      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
-    )
+    const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
     await act(async () => {
-      await actions?.openTerminal?.('ghostty')
+      await requiredAction(result.current.actions.openTerminal, 'openTerminal')('ghostty')
     })
 
     expect(mocks.openWorkspaceTerminal).toHaveBeenCalledWith(
@@ -119,14 +116,11 @@ describe('useBranchActions', () => {
       value: { writeText },
     })
 
-    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(
-      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
-    )
+    const { result: hookResult } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
     let result = false
     await act(async () => {
-      result = (await actions?.copyPatch()) ?? false
+      result = await requiredAction(hookResult.current.actions.copyPatch, 'copyPatch')()
     })
 
     expect(result).toBe(true)
@@ -146,14 +140,11 @@ describe('useBranchActions', () => {
     Reflect.deleteProperty(navigator, 'clipboard')
 
     try {
-      let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-      renderInJsdom(
-        <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
-      )
+      const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
       let copied = true
       await act(async () => {
-        copied = (await actions?.copyPatch()) ?? true
+        copied = await requiredAction(result.current.actions.copyPatch, 'copyPatch')()
       })
 
       expect(copied).toBe(false)
@@ -203,71 +194,12 @@ describe('useBranchActions', () => {
     })
     mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
 
-    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(
-      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
-    )
+    const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
     await act(async () => {
-      await actions?.openEditor?.('vscode')
+      await requiredAction(result.current.actions.openEditor, 'openEditor')('vscode')
     })
 
-    expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(
-      worktreeTarget(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature'),
-      'vscode',
-    )
-  })
-
-  test('openTerminal and openEditor forward explicit app choices for remote repos', async () => {
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.com',
-      user: 'alice',
-      port: 22,
-      remotePath: '/srv/repo',
-    })
-    expect(target).not.toBeNull()
-    const branch = createRepoBranch('feature/remote', {
-      worktree: { path: '/srv/repo-feature', isPrimary: false, isLocked: false },
-    })
-    const repo = seedRepoWithReadModelForTest({
-      id: target!.id,
-      branches: [branch],
-      remoteLifecycle: { kind: 'ready', target: target! },
-      remote: {
-        remotes: [
-          {
-            name: 'origin',
-            fetchUrl: 'https://example.invalid/repository.git',
-            pushUrl: 'https://example.invalid/repository.git',
-          },
-        ],
-        hasRemotes: true,
-        hasBrowserRemote: true,
-        browserRemoteProvider: 'github',
-        remoteProviders: { origin: 'github' },
-        hasGitHubRemote: true,
-      },
-    })
-    mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
-    mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
-
-    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(
-      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
-    )
-
-    await act(async () => {
-      await actions?.openTerminal?.('ghostty')
-    })
-    await act(async () => {
-      await actions?.openEditor?.('vscode')
-    })
-
-    expect(mocks.openWorkspaceTerminal).toHaveBeenCalledWith(
-      worktreeTarget(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature'),
-      'ghostty',
-    )
     expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(
       worktreeTarget(target!.id, repo.workspaceRuntimeId, '/srv/repo-feature'),
       'vscode',
@@ -284,13 +216,10 @@ describe('useBranchActions', () => {
     })
     mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
 
-    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(
-      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
-    )
+    const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
     await act(async () => {
-      await actions?.openTerminal?.('ghostty')
+      await requiredAction(result.current.actions.openTerminal, 'openTerminal')('ghostty')
     })
 
     expect(mocks.openWorkspaceTerminal).toHaveBeenCalledWith(
@@ -309,13 +238,10 @@ describe('useBranchActions', () => {
     })
     mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
 
-    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(
-      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
-    )
+    const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
     await act(async () => {
-      await actions?.openEditor?.('vscode')
+      await requiredAction(result.current.actions.openEditor, 'openEditor')('vscode')
     })
 
     expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(
@@ -334,13 +260,10 @@ describe('useBranchActions', () => {
     })
     mocks.openWorkspaceInFinder.mockResolvedValue({ ok: true, message: '/tmp/local-feature' })
 
-    let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(
-      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
-    )
+    const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
     await act(async () => {
-      await actions?.openFinder?.()
+      await requiredAction(result.current.actions.openFinder, 'openFinder')()
     })
 
     expect(mocks.openWorkspaceInFinder).toHaveBeenCalledWith(
@@ -362,41 +285,29 @@ describe('useBranchActions', () => {
     })
     mocks.openWorkspaceTerminal.mockReturnValue(firstOpen.promise)
 
-    const surfaceRef: { current: ReturnType<typeof useBranchActions> | null } = { current: null }
-    const view = renderInJsdom(
-      <BranchActionsSurfaceHarness
-        repo={repoPresentationFromQueryForTest(repo)}
-        branchIndex={0}
-        onReady={(value) => {
-          surfaceRef.current = value
-        }}
-      />,
+    const presentation = repoPresentationFromQueryForTest(repo)
+    const view = renderHookInJsdom(
+      ({ branchIndex }) => useBranchActions(presentation, presentation.snapshot.branches[branchIndex]!),
+      {
+        initialProps: { branchIndex: 0 },
+        wrapper: AppQueryClientProvider,
+      },
     )
 
     act(() => {
-      void surfaceRef.current?.actions.openTerminal?.('ghostty')
+      void requiredAction(view.result.current.actions.openTerminal, 'openTerminal')('ghostty')
     })
     await act(async () => {
       await Promise.resolve()
     })
 
-    expect(surfaceRef.current?.busyAction).toBe('terminal')
-    expect(surfaceRef.current?.blocked).toBe(true)
+    expect(view.result.current.busyAction).toBe('terminal')
+    expect(view.result.current.blocked).toBe(true)
 
-    act(() => {
-      view.rerender(
-        <BranchActionsSurfaceHarness
-          repo={repoPresentationFromQueryForTest(repo)}
-          branchIndex={1}
-          onReady={(value) => {
-            surfaceRef.current = value
-          }}
-        />,
-      )
-    })
+    view.rerender({ branchIndex: 1 })
 
-    expect(surfaceRef.current?.busyAction).toBeNull()
-    expect(surfaceRef.current?.blocked).toBe(false)
+    expect(view.result.current.busyAction).toBeNull()
+    expect(view.result.current.blocked).toBe(false)
 
     await act(async () => {
       firstOpen.resolve({ ok: true, message: '' })
@@ -411,64 +322,16 @@ function worktreeTarget(workspaceId: WorkspaceId, workspaceRuntimeId: string, wo
   return target
 }
 
-function BranchActionsHarness({
-  repo,
-  onReady,
-}: {
-  repo: RepoPresentationForTest
-  onReady: (actions: ReturnType<typeof useBranchActions>['actions']) => void
-}) {
-  return (
-    <QueryClientProvider client={appQueryClient}>
-      <BranchActionsHarnessInner repo={repo} onReady={onReady} />
-    </QueryClientProvider>
-  )
-}
-
-function BranchActionsHarnessInner({
-  repo,
-  onReady,
-}: {
-  repo: RepoPresentationForTest
-  onReady: (actions: ReturnType<typeof useBranchActions>['actions']) => void
-}) {
+function renderBranchActions(repo: RepoPresentationForTest) {
   const branch = repo.snapshot.branches[0]!
-  const { actions } = useBranchActions(repo, branch)
-  React.useEffect(() => {
-    onReady(actions)
-  }, [actions, onReady])
-  return null
+  return renderHookInJsdom(() => useBranchActions(repo, branch), { wrapper: AppQueryClientProvider })
 }
 
-function BranchActionsSurfaceHarness({
-  repo,
-  branchIndex,
-  onReady,
-}: {
-  repo: RepoPresentationForTest
-  branchIndex: number
-  onReady: (surface: ReturnType<typeof useBranchActions>) => void
-}) {
-  return (
-    <QueryClientProvider client={appQueryClient}>
-      <BranchActionsSurfaceHarnessInner repo={repo} branchIndex={branchIndex} onReady={onReady} />
-    </QueryClientProvider>
-  )
+function AppQueryClientProvider({ children }: { children: ReactNode }) {
+  return <QueryClientProvider client={appQueryClient}>{children}</QueryClientProvider>
 }
 
-function BranchActionsSurfaceHarnessInner({
-  repo,
-  branchIndex,
-  onReady,
-}: {
-  repo: RepoPresentationForTest
-  branchIndex: number
-  onReady: (surface: ReturnType<typeof useBranchActions>) => void
-}) {
-  const branch = repo.snapshot.branches[branchIndex]!
-  const surface = useBranchActions(repo, branch)
-  React.useEffect(() => {
-    onReady(surface)
-  }, [surface, onReady])
-  return null
+function requiredAction<T>(action: T | undefined, name: string): T {
+  if (action === undefined) throw new Error(`${name} action unavailable in test fixture`)
+  return action
 }

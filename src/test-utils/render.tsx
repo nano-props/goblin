@@ -39,11 +39,14 @@
 //     assume that need on the caller's behalf.
 
 import { afterEach } from 'vitest'
-import { cleanup, render, type RenderOptions, type RenderResult } from '@testing-library/react'
+import { cleanup, render, renderHook, type RenderOptions, type RenderResult } from '@testing-library/react'
 
 afterEach(() => {
   cleanup()
 })
+
+/** Render a hook through RTL while retaining this module's cleanup boundary. */
+export const renderHookInJsdom = renderHook
 
 /**
  * Render a React element under jsdom through RTL's synchronous `act`

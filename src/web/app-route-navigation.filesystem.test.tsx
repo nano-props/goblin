@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { seedRepoWithReadModelForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { act, renderHook } from '@testing-library/react'
+import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { HistoryState } from '@tanstack/history'
 import type * as ReactRouterModule from '@tanstack/react-router'
@@ -19,6 +19,7 @@ import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { FilesystemWorkspacePaneRouteTarget } from '#/web/app-route-navigation.ts'
+import { renderHookInJsdom } from '#/test-utils/render.tsx'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/filesystem-route-navigation-workspace')
 const WORKTREE_PATH = '/tmp/filesystem-route-navigation-worktree'
@@ -45,7 +46,7 @@ describe('filesystem workspace pane route navigation', () => {
       const sourceRoute = { kind: 'invalid-static' as const, tabKey: 'missing tab' }
       const harness = routeNavigationHarness(`${rootHref}/tab/${encodeURIComponent(sourceRoute.tabKey)}`)
       routerMock.current = harness.router
-      const { result, unmount } = renderHook(() => useAppRouteNavigation())
+      const { result, unmount } = renderHookInJsdom(() => useAppRouteNavigation())
       let committed = false
 
       await act(async () => {
@@ -69,7 +70,7 @@ describe('filesystem workspace pane route navigation', () => {
   ])('rejects a malformed extra-segment source route for the %s target', async (_label, target) => {
     const harness = routeNavigationHarness(`${filesystemRootHref(target)}/tab/files/extra`)
     routerMock.current = harness.router
-    const { result } = renderHook(() => useAppRouteNavigation())
+    const { result } = renderHookInJsdom(() => useAppRouteNavigation())
     const onAbandon = vi.fn()
 
     await expect(
@@ -94,7 +95,7 @@ describe('filesystem workspace pane route navigation', () => {
     const staleSourceRoute = { kind: 'terminal' as const, terminalSessionId: TERMINAL_SESSION_ID }
     const harness = routeNavigationHarness(filesystemRouteHref(target, currentRoute))
     routerMock.current = harness.router
-    const { result } = renderHook(() => useAppRouteNavigation())
+    const { result } = renderHookInJsdom(() => useAppRouteNavigation())
     const onAbandon = vi.fn()
 
     await expect(

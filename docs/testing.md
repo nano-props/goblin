@@ -41,7 +41,8 @@ Always reach for the library tool before writing one yourself:
 
 | Need                                                | Use                                                                                                                                                                                                                                                                                         |
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Render a React tree, query by accessible name       | `@testing-library/react` (`render`, `screen`)                                                                                                                                                                                                                                               |
+| Render a React tree, query by accessible name       | `renderInJsdom` from `src/test-utils/render.tsx`, then `@testing-library/react` queries                                                                                                                                                                                                     |
+| Render a React hook                                 | `renderHookInJsdom` from `src/test-utils/render.tsx`                                                                                                                                                                                                                                        |
 | Flush React work scheduled by an async test step    | `@testing-library/react` (`act`) — handles `IS_REACT_ACT_ENVIRONMENT` for the duration of the callback. RTL already wraps the synchronous render; put timer advancement or the state-changing async operation inside `await act(async () => …)`. Do not import `act` from `react` directly. |
 | Type, click, tab through, fire keyboard events      | `@testing-library/user-event` (`userEvent.setup()`)                                                                                                                                                                                                                                         |
 | Query a non-React DOM (portals, raw HTML)           | `@testing-library/dom` (`screen.getByRole`, etc.)                                                                                                                                                                                                                                           |
@@ -67,6 +68,8 @@ import a helper from inside another test file.
 - Importing `act` from `react` in tests. Use `act` from
   `@testing-library/react` so the act environment flag is scoped to the
   callback.
+- Importing RTL `renderHook` directly in tests. Use `renderHookInJsdom` so the
+  shared helper owns `afterEach(cleanup)` when Vitest globals are disabled.
 - Defining or installing a WebSocket mock outside
   `src/web/test-utils/websocket-mock.ts`. An inline xterm mock is allowed only
   in `src/web/test-utils/terminal-session.ts`; do not duplicate that
@@ -126,8 +129,10 @@ Exports:
   `IS_REACT_ACT_ENVIRONMENT` enabled afterward. Tests wrap the later
   state-changing async operation—not the render—in an explicit RTL `act`.
   Returns the standard RTL result plus a `flushAnimationFrames()` helper.
+- `renderHookInJsdom(callback, options?)` — wraps RTL's `renderHook` while
+  retaining this module's shared cleanup boundary.
 
-Tests call `renderInJsdom(<Foo />)` and never see a `createRoot`. An
+Tests call these helpers instead of creating React roots directly. An
 `afterEach(cleanup)` is registered at module load so the RTL result is
 disposed automatically; tests do not need to call `cleanup` themselves.
 

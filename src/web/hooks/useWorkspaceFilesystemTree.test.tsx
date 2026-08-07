@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from '@testing-library/react'
+import { act, type RenderResult } from '@testing-library/react'
 import { StrictMode, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -140,7 +140,7 @@ async function emitFilesystemInvalidation(target = mainExecutionTarget()): Promi
   })
 }
 
-let rendered: ReturnType<typeof renderInJsdom> | null = null
+let rendered: RenderResult | null = null
 let lastSnapshot: HarnessSnapshot | null = null
 let queryClient: QueryClient
 let stopInvalidationSync: (() => void) | null = null
@@ -154,8 +154,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  rendered?.unmount()
-  rendered = null
+  unmountRenderedTree()
   stopInvalidationSync?.()
   stopInvalidationSync = null
   queryClient.clear()
@@ -183,6 +182,12 @@ function renderElement(element: ReactNode): Promise<void> {
   return act(async () => {
     rendered = renderInJsdom(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>)
   })
+}
+
+function unmountRenderedTree(): void {
+  if (!rendered) return
+  rendered.unmount()
+  rendered = null
 }
 
 async function flush() {
@@ -456,8 +461,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(filesystemReadCount()).toBe(1)
     expect(filesystemReadCount('src')).toBe(1)
 
-    rendered?.unmount()
-    rendered = null
+    unmountRenderedTree()
     children = filesystemTree(fileNode('src/new.ts', 'src'))
 
     await render(props)
@@ -477,8 +481,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await render(props)
     expect(filesystemReadCount()).toBe(1)
 
-    rendered?.unmount()
-    rendered = null
+    unmountRenderedTree()
     await render(props)
     expect(filesystemReadCount()).toBe(1)
 
@@ -762,8 +765,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.tree?.nodes).toEqual([])
     expect(lastSnapshot?.error).toBeNull()
 
-    rendered?.unmount()
-    rendered = null
+    unmountRenderedTree()
     await render(props)
     await flush()
 
@@ -793,8 +795,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await render(props)
     await flush()
 
-    rendered?.unmount()
-    rendered = null
+    unmountRenderedTree()
     phase = 'failing'
     await render(props)
     await flush()
@@ -1071,8 +1072,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await render(mainHarnessProps({ onSnapshot: () => {} }))
     await flush()
 
-    rendered?.unmount()
-    rendered = null
+    unmountRenderedTree()
     await emitFilesystemInvalidation()
     await render(mainHarnessProps({ onSnapshot: () => {} }))
     await flush()

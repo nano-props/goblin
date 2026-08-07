@@ -24,15 +24,21 @@ describe('session restore membership invalidation', () => {
   })
 
   afterEach(async () => {
-    const settings = await import('#/server/modules/settings-source.ts')
-    const runtimes = await import('#/server/modules/workspace-runtimes.ts')
-    settings.resetServerSettingsSourceForTests()
-    runtimes.clearWorkspaceRuntimesForUser(RESTORE_USER_ID)
-    runtimes.clearWorkspaceRuntimesForUser(OTHER_USER_ID)
-    rmSync(dataDir, { recursive: true, force: true })
-    if (previousDataDir === undefined) delete process.env.GOBLIN_SERVER_DATA_DIR
-    else process.env.GOBLIN_SERVER_DATA_DIR = previousDataDir
-    vi.resetModules()
+    try {
+      const settings = await import('#/server/modules/settings-source.ts')
+      const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+      settings.resetServerSettingsSourceForTests()
+      runtimes.clearWorkspaceRuntimesForUser(RESTORE_USER_ID)
+      runtimes.clearWorkspaceRuntimesForUser(OTHER_USER_ID)
+    } finally {
+      try {
+        rmSync(dataDir, { recursive: true, force: true })
+      } finally {
+        if (previousDataDir === undefined) delete process.env.GOBLIN_SERVER_DATA_DIR
+        else process.env.GOBLIN_SERVER_DATA_DIR = previousDataDir
+        vi.resetModules()
+      }
+    }
   })
 
   test('restore batch repair invalidates every runtime projected from removed durable memberships', async () => {

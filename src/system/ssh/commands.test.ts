@@ -15,7 +15,8 @@ const tempDirs: string[] = []
 const testPosix = process.platform === 'win32' ? test.skip : test
 
 afterEach(() => {
-  process.env.PATH = originalPath
+  if (originalPath === undefined) delete process.env.PATH
+  else process.env.PATH = originalPath
   if (originalPathExt === undefined) delete process.env.PATHEXT
   else process.env.PATHEXT = originalPathExt
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true })

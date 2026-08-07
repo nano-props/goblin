@@ -9,6 +9,7 @@ const POLICY_FILE = 'src/test-utils/test-harness-policy.test.ts'
 const CANONICAL_WEBSOCKET_MOCK_FILE = 'src/web/test-utils/websocket-mock.ts'
 const CANONICAL_XTERM_MOCK_FILE = 'src/web/test-utils/terminal-session.ts'
 const CANONICAL_TIMERS_FILE = 'src/test-utils/timers.ts'
+const CANONICAL_RENDER_FILE = 'src/test-utils/render.tsx'
 const CANONICAL_STORAGE_FILE = 'src/test-utils/storage.ts'
 const CANONICAL_FETCH_MOCK_FILES = new Set(['src/test-utils/fetch-mock.ts', 'src/web/test-utils/bridge.ts'])
 const MAX_TEST_SURFACE_LINES = 1_500
@@ -30,6 +31,7 @@ const repositoryPolicyLabels = [
   'hand-rolled React root',
   'act imported directly from React',
   'manual React act-environment mutation',
+  'direct RTL renderHook',
   'inline WebSocket mock',
   'test-local fetch replacement',
   'test-local Storage replacement',
@@ -121,6 +123,8 @@ describe('test harness policy', () => {
   test.each([
     ['hand-rolled React root', "import { createRoot as mount } from 'react-dom/client'; mount(node)"],
     ['act imported directly from React', "import { act as reactAct } from 'react'"],
+    ['direct RTL renderHook', "import { renderHook as mountHook } from '@testing-library/react'"],
+    ['direct RTL renderHook', "import * as rtl from '@testing-library/react'; rtl.renderHook(() => null)"],
     ['inline WebSocket mock', 'class FakeWebSocket {}'],
     ['test-local fetch replacement', "import { vi } from 'vitest'; vi.stubGlobal('fetch', fetchMock)"],
     ['test-local fetch replacement', 'globalThis.fetch = fetchMock'],
@@ -168,6 +172,7 @@ describe('test harness policy', () => {
 
 function isCanonicalPolicyOwner(file: string, label: (typeof repositoryPolicyLabels)[number]): boolean {
   if (label === 'hand-rolled React root') return !isTestFile(file)
+  if (label === 'direct RTL renderHook') return file === CANONICAL_RENDER_FILE
   if (label === 'inline WebSocket mock') return file === CANONICAL_WEBSOCKET_MOCK_FILE
   if (label === 'test-local fetch replacement') return CANONICAL_FETCH_MOCK_FILES.has(file)
   if (label === 'test-local Storage replacement') return file === CANONICAL_STORAGE_FILE
@@ -198,6 +203,9 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
       if (importSource(path) === 'react' && importedName(path) === 'act') {
         violations.add('act imported directly from React')
       }
+      if (importSource(path) === '@testing-library/react' && importedName(path) === 'renderHook') {
+        violations.add('direct RTL renderHook')
+      }
     },
     Class(path) {
       if (path.node.id?.name === 'MockWebSocket' || path.node.id?.name === 'FakeWebSocket') {
@@ -223,6 +231,7 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
     CallExpression(path) {
       const callee = path.get('callee')
       if (isImportedCreateRoot(callee)) violations.add('hand-rolled React root')
+      if (isTestingLibraryRenderHook(callee)) violations.add('direct RTL renderHook')
       if (isVitestViMember(callee, 'useFakeTimers')) {
         violations.add('direct fake-timer configuration')
       }
@@ -271,6 +280,12 @@ function isImportedCreateRoot(callee: NodePath): boolean {
   if (isImportedIdentifier(callee, 'react-dom/client', 'createRoot')) return true
   if (!callee.isMemberExpression() || memberPropertyName(callee) !== 'createRoot') return false
   return isImportedNamespace(callee.get('object'), 'react-dom/client')
+}
+
+function isTestingLibraryRenderHook(callee: NodePath): boolean {
+  if (isImportedIdentifier(callee, '@testing-library/react', 'renderHook')) return true
+  if (!callee.isMemberExpression() || memberPropertyName(callee) !== 'renderHook') return false
+  return isImportedNamespace(callee.get('object'), '@testing-library/react')
 }
 
 function isVitestViMember(callee: NodePath, property: string): boolean {

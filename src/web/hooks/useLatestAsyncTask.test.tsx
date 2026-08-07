@@ -3,36 +3,23 @@
 import { act, waitFor } from '@testing-library/react'
 import { StrictMode, type ReactNode } from 'react'
 import { describe, expect, test } from 'vitest'
-import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useLatestAsyncTask, type LatestAsyncTaskResult } from '#/web/hooks/useLatestAsyncTask.ts'
+import { renderHookInJsdom } from '#/test-utils/render.tsx'
 
 describe('useLatestAsyncTask', () => {
   test('marks superseded task results as stale and keeps latest result current', async () => {
     const first = Promise.withResolvers<string>()
     const second = Promise.withResolvers<string>()
-    let latestTask:
-      | {
-          pending: boolean
-          runLatest: ReturnType<typeof useLatestAsyncTask>['runLatest']
-        }
-      | undefined
+    const { result } = renderHookInJsdom(() => useLatestAsyncTask())
 
-    function HookHost() {
-      latestTask = useLatestAsyncTask()
-      return null
-    }
-
-    render(<HookHost />)
-
-    let firstPromise!: Promise<LatestAsyncTaskResult<string>>
-    let secondPromise!: Promise<LatestAsyncTaskResult<string>>
-    act(() => {
-      firstPromise = latestTask!.runLatest(() => first.promise)
-      secondPromise = latestTask!.runLatest(() => second.promise)
+    const { firstPromise, secondPromise } = await act(async () => {
+      const firstPromise = result.current.runLatest(() => first.promise)
+      const secondPromise = result.current.runLatest(() => second.promise)
+      return { firstPromise, secondPromise }
     })
 
     await waitFor(() => {
-      expect(latestTask!.pending).toBe(true)
+      expect(result.current.pending).toBe(true)
     })
 
     let results: Array<LatestAsyncTaskResult<string>> = []
@@ -43,82 +30,63 @@ describe('useLatestAsyncTask', () => {
     })
 
     expect(results).toEqual([{ status: 'stale' }, { status: 'current', value: 'second' }])
-    expect(latestTask!.pending).toBe(false)
+    expect(result.current.pending).toBe(false)
   })
 
   test('reset invalidates the in-flight task and clears pending', async () => {
     const deferred = Promise.withResolvers<string>()
-    let latestTask: ReturnType<typeof useLatestAsyncTask> | undefined
+    const { result } = renderHookInJsdom(() => useLatestAsyncTask())
 
-    function HookHost() {
-      latestTask = useLatestAsyncTask()
-      return null
-    }
-
-    render(<HookHost />)
-
-    let pendingPromise!: Promise<LatestAsyncTaskResult<string>>
-    act(() => {
-      pendingPromise = latestTask!.runLatest(() => deferred.promise)
+    const { pendingPromise } = await act(async () => {
+      const pendingPromise = result.current.runLatest(() => deferred.promise)
+      return { pendingPromise }
     })
     await waitFor(() => {
-      expect(latestTask!.pending).toBe(true)
+      expect(result.current.pending).toBe(true)
     })
 
     act(() => {
-      latestTask!.reset()
+      result.current.reset()
     })
 
-    expect(latestTask!.pending).toBe(false)
+    expect(result.current.pending).toBe(false)
 
-    let result: LatestAsyncTaskResult<string> | undefined
-    await act(async () => {
+    const taskResult = await act(async () => {
       deferred.resolve('done')
-      result = await pendingPromise
+      return await pendingPromise
     })
-    expect(result).toEqual({ status: 'stale' })
+    expect(taskResult).toEqual({ status: 'stale' })
   })
 
   test('clears pending state after StrictMode replays the mount effect', async () => {
     const first = Promise.withResolvers<string>()
     const second = Promise.withResolvers<string>()
-    let latestTask: ReturnType<typeof useLatestAsyncTask> | undefined
+    const { result } = renderHookInJsdom(() => useLatestAsyncTask(), { wrapper: StrictModeHarness })
 
-    function HookHost() {
-      latestTask = useLatestAsyncTask()
-      return null
-    }
-
-    render(
-      <StrictMode>
-        <HookHost />
-      </StrictMode>,
-    )
-
-    let firstPromise!: Promise<LatestAsyncTaskResult<string>>
-    act(() => {
-      firstPromise = latestTask!.runLatest(() => first.promise)
+    const { firstPromise } = await act(async () => {
+      const firstPromise = result.current.runLatest(() => first.promise)
+      return { firstPromise }
     })
-    await waitFor(() => expect(latestTask!.pending).toBe(true))
+    await waitFor(() => expect(result.current.pending).toBe(true))
 
-    act(() => latestTask!.reset())
-    expect(latestTask!.pending).toBe(false)
+    act(() => result.current.reset())
+    expect(result.current.pending).toBe(false)
 
-    let secondPromise!: Promise<LatestAsyncTaskResult<string>>
-    act(() => {
-      secondPromise = latestTask!.runLatest(() => second.promise)
+    const { secondPromise } = await act(async () => {
+      const secondPromise = result.current.runLatest(() => second.promise)
+      return { secondPromise }
     })
-    await waitFor(() => expect(latestTask!.pending).toBe(true))
+    await waitFor(() => expect(result.current.pending).toBe(true))
 
     await act(async () => {
       first.resolve('stale')
       second.resolve('current')
       await Promise.all([firstPromise, secondPromise])
     })
-    expect(latestTask!.pending).toBe(false)
+    expect(result.current.pending).toBe(false)
   })
 })
 
-function render(element: ReactNode) {
-  return renderInJsdom(element)
+function StrictModeHarness({ children }: { children: ReactNode }) {
+  return <StrictMode>{children}</StrictMode>
 }

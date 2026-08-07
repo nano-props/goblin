@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { StrictMode, type ReactNode } from 'react'
-import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { renderHookInJsdom } from '#/test-utils/render.tsx'
 import {
   getTerminalSessionProjection,
   setTerminalSessionProjectionForTests,
@@ -26,7 +26,7 @@ afterEach(() => {
 
 describe('useTerminalSessionProjection', () => {
   test('retains the client singleton across StrictMode and a component remount', () => {
-    const firstMount = renderHook(() => useTerminalSessionProjection(), { wrapper: StrictModeHarness })
+    const firstMount = renderHookInJsdom(() => useTerminalSessionProjection(), { wrapper: StrictModeHarness })
     projectionForCleanup = firstMount.result.current
 
     expect(
@@ -36,7 +36,7 @@ describe('useTerminalSessionProjection', () => {
     ).toBe(projectionForCleanup)
 
     firstMount.unmount()
-    const secondMount = renderHook(() => useTerminalSessionProjection(), { wrapper: StrictModeHarness })
+    const secondMount = renderHookInJsdom(() => useTerminalSessionProjection(), { wrapper: StrictModeHarness })
 
     expect(secondMount.result.current).toBe(projectionForCleanup)
     secondMount.unmount()

@@ -42,7 +42,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  process.env.SHELL = originalShell
+  if (originalShell === undefined) delete process.env.SHELL
+  else process.env.SHELL = originalShell
 })
 
 function ptyStub(processName = 'zsh') {

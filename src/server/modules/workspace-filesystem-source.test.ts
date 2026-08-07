@@ -17,18 +17,23 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 async function makeTempWorktree(files: Record<string, string>): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'workspace-filesystem-source-'))
-  await execa('git', ['-C', root, 'init', '-q'])
-  // Isolate from the host machine's global gitignore (`core.excludesFile`).
-  // Without this, a developer's personal excludes (e.g. a global rule for
-  // `.env`) silently changes which fixture files these tests see as
-  // ignored, making assertions about *this repo's* `.gitignore` flaky.
-  await execa('git', ['-C', root, 'config', 'core.excludesFile', '/dev/null'])
-  for (const [relpath, contents] of Object.entries(files)) {
-    const full = path.join(root, relpath)
-    await fs.mkdir(path.dirname(full), { recursive: true })
-    await fs.writeFile(full, contents, 'utf8')
+  try {
+    await execa('git', ['-C', root, 'init', '-q'])
+    // Isolate from the host machine's global gitignore (`core.excludesFile`).
+    // Without this, a developer's personal excludes (e.g. a global rule for
+    // `.env`) silently changes which fixture files these tests see as
+    // ignored, making assertions about *this repo's* `.gitignore` flaky.
+    await execa('git', ['-C', root, 'config', 'core.excludesFile', '/dev/null'])
+    for (const [relpath, contents] of Object.entries(files)) {
+      const full = path.join(root, relpath)
+      await fs.mkdir(path.dirname(full), { recursive: true })
+      await fs.writeFile(full, contents, 'utf8')
+    }
+    return root
+  } catch (error) {
+    await fs.rm(root, { recursive: true, force: true })
+    throw error
   }
-  return root
 }
 
 describe('workspace-filesystem-source — local direct children', () => {

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { BrowserWindowConstructorOptions } from 'electron'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
@@ -137,6 +137,8 @@ vi.mock('#/main/embedded-server-lifecycle.ts', () => ({
   getEmbeddedServerRuntime: mocks.getEmbeddedServerRuntime,
 }))
 
+const originalWebDevUrl = process.env.GOBLIN_WEB_DEV_URL
+
 describe('primary window navigation boundaries', () => {
   beforeEach(() => {
     vi.resetModules()
@@ -156,6 +158,16 @@ describe('primary window navigation boundaries', () => {
     mocks.cookieSetMock.mockReset()
     mocks.cookieSetMock.mockResolvedValue(undefined)
     mocks.downloadURL.mockReset()
+    mocks.getEmbeddedServerRuntime.mockReset()
+    mocks.getEmbeddedServerRuntime.mockReturnValue({
+      url: 'http://127.0.0.1:32100/',
+      accessToken: 'secret',
+    })
+  })
+
+  afterEach(() => {
+    if (originalWebDevUrl === undefined) delete process.env.GOBLIN_WEB_DEV_URL
+    else process.env.GOBLIN_WEB_DEV_URL = originalWebDevUrl
   })
 
   test('prevents client navigation away from the packaged app page', async () => {
@@ -313,22 +325,6 @@ describe('primary window navigation boundaries', () => {
 
     expect(mocks.readFileSync).toHaveBeenCalledWith('/app/dist/preload/manifest.json', 'utf8')
     expect(mocks.windowOptions[0]?.webPreferences?.preload).toBe('/app/dist/preload/preload-0.1.0-testhash.cjs')
-  })
-
-  test('uses the client dev server origin in window URL during development', async () => {
-    // The bootstrap (access token, server URL, home dir, platform)
-    // is ferried from the native host to the preload via IPC; the
-    // `webDevUrl` env override just changes which URL the client
-    // window is pointed at (Vite vs the embedded server's static
-    // file route). The dev-URL override flows through
-    // `createBrowserEntryUrl`; the bootstrap-IPC behavior is
-    // covered by the IPC handler tests.
-    process.env.GOBLIN_WEB_DEV_URL = 'http://127.0.0.1:5173/'
-    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
-
-    await getOrCreatePrimaryWindow()
-
-    expect(mocks.windowOptions[0]?.webPreferences?.preload).toBeTruthy()
   })
 
   test('fails window creation when no client base URL is available', async () => {

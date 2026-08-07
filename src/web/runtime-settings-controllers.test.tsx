@@ -2,10 +2,11 @@
 
 import { QueryClientProvider } from '@tanstack/react-query'
 import { act } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import { renderHookInJsdom } from '#/test-utils/render.tsx'
 
 const settingsActionsMocks = vi.hoisted(() => ({
   refreshExternalAppsDetection: vi.fn(async () => {}),
@@ -46,18 +47,11 @@ beforeEach(() => {
 describe('runtime settings controllers', () => {
   test('runs fetch settings writes through settings mutations', async () => {
     const { useFetchSettingsController } = await import('#/web/runtime-settings-fetch.ts')
-    let controller: ReturnType<typeof useFetchSettingsController> | undefined
-
-    function HookHost() {
-      controller = useFetchSettingsController()
-      return null
-    }
-
-    renderWithAppQueryClient(<HookHost />)
+    const { result } = renderHookInJsdom(() => useFetchSettingsController(), { wrapper: AppQueryClientProvider })
 
     await act(async () => {
-      await controller?.setFetchInterval(300)
-      await controller?.setTerminalNotificationsEnabled(true)
+      await result.current.setFetchInterval(300)
+      await result.current.setTerminalNotificationsEnabled(true)
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('fetch interval update', expect.any(Function))
@@ -71,17 +65,10 @@ describe('runtime settings controllers', () => {
 
   test('runs LAN settings writes through settings mutations', async () => {
     const { useLanSettingsController } = await import('#/web/runtime-settings-lan.ts')
-    let controller: ReturnType<typeof useLanSettingsController> | undefined
-
-    function HookHost() {
-      controller = useLanSettingsController()
-      return null
-    }
-
-    renderWithAppQueryClient(<HookHost />)
+    const { result } = renderHookInJsdom(() => useLanSettingsController(), { wrapper: AppQueryClientProvider })
 
     await act(async () => {
-      await controller?.setLanEnabled(true)
+      await result.current.setLanEnabled(true)
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('lanEnabled update', expect.any(Function))
@@ -90,20 +77,12 @@ describe('runtime settings controllers', () => {
 
   test('runs shortcut settings writes through settings mutations', async () => {
     const { useShortcutSettingsController } = await import('#/web/runtime-settings-shortcuts.ts')
-    let controller: ReturnType<typeof useShortcutSettingsController> | undefined
+    const { result } = renderHookInJsdom(() => useShortcutSettingsController(), { wrapper: AppQueryClientProvider })
 
-    function HookHost() {
-      controller = useShortcutSettingsController()
-      return null
-    }
-
-    renderWithAppQueryClient(<HookHost />)
-
-    let globalShortcutResult: Awaited<ReturnType<NonNullable<typeof controller>['setGlobalShortcut']>> | undefined
-    await act(async () => {
-      await controller?.setShortcutsDisabled(true)
-      await controller?.setGlobalShortcutDisabled(true)
-      globalShortcutResult = await controller?.setGlobalShortcut('CommandOrControl+Shift+K')
+    const globalShortcutResult = await act(async () => {
+      await result.current.setShortcutsDisabled(true)
+      await result.current.setGlobalShortcutDisabled(true)
+      return await result.current.setGlobalShortcut('CommandOrControl+Shift+K')
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('shortcuts update', expect.any(Function))
@@ -120,17 +99,10 @@ describe('runtime settings controllers', () => {
 
   test('runs external app refresh through settings mutations', async () => {
     const { useExternalAppSettingsController } = await import('#/web/runtime-settings-external-apps.ts')
-    let controller: ReturnType<typeof useExternalAppSettingsController> | undefined
-
-    function HookHost() {
-      controller = useExternalAppSettingsController()
-      return null
-    }
-
-    renderWithAppQueryClient(<HookHost />)
+    const { result } = renderHookInJsdom(() => useExternalAppSettingsController(), { wrapper: AppQueryClientProvider })
 
     await act(async () => {
-      await controller?.refreshExternalApps()
+      await result.current.refreshExternalApps()
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('external app refresh', expect.any(Function))
@@ -141,22 +113,13 @@ describe('runtime settings controllers', () => {
     const { useExternalAppSettingsController } = await import('#/web/runtime-settings-external-apps.ts')
     const refresh = Promise.withResolvers<void>()
     settingsActionsMocks.refreshExternalAppsDetection.mockImplementation(async () => await refresh.promise)
-    let controller: ReturnType<typeof useExternalAppSettingsController> | undefined
+    const { result } = renderHookInJsdom(() => useExternalAppSettingsController(), { wrapper: AppQueryClientProvider })
 
-    function HookHost() {
-      controller = useExternalAppSettingsController()
-      return null
-    }
-
-    renderWithAppQueryClient(<HookHost />)
-    if (!controller) throw new Error('controller not mounted')
-
-    let firstRefresh: Promise<void> | undefined
-    let secondRefresh: Promise<void> | undefined
-    await act(async () => {
-      firstRefresh = controller?.refreshExternalApps()
-      secondRefresh = controller?.refreshExternalApps()
+    const { firstRefresh, secondRefresh } = await act(async () => {
+      const firstRefresh = result.current.refreshExternalApps()
+      const secondRefresh = result.current.refreshExternalApps()
       await flushMicrotasks()
+      return { firstRefresh, secondRefresh }
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledTimes(1)
@@ -170,17 +133,10 @@ describe('runtime settings controllers', () => {
 
   test('runs GitHub CLI refresh through settings mutations', async () => {
     const { useGitHubSettingsController } = await import('#/web/runtime-settings-github.ts')
-    let controller: ReturnType<typeof useGitHubSettingsController> | undefined
-
-    function HookHost() {
-      controller = useGitHubSettingsController()
-      return null
-    }
-
-    renderWithAppQueryClient(<HookHost />)
+    const { result } = renderHookInJsdom(() => useGitHubSettingsController(), { wrapper: AppQueryClientProvider })
 
     await act(async () => {
-      await controller?.refreshGitHubCli()
+      await result.current.refreshGitHubCli()
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('GitHub CLI refresh', expect.any(Function))
@@ -191,22 +147,13 @@ describe('runtime settings controllers', () => {
     const { useGitHubSettingsController } = await import('#/web/runtime-settings-github.ts')
     const refresh = Promise.withResolvers<void>()
     settingsActionsMocks.refreshGitHubCliDetection.mockImplementation(async () => await refresh.promise)
-    let controller: ReturnType<typeof useGitHubSettingsController> | undefined
+    const { result } = renderHookInJsdom(() => useGitHubSettingsController(), { wrapper: AppQueryClientProvider })
 
-    function HookHost() {
-      controller = useGitHubSettingsController()
-      return null
-    }
-
-    renderWithAppQueryClient(<HookHost />)
-    if (!controller) throw new Error('controller not mounted')
-
-    let firstRefresh: Promise<void> | undefined
-    let secondRefresh: Promise<void> | undefined
-    await act(async () => {
-      firstRefresh = controller?.refreshGitHubCli()
-      secondRefresh = controller?.refreshGitHubCli()
+    const { firstRefresh, secondRefresh } = await act(async () => {
+      const firstRefresh = result.current.refreshGitHubCli()
+      const secondRefresh = result.current.refreshGitHubCli()
       await flushMicrotasks()
+      return { firstRefresh, secondRefresh }
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledTimes(1)
@@ -219,6 +166,6 @@ describe('runtime settings controllers', () => {
   })
 })
 
-function renderWithAppQueryClient(element: React.ReactElement) {
-  return renderInJsdom(<QueryClientProvider client={appQueryClient}>{element}</QueryClientProvider>)
+function AppQueryClientProvider({ children }: { children: ReactNode }) {
+  return <QueryClientProvider client={appQueryClient}>{children}</QueryClientProvider>
 }

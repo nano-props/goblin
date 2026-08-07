@@ -8,12 +8,15 @@ let previousDataDir: string | undefined
 
 describe('settings persistence', () => {
   afterEach(() => {
-    if (tmp) rmSync(tmp, { recursive: true, force: true })
-    tmp = null
-    if (previousDataDir === undefined) delete process.env.GOBLIN_SERVER_DATA_DIR
-    else process.env.GOBLIN_SERVER_DATA_DIR = previousDataDir
-    vi.resetModules()
-    vi.doUnmock('write-file-atomic')
+    try {
+      if (tmp) rmSync(tmp, { recursive: true, force: true })
+    } finally {
+      tmp = null
+      if (previousDataDir === undefined) delete process.env.GOBLIN_SERVER_DATA_DIR
+      else process.env.GOBLIN_SERVER_DATA_DIR = previousDataDir
+      vi.resetModules()
+      vi.doUnmock('write-file-atomic')
+    }
   })
 
   test('continues processing queued settings writes after a write failure', async () => {

@@ -35,13 +35,19 @@ async function writeWorkspacePaneLayout(
 
 describe('settings source', () => {
   afterEach(async () => {
-    const mod = await import('#/server/modules/settings-source.ts')
-    mod.resetServerSettingsSourceForTests()
-    if (tmp) rmSync(tmp, { recursive: true, force: true })
-    tmp = null
-    if (previousDataDir === undefined) delete process.env.GOBLIN_SERVER_DATA_DIR
-    else process.env.GOBLIN_SERVER_DATA_DIR = previousDataDir
-    vi.resetModules()
+    try {
+      const mod = await import('#/server/modules/settings-source.ts')
+      mod.resetServerSettingsSourceForTests()
+    } finally {
+      try {
+        if (tmp) rmSync(tmp, { recursive: true, force: true })
+      } finally {
+        tmp = null
+        if (previousDataDir === undefined) delete process.env.GOBLIN_SERVER_DATA_DIR
+        else process.env.GOBLIN_SERVER_DATA_DIR = previousDataDir
+        vi.resetModules()
+      }
+    }
   })
 
   test('initializes user-settings.json with defaults when no persisted settings exist', async () => {

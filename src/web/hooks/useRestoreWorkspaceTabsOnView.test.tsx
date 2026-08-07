@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
     restoredClientWorkspaceBaseline: null,
     promoteRestoredWorkspace: vi.fn(),
   } as {
-    workspaces: Record<string, ReturnType<typeof stubRepo> | undefined>
+    workspaces: Record<string, ReturnType<typeof stubRepo>>
     restoredClientWorkspaceBaseline?: ClientWorkspaceState | null
     promoteRestoredWorkspace: ReturnType<typeof vi.fn>
   },

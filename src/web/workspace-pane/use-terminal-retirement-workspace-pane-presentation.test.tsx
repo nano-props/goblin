@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { act, renderHook } from '@testing-library/react'
+import { act } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { AcceptedTerminalRetirement } from '#/web/components/terminal/TerminalSessionProjection.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
+import { renderHookInJsdom } from '#/test-utils/render.tsx'
 
 const mocks = vi.hoisted(() => ({
   listener: null as ((retirement: AcceptedTerminalRetirement) => void) | null,
@@ -48,7 +49,7 @@ describe('terminal retirement workspace pane presentation', () => {
       workspacePaneRoute: { kind: 'terminal' as const, terminalSessionId: 'term-111111111111111111111' },
       filesystemTarget: null,
     }
-    const { unmount } = renderHook(() =>
+    const { unmount } = renderHookInJsdom(() =>
       useTerminalRetirementWorkspacePanePresentation({
         currentTarget: target,
         navigation,
@@ -76,7 +77,7 @@ describe('terminal retirement workspace pane presentation', () => {
   })
 
   test('ignores an accepted exit without a current command target', () => {
-    renderHook(() =>
+    renderHookInJsdom(() =>
       useTerminalRetirementWorkspacePanePresentation({
         currentTarget: null,
         navigation: appNavigationActionsForTest(),

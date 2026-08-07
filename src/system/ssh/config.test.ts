@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { aroundEach, describe, expect, test, vi } from 'vitest'
+import { mkdtempDisposableSync, mkdirSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -14,24 +14,25 @@ vi.mock('execa', () => ({
 
 vi.mock('node:os', async () => {
   const actual = await vi.importActual<typeof NodeOsModule>('node:os')
-  return {
+  const mocked = {
     ...actual,
     homedir: () => tmpHome,
     userInfo: () => ({ username: 'tester' }),
   }
+  return {
+    ...mocked,
+    default: mocked,
+  }
 })
 
 describe('ssh config resolution', () => {
-  beforeEach(() => {
+  aroundEach(async (runTest) => {
     vi.resetModules()
     execaMock.mockReset()
-    tmpHome = mkdtempSync(path.join(os.tmpdir(), 'goblin-ssh-config-test-'))
-    process.env.HOME = tmpHome
+    using temporaryHome = mkdtempDisposableSync(path.join(os.tmpdir(), 'goblin-ssh-config-test-'))
+    tmpHome = temporaryHome.path
     mkdirSync(path.join(tmpHome, '.ssh'), { recursive: true })
-  })
-
-  afterEach(() => {
-    rmSync(tmpHome, { recursive: true, force: true })
+    await runTest()
   })
 
   test.each(['-F', '.', '..', 'bad alias', '服务器', ' prod '])(
