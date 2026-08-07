@@ -25,11 +25,13 @@ Make paste and drop symmetric on Electron and web runtimes.
 | ---------------- | ----------------------------------- | ----------- |
 | Drag-and-drop    | native path attempt + HTTP fallback | HTTP upload |
 | Paste (Cmd+V)    | native path attempt + HTTP fallback | HTTP upload |
+| Composer Upload  | native path attempt + HTTP fallback | HTTP upload |
 | Mobile paste btn | unsupported                         | unsupported |
 
-Both runtimes use the same classification, authority, size, and error contract.
-The resulting temporary path may differ because path resolution depends on the
-runtime filesystem boundary.
+Both runtimes use the same classification, authority, upload, and error
+contract. The resulting path may differ because path resolution depends on the
+runtime filesystem boundary. A proven native path does not upload file content
+and therefore is not subject to upload size limits.
 
 ## Resolver
 
@@ -76,22 +78,37 @@ xterm.js's descendant textarea listener.
 
 ## Size cap
 
-Each file is capped at 10 MiB. The client enforces the per-file limit before
-upload; the HTTP body limit bounds the batch; and the server checks every file
-again before writing. Batch transport limits include bounded multipart
-overhead.
+Each uploaded blob is capped at 25 MiB. The client uses approximately 32 MiB of
+uploaded blob content as the normal batch target after native path resolution,
+so directly readable native paths do not contribute to it. The encoded
+multipart request has a 34 MiB hard limit that bounds memory use and tolerates
+modest multipart overhead or small differences from clients. The server
+independently enforces the per-file limit before writing.
 
 ## Error surface
 
-- Total transfer failure reports that no paths are available.
-- A backend result that resolves only part of its requested files reports the
-  resolved paths and failed remainder. A rejected upload is a total backend
-  failure; the client does not claim partial success from files written before
-  that rejection.
-- Unsafe returned paths are rejected even after temporary-file fallback.
-- Per-file size violations are reported before transfer.
+- Upload success requires exactly one returned path for every requested file.
+  Missing, empty, or malformed results reject the complete action.
+- Unsafe returned paths reject the complete action even after temporary-file
+  fallback; no partial path list is written.
+- Per-file, per-batch content, and 256-blob upload-count violations are
+  reported before transfer with an actionable limit-specific error. Native
+  paths do not consume this upload allowance. The authenticated server route
+  independently validates the decoded batch before creating temporary storage
+  or writing any file. Access-token admission occurs before body parsing, and
+  the encoded request cap bounds each accepted request; the server-side count
+  check protects persistence and inode usage rather than treating an authorised
+  caller as an anonymous hostile transport peer.
+- Remote terminal targets do not offer Composer Upload. File paste and drop are
+  rejected before native-path resolution or upload because neither result is
+  readable by the remote shell.
+- Composer resolution, upload, limit, and concurrent-draft failures leave the
+  existing draft unchanged. A concurrent-draft failure asks the user to retry;
+  it never overwrites or replays against newer input.
 - An escaped path list that exceeds the terminal input boundary is rejected
   rather than partially written.
+- If the selected terminal can no longer accept input, the action stops without
+  resolving or replaying files and tells the user to retry.
 
 ## Architectural invariants
 
@@ -102,12 +119,28 @@ overhead.
   silently ignore file input; native text paste retains xterm semantics.
 - **Shared resolution contract**: Electron and web backends differ only behind
   the file-resolution boundary.
+- **Ordered, complete resolution**: returned paths preserve input order and are
+  written only after every input has exactly one safe path.
+- **User-controlled, non-blocking completion**: asynchronous file paste and drop
+  do not reserve or pause PTY input. Progress remains visible while the user is
+  free to continue typing; the resolved path is written when ready, so intervening
+  user input may arrive first.
+- **No hidden coordination**: the client does not queue, compensate, or replay
+  input. The captured writer stays bound to its original runtime generation, so
+  an invalidated late result fails instead of being redirected. Shell-reported
+  progress takes priority over local file-processing progress.
 
 ## Acceptance
 
-Manual matrix (each gesture, on each runtime, with at least one oversized file to confirm the size cap surfaces as documented):
+Manual matrix (each gesture, on each runtime, with an oversized blob to confirm
+the upload cap and an oversized native file to confirm path-only resolution):
 
-- Electron: drop file from Finder / Explorer / Nautilus, paste from same, paste an image from browser (blob-save path).
-- Web: drop / paste file via OS file manager, paste an image.
+- Electron: drop, paste, and Composer Upload from Finder / Explorer / Nautilus;
+  paste an image from a browser (blob-save path).
+- Web: drop, paste, and Composer Upload via the OS file manager; paste an image.
+- Composer: confirm an oversized blob rejection preserves the existing draft;
+  on Electron, an oversized native file inserts its path without uploading.
+- Remote terminal: confirm Composer Upload is absent, while paste and drop reject
+  before file resolution and leave terminal input and Composer draft unchanged.
 - Linux: paste a file from Nautilus — confirms URI list is dropped, not written as literal `file://`.
 - Excel: paste a single cell value, a single row, and a multi-row range — text wins in all three cases, no `/tmp/...png` path appears.
