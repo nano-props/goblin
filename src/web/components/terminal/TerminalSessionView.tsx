@@ -31,6 +31,8 @@ import {
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { TerminalComposer, type TerminalComposerHandle } from '#/web/components/terminal/terminal-composer.tsx'
 import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
+import { PasteFileLimitError } from '#/shared/clipboard-paste.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
 import type { TerminalInputWriter } from '#/web/components/terminal/types.ts'
@@ -44,6 +46,18 @@ import {
 } from '#/web/components/terminal/terminal-session-overlays.tsx'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
+
+const TERMINAL_PASTE_FILE_ERROR_KEYS = {
+  file: 'terminal.paste-file-too-large',
+  batch: 'terminal.paste-file-batch-too-large',
+  count: 'terminal.paste-file-too-many',
+} as const satisfies Record<PasteFileLimitError['kind'], string>
+
+function terminalPasteFileErrorKey(error: unknown) {
+  if (!(error instanceof PasteFileLimitError)) return 'terminal.paste-file-failed'
+  const limitErrorKey = TERMINAL_PASTE_FILE_ERROR_KEYS[error.kind]
+  return limitErrorKey
+}
 
 interface TerminalSessionViewProps {
   base: TerminalSessionBase
@@ -90,6 +104,7 @@ export function TerminalSessionView({
     focusTerminal,
   } = context
   const { workspaceId, executionRootId } = terminalSessionCoordinates(base)
+  const supportsTerminalFilePaths = !isRemoteWorkspaceId(workspaceId)
   const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(workspaceId, executionRootId)
   const selectedDescriptor = useTerminalFilesystemTargetSelectedDescriptor(terminalFilesystemTargetKey)
   const explicitDescriptor = useTerminalFilesystemTargetSessionDescriptor({
@@ -243,17 +258,33 @@ export function TerminalSessionView({
     },
     [searchNext, searchPrevious],
   )
-  const resultLabel =
-    snapshot.search && searchTerm
-      ? snapshot.search.resultCount > 0
-        ? snapshot.search.resultIndex >= 0
-          ? `${snapshot.search.resultIndex + 1}/${snapshot.search.resultCount}`
-          : String(snapshot.search.resultCount)
-        : t('terminal.search-no-results')
-      : ''
+  let resultLabel = ''
+  if (snapshot.search && searchTerm) {
+    if (snapshot.search.resultCount === 0) resultLabel = t('terminal.search-no-results')
+    else if (snapshot.search.resultIndex < 0) resultLabel = String(snapshot.search.resultCount)
+    else resultLabel = `${snapshot.search.resultIndex + 1}/${snapshot.search.resultCount}`
+  }
 
   const [dragOver, setDragOver] = useState(false)
-  const progress = snapshot.progress
+  // This counter owns presentation only. Scope it to the captured session so
+  // switching terminals cannot turn pending UI into input ordering or retargeting.
+  const [pendingFileResolutions, setPendingFileResolutions] = useState<ReadonlyMap<string, number>>(() => new Map())
+  const trackFileResolution = useCallback(<T,>(terminalSessionId: string, resolution: Promise<T>) => {
+    setPendingFileResolutions((current) => {
+      const next = new Map(current)
+      next.set(terminalSessionId, (next.get(terminalSessionId) ?? 0) + 1)
+      return next
+    })
+    return resolution.finally(() => {
+      setPendingFileResolutions((current) => {
+        const next = new Map(current)
+        const remaining = (next.get(terminalSessionId) ?? 1) - 1
+        if (remaining === 0) next.delete(terminalSessionId)
+        else next.set(terminalSessionId, remaining)
+        return next
+      })
+    })
+  }, [])
   const attachment = snapshot.attachment
   // Session mode is a small state machine. The previous two-flag design
   // (`isController` / `isReadonly`, both gated on `phase === 'open'`)
@@ -288,6 +319,22 @@ export function TerminalSessionView({
   const isController = sessionPhase === 'open-controller'
   const isReadonly = sessionPhase === 'open-viewer' || sessionPhase === 'error-viewer'
   const isAttaching = sessionPhase === 'opening' || sessionPhase === 'restarting'
+  const terminalFileInputSessionId = isController ? terminalSessionId : null
+  let terminalFileInputAdmission: 'available' | 'remote-unsupported' | 'inactive' = 'inactive'
+  if (terminalFileInputSessionId) {
+    terminalFileInputAdmission = supportsTerminalFilePaths ? 'available' : 'remote-unsupported'
+  }
+  const fileResolutionPending = terminalSessionId ? (pendingFileResolutions.get(terminalSessionId) ?? 0) > 0 : false
+  // Shell-reported progress is authoritative. Local file progress is only a
+  // best-effort projection and must not overwrite the xterm OSC progress state.
+  const progress = snapshot.progress ?? (fileResolutionPending ? { state: 3 as const, value: 0 } : null)
+  const progressLabelKey = snapshot.progress ? 'terminal.progress' : 'terminal.file-resolution-progress'
+
+  useEffect(() => {
+    // Drag state is gesture-local. Never revive an old overlay after input
+    // authority or target support leaves and later returns.
+    if (terminalFileInputAdmission !== 'available') setDragOver(false)
+  }, [terminalFileInputAdmission])
 
   const hideTerminalHost = isReadonly || (hasSessions && isAttaching)
   const presentationRecovery = snapshot.presentationRecovery
@@ -349,29 +396,36 @@ export function TerminalSessionView({
   const showStatusOverlay =
     (isAttaching && !showEmptyCta && !(sessionPhase === 'opening' && !hasSessions && projectionFailed)) ||
     (!showErrorChip && !isAttaching && presentationRecovery === 'pending' && !projectionFailed)
-  const statusOverlayLabel =
-    sessionPhase === 'restarting'
-      ? t('terminal.restarting')
-      : sessionPhase === 'opening' && !hasSessions && projectionPending
-        ? t('terminal.loading')
-        : presentationRecovery === 'pending'
-          ? t('terminal.restoring')
-          : t('terminal.opening')
+  let statusOverlayLabel = t('terminal.opening')
+  if (sessionPhase === 'restarting') statusOverlayLabel = t('terminal.restarting')
+  else if (sessionPhase === 'opening' && !hasSessions && projectionPending) statusOverlayLabel = t('terminal.loading')
+  else if (presentationRecovery === 'pending') statusOverlayLabel = t('terminal.restoring')
   const projectionFailureLabel = projectionErrorMessage
     ? `${t('terminal.load-failed')} (${projectionErrorMessage})`
     : t('terminal.load-failed')
-  const progressVariant =
-    progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
-  const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (!event.dataTransfer.types.includes('Files')) return
-    event.preventDefault()
-    setDragOver(true)
-  }, [])
-  const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (!event.dataTransfer.types.includes('Files')) return
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'copy'
-  }, [])
+  let progressVariant = ''
+  if (progress?.state === 2) progressVariant = 'error'
+  else if (progress?.state === 4) progressVariant = 'warning'
+  else if (progress?.state === 3) progressVariant = 'indeterminate'
+  const handleDragEnter = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!event.dataTransfer.types.includes('Files')) return
+      // Always consume file drags so the browser cannot navigate to the file.
+      // Only the admitted local controller gets a positive copy affordance.
+      event.preventDefault()
+      event.dataTransfer.dropEffect = terminalFileInputAdmission === 'available' ? 'copy' : 'none'
+      setDragOver(terminalFileInputAdmission === 'available')
+    },
+    [terminalFileInputAdmission],
+  )
+  const handleDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!event.dataTransfer.types.includes('Files')) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = terminalFileInputAdmission === 'available' ? 'copy' : 'none'
+    },
+    [terminalFileInputAdmission],
+  )
   const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
     if (!event.dataTransfer.types.includes('Files')) return
     const relatedTarget = event.relatedTarget
@@ -379,13 +433,13 @@ export function TerminalSessionView({
   }, [])
   const prepareResolvedPaths = useCallback(
     (resolution: PasteResolution) => {
-      const plan = planTerminalPathWrite(resolution.paths, {
-        failedUnsafe: resolution.failedUnsafe,
-        failedBackend: resolution.failedBackend,
-      })
-      if (plan.kind === 'none') {
-        if (plan.failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
-        if (plan.failures.failedBackend > 0) toast.error(t('terminal.paste-file-failed'))
+      const plan = planTerminalPathWrite(resolution.paths)
+      if (plan.kind === 'none' || plan.kind === 'invalid') {
+        toast.error(t('terminal.paste-file-failed'))
+        return null
+      }
+      if (plan.kind === 'unsafe') {
+        toast.error(t('terminal.paste-file-unsafe'))
         return null
       }
       if (plan.kind === 'too-long') {
@@ -396,62 +450,59 @@ export function TerminalSessionView({
     },
     [t],
   )
-  const reportResolvedPathFailures = useCallback(
-    (failures: { failedUnsafe: number; failedBackend: number }) => {
-      if (failures.failedUnsafe > 0) toast.error(t('terminal.paste-file-unsafe'))
-      if (failures.failedBackend > 0) toast.error(t('terminal.paste-file-partial'))
-    },
-    [t],
-  )
   const writeResolutionToPty = useCallback(
     (resolution: PasteResolution, inputWriter: TerminalInputWriter) => {
       const plan = prepareResolvedPaths(resolution)
       if (!plan) return
       if (!inputWriter(plan.data)) {
-        toast.error(t('terminal.paste-file-failed'))
+        toast.warning(t('terminal.write-not-sent'))
         return
       }
-      reportResolvedPathFailures(plan.failures)
     },
-    [prepareResolvedPaths, reportResolvedPathFailures, t],
+    [prepareResolvedPaths, t],
   )
   const handleDroppedFiles = useCallback(
     (selectedFiles: File[]) => {
-      // `isController` gate matches paste: a viewer dropping files into
-      // a session it doesn't own would otherwise silently route input
-      // to the controller's PTY. The `!terminalSessionId` half preserves the
-      // pre-existing guard against sessions with no session.
-      if (!terminalSessionId || !isController) return
+      if (!terminalFileInputSessionId) return
       const files = selectedFiles.filter(isNonPlaceholderClipboardFile)
       if (files.length === 0) return
+      if (terminalFileInputAdmission === 'remote-unsupported') {
+        toast.error(t('terminal.paste-file-remote-unsupported'))
+        return
+      }
       // Capture the terminal session the user actually dropped into. Async
       // file resolution may finish after the user changes panes, but the
       // operation's target was fixed by the drop event.
-      const inputWriter = captureInputWriter(terminalSessionId)
-      if (!inputWriter) return
-      void processDrop({ files }).then(
+      const inputWriter = captureInputWriter(terminalFileInputSessionId)
+      if (!inputWriter) {
+        // The event target is authoritative. Do not retarget or replay after
+        // reconnect; tell the user this attempt was not sent.
+        toast.warning(t('terminal.write-not-sent'))
+        return
+      }
+      void trackFileResolution(terminalFileInputSessionId, processDrop({ files })).then(
         (outcome) => {
-          // `no-op` is unreachable at this call site: `handleDrop`
-          // filters zero-byte files before calling `processDrop`, so
-          // `processDrop` can only return `files` or `too-large`.
-          // `handlePasteCapture` uses the same if-narrowing shape.
           if (outcome.kind === 'files') {
             writeResolutionToPty(outcome.resolution, inputWriter)
-            return
-          }
-          if (outcome.kind === 'too-large') {
-            toast.error(t('terminal.paste-file-too-large'))
           }
         },
         (err) => {
           // IPC / network / server failure. Surface it instead of
           // silently swallowing the rejection.
           terminalLog.warn('drop resolver failed', { err })
-          toast.error(t('terminal.paste-file-failed'))
+          const errorKey = terminalPasteFileErrorKey(err)
+          toast.error(t(errorKey))
         },
       )
     },
-    [captureInputWriter, isController, terminalSessionId, t, writeResolutionToPty],
+    [
+      captureInputWriter,
+      terminalFileInputAdmission,
+      terminalFileInputSessionId,
+      t,
+      trackFileResolution,
+      writeResolutionToPty,
+    ],
   )
   const handleDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
@@ -464,31 +515,33 @@ export function TerminalSessionView({
   )
   const resolveComposerFiles = useCallback(
     async (selectedFiles: File[]) => {
-      if (!terminalSessionId || !isController) return null
+      if (!terminalFileInputSessionId) return null
       const files = selectedFiles.filter(isNonPlaceholderClipboardFile)
       if (files.length === 0) return null
+      // Composer visibility is only a best-effort projection. Enforce target
+      // policy again at the action boundary before resolving any local path.
+      if (terminalFileInputAdmission === 'remote-unsupported') {
+        toast.error(t('terminal.paste-file-remote-unsupported'))
+        return null
+      }
       try {
         const outcome = await processDrop({ files })
-        if (outcome.kind === 'too-large') {
-          toast.error(t('terminal.paste-file-too-large'))
-          return null
-        }
         if (outcome.kind === 'no-op') return null
         const plan = prepareResolvedPaths(outcome.resolution)
         if (!plan) return null
-        reportResolvedPathFailures(plan.failures)
         return plan.data
       } catch (err) {
         terminalLog.warn('composer file resolver failed', { err })
-        toast.error(t('terminal.paste-file-failed'))
+        const errorKey = terminalPasteFileErrorKey(err)
+        toast.error(t(errorKey))
         return null
       }
     },
-    [isController, prepareResolvedPaths, reportResolvedPathFailures, t, terminalSessionId],
+    [prepareResolvedPaths, t, terminalFileInputAdmission, terminalFileInputSessionId],
   )
   const handlePasteCapture = useCallback(
     (event: ClipboardEvent<HTMLDivElement>) => {
-      if (!terminalSessionId || !isController) return
+      if (!terminalFileInputSessionId) return
       const clipboardData = event.clipboardData
       if (!clipboardData) return
 
@@ -518,16 +571,21 @@ export function TerminalSessionView({
       event.preventDefault()
       event.stopPropagation()
 
-      if (preview.kind === 'too-large') {
-        toast.error(t('terminal.paste-file-too-large'))
+      if (terminalFileInputAdmission === 'remote-unsupported') {
+        toast.error(t('terminal.paste-file-remote-unsupported'))
         return
       }
 
       // 'files' — resolve paths asynchronously. Capture the terminal
       // session id selected by the paste event.
-      const inputWriter = captureInputWriter(terminalSessionId)
-      if (!inputWriter) return
-      void resolvePastedFiles(files).then(
+      const inputWriter = captureInputWriter(terminalFileInputSessionId)
+      if (!inputWriter) {
+        // Paste is already consumed, so a silent return would lose the user's
+        // action. Retrying remains explicit because the target may have changed.
+        toast.warning(t('terminal.write-not-sent'))
+        return
+      }
+      void trackFileResolution(terminalFileInputSessionId, resolvePastedFiles(files)).then(
         (resolution) => {
           writeResolutionToPty(resolution, inputWriter)
         },
@@ -536,11 +594,19 @@ export function TerminalSessionView({
           // silently swallowing the rejection — the user needs to
           // know their paste didn't land.
           terminalLog.warn('paste resolver failed', { err })
-          toast.error(t('terminal.paste-file-failed'))
+          const errorKey = terminalPasteFileErrorKey(err)
+          toast.error(t(errorKey))
         },
       )
     },
-    [captureInputWriter, isController, terminalSessionId, t, writeResolutionToPty],
+    [
+      captureInputWriter,
+      terminalFileInputAdmission,
+      terminalFileInputSessionId,
+      t,
+      trackFileResolution,
+      writeResolutionToPty,
+    ],
   )
   const handleComposerSend = useCallback(
     async (text: string) => {
@@ -566,7 +632,7 @@ export function TerminalSessionView({
         <div
           className={cn('goblin-terminal-progress', progressVariant && `goblin-terminal-progress--${progressVariant}`)}
           role="progressbar"
-          aria-label={t('terminal.progress')}
+          aria-label={t(progressLabelKey)}
           aria-valuenow={progress.state === 3 ? undefined : progress.value}
           aria-valuemin={0}
           aria-valuemax={100}
@@ -619,6 +685,7 @@ export function TerminalSessionView({
           draft={snapshot.composer.draft}
           historyEntries={snapshot.composer.historyEntries}
           shortcut={terminalComposerShortcut}
+          canUploadFiles={terminalFileInputAdmission === 'available'}
           onVirtualKey={(key) => sendVirtualKey(terminalSessionId, key)}
           onCopyContent={copyContent}
           onSendText={handleComposerSend}
@@ -628,6 +695,7 @@ export function TerminalSessionView({
           onDraftChange={(draft) => setComposerDraft(terminalSessionId, draft)}
           onDraftReplace={(expectedDraft, draft) => replaceComposerDraft(terminalSessionId, expectedDraft, draft)}
           onResolveFiles={resolveComposerFiles}
+          onFileInsertionRejected={() => toast.warning(t('terminal.composer-file-insertion-rejected'))}
         />
       )}
       {showViewerOverlay && (
@@ -694,7 +762,7 @@ export function TerminalSessionView({
           )}
         </div>
       )}
-      {dragOver && (
+      {dragOver && terminalFileInputAdmission === 'available' && (
         <div className="goblin-terminal-session__drop-overlay">
           <span>{t('terminal.drop-hint')}</span>
         </div>

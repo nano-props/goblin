@@ -38,9 +38,11 @@ function render(
     onVirtualKey?: (key: TerminalVirtualKey) => void
     onSendText?: (text: string) => Promise<boolean>
     onResolveFiles?: (files: File[]) => Promise<string | null>
+    onFileInsertionRejected?: () => void
     onCopyContent?: () => Promise<void>
     initialMode?: TerminalComposerMode
     initialDraft?: string
+    canUploadFiles?: boolean
     draftReplaceAccepted?: boolean
     closeAccepted?: boolean
   } = {},
@@ -65,6 +67,7 @@ function render(
         draft={draft}
         historyEntries={historyEntries}
         shortcut="Control+Shift+Enter"
+        canUploadFiles={props.canUploadFiles ?? true}
         onVirtualKey={props.onVirtualKey ?? vi.fn()}
         onCopyContent={props.onCopyContent ?? vi.fn(async () => {})}
         onSendText={sendText}
@@ -92,6 +95,7 @@ function render(
           return true
         }}
         onResolveFiles={props.onResolveFiles ?? vi.fn(async () => null)}
+        onFileInsertionRejected={props.onFileInsertionRejected ?? vi.fn()}
       />
     )
   }
@@ -141,6 +145,7 @@ function ExpandedComposerForTest({
       draft={draft}
       historyEntries={historyEntries}
       shortcut="Control+Shift+Enter"
+      canUploadFiles
       onVirtualKey={vi.fn()}
       onCopyContent={vi.fn(async () => {})}
       onSendText={vi.fn(async () => true)}
@@ -157,6 +162,7 @@ function ExpandedComposerForTest({
         return true
       }}
       onResolveFiles={vi.fn(async () => null)}
+      onFileInsertionRejected={vi.fn()}
     />
   )
 }
@@ -745,6 +751,30 @@ describe('TerminalComposer', () => {
     expect(textarea.selectionStart).toBe(`cat\n${resolvedPath}`.length)
   })
 
+  test('preserves a newer draft and asks for retry when file insertion is rejected', async () => {
+    const onFileInsertionRejected = vi.fn()
+    const { container } = render({
+      initialDraft: 'cat ',
+      draftReplaceAccepted: false,
+      onResolveFiles: vi.fn(async () => "'/tmp/notes.txt'"),
+      onFileInsertionRejected,
+    })
+    expand(container)
+    showInput(container)
+    const textarea = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
+    if (!fileInput) throw new Error('expected file input')
+    openMoreMenu(container)
+    act(() => menuItemByText(LABELS.uploadFiles).click())
+
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [new File(['content'], 'notes.txt')] } })
+    })
+
+    expect(textarea.value).toBe('cat ')
+    expect(onFileInsertionRejected).toHaveBeenCalledOnce()
+  })
+
   test('keeps one draft edit admitted while selected files resolve', async () => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
     const resolution = Promise.withResolvers<string | null>()
@@ -885,13 +915,7 @@ describe('TerminalComposer', () => {
     ).not.toBeNull()
     expect(buttonByAccessibleName(container, LABELS.more).querySelector('.lucide-ellipsis')).not.toBeNull()
 
-    const optionalKeyLabels = [
-      LABELS.backspace,
-      LABELS.escape,
-      LABELS.ctrlL,
-      LABELS.ctrlC,
-      LABELS.ctrlD,
-    ]
+    const optionalKeyLabels = [LABELS.backspace, LABELS.escape, LABELS.ctrlL, LABELS.ctrlC, LABELS.ctrlD]
     const responsiveActionLabels = [LABELS.copyContent, ...optionalKeyLabels]
     const pinnedCommandLabels = [LABELS.tab, LABELS.enter]
     const directionLabels = [LABELS.arrowLeft, LABELS.arrowDown, LABELS.arrowUp, LABELS.arrowRight]

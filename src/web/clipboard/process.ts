@@ -1,9 +1,4 @@
-import {
-  PASTE_FILE_MAX_BYTES,
-  isAbsolutePathLike,
-  looksLikeAbsolutePathList,
-  looksLikeUriList,
-} from '#/shared/clipboard-paste.ts'
+import { isAbsolutePathLike, looksLikeAbsolutePathList, looksLikeUriList } from '#/shared/clipboard-paste.ts'
 import { resolvePastedFiles, type PasteResolution } from '#/web/clipboard/resolver.ts'
 
 /**
@@ -18,9 +13,6 @@ import { resolvePastedFiles, type PasteResolution } from '#/web/clipboard/resolv
  * - **files branch**: stop the event from reaching xterm.js, resolve
  *   paths via the resolver (`resolvePastedFiles`), and write the
  *   shell-escaped path list to PTY.
- * - **too-large branch**: stop the event, toast
- *   `terminal.paste-file-too-large`, return.
- *
  * `previewPaste` is **synchronous** and side-effect free. The
  * `TerminalSessionView` handler calls it in the capture-phase listener so it can call
  * `event.preventDefault()` and `event.stopPropagation()` *before* the
@@ -48,8 +40,7 @@ export interface DropInputs {
  * whether to call `event.preventDefault()` / `event.stopPropagation()`
  * before any async work runs.
  */
-export type PastePreview =
-  { kind: 'no-op' } | { kind: 'too-large' } | { kind: 'text'; text: string } | { kind: 'files' }
+export type PastePreview = { kind: 'no-op' } | { kind: 'text'; text: string } | { kind: 'files' }
 
 /**
  * Decide which channel wins when both `text/plain` and `Files` are
@@ -111,17 +102,15 @@ export function previewPaste(inputs: PasteInputs): PastePreview {
   if (!hasFiles && inputs.text.length === 0) return { kind: 'no-op' }
   // After the line above, `inputs.text.length > 0` or `hasFiles` (or both).
   if (shouldPreferFilesOverText(inputs.text, hasFiles)) {
-    if (inputs.files.some((f) => f.size > PASTE_FILE_MAX_BYTES)) return { kind: 'too-large' }
     return { kind: 'files' }
   }
   return { kind: 'text', text: inputs.text }
 }
 
-export type DropOutcome = { kind: 'no-op' } | { kind: 'too-large' } | { kind: 'files'; resolution: PasteResolution }
+export type DropOutcome = { kind: 'no-op' } | { kind: 'files'; resolution: PasteResolution }
 
 export async function processDrop(inputs: DropInputs): Promise<DropOutcome> {
   if (inputs.files.length === 0) return { kind: 'no-op' }
-  if (inputs.files.some((f) => f.size > PASTE_FILE_MAX_BYTES)) return { kind: 'too-large' }
   const resolution = await resolvePastedFiles(inputs.files)
   return { kind: 'files', resolution }
 }

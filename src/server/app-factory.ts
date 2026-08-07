@@ -24,7 +24,7 @@ import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
-import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
+import { MAX_PASTE_HTTP_BODY_BYTES } from '#/shared/clipboard-paste.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import { createRepoMutationApplication } from '#/server/repo-mutation/repo-mutation-application.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
@@ -215,25 +215,16 @@ export function createApp(options: ServerAppOptions): Hono {
     }),
   )
   app.use('/api/clipboard/*', createAccessTokenMiddleware(options.accessToken))
-  // MAX_PASTE_BATCH_BYTES (12 MiB) is the *success* ceiling. The
-  // failure case is also bounded but the timing depends on the
-  // request's Transfer-Encoding: when `Content-Length` is set,
-  // Hono rejects on the header value alone (see
-  // node_modules/hono/dist/middleware/body-limit/index.js:18-21)
-  // without reading any body bytes; when `Transfer-Encoding:
-  // chunked` is set (or `Content-Length` is absent), Hono
-  // accumulates bytes chunk-by-chunk and rejects once the running
-  // total exceeds `maxSize`. A single oversized chunked request
-  // can therefore pin ~`maxSize` of memory until the next GC.
-  // For our threat model (auth required, body cap of 12 MiB, no
-  // rate limiter) that's a bounded DoS surface, not an unbounded
-  // one — but a future PR should add a per-IP rate limit on this
-  // route to cap concurrent accumulation. The 413 envelope
-  // already exists; rate-limiting is the missing piece.
+  // MAX_PASTE_HTTP_BODY_BYTES (34 MiB) bounds the encoded multipart body.
+  // Access-token middleware runs first, so multipart cardinality is a
+  // persistence/inode invariant rather than an unauthenticated request
+  // admission boundary; `saveClipboardFiles` checks it before creating storage.
+  // Hono rejects an oversized Content-Length before reading the body and
+  // bounds chunked requests while reading them.
   app.use(
     '/api/clipboard/*',
     bodyLimit({
-      maxSize: MAX_PASTE_BATCH_BYTES,
+      maxSize: MAX_PASTE_HTTP_BODY_BYTES,
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
@@ -286,9 +277,10 @@ export function createApp(options: ServerAppOptions): Hono {
   // runs. The route factory's `pruneStaleClipboardTempDirs` call
   // already cleaned the current-run dir from any prior PIDs, but a
   // long-lived server (e.g. LAN deployment) would otherwise
-  // accumulate files until next restart. The cap is bounded by
-  // per-file size, not file count, so this is housekeeping, not
-  // security. Coarse cadence (1 h) because the cost is trivial.
+  // accumulate files until next restart. Per-request byte and file-count
+  // limits do not bound accumulation across repeated accepted requests, so
+  // expiry remains the durable-storage bound. Coarse cadence (1 h) because
+  // the cost is trivial.
   // The `unref` lets the process exit naturally — without it, the
   // interval keeps the event loop alive.
   const periodic = setInterval(

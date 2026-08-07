@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import { previewPaste, processDrop } from '#/web/clipboard/process.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -101,12 +100,6 @@ describe('previewPaste', () => {
     expect(previewPaste({ text: '/home/user/file.png\n', files: [f] })).toEqual({ kind: 'files' })
   })
 
-  test('any oversized file in files branch → too-large', () => {
-    const ok = new File([new Uint8Array([1])], 'ok.png')
-    const huge = new File([new Uint8Array(PASTE_FILE_MAX_BYTES + 1)], 'huge.bin')
-    expect(previewPaste({ text: '', files: [ok, huge] })).toEqual({ kind: 'too-large' })
-  })
-
   test('text-only oversized is not gated (text has no size cap at this layer)', () => {
     // The text branch never goes through the resolver and has no
     // size cap; xterm.js itself handles paste payload size limits.
@@ -127,18 +120,12 @@ describe('processDrop', () => {
     expect(mocks.resolvePastedFiles).not.toHaveBeenCalled()
   })
 
-  test('returns too-large for any file over the cap', async () => {
-    const huge = new File([new Uint8Array(PASTE_FILE_MAX_BYTES + 1)], 'huge.bin')
-    await expect(processDrop({ files: [huge] })).resolves.toEqual({ kind: 'too-large' })
-    expect(mocks.resolvePastedFiles).not.toHaveBeenCalled()
-  })
-
   test('delegates to the resolver for OK-sized files', async () => {
-    mocks.resolvePastedFiles.mockResolvedValue({ paths: ['/abs/a'], failedUnsafe: 0, failedBackend: 0 })
+    mocks.resolvePastedFiles.mockResolvedValue({ paths: ['/abs/a'] })
     const a = new File([new Uint8Array([1])], 'a')
     await expect(processDrop({ files: [a] })).resolves.toEqual({
       kind: 'files',
-      resolution: { paths: ['/abs/a'], failedUnsafe: 0, failedBackend: 0 },
+      resolution: { paths: ['/abs/a'] },
     })
     expect(mocks.resolvePastedFiles).toHaveBeenCalledWith([a])
   })

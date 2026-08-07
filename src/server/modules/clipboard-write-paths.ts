@@ -1,7 +1,12 @@
 import { mkdir, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { serverDataDir } from '#/shared/data-dir.ts'
-import { CLIPBOARD_TEMP_FILE_MAX_AGE_MS, PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
+import {
+  CLIPBOARD_TEMP_FILE_MAX_AGE_MS,
+  MAX_PASTE_UPLOAD_FILES,
+  PASTE_FILE_MAX_BYTES,
+  PasteFileLimitError,
+} from '#/shared/clipboard-paste.ts'
 import { createClipboardTimestampedFileName, listDirEntries } from '#/shared/clipboard-paste-node.ts'
 
 /**
@@ -27,30 +32,31 @@ export interface SaveClipboardFilesResult {
  * Persist `File` instances received from the multipart body to the
  * per-process temp directory.
  *
- * Throws if any single file exceeds `PASTE_FILE_MAX_BYTES` — the route
- * layer maps this to a 413. The bodyLimit middleware bounds the *batch*,
- * so a single oversized file still surfaces here only when the client
- * is bypassed (a misbehaving client) or when the per-file check in the
- * client was skipped.
+ * Validate the complete batch before creating storage. The authenticated HTTP
+ * boundary already caps encoded request bytes; these checks protect the
+ * persistence boundary from excessive file sizes and inode consumption.
  */
 export async function saveClipboardFiles(files: File[]): Promise<SaveClipboardFilesResult> {
   if (files.length === 0) return { paths: [] }
-  for (const file of files) {
-    if (file.size > PASTE_FILE_MAX_BYTES) {
-      throw new Error(`Clipboard payload exceeds ${PASTE_FILE_MAX_BYTES} bytes`)
-    }
-  }
+  if (files.length > MAX_PASTE_UPLOAD_FILES) throw new PasteFileLimitError('count')
+  if (files.some(({ size }) => size > PASTE_FILE_MAX_BYTES)) throw new PasteFileLimitError('file')
   const dir = clipboardTempDir()
   await mkdir(dir, { recursive: true })
-  const written: string[] = []
-  for (let i = 0; i < files.length; i += 1) {
-    const file = files[i]
-    const filePath = path.join(dir, timestampedFileName(i, file.name))
-    const buffer = Buffer.from(await file.arrayBuffer())
-    await writeFile(filePath, buffer)
-    written.push(filePath)
+  const ownedPaths: string[] = []
+  try {
+    for (let i = 0; i < files.length; i += 1) {
+      const file = files[i]
+      const filePath = path.join(dir, timestampedFileName(i, file.name))
+      // Register ownership before writing so a partially created failing file
+      // belongs to this request's best-effort cleanup as well.
+      ownedPaths.push(filePath)
+      await writeFile(filePath, Buffer.from(await file.arrayBuffer()))
+    }
+  } catch (error) {
+    await Promise.allSettled(ownedPaths.map((filePath) => unlink(filePath)))
+    throw error
   }
-  return { paths: written }
+  return { paths: ownedPaths }
 }
 
 /**

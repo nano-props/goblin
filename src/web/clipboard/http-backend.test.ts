@@ -69,27 +69,23 @@ describe('createHttpClipboardBackend', () => {
     await expect(backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow('network')
   })
 
-  test('rejects when response paths is not an array', async () => {
-    mockFetch(async () => ({ ok: true, json: async () => ({ paths: 'not-an-array' }) }))
+  test.each([
+    ['non-array paths', { paths: 'not-an-array' }],
+    ['invalid path entries', { paths: ['/ok', 123, null] }],
+    ['an empty path', { paths: [''] }],
+    ['unknown fields', { paths: ['/ok'], legacyPaths: [] }],
+  ])('rejects a malformed response with %s', async (_case, response) => {
+    mockFetch(async () => ({ ok: true, json: async () => response }))
     const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
     await expect(backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow(
       'Invalid clipboard file response',
     )
   })
 
-  test('rejects the complete response when any path entry is invalid', async () => {
-    mockFetch(async () => ({ ok: true, json: async () => ({ paths: ['/ok', 123, null, '/also-ok'] }) }))
+  test('rejects a response that does not return one path per file', async () => {
+    mockFetch(async () => ({ ok: true, json: async () => ({ paths: ['/tmp/a'] }) }))
     const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
-    await expect(backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow(
-      'Invalid clipboard file response',
-    )
-  })
-
-  test('rejects unknown response fields', async () => {
-    mockFetch(async () => ({ ok: true, json: async () => ({ paths: ['/ok'], legacyPaths: [] }) }))
-    const backend = createHttpClipboardBackend({ url: 'http://server/', accessToken: 'sec' })
-    await expect(backend.saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow(
-      'Invalid clipboard file response',
-    )
+    const files = [new File([new Uint8Array([1])], 'a'), new File([new Uint8Array([2])], 'b')]
+    await expect(backend.saveClipboardFiles(files)).rejects.toThrow('Incomplete clipboard file response')
   })
 })

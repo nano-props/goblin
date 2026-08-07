@@ -194,15 +194,11 @@ describe('app shell client', () => {
   })
 
   test('saveClipboardFiles forwards paths from the bridge', async () => {
-    // Happy path — the resolver relies on the wrapper passing the
-    // bridge's response through unchanged so a multi-file paste can
-    // hit the paste-file-partial branch when only some files made
-    // it across. Without this test, that contract relied on
-    // coincidence.
     const bridgeModule = await import('#/web/client-bridge.ts')
     bridgeModule.setClientBridgeForTests(testBridge({ saveClipboardFiles: vi.fn(async () => ['/tmp/a', '/tmp/b']) }))
     const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
-    await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).resolves.toEqual(['/tmp/a', '/tmp/b'])
+    const files = [new File([new Uint8Array([1])], 'a'), new File([new Uint8Array([2])], 'b')]
+    await expect(saveClipboardFiles(files)).resolves.toEqual(['/tmp/a', '/tmp/b'])
   })
 
   test('saveClipboardFiles propagates a synchronous bridge failure', async () => {

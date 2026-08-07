@@ -3,6 +3,7 @@
 import { act, fireEvent, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
+import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import {
   clipboardDataWithFiles,
   dropDataWithFiles,
@@ -25,6 +26,15 @@ function composerInput(container: HTMLElement) {
 function openComposerInput(container: HTMLElement) {
   act(() => buttonByLabel(container, 'terminal.composer-open').click())
   return composerInput(container)
+}
+
+function chooseComposerFile(container: HTMLElement, draft: string, file: File) {
+  const textarea = openComposerInput(container)
+  const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
+  if (!fileInput) throw new Error('expected composer file controls')
+  fireEvent.change(textarea, { target: { value: draft } })
+  fireEvent.change(fileInput, { target: { files: [file] } })
+  return textarea
 }
 
 function copyContent(container: HTMLElement) {
@@ -429,12 +439,82 @@ describe('TerminalSessionView composer', () => {
       if (!uploadItem) throw new Error('expected composer upload action')
       act(() => uploadItem.click())
 
-      fireEvent.change(fileInput, {
-        target: { files: [new File(['content'], 'notes.txt', { type: 'text/plain' })] },
-      })
+      const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
+      Object.defineProperty(file, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
+      fireEvent.change(fileInput, { target: { files: [file] } })
 
       await vi.waitFor(() => expect(textarea.value).toBe("cat '/abs/notes file.txt'"))
       expect(rendered.writeInput).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('keeps the composer draft and reports an oversized uploaded blob', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    const toast = terminalSessionViewToastForTest()
+    toast.error.mockClear()
+    const rendered = await renderTerminalSession()
+
+    try {
+      const file = new File([new Uint8Array([1])], 'archive.bin')
+      Object.defineProperty(file, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
+      const textarea = chooseComposerFile(rendered.container, 'cat ', file)
+
+      await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith('terminal.paste-file-too-large'))
+      expect(textarea.value).toBe('cat ')
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('keeps the composer draft when file upload fails', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockRejectedValue(new Error('network down'))
+    const toast = terminalSessionViewToastForTest()
+    toast.error.mockClear()
+    const rendered = await renderTerminalSession()
+
+    try {
+      const textarea = chooseComposerFile(rendered.container, 'cat existing.txt', new File(['content'], 'notes.txt'))
+
+      await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith('terminal.paste-file-failed'))
+      expect(textarea.value).toBe('cat existing.txt')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('does not offer file upload for a remote terminal', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockClear()
+    vi.mocked(shellClient.saveClipboardFiles).mockClear()
+    const toast = terminalSessionViewToastForTest()
+    toast.error.mockClear()
+    const rendered = await renderTerminalSession(
+      {},
+      {
+        repoRoot: 'goblin+ssh://example/srv/repo',
+        worktreePath: 'goblin+ssh://example/srv/repo-feature',
+      },
+    )
+
+    try {
+      const textarea = openComposerInput(rendered.container)
+      fireEvent.change(textarea, { target: { value: 'cat existing.txt' } })
+      act(() => buttonByLabel(rendered.container, 'terminal.composer-more').click())
+      const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
+      if (!menu) throw new Error('expected open Composer menu')
+
+      expect(within(menu).queryByRole('button', { name: 'terminal.composer-upload-files' })).toBeNull()
+      expect(rendered.container.querySelector('input[type="file"]')).toBeNull()
+      expect(textarea.value).toBe('cat existing.txt')
+      expect(toast.error).not.toHaveBeenCalled()
+      expect(shellClient.pathForDroppedFile).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       await rendered.cleanup()
     }
@@ -448,6 +528,7 @@ describe('TerminalSessionView composer', () => {
     try {
       const textarea = openComposerInput(rendered.container)
       const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
+      Object.defineProperty(file, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
       fireEvent.change(textarea, { target: { value: 'cat ' } })
       textarea.setSelectionRange(4, 4)
       if (kind === 'paste') {

@@ -77,6 +77,7 @@ interface TerminalComposerProps {
   draft: string
   historyEntries: readonly string[]
   shortcut: string
+  canUploadFiles: boolean
   onVirtualKey: (key: TerminalVirtualKey) => void
   onCopyContent: () => Promise<void>
   onSendText: (text: string) => Promise<boolean>
@@ -86,6 +87,7 @@ interface TerminalComposerProps {
   onDraftChange: (draft: string) => boolean
   onDraftReplace: (expectedDraft: string, draft: string) => boolean
   onResolveFiles: (files: File[]) => Promise<string | null>
+  onFileInsertionRejected: () => void
   hidden?: boolean
   className?: string
 }
@@ -167,6 +169,7 @@ export function TerminalComposer({
   draft,
   historyEntries,
   shortcut,
+  canUploadFiles,
   onVirtualKey,
   onCopyContent,
   onSendText,
@@ -176,6 +179,7 @@ export function TerminalComposer({
   onDraftChange,
   onDraftReplace,
   onResolveFiles,
+  onFileInsertionRejected,
   hidden,
   className,
 }: TerminalComposerProps) {
@@ -350,9 +354,13 @@ export function TerminalComposer({
       const start = Math.min(insertionRange.start, draft.length)
       const end = Math.min(Math.max(insertionRange.end, start), draft.length)
       const next = insertComposerText(draft, insertion, start, end)
-      if (onDraftReplace(draft, next.value)) {
-        pendingCaretRef.current = draftOffsetToTextareaOffset(next.value, next.caret)
+      if (!onDraftReplace(draft, next.value)) {
+        // The current draft is authoritative. Never overwrite edits made while
+        // files resolved; leave recovery to an explicit user retry.
+        onFileInsertionRejected()
+        return
       }
+      pendingCaretRef.current = draftOffsetToTextareaOffset(next.value, next.caret)
     } finally {
       setResolvingFiles(false)
     }
@@ -494,18 +502,21 @@ export function TerminalComposer({
               </div>
             </ScrollArea>
           )}
-          <input
-            ref={fileInputRef}
-            hidden
-            tabIndex={-1}
-            aria-hidden="true"
-            type="file"
-            multiple
-            onChange={handleFileSelection}
-          />
+          {canUploadFiles && (
+            <input
+              ref={fileInputRef}
+              hidden
+              tabIndex={-1}
+              aria-hidden="true"
+              type="file"
+              multiple
+              onChange={handleFileSelection}
+            />
+          )}
           <TerminalComposerMenu
             labels={labels}
             mode={mode}
+            canUploadFiles={canUploadFiles}
             resolvingFiles={resolvingFiles}
             copyingContent={copyingContent}
             onUpload={openFilePicker}

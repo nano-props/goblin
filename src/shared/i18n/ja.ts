@@ -389,6 +389,7 @@ export const ja: Record<DictKey, string> = {
   'terminal.confirm-close-running-body': '実行中のプロセス:',
   'terminal.confirm-close-running-confirm': 'ターミナルを閉じる',
   'terminal.progress': 'ターミナル進行状況',
+  'terminal.file-resolution-progress': 'ターミナルファイルを処理中',
   'terminal.empty': '開いているターミナルはありません',
   'terminal.output-active': 'ターミナルが出力中',
   'terminal.drop-hint': 'ドロップしてパスを貼り付け',
@@ -407,11 +408,17 @@ export const ja: Record<DictKey, string> = {
   'terminal.bell-unread': '未読のターミナルベル',
   'terminal.bell-unread-count': '未読ベル {count} 件',
   'terminal.paste-file-failed': 'ファイルをターミナルに貼り付けできませんでした。',
-  'terminal.paste-file-partial': '一部のファイルを保存できませんでした。',
-  'terminal.paste-file-unsafe': '一部の貼り付けたパスにはターミナル制御文字が含まれるためスキップしました。',
+  'terminal.composer-file-insertion-rejected':
+    '下書きが変更されたため、ファイルは挿入されませんでした。もう一度お試しください。',
+  'terminal.paste-file-unsafe': '貼り付けたパスにターミナル制御文字が含まれています。ファイルは挿入されませんでした。',
   'terminal.paste-file-too-large':
-    'ファイルが大きすぎて貼り付けできません。scp、rsync、またはファイルマネージャをご利用ください。',
+    'ファイルが 25 MiB のアップロード上限を超えています。小さいファイルを選ぶか、scp または rsync を使用してください。',
+  'terminal.paste-file-batch-too-large':
+    '選択したファイルが合計 32 MiB のアップロード上限を超えています。ファイル数を減らしてください。',
+  'terminal.paste-file-too-many': '一度にアップロードできるファイルは 256 個までです。',
   'terminal.paste-file-overflow': '貼り付けたパスが長すぎてターミナルに送信できません。',
+  'terminal.paste-file-remote-unsupported':
+    'リモートターミナルにローカルファイルを挿入できません。代わりに scp または rsync を使用してください。',
   'terminal.composer-label': 'ターミナル入力',
   'terminal.composer-open': 'ターミナル入力を開く',
   'terminal.composer-close': '折りたたむ',

@@ -28,6 +28,7 @@ type TerminalComposerMenuLabels = Record<TerminalComposerOptionalActionLabelKey,
 interface TerminalComposerMenuProps {
   labels: TerminalComposerMenuLabels
   mode: 'input' | 'keys'
+  canUploadFiles: boolean
   resolvingFiles: boolean
   copyingContent: boolean
   onUpload: () => void
@@ -50,6 +51,7 @@ function preventMouseFocus(event: ReactMouseEvent<HTMLElement>): void {
 export function TerminalComposerMenu({
   labels,
   mode,
+  canUploadFiles,
   resolvingFiles,
   copyingContent,
   onUpload,
@@ -115,19 +117,16 @@ export function TerminalComposerMenu({
             </span>
             {labels[TERMINAL_COMPOSER_COPY_ACTION.labelKey]}
           </ComposerMenuItem>
-          <Separator className="-mx-1 my-1 w-auto" />
-          {mode === 'input' ? (
+          {(mode === 'keys' || canUploadFiles) && <Separator className="-mx-1 my-1 w-auto" />}
+          {mode === 'input' && canUploadFiles && (
             <ComposerMenuItem disabled={resolvingFiles} onClick={onUpload} closeMenu={closeMenu}>
               <Upload className="size-4" />
               {labels.uploadFiles}
             </ComposerMenuItem>
-          ) : (
+          )}
+          {mode === 'keys' &&
             TERMINAL_COMPOSER_OPTIONAL_ACTIONS.map((action) => (
-              <ComposerMenuItem
-                key={action.key}
-                onClick={() => sendVirtualKey(action.key)}
-                closeMenu={closeMenu}
-              >
+              <ComposerMenuItem key={action.key} onClick={() => sendVirtualKey(action.key)} closeMenu={closeMenu}>
                 {action.key === 'backspace' ? (
                   <span aria-hidden="true" className="inline-flex w-6 shrink-0 items-center justify-center">
                     <Delete className="size-4" />
@@ -137,8 +136,7 @@ export function TerminalComposerMenu({
                 )}
                 {labels[action.labelKey]}
               </ComposerMenuItem>
-            ))
-          )}
+            ))}
           <Separator className="-mx-1 my-1 w-auto" />
           <ComposerMenuItem onClick={collapseComposer} closeMenu={closeMenu}>
             <X className="size-4" />

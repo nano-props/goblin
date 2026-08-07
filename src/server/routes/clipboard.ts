@@ -5,7 +5,13 @@ import {
   pruneStaleClipboardTempDirs,
   saveClipboardFiles,
 } from '#/server/modules/clipboard-write-paths.ts'
-import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
+import { MAX_PASTE_UPLOAD_FILES, PASTE_FILE_MAX_BYTES, PasteFileLimitError } from '#/shared/clipboard-paste.ts'
+
+const PASTE_UPLOAD_LIMIT_MESSAGES = {
+  file: `One or more files exceed the ${PASTE_FILE_MAX_BYTES}-byte cap`,
+  batch: 'Upload request is too large',
+  count: `Upload contains more than ${MAX_PASTE_UPLOAD_FILES} files`,
+} satisfies Record<PasteFileLimitError['kind'], string>
 
 export function createClipboardRoutes() {
   const app = createRouteApp()
@@ -15,11 +21,9 @@ export function createClipboardRoutes() {
   void pruneStaleClipboardTempDirs()
   void pruneExpiredClipboardTempFiles()
 
-  // Persist binary blobs from a `ClipboardEvent` / `DragEvent` on the
-  // web client. The multipart body shape is fixed (repeated `files`),
-  // so no valibot schema is needed — we normalise Hono's
-  // `Record<string, string | File | (string | File)[]>` to a `File[]`
-  // and hand it to the write-paths module.
+  // Persist binary blobs from a `ClipboardEvent` / `DragEvent` on the web
+  // client. Access-token authentication and the HTTP body cap are the request
+  // resource boundary; this route normalises the owned repeated-`files` shape.
   app.post('/files', async (c) => {
     if (!c.req.header('content-type')?.toLowerCase().startsWith('multipart/form-data;')) {
       return errorJson(c, 'UNSUPPORTED_MEDIA_TYPE', 'Content-Type must be multipart/form-data')
@@ -46,8 +50,8 @@ export function createClipboardRoutes() {
       const { paths } = await saveClipboardFiles(files)
       return c.json({ paths })
     } catch (err) {
-      if (err instanceof Error && /exceeds/.test(err.message)) {
-        return errorJson(c, 'PAYLOAD_TOO_LARGE', `One or more files exceed the ${PASTE_FILE_MAX_BYTES}-byte cap`)
+      if (err instanceof PasteFileLimitError) {
+        return errorJson(c, 'PAYLOAD_TOO_LARGE', PASTE_UPLOAD_LIMIT_MESSAGES[err.kind])
       }
       return errorJson(c, 'INTERNAL_SERVER_ERROR', 'Failed to persist clipboard files')
     }

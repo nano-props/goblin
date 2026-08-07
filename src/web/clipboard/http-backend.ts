@@ -11,7 +11,7 @@ import { CLIPBOARD_UNNAMED_FILE_NAME } from '#/shared/clipboard-paste.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
 import * as v from 'valibot'
 
-const ClipboardFilesResponseSchema = v.strictObject({ paths: v.array(v.string()) })
+const ClipboardFilesResponseSchema = v.strictObject({ paths: v.array(v.pipe(v.string(), v.minLength(1))) })
 
 export interface HttpClipboardBackendConfig {
   /** Bootstrap-derived server origin, e.g. `http://127.0.0.1:32100/`. */
@@ -55,6 +55,9 @@ export function createHttpClipboardBackend(config: HttpClipboardBackendConfig): 
       if (!res.ok) throw new Error(`Clipboard file request failed with status ${res.status}`)
       const json = v.safeParse(ClipboardFilesResponseSchema, await res.json())
       if (!json.success) throw new Error('Invalid clipboard file response')
+      // The owned server returns one path per multipart file or rejects the
+      // request. A short response is protocol failure, not partial success.
+      if (json.output.paths.length !== files.length) throw new Error('Incomplete clipboard file response')
       return json.output.paths
     },
   }

@@ -1,5 +1,20 @@
 import { describe, expect, test } from 'vitest'
-import { isTerminalPastePathSafe, looksLikeAbsolutePathList, looksLikeUriList } from '#/shared/clipboard-paste.ts'
+import {
+  isTerminalPastePathSafe,
+  looksLikeAbsolutePathList,
+  looksLikeUriList,
+  MAX_PASTE_BATCH_BYTES,
+  MAX_PASTE_HTTP_BODY_BYTES,
+  MAX_PASTE_UPLOAD_FILES,
+  PASTE_FILE_MAX_BYTES,
+} from '#/shared/clipboard-paste.ts'
+
+test('locks the terminal blob content and multipart transport limits', () => {
+  expect(PASTE_FILE_MAX_BYTES).toBe(25 * 1024 * 1024)
+  expect(MAX_PASTE_BATCH_BYTES).toBe(32 * 1024 * 1024)
+  expect(MAX_PASTE_HTTP_BODY_BYTES).toBe(34 * 1024 * 1024)
+  expect(MAX_PASTE_UPLOAD_FILES).toBe(256)
+})
 
 describe('isTerminalPastePathSafe', () => {
   test('allows ordinary shell metacharacters that shell quoting handles', () => {

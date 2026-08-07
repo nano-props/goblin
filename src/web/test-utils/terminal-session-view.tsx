@@ -18,7 +18,8 @@ import type {
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { stubI18n } from '#/test-utils/i18n-mock.ts'
 
 stubI18n()
@@ -147,22 +148,32 @@ export function completeFilesystemTargetSnapshot(
 
 export async function renderTerminalSession(
   contextOverrides: Partial<TerminalSessionContextValue> = {},
-  options: { snapshot?: TerminalSnapshot; projectionPhase?: 'pending' | 'ready' | 'failed' } = {},
+  options: {
+    snapshot?: TerminalSnapshot
+    projectionPhase?: 'pending' | 'ready' | 'failed'
+    repoRoot?: string
+    worktreePath?: string
+  } = {},
 ) {
+  const repoRoot = options.repoRoot ?? '/repo'
+  const worktreePath = options.worktreePath ?? '/worktree'
+  const base = terminalBaseForTest(repoRoot, 'repo-runtime-test', 'feature', worktreePath)
+  const { workspaceId, executionRootId } = terminalSessionCoordinates(base)
+  const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKey(workspaceId, executionRootId)
   const writeInput = vi.fn()
   const descriptor = {
     terminalSessionId: 'term-111111111111111111111',
-    terminalFilesystemTargetKey: '/repo\0/worktree',
+    terminalFilesystemTargetKey,
     index: 1,
-    ...terminalDescriptorTargetForTest(),
+    ...base,
   }
   const terminalFilesystemTargetSnapshot = {
-    terminalFilesystemTargetKey: '/repo\0/worktree',
+    terminalFilesystemTargetKey,
     selectedDescriptor: descriptor,
     sessions: [
       {
         terminalSessionId: 'term-111111111111111111111',
-        terminalFilesystemTargetKey: '/repo\0/worktree',
+        terminalFilesystemTargetKey,
         index: 1,
         title: 'zsh',
         phase: 'open' as const,
@@ -255,10 +266,10 @@ export async function renderTerminalSession(
     <TerminalSessionContext value={context}>
       <TerminalSessionReadContext value={readContext}>
         <TerminalSessionView
-          repoRoot="/repo"
+          repoRoot={repoRoot}
           workspaceRuntimeId={'repo-runtime-test'}
           branch="feature"
-          worktreePath="/worktree"
+          worktreePath={worktreePath}
           projectionPhase={options.projectionPhase}
         />
       </TerminalSessionReadContext>

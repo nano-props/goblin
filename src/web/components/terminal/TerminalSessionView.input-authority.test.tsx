@@ -204,14 +204,24 @@ describe('TerminalSessionView input authority', () => {
       // build a minimal proxy that satisfies the handler.
       const file = new File([new Uint8Array([1, 2, 3])], 'shot.png')
       const dataTransfer = dropDataWithFiles([file])
+      const dragEnter = new Event('dragenter', { bubbles: true, cancelable: true })
+      Object.defineProperty(dragEnter, 'dataTransfer', { value: dataTransfer })
+      const dragOver = new Event('dragover', { bubbles: true, cancelable: true })
+      Object.defineProperty(dragOver, 'dataTransfer', { value: dataTransfer })
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
       await act(async () => {
+        sessionRoot.dispatchEvent(dragEnter)
+        sessionRoot.dispatchEvent(dragOver)
         sessionRoot.dispatchEvent(dropEvent)
         // give the resolver microtask chain a tick — even though we
         // expect it never to run.
         await Promise.resolve()
       })
+      expect(dragEnter.defaultPrevented).toBe(true)
+      expect(dragOver.defaultPrevented).toBe(true)
+      expect(dataTransfer.dropEffect).toBe('none')
+      expect(container.querySelector('.goblin-terminal-session__drop-overlay')).toBeNull()
       expect(writeInput).not.toHaveBeenCalled()
     } finally {
       unmount()

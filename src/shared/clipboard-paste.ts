@@ -1,29 +1,49 @@
 /**
  * Per-file ceiling for clipboard paste / drop into the terminal session.
  *
- * Read by:
- * - `TerminalSessionView` paste / drop handlers (client): early bail-out with
- *   `terminal.paste-file-too-large` toast before HTTP traffic.
- * - the server clipboard write boundary: the same defense in depth before
- *   writing to disk.
+ * Applied only to blobs that must be uploaded. Native files whose paths can
+ * be passed directly to the terminal do not buffer their contents and are
+ * not subject to this ceiling.
  *
  * Pasting a multi-GB ISO into a shell prompt is almost never the intent;
  * if a user genuinely needs a large file at the prompt they can `scp`,
  * `rsync`, or drag-and-drop the path through the file manager (which does
  * not buffer the file contents).
  */
-export const PASTE_FILE_MAX_BYTES = 10 * 1024 * 1024 // 10 MiB
+export const PASTE_FILE_MAX_BYTES = 25 * 1024 * 1024 // 25 MiB
 
 /**
- * Per-batch transport ceiling for the `/api/clipboard/files` HTTP route.
- * Sized at `PASTE_FILE_MAX_BYTES + 2 MiB` to cover multipart-encoding
- * overhead on a single max-sized file. A batch where every file is under
- * the per-file cap but the sum exceeds this ceiling is rejected with a
- * generic 413 — that's intentional: the per-file check protects the user
- * (specific toast), the batch limit protects the worker (hostile clients
- * streaming arbitrary bytes).
+ * Client-side target for blob content uploaded in one batch. Native paths do
+ * not contribute to this total. The encoded HTTP request cap is the
+ * authoritative resource bound and intentionally allows modest headroom.
  */
-export const MAX_PASTE_BATCH_BYTES = PASTE_FILE_MAX_BYTES + 2 * 1024 * 1024 // 12 MiB
+export const MAX_PASTE_BATCH_BYTES = 32 * 1024 * 1024 // 32 MiB
+
+/** Encoded multipart request ceiling that keeps each upload resource-bounded. */
+export const MAX_PASTE_HTTP_BODY_BYTES = MAX_PASTE_BATCH_BYTES + 2 * 1024 * 1024 // 34 MiB
+
+/**
+ * Maximum number of blobs in one upload. The byte caps bound memory and
+ * bandwidth, but empty files have negligible encoded size and still consume
+ * one inode and one write operation each.
+ */
+export const MAX_PASTE_UPLOAD_FILES = 256
+
+const PASTE_FILE_LIMIT_MESSAGES = {
+  file: 'Clipboard file is too large',
+  batch: 'Clipboard file batch is too large',
+  count: 'Clipboard file batch contains too many files',
+} as const
+
+export class PasteFileLimitError extends Error {
+  readonly kind: keyof typeof PASTE_FILE_LIMIT_MESSAGES
+
+  constructor(kind: keyof typeof PASTE_FILE_LIMIT_MESSAGES) {
+    super(PASTE_FILE_LIMIT_MESSAGES[kind])
+    this.name = 'PasteFileLimitError'
+    this.kind = kind
+  }
+}
 
 /**
  * How long pasted blob files stay in server-managed temporary storage. The

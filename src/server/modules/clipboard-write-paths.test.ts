@@ -1,20 +1,21 @@
-import { mkdir, readdir, readFile, rm, symlink, utimes, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtempDisposable, readdir, readFile, symlink, utimes, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
+import { aroundEach, describe, expect, test, vi } from 'vitest'
+import { MAX_PASTE_UPLOAD_FILES, PASTE_FILE_MAX_BYTES, PasteFileLimitError } from '#/shared/clipboard-paste.ts'
 
 let dataDir = ''
 
-beforeEach(async () => {
-  dataDir = path.join(os.tmpdir(), `clipboard-write-paths-test-${process.pid}-${Math.random().toString(36).slice(2)}`)
-  await mkdir(dataDir, { recursive: true })
+aroundEach(async (runTest) => {
+  await using temporaryDataDir = await mkdtempDisposable(path.join(os.tmpdir(), 'goblin-clipboard-write-paths-test-'))
+  dataDir = temporaryDataDir.path
   vi.stubEnv('GOBLIN_SERVER_DATA_DIR', dataDir)
-})
-
-afterEach(async () => {
-  vi.unstubAllEnvs()
-  await rm(dataDir, { recursive: true, force: true }).catch(() => {})
+  try {
+    await runTest()
+  } finally {
+    dataDir = ''
+    vi.unstubAllEnvs()
+  }
 })
 
 describe('saveClipboardFiles', () => {
@@ -52,10 +53,42 @@ describe('saveClipboardFiles', () => {
     expect(await saveClipboardFiles([])).toEqual({ paths: [] })
   })
 
-  test('rejects when any single file exceeds PASTE_FILE_MAX_BYTES', async () => {
+  test('rejects an oversized file before creating storage', async () => {
     const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
-    const big = new File([new Uint8Array(PASTE_FILE_MAX_BYTES + 1)], 'big.bin')
-    await expect(saveClipboardFiles([big])).rejects.toThrow(/exceeds/)
+    const oversized = new File([new Uint8Array([1])], 'oversized.bin')
+    Object.defineProperty(oversized, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
+
+    await expect(saveClipboardFiles([oversized])).rejects.toEqual(new PasteFileLimitError('file'))
+    expect(await readdir(dataDir)).toEqual([])
+  })
+
+  test('rejects excess files before creating storage', async () => {
+    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const files = Array.from({ length: MAX_PASTE_UPLOAD_FILES + 1 }, (_, index) => new File([], `empty-${index}.txt`))
+
+    await expect(saveClipboardFiles(files)).rejects.toEqual(new PasteFileLimitError('count'))
+    expect(await readdir(dataDir)).toEqual([])
+  })
+
+  test('validates the complete batch before writing any file', async () => {
+    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const valid = new File([new Uint8Array([1])], 'valid.bin')
+    const oversized = new File([new Uint8Array([2])], 'oversized.bin')
+    Object.defineProperty(oversized, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
+
+    await expect(saveClipboardFiles([valid, oversized])).rejects.toEqual(new PasteFileLimitError('file'))
+    expect(await readdir(dataDir)).toEqual([])
+  })
+
+  test('removes files owned by a batch when a later file cannot be read', async () => {
+    const { clipboardTempDir, saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const unreadable = new File([new Uint8Array([2])], 'unreadable.bin')
+    vi.spyOn(unreadable, 'arrayBuffer').mockRejectedValue(new Error('file read failed'))
+
+    await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'written.bin'), unreadable])).rejects.toThrow(
+      'file read failed',
+    )
+    expect(await readdir(clipboardTempDir())).toEqual([])
   })
 
   test('sanitises path-separator characters in the file name', async () => {

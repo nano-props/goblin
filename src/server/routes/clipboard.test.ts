@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { MAX_PASTE_UPLOAD_FILES, PasteFileLimitError } from '#/shared/clipboard-paste.ts'
 
 const mocks = vi.hoisted(() => ({
   saveClipboardFiles: vi.fn(),
@@ -83,16 +84,31 @@ describe('clipboard routes', () => {
     })
   })
 
-  test('413 surfaces a PAYLOAD_TOO_LARGE envelope when the module throws "exceeds"', async () => {
-    mocks.saveClipboardFiles.mockRejectedValue(new Error('Clipboard payload exceeds 12345 bytes'))
+  test('413 surfaces a PAYLOAD_TOO_LARGE envelope for a file-size limit error', async () => {
+    mocks.saveClipboardFiles.mockRejectedValue(new PasteFileLimitError('file'))
     const { createClipboardRoutes } = await import('#/server/routes/clipboard.ts')
     const app = createClipboardRoutes()
     const form = new FormData()
-    form.append('files', new File([new Uint8Array([0])], 'a.png'))
+    form.append('files', new File([new Uint8Array([0])], 'oversized.bin'))
     const res = await app.request(new Request('http://x/files', { method: 'POST', body: form }))
     expect(res.status).toBe(413)
     const body = (await res.json()) as { ok: false; code: string }
     expect(body.code).toBe('PAYLOAD_TOO_LARGE')
+  })
+
+  test('413 surfaces the persistence file-count limit', async () => {
+    mocks.saveClipboardFiles.mockRejectedValue(new PasteFileLimitError('count'))
+    const { createClipboardRoutes } = await import('#/server/routes/clipboard.ts')
+    const app = createClipboardRoutes()
+    const form = new FormData()
+    form.append('files', new File([], 'empty.txt'))
+    const res = await app.request(new Request('http://x/files', { method: 'POST', body: form }))
+    expect(res.status).toBe(413)
+    expect(await res.json()).toEqual({
+      ok: false,
+      code: 'PAYLOAD_TOO_LARGE',
+      message: `Upload contains more than ${MAX_PASTE_UPLOAD_FILES} files`,
+    })
   })
 
   test('500 for unexpected module errors', async () => {

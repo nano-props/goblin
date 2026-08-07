@@ -2,6 +2,7 @@
 
 import { act } from '@testing-library/react'
 import { describe, expect, test, vi } from 'vitest'
+import { MAX_PASTE_BATCH_BYTES, MAX_PASTE_UPLOAD_FILES, PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
@@ -26,154 +27,140 @@ import {
 } from '#/web/test-utils/terminal-session-view.tsx'
 
 describe('TerminalSessionView file transfer', () => {
-  test('paste with oversized file triggers paste-file-too-large and prevents xterm fallback', async () => {
-    // The handler must call preventDefault() synchronously when it
-    // sees an oversized file, so xterm doesn't also try to paste
-    // the oversized clipboard data. We assert on `defaultPrevented`
-    // after the synchronous dispatch (the capture handler's size
-    // check runs before any async resolver work).
-    const writeInput = vi.fn()
-    const descriptor = {
-      terminalSessionId: 'term-111111111111111111111',
-      terminalFilesystemTargetKey: '/repo\0/worktree',
-      index: 1,
-      ...terminalDescriptorTargetForTest(),
-    }
-    const terminalFilesystemTargetSnapshot = {
-      terminalFilesystemTargetKey: '/repo\0/worktree',
-      selectedDescriptor: descriptor,
-      sessions: [
-        {
-          terminalSessionId: 'term-111111111111111111111',
-          terminalFilesystemTargetKey: '/repo\0/worktree',
-          index: 1,
-          title: 'zsh',
-          phase: 'open' as const,
-          selected: true,
-          hasBell: false,
-          hasRecentOutput: false,
-        },
-      ],
-      count: 1,
-      createPending: false,
-    }
-    const snapshot = {
-      phase: 'open' as const,
-      message: null,
-      processName: 'zsh',
-      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-      attachment: {
-        role: 'controller' as const,
-      },
-    }
-    const context: TerminalSessionContextValue = terminalSessionContextForTest({
-      createTerminal: async () => 'term-111111111111111111111',
-      selectTerminal: vi.fn(),
-      scrollToBottom: vi.fn(),
-      clearBell: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => true),
-      attach: vi.fn(),
-      detach: vi.fn(),
-      restart: vi.fn(),
-      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      clearSearch: vi.fn(),
-      captureInputWriter: captureInputWriterForTest(writeInput),
-      takeover: vi.fn(),
-      focusTerminal: vi.fn(),
-    })
-    const readContext: TerminalSessionReadContextValue = {
-      terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
-      subscribeTerminalFilesystemTarget: () => () => {},
-      workspaceBellCount: () => 0,
-      subscribeWorkspaceBellCount: () => () => {},
-      snapshot: () => snapshot,
-      subscribeSnapshot: () => () => {},
-    }
-
-    const shellClient = await import('#/web/app-shell-client.ts')
-    const oversized = new File([new Uint8Array(11 * 1024 * 1024)], 'huge.bin', { type: 'application/octet-stream' })
-    // size is settable on File in jsdom (the constructor doesn't
-    // refuse it), but read it from the object to keep the assertion
-    // in sync with the constant.
-    expect(oversized.size).toBeGreaterThan(10 * 1024 * 1024)
-
-    const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView
-            repoRoot="/repo"
-            workspaceRuntimeId={'repo-runtime-test'}
-            branch="feature"
-            worktreePath="/worktree"
-          />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
-    )
+  test('does not revive a stale drop overlay after input authority returns', async () => {
+    const rendered = await renderTerminalSession()
+    const transfer = dropDataWithFiles([new File(['content'], 'notes.txt')])
 
     try {
-      const sessionRoot = container.querySelector('.goblin-terminal-session') as HTMLElement
-      const clipboardData = clipboardDataWithFiles([oversized])
+      const dragEnter = new Event('dragenter', { bubbles: true, cancelable: true })
+      Object.defineProperty(dragEnter, 'dataTransfer', { value: transfer })
+      await act(async () => rendered.sessionRoot.dispatchEvent(dragEnter))
+      expect(rendered.container.querySelector('.goblin-terminal-session__drop-overlay')).not.toBeNull()
+
+      const snapshot = {
+        phase: 'open' as const,
+        message: null,
+        processName: 'zsh',
+        composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
+      }
+      await rendered.publishSnapshot({ ...snapshot, attachment: { role: 'viewer' } })
+      expect(rendered.container.querySelector('.goblin-terminal-session__drop-overlay')).toBeNull()
+
+      await rendered.publishSnapshot({ ...snapshot, attachment: { role: 'controller' } })
+      expect(rendered.container.querySelector('.goblin-terminal-session__drop-overlay')).toBeNull()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('paste with an oversized blob fails without upload or xterm fallback', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+    const oversized = new File([new Uint8Array([1])], 'huge.bin', { type: 'application/octet-stream' })
+    Object.defineProperty(oversized, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
+    const rendered = await renderTerminalSession()
+
+    try {
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
-      Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
+      Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardDataWithFiles([oversized]) })
       await act(async () => {
-        sessionRoot.dispatchEvent(pasteEvent)
+        rendered.sessionRoot.dispatchEvent(pasteEvent)
         await waitForNextMacrotask()
       })
-      // The synchronous size check called preventDefault() before
-      // returning; the resolver never ran, so neither did the
-      // bridge. writeInput is also untouched.
       expect(pasteEvent.defaultPrevented).toBe(true)
-      expect(writeInput).not.toHaveBeenCalled()
+      expect(rendered.writeInput).not.toHaveBeenCalled()
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
-    } finally {
-      unmount()
-    }
-  })
-
-  test('paste with backend failure surfaces paste-file-failed without writing', async () => {
-    const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
-    const { toast } = await import('sonner')
-    vi.mocked(toast.error).mockClear()
-    const rendered = await renderTerminalSession()
-
-    try {
-      await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'a.png')])
-
-      expect(rendered.writeInput).not.toHaveBeenCalled()
-      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
-      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-unsafe')
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-too-large')
     } finally {
       await rendered.cleanup()
     }
   })
 
-  test('paste surfaces paste-file-failed when the resolver throws (no silent failure)', async () => {
-    // Defensive regression: if `resolvePastedFiles` rejects (IPC
-    // channel error, network failure, server 5xx) the session must
-    // surface a toast instead of silently dropping the paste. Force
-    // the blob-save tier by giving path-attempt a no-path result.
+  test.each([
+    ['paste', PASTE_FILE_MAX_BYTES + 1],
+    ['drop', 1],
+  ] as const)('remote %s rejects files before local resolution or terminal input', async (kind, fileSize) => {
     const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
-    vi.mocked(shellClient.saveClipboardFiles).mockRejectedValue(new Error('network down'))
     const { toast } = await import('sonner')
+    vi.mocked(shellClient.pathForDroppedFile).mockClear()
+    vi.mocked(shellClient.saveClipboardFiles).mockClear()
     vi.mocked(toast.error).mockClear()
-    const rendered = await renderTerminalSession()
+    const rendered = await renderTerminalSession(
+      {},
+      {
+        repoRoot: 'goblin+ssh://example/srv/repo',
+        worktreePath: 'goblin+ssh://example/srv/repo-feature',
+      },
+    )
+    const file = new File([new Uint8Array([1])], 'archive.bin')
+    Object.defineProperty(file, 'size', { value: fileSize })
 
     try {
-      await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'foo.png')])
+      const transfer = kind === 'drop' ? dropDataWithFiles([file]) : null
+      if (transfer) {
+        const dragEnter = new Event('dragenter', { bubbles: true, cancelable: true })
+        Object.defineProperty(dragEnter, 'dataTransfer', { value: transfer })
+        rendered.sessionRoot.dispatchEvent(dragEnter)
+        const dragOver = new Event('dragover', { bubbles: true, cancelable: true })
+        Object.defineProperty(dragOver, 'dataTransfer', { value: transfer })
+        rendered.sessionRoot.dispatchEvent(dragOver)
+        expect(dragEnter.defaultPrevented).toBe(true)
+        expect(dragOver.defaultPrevented).toBe(true)
+        expect(transfer.dropEffect).toBe('none')
+        expect(rendered.container.querySelector('.goblin-terminal-session__drop-overlay')).toBeNull()
+      }
+      const event = new Event(kind, { bubbles: true, cancelable: true })
+      Object.defineProperty(event, kind === 'paste' ? 'clipboardData' : 'dataTransfer', {
+        value: kind === 'paste' ? clipboardDataWithFiles([file]) : transfer,
+      })
+      await act(async () => {
+        rendered.sessionRoot.dispatchEvent(event)
+        await waitForNextMacrotask()
+      })
 
+      expect(event.defaultPrevented).toBe(true)
+      expect(shellClient.pathForDroppedFile).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
       expect(rendered.writeInput).not.toHaveBeenCalled()
-      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-remote-unsupported')
     } finally {
       await rendered.cleanup()
     }
   })
 
-  test('drop surfaces paste-file-failed when the resolver throws', async () => {
-    // Same defensive regression for the drop path.
+  test.each(['paste', 'drop'] as const)('%s reports when the selected terminal cannot accept input', async (kind) => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    const { toast } = await import('sonner')
+    vi.mocked(shellClient.pathForDroppedFile).mockClear()
+    vi.mocked(shellClient.saveClipboardFiles).mockClear()
+    vi.mocked(toast.warning).mockClear()
+    const rendered = await renderTerminalSession({ captureInputWriter: vi.fn(() => null) })
+    const file = new File(['content'], 'notes.txt')
+
+    try {
+      if (kind === 'paste') {
+        const event = new Event('paste', { bubbles: true, cancelable: true })
+        Object.defineProperty(event, 'clipboardData', { value: clipboardDataWithFiles([file]) })
+        rendered.sessionRoot.dispatchEvent(event)
+        expect(event.defaultPrevented).toBe(true)
+      } else {
+        const event = new Event('drop', { bubbles: true, cancelable: true })
+        Object.defineProperty(event, 'dataTransfer', { value: dropDataWithFiles([file]) })
+        rendered.sessionRoot.dispatchEvent(event)
+        expect(event.defaultPrevented).toBe(true)
+      }
+
+      expect(shellClient.pathForDroppedFile).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+      expect(vi.mocked(toast.warning)).toHaveBeenCalledWith('terminal.write-not-sent')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test.each(['paste', 'drop'] as const)('%s surfaces a resolver failure without writing', async (kind) => {
     const shellClient = await import('#/web/app-shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockRejectedValue(new Error('network down'))
@@ -183,17 +170,113 @@ describe('TerminalSessionView file transfer', () => {
     const file = new File([new Uint8Array([1])], 'foo.png')
 
     try {
-      const sessionRoot = rendered.sessionRoot
-      const dataTransfer = dropDataWithFiles([file])
+      if (kind === 'paste') await dispatchPaste(rendered.sessionRoot, [file])
+      else {
+        const event = new Event('drop', { bubbles: true, cancelable: true })
+        Object.defineProperty(event, 'dataTransfer', { value: dropDataWithFiles([file]) })
+        await act(async () => {
+          rendered.sessionRoot.dispatchEvent(event)
+          await waitForNextMacrotask()
+        })
+      }
+
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('keeps file progress visible until concurrent resolutions finish', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    const first = Promise.withResolvers<string[]>()
+    const second = Promise.withResolvers<string[]>()
+    vi.mocked(shellClient.saveClipboardFiles)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+    const rendered = await renderTerminalSession()
+
+    try {
+      const dispatchPendingPaste = (name: string) => {
+        const event = new Event('paste', { bubbles: true, cancelable: true })
+        Object.defineProperty(event, 'clipboardData', {
+          value: clipboardDataWithFiles([new File(['content'], name)]),
+        })
+        rendered.sessionRoot.dispatchEvent(event)
+      }
+      await act(async () => {
+        dispatchPendingPaste('first.txt')
+        dispatchPendingPaste('second.txt')
+        await Promise.resolve()
+      })
+
+      const pendingProgress = () => rendered.container.querySelector('[aria-label="terminal.file-resolution-progress"]')
+      expect(pendingProgress()).not.toBeNull()
+
+      await act(async () => {
+        first.resolve(['/tmp/first.txt'])
+        await waitForNextMacrotask()
+      })
+      expect(pendingProgress()).not.toBeNull()
+
+      await act(async () => {
+        second.resolve(['/tmp/second.txt'])
+        await waitForNextMacrotask()
+      })
+      expect(pendingProgress()).toBeNull()
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('drop fast-fails an oversized blob batch with the batch limit error', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+    const rendered = await renderTerminalSession()
+    const first = new File([new Uint8Array([1])], 'first.bin')
+    const second = new File([new Uint8Array([1])], 'second.bin')
+    Object.defineProperty(first, 'size', { value: MAX_PASTE_BATCH_BYTES / 2 + 1 })
+    Object.defineProperty(second, 'size', { value: MAX_PASTE_BATCH_BYTES / 2 })
+
+    try {
+      const dataTransfer = dropDataWithFiles([first, second])
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
       await act(async () => {
-        sessionRoot.dispatchEvent(dropEvent)
+        rendered.sessionRoot.dispatchEvent(dropEvent)
         await waitForNextMacrotask()
       })
 
       expect(rendered.writeInput).not.toHaveBeenCalled()
-      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-failed')
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-batch-too-large')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('drop fast-fails an excessive blob count before upload', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+    const rendered = await renderTerminalSession()
+    const files = Array.from({ length: MAX_PASTE_UPLOAD_FILES + 1 }, (_, index) => new File([], `empty-${index}.txt`))
+
+    try {
+      const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
+      Object.defineProperty(dropEvent, 'dataTransfer', { value: dropDataWithFiles(files) })
+      await act(async () => {
+        rendered.sessionRoot.dispatchEvent(dropEvent)
+        await waitForNextMacrotask()
+      })
+
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-too-many')
     } finally {
       await rendered.cleanup()
     }
@@ -217,12 +300,10 @@ describe('TerminalSessionView file transfer', () => {
     }
   })
 
-  test('paste with partial backend failure writes resolved paths and surfaces paste-file-partial', async () => {
+  test('paste rejects the complete path list when a returned path is unsafe', async () => {
     const shellClient = await import('#/web/app-shell-client.ts')
-    vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) =>
-      file.name === 'a.png' ? '/abs/a.png' : '',
-    )
-    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/b.png'])
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
+    vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/a.png', '/tmp/b\n.png'])
     const { toast } = await import('sonner')
     vi.mocked(toast.error).mockClear()
     const rendered = await renderTerminalSession()
@@ -231,12 +312,27 @@ describe('TerminalSessionView file transfer', () => {
       await dispatchPaste(rendered.sessionRoot, [
         new File([new Uint8Array([1])], 'a.png'),
         new File([new Uint8Array([1])], 'b.png'),
-        new File([new Uint8Array([1])], 'c.png'),
       ])
 
-      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/abs/a.png' '/tmp/b.png'")
-      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
-      expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-unsafe')
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
+  test('paste reports when the captured terminal stops accepting input before the write', async () => {
+    const shellClient = await import('#/web/app-shell-client.ts')
+    vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/abs/a.png')
+    const { toast } = await import('sonner')
+    vi.mocked(toast.warning).mockClear()
+    const rendered = await renderTerminalSession({ captureInputWriter: vi.fn(() => () => false) })
+
+    try {
+      await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'a.png')])
+
+      expect(rendered.writeInput).not.toHaveBeenCalled()
+      expect(vi.mocked(toast.warning)).toHaveBeenCalledWith('terminal.write-not-sent')
     } finally {
       await rendered.cleanup()
     }
@@ -375,6 +471,7 @@ describe('TerminalSessionView file transfer', () => {
         // saveClipboardFiles Promise.
         await Promise.resolve()
       })
+      expect(container.querySelector('[aria-label="terminal.file-resolution-progress"]')).not.toBeNull()
 
       // User switches filesystem targets mid-resolve. The session re-renders with
       // the new descriptor, but the in-flight drop keeps the target captured
@@ -392,6 +489,7 @@ describe('TerminalSessionView file transfer', () => {
           </TerminalSessionReadContext>
         </TerminalSessionContext>,
       )
+      expect(container.querySelector('[aria-label="terminal.file-resolution-progress"]')).toBeNull()
 
       // Now resolve the in-flight blob-save call. The chain runs through
       // several microtask hops (saveClipboardFiles.then →
