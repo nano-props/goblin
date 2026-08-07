@@ -24,9 +24,15 @@ describe('workspace directory overview query', () => {
     unsubscribe()
     const replacementObserver = new QueryObserver(client, options)
     const unsubscribeReplacement = replacementObserver.subscribe(() => {})
-    overview.resolve({ topLevelFileCount: 1, topLevelDirectoryCount: 2, totalSizeBytes: 3 })
+    overview.resolve({
+      topLevelFileCount: 1,
+      topLevelDirectoryCount: 2,
+      lastModifiedAt: '2023-11-14T22:13:20.000Z',
+    })
 
-    await vi.waitFor(() => expect(replacementObserver.getCurrentResult().data?.totalSizeBytes).toBe(3))
+    await vi.waitFor(() =>
+      expect(replacementObserver.getCurrentResult().data?.lastModifiedAt).toBe('2023-11-14T22:13:20.000Z'),
+    )
     expect(getWorkspaceDirectoryOverview).toHaveBeenCalledOnce()
     unsubscribeReplacement()
     client.clear()

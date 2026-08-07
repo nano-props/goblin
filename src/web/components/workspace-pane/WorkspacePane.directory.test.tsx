@@ -391,7 +391,7 @@ describe('WorkspacePane directory workspaces', () => {
     appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
       topLevelFileCount: 7,
       topLevelDirectoryCount: 3,
-      totalSizeBytes: 2048,
+      lastModifiedAt: '2023-11-14T22:13:20.000Z',
     })
 
     render(
@@ -418,41 +418,11 @@ describe('WorkspacePane directory workspaces', () => {
     )
     expect(screen.getByText('7')).toBeTruthy()
     expect(screen.getByText('3')).toBeTruthy()
-    expect(screen.getByText('2.0 KB')).toBeTruthy()
-  })
-
-  test('marks an unavailable directory size for attention while leaving ordinary counts neutral', () => {
-    const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-status-unavailable-size')
-    const repo = seedRepoWithReadModelForTest({
-      id: workspaceId,
-      branches: [],
-      currentBranchName: null,
-      workspaceProbe: directoryWorkspaceProbe(),
-    })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
-    appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
-      topLevelFileCount: 1,
-      topLevelDirectoryCount: 2,
-      totalSizeBytes: null,
-    })
-
-    render(
-      <QueryClientProvider client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
-              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
-        </AppNavigationProvider>
-      </QueryClientProvider>,
-    )
-
-    const unavailableSize = screen.getByText('—').closest('[role="listitem"]')
-    expect(unavailableSize?.querySelector('svg')?.parentElement?.className).toContain('text-attention')
-    expect(
-      screen.getByText('1').closest('[role="listitem"]')?.querySelector('svg')?.parentElement?.className,
-    ).toContain('text-muted-foreground')
+    const lastModifiedRow = screen.getByText('dashboard.directory.last-modified').closest('[role="listitem"]')
+    const lastModifiedValue = lastModifiedRow?.querySelector<HTMLElement>('[title]')
+    expect(lastModifiedValue?.textContent).toBe(lastModifiedValue?.title)
+    expect(lastModifiedValue?.textContent).toMatch(/ ago$/u)
+    expect(lastModifiedValue?.className).toContain('truncate')
   })
 
   test('opens Files from the working-directory row in a non-Git Status tab', async () => {
@@ -467,7 +437,7 @@ describe('WorkspacePane directory workspaces', () => {
     appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
       topLevelFileCount: 1,
       topLevelDirectoryCount: 2,
-      totalSizeBytes: 3,
+      lastModifiedAt: '2023-11-14T22:13:20.000Z',
     })
     const commitFilesystemWorkspacePaneRoute = vi.fn(async (_target, _route, options) => {
       options?.onCommit?.()

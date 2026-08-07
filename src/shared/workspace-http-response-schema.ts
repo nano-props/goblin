@@ -5,6 +5,13 @@ import { REMOTE_DIAGNOSTIC_CATEGORIES, REMOTE_WORKSPACE_FAILURE_REASONS } from '
 
 const NonEmptyStringSchema = v.pipe(v.string(), v.nonEmpty())
 const NonNegativeIntegerSchema = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0))
+const CanonicalIsoTimestampSchema = v.pipe(
+  v.string(),
+  v.check((value) => {
+    const timestamp = Date.parse(value)
+    return !Number.isNaN(timestamp) && new Date(timestamp).toISOString() === value
+  }, 'timestamp must use canonical ISO format'),
+)
 
 export const AckResponseSchema = v.strictObject({ ok: v.literal(true) })
 export const StringArrayResponseSchema = v.array(v.string())
@@ -164,7 +171,7 @@ export const WorkspaceRefreshResponseSchema = v.variant('kind', [
 export const WorkspaceDirectoryOverviewResponseSchema = v.strictObject({
   topLevelFileCount: NonNegativeIntegerSchema,
   topLevelDirectoryCount: NonNegativeIntegerSchema,
-  totalSizeBytes: v.nullable(NonNegativeIntegerSchema),
+  lastModifiedAt: CanonicalIsoTimestampSchema,
 })
 
 export const WorkspaceFilesystemTreeResponseSchema = v.strictObject({

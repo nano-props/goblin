@@ -1,4 +1,9 @@
+import { mkdtempDisposable, mkdir, symlink } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import { execa } from 'execa'
 import { describe, expect, it, vi } from 'vitest'
+import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
   probeLocalWorkspace,
   type LocalGitRootProbe,
@@ -47,10 +52,10 @@ describe('workspace probe', () => {
   })
 
   it('enables Git only when canonical resolved roots match', async () => {
-    const deps = dependencies(gitProbe({ status: 'root', path: '/link', pullRequests: 'github' }), {
+    const deps = dependencies(gitProbe({ status: 'root', path: '/repo-alias', pullRequests: 'github' }), {
       realpath: vi.fn(async () => '/canonical/repo'),
     })
-    const result = await probeLocalWorkspace('goblin+file:///link', 'posix', { dependencies: deps })
+    const result = await probeLocalWorkspace('goblin+file:///workspace-alias', 'posix', { dependencies: deps })
     expect(result.status === 'ready' && result.capabilities.git).toEqual({
       status: 'available',
       worktrees: true,
@@ -89,5 +94,22 @@ describe('workspace probe', () => {
       reason: 'error.workspace-locator-malformed',
     })
     expect(deps.stat).not.toHaveBeenCalled()
+  })
+
+  it.runIf(process.platform !== 'win32')('opens real Git and non-Git directories through symbolic links', async () => {
+    await using temporaryRoot = await mkdtempDisposable(path.join(os.tmpdir(), 'goblin-workspace-probe-'))
+    const target = path.join(temporaryRoot.path, 'target')
+    const link = path.join(temporaryRoot.path, 'link')
+    await mkdir(target)
+    await symlink(target, link)
+    const workspaceId = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: link }, 'posix')
+    if (!workspaceId) throw new Error('invalid workspace locator fixture')
+
+    const nonGit = await probeLocalWorkspace(workspaceId, 'posix')
+    expect(nonGit.status === 'ready' && nonGit.capabilities.git.status).toBe('unavailable')
+
+    await execa('git', ['init', '-q', target])
+    const git = await probeLocalWorkspace(workspaceId, 'posix')
+    expect(git.status === 'ready' && git.capabilities.git.status).toBe('available')
   })
 })

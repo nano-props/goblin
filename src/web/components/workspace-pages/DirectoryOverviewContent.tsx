@@ -1,7 +1,7 @@
-import { File, Folder, HardDrive } from 'lucide-react'
-import { useT } from '#/web/stores/i18n.ts'
+import { CalendarClock, File, Folder } from 'lucide-react'
+import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { cn } from '#/web/lib/cn.ts'
-import { formatByteSize } from '#/web/lib/format-byte-size.ts'
+import { formatRelativeTime } from '#/web/lib/dates.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import { DashboardMetricCard } from '#/web/components/workspace-pages/dashboard-ui.tsx'
 
@@ -13,8 +13,8 @@ export function DirectoryOverviewContent({
   compact?: boolean
 }) {
   const t = useT()
-  const sizeAvailable = overview.totalSizeBytes !== null
-  const sizeDetailKey = sizeAvailable ? 'dashboard.directory.total-size' : 'dashboard.directory.size-unavailable'
+  const lang = useI18nStore((state) => state.lang)
+  const lastModifiedLabel = formatRelativeTime(overview.lastModifiedAt, lang)
   return (
     <div className={cn('grid gap-2', compact ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-3')}>
       <DashboardMetricCard
@@ -30,10 +30,11 @@ export function DirectoryOverviewContent({
         detail={t('dashboard.directory.top-level')}
       />
       <DashboardMetricCard
-        icon={HardDrive}
-        label={t('dashboard.directory.size')}
-        value={sizeAvailable ? formatByteSize(overview.totalSizeBytes) : '—'}
-        detail={t(sizeDetailKey)}
+        icon={CalendarClock}
+        label={t('dashboard.directory.last-modified')}
+        value={lastModifiedLabel}
+        valueClassName="min-w-0 shrink truncate text-sm"
+        valueTitle={lastModifiedLabel}
       />
     </div>
   )

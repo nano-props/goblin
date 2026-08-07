@@ -1,8 +1,8 @@
-import { File, Folder, FolderTree, HardDrive } from 'lucide-react'
+import { CalendarClock, File, Folder, FolderTree } from 'lucide-react'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import { StatusChip, StatusLink, StatusRow, StatusRows } from '#/web/components/workspace-pane/status-ui.tsx'
-import { formatByteSize } from '#/web/lib/format-byte-size.ts'
-import { useT } from '#/web/stores/i18n.ts'
+import { formatRelativeTime } from '#/web/lib/dates.ts'
+import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 
 export function WorkspaceDirectoryStatus({
   overview,
@@ -14,7 +14,8 @@ export function WorkspaceDirectoryStatus({
   onOpenFiles: () => void
 }) {
   const t = useT()
-  const size = overview.totalSizeBytes === null ? '—' : formatByteSize(overview.totalSizeBytes)
+  const lang = useI18nStore((state) => state.lang)
+  const lastModifiedLabel = formatRelativeTime(overview.lastModifiedAt, lang)
   return (
     <StatusRows>
       <StatusRow
@@ -47,11 +48,14 @@ export function WorkspaceDirectoryStatus({
         valueLayout="inline"
       />
       <StatusRow
-        icon={<HardDrive size={14} />}
-        label={t('dashboard.directory.size')}
-        value={<StatusChip>{size}</StatusChip>}
+        icon={<CalendarClock size={14} />}
+        label={t('dashboard.directory.last-modified')}
+        value={
+          <StatusChip className="min-w-0 max-w-full shrink truncate" title={lastModifiedLabel}>
+            {lastModifiedLabel}
+          </StatusChip>
+        }
         valueLayout="inline"
-        tone={overview.totalSizeBytes === null ? 'attention' : 'neutral'}
       />
     </StatusRows>
   )

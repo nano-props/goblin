@@ -1,4 +1,15 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
@@ -96,7 +107,7 @@ describe('remote ssh command builders', () => {
     mkdirSync(path.join(root, 'nested folder'), { recursive: true })
     writeFileSync(path.join(root, 'visible file'), 'abc')
     writeFileSync(path.join(root, '.hidden'), '12345')
-    writeFileSync(path.join(root, 'nested folder', 'child'), '1234567')
+    utimesSync(root, new Date(1_700_000_000_000), new Date(1_700_000_000_000))
     const invocation = buildRemoteCommandInvocation(targetWithPath(root), {
       type: 'directoryOverview',
       path: root,
@@ -104,33 +115,44 @@ describe('remote ssh command builders', () => {
 
     const result = await execa('sh', ['-lc', invocation.script])
 
-    expect(result.stdout.trim().split('\n').at(-1)).toBe('2\t1\t15')
+    const overviewFields = result.stdout.trim().split('\n').at(-1)?.split('\t')
+    expect(overviewFields?.slice(0, 2)).toEqual(['2', '1'])
+    expect(overviewFields?.[2]).toBe('1700000000')
   })
 
-  testPosix('keeps directory facts when recursive size collection fails', async () => {
-    const root = path.join(os.tmpdir(), `goblin-directory-overview-partial-${process.pid}-${Date.now()}`)
-    const bin = path.join(root, 'bin')
-    tempDirs.push(root)
-    mkdirSync(path.join(root, 'blocked'), { recursive: true })
-    mkdirSync(bin)
+  testPosix('follows a root directory symbolic link during remote admission and overview reads', async () => {
+    const root = path.join(os.tmpdir(), `goblin-directory-probe-${process.pid}-${Date.now()}`)
+    const link = `${root}-link`
+    tempDirs.push(root, link)
+    mkdirSync(root, { recursive: true })
     writeFileSync(path.join(root, 'visible'), 'abc')
-    writeFileSync(path.join(root, 'blocked', 'nested'), 'not measurable')
-    const statShim = path.join(bin, 'stat')
-    writeFileSync(
-      statShim,
-      '#!/bin/sh\ncase "$*" in *blocked*) exit 1;; esac\nPATH=/usr/bin:/bin\nexport PATH\nexec stat "$@"\n',
-    )
-    chmodSync(statShim, 0o755)
-    const invocation = buildRemoteCommandInvocation(targetWithPath(root), {
-      type: 'directoryOverview',
-      path: root,
-    })
+    utimesSync(root, new Date(1_700_000_000_000), new Date(1_700_000_000_000))
+    symlinkSync(root, link)
 
-    const result = await execa('sh', ['-c', invocation.script], {
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` },
-    })
+    const admission = buildRemoteCommandInvocation(targetWithPath(link), { type: 'testDirectory', path: link })
+    await expect(execa('sh', ['-lc', admission.script])).resolves.toMatchObject({ stdout: realpathSync(root) })
 
-    expect(result.stdout.trim().split('\n').at(-1)).toBe('1\t2\t-')
+    const overview = buildRemoteCommandInvocation(targetWithPath(link), { type: 'directoryOverview', path: link })
+    await expect(execa('sh', ['-lc', overview.script])).resolves.toMatchObject({ stdout: '1\t0\t1700000000' })
+  })
+
+  testPosix('recognizes a Git workspace root through a symbolic link', async () => {
+    const root = path.join(os.tmpdir(), `goblin-git-directory-probe-${process.pid}-${Date.now()}`)
+    const link = `${root}-link`
+    tempDirs.push(root, link)
+    mkdirSync(root, { recursive: true })
+    await execa('git', ['init', '-q', root])
+    symlinkSync(root, link)
+
+    const admission = buildRemoteCommandInvocation(targetWithPath(link), { type: 'testDirectory', path: link })
+    const gitRoot = buildRemoteCommandInvocation(targetWithPath(link), { type: 'revParseTopLevel', path: link })
+    const [admissionResult, gitRootResult] = await Promise.all([
+      execa('sh', ['-lc', admission.script]),
+      execa('sh', ['-lc', gitRoot.script]),
+    ])
+
+    expect(admissionResult.stdout).toBe(realpathSync(root))
+    expect(gitRootResult.stdout).toBe(admissionResult.stdout)
   })
 
   test('uses an ssh executable discovered on PATH', () => {

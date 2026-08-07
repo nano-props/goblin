@@ -3,6 +3,7 @@ import * as v from 'valibot'
 import {
   RemoteLifecycleResponseSchema,
   StringArrayResponseSchema,
+  WorkspaceDirectoryOverviewResponseSchema,
   WorkspaceFilesystemTreeResponseSchema,
   WorkspaceProbeStateResponseSchema,
   WorkspaceRuntimeOpenResponseSchema,
@@ -38,6 +39,18 @@ describe('workspace HTTP response schemas', () => {
 
   test('requires every path suggestion to be a string', () => {
     expect(() => v.parse(StringArrayResponseSchema, ['/repo', null])).toThrow()
+  })
+
+  test('requires a canonical directory modification timestamp', () => {
+    const overview = {
+      topLevelFileCount: 2,
+      topLevelDirectoryCount: 1,
+      lastModifiedAt: '2023-11-14T22:13:20.000Z',
+    }
+    expect(v.parse(WorkspaceDirectoryOverviewResponseSchema, overview)).toEqual(overview)
+    for (const lastModifiedAt of ['not-a-date', '2023-11-14', '2023-11-14T22:13:20Z']) {
+      expect(v.safeParse(WorkspaceDirectoryOverviewResponseSchema, { ...overview, lastModifiedAt }).success).toBe(false)
+    }
   })
 
   test('rejects legacy workspace names in runtime response contracts', () => {

@@ -102,7 +102,7 @@ describe('WorkspaceDashboardPane', () => {
     appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId), {
       topLevelFileCount: 4,
       topLevelDirectoryCount: 2,
-      totalSizeBytes: 2048,
+      lastModifiedAt: '2023-11-14T22:13:20.000Z',
     })
 
     const { container } = renderInJsdom(
@@ -113,7 +113,13 @@ describe('WorkspaceDashboardPane', () => {
 
     expect(container.textContent).toContain('dashboard.directory.files4')
     expect(container.textContent).toContain('dashboard.directory.folders2')
-    expect(container.textContent).toContain('2.0 KB')
+    expect(container.textContent).toContain('dashboard.directory.last-modified')
+    const lastModifiedValue = screen
+      .getByText('dashboard.directory.last-modified')
+      .parentElement?.querySelector<HTMLElement>('[title]')
+    expect(lastModifiedValue?.textContent).toBe(lastModifiedValue?.title)
+    expect(lastModifiedValue?.textContent).toMatch(/ ago$/u)
+    expect(lastModifiedValue?.className).toContain('truncate')
     expect(container.textContent).toContain('/workspace')
     expect(container.textContent).not.toContain('goblin+file://')
     expect(

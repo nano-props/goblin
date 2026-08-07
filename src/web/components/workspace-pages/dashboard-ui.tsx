@@ -10,13 +10,17 @@ export function DashboardMetricCard({
   icon: Icon,
   label,
   value,
+  valueClassName,
+  valueTitle,
   detail,
   tone = 'default',
 }: {
   icon: LucideIcon
   label: string
   value: string | number
-  detail: string
+  valueClassName?: string
+  valueTitle?: string
+  detail?: string
   tone?: DashboardTone
 }) {
   return (
@@ -27,9 +31,14 @@ export function DashboardMetricCard({
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-2">
           <div className="truncate text-xs font-medium text-muted-foreground">{label}</div>
-          <div className="shrink-0 text-lg font-semibold leading-none text-foreground">{value}</div>
+          <div
+            className={cn('shrink-0 text-lg font-semibold leading-none text-foreground', valueClassName)}
+            title={valueTitle}
+          >
+            {value}
+          </div>
         </div>
-        <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{detail}</div>
+        <div className="mt-0.5 min-h-4 truncate text-[11px] text-muted-foreground">{detail}</div>
       </div>
     </div>
   )

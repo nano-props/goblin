@@ -1,4 +1,4 @@
-import { lstat, opendir } from 'node:fs/promises'
+import { lstat, opendir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { localWorkspaceNativePath } from '#/server/modules/workspace-path.ts'
 import { resolveRemoteWorkspaceTarget } from '#/server/modules/remote-repo-execution.ts'
@@ -61,61 +61,31 @@ export async function readLocalDirectoryOverview(
 ): Promise<WorkspaceDirectoryOverview> {
   let topLevelFileCount = 0
   let topLevelDirectoryCount = 0
-  let totalSizeBytes = 0
-  let totalSizeComplete = true
-  const pending = [root]
-
-  while (pending.length > 0) {
-    signal?.throwIfAborted()
-    const directory = pending.pop()
-    if (!directory) break
-    let directoryStat
-    try {
-      directoryStat = await lstat(directory)
-    } catch (error) {
+  signal?.throwIfAborted()
+  const rootStat = await stat(root)
+  if (!rootStat.isDirectory()) {
+    throw new Error('workspace overview root is not a directory')
+  }
+  const lastModifiedAt = rootStat.mtime.toISOString()
+  const handle = await opendir(root)
+  try {
+    for await (const entry of handle) {
       signal?.throwIfAborted()
-      if (directory === root) throw error
-      totalSizeComplete = false
-      continue
-    }
-    if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink()) continue
-    let handle
-    try {
-      handle = await opendir(directory)
-    } catch (error) {
-      signal?.throwIfAborted()
-      if (directory === root) throw error
-      totalSizeComplete = false
-      continue
-    }
-    try {
-      for await (const entry of handle) {
+      const entryPath = path.join(root, entry.name)
+      let entryStat
+      try {
+        entryStat = await lstat(entryPath)
+      } catch {
         signal?.throwIfAborted()
-        const entryPath = path.join(directory, entry.name)
-        let entryStat
-        try {
-          entryStat = await lstat(entryPath)
-        } catch {
-          signal?.throwIfAborted()
-          totalSizeComplete = false
-          continue
-        }
-        if (directory === root) {
-          if (entryStat.isDirectory()) topLevelDirectoryCount += 1
-          else if (entryStat.isFile()) topLevelFileCount += 1
-        }
-        if (entryStat.isDirectory()) pending.push(entryPath)
-        else if (entryStat.isFile()) totalSizeBytes += entryStat.size
+        continue
       }
-    } finally {
-      await handle.close().catch(() => undefined)
+      if (entryStat.isDirectory()) topLevelDirectoryCount += 1
+      else if (entryStat.isFile()) topLevelFileCount += 1
     }
+  } finally {
+    await handle.close().catch(() => undefined)
   }
-  return {
-    topLevelFileCount,
-    topLevelDirectoryCount,
-    totalSizeBytes: totalSizeComplete ? totalSizeBytes : null,
-  }
+  return { topLevelFileCount, topLevelDirectoryCount, lastModifiedAt }
 }
 
 export function parseRemoteDirectoryOverview(output: string): WorkspaceDirectoryOverview {
@@ -123,20 +93,28 @@ export function parseRemoteDirectoryOverview(output: string): WorkspaceDirectory
   const fields = record.split('\t')
   const topLevelFileCount = parseCanonicalOverviewInteger(fields[0])
   const topLevelDirectoryCount = parseCanonicalOverviewInteger(fields[1])
-  const totalSizeBytes = fields[2] === '-' ? null : parseCanonicalOverviewInteger(fields[2])
+  const lastModifiedAtSeconds = parseCanonicalSignedInteger(fields[2])
+  const lastModifiedAtDate = lastModifiedAtSeconds === undefined ? null : new Date(lastModifiedAtSeconds * 1_000)
   if (
     fields.length !== 3 ||
     topLevelFileCount === undefined ||
     topLevelDirectoryCount === undefined ||
-    totalSizeBytes === undefined
+    !lastModifiedAtDate ||
+    Number.isNaN(lastModifiedAtDate.getTime())
   ) {
     throw new Error('invalid remote directory overview')
   }
-  return { topLevelFileCount, topLevelDirectoryCount, totalSizeBytes }
+  return { topLevelFileCount, topLevelDirectoryCount, lastModifiedAt: lastModifiedAtDate.toISOString() }
 }
 
 function parseCanonicalOverviewInteger(field: string | undefined): number | undefined {
   if (!field || !/^(?:0|[1-9][0-9]*)$/u.test(field)) return undefined
+  const value = Number(field)
+  return Number.isSafeInteger(value) ? value : undefined
+}
+
+function parseCanonicalSignedInteger(field: string | undefined): number | undefined {
+  if (!field || !/^(?:0|-?[1-9][0-9]*)$/u.test(field)) return undefined
   const value = Number(field)
   return Number.isSafeInteger(value) ? value : undefined
 }

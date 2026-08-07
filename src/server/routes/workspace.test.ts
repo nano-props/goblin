@@ -93,7 +93,7 @@ describe('workspace routes', () => {
     mocks.readWorkspaceDirectoryOverview.mockResolvedValue({
       topLevelFileCount: 2,
       topLevelDirectoryCount: 1,
-      totalSizeBytes: 128,
+      lastModifiedAt: '2023-11-14T22:13:20.000Z',
     })
     mocks.trashWorkspaceFile.mockResolvedValue({ ok: true, message: '' })
     mocks.openWorkspaceFileDownload.mockResolvedValue({
@@ -155,7 +155,7 @@ describe('workspace routes', () => {
     await expect(response.json()).resolves.toEqual({
       topLevelFileCount: 2,
       topLevelDirectoryCount: 1,
-      totalSizeBytes: 128,
+      lastModifiedAt: '2023-11-14T22:13:20.000Z',
     })
     expect(mocks.readWorkspaceDirectoryOverview).toHaveBeenCalledWith(WORKSPACE_ID, {
       workspaceRuntimeId,
