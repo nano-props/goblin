@@ -3,104 +3,82 @@
 Use Vue as a typed projection layer over the project's authoritative models.
 Keep component contracts explicit, ownership local, and rendering declarative.
 
-## Components
+## Component contracts
 
-- Write rendered UI in TSX. Do not use `h(...)` in production code, tests,
-  fixtures, or examples.
-- When a file primarily defines one component, name the file after that
-  component in PascalCase, such as `SelectValue.tsx`.
-- Use `class`, not `className`, in JSX.
-- Give inline CSS lengths explicit units. Vue does not infer `px` from numeric
-  values; keep numbers only for genuinely unitless CSS values.
-- Define setup-based Vue components with the object form of `defineComponent`
-  so the public contract, lifecycle, behavior, and render function stay visible
-  in one place.
-- Prefer the explicit `FunctionalComponent` type name over a generic `FC`
-  alias. When local repetition warrants an alias, name it for its role rather
-  than introducing a project-wide abbreviation.
-- Prefer a TypeScript interface as the prop type source. TSX still lists prop
-  names at runtime so Vue can separate them from attrs. Use runtime prop options
-  when defaults, coercion, or runtime validation are part of the contract.
-- Required domain inputs remain required and non-null. Component convenience
-  must not weaken a domain invariant.
-- Treat fallthrough attrs as component behavior, not definition boilerplate.
-  Use `inheritAttrs: false` when a component rejects attrs or forwards them to
-  one chosen owner; otherwise Vue's default fallthrough remains part of its
-  contract.
+- Render UI in TSX. `.vue` SFCs and the `h(...)` render helper are outside the
+  project conventions, including tests, fixtures, and examples.
+- Name component-primary files after the component in PascalCase, such as
+  `SelectValue.tsx`. Use `class` in JSX and explicit units for CSS lengths;
+  numbers are reserved for genuinely unitless values.
+- Use object-form `defineComponent` for components with setup state,
+  composables, or lifecycle. Pure render-only components may use the explicit
+  `FunctionalComponent` type; do not introduce a project-wide `FC` alias.
+- Keep one clear props type source. Domain components normally use
+  `defineComponent<Props>`; option-heavy primitives may infer from a runtime
+  props object with `PropType`. TypeScript types are erased, so register each
+  owned setup prop at runtime. Use name arrays for type-only declarations and
+  object options for required checks, Boolean casting, defaults, or validation.
+  Transparent adapters may leave open platform props in attrs. Required domain
+  inputs remain required and non-null.
+- Use `emits` for Vue model and event protocols. Use a typed callback prop when
+  the caller provides an application capability or its outcome is part of the
+  contract; do not expose the same interaction through both forms.
+- Treat slots as lazy render contracts: invoke them in the render function, and
+  use scoped slots when the child owns the rendered state.
+- Treat fallthrough attrs as public behavior. A single-root component may
+  intentionally rely on Vue's default fallthrough. For multiple roots or
+  redirected or rejected attrs, use `inheritAttrs: false` and either reject
+  them explicitly or forward them to one chosen owner. Values that drive
+  behavior are props, not attrs.
 
 ```tsx
 import { defineComponent } from 'vue'
 
-interface ConfirmDialogProps {
-  label: string
-}
+type DisclosurePanelProps = { title: string; open: boolean }
 
-export const ConfirmDialog = defineComponent<ConfirmDialogProps>({
-  name: 'ConfirmDialog',
+export const DisclosurePanel = defineComponent<DisclosurePanelProps>({
+  name: 'DisclosurePanel',
   inheritAttrs: false,
-
-  props: ['label'],
-
-  emits: {
-    confirm: () => true,
+  props: {
+    title: { type: String, required: true },
+    open: { type: Boolean, required: true },
   },
-
-  setup(props, { attrs, emit }) {
-    function confirm() {
-      emit('confirm')
-    }
-
+  emits: { 'update:open': (open: boolean) => typeof open === 'boolean' },
+  setup(props, { emit, slots }) {
     return () => (
-      <div class="dialog">
-        <button {...attrs} type="button" onClick={confirm}>
-          {props.label}
+      <section>
+        <button type="button" aria-expanded={props.open} onClick={() => emit('update:open', !props.open)}>
+          {props.title}
         </button>
-      </div>
+        {props.open ? slots.default?.() : null}
+      </section>
     )
   },
 })
 ```
 
-## Migration
+## Reactivity and lifetime
 
-- Port React components to Vue with TSX first. Preserve reviewable structure and
-  data flow while functional parity is being established.
-- Preserve runtime props, emits, slots, and attrs behavior when changing a
-  component's definition form. Review fallthrough-boundary changes separately.
-- Do not mix the framework port with broad component redesign. Remove the React
-  path atomically rather than maintaining parallel implementations.
-- SFCs are not part of the current toolchain. Introduce SFC compilation, type
-  checking, and conventions together in a separate, complete change before
-  adding `.vue` files.
-- Remove this migration section when the port and its follow-up refactors are
-  complete.
-
-## Reactivity and ownership
-
-- Prefer derivation over synchronization. Values derived from props, routes,
-  stores, or queries should normally be computed rather than copied into local
-  state.
-- Use watchers for genuine imperative effects and resource lifetimes, not as a
-  workaround for unclear data flow. Each watcher should have one identifiable
-  owner, stable inputs, and matching cleanup.
-- Keep composables at the top level of `setup`, and keep the returned function
+- Keep props reactive by reading `props.x`, passing a getter, or using `toRef`
+  or `computed`; do not snapshot them through plain destructuring or
+  `ref(props.x)` in `setup`. Prefer derivation over mirrored local state.
+- Create component-owned composables and watchers synchronously at the top
+  level of `setup` so the component scope owns them. Keep the returned function
   focused on rendering.
-- Tie subscriptions, requests, timers, DOM integrations, and third-party
-  instances to the lifetime of the component that owns them.
+- Use watchers for imperative projection or resource lifetimes, not as a
+  workaround for unclear data flow. Inputs and ownership must be stable, and
+  subscriptions, requests, timers, DOM integrations, and other work that can
+  outlive a watcher run must be invalidated or cleaned up.
+- DOM-reading and animation effects must establish their required commit and
+  frame boundaries explicitly; watcher flush timing is part of the contract.
 - Capture the accepted target of an asynchronous action before yielding. A
   later route or prop change must not redirect work already in progress.
 - Express conditional ownership with component lifetime instead of nullable
   identities, mirrored state, or compensating effects.
 
-## Boundaries and tests
+## Architecture and tests
 
-- Reuse the project's canonical UI, navigation, state, query, i18n, and service
-  boundaries. Vue integration must not create a second authority for the same
-  fact.
-- Keep domain components closed and typed. Forward open-ended attrs only where
-  transparent platform adaptation is the component's explicit purpose.
-- Tests use the same TSX and component conventions as production code. Await
-  Vue updates and verify observable behavior, ownership changes, and cleanup.
-- Prefer rules that describe invariants and ownership. Keep library-specific
-  mechanics near the integration that owns them so the architecture can evolve
-  without compatibility layers.
+- Reuse existing feature-owned boundaries. Vue integration must not create a
+  second authority for the same fact.
+- Follow [the testing strategy](testing.md). Await Vue updates and verify
+  observable behavior, ownership changes, invalidation, and cleanup.
