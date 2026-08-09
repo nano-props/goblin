@@ -16,10 +16,10 @@ Keep component contracts explicit, ownership local, and rendering declarative.
 - Keep one clear props type source. Domain components normally use
   `defineComponent<Props>`; option-heavy primitives may infer from a runtime
   props object with `PropType`. TypeScript types are erased, so register each
-  owned setup prop at runtime. Use name arrays for type-only declarations and
-  object options for required checks, Boolean casting, defaults, or validation.
-  Transparent adapters may leave open platform props in attrs. Required domain
-  inputs remain required and non-null.
+  owned setup prop at runtime. Use a name array when Vue only needs to separate
+  props from attrs, and object options for runtime required checks, Boolean
+  casting, defaults, or validation. Transparent adapters may leave open
+  platform props in attrs. Required domain inputs remain required and non-null.
 - Use `emits` for Vue model and event protocols. Use a typed callback prop when
   the caller provides an application capability or its outcome is part of the
   contract; do not expose the same interaction through both forms.
@@ -34,24 +34,21 @@ Keep component contracts explicit, ownership local, and rendering declarative.
 ```tsx
 import { defineComponent } from 'vue'
 
-type DisclosurePanelProps = { title: string; open: boolean }
+interface WorkspaceCardProps {
+  name: string
+  path: string
+  onOpen: () => void
+}
 
-export const DisclosurePanel = defineComponent<DisclosurePanelProps>({
-  name: 'DisclosurePanel',
-  inheritAttrs: false,
-  props: {
-    title: { type: String, required: true },
-    open: { type: Boolean, required: true },
-  },
-  emits: { 'update:open': (open: boolean) => typeof open === 'boolean' },
-  setup(props, { emit, slots }) {
+export const WorkspaceCard = defineComponent<WorkspaceCardProps>({
+  name: 'WorkspaceCard',
+  props: ['name', 'path', 'onOpen'],
+  setup(props) {
     return () => (
-      <section>
-        <button type="button" aria-expanded={props.open} onClick={() => emit('update:open', !props.open)}>
-          {props.title}
-        </button>
-        {props.open ? slots.default?.() : null}
-      </section>
+      <button type="button" onClick={props.onOpen}>
+        <strong>{props.name}</strong>
+        <span>{props.path}</span>
+      </button>
     )
   },
 })
