@@ -31,8 +31,19 @@ interface GitWorkspacePaneContentProps {
 
 // Pure view: the workspace pane body is derived from the workspace store's
 // target-scoped preferred tab and live terminal truth.
-export const GitWorkspacePaneContent = defineComponent(
-  (props: GitWorkspacePaneContentProps) => {
+export const GitWorkspacePaneContent = defineComponent<GitWorkspacePaneContentProps>({
+  name: 'GitWorkspacePaneContent',
+  props: [
+    'repo',
+    'detail',
+    'workspacePaneId',
+    'workspacePaneTabModel',
+    'readFailures',
+    'onRetryStatus',
+    'onBackToBranchNavigator',
+  ],
+
+  setup(props) {
     const t = useT()
     const compact = useIsCompactUi()
 
@@ -105,19 +116,7 @@ export const GitWorkspacePaneContent = defineComponent(
       )
     }
   },
-  {
-    name: 'GitWorkspacePaneContent',
-    props: [
-      'repo',
-      'detail',
-      'workspacePaneId',
-      'workspacePaneTabModel',
-      'readFailures',
-      'onRetryStatus',
-      'onBackToBranchNavigator',
-    ],
-  },
-)
+})
 
 function workspacePanePanelLabel(input: {
   selection: WorkspacePaneSelection | null

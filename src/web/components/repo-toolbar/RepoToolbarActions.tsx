@@ -33,8 +33,10 @@ RepoSyncAction.props = ['repoId']
 export const BranchFilterAction: FunctionalComponent<Props> = (props) => <WorktreeFilterToggle repoId={props.repoId} />
 BranchFilterAction.props = ['repoId']
 
-const WorktreeFilterToggle = defineComponent(
-  (props: Props) => {
+const WorktreeFilterToggle = defineComponent<Props>({
+  name: 'WorktreeFilterToggle',
+  props: ['repoId'],
+  setup(props) {
     const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
     const branchViewModeByWorkspace = useStoreSelector(workspacesStore, (state) => state.branchViewModeByWorkspace)
     const repoView = computed<WorktreeFilterRepo | null>(() => {
@@ -54,8 +56,7 @@ const WorktreeFilterToggle = defineComponent(
         <BranchViewModeControl value={DEFAULT_BRANCH_VIEW_MODE} disabled onChange={() => {}} />
       )
   },
-  { name: 'WorktreeFilterToggle', props: ['repoId'] },
-)
+})
 
 interface WorktreeFilterRepo {
   id: WorkspaceId
@@ -87,8 +88,10 @@ const WorktreeFilterReadModel = defineComponent<{ repo: WorktreeFilterRepo }>({
   },
 })
 
-export const CreateWorktreeRowAction = defineComponent(
-  (props: CreateWorktreeRowActionProps) => {
+export const CreateWorktreeRowAction = defineComponent<CreateWorktreeRowActionProps>({
+  name: 'CreateWorktreeRowAction',
+  props: ['repoId', 'selected', 'onCreateWorktree'],
+  setup(props) {
     const overlayActions = useLayoutOverlayActions()
     const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
     const repo = computed<CreateWorktreeActionRepo | null>(() => {
@@ -118,8 +121,7 @@ export const CreateWorktreeRowAction = defineComponent(
         <CreateWorktreeRowActionView disabled selected={props.selected ?? false} onActivate={openCreateWorktree} />
       )
   },
-  { name: 'CreateWorktreeRowAction', props: ['repoId', 'selected', 'onCreateWorktree'] },
-)
+})
 
 interface CreateWorktreeActionRepo {
   id: WorkspaceId

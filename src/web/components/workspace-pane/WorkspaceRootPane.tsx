@@ -25,8 +25,11 @@ interface WorkspaceRootPaneProps {
   onBackToNavigator?: () => void
 }
 
-export const WorkspaceRootPane = defineComponent(
-  (props: WorkspaceRootPaneProps) => {
+export const WorkspaceRootPane = defineComponent<WorkspaceRootPaneProps>({
+  name: 'WorkspaceRootPane',
+  props: ['workspace', 'workspacePaneId', 'route', 'toolbarTrafficLightOffset', 'onBackToNavigator'],
+
+  setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
     const model = useWorkspaceRootTabModel(
@@ -107,19 +110,18 @@ export const WorkspaceRootPane = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspaceRootPane',
-    props: ['workspace', 'workspacePaneId', 'route', 'toolbarTrafficLightOffset', 'onBackToNavigator'],
-  },
-)
+})
 
-const WorkspaceRootStatusPanel = defineComponent(
-  (props: {
-    workspaceId: FilesystemWorkspacePaneProjection['id']
-    workspaceRuntimeId: string
-    workspacePaneId: string
-    onOpenFiles: () => void
-  }) => {
+const WorkspaceRootStatusPanel = defineComponent<{
+  workspaceId: FilesystemWorkspacePaneProjection['id']
+  workspaceRuntimeId: string
+  workspacePaneId: string
+  onOpenFiles: () => void
+}>({
+  name: 'WorkspaceRootStatusPanel',
+  props: ['workspaceId', 'workspaceRuntimeId', 'workspacePaneId', 'onOpenFiles'],
+
+  setup(props) {
     const t = useT()
     const overviewReadModel = useWorkspaceDirectoryOverview(
       () => props.workspaceId,
@@ -145,8 +147,4 @@ const WorkspaceRootStatusPanel = defineComponent(
       </WorkspacePanePanelFrame>
     )
   },
-  {
-    name: 'WorkspaceRootStatusPanel',
-    props: ['workspaceId', 'workspaceRuntimeId', 'workspacePaneId', 'onOpenFiles'],
-  },
-)
+})

@@ -114,16 +114,17 @@ function renderHookHost(actions: ShortcutActionItems) {
   renderInJsdom(<HookHost actions={actions} />)
 }
 
-const HookHost = defineComponent(
-  (props: { actions: ShortcutActionItems; enabled?: boolean }) => {
+const HookHost = defineComponent<{ actions: ShortcutActionItems; enabled?: boolean }>({
+  name: 'BranchActionShortcutRegistryTestHost',
+  props: ['actions', 'enabled'],
+  setup(props) {
     useBranchActionShortcutRegistry(
       () => props.actions,
       () => props.enabled !== false,
     )
     return () => null
   },
-  { name: 'BranchActionShortcutRegistryTestHost', props: ['actions', 'enabled'] },
-)
+})
 
 function actionsWith(onPull: () => void): ShortcutActionItems {
   return {

@@ -40,8 +40,11 @@ interface WorkspacePaneRuntimeTabPanelProps extends Omit<WorkspacePaneRuntimeTab
   runtimeType: WorkspacePaneRuntimeTabType
 }
 
-const TerminalWorkspacePaneRuntimeTabPanel = defineComponent(
-  (props: WorkspacePaneRuntimeTabPanelProps) => {
+const TerminalWorkspacePaneRuntimeTabPanel = defineComponent<WorkspacePaneRuntimeTabPanelProps>({
+  name: 'TerminalWorkspacePaneRuntimeTabPanel',
+  props: ['runtimeType', 'workspacePaneId', 'panelLabel', 'target', 'selectedSessionId', 'runtimeState'],
+
+  setup(props) {
     const t = useT()
     const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
     const navigation = useAppNavigation()
@@ -100,11 +103,7 @@ const TerminalWorkspacePaneRuntimeTabPanel = defineComponent(
       )
     }
   },
-  {
-    name: 'TerminalWorkspacePaneRuntimeTabPanel',
-    props: ['runtimeType', 'workspacePaneId', 'panelLabel', 'target', 'selectedSessionId', 'runtimeState'],
-  },
-)
+})
 
 export function renderWorkspacePaneRuntimeTabPanel(input: WorkspacePaneRuntimeTabPanelRenderInput): VNodeChild {
   return (

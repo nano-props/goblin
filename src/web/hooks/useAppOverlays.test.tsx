@@ -8,20 +8,24 @@ import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import type { AppOverlayKey } from '#/web/hooks/useAppOverlays.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 
-const Harness = defineComponent(() => {
-  const overlays = useAppOverlays()
-  return () => <OverlayHarnessView overlays={overlays} />
+const Harness = defineComponent({
+  setup() {
+    const overlays = useAppOverlays()
+    return () => <OverlayHarnessView overlays={overlays} />
+  },
 })
 
-const RoutedHarness = defineComponent(() => {
-  const overlay = ref<AppOverlayKey | null>(null)
-  const overlays = useAppOverlays({
-    routeOverlay: overlay,
-    onRouteOverlayChange: (nextOverlay) => {
-      overlay.value = nextOverlay
-    },
-  })
-  return () => <OverlayHarnessView overlays={overlays} />
+const RoutedHarness = defineComponent({
+  setup() {
+    const overlay = ref<AppOverlayKey | null>(null)
+    const overlays = useAppOverlays({
+      routeOverlay: overlay,
+      onRouteOverlayChange: (nextOverlay) => {
+        overlay.value = nextOverlay
+      },
+    })
+    return () => <OverlayHarnessView overlays={overlays} />
+  },
 })
 
 function OverlayHarnessView({ overlays }: { overlays: ReturnType<typeof useAppOverlays> }) {

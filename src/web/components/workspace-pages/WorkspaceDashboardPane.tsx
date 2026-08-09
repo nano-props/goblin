@@ -42,8 +42,11 @@ interface WorkspaceDashboardPaneProps {
   onSelectBranch?: (branchName: string) => void
 }
 
-export const WorkspaceDashboardPane = defineComponent(
-  (props: WorkspaceDashboardPaneProps) => {
+export const WorkspaceDashboardPane = defineComponent<WorkspaceDashboardPaneProps>({
+  name: 'WorkspaceDashboardPane',
+  props: ['workspaceId', 'compact', 'trafficLightOffset', 'onBack', 'onSelectBranch'],
+
+  setup(props) {
     const t = useT()
     const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
     const workspace = computed(() => {
@@ -91,11 +94,7 @@ export const WorkspaceDashboardPane = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspaceDashboardPane',
-    props: ['workspaceId', 'compact', 'trafficLightOffset', 'onBack', 'onSelectBranch'],
-  },
-)
+})
 
 type DashboardWorkspaceProjection = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId' | 'admission' | 'capability'>
 type GitDashboardWorkspace = Omit<DashboardWorkspaceProjection, 'capability'> & {
@@ -106,8 +105,15 @@ function isGitDashboardWorkspace(workspace: DashboardWorkspaceProjection | null)
   return workspace?.capability.kind === 'git'
 }
 
-const GitDashboardReadModel = defineComponent(
-  (props: { workspace: GitDashboardWorkspace; compact: boolean; onSelectBranch?: (branchName: string) => void }) => {
+const GitDashboardReadModel = defineComponent<{
+  workspace: GitDashboardWorkspace
+  compact: boolean
+  onSelectBranch?: (branchName: string) => void
+}>({
+  name: 'GitDashboardReadModel',
+  props: ['workspace', 'compact', 'onSelectBranch'],
+
+  setup(props) {
     const t = useT()
     const snapshotReadModel = useRepoSnapshotReadModel(
       () => props.workspace.id,
@@ -228,14 +234,12 @@ const GitDashboardReadModel = defineComponent(
       )
     }
   },
-  {
-    name: 'GitDashboardReadModel',
-    props: ['workspace', 'compact', 'onSelectBranch'],
-  },
-)
+})
 
-const DirectoryDashboardReadModel = defineComponent(
-  (props: { workspace: DashboardWorkspaceProjection; compact: boolean }) => {
+const DirectoryDashboardReadModel = defineComponent<{ workspace: DashboardWorkspaceProjection; compact: boolean }>({
+  name: 'DirectoryDashboardReadModel',
+  props: ['workspace', 'compact'],
+  setup(props) {
     const t = useT()
     const overviewReadModel = useWorkspaceDirectoryOverview(
       () => props.workspace.id,
@@ -257,8 +261,7 @@ const DirectoryDashboardReadModel = defineComponent(
         <div class={cn(DASHBOARD_CARD_CLASS, 'p-4 text-sm text-muted-foreground')}>{t('dashboard.loading')}</div>
       )
   },
-  { name: 'DirectoryDashboardReadModel', props: ['workspace', 'compact'] },
-)
+})
 
 interface DirectoryDashboardProps {
   workspace: Pick<WorkspaceState, 'id' | 'admission'>

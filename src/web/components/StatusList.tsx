@@ -35,8 +35,15 @@ function StatusCode({ entry }: { entry: StatusEntry }) {
   )
 }
 
-export const StatusList = defineComponent(
-  (props: Props) => {
+export const StatusList = defineComponent<Props>({
+  name: 'StatusList',
+  props: {
+    status: { type: Array as PropType<WorktreeStatus[]>, required: true },
+    emptyTitleKey: String,
+    emptyBodyKey: String,
+  },
+
+  setup(props) {
     const t = useT()
     return () => {
       const emptyTitleKey = props.emptyTitleKey ?? 'status.clean-title'
@@ -67,12 +74,4 @@ export const StatusList = defineComponent(
       )
     }
   },
-  {
-    name: 'StatusList',
-    props: {
-      status: { type: Array as PropType<WorktreeStatus[]>, required: true },
-      emptyTitleKey: String,
-      emptyBodyKey: String,
-    },
-  },
-)
+})

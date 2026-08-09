@@ -62,8 +62,11 @@ type SessionPhase = 'opening' | 'restarting' | 'open-controller' | 'open-viewer'
 
 type TerminalFileInputAdmission = 'available' | 'remote-unsupported' | 'inactive'
 
-export const TerminalSessionView = defineComponent(
-  (props: TerminalSessionViewProps) => {
+export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
+  name: 'TerminalSessionView',
+  props: ['base', 'selectedTerminalSessionId', 'projectionPhase', 'projectionErrorMessage', 'createTerminalForSlot'],
+
+  setup(props) {
     const t = useT()
     const sessionRoot = ref<HTMLDivElement | null>(null)
     const host = ref<HTMLDivElement | null>(null)
@@ -634,11 +637,7 @@ export const TerminalSessionView = defineComponent(
       )
     }
   },
-  {
-    name: 'TerminalSessionView',
-    props: ['base', 'selectedTerminalSessionId', 'projectionPhase', 'projectionErrorMessage', 'createTerminalForSlot'],
-  },
-)
+})
 
 function showTerminalTakeoverFailure(error: unknown, t: (key: string) => string): void {
   if (error instanceof ClientRealtimeRequestError) {

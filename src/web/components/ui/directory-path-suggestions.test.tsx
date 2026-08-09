@@ -432,8 +432,11 @@ interface HarnessProps {
   ariaInvalid?: boolean
 }
 
-const Harness = defineComponent(
-  (props: HarnessProps) => {
+const Harness = defineComponent<HarnessProps>({
+  name: 'DirectoryPathSuggestionsHarness',
+  props: ['suggestions', 'onChange', 'disabled', 'isLoading', 'hasFetched', 'ariaInvalid'],
+
+  setup(props) {
     const value = ref('')
     return () => (
       <DirectoryPathSuggestions
@@ -452,11 +455,7 @@ const Harness = defineComponent(
       />
     )
   },
-  {
-    name: 'DirectoryPathSuggestionsHarness',
-    props: ['suggestions', 'onChange', 'disabled', 'isLoading', 'hasFetched', 'ariaInvalid'],
-  },
-)
+})
 
 function render(element: VNode) {
   return renderInJsdom(element)

@@ -2,9 +2,15 @@ import { defineComponent } from 'vue'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 
-export const SettingsContentFrame = defineComponent(
-  (props: { topInset?: number; title: string }, { slots }) =>
-    () => {
+export const SettingsContentFrame = defineComponent<{ topInset?: number; title: string }>({
+  name: 'SettingsContentFrame',
+  props: {
+    topInset: Number,
+    title: { type: String, required: true },
+  },
+
+  setup(props, { slots }) {
+    return () => {
       const chromeHeight = (props.topInset ?? 0) > 0 ? props.topInset : TITLE_BAR_HEIGHT_PX
       return (
         <section class="flex min-w-0 flex-1 flex-col bg-background">
@@ -17,12 +23,6 @@ export const SettingsContentFrame = defineComponent(
           </ScrollArea>
         </section>
       )
-    },
-  {
-    name: 'SettingsContentFrame',
-    props: {
-      topInset: Number,
-      title: { type: String, required: true },
-    },
+    }
   },
-)
+})

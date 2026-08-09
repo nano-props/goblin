@@ -34,8 +34,10 @@ const COMPLETION_VISIBLE_MS = 1500
 
 type RepoActivityControlRepo = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> & RepoActivityProjectionRepo
 
-export const RepoActivityControl = defineComponent(
-  (props: Props) => {
+export const RepoActivityControl = defineComponent<Props>({
+  name: 'RepoActivityControl',
+  props: ['repoId'],
+  setup(props) {
     const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
     const repo = computed<RepoActivityControlRepo | undefined>(() => {
       const workspace = workspaces.value[props.repoId]
@@ -49,8 +51,7 @@ export const RepoActivityControl = defineComponent(
     })
     return () => (repo.value ? <RepoActivityControlView repo={repo.value} /> : null)
   },
-  { name: 'RepoActivityControl', props: ['repoId'] },
-)
+})
 
 const RepoActivityControlView = defineComponent<{ repo: RepoActivityControlRepo }>({
   name: 'RepoActivityControlView',
@@ -151,8 +152,19 @@ function useRepoCompletion(repoId: () => WorkspaceId) {
   return completion
 }
 
-const RepoRefreshButton = defineComponent(
-  (props: { repo: RepoActivityControlRepo; primaryRefreshBusy: boolean; lastFetchAt: number | null }) => {
+const RepoRefreshButton = defineComponent<{
+  repo: RepoActivityControlRepo
+  primaryRefreshBusy: boolean
+  lastFetchAt: number | null
+}>({
+  name: 'RepoRefreshButton',
+  props: {
+    repo: { type: Object as PropType<RepoActivityControlRepo>, required: true },
+    primaryRefreshBusy: Boolean,
+    lastFetchAt: { type: Number as PropType<number | null>, default: null },
+  },
+
+  setup(props) {
     const t = useT()
     const lang = useStoreSelector(i18nStore, (state) => state.lang)
 
@@ -190,15 +202,7 @@ const RepoRefreshButton = defineComponent(
       )
     }
   },
-  {
-    name: 'RepoRefreshButton',
-    props: {
-      repo: { type: Object as PropType<RepoActivityControlRepo>, required: true },
-      primaryRefreshBusy: Boolean,
-      lastFetchAt: { type: Number as PropType<number | null>, default: null },
-    },
-  },
-)
+})
 
 function RepoActivityIndicator({ activity: _activity, label }: { activity: RepoActivity; label: string }) {
   return (

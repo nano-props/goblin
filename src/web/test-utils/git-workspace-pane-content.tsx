@@ -89,39 +89,51 @@ type GitWorkspacePaneContentHarnessProps = Omit<
   navigation?: AppNavigationActions
 }
 
-export const GitWorkspacePaneContentHarness = defineComponent(
-  (props: GitWorkspacePaneContentHarnessProps) => () => (
-    <AppNavigationProvider value={props.navigation ?? navigationWith({})}>
-      <VueQueryClientScope client={appQueryClient}>
-        <GitWorkspacePaneContentInner
-          repo={props.repo}
-          detail={props.detail}
-          workspacePaneId={props.workspacePaneId}
-          readFailures={props.readFailures}
-          onRetryStatus={props.onRetryStatus}
-          onBackToBranchNavigator={props.onBackToBranchNavigator}
-          workspacePaneRouteMode={props.workspacePaneRouteMode}
-        />
-      </VueQueryClientScope>
-    </AppNavigationProvider>
-  ),
-  {
-    name: 'GitWorkspacePaneContentHarness',
-    props: [
-      'repo',
-      'detail',
-      'workspacePaneId',
-      'readFailures',
-      'onRetryStatus',
-      'onBackToBranchNavigator',
-      'workspacePaneRouteMode',
-      'navigation',
-    ],
-  },
-)
+export const GitWorkspacePaneContentHarness = defineComponent<GitWorkspacePaneContentHarnessProps>({
+  name: 'GitWorkspacePaneContentHarness',
+  props: [
+    'repo',
+    'detail',
+    'workspacePaneId',
+    'readFailures',
+    'onRetryStatus',
+    'onBackToBranchNavigator',
+    'workspacePaneRouteMode',
+    'navigation',
+  ],
 
-const GitWorkspacePaneContentInner = defineComponent(
-  (props: GitWorkspacePaneContentHarnessProps) => {
+  setup(props) {
+    return () => (
+      <AppNavigationProvider value={props.navigation ?? navigationWith({})}>
+        <VueQueryClientScope client={appQueryClient}>
+          <GitWorkspacePaneContentInner
+            repo={props.repo}
+            detail={props.detail}
+            workspacePaneId={props.workspacePaneId}
+            readFailures={props.readFailures}
+            onRetryStatus={props.onRetryStatus}
+            onBackToBranchNavigator={props.onBackToBranchNavigator}
+            workspacePaneRouteMode={props.workspacePaneRouteMode}
+          />
+        </VueQueryClientScope>
+      </AppNavigationProvider>
+    )
+  },
+})
+
+const GitWorkspacePaneContentInner = defineComponent<GitWorkspacePaneContentHarnessProps>({
+  name: 'GitWorkspacePaneContentInner',
+  props: [
+    'repo',
+    'detail',
+    'workspacePaneId',
+    'readFailures',
+    'onRetryStatus',
+    'onBackToBranchNavigator',
+    'workspacePaneRouteMode',
+  ],
+
+  setup(props) {
     const readContext = useTerminalSessionReadContext()
     const workspacePaneRoute = computed(() => harnessWorkspacePaneRoute(props, readContext))
     const workspacePaneTabModel = useGitWorkspacePaneTabModel(
@@ -141,19 +153,7 @@ const GitWorkspacePaneContentInner = defineComponent(
       />
     )
   },
-  {
-    name: 'GitWorkspacePaneContentInner',
-    props: [
-      'repo',
-      'detail',
-      'workspacePaneId',
-      'readFailures',
-      'onRetryStatus',
-      'onBackToBranchNavigator',
-      'workspacePaneRouteMode',
-    ],
-  },
-)
+})
 
 function harnessWorkspacePaneRoute(
   props: GitWorkspacePaneContentHarnessProps,

@@ -21,8 +21,10 @@ interface Props {
   onOpen: (path: string, signal: AbortSignal) => Promise<OpenWorkspaceResult>
 }
 
-export const OpenWorkspaceDialog = defineComponent(
-  (props: Props) => {
+export const OpenWorkspaceDialog = defineComponent<Props>({
+  name: 'OpenWorkspaceDialog',
+  props: ['open', 'onClose', 'onOpen'],
+  setup(props) {
     const t = useT()
     const compact = useIsCompactUi()
     const path = ref('')
@@ -178,5 +180,4 @@ export const OpenWorkspaceDialog = defineComponent(
       </FormDialog>
     )
   },
-  { name: 'OpenWorkspaceDialog', props: ['open', 'onClose', 'onOpen'] },
-)
+})

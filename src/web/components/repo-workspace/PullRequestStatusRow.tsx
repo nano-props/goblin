@@ -208,8 +208,11 @@ interface PullRequestStatusRowProps {
   tooltipSide?: TooltipSide
 }
 
-export const PullRequestStatusRow = defineComponent(
-  (props: PullRequestStatusRowProps) => {
+export const PullRequestStatusRow = defineComponent<PullRequestStatusRowProps>({
+  name: 'PullRequestStatusRow',
+  props: ['repoId', 'workspaceRuntimeId', 'branchName', 'pullRequest', 'read', 'tooltipSide'],
+
+  setup(props) {
     const t = useT()
     const lang = useStoreSelector(i18nStore, (state) => state.lang)
     const throttleController = new AbortController()
@@ -298,8 +301,4 @@ export const PullRequestStatusRow = defineComponent(
       )
     }
   },
-  {
-    name: 'PullRequestStatusRow',
-    props: ['repoId', 'workspaceRuntimeId', 'branchName', 'pullRequest', 'read', 'tooltipSide'],
-  },
-)
+})

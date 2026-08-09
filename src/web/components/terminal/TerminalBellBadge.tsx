@@ -1,8 +1,10 @@
 import { defineComponent } from 'vue'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
-export const TerminalBellBadge = defineComponent(
-  (props: { count: number }) => {
+export const TerminalBellBadge = defineComponent<{ count: number }>({
+  name: 'TerminalBellBadge',
+  props: { count: { type: Number, required: true } },
+  setup(props) {
     const t = useT()
     return () => {
       if (props.count <= 0) return null
@@ -19,5 +21,4 @@ export const TerminalBellBadge = defineComponent(
       )
     }
   },
-  { name: 'TerminalBellBadge', props: { count: { type: Number, required: true } } },
-)
+})

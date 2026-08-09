@@ -813,8 +813,20 @@ function serverOperation(
   }
 }
 
-const HookHost = defineComponent(
-  (overrides: Partial<HookHostOptions>) => {
+const HookHost = defineComponent<Partial<HookHostOptions>>({
+  name: 'KeyboardTestHost',
+  props: [
+    'currentWorkspaceId',
+    'currentBranchName',
+    'currentWorkspacePaneCommandTarget',
+    'isWorkspaceShortcutSuppressed',
+    'isSettingsOpen',
+    'onExitSettings',
+    'openCreateWorktree',
+    'navigation',
+  ],
+
+  setup(overrides) {
     const repo = overrides.currentWorkspaceId
       ? workspacesStore.getState().workspaces[overrides.currentWorkspaceId]
       : null
@@ -865,20 +877,7 @@ const HookHost = defineComponent(
     })
     return () => null
   },
-  {
-    name: 'KeyboardTestHost',
-    props: [
-      'currentWorkspaceId',
-      'currentBranchName',
-      'currentWorkspacePaneCommandTarget',
-      'isWorkspaceShortcutSuppressed',
-      'isSettingsOpen',
-      'onExitSettings',
-      'openCreateWorktree',
-      'navigation',
-    ],
-  },
-)
+})
 
 function navigationWith(overrides: AppNavigationOverridesForTest = {}): AppNavigationActions {
   return observedAppNavigationActionsForTest({

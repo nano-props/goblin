@@ -143,8 +143,10 @@ export const BranchSummaryIcon: FunctionalComponent<BranchSummaryIconProps> = (p
 // leading BranchSummaryIcon glyph — no worktree / dirty badges here.
 // Read-only by design — none of the inner spans are interactive.
 // BranchRow renders it as part of BranchSummaryInline.
-export const BranchSummaryMeta = defineComponent(
-  (props: Pick<BranchSummaryInlineProps, 'repo' | 'branch' | 'selected'>) => {
+export const BranchSummaryMeta = defineComponent<Pick<BranchSummaryInlineProps, 'repo' | 'branch' | 'selected'>>({
+  name: 'BranchSummaryMeta',
+  props: ['repo', 'branch', 'selected'],
+  setup(props) {
     const t = useT()
     const lang = useStoreSelector(i18nStore, (state) => state.lang)
 
@@ -193,11 +195,21 @@ export const BranchSummaryMeta = defineComponent(
       )
     }
   },
-  { name: 'BranchSummaryMeta', props: ['repo', 'branch', 'selected'] },
-)
+})
 
-export const BranchSummaryInline = defineComponent(
-  (props: BranchSummaryInlineProps) => {
+export const BranchSummaryInline = defineComponent<BranchSummaryInlineProps>({
+  name: 'BranchSummaryInline',
+  props: [
+    'repo',
+    'branch',
+    'selected',
+    'leadingTerminalBellCount',
+    'leadingTerminalOutputActive',
+    'worktreeIconDirty',
+    'class',
+  ],
+
+  setup(props) {
     const t = useT()
     const lang = useStoreSelector(i18nStore, (state) => state.lang)
 
@@ -251,16 +263,4 @@ export const BranchSummaryInline = defineComponent(
       )
     }
   },
-  {
-    name: 'BranchSummaryInline',
-    props: [
-      'repo',
-      'branch',
-      'selected',
-      'leadingTerminalBellCount',
-      'leadingTerminalOutputActive',
-      'worktreeIconDirty',
-      'class',
-    ],
-  },
-)
+})

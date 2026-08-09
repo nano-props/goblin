@@ -12,8 +12,15 @@ type SettingsItemSize = 'sm' | 'md' | 'lg' | 'xl'
 type SettingsSelectValue = string | number
 type SettingsSelectOption = { value: SettingsSelectValue; label: string; icon?: LucideIcon }
 
-export const SettingsGroup = defineComponent(
-  (props: { label: VNodeChild; hint?: string; action?: VNodeChild }, { slots }) => {
+export const SettingsGroup = defineComponent<{ label: VNodeChild; hint?: string; action?: VNodeChild }>({
+  name: 'SettingsGroup',
+  props: {
+    label: { required: true },
+    hint: String,
+    action: null,
+  },
+
+  setup(props, { slots }) {
     const compact = useIsCompactUi()
     return () => (
       <section class="w-full space-y-1.5">
@@ -26,15 +33,7 @@ export const SettingsGroup = defineComponent(
       </section>
     )
   },
-  {
-    name: 'SettingsGroup',
-    props: {
-      label: { required: true },
-      hint: String,
-      action: null,
-    },
-  },
-)
+})
 
 export const SettingsCard = defineComponent({
   name: 'SettingsCard',
@@ -61,11 +60,12 @@ export const SettingsCard = defineComponent({
   },
 })
 
-export const SettingsList = defineComponent(
-  (_props, { slots }) =>
-    () => <SettingsCard>{slots.default?.()}</SettingsCard>,
-  { name: 'SettingsList' },
-)
+export const SettingsList = defineComponent({
+  name: 'SettingsList',
+  setup(_props, { slots }) {
+    return () => <SettingsCard>{slots.default?.()}</SettingsCard>
+  },
+})
 
 export const SettingsListItem = defineComponent({
   name: 'SettingsListItem',
@@ -100,8 +100,21 @@ export const SettingsListItem = defineComponent({
   },
 })
 
-export const SettingsRow = defineComponent(
-  (props: { controlId: string; label: VNodeChild; hint?: string; control: VNodeChild }) => {
+export const SettingsRow = defineComponent<{
+  controlId: string
+  label: VNodeChild
+  hint?: string
+  control: VNodeChild
+}>({
+  name: 'SettingsRow',
+  props: {
+    controlId: { type: String, required: true },
+    label: { required: true },
+    hint: String,
+    control: { required: true },
+  },
+
+  setup(props) {
     const compact = useIsCompactUi()
     return () => (
       <SettingsListItem size="lg" class={cn(compact.value && 'flex-col items-stretch justify-start gap-2')}>
@@ -115,24 +128,26 @@ export const SettingsRow = defineComponent(
       </SettingsListItem>
     )
   },
-  {
-    name: 'SettingsRow',
-    props: {
-      controlId: { type: String, required: true },
-      label: { required: true },
-      hint: String,
-      control: { required: true },
-    },
-  },
-)
+})
 
-export const SettingsSelect = defineComponent(
-  (props: {
-    id: string
-    value: SettingsSelectValue
-    options: SettingsSelectOption[]
-    onChange: (value: SettingsSelectValue) => void
-  }) => {
+export const SettingsSelect = defineComponent<{
+  id: string
+  value: SettingsSelectValue
+  options: SettingsSelectOption[]
+  onChange: (value: SettingsSelectValue) => void
+}>({
+  name: 'SettingsSelect',
+  props: {
+    id: { type: String, required: true },
+    value: { type: [String, Number] as PropType<SettingsSelectValue>, required: true },
+    options: {
+      type: Array as PropType<SettingsSelectOption[]>,
+      required: true,
+    },
+    onChange: { type: Function as PropType<(value: SettingsSelectValue) => void>, required: true },
+  },
+
+  setup(props) {
     const compact = useIsCompactUi()
     return () => {
       const optionsSignature = props.options.map((option) => `${String(option.value)}:${option.label}`).join('|')
@@ -174,16 +189,4 @@ export const SettingsSelect = defineComponent(
       )
     }
   },
-  {
-    name: 'SettingsSelect',
-    props: {
-      id: { type: String, required: true },
-      value: { type: [String, Number] as PropType<SettingsSelectValue>, required: true },
-      options: {
-        type: Array as PropType<SettingsSelectOption[]>,
-        required: true,
-      },
-      onChange: { type: Function as PropType<(value: SettingsSelectValue) => void>, required: true },
-    },
-  },
-)
+})

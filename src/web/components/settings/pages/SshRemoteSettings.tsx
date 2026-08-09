@@ -5,8 +5,9 @@ import {
   SettingsRow,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
-export const SshRemoteSettings = defineComponent(
-  () => {
+export const SshRemoteSettings = defineComponent({
+  name: 'SshRemoteSettings',
+  setup() {
     const t = useT()
 
     return () => (
@@ -33,6 +34,5 @@ export const SshRemoteSettings = defineComponent(
       </SettingsGroup>
     )
   },
-  { name: 'SshRemoteSettings' },
-)
+})
 import { defineComponent } from 'vue'

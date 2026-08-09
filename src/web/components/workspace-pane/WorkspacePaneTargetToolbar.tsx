@@ -73,32 +73,44 @@ WorkspacePaneTargetToolbar.props = [
   'staticTabAvailable',
 ]
 
-const WorkspacePaneFilesystemTargetToolbar = defineComponent(
-  (props: WorkspacePaneFilesystemTargetToolbarProps) => {
+const WorkspacePaneFilesystemTargetToolbar = defineComponent<WorkspacePaneFilesystemTargetToolbarProps>({
+  name: 'WorkspacePaneFilesystemTargetToolbar',
+  props: [
+    'target',
+    'model',
+    'workspacePaneId',
+    'workspacePaneRoute',
+    'statusCount',
+    'trafficLightOffset',
+    'onBackToNavigator',
+    'staticTabAvailable',
+  ],
+
+  setup(props) {
     const externalAppItems = useWorkspaceExternalAppItems(() => props.target)
     return () => <WorkspacePaneTargetToolbarContent {...props} externalAppItems={externalAppItems.value} />
   },
-  {
-    name: 'WorkspacePaneFilesystemTargetToolbar',
-    props: [
-      'target',
-      'model',
-      'workspacePaneId',
-      'workspacePaneRoute',
-      'statusCount',
-      'trafficLightOffset',
-      'onBackToNavigator',
-      'staticTabAvailable',
-    ],
-  },
-)
+})
 
 interface WorkspacePaneTargetToolbarContentProps extends WorkspacePaneTargetToolbarProps {
   externalAppItems: readonly WorkspaceExternalAppItem[]
 }
 
-const WorkspacePaneTargetToolbarContent = defineComponent(
-  (props: WorkspacePaneTargetToolbarContentProps) => {
+const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToolbarContentProps>({
+  name: 'WorkspacePaneTargetToolbarContent',
+  props: [
+    'target',
+    'model',
+    'workspacePaneId',
+    'workspacePaneRoute',
+    'statusCount',
+    'trafficLightOffset',
+    'onBackToNavigator',
+    'staticTabAvailable',
+    'externalAppItems',
+  ],
+
+  setup(props) {
     const t = useT()
     const compact = useIsCompactUi()
     const navigation = useAppNavigation()
@@ -249,34 +261,28 @@ const WorkspacePaneTargetToolbarContent = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspacePaneTargetToolbarContent',
-    props: [
-      'target',
-      'model',
-      'workspacePaneId',
-      'workspacePaneRoute',
-      'statusCount',
-      'trafficLightOffset',
-      'onBackToNavigator',
-      'staticTabAvailable',
-      'externalAppItems',
-    ],
-  },
-)
+})
 
 interface WorkspacePaneTabDragPreviewOwner {
   key: string
   preview: WorkspacePaneTabDragPreviewState
 }
 
-const WorkspacePaneTabDragPreviewOwner = defineComponent(
-  (props: {
-    ownerKey: string
-    canonicalTabs: readonly WorkspacePaneTabEntry[]
-    onActivate: (owner: WorkspacePaneTabDragPreviewOwner) => void
-    onDispose: (owner: WorkspacePaneTabDragPreviewOwner) => void
-  }) => {
+const WorkspacePaneTabDragPreviewOwner = defineComponent<{
+  ownerKey: string
+  canonicalTabs: readonly WorkspacePaneTabEntry[]
+  onActivate: (owner: WorkspacePaneTabDragPreviewOwner) => void
+  onDispose: (owner: WorkspacePaneTabDragPreviewOwner) => void
+}>({
+  name: 'WorkspacePaneTabDragPreviewOwner',
+  props: {
+    ownerKey: { type: String, required: true },
+    canonicalTabs: { type: Array as PropType<WorkspacePaneTabEntry[]>, required: true },
+    onActivate: { type: Function as PropType<(owner: WorkspacePaneTabDragPreviewOwner) => void>, required: true },
+    onDispose: { type: Function as PropType<(owner: WorkspacePaneTabDragPreviewOwner) => void>, required: true },
+  },
+
+  setup(props) {
     const owner: WorkspacePaneTabDragPreviewOwner = {
       key: props.ownerKey,
       preview: useWorkspacePaneTabDragPreview(() => props.canonicalTabs),
@@ -285,16 +291,7 @@ const WorkspacePaneTabDragPreviewOwner = defineComponent(
     onScopeDispose(() => props.onDispose(owner))
     return () => null
   },
-  {
-    name: 'WorkspacePaneTabDragPreviewOwner',
-    props: {
-      ownerKey: { type: String, required: true },
-      canonicalTabs: { type: Array as PropType<WorkspacePaneTabEntry[]>, required: true },
-      onActivate: { type: Function as PropType<(owner: WorkspacePaneTabDragPreviewOwner) => void>, required: true },
-      onDispose: { type: Function as PropType<(owner: WorkspacePaneTabDragPreviewOwner) => void>, required: true },
-    },
-  },
-)
+})
 
 function tabsMutationInput(
   target: WorkspacePaneTabsTarget,

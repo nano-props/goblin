@@ -33,8 +33,10 @@ interface EmptyTerminalCtaProps {
 // a second create while the first one is in flight. The registry's
 // pending-create queue would dedupe the second call by filesystem-target
 // key, but a visible loading state is still the right user signal.
-export const EmptyTerminalCta = defineComponent(
-  (props: EmptyTerminalCtaProps) => {
+export const EmptyTerminalCta = defineComponent<EmptyTerminalCtaProps>({
+  name: 'EmptyTerminalCta',
+  props: ['onCreate', 'emptyLabel', 'newTerminalLabel'],
+  setup(props) {
     const creating = ref(false)
 
     async function create(): Promise<void> {
@@ -58,8 +60,7 @@ export const EmptyTerminalCta = defineComponent(
       </div>
     )
   },
-  { name: 'EmptyTerminalCta', props: ['onCreate', 'emptyLabel', 'newTerminalLabel'] },
-)
+})
 
 interface StatusOverlayProps {
   label: string

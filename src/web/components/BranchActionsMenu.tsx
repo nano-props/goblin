@@ -16,8 +16,16 @@ interface Props {
   onOpenChange?: (open: boolean) => void
 }
 
-export const BranchActionsMenu = defineComponent(
-  (props: Props) => {
+export const BranchActionsMenu = defineComponent<Props>({
+  name: 'BranchActionsMenu',
+  props: {
+    repo: { type: Object as PropType<BranchActionRepo>, required: true },
+    branch: { type: Object as PropType<BranchSnapshotInfo>, required: true },
+    open: { type: Boolean, default: undefined },
+    onOpenChange: Function as PropType<(open: boolean) => void>,
+  },
+
+  setup(props) {
     const branchActions = useBranchActions(
       () => props.repo,
       () => props.branch,
@@ -42,24 +50,23 @@ export const BranchActionsMenu = defineComponent(
       />
     )
   },
-  {
-    name: 'BranchActionsMenu',
-    props: {
-      repo: { type: Object as PropType<BranchActionRepo>, required: true },
-      branch: { type: Object as PropType<BranchSnapshotInfo>, required: true },
-      open: { type: Boolean, default: undefined },
-      onOpenChange: Function as PropType<(open: boolean) => void>,
-    },
-  },
-)
+})
 
 type BranchActionsPopoverProps = Pick<BranchActionSurface, 'mainItems' | 'destructiveItems'> & {
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }
 
-export const BranchActionsPopover = defineComponent(
-  (props: BranchActionsPopoverProps) => {
+export const BranchActionsPopover = defineComponent<BranchActionsPopoverProps>({
+  name: 'BranchActionsPopover',
+  props: {
+    mainItems: { type: Array as PropType<BranchActionItem[]>, required: true },
+    destructiveItems: { type: Array as PropType<BranchActionItem[]>, required: true },
+    open: { type: Boolean, default: undefined },
+    onOpenChange: Function as PropType<(open: boolean) => void>,
+  },
+
+  setup(props) {
     const t = useT()
     const { pending: pendingAction, run } = useAsyncPending<BranchActionItem['id']>()
     const visibleMainItems = computed(() => props.mainItems.filter((item) => item.visible))
@@ -119,16 +126,7 @@ export const BranchActionsPopover = defineComponent(
       </ActionPopover>
     )
   },
-  {
-    name: 'BranchActionsPopover',
-    props: {
-      mainItems: { type: Array as PropType<BranchActionItem[]>, required: true },
-      destructiveItems: { type: Array as PropType<BranchActionItem[]>, required: true },
-      open: { type: Boolean, default: undefined },
-      onOpenChange: Function as PropType<(open: boolean) => void>,
-    },
-  },
-)
+})
 
 interface BranchActionPopoverItemProps {
   item: BranchActionItem

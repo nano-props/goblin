@@ -6,8 +6,9 @@ import {
 } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { useFetchSettingsController, useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-export const SyncSettings = defineComponent(
-  () => {
+export const SyncSettings = defineComponent({
+  name: 'SyncSettings',
+  setup() {
     const t = useT()
     const fetchSettings = useFetchSettings()
     const { setFetchInterval } = useFetchSettingsController()
@@ -42,6 +43,5 @@ export const SyncSettings = defineComponent(
       </SettingsGroup>
     )
   },
-  { name: 'SyncSettings' },
-)
+})
 import { defineComponent } from 'vue'

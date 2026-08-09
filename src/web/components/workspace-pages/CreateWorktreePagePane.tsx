@@ -343,8 +343,10 @@ interface CreateWorktreePageShellProps {
   onBack: () => void
 }
 
-const CreateWorktreePageShell = defineComponent(
-  (props: CreateWorktreePageShellProps, { slots }) => {
+const CreateWorktreePageShell = defineComponent<CreateWorktreePageShellProps>({
+  name: 'CreateWorktreePageShell',
+  props: ['compact', 'trafficLightOffset', 'onBack'],
+  setup(props, { slots }) {
     const t = useT()
     return () => (
       <WorkspacePagePane
@@ -358,8 +360,7 @@ const CreateWorktreePageShell = defineComponent(
       </WorkspacePagePane>
     )
   },
-  { name: 'CreateWorktreePageShell', props: ['compact', 'trafficLightOffset', 'onBack'] },
-)
+})
 
 function createWorktreeTargetBranch(input: CreateWorktreeRequest['input']): string {
   switch (input.mode.kind) {

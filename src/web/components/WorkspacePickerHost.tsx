@@ -24,8 +24,11 @@ interface WorkspacePickerHostProps {
   surface?: WorkspacePickerSurface
 }
 
-export const WorkspacePickerHost = defineComponent(
-  (props: WorkspacePickerHostProps) => {
+export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
+  name: 'WorkspacePickerHost',
+  props: ['currentWorkspaceId', 'onOpenWorkspacePathDialog', 'onOpenRemote', 'onClone', 'surface'],
+
+  setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
     const shortcutSettings = useShortcutSettings()
@@ -114,8 +117,4 @@ export const WorkspacePickerHost = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspacePickerHost',
-    props: ['currentWorkspaceId', 'onOpenWorkspacePathDialog', 'onOpenRemote', 'onClone', 'surface'],
-  },
-)
+})

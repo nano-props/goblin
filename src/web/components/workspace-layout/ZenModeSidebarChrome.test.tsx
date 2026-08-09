@@ -461,8 +461,18 @@ function mockSidebarPane(props: MockSidebarProps = {}) {
   return <MockSidebar {...props} />
 }
 
-const MockSidebar = defineComponent(
-  (props: MockSidebarProps) => {
+const MockSidebar = defineComponent<MockSidebarProps>({
+  name: 'MockSidebar',
+  props: [
+    'onOpenDashboard',
+    'onCreateWorktree',
+    'onSelectBranch',
+    'dashboardSelected',
+    'newWorktreeSelected',
+    'currentBranchName',
+  ],
+
+  setup(props) {
     const open = ref(false)
 
     return () => (
@@ -497,15 +507,4 @@ const MockSidebar = defineComponent(
       </div>
     )
   },
-  {
-    name: 'MockSidebar',
-    props: [
-      'onOpenDashboard',
-      'onCreateWorktree',
-      'onSelectBranch',
-      'dashboardSelected',
-      'newWorktreeSelected',
-      'currentBranchName',
-    ],
-  },
-)
+})

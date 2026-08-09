@@ -164,8 +164,9 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   )
 }
 
-const FiletreeNoWorktreeView = defineComponent(
-  () => {
+const FiletreeNoWorktreeView = defineComponent({
+  name: 'FiletreeNoWorktreeView',
+  setup() {
     const t = useT()
     return () => (
       <EmptyState
@@ -175,8 +176,7 @@ const FiletreeNoWorktreeView = defineComponent(
       />
     )
   },
-  { name: 'FiletreeNoWorktreeView' },
-)
+})
 
 interface BranchHistoryTabProps {
   repoId: WorkspaceId
@@ -186,8 +186,11 @@ interface BranchHistoryTabProps {
   panelLabel: WorkspacePanePanelLabel
 }
 
-const BranchHistoryTab = defineComponent(
-  (props: BranchHistoryTabProps) => {
+const BranchHistoryTab = defineComponent<BranchHistoryTabProps>({
+  name: 'BranchHistoryTab',
+  props: ['repoId', 'workspaceRuntimeId', 'branchName', 'workspacePaneId', 'panelLabel'],
+
+  setup(props) {
     const t = useT()
     const historyQuery = useRepoLogQuery(
       () => props.repoId,
@@ -225,11 +228,7 @@ const BranchHistoryTab = defineComponent(
       )
     }
   },
-  {
-    name: 'BranchHistoryTab',
-    props: ['repoId', 'workspaceRuntimeId', 'branchName', 'workspacePaneId', 'panelLabel'],
-  },
-)
+})
 
 interface BranchChangesTabProps {
   workspacePaneId: string
@@ -239,8 +238,11 @@ interface BranchChangesTabProps {
   statusLoading: boolean
 }
 
-const BranchChangesTab = defineComponent(
-  (props: BranchChangesTabProps) => {
+const BranchChangesTab = defineComponent<BranchChangesTabProps>({
+  name: 'BranchChangesTab',
+  props: ['workspacePaneId', 'panelLabel', 'branch', 'currentBranchStatus', 'statusLoading'],
+
+  setup(props) {
     const t = useT()
     return () => {
       const totalEntries = props.currentBranchStatus?.reduce((count, worktree) => count + worktree.entries.length, 0)
@@ -274,8 +276,4 @@ const BranchChangesTab = defineComponent(
       )
     }
   },
-  {
-    name: 'BranchChangesTab',
-    props: ['workspacePaneId', 'panelLabel', 'branch', 'currentBranchStatus', 'statusLoading'],
-  },
-)
+})

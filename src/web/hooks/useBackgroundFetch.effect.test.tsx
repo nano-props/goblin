@@ -98,16 +98,17 @@ describe('useBackgroundFetch request lifecycle', () => {
   })
 })
 
-const BackgroundFetchHost = defineComponent(
-  (props: { workspaceId: WorkspaceId; workspaceRuntimeId: string }) => {
+const BackgroundFetchHost = defineComponent<{ workspaceId: WorkspaceId; workspaceRuntimeId: string }>({
+  name: 'BackgroundFetchTestHost',
+  props: ['workspaceId', 'workspaceRuntimeId'],
+  setup(props) {
     useBackgroundFetch({
       workspaceId: () => props.workspaceId,
       workspaceRuntimeId: () => props.workspaceRuntimeId,
     })
     return () => null
   },
-  { name: 'BackgroundFetchTestHost', props: ['workspaceId', 'workspaceRuntimeId'] },
-)
+})
 
 function renderBackgroundFetchHost(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
   return renderInJsdom(

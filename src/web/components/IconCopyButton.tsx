@@ -5,17 +5,28 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
-export const IconCopyButton = defineComponent(
-  (props: {
-    label: string
-    succeeded: boolean
-    busy?: boolean
-    disabled?: boolean
-    side?: 'top' | 'right' | 'bottom' | 'left'
-    class?: string
-    onClick: () => void
-  }) =>
-    () => (
+export const IconCopyButton = defineComponent<{
+  label: string
+  succeeded: boolean
+  busy?: boolean
+  disabled?: boolean
+  side?: 'top' | 'right' | 'bottom' | 'left'
+  class?: string
+  onClick: () => void
+}>({
+  name: 'IconCopyButton',
+  props: {
+    label: { type: String, required: true },
+    succeeded: { type: Boolean, required: true },
+    busy: Boolean,
+    disabled: Boolean,
+    side: String as PropType<'top' | 'right' | 'bottom' | 'left'>,
+    class: String,
+    onClick: { type: Function as PropType<() => void>, required: true },
+  },
+
+  setup(props) {
+    return () => (
       <Tip label={props.label} side={props.side ?? 'right'} forceOpen={props.succeeded}>
         <Button
           type="button"
@@ -36,17 +47,6 @@ export const IconCopyButton = defineComponent(
           )}
         </Button>
       </Tip>
-    ),
-  {
-    name: 'IconCopyButton',
-    props: {
-      label: { type: String, required: true },
-      succeeded: { type: Boolean, required: true },
-      busy: Boolean,
-      disabled: Boolean,
-      side: String as PropType<'top' | 'right' | 'bottom' | 'left'>,
-      class: String,
-      onClick: { type: Function as PropType<() => void>, required: true },
-    },
+    )
   },
-)
+})

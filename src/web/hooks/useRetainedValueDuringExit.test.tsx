@@ -8,8 +8,9 @@ import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringEx
 
 const RETAIN_MS = 240
 
-const Harness = defineComponent(
-  (props: { value: string | null; active: boolean; resetKey?: string }) => {
+const Harness = defineComponent<{ value: string | null; active: boolean; resetKey?: string }>({
+  props: ['value', 'active', 'resetKey'],
+  setup(props) {
     const retainedValue = useRetainedValueDuringExit({
       value: () => props.value,
       active: () => props.active,
@@ -18,8 +19,7 @@ const Harness = defineComponent(
     })
     return () => <div data-testid="retained-value" data-retained-value={retainedValue.value ?? ''} />
   },
-  { props: ['value', 'active', 'resetKey'] },
-)
+})
 
 describe('useRetainedValueDuringExit', () => {
   test('retains the last active value until the exit window ends', async () => {

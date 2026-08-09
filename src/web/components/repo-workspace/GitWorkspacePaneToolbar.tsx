@@ -26,8 +26,19 @@ interface GitWorkspacePaneToolbarProps {
   onBackToBranchNavigator?: () => void
 }
 
-export const GitWorkspacePaneToolbar = defineComponent(
-  (props: GitWorkspacePaneToolbarProps) => {
+export const GitWorkspacePaneToolbar = defineComponent<GitWorkspacePaneToolbarProps>({
+  name: 'GitWorkspacePaneToolbar',
+  props: [
+    'repo',
+    'detail',
+    'workspacePaneId',
+    'workspacePaneRoute',
+    'workspacePaneTabModel',
+    'trafficLightOffset',
+    'onBackToBranchNavigator',
+  ],
+
+  setup(props) {
     const compact = useIsCompactUi()
 
     return () => {
@@ -70,16 +81,4 @@ export const GitWorkspacePaneToolbar = defineComponent(
       )
     }
   },
-  {
-    name: 'GitWorkspacePaneToolbar',
-    props: [
-      'repo',
-      'detail',
-      'workspacePaneId',
-      'workspacePaneRoute',
-      'workspacePaneTabModel',
-      'trafficLightOffset',
-      'onBackToBranchNavigator',
-    ],
-  },
-)
+})

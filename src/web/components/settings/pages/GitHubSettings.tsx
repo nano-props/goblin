@@ -13,8 +13,9 @@ function hostLoginCommand(host: string): string {
   return host === 'github.com' ? 'gh auth login' : `gh auth login --hostname ${host}`
 }
 
-export const GitHubSettings = defineComponent(
-  () => {
+export const GitHubSettings = defineComponent({
+  name: 'GitHubSettings',
+  setup() {
     const t = useT()
     const { data } = useGitHubCliQuery()
     const { refreshingGitHubCli, refreshGitHubCli } = useGitHubSettingsController()
@@ -119,5 +120,4 @@ export const GitHubSettings = defineComponent(
       )
     }
   },
-  { name: 'GitHubSettings' },
-)
+})

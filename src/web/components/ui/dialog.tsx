@@ -39,9 +39,13 @@ type DialogContentProps = Omit<InstanceType<typeof RekaDialogContent>['$props'],
   showCloseButton?: boolean
 }
 
-export const DialogContent = defineComponent<DialogContentProps>(
-  (props, { attrs, slots }) =>
-    () => {
+export const DialogContent = defineComponent<DialogContentProps>({
+  name: 'DialogContent',
+  inheritAttrs: false,
+  props: ['showCloseButton'],
+
+  setup(props, { attrs, slots }) {
+    return () => {
       const { class: classValue, ...contentAttrs } = attrs as HTMLAttributes
       return (
         <RekaDialogPortal>
@@ -70,13 +74,9 @@ export const DialogContent = defineComponent<DialogContentProps>(
           </RekaDialogContent>
         </RekaDialogPortal>
       )
-    },
-  {
-    name: 'DialogContent',
-    inheritAttrs: false,
-    props: ['showCloseButton'],
+    }
   },
-)
+})
 
 export const DialogHeader: FunctionalComponent<HTMLAttributes> = (props, { slots }) => {
   const { class: classValue, ...elementProps } = props
@@ -92,8 +92,12 @@ type DialogFooterProps = HTMLAttributes & {
   showCloseButton?: boolean
 }
 
-export const DialogFooter = defineComponent<DialogFooterProps>(
-  (props, { attrs, slots }) => {
+export const DialogFooter = defineComponent<DialogFooterProps>({
+  name: 'DialogFooter',
+  inheritAttrs: false,
+  props: ['showCloseButton'],
+
+  setup(props, { attrs, slots }) {
     const compact = useIsCompactUi()
     const t = useT()
 
@@ -115,11 +119,6 @@ export const DialogFooter = defineComponent<DialogFooterProps>(
       )
     }
   },
-  {
-    name: 'DialogFooter',
-    inheritAttrs: false,
-    props: ['showCloseButton'],
-  },
-)
+})
 
 export type { DialogContentProps, DialogFooterProps }

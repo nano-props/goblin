@@ -9,8 +9,11 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
-export const WorkspaceRefreshAction = defineComponent(
-  (props: { workspaceId: string }) => {
+export const WorkspaceRefreshAction = defineComponent<{ workspaceId: string }>({
+  name: 'WorkspaceRefreshAction',
+  props: { workspaceId: { type: String, required: true } },
+
+  setup(props) {
     const t = useT()
     const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
     const workspaceId = computed(() => canonicalWorkspaceLocator(props.workspaceId))
@@ -52,8 +55,4 @@ export const WorkspaceRefreshAction = defineComponent(
       </Tip>
     )
   },
-  {
-    name: 'WorkspaceRefreshAction',
-    props: { workspaceId: { type: String, required: true } },
-  },
-)
+})

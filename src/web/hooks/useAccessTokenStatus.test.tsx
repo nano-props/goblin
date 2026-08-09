@@ -116,8 +116,9 @@ describe('useAccessTokenStatus', () => {
   })
 })
 
-const Harness = defineComponent(
-  () => {
+const Harness = defineComponent({
+  name: 'AccessTokenStatusTestHarness',
+  setup() {
     const auth = useAccessTokenStatus()
     return () => (
       <button type="button" onClick={auth.refresh}>
@@ -125,5 +126,4 @@ const Harness = defineComponent(
       </button>
     )
   },
-  { name: 'AccessTokenStatusTestHarness' },
-)
+})

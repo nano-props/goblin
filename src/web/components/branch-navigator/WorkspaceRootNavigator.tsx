@@ -27,8 +27,11 @@ interface WorkspaceRootNavigatorProps {
 }
 
 /** The non-Git workspace root is a first-class navigation target, not a synthetic branch. */
-export const WorkspaceRootNavigator = defineComponent(
-  (props: WorkspaceRootNavigatorProps) => {
+export const WorkspaceRootNavigator = defineComponent<WorkspaceRootNavigatorProps>({
+  name: 'WorkspaceRootNavigator',
+  props: ['workspaceId', 'selected', 'onSelect'],
+
+  setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
     const compact = useIsCompactUi()
@@ -148,11 +151,7 @@ export const WorkspaceRootNavigator = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspaceRootNavigator',
-    props: ['workspaceId', 'selected', 'onSelect'],
-  },
-)
+})
 
 interface WorkspaceActionProps {
   label: string

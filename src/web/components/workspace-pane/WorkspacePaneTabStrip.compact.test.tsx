@@ -359,8 +359,9 @@ describe('WorkspacePaneTabStrip compact', () => {
   })
 
   test('closes the active compact tab through the tab switcher', async () => {
-    const CompactCloseHarness = defineComponent(
-      () => {
+    const CompactCloseHarness = defineComponent({
+      name: 'CompactCloseHarness',
+      setup() {
         const sessions = shallowRef([
           session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: true }),
           session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
@@ -388,8 +389,7 @@ describe('WorkspacePaneTabStrip compact', () => {
           />
         )
       },
-      { name: 'CompactCloseHarness' },
-    )
+    })
 
     render(<CompactCloseHarness />)
     const compactTab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id]')

@@ -13,8 +13,10 @@ interface WorkspaceDirectoryStatusProps {
   onOpenFiles: () => void
 }
 
-export const WorkspaceDirectoryStatus = defineComponent(
-  (props: WorkspaceDirectoryStatusProps) => {
+export const WorkspaceDirectoryStatus = defineComponent<WorkspaceDirectoryStatusProps>({
+  name: 'WorkspaceDirectoryStatus',
+  props: ['overview', 'workingDirectory', 'onOpenFiles'],
+  setup(props) {
     const t = useT()
     const lang = useStoreSelector(i18nStore, (state) => state.lang)
     return () => {
@@ -64,5 +66,4 @@ export const WorkspaceDirectoryStatus = defineComponent(
       )
     }
   },
-  { name: 'WorkspaceDirectoryStatus', props: ['overview', 'workingDirectory', 'onOpenFiles'] },
-)
+})

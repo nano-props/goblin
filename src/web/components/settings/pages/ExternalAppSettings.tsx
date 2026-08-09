@@ -93,8 +93,10 @@ const EDITOR_APPS = [
   },
 ] as const satisfies readonly (ExternalToolItem & { id: EditorApp })[]
 
-const DetectionStatusBadge = defineComponent(
-  (props: { available: boolean }) => {
+const DetectionStatusBadge = defineComponent<{ available: boolean }>({
+  name: 'DetectionStatusBadge',
+  props: { available: Boolean },
+  setup(props) {
     const t = useT()
     return () => (
       <Badge variant={props.available ? 'success' : 'outline'}>
@@ -102,11 +104,15 @@ const DetectionStatusBadge = defineComponent(
       </Badge>
     )
   },
-  { name: 'DetectionStatusBadge', props: { available: Boolean } },
-)
+})
 
-const DetectionRow = defineComponent(
-  (props: { item: ExternalToolItem & { available: boolean } }) => {
+const DetectionRow = defineComponent<{ item: ExternalToolItem & { available: boolean } }>({
+  name: 'DetectionRow',
+  props: {
+    item: { type: Object as PropType<ExternalToolItem & { available: boolean }>, required: true },
+  },
+
+  setup(props) {
     const t = useT()
     return () => {
       const Icon = props.item.Icon
@@ -129,32 +135,28 @@ const DetectionRow = defineComponent(
       )
     }
   },
-  {
-    name: 'DetectionRow',
-    props: {
-      item: { type: Object as PropType<ExternalToolItem & { available: boolean }>, required: true },
-    },
-  },
-)
+})
 
-const DetectionList = defineComponent(
-  (props: { items: Array<ExternalToolItem & { available: boolean }> }) => () => (
-    <SettingsCard as="ul">
-      {props.items.map((item) => (
-        <DetectionRow key={item.titleKey} item={item} />
-      ))}
-    </SettingsCard>
-  ),
-  {
-    name: 'DetectionList',
-    props: {
-      items: { type: Array as PropType<Array<ExternalToolItem & { available: boolean }>>, required: true },
-    },
+const DetectionList = defineComponent<{ items: Array<ExternalToolItem & { available: boolean }> }>({
+  name: 'DetectionList',
+  props: {
+    items: { type: Array as PropType<Array<ExternalToolItem & { available: boolean }>>, required: true },
   },
-)
 
-export const ExternalAppSettings = defineComponent(
-  () => {
+  setup(props) {
+    return () => (
+      <SettingsCard as="ul">
+        {props.items.map((item) => (
+          <DetectionRow key={item.titleKey} item={item} />
+        ))}
+      </SettingsCard>
+    )
+  },
+})
+
+export const ExternalAppSettings = defineComponent({
+  name: 'ExternalAppSettings',
+  setup() {
     const t = useT()
     const { data } = useExternalAppsQuery()
     const { refreshExternalApps, refreshing } = useExternalAppSettingsController()
@@ -213,5 +215,4 @@ export const ExternalAppSettings = defineComponent(
       )
     }
   },
-  { name: 'ExternalAppSettings' },
-)
+})

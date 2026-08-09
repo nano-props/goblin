@@ -8,8 +8,9 @@ import { useT } from '#/web/stores/i18n-vue.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import { getPlatform } from '#/web/stores/host-info.ts'
 import { settingsLog } from '#/web/logger.ts'
-export const NotificationSettings = defineComponent(
-  () => {
+export const NotificationSettings = defineComponent({
+  name: 'NotificationSettings',
+  setup() {
     const t = useT()
     const fetchSettings = useFetchSettings()
     const { setTerminalNotificationsEnabled } = useFetchSettingsController()
@@ -86,8 +87,7 @@ export const NotificationSettings = defineComponent(
       </SettingsGroup>
     )
   },
-  { name: 'NotificationSettings' },
-)
+})
 
 /**
  * Pick the OS-specific i18n key for the notification permission hint.

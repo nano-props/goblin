@@ -37,8 +37,10 @@ interface DashboardHeaderProps {
   currentBranch: string
 }
 
-export const DashboardHeader = defineComponent(
-  (props: DashboardHeaderProps) => {
+export const DashboardHeader = defineComponent<DashboardHeaderProps>({
+  name: 'DashboardHeader',
+  props: ['workspace', 'remote', 'currentBranch'],
+  setup(props) {
     const t = useT()
     return () => {
       const remoteState = dashboardRemoteState(props.remote)
@@ -77,8 +79,7 @@ export const DashboardHeader = defineComponent(
       )
     }
   },
-  { name: 'DashboardHeader', props: ['workspace', 'remote', 'currentBranch'] },
-)
+})
 
 function dashboardRemoteState(remote: RepoRemoteInfo): {
   labelKey: 'dashboard.remote.connected' | 'dashboard.remote.local-only'
@@ -95,8 +96,10 @@ interface DashboardStatsProps {
   pullRequestState: DashboardPullRequestState
 }
 
-export const DashboardStats = defineComponent(
-  (props: DashboardStatsProps) => {
+export const DashboardStats = defineComponent<DashboardStatsProps>({
+  name: 'DashboardStats',
+  props: ['compact', 'summary', 'pullRequestState'],
+  setup(props) {
     const t = useT()
     return () => (
       <div
@@ -138,8 +141,7 @@ export const DashboardStats = defineComponent(
       </div>
     )
   },
-  { name: 'DashboardStats', props: ['compact', 'summary', 'pullRequestState'] },
-)
+})
 
 function pullRequestMetricValue(
   state: DashboardPullRequestState,
@@ -158,8 +160,10 @@ interface DashboardAttentionProps {
   onSelectBranch?: (branchName: string) => void
 }
 
-export const DashboardAttention = defineComponent(
-  (props: DashboardAttentionProps) => {
+export const DashboardAttention = defineComponent<DashboardAttentionProps>({
+  name: 'DashboardAttention',
+  props: ['branchModel', 'summary', 'onSelectBranch'],
+  setup(props) {
     const t = useT()
     return () => {
       if (props.summary.attentionBranches.length === 0) return null
@@ -179,8 +183,7 @@ export const DashboardAttention = defineComponent(
       )
     }
   },
-  { name: 'DashboardAttention', props: ['branchModel', 'summary', 'onSelectBranch'] },
-)
+})
 
 interface BranchAttentionRowProps {
   branchModel: DashboardRepositoryFacts
@@ -208,8 +211,10 @@ const BranchAttentionRow: FunctionalComponent<BranchAttentionRowProps> = (props)
 
 BranchAttentionRow.props = ['branchModel', 'item', 'onSelectBranch']
 
-const BranchSignals = defineComponent(
-  (props: { item: DashboardBranchItem }) => {
+const BranchSignals = defineComponent<{ item: DashboardBranchItem }>({
+  name: 'BranchSignals',
+  props: ['item'],
+  setup(props) {
     const t = useT()
     return () => {
       const { branch, dirty, pullRequest } = props.item
@@ -226,11 +231,12 @@ const BranchSignals = defineComponent(
       )
     }
   },
-  { name: 'BranchSignals', props: ['item'] },
-)
+})
 
-const SignalDelta = defineComponent(
-  (props: { direction: 'ahead' | 'behind'; count: number }) => {
+const SignalDelta = defineComponent<{ direction: 'ahead' | 'behind'; count: number }>({
+  name: 'SignalDelta',
+  props: ['direction', 'count'],
+  setup(props) {
     const t = useT()
     return () => {
       const Icon = props.direction === 'ahead' ? ArrowUp : ArrowDown
@@ -249,8 +255,7 @@ const SignalDelta = defineComponent(
       )
     }
   },
-  { name: 'SignalDelta', props: ['direction', 'count'] },
-)
+})
 
 interface DashboardRecentBranchesProps {
   branchModel: DashboardRepositoryFacts
@@ -258,8 +263,10 @@ interface DashboardRecentBranchesProps {
   onSelectBranch?: (branchName: string) => void
 }
 
-export const DashboardRecentBranches = defineComponent(
-  (props: DashboardRecentBranchesProps) => {
+export const DashboardRecentBranches = defineComponent<DashboardRecentBranchesProps>({
+  name: 'DashboardRecentBranches',
+  props: ['branchModel', 'branches', 'onSelectBranch'],
+  setup(props) {
     const t = useT()
     return () => (
       <DashboardSection title={t('dashboard.recent.title')} description={t('dashboard.recent.description')}>
@@ -295,5 +302,4 @@ export const DashboardRecentBranches = defineComponent(
       </DashboardSection>
     )
   },
-  { name: 'DashboardRecentBranches', props: ['branchModel', 'branches', 'onSelectBranch'] },
-)
+})

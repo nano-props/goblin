@@ -37,28 +37,29 @@ function projectRepoReadNotice(failures: readonly RepoReadFailure[]): RepoReadNo
   }
 }
 
-export const RepoReadNotice = defineComponent(
-  (props: { failures: readonly RepoReadFailure[] }) => () => {
-    const presentation = projectRepoReadNotice(props.failures)
-    if (!presentation) return null
-    return presentation.stale ? (
-      <RepoStatusStaleNotice
-        messageKey={presentation.message}
-        retrying={presentation.retrying}
-        onRetry={presentation.retry}
-      />
-    ) : (
-      <RepoReadFailureNotice
-        messageKey={presentation.message}
-        retrying={presentation.retrying}
-        onRetry={presentation.retry}
-      />
-    )
+export const RepoReadNotice = defineComponent<{ failures: readonly RepoReadFailure[] }>({
+  name: 'RepoReadNotice',
+  props: {
+    failures: { type: Array as PropType<readonly RepoReadFailure[]>, required: true },
   },
-  {
-    name: 'RepoReadNotice',
-    props: {
-      failures: { type: Array as PropType<readonly RepoReadFailure[]>, required: true },
-    },
+
+  setup(props) {
+    return () => {
+      const presentation = projectRepoReadNotice(props.failures)
+      if (!presentation) return null
+      return presentation.stale ? (
+        <RepoStatusStaleNotice
+          messageKey={presentation.message}
+          retrying={presentation.retrying}
+          onRetry={presentation.retry}
+        />
+      ) : (
+        <RepoReadFailureNotice
+          messageKey={presentation.message}
+          retrying={presentation.retrying}
+          onRetry={presentation.retry}
+        />
+      )
+    }
   },
-)
+})

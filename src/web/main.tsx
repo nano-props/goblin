@@ -28,23 +28,25 @@ interface MainHotData {
 const hotData: MainHotData = import.meta.hot?.data ?? {}
 const bootstrapOwner = createWebBootstrapOwner(hotData.nextBootstrapGeneration ?? 1)
 const phase = shallowRef<BootstrapPhase>({ kind: 'loading' })
-const Root = defineComponent(
-  () => () => {
-    if (phase.value.kind === 'loading') return <BootLoading />
-    if (phase.value.kind === 'error') return <BootError onRetry={phase.value.retry} />
-    return (
-      <>
-        <ResponsiveUiProvider>
-          <AuthProvider>
-            <AppRouterProvider />
-          </AuthProvider>
-        </ResponsiveUiProvider>
-        {import.meta.env.DEV ? <VueQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" /> : null}
-      </>
-    )
+const Root = defineComponent({
+  name: 'Root',
+  setup() {
+    return () => {
+      if (phase.value.kind === 'loading') return <BootLoading />
+      if (phase.value.kind === 'error') return <BootError onRetry={phase.value.retry} />
+      return (
+        <>
+          <ResponsiveUiProvider>
+            <AuthProvider>
+              <AppRouterProvider />
+            </AuthProvider>
+          </ResponsiveUiProvider>
+          {import.meta.env.DEV ? <VueQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" /> : null}
+        </>
+      )
+    }
   },
-  { name: 'Root' },
-)
+})
 const app = createApp(Root)
 const errorHandler = vueAppErrorHandler()
 if (errorHandler) app.config.errorHandler = errorHandler

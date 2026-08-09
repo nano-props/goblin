@@ -9,8 +9,14 @@ interface WorkspaceDashboardRowActionProps {
   onOpenDashboard?: () => void
 }
 
-export const WorkspaceDashboardRowAction = defineComponent(
-  (props: WorkspaceDashboardRowActionProps) => {
+export const WorkspaceDashboardRowAction = defineComponent<WorkspaceDashboardRowActionProps>({
+  name: 'WorkspaceDashboardRowAction',
+  props: {
+    selected: Boolean,
+    onOpenDashboard: Function as PropType<() => void>,
+  },
+
+  setup(props) {
     const t = useT()
     return () => (
       <SidebarRowButton
@@ -24,11 +30,4 @@ export const WorkspaceDashboardRowAction = defineComponent(
       </SidebarRowButton>
     )
   },
-  {
-    name: 'WorkspaceDashboardRowAction',
-    props: {
-      selected: Boolean,
-      onOpenDashboard: Function as PropType<() => void>,
-    },
-  },
-)
+})

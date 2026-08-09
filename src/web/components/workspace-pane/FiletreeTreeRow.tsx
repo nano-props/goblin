@@ -166,8 +166,11 @@ interface FiletreeActionMenuProps {
   readonly onRequestTrashFile?: (node: WorkspaceFilesystemNode) => void
 }
 
-const FiletreeActionMenu = defineComponent(
-  (props: FiletreeActionMenuProps) => {
+const FiletreeActionMenu = defineComponent<FiletreeActionMenuProps>({
+  name: 'FiletreeActionMenu',
+  props: ['node', 'busy', 'onOpenFile', 'onDownloadFile', 'onRequestTrashFile'],
+
+  setup(props) {
     const t = useT()
     const open = ref(false)
     const compact = useIsCompactUi()
@@ -241,8 +244,4 @@ const FiletreeActionMenu = defineComponent(
       )
     }
   },
-  {
-    name: 'FiletreeActionMenu',
-    props: ['node', 'busy', 'onOpenFile', 'onDownloadFile', 'onRequestTrashFile'],
-  },
-)
+})

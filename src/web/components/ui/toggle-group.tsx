@@ -49,8 +49,29 @@ type ToggleGroupProps = Omit<ToggleGroupRootProps, 'class' | 'modelValue'> &
     'onUpdate:modelValue'?: (value: AcceptableValue | AcceptableValue[]) => void
   }
 
-export const ToggleGroup = defineComponent<ToggleGroupProps>(
-  (props, { attrs, slots }) => {
+export const ToggleGroup = defineComponent<ToggleGroupProps>({
+  name: 'ToggleGroup',
+  inheritAttrs: false,
+  props: [
+    'as',
+    'asChild',
+    'type',
+    'modelValue',
+    'defaultValue',
+    'rovingFocus',
+    'disabled',
+    'orientation',
+    'dir',
+    'loop',
+    'name',
+    'required',
+    'variant',
+    'size',
+    'spacing',
+    'onUpdate:modelValue',
+  ],
+
+  setup(props, { attrs, slots }) {
     const variant = computed(() => props.variant ?? 'default')
     const size = computed(() => props.size ?? 'default')
     const spacing = computed(() => props.spacing ?? 0)
@@ -89,34 +110,16 @@ export const ToggleGroup = defineComponent<ToggleGroupProps>(
       )
     }
   },
-  {
-    name: 'ToggleGroup',
-    inheritAttrs: false,
-    props: [
-      'as',
-      'asChild',
-      'type',
-      'modelValue',
-      'defaultValue',
-      'rovingFocus',
-      'disabled',
-      'orientation',
-      'dir',
-      'loop',
-      'name',
-      'required',
-      'variant',
-      'size',
-      'spacing',
-      'onUpdate:modelValue',
-    ],
-  },
-)
+})
 
 type ToggleGroupItemProps = Omit<RekaToggleGroupItemProps, 'class'> & HTMLAttributes & ToggleVariantProps
 
-export const ToggleGroupItem = defineComponent<ToggleGroupItemProps>(
-  (props, { attrs, slots }) => {
+export const ToggleGroupItem = defineComponent<ToggleGroupItemProps>({
+  name: 'ToggleGroupItem',
+  inheritAttrs: false,
+  props: ['as', 'asChild', 'value', 'disabled', 'variant', 'size'],
+
+  setup(props, { attrs, slots }) {
     const context = inject(toggleGroupKey, null)
 
     return () => {
@@ -149,9 +152,4 @@ export const ToggleGroupItem = defineComponent<ToggleGroupItemProps>(
       )
     }
   },
-  {
-    name: 'ToggleGroupItem',
-    inheritAttrs: false,
-    props: ['as', 'asChild', 'value', 'disabled', 'variant', 'size'],
-  },
-)
+})

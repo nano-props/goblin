@@ -3,18 +3,25 @@ import type { PropType } from 'vue'
 import { Checkbox } from '#/web/components/ui/checkbox.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
-export const ConfirmCheckbox = defineComponent(
-  (
-    props: {
-      checked: boolean
-      describedBy?: string
-      destructive?: boolean
-      disabled?: boolean
-      onCheckedChange: (checked: boolean) => void
-      title?: string
-    },
-    { slots },
-  ) => {
+export const ConfirmCheckbox = defineComponent<{
+  checked: boolean
+  describedBy?: string
+  destructive?: boolean
+  disabled?: boolean
+  onCheckedChange: (checked: boolean) => void
+  title?: string
+}>({
+  name: 'ConfirmCheckbox',
+  props: {
+    checked: { type: Boolean, required: true },
+    describedBy: String,
+    destructive: Boolean,
+    disabled: Boolean,
+    onCheckedChange: { type: Function as PropType<(checked: boolean) => void>, required: true },
+    title: String,
+  },
+
+  setup(props, { slots }) {
     const id = useId()
     return () => (
       <div
@@ -38,15 +45,4 @@ export const ConfirmCheckbox = defineComponent(
       </div>
     )
   },
-  {
-    name: 'ConfirmCheckbox',
-    props: {
-      checked: { type: Boolean, required: true },
-      describedBy: String,
-      destructive: Boolean,
-      disabled: Boolean,
-      onCheckedChange: { type: Function as PropType<(checked: boolean) => void>, required: true },
-      title: String,
-    },
-  },
-)
+})

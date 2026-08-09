@@ -35,8 +35,14 @@ interface WorkspacePaneTabTooltipLayerProps {
   class?: HTMLAttributes['class']
 }
 
-export const WorkspacePaneTabTooltipLayer = defineComponent(
-  (props: WorkspacePaneTabTooltipLayerProps, { attrs, slots }) => {
+export const WorkspacePaneTabTooltipLayer = defineComponent<WorkspacePaneTabTooltipLayerProps>({
+  name: 'WorkspacePaneTabTooltipLayer',
+  inheritAttrs: false,
+  props: {
+    items: { type: Array as PropType<readonly WorkspacePaneTabItem[]>, required: true },
+  },
+
+  setup(props, { attrs, slots }) {
     const rootRef = ref<HTMLElement | null>(null)
     const popupRef = ref<HTMLDivElement | null>(null)
     const tooltip = shallowRef<TooltipState | null>(null)
@@ -254,14 +260,7 @@ export const WorkspacePaneTabTooltipLayer = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspacePaneTabTooltipLayer',
-    inheritAttrs: false,
-    props: {
-      items: { type: Array as PropType<readonly WorkspacePaneTabItem[]>, required: true },
-    },
-  },
-)
+})
 
 function componentRootElement(value: unknown): HTMLElement | null {
   if (value instanceof HTMLElement) return value

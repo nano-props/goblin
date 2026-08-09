@@ -23,45 +23,46 @@ interface AppOverlaysProps {
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
 }
 
-export const AppOverlays = defineComponent(
-  (props: AppOverlaysProps) => () => (
-    <>
-      <WorkspaceOpenDialog
-        open={props.overlays.state.value.openWorkspace.open}
-        onOpenChange={props.overlays.setOpenWorkspaceOpen}
-      />
-      <RepoCloneDialog open={props.overlays.state.value.clone.open} onOpenChange={props.overlays.setCloneOpen} />
-      <OpenRemoteWorkspaceDialog
-        open={props.overlays.state.value.openRemoteWorkspace.open}
-        onOpenChange={props.overlays.setOpenRemoteWorkspaceOpen}
-      />
-      <BranchActionDialogHost
-        currentWorkspaceId={props.hydratedRouteWorkspaceId}
-        currentBranchName={props.currentBranchName}
-      />
-      <FiletreeActionDialogHost
-        currentWorkspaceId={props.hydratedRouteWorkspaceId}
-        currentWorkspaceRuntimeId={props.currentWorkspaceRuntimeId}
-      />
-      <TerminalActionDialogHost
-        currentWorkspaceId={props.hydratedRouteWorkspaceId}
-        currentWorkspacePaneRoute={props.currentWorkspacePaneRoute}
-        navigation={props.navigation}
-      />
-      <WorkspaceDropOverlay active={props.workspaceDrop.active.value} />
-      <Toaster position="bottom-right" closeButton />
-    </>
-  ),
-  {
-    name: 'AppOverlays',
-    props: [
-      'overlays',
-      'workspaceDrop',
-      'navigation',
-      'hydratedRouteWorkspaceId',
-      'currentWorkspaceRuntimeId',
-      'currentBranchName',
-      'currentWorkspacePaneRoute',
-    ],
+export const AppOverlays = defineComponent<AppOverlaysProps>({
+  name: 'AppOverlays',
+  props: [
+    'overlays',
+    'workspaceDrop',
+    'navigation',
+    'hydratedRouteWorkspaceId',
+    'currentWorkspaceRuntimeId',
+    'currentBranchName',
+    'currentWorkspacePaneRoute',
+  ],
+
+  setup(props) {
+    return () => (
+      <>
+        <WorkspaceOpenDialog
+          open={props.overlays.state.value.openWorkspace.open}
+          onOpenChange={props.overlays.setOpenWorkspaceOpen}
+        />
+        <RepoCloneDialog open={props.overlays.state.value.clone.open} onOpenChange={props.overlays.setCloneOpen} />
+        <OpenRemoteWorkspaceDialog
+          open={props.overlays.state.value.openRemoteWorkspace.open}
+          onOpenChange={props.overlays.setOpenRemoteWorkspaceOpen}
+        />
+        <BranchActionDialogHost
+          currentWorkspaceId={props.hydratedRouteWorkspaceId}
+          currentBranchName={props.currentBranchName}
+        />
+        <FiletreeActionDialogHost
+          currentWorkspaceId={props.hydratedRouteWorkspaceId}
+          currentWorkspaceRuntimeId={props.currentWorkspaceRuntimeId}
+        />
+        <TerminalActionDialogHost
+          currentWorkspaceId={props.hydratedRouteWorkspaceId}
+          currentWorkspacePaneRoute={props.currentWorkspacePaneRoute}
+          navigation={props.navigation}
+        />
+        <WorkspaceDropOverlay active={props.workspaceDrop.active.value} />
+        <Toaster position="bottom-right" closeButton />
+      </>
+    )
   },
-)
+})

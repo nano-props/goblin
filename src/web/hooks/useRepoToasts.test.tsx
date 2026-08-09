@@ -108,13 +108,14 @@ describe('useRepoToasts', () => {
   })
 })
 
-const Harness = defineComponent(
-  (props: { repoId: WorkspaceId }) => {
+const Harness = defineComponent<{ repoId: WorkspaceId }>({
+  name: 'RepoToastsHarness',
+  props: ['repoId'],
+  setup(props) {
     useRepoToasts(() => props.repoId)
     return () => null
   },
-  { name: 'RepoToastsHarness', props: ['repoId'] },
-)
+})
 
 function toastDescriptionText(description: unknown): string {
   if (!isVNode(description)) throw new Error('expected a Vue toast description')

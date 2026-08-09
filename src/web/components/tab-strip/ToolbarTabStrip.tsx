@@ -12,47 +12,52 @@ interface ToolbarTabStripProps {
   viewportOnScroll?: (event: Event) => void
 }
 
-export const ToolbarTabStrip = defineComponent(
-  (props: ToolbarTabStripProps) => () => {
-    if (props.compact) {
-      return <div class="flex h-full min-w-0 flex-1 items-center">{props.compactContent}</div>
-    }
+export const ToolbarTabStrip = defineComponent<ToolbarTabStripProps>({
+  name: 'ToolbarTabStrip',
+  props: {
+    compact: { type: Boolean, required: true },
+    compactContent: { type: null, required: true },
+    scrollContent: { type: null, required: true },
+    viewportRef: [Object, Function] as PropType<ToolbarTabStripProps['viewportRef']>,
+    viewportOnScroll: Function as PropType<(event: Event) => void>,
+  },
 
-    return (
-      <div class="flex h-full min-w-0 flex-1 items-center">
-        <TitleBarScrollableInteractiveRegion asChild>
-          <ScrollArea
-            orientation="horizontal"
-            scrollbarMode="compact"
-            class="h-full min-w-0 max-w-full flex-none w-fit"
-            viewportClass="[&>div]:h-full"
-            viewportRef={props.viewportRef}
-            viewportOnScroll={props.viewportOnScroll}
-          >
-            {props.scrollContent}
-          </ScrollArea>
-        </TitleBarScrollableInteractiveRegion>
-        <TitleBarDragRegion reserveWindowControls={false} class="min-w-0 flex-1 self-stretch" aria-hidden="true" />
-      </div>
-    )
+  setup(props) {
+    return () => {
+      if (props.compact) {
+        return <div class="flex h-full min-w-0 flex-1 items-center">{props.compactContent}</div>
+      }
+
+      return (
+        <div class="flex h-full min-w-0 flex-1 items-center">
+          <TitleBarScrollableInteractiveRegion asChild>
+            <ScrollArea
+              orientation="horizontal"
+              scrollbarMode="compact"
+              class="h-full min-w-0 max-w-full flex-none w-fit"
+              viewportClass="[&>div]:h-full"
+              viewportRef={props.viewportRef}
+              viewportOnScroll={props.viewportOnScroll}
+            >
+              {props.scrollContent}
+            </ScrollArea>
+          </TitleBarScrollableInteractiveRegion>
+          <TitleBarDragRegion reserveWindowControls={false} class="min-w-0 flex-1 self-stretch" aria-hidden="true" />
+        </div>
+      )
+    }
   },
-  {
-    name: 'ToolbarTabStrip',
-    props: {
-      compact: { type: Boolean, required: true },
-      compactContent: { type: null, required: true },
-      scrollContent: { type: null, required: true },
-      viewportRef: [Object, Function] as PropType<ToolbarTabStripProps['viewportRef']>,
-      viewportOnScroll: Function as PropType<(event: Event) => void>,
-    },
-  },
-)
+})
 
 type ToolbarTabStripBodyProps = HTMLAttributes & { scroll?: boolean }
 
-export const ToolbarTabStripBody = defineComponent(
-  (props: ToolbarTabStripBodyProps, { slots, attrs }) =>
-    () => {
+export const ToolbarTabStripBody = defineComponent<ToolbarTabStripBodyProps>({
+  name: 'ToolbarTabStripBody',
+  inheritAttrs: false,
+  props: { scroll: Boolean },
+
+  setup(props, { slots, attrs }) {
+    return () => {
       const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
       return (
         <div
@@ -62,23 +67,21 @@ export const ToolbarTabStripBody = defineComponent(
           {slots.default?.()}
         </div>
       )
-    },
-  {
-    name: 'ToolbarTabStripBody',
-    inheritAttrs: false,
-    props: { scroll: Boolean },
+    }
   },
-)
+})
 
-export const ToolbarTabList = defineComponent(
-  (_props, { slots, attrs }) =>
-    () => {
+export const ToolbarTabList = defineComponent<HTMLAttributes>({
+  name: 'ToolbarTabList',
+  inheritAttrs: false,
+  setup(_props, { slots, attrs }) {
+    return () => {
       const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
       return (
         <div {...elementAttrs} class={cn('flex h-full min-w-0 items-center gap-1', classValue)}>
           {slots.default?.()}
         </div>
       )
-    },
-  { name: 'ToolbarTabList', inheritAttrs: false },
-)
+    }
+  },
+})

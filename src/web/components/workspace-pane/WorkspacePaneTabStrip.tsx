@@ -51,8 +51,27 @@ interface WorkspacePaneTabStripProps {
 
 export const EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY = '__workspace-pane-empty__'
 
-export const WorkspacePaneTabStrip = defineComponent(
-  (props: WorkspacePaneTabStripProps) => {
+export const WorkspacePaneTabStrip = defineComponent<WorkspacePaneTabStripProps>({
+  name: 'WorkspacePaneTabStrip',
+  props: [
+    'workspacePaneTabTargetKey',
+    'items',
+    'workspacePaneId',
+    'responsiveCompact',
+    'activeTabIdentity',
+    'panelActive',
+    'focusRegistry',
+    'emptyFocusKey',
+    'createAction',
+    'onSelect',
+    'onReselect',
+    'onClose',
+    'onReorder',
+    'onNavigateOut',
+    'activateKeyboardNavigationSelection',
+  ],
+
+  setup(props) {
     const t = useT()
     const sortableItems = computed(() => props.items.filter(isSortableWorkspacePaneTabItem))
     const activeItem = computed(() =>
@@ -281,24 +300,4 @@ export const WorkspacePaneTabStrip = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspacePaneTabStrip',
-    props: [
-      'workspacePaneTabTargetKey',
-      'items',
-      'workspacePaneId',
-      'responsiveCompact',
-      'activeTabIdentity',
-      'panelActive',
-      'focusRegistry',
-      'emptyFocusKey',
-      'createAction',
-      'onSelect',
-      'onReselect',
-      'onClose',
-      'onReorder',
-      'onNavigateOut',
-      'activateKeyboardNavigationSelection',
-    ],
-  },
-)
+})

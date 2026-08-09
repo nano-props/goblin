@@ -31,8 +31,9 @@ import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
  * we don't surface those native-host controls. Server-reported LAN
  * addresses remain visible because they are useful in either runtime.
  */
-export const WebSettings = defineComponent(
-  () => {
+export const WebSettings = defineComponent({
+  name: 'WebSettings',
+  setup() {
     const t = useT()
     const bridge = getClientBridge()
     const isElectron = bridge.kind() === 'electron'
@@ -233,8 +234,7 @@ export const WebSettings = defineComponent(
       )
     }
   },
-  { name: 'WebSettings' },
-)
+})
 
 function isLoopbackHost(host: string): boolean {
   return host === 'localhost' || host === '::1' || host === '[::1]' || host.startsWith('127.')
@@ -268,8 +268,14 @@ const AddressControl: FunctionalComponent<AddressControlProps> = ({ id, url, cop
 AddressControl.props = ['id', 'url', 'copyLabel', 'onCopy']
 AddressControl.inheritAttrs = false
 
-const QrCodeCell = defineComponent(
-  (props: { target: string; label: string }) => {
+const QrCodeCell = defineComponent<{ target: string; label: string }>({
+  name: 'QrCodeCell',
+  props: {
+    target: { type: String, required: true },
+    label: { type: String, required: true },
+  },
+
+  setup(props) {
     const dataUrl = ref<string | null>(null)
     // QR generation is a lazy async resource owned by the current target.
     watch(
@@ -303,11 +309,4 @@ const QrCodeCell = defineComponent(
       </div>
     )
   },
-  {
-    name: 'QrCodeCell',
-    props: {
-      target: { type: String, required: true },
-      label: { type: String, required: true },
-    },
-  },
-)
+})

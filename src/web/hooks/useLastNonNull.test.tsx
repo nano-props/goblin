@@ -7,13 +7,13 @@ import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 
 describe('useLastNonNull', () => {
   test('keeps the latest non-null value when the source becomes null', async () => {
-    const Harness = defineComponent(
-      (props: { value: { branch: string } | null }) => {
+    const Harness = defineComponent<{ value: { branch: string } | null }>({
+      props: ['value'],
+      setup(props) {
         const retained = useLastNonNull(() => props.value)
         return () => <div data-testid="value">{retained.value?.branch ?? ''}</div>
       },
-      { props: ['value'] },
-    )
+    })
     const view = renderInJsdom(Harness, { props: { value: { branch: 'feature/x' } } })
 
     expect(view.getByTestId('value').textContent).toBe('feature/x')
@@ -26,9 +26,11 @@ describe('useLastNonNull', () => {
   })
 
   test('returns null when the source has always been null', async () => {
-    const Harness = defineComponent(() => {
-      const retained = useLastNonNull<string>(null)
-      return () => <div data-testid="value">{retained.value ?? ''}</div>
+    const Harness = defineComponent({
+      setup() {
+        const retained = useLastNonNull<string>(null)
+        return () => <div data-testid="value">{retained.value ?? ''}</div>
+      },
     })
     const view = renderInJsdom(Harness)
     expect(view.getByTestId('value').textContent).toBe('')

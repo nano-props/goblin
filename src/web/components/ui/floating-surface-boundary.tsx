@@ -12,8 +12,11 @@ interface FloatingSurfaceBoundaryProps {
 const floatingSurfaceBoundaryKey: InjectionKey<FloatingSurfaceBoundaryContextValue> =
   Symbol('floating-surface-boundary')
 
-const FloatingSurfaceBoundary = defineComponent<FloatingSurfaceBoundaryProps>(
-  (props, { slots }) => {
+const FloatingSurfaceBoundary = defineComponent<FloatingSurfaceBoundaryProps>({
+  name: 'FloatingSurfaceBoundary',
+  props: ['onPinnedChange'],
+
+  setup(props, { slots }) {
     const openDescendantCount = ref(0)
     let mounted = false
     let lastPinned: boolean | undefined
@@ -47,11 +50,7 @@ const FloatingSurfaceBoundary = defineComponent<FloatingSurfaceBoundaryProps>(
 
     return () => slots.default?.()
   },
-  {
-    name: 'FloatingSurfaceBoundary',
-    props: ['onPinnedChange'],
-  },
-)
+})
 
 export function useFloatingSurfaceBoundaryPin(open: MaybeRefOrGetter<boolean>): void {
   const boundary = inject(floatingSurfaceBoundaryKey, null)

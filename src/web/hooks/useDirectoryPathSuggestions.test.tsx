@@ -152,8 +152,10 @@ describe('useDirectoryPathSuggestions', () => {
 
     const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
 
-    const Host = defineComponent(
-      (props: { prefix: string }) => {
+    const Host = defineComponent<{ prefix: string }>({
+      name: 'RemotePathSuggestionsTestHost',
+      props: ['prefix'],
+      setup(props) {
         const state = useDirectoryPathSuggestions({
           enabled: true,
           source: { kind: 'ssh', alias: 'host' },
@@ -162,8 +164,7 @@ describe('useDirectoryPathSuggestions', () => {
         snapshots.push(state)
         return () => null
       },
-      { name: 'RemotePathSuggestionsTestHost', props: ['prefix'] },
-    )
+    })
 
     const { rerender } = renderInJsdom(<Host prefix="/srv/" />)
 
@@ -208,8 +209,10 @@ describe('useDirectoryPathSuggestions', () => {
     mockedLocalFetch.mockResolvedValueOnce(['/srv/alpha']).mockResolvedValueOnce(['/srv/beta'])
     const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
 
-    const Host = defineComponent(
-      (props: { prefix: string }) => {
+    const Host = defineComponent<{ prefix: string }>({
+      name: 'LocalPathSuggestionsTestHost',
+      props: ['prefix'],
+      setup(props) {
         const state = useDirectoryPathSuggestions({
           enabled: true,
           source: { kind: 'local' },
@@ -218,8 +221,7 @@ describe('useDirectoryPathSuggestions', () => {
         snapshots.push(state)
         return () => null
       },
-      { name: 'LocalPathSuggestionsTestHost', props: ['prefix'] },
-    )
+    })
 
     const { rerender } = renderInJsdom(<Host prefix="/srv/a" />)
     await flushTestUpdates(async () => await advanceTimersAndFlush(350))
@@ -240,8 +242,10 @@ describe('useDirectoryPathSuggestions', () => {
     mockedFetch.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
     const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
 
-    const Host = defineComponent(
-      (props: { alias: string }) => {
+    const Host = defineComponent<{ alias: string }>({
+      name: 'AliasedPathSuggestionsTestHost',
+      props: ['alias'],
+      setup(props) {
         const state = useDirectoryPathSuggestions({
           enabled: true,
           source: () => ({ kind: 'ssh', alias: props.alias }),
@@ -250,8 +254,7 @@ describe('useDirectoryPathSuggestions', () => {
         snapshots.push(state)
         return () => null
       },
-      { name: 'AliasedPathSuggestionsTestHost', props: ['alias'] },
-    )
+    })
 
     const { rerender } = renderInJsdom(<Host alias="first" />)
     await flushTestUpdates(async () => await advanceTimersAndFlush(350))
@@ -281,8 +284,10 @@ describe('useDirectoryPathSuggestions', () => {
     const request = Promise.withResolvers<string[]>()
     mockedFetch.mockReturnValue(request.promise)
     const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
-    const Host = defineComponent(
-      (props: { alias: string; prefix: string }) => {
+    const Host = defineComponent<{ alias: string; prefix: string }>({
+      name: 'CanonicalPathSuggestionsTestHost',
+      props: ['alias', 'prefix'],
+      setup(props) {
         const state = useDirectoryPathSuggestions({
           enabled: true,
           source: () => ({ kind: 'ssh', alias: props.alias }),
@@ -291,8 +296,7 @@ describe('useDirectoryPathSuggestions', () => {
         snapshots.push(state)
         return () => null
       },
-      { name: 'CanonicalPathSuggestionsTestHost', props: ['alias', 'prefix'] },
-    )
+    })
     const view = renderInJsdom(<Host alias="prod" prefix="/srv/repo" />)
     await flushTestUpdates(async () => await advanceTimersAndFlush(350))
     const signal = mockedFetch.mock.calls[0]?.[1]
@@ -333,8 +337,9 @@ interface RenderInput {
 async function renderHookAndWaitForFetch(input: RenderInput) {
   useFakeTimers()
   let captured = { suggestions: [] as string[], isLoading: false, hasFetched: false }
-  const Host = defineComponent(
-    () => {
+  const Host = defineComponent({
+    name: 'PathSuggestionsResultTestHost',
+    setup() {
       captured = useDirectoryPathSuggestions({
         enabled: input.enabled,
         source: { kind: 'ssh', alias: input.alias },
@@ -342,8 +347,7 @@ async function renderHookAndWaitForFetch(input: RenderInput) {
       })
       return () => null
     },
-    { name: 'PathSuggestionsResultTestHost' },
-  )
+  })
   renderInJsdom(<Host />)
   // The hook debounces by 350ms before firing; advance past that and
   // let the queued microtasks settle so the state update lands.
@@ -354,8 +358,9 @@ async function renderHookAndWaitForFetch(input: RenderInput) {
 async function renderHookLifecycle(input: RenderInput) {
   useFakeTimers()
   const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
-  const Host = defineComponent(
-    () => {
+  const Host = defineComponent({
+    name: 'PathSuggestionsLifecycleTestHost',
+    setup() {
       const state = useDirectoryPathSuggestions({
         enabled: input.enabled,
         source: { kind: 'ssh', alias: input.alias },
@@ -364,8 +369,7 @@ async function renderHookLifecycle(input: RenderInput) {
       snapshots.push(state)
       return () => null
     },
-    { name: 'PathSuggestionsLifecycleTestHost' },
-  )
+  })
   renderInJsdom(<Host />)
   await flushTestUpdates(async () => await advanceTimersAndFlush(350))
   return snapshots

@@ -53,13 +53,21 @@ export const WorkspaceLayoutPane: FunctionalComponent = (_props, { slots }) => (
   <div class="flex min-h-0 flex-1 flex-col overflow-hidden">{slots.default?.()}</div>
 )
 
-export const CompactWorkspaceLayout = defineComponent(
-  (props: {
-    activePane: 'navigator' | 'workspace'
-    sidebarPane: VNodeChild
-    workspacePane: VNodeChild
-    transitionScopeKey?: unknown
-  }) => {
+export const CompactWorkspaceLayout = defineComponent<{
+  activePane: 'navigator' | 'workspace'
+  sidebarPane: VNodeChild
+  workspacePane: VNodeChild
+  transitionScopeKey?: unknown
+}>({
+  name: 'CompactWorkspaceLayout',
+  props: {
+    activePane: { type: String as PropType<'navigator' | 'workspace'>, required: true },
+    sidebarPane: { type: null, required: true },
+    workspacePane: { type: null, required: true },
+    transitionScopeKey: null,
+  },
+
+  setup(props) {
     const workspaceActive = () => props.activePane === 'workspace'
     const retainedSidebarPane = useRetainedValueDuringExit({
       value: () => ({ content: props.sidebarPane }),
@@ -103,16 +111,7 @@ export const CompactWorkspaceLayout = defineComponent(
       )
     }
   },
-  {
-    name: 'CompactWorkspaceLayout',
-    props: {
-      activePane: { type: String as PropType<'navigator' | 'workspace'>, required: true },
-      sidebarPane: { type: null, required: true },
-      workspacePane: { type: null, required: true },
-      transitionScopeKey: null,
-    },
-  },
-)
+})
 
 export const ScrollPane: FunctionalComponent = (_props, { slots }) => (
   <ScrollArea class="min-h-0 flex-1">{slots.default?.()}</ScrollArea>

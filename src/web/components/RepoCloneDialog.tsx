@@ -16,8 +16,10 @@ interface RepoCloneDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export const RepoCloneDialog = defineComponent(
-  (props: RepoCloneDialogProps) => {
+export const RepoCloneDialog = defineComponent<RepoCloneDialogProps>({
+  name: 'RepoCloneDialog',
+  props: ['open', 'onOpenChange'],
+  setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
 
@@ -61,5 +63,4 @@ export const RepoCloneDialog = defineComponent(
       <CloneRepositoryDialog open={props.open} onClose={() => props.onOpenChange(false)} onClone={cloneRepository} />
     )
   },
-  { name: 'RepoCloneDialog', props: ['open', 'onOpenChange'] },
-)
+})

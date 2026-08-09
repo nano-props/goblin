@@ -13,8 +13,10 @@ interface Props {
   idleText: string
 }
 
-export const RemoteDiagnosticsPanel = defineComponent(
-  (props: Props) => {
+export const RemoteDiagnosticsPanel = defineComponent<Props>({
+  name: 'RemoteDiagnosticsPanel',
+  props: ['diagnostics', 'error', 'loading', 'idleText'],
+  setup(props) {
     const t = useT()
 
     async function copyText(value: string): Promise<void> {
@@ -60,8 +62,7 @@ export const RemoteDiagnosticsPanel = defineComponent(
       )
     }
   },
-  { name: 'RemoteDiagnosticsPanel', props: ['diagnostics', 'error', 'loading', 'idleText'] },
-)
+})
 
 function diagnosticCategoryLabel(t: (key: string) => string, category: string): string {
   const known = category as RemoteDiagnosticCategory

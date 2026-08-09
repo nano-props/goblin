@@ -13,8 +13,9 @@ import { useTerminalRuntimeMembershipIndex } from '#/web/components/terminal/ter
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
-export const TerminalSessionProvider = defineComponent(
-  (_props, { slots }) => {
+export const TerminalSessionProvider = defineComponent({
+  name: 'TerminalSessionProvider',
+  setup(_props, { slots }) {
     const runtimeMembershipIndex = useTerminalRuntimeMembershipIndex()
     const selectedSessionIds = useStoreSelector(
       workspacesStore,
@@ -98,5 +99,4 @@ export const TerminalSessionProvider = defineComponent(
 
     return () => slots.default?.()
   },
-  { name: 'TerminalSessionProvider' },
-)
+})

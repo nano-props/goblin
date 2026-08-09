@@ -33,8 +33,23 @@ export interface BranchRowProps {
   branchActionBusy?: boolean
 }
 
-export const BranchRow = defineComponent(
-  (props: BranchRowProps) => {
+export const BranchRow = defineComponent<BranchRowProps>({
+  name: 'BranchRow',
+  props: {
+    repo: { type: Object as PropType<BranchActionRepo>, required: true },
+    branch: { type: Object as PropType<BranchSnapshotInfo>, required: true },
+    selected: { type: String, default: null },
+    onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
+    onOpenBranchStatus: { type: Function as PropType<(branch: string) => void>, required: true },
+    selectedRef: { type: null, required: true },
+    actionMenuOpen: Boolean,
+    onActionMenuOpenChange: Function as PropType<(open: boolean) => void>,
+    terminalBellCount: { type: Number, default: 0 },
+    terminalOutputActive: Boolean,
+    branchActionBusy: Boolean,
+  },
+
+  setup(props) {
     const compact = useIsCompactUi()
 
     return () => {
@@ -86,23 +101,7 @@ export const BranchRow = defineComponent(
       )
     }
   },
-  {
-    name: 'BranchRow',
-    props: {
-      repo: { type: Object as PropType<BranchActionRepo>, required: true },
-      branch: { type: Object as PropType<BranchSnapshotInfo>, required: true },
-      selected: { type: String, default: null },
-      onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
-      onOpenBranchStatus: { type: Function as PropType<(branch: string) => void>, required: true },
-      selectedRef: { type: null, required: true },
-      actionMenuOpen: Boolean,
-      onActionMenuOpenChange: Function as PropType<(open: boolean) => void>,
-      terminalBellCount: { type: Number, default: 0 },
-      terminalOutputActive: Boolean,
-      branchActionBusy: Boolean,
-    },
-  },
-)
+})
 
 type BranchRowActionSlotProps = Pick<
   BranchRowProps,

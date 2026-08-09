@@ -11,18 +11,25 @@ interface ActionPopoverState {
   readonly close: () => void
 }
 
-export const ActionPopover = defineComponent(
-  (
-    props: {
-      label: string
-      open?: boolean
-      onOpenChange?: (open: boolean) => void
-      busy?: boolean
-      triggerClass?: string
-      contentClass?: string
-    },
-    { slots },
-  ) => {
+export const ActionPopover = defineComponent<{
+  label: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  busy?: boolean
+  triggerClass?: string
+  contentClass?: string
+}>({
+  name: 'ActionPopover',
+  props: {
+    label: { type: String, required: true },
+    open: { type: Boolean, default: undefined },
+    onOpenChange: Function as PropType<(open: boolean) => void>,
+    busy: Boolean,
+    triggerClass: String,
+    contentClass: String,
+  },
+
+  setup(props, { slots }) {
     const internalOpen = ref(false)
 
     function setOpen(next: boolean): void {
@@ -62,31 +69,32 @@ export const ActionPopover = defineComponent(
       </Popover>
     )
   },
-  {
-    name: 'ActionPopover',
-    props: {
-      label: { type: String, required: true },
-      open: { type: Boolean, default: undefined },
-      onOpenChange: Function as PropType<(open: boolean) => void>,
-      busy: Boolean,
-      triggerClass: String,
-      contentClass: String,
-    },
-  },
-)
+})
 
-export const ActionPopoverItem = defineComponent(
-  (props: {
-    label: string
-    title?: string
-    icon?: VNodeChild
-    shortcut?: string
-    disabled?: boolean
-    busy?: boolean
-    destructive?: boolean
-    onSelect: () => void
-  }) =>
-    () => (
+export const ActionPopoverItem = defineComponent<{
+  label: string
+  title?: string
+  icon?: VNodeChild
+  shortcut?: string
+  disabled?: boolean
+  busy?: boolean
+  destructive?: boolean
+  onSelect: () => void
+}>({
+  name: 'ActionPopoverItem',
+  props: {
+    label: { type: String, required: true },
+    title: String,
+    icon: null,
+    shortcut: String,
+    disabled: Boolean,
+    busy: Boolean,
+    destructive: Boolean,
+    onSelect: { type: Function as PropType<() => void>, required: true },
+  },
+
+  setup(props) {
+    return () => (
       <button
         type="button"
         disabled={props.disabled}
@@ -108,21 +116,9 @@ export const ActionPopoverItem = defineComponent(
         <span class="min-w-0 flex-1 truncate">{props.label}</span>
         {props.shortcut ? <InlineShortcut shortcut={props.shortcut} /> : null}
       </button>
-    ),
-  {
-    name: 'ActionPopoverItem',
-    props: {
-      label: { type: String, required: true },
-      title: String,
-      icon: null,
-      shortcut: String,
-      disabled: Boolean,
-      busy: Boolean,
-      destructive: Boolean,
-      onSelect: { type: Function as PropType<() => void>, required: true },
-    },
+    )
   },
-)
+})
 
 function stopPropagation(event: Event): void {
   event.stopPropagation()

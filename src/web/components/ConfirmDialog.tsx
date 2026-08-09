@@ -14,16 +14,27 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 
-export const ConfirmDialog = defineComponent(
-  (props: {
-    open: boolean
-    title: string
-    message: VNodeChild
-    confirmLabel: string
-    destructive?: boolean
-    onCancel: () => void
-    onConfirm: () => void | Promise<unknown>
-  }) => {
+export const ConfirmDialog = defineComponent<{
+  open: boolean
+  title: string
+  message: VNodeChild
+  confirmLabel: string
+  destructive?: boolean
+  onCancel: () => void
+  onConfirm: () => void | Promise<unknown>
+}>({
+  name: 'ConfirmDialog',
+  props: {
+    open: { type: Boolean, required: true },
+    title: { type: String, required: true },
+    message: null,
+    confirmLabel: { type: String, required: true },
+    destructive: Boolean,
+    onCancel: { type: Function as PropType<() => void>, required: true },
+    onConfirm: { type: Function as PropType<() => void | Promise<unknown>>, required: true },
+  },
+
+  setup(props) {
     const t = useT()
     const pendingState = useAsyncPending<'confirm'>()
 
@@ -65,16 +76,4 @@ export const ConfirmDialog = defineComponent(
       )
     }
   },
-  {
-    name: 'ConfirmDialog',
-    props: {
-      open: { type: Boolean, required: true },
-      title: { type: String, required: true },
-      message: null,
-      confirmLabel: { type: String, required: true },
-      destructive: Boolean,
-      onCancel: { type: Function as PropType<() => void>, required: true },
-      onConfirm: { type: Function as PropType<() => void | Promise<unknown>>, required: true },
-    },
-  },
-)
+})

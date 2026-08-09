@@ -16,8 +16,9 @@ import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
-export const GeneralSettings = defineComponent(
-  () => {
+export const GeneralSettings = defineComponent({
+  name: 'GeneralSettings',
+  setup() {
     const t = useT()
     const theme = useStoreSelector(themeStore, (state) => ({ pref: state.pref, colorTheme: state.colorTheme }))
     const langPref = useStoreSelector(i18nStore, (state) => state.pref)
@@ -107,5 +108,4 @@ export const GeneralSettings = defineComponent(
       </>
     )
   },
-  { name: 'GeneralSettings' },
-)
+})

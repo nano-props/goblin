@@ -137,7 +137,11 @@ afterEach(() => {
 
 describe('SplitPane', () => {
   test('preserves the mainline keyboard resize step', () => {
-    const View = defineComponent(() => () => <SplitPane before={<div />} after={<div />} afterSize={62} />)
+    const View = defineComponent({
+      setup() {
+        return () => <SplitPane before={<div />} after={<div />} afterSize={62} />
+      },
+    })
     renderInJsdom(View)
 
     expect(splitterMocks.keyboardResizeBy).toBe(5)
@@ -145,9 +149,11 @@ describe('SplitPane', () => {
 
   test('persists user layout changes while expanded', async () => {
     const onAfterSizeChange = vi.fn()
-    const View = defineComponent(() => () => (
-      <SplitPane before={<div />} after={<div />} afterSize={62} onAfterSizeChange={onAfterSizeChange} />
-    ))
+    const View = defineComponent({
+      setup() {
+        return () => <SplitPane before={<div />} after={<div />} afterSize={62} onAfterSizeChange={onAfterSizeChange} />
+      },
+    })
     renderInJsdom(View)
 
     expect(splitterMocks.beforeDefaultSize).toBe(38)
@@ -160,18 +166,22 @@ describe('SplitPane', () => {
 
   test('collapses the before pane without persisting the collapsed layout', async () => {
     const onAfterSizeChange = vi.fn()
-    const View = defineComponent(() => () => (
-      <SplitPane
-        before={<button type="button">before</button>}
-        after={<div />}
-        afterSize={62}
-        beforeCollapsed
-        beforeMinSize="14rem"
-        beforeContentMinSize="14rem"
-        afterMinSize="22rem"
-        onAfterSizeChange={onAfterSizeChange}
-      />
-    ))
+    const View = defineComponent({
+      setup() {
+        return () => (
+          <SplitPane
+            before={<button type="button">before</button>}
+            after={<div />}
+            afterSize={62}
+            beforeCollapsed
+            beforeMinSize="14rem"
+            beforeContentMinSize="14rem"
+            afterMinSize="22rem"
+            onAfterSizeChange={onAfterSizeChange}
+          />
+        )
+      },
+    })
     const { container } = renderInJsdom(View)
 
     expect(splitterMocks.beforeDefaultSize).toBe(0)
@@ -194,16 +204,20 @@ describe('SplitPane', () => {
   })
 
   test('uses measured before panel width when available', async () => {
-    const View = defineComponent(() => () => (
-      <SplitPane
-        before={<div />}
-        after={<div />}
-        afterSize={62}
-        beforeMinSize="14rem"
-        beforeContentMinSize="14rem"
-        afterMinSize="22rem"
-      />
-    ))
+    const View = defineComponent({
+      setup() {
+        return () => (
+          <SplitPane
+            before={<div />}
+            after={<div />}
+            afterSize={62}
+            beforeMinSize="14rem"
+            beforeContentMinSize="14rem"
+            afterMinSize="22rem"
+          />
+        )
+      },
+    })
     const { container } = renderInJsdom(View)
 
     await nextTick()
@@ -215,17 +229,21 @@ describe('SplitPane', () => {
   })
 
   test('does not animate the initially collapsed pane', async () => {
-    const View = defineComponent(() => () => (
-      <SplitPane
-        before={<div />}
-        after={<div />}
-        afterSize={62}
-        beforeCollapsed
-        animateBeforeCollapse
-        beforeMinSize={0}
-        beforeContentMinSize="14rem"
-      />
-    ))
+    const View = defineComponent({
+      setup() {
+        return () => (
+          <SplitPane
+            before={<div />}
+            after={<div />}
+            afterSize={62}
+            beforeCollapsed
+            animateBeforeCollapse
+            beforeMinSize={0}
+            beforeContentMinSize="14rem"
+          />
+        )
+      },
+    })
     const { container } = renderInJsdom(View)
 
     expect(splitPane(container)?.dataset.collapseTransition).toBeUndefined()
@@ -234,17 +252,21 @@ describe('SplitPane', () => {
   test('keeps panel transition active when collapse is reversed before the timeout settles', async () => {
     useFakeTimers()
     const collapsed = ref(false)
-    const View = defineComponent(() => () => (
-      <SplitPane
-        before={<div />}
-        after={<div />}
-        afterSize={62}
-        beforeCollapsed={collapsed.value}
-        animateBeforeCollapse
-        beforeMinSize={collapsed.value ? 0 : '14rem'}
-        beforeContentMinSize="14rem"
-      />
-    ))
+    const View = defineComponent({
+      setup() {
+        return () => (
+          <SplitPane
+            before={<div />}
+            after={<div />}
+            afterSize={62}
+            beforeCollapsed={collapsed.value}
+            animateBeforeCollapse
+            beforeMinSize={collapsed.value ? 0 : '14rem'}
+            beforeContentMinSize="14rem"
+          />
+        )
+      },
+    })
     const { container } = renderInJsdom(View)
     expect(splitPane(container)?.dataset.collapseTransition).toBeUndefined()
 
@@ -272,15 +294,19 @@ describe('SplitPane', () => {
   test('commits the transition style before changing the splitter layout', async () => {
     useFakeTimers()
     const collapsed = ref(false)
-    const View = defineComponent(() => () => (
-      <SplitPane
-        before={<div />}
-        after={<div />}
-        afterSize={62}
-        beforeCollapsed={collapsed.value}
-        animateBeforeCollapse
-      />
-    ))
+    const View = defineComponent({
+      setup() {
+        return () => (
+          <SplitPane
+            before={<div />}
+            after={<div />}
+            afterSize={62}
+            beforeCollapsed={collapsed.value}
+            animateBeforeCollapse
+          />
+        )
+      },
+    })
     const { container } = renderInJsdom(View)
     const root = splitPane(container)
     if (!root) throw new Error('missing split pane')
@@ -300,17 +326,21 @@ describe('SplitPane', () => {
     useFakeTimers()
     const collapsed = ref(false)
     const animate = ref(true)
-    const View = defineComponent(() => () => (
-      <SplitPane
-        before={<div />}
-        after={<div />}
-        afterSize={62}
-        beforeCollapsed={collapsed.value}
-        animateBeforeCollapse={animate.value}
-        beforeMinSize={collapsed.value ? 0 : '14rem'}
-        beforeContentMinSize="14rem"
-      />
-    ))
+    const View = defineComponent({
+      setup() {
+        return () => (
+          <SplitPane
+            before={<div />}
+            after={<div />}
+            afterSize={62}
+            beforeCollapsed={collapsed.value}
+            animateBeforeCollapse={animate.value}
+            beforeMinSize={collapsed.value ? 0 : '14rem'}
+            beforeContentMinSize="14rem"
+          />
+        )
+      },
+    })
     const { container } = renderInJsdom(View)
 
     collapsed.value = true

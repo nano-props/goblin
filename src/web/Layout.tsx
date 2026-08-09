@@ -36,8 +36,9 @@ import { AppOverlays } from '#/web/components/AppOverlays.tsx'
 import { AuthenticatedWorkspaceSideEffects } from '#/web/components/AuthenticatedWorkspaceSideEffects.tsx'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
-export const Layout = defineComponent(
-  () => {
+export const Layout = defineComponent({
+  name: 'Layout',
+  setup() {
     const route = useRoute()
     useSettingsWriteErrorToast()
     useAppHistoryPresentationObserver()
@@ -50,11 +51,11 @@ export const Layout = defineComponent(
       </ErrorBoundary>
     )
   },
-  { name: 'Layout' },
-)
+})
 
-const AuthenticatedAppShell = defineComponent(
-  () => {
+const AuthenticatedAppShell = defineComponent({
+  name: 'AuthenticatedAppShell',
+  setup() {
     useWorkspaceFilesystemInvalidationSync()
     const route = useRoute()
     const routeContext = computed(() => workspaceRouteContextFromVueRoute(route))
@@ -84,18 +85,19 @@ const AuthenticatedAppShell = defineComponent(
       )
     }
   },
-  { name: 'AuthenticatedAppShell' },
-)
+})
 
-const AuthenticatedSettingsShell = defineComponent(
-  () => () => (
-    <div class="relative flex h-full flex-col">
-      <RouterView />
-      <Toaster position="bottom-right" closeButton />
-    </div>
-  ),
-  { name: 'AuthenticatedSettingsShell' },
-)
+const AuthenticatedSettingsShell = defineComponent({
+  name: 'AuthenticatedSettingsShell',
+  setup() {
+    return () => (
+      <div class="relative flex h-full flex-col">
+        <RouterView />
+        <Toaster position="bottom-right" closeButton />
+      </div>
+    )
+  },
+})
 
 const AuthenticatedWorkspaceShell = defineComponent({
   name: 'AuthenticatedWorkspaceShell',

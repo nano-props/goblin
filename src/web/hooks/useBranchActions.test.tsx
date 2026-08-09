@@ -327,11 +327,12 @@ function renderBranchActions(repo: RepoPresentationForTest) {
   return renderComposableInJsdom(() => useBranchActions(repo, branch), { wrapper: AppVueQueryClientScope })
 }
 
-const AppVueQueryClientScope = defineComponent(
-  (_props, { slots }) =>
-    () => <VueQueryClientScope client={appQueryClient}>{slots.default?.()}</VueQueryClientScope>,
-  { name: 'AppVueQueryClientScope' },
-)
+const AppVueQueryClientScope = defineComponent({
+  name: 'AppVueQueryClientScope',
+  setup(_props, { slots }) {
+    return () => <VueQueryClientScope client={appQueryClient}>{slots.default?.()}</VueQueryClientScope>
+  },
+})
 
 function requiredAction<T>(action: T | undefined, name: string): T {
   if (action === undefined) throw new Error(`${name} action unavailable in test fixture`)

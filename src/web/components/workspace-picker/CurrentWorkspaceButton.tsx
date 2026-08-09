@@ -32,8 +32,20 @@ interface CurrentWorkspaceToolbarButtonProps extends CurrentWorkspaceButtonBaseP
 type CurrentWorkspaceSidebarButtonProps = Omit<ButtonHTMLAttributes, 'children' | 'type'> &
   CurrentWorkspaceButtonBaseProps
 
-export const CurrentWorkspaceToolbarButton = defineComponent(
-  (props: CurrentWorkspaceToolbarButtonProps) => {
+export const CurrentWorkspaceToolbarButton = defineComponent<CurrentWorkspaceToolbarButtonProps>({
+  name: 'CurrentWorkspaceToolbarButton',
+  props: [
+    'workspace',
+    'isCurrent',
+    'focusRegistry',
+    'onActivate',
+    'onKeyboardNavigate',
+    'unavailableLabel',
+    'terminalBellCount',
+    'fill',
+  ],
+
+  setup(props) {
     const t = useT()
     return () => {
       const terminalBellCount = props.terminalBellCount ?? 0
@@ -78,23 +90,14 @@ export const CurrentWorkspaceToolbarButton = defineComponent(
       )
     }
   },
-  {
-    name: 'CurrentWorkspaceToolbarButton',
-    props: [
-      'workspace',
-      'isCurrent',
-      'focusRegistry',
-      'onActivate',
-      'onKeyboardNavigate',
-      'unavailableLabel',
-      'terminalBellCount',
-      'fill',
-    ],
-  },
-)
+})
 
-export const CurrentWorkspaceSidebarButton = defineComponent(
-  (props: CurrentWorkspaceSidebarButtonProps, { attrs }) => {
+export const CurrentWorkspaceSidebarButton = defineComponent<CurrentWorkspaceSidebarButtonProps>({
+  name: 'CurrentWorkspaceSidebarButton',
+  inheritAttrs: false,
+  props: ['workspace', 'focusRegistry', 'onKeyboardNavigate', 'unavailableLabel', 'terminalBellCount', 'fill'],
+
+  setup(props, { attrs }) {
     const t = useT()
     const { forwardRef } = useForwardExpose()
 
@@ -141,12 +144,7 @@ export const CurrentWorkspaceSidebarButton = defineComponent(
       )
     }
   },
-  {
-    name: 'CurrentWorkspaceSidebarButton',
-    inheritAttrs: false,
-    props: ['workspace', 'focusRegistry', 'onKeyboardNavigate', 'unavailableLabel', 'terminalBellCount', 'fill'],
-  },
-)
+})
 
 interface CurrentWorkspaceButtonState {
   showConnecting: boolean

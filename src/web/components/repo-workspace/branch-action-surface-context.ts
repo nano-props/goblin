@@ -4,21 +4,20 @@ import type { BranchActionSurface } from '#/web/hooks/useBranchActionItems.tsx'
 
 const branchActionSurfaceKey: InjectionKey<ComputedRef<BranchActionSurface>> = Symbol('branch-action-surface')
 
-export const BranchActionSurfaceProvider = defineComponent(
-  (props: { value: BranchActionSurface }, { slots }) => {
+export const BranchActionSurfaceProvider = defineComponent<{ value: BranchActionSurface }>({
+  name: 'BranchActionSurfaceProvider',
+  props: {
+    value: { type: Object as PropType<BranchActionSurface>, required: true },
+  },
+
+  setup(props, { slots }) {
     provide(
       branchActionSurfaceKey,
       computed(() => props.value),
     )
     return () => slots.default?.()
   },
-  {
-    name: 'BranchActionSurfaceProvider',
-    props: {
-      value: { type: Object as PropType<BranchActionSurface>, required: true },
-    },
-  },
-)
+})
 
 export function useBranchActionSurface(): ComputedRef<BranchActionSurface> {
   const value = inject(branchActionSurfaceKey, null)

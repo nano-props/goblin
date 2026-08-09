@@ -102,7 +102,9 @@ function createTestRouter() {
         component: defineComponent({
           name: 'TestRouterRoute',
           inheritAttrs: false,
-          setup: () => () => null,
+          setup() {
+            return () => null
+          },
         }),
       },
     ],

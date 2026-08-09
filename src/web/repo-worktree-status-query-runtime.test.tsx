@@ -367,12 +367,12 @@ describe('repo worktree status query data', () => {
 })
 
 function statusObservers() {
-  return defineComponent(
-    () => {
+  return defineComponent({
+    name: 'RepoWorktreeStatusObservers',
+    setup() {
       useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1')
       useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1')
       return () => null
     },
-    { name: 'RepoWorktreeStatusObservers' },
-  )
+  })
 }

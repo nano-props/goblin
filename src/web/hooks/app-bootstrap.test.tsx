@@ -562,8 +562,10 @@ describe('app bootstrap hooks', () => {
   })
 })
 
-const Harness = defineComponent(
-  (props: { activeWorkspaceId?: WorkspaceId | null }) => {
+const Harness = defineComponent<{ activeWorkspaceId?: WorkspaceId | null }>({
+  name: 'AuthenticatedAppBootstrapHarness',
+  props: ['activeWorkspaceId'],
+  setup(props) {
     const bootstrap = useAuthenticatedAppBootstrap({ activeWorkspaceId: () => props.activeWorkspaceId })
     return () =>
       bootstrap.state.value.status === 'failed' ? (
@@ -572,11 +574,11 @@ const Harness = defineComponent(
         <div>{bootstrap.state.value.status}</div>
       )
   },
-  { name: 'AuthenticatedAppBootstrapHarness', props: ['activeWorkspaceId'] },
-)
+})
 
-const PersistenceHarness = defineComponent(
-  () => {
+const PersistenceHarness = defineComponent({
+  name: 'AuthenticatedAppPersistenceHarness',
+  setup() {
     const bootstrap = useAuthenticatedAppBootstrap()
     useClientWorkspacePersistence({ routedWorkspaceId: null })
     return () =>
@@ -586,8 +588,7 @@ const PersistenceHarness = defineComponent(
         <div>{bootstrap.state.value.status}</div>
       )
   },
-  { name: 'AuthenticatedAppPersistenceHarness' },
-)
+})
 
 interface WorkspaceRestoreFixture {
   serverWorkspace: ServerWorkspaceState

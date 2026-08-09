@@ -19,8 +19,13 @@ interface Props {
   workspace: WorkspaceState
 }
 
-export const UnavailableWorkspaceView = defineComponent(
-  (props: Props) => {
+export const UnavailableWorkspaceView = defineComponent<Props>({
+  name: 'UnavailableWorkspaceView',
+  props: {
+    workspace: { type: Object as PropType<WorkspaceState>, required: true },
+  },
+
+  setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
 
@@ -113,10 +118,4 @@ export const UnavailableWorkspaceView = defineComponent(
       )
     }
   },
-  {
-    name: 'UnavailableWorkspaceView',
-    props: {
-      workspace: { type: Object as PropType<WorkspaceState>, required: true },
-    },
-  },
-)
+})

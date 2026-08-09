@@ -55,8 +55,22 @@ export interface AppProps {
   ) => void
 }
 
-export const App = defineComponent(
-  (props: AppProps) => {
+export const App = defineComponent<AppProps>({
+  name: 'App',
+  props: [
+    'routeSettingsPage',
+    'routeWorkspaceView',
+    'onRouteSettingsPageChange',
+    'onOpenWorkspaceNavigator',
+    'onOpenWorkspaceRootPane',
+    'onOpenWorkspaceDashboard',
+    'onOpenRepoBranch',
+    'onOpenRepoNewWorktree',
+    'onCancelRepoNewWorktree',
+    'onReplaceRepoBranch',
+  ],
+
+  setup(props) {
     const workspaceMembershipReady = useStoreSelector(workspacesStore, (state) => state.workspaceMembershipReady)
     const zenMode = useStoreSelector(workspacesStore, (state) => state.zenMode)
     const uiMode = useResponsiveUiMode()
@@ -108,19 +122,4 @@ export const App = defineComponent(
       )
     }
   },
-  {
-    name: 'App',
-    props: [
-      'routeSettingsPage',
-      'routeWorkspaceView',
-      'onRouteSettingsPageChange',
-      'onOpenWorkspaceNavigator',
-      'onOpenWorkspaceRootPane',
-      'onOpenWorkspaceDashboard',
-      'onOpenRepoBranch',
-      'onOpenRepoNewWorktree',
-      'onCancelRepoNewWorktree',
-      'onReplaceRepoBranch',
-    ],
-  },
-)
+})

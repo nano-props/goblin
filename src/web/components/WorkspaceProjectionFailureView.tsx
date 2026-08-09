@@ -14,8 +14,15 @@ interface WorkspaceProjectionFailureViewProps {
   onRetry: () => void
 }
 
-export const WorkspaceProjectionFailureView = defineComponent(
-  (props: WorkspaceProjectionFailureViewProps) => {
+export const WorkspaceProjectionFailureView = defineComponent<WorkspaceProjectionFailureViewProps>({
+  name: 'WorkspaceProjectionFailureView',
+  props: {
+    workspace: { type: Object as PropType<WorkspaceState>, required: true },
+    message: { type: String, required: true },
+    onRetry: { type: Function as PropType<() => void>, required: true },
+  },
+
+  setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
 
@@ -51,12 +58,4 @@ export const WorkspaceProjectionFailureView = defineComponent(
       </section>
     )
   },
-  {
-    name: 'WorkspaceProjectionFailureView',
-    props: {
-      workspace: { type: Object as PropType<WorkspaceState>, required: true },
-      message: { type: String, required: true },
-      onRetry: { type: Function as PropType<() => void>, required: true },
-    },
-  },
-)
+})

@@ -96,86 +96,87 @@ interface TestWorkspacePaneTabStripProps {
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
 }
 
-export const TestWorkspacePaneTabStrip = defineComponent(
-  (props: TestWorkspacePaneTabStripProps) => () => {
-    const selected = props.sessions.find((candidate) => candidate.selected) ?? null
-    const items: WorkspacePaneTabItem[] = props.sessions.map((tab) =>
-      createRuntimeWorkspacePaneTabItem({
-        view: tab,
-        label: tab.originalTitle ?? tab.fullTitle ?? tab.title,
-        tooltip: tab.originalTitle ?? tab.fullTitle ?? tab.title,
-        closeLabel: `close ${tab.title}`,
-      }),
-    )
-    if (props.pendingTerminal) {
-      items.push(
-        createPendingWorkspacePaneTabItem({
-          type: 'terminal',
-          label: 'terminal.opening',
-          tooltip: 'terminal.opening',
+export const TestWorkspacePaneTabStrip = defineComponent<TestWorkspacePaneTabStripProps>({
+  name: 'TestWorkspacePaneTabStrip',
+  props: [
+    'terminalFilesystemTargetKey',
+    'workspacePaneTabTargetKey',
+    'sessions',
+    'workspacePaneId',
+    'pendingTerminal',
+    'responsiveCompact',
+    'panelActive',
+    'newTerminalBusy',
+    'newTerminalBlocksTabInteraction',
+    'onNew',
+    'onSelect',
+    'onScrollToBottom',
+    'onClose',
+    'onReorder',
+    'onNavigateOut',
+  ],
+
+  setup(props) {
+    return () => {
+      const selected = props.sessions.find((candidate) => candidate.selected) ?? null
+      const items: WorkspacePaneTabItem[] = props.sessions.map((tab) =>
+        createRuntimeWorkspacePaneTabItem({
+          view: tab,
+          label: tab.originalTitle ?? tab.fullTitle ?? tab.title,
+          tooltip: tab.originalTitle ?? tab.fullTitle ?? tab.title,
+          closeLabel: `close ${tab.title}`,
         }),
       )
+      if (props.pendingTerminal) {
+        items.push(
+          createPendingWorkspacePaneTabItem({
+            type: 'terminal',
+            label: 'terminal.opening',
+            tooltip: 'terminal.opening',
+          }),
+        )
+      }
+      return (
+        <WorkspacePaneTabStrip
+          workspacePaneId={props.workspacePaneId}
+          responsiveCompact={props.responsiveCompact}
+          panelActive={props.panelActive}
+          onReorder={props.onReorder}
+          onNavigateOut={props.onNavigateOut}
+          createAction={
+            props.terminalFilesystemTargetKey
+              ? {
+                  label: 'terminal.new',
+                  busy: props.newTerminalBusy ?? false,
+                  blocksTabInteraction: props.newTerminalBlocksTabInteraction ?? false,
+                  onCreate: props.onNew,
+                }
+              : null
+          }
+          workspacePaneTabTargetKey={props.workspacePaneTabTargetKey ?? '/repo\0branch\0main'}
+          items={items}
+          activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalSessionId) : null}
+          onSelect={(item) => {
+            if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+              props.onSelect(props.terminalFilesystemTargetKey, item.view)
+            }
+          }}
+          onReselect={(item) => {
+            if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+              props.onScrollToBottom(item.view.terminalSessionId)
+            }
+          }}
+          onClose={(item, presentationEffects) => {
+            if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+              props.onClose(item.view)
+              presentationEffects?.onCommit()
+            }
+          }}
+        />
+      )
     }
-    return (
-      <WorkspacePaneTabStrip
-        workspacePaneId={props.workspacePaneId}
-        responsiveCompact={props.responsiveCompact}
-        panelActive={props.panelActive}
-        onReorder={props.onReorder}
-        onNavigateOut={props.onNavigateOut}
-        createAction={
-          props.terminalFilesystemTargetKey
-            ? {
-                label: 'terminal.new',
-                busy: props.newTerminalBusy ?? false,
-                blocksTabInteraction: props.newTerminalBlocksTabInteraction ?? false,
-                onCreate: props.onNew,
-              }
-            : null
-        }
-        workspacePaneTabTargetKey={props.workspacePaneTabTargetKey ?? '/repo\0branch\0main'}
-        items={items}
-        activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalSessionId) : null}
-        onSelect={(item) => {
-          if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
-            props.onSelect(props.terminalFilesystemTargetKey, item.view)
-          }
-        }}
-        onReselect={(item) => {
-          if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
-            props.onScrollToBottom(item.view.terminalSessionId)
-          }
-        }}
-        onClose={(item, presentationEffects) => {
-          if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
-            props.onClose(item.view)
-            presentationEffects?.onCommit()
-          }
-        }}
-      />
-    )
   },
-  {
-    name: 'TestWorkspacePaneTabStrip',
-    props: [
-      'terminalFilesystemTargetKey',
-      'workspacePaneTabTargetKey',
-      'sessions',
-      'workspacePaneId',
-      'pendingTerminal',
-      'responsiveCompact',
-      'panelActive',
-      'newTerminalBusy',
-      'newTerminalBlocksTabInteraction',
-      'onNew',
-      'onSelect',
-      'onScrollToBottom',
-      'onClose',
-      'onReorder',
-      'onNavigateOut',
-    ],
-  },
-)
+})
 
 let lastRender: JsdomRenderResult | null = null
 

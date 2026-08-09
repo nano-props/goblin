@@ -2,8 +2,10 @@ import { defineComponent } from 'vue'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { cn } from '#/web/lib/cn.ts'
 
-export const WorkspaceDropOverlay = defineComponent(
-  (props: { active: boolean }) => {
+export const WorkspaceDropOverlay = defineComponent<{ active: boolean }>({
+  name: 'WorkspaceDropOverlay',
+  props: { active: Boolean },
+  setup(props) {
     const t = useT()
     return () => (
       <div
@@ -20,5 +22,4 @@ export const WorkspaceDropOverlay = defineComponent(
       </div>
     )
   },
-  { name: 'WorkspaceDropOverlay', props: { active: Boolean } },
-)
+})

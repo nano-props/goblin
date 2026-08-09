@@ -140,8 +140,31 @@ function focusComposerInput(input: HTMLTextAreaElement): void {
   input.focus()
 }
 
-export const TerminalComposer = defineComponent(
-  (props: TerminalComposerProps, { expose }) => {
+export const TerminalComposer = defineComponent<TerminalComposerProps>({
+  name: 'TerminalComposer',
+  props: [
+    'labels',
+    'expanded',
+    'mode',
+    'draft',
+    'historyEntries',
+    'shortcut',
+    'canUploadFiles',
+    'onVirtualKey',
+    'onCopyContent',
+    'onSendText',
+    'onOpen',
+    'onClose',
+    'onModeChange',
+    'onDraftChange',
+    'onDraftReplace',
+    'onResolveFiles',
+    'onFileInsertionRejected',
+    'hidden',
+    'class',
+  ],
+
+  setup(props, { expose }) {
     const resolvingFiles = ref(false)
     const copyingContent = ref(false)
     const trigger = ref<HTMLButtonElement | null>(null)
@@ -510,31 +533,7 @@ export const TerminalComposer = defineComponent(
       </div>
     )
   },
-  {
-    name: 'TerminalComposer',
-    props: [
-      'labels',
-      'expanded',
-      'mode',
-      'draft',
-      'historyEntries',
-      'shortcut',
-      'canUploadFiles',
-      'onVirtualKey',
-      'onCopyContent',
-      'onSendText',
-      'onOpen',
-      'onClose',
-      'onModeChange',
-      'onDraftChange',
-      'onDraftReplace',
-      'onResolveFiles',
-      'onFileInsertionRejected',
-      'hidden',
-      'class',
-    ],
-  },
-)
+})
 
 interface ComposerButtonProps extends ButtonHTMLAttributes {
   accessibleName: string

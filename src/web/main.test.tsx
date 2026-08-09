@@ -40,14 +40,14 @@ beforeEach(() => {
   }))
   vi.doMock('#/web/app-router.tsx', () => ({
     appRouter: { install: vi.fn() },
-    AppRouterProvider: defineComponent(
-      () => {
+    AppRouterProvider: defineComponent({
+      name: 'TestAppRouterProvider',
+      setup() {
         onMounted(appMount)
         onUnmounted(appUnmount)
         return () => <div>app mounted</div>
       },
-      { name: 'TestAppRouterProvider' },
-    ),
+    }),
   }))
 })
 

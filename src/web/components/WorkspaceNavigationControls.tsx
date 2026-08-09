@@ -10,16 +10,22 @@ import { useT } from '#/web/stores/i18n-vue.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
-export const WorkspaceNavigationControls = defineComponent(
-  (
-    props: {
-      workspaceId?: string
-      zenRevealTriggerEnabled?: boolean
-      onZenRevealTriggerEnter?: () => void
-      class?: HTMLAttributes['class']
-    },
-    { attrs },
-  ) => {
+export const WorkspaceNavigationControls = defineComponent<{
+  workspaceId?: string
+  zenRevealTriggerEnabled?: boolean
+  onZenRevealTriggerEnter?: () => void
+  class?: HTMLAttributes['class']
+}>({
+  name: 'WorkspaceNavigationControls',
+  inheritAttrs: false,
+  props: {
+    workspaceId: String,
+    zenRevealTriggerEnabled: Boolean,
+    onZenRevealTriggerEnter: Function as PropType<() => void>,
+    class: null,
+  },
+
+  setup(props, { attrs }) {
     const t = useT()
     const navigation = useAppNavigation()
     const histories = useStoreSelector(workspacesStore, (state) => state.navigationHistoryByWorkspace)
@@ -71,14 +77,4 @@ export const WorkspaceNavigationControls = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspaceNavigationControls',
-    inheritAttrs: false,
-    props: {
-      workspaceId: String,
-      zenRevealTriggerEnabled: Boolean,
-      onZenRevealTriggerEnter: Function as PropType<() => void>,
-      class: null,
-    },
-  },
-)
+})

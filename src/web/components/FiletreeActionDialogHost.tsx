@@ -14,8 +14,11 @@ interface Props {
   readonly currentWorkspaceRuntimeId: string | null
 }
 
-export const FiletreeActionDialogHost = defineComponent(
-  (props: Props) => {
+export const FiletreeActionDialogHost = defineComponent<Props>({
+  name: 'FiletreeActionDialogHost',
+  props: ['currentWorkspaceId', 'currentWorkspaceRuntimeId'],
+
+  setup(props) {
     const t = useT()
     const trashFileConfirm = useStoreSelector(filetreeActionDialogsStore, (state) => state.trashFileConfirm)
     const displayTrashFileConfirm = useLastNonNull(trashFileConfirm)
@@ -62,11 +65,7 @@ export const FiletreeActionDialogHost = defineComponent(
       />
     )
   },
-  {
-    name: 'FiletreeActionDialogHost',
-    props: ['currentWorkspaceId', 'currentWorkspaceRuntimeId'],
-  },
-)
+})
 
 const FiletreeTrashConfirmBody: FunctionalComponent<{ body: string; path: string }> = (props) => (
   <div class="space-y-1">

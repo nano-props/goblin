@@ -24,8 +24,11 @@ function formatShortcutCombo(combo: string[]): string {
   return combo.join('')
 }
 
-const ShortcutRow = defineComponent(
-  (props: { row: HelpShortcutRow }) => {
+const ShortcutRow = defineComponent<{ row: HelpShortcutRow }>({
+  name: 'ShortcutRow',
+  props: { row: { type: Object as PropType<HelpShortcutRow>, required: true } },
+
+  setup(props) {
     const t = useT()
     return () => (
       <SettingsListItem as="li" size="sm" class="border-t border-separator" separated={false}>
@@ -36,14 +39,13 @@ const ShortcutRow = defineComponent(
       </SettingsListItem>
     )
   },
-  {
-    name: 'ShortcutRow',
-    props: { row: { type: Object as PropType<HelpShortcutRow>, required: true } },
-  },
-)
+})
 
-const ShortcutList = defineComponent(
-  (props: { sections: HelpShortcutSection[] }) => {
+const ShortcutList = defineComponent<{ sections: HelpShortcutSection[] }>({
+  name: 'ShortcutList',
+  props: { sections: { type: Array as PropType<HelpShortcutSection[]>, required: true } },
+
+  setup(props) {
     const t = useT()
     return () => (
       <SettingsCard>
@@ -65,14 +67,11 @@ const ShortcutList = defineComponent(
       </SettingsCard>
     )
   },
-  {
-    name: 'ShortcutList',
-    props: { sections: { type: Array as PropType<HelpShortcutSection[]>, required: true } },
-  },
-)
+})
 
-export const KeyboardShortcutSettings = defineComponent(
-  () => {
+export const KeyboardShortcutSettings = defineComponent({
+  name: 'KeyboardShortcutSettings',
+  setup() {
     const t = useT()
     const shortcutSettings = useShortcutSettings()
     return () => (
@@ -86,5 +85,4 @@ export const KeyboardShortcutSettings = defineComponent(
       </>
     )
   },
-  { name: 'KeyboardShortcutSettings' },
-)
+})

@@ -10,9 +10,13 @@ type FormDialogProps = Omit<DialogContentProps, 'title'> & {
   description?: VNodeChild
 }
 
-export const FormDialog = defineComponent(
-  (props: FormDialogProps, { attrs, slots }) =>
-    () => (
+export const FormDialog = defineComponent<FormDialogProps>({
+  name: 'FormDialog',
+  inheritAttrs: false,
+  props: ['open', 'onOpenChange', 'title', 'description'],
+
+  setup(props, { attrs, slots }) {
+    return () => (
       <DialogRoot open={props.open} onUpdate:open={props.onOpenChange}>
         <DialogContent {...attrs}>
           <DialogHeader>
@@ -24,12 +28,8 @@ export const FormDialog = defineComponent(
           {slots.default?.()}
         </DialogContent>
       </DialogRoot>
-    ),
-  {
-    name: 'FormDialog',
-    inheritAttrs: false,
-    props: ['open', 'onOpenChange', 'title', 'description'],
+    )
   },
-)
+})
 
 export type { FormDialogProps }

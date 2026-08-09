@@ -57,28 +57,29 @@ interface HarnessProps {
   readonly onSnapshot: (snapshot: HarnessSnapshot) => void
 }
 
-const Harness = defineComponent(
-  (props: HarnessProps) => () => {
-    const target = mockExecutionTarget(
-      props.workspaceRootPath,
-      props.workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID,
-      props.worktreePath,
-      props.targetKind ?? 'git-worktree',
-    )
-    return (
-      <ExecutionTargetHarness
-        key={workspacePaneFilesystemExecutionTargetKey(target)}
-        target={target}
-        expandedKeys={props.expandedKeys}
-        onSnapshot={props.onSnapshot}
-      />
-    )
+const Harness = defineComponent<HarnessProps>({
+  name: 'WorkspaceFilesystemTreeHarness',
+  props: ['workspaceRootPath', 'workspaceRuntimeId', 'worktreePath', 'targetKind', 'expandedKeys', 'onSnapshot'],
+
+  setup(props) {
+    return () => {
+      const target = mockExecutionTarget(
+        props.workspaceRootPath,
+        props.workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID,
+        props.worktreePath,
+        props.targetKind ?? 'git-worktree',
+      )
+      return (
+        <ExecutionTargetHarness
+          key={workspacePaneFilesystemExecutionTargetKey(target)}
+          target={target}
+          expandedKeys={props.expandedKeys}
+          onSnapshot={props.onSnapshot}
+        />
+      )
+    }
   },
-  {
-    name: 'WorkspaceFilesystemTreeHarness',
-    props: ['workspaceRootPath', 'workspaceRuntimeId', 'worktreePath', 'targetKind', 'expandedKeys', 'onSnapshot'],
-  },
-)
+})
 
 interface ExecutionTargetHarnessProps {
   readonly target: WorkspacePaneFilesystemExecutionTarget
@@ -86,14 +87,15 @@ interface ExecutionTargetHarnessProps {
   readonly onSnapshot: (snapshot: HarnessSnapshot) => void
 }
 
-const ExecutionTargetHarness = defineComponent(
-  (props: ExecutionTargetHarnessProps) => {
+const ExecutionTargetHarness = defineComponent<ExecutionTargetHarnessProps>({
+  name: 'ExecutionTargetHarness',
+  props: ['target', 'expandedKeys', 'onSnapshot'],
+  setup(props) {
     const result = useWorkspaceFilesystemTree({ target: props.target, expandedKeys: () => props.expandedKeys ?? [] })
     props.onSnapshot(result)
     return () => null
   },
-  { name: 'ExecutionTargetHarness', props: ['target', 'expandedKeys', 'onSnapshot'] },
-)
+})
 
 function mockExecutionTarget(
   workspaceRootPath: string,

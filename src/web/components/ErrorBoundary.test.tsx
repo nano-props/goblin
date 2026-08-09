@@ -22,12 +22,14 @@ describe('ErrorBoundary', () => {
     const renderError = new Error('inner render failed')
     const fallbackError = new Error('inner fallback failed')
     fallbackButton.error = fallbackError
-    const CrashingChild = defineComponent(
-      () => () => {
-        throw renderError
+    const CrashingChild = defineComponent({
+      name: 'CrashingChild',
+      setup() {
+        return () => {
+          throw renderError
+        }
       },
-      { name: 'CrashingChild' },
-    )
+    })
 
     const view = renderInJsdom(
       <ErrorBoundary>

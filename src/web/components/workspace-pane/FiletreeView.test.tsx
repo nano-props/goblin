@@ -55,8 +55,28 @@ function dirNode(id: string, parentId: string | null = null): WorkspaceFilesyste
   return { id, path: id, name, parentId, kind: 'directory', status: 'clean' }
 }
 
-const FiletreeViewHarness = defineComponent(
-  (props: FiletreeViewHarnessProps) => {
+const FiletreeViewHarness = defineComponent<FiletreeViewHarnessProps>({
+  name: 'FiletreeViewHarness',
+  props: [
+    'tree',
+    'isInitialLoading',
+    'isReading',
+    'loadingKeys',
+    'openingFileKeys',
+    'error',
+    'onSelect',
+    'onActivate',
+    'onOpenFile',
+    'onDownloadFile',
+    'onRequestTrashFile',
+    'onRetry',
+    'initialTopVisibleRowIndex',
+    'scrollRestoreKey',
+    'scrollRestoreReady',
+    'onTopVisibleRowIndexChange',
+  ],
+
+  setup(props) {
     const selectedKeys = shallowRef<ReadonlySet<string>>(new Set())
     const expandedKeys = shallowRef<ReadonlySet<string>>(new Set())
     const pruneKeys = (validKeys: ReadonlySet<string>) => {
@@ -98,28 +118,7 @@ const FiletreeViewHarness = defineComponent(
       />
     )
   },
-  {
-    name: 'FiletreeViewHarness',
-    props: [
-      'tree',
-      'isInitialLoading',
-      'isReading',
-      'loadingKeys',
-      'openingFileKeys',
-      'error',
-      'onSelect',
-      'onActivate',
-      'onOpenFile',
-      'onDownloadFile',
-      'onRequestTrashFile',
-      'onRetry',
-      'initialTopVisibleRowIndex',
-      'scrollRestoreKey',
-      'scrollRestoreReady',
-      'onTopVisibleRowIndexChange',
-    ],
-  },
-)
+})
 
 function filterValidKeys(keys: ReadonlySet<string>, validKeys: ReadonlySet<string>): ReadonlySet<string> {
   let changed = false

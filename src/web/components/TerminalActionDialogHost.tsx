@@ -15,8 +15,11 @@ interface Props {
   navigation: AppNavigationActions
 }
 
-export const TerminalActionDialogHost = defineComponent(
-  (props: Props) => {
+export const TerminalActionDialogHost = defineComponent<Props>({
+  name: 'TerminalActionDialogHost',
+  props: ['currentWorkspaceId', 'currentWorkspacePaneRoute', 'navigation'],
+
+  setup(props) {
     const t = useT()
     const closeConfirm = useStoreSelector(terminalActionDialogsStore, (state) => state.closeConfirm)
     const displayCloseConfirm = useLastNonNull(closeConfirm)
@@ -70,11 +73,7 @@ export const TerminalActionDialogHost = defineComponent(
       />
     )
   },
-  {
-    name: 'TerminalActionDialogHost',
-    props: ['currentWorkspaceId', 'currentWorkspacePaneRoute', 'navigation'],
-  },
-)
+})
 
 const TerminalCloseConfirmBody: FunctionalComponent<{ body: string; processName: string }> = (props) => (
   <div class="space-y-1">

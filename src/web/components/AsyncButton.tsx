@@ -14,8 +14,16 @@ type AsyncButtonProps = Omit<ButtonProps, 'onClick'> & {
   action?: (event: MouseEvent) => void | Promise<unknown>
 }
 
-export const AsyncButton = defineComponent(
-  (props: AsyncButtonProps, { attrs, slots }) => {
+export const AsyncButton = defineComponent<AsyncButtonProps>({
+  name: 'AsyncButton',
+  inheritAttrs: false,
+  props: {
+    loading: Boolean,
+    disabled: Boolean,
+    action: Function as PropType<(event: MouseEvent) => void | Promise<unknown>>,
+  },
+
+  setup(props, { attrs, slots }) {
     const pendingState = useAsyncPending<'click'>()
 
     function handleClick(event: MouseEvent): void {
@@ -33,13 +41,4 @@ export const AsyncButton = defineComponent(
       )
     }
   },
-  {
-    name: 'AsyncButton',
-    inheritAttrs: false,
-    props: {
-      loading: Boolean,
-      disabled: Boolean,
-      action: Function as PropType<(event: MouseEvent) => void | Promise<unknown>>,
-    },
-  },
-)
+})

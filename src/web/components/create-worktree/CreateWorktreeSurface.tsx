@@ -63,8 +63,10 @@ interface CreateWorktreeFormProps {
   onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
 }
 
-export const CreateWorktreePageBody = defineComponent(
-  (props: CreateWorktreeFormProps) => {
+export const CreateWorktreePageBody = defineComponent<CreateWorktreeFormProps>({
+  name: 'CreateWorktreePageBody',
+  props: ['repo', 'worktreeBootstrap', 'onCancel', 'onCreate'],
+  setup(props) {
     const t = useT()
     return () => (
       <div class="flex w-full flex-col gap-4 p-6">
@@ -81,13 +83,14 @@ export const CreateWorktreePageBody = defineComponent(
       </div>
     )
   },
-  { name: 'CreateWorktreePageBody', props: ['repo', 'worktreeBootstrap', 'onCancel', 'onCreate'] },
-)
+})
 
 type CreateWorktreeFormPhase = 'editing' | 'creating'
 
-export const CreateWorktreeForm = defineComponent(
-  (props: CreateWorktreeFormProps) => {
+export const CreateWorktreeForm = defineComponent<CreateWorktreeFormProps>({
+  name: 'CreateWorktreeForm',
+  props: ['repo', 'worktreeBootstrap', 'onCancel', 'onCreate'],
+  setup(props) {
     const t = useT()
     const compact = useIsCompactUi()
     const mode = ref<CreateWorktreeMode>('newBranch')
@@ -439,8 +442,7 @@ export const CreateWorktreeForm = defineComponent(
       )
     }
   },
-  { name: 'CreateWorktreeForm', props: ['repo', 'worktreeBootstrap', 'onCancel', 'onCreate'] },
-)
+})
 
 interface WorktreeBootstrapTrustRowProps {
   state?: WorktreeBootstrapPromptState
@@ -454,8 +456,10 @@ const WorktreeBootstrapTrustRow: FunctionalComponent<WorktreeBootstrapTrustRowPr
 
 WorktreeBootstrapTrustRow.props = ['state', 'disabled']
 
-const WorktreeBootstrapTrustCheckbox = defineComponent(
-  (props: WorktreeBootstrapTrustRowProps) => {
+const WorktreeBootstrapTrustCheckbox = defineComponent<WorktreeBootstrapTrustRowProps>({
+  name: 'WorktreeBootstrapTrustCheckbox',
+  props: ['state', 'disabled'],
+  setup(props) {
     const t = useT()
     return () =>
       props.state ? (
@@ -470,8 +474,7 @@ const WorktreeBootstrapTrustCheckbox = defineComponent(
         </div>
       ) : null
   },
-  { name: 'WorktreeBootstrapTrustCheckbox', props: ['state', 'disabled'] },
-)
+})
 
 function shouldShowWorktreeBootstrapTrust(state: WorktreeBootstrapPromptState | undefined): boolean {
   const preview = state?.preview ?? null

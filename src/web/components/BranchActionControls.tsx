@@ -36,8 +36,15 @@ interface BranchActionAutoProps {
   destructiveItems: BranchActionItem[]
 }
 
-const BranchActionAuto = defineComponent(
-  (props: BranchActionAutoProps) => {
+const BranchActionAuto = defineComponent<BranchActionAutoProps>({
+  name: 'BranchActionAuto',
+  props: {
+    visibleItems: { type: Array as PropType<BranchActionItem[]>, required: true },
+    mainItems: { type: Array as PropType<BranchActionItem[]>, required: true },
+    destructiveItems: { type: Array as PropType<BranchActionItem[]>, required: true },
+  },
+
+  setup(props) {
     const layoutKey = computed(() =>
       props.visibleItems.map((item) => `${item.id}:${item.label}:${item.disabled}`).join('|'),
     )
@@ -56,15 +63,7 @@ const BranchActionAuto = defineComponent(
       </div>
     )
   },
-  {
-    name: 'BranchActionAuto',
-    props: {
-      visibleItems: { type: Array as PropType<BranchActionItem[]>, required: true },
-      mainItems: { type: Array as PropType<BranchActionItem[]>, required: true },
-      destructiveItems: { type: Array as PropType<BranchActionItem[]>, required: true },
-    },
-  },
-)
+})
 
 function BranchActionButtonScroller({ visibleItems }: { visibleItems: BranchActionItem[] }) {
   return (

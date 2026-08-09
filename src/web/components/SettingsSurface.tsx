@@ -11,15 +11,24 @@ import { SshRemoteSettings } from '#/web/components/settings/pages/SshRemoteSett
 import { SyncSettings } from '#/web/components/settings/pages/SyncSettings.tsx'
 import { WebSettings } from '#/web/components/settings/pages/WebSettings.tsx'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-export const SettingsSurface = defineComponent(
-  (props: {
-    page: SettingsPage
-    onBack?: () => void
-    onPageChange?: (page: SettingsPage) => void
-    topInset?: number
-    autoFocusSelected?: boolean
-  }) =>
-    () => (
+export const SettingsSurface = defineComponent<{
+  page: SettingsPage
+  onBack?: () => void
+  onPageChange?: (page: SettingsPage) => void
+  topInset?: number
+  autoFocusSelected?: boolean
+}>({
+  name: 'SettingsSurface',
+  props: {
+    page: { type: String as PropType<SettingsPage>, required: true },
+    onBack: Function as PropType<() => void>,
+    onPageChange: Function as PropType<(page: SettingsPage) => void>,
+    topInset: Number,
+    autoFocusSelected: { type: Boolean, default: true },
+  },
+
+  setup(props) {
+    return () => (
       <SettingsLayout
         page={props.page}
         onBack={props.onBack}
@@ -29,18 +38,9 @@ export const SettingsSurface = defineComponent(
       >
         <SettingsPageContent page={props.page} />
       </SettingsLayout>
-    ),
-  {
-    name: 'SettingsSurface',
-    props: {
-      page: { type: String as PropType<SettingsPage>, required: true },
-      onBack: Function as PropType<() => void>,
-      onPageChange: Function as PropType<(page: SettingsPage) => void>,
-      topInset: Number,
-      autoFocusSelected: { type: Boolean, default: true },
-    },
+    )
   },
-)
+})
 
 function SettingsPageContent({ page }: { page: SettingsPage }) {
   switch (page) {

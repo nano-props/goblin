@@ -8,16 +8,26 @@ import { useRestoreTopVisibleRowIndex } from '#/web/hooks/useRestoreTopVisibleRo
 
 type ScrollToIndex = (index: number, options?: { align?: 'start' | 'center' | 'end' | 'auto' }) => void
 
-const ScrollRestoreHarness = defineComponent(
-  (props: {
-    topVisibleRowIndex: number
-    restoreKey: string
-    enabled: boolean
-    ready: boolean
-    rowCount: number
-    showScrollElement: boolean
-    scrollToIndex: ScrollToIndex
-  }) => {
+const ScrollRestoreHarness = defineComponent<{
+  topVisibleRowIndex: number
+  restoreKey: string
+  enabled: boolean
+  ready: boolean
+  rowCount: number
+  showScrollElement: boolean
+  scrollToIndex: ScrollToIndex
+}>({
+  props: {
+    topVisibleRowIndex: { type: Number, required: true },
+    restoreKey: { type: String, required: true },
+    enabled: { type: Boolean, required: true },
+    ready: { type: Boolean, required: true },
+    rowCount: { type: Number, required: true },
+    showScrollElement: { type: Boolean, required: true },
+    scrollToIndex: { type: Function as PropType<ScrollToIndex>, required: true },
+  },
+
+  setup(props) {
     const scrollElement = ref<HTMLElement | null>(null)
     useRestoreTopVisibleRowIndex({
       restoreKey: () => props.restoreKey,
@@ -30,18 +40,7 @@ const ScrollRestoreHarness = defineComponent(
     })
     return () => (props.showScrollElement ? <div ref={scrollElement} /> : null)
   },
-  {
-    props: {
-      topVisibleRowIndex: { type: Number, required: true },
-      restoreKey: { type: String, required: true },
-      enabled: { type: Boolean, required: true },
-      ready: { type: Boolean, required: true },
-      rowCount: { type: Number, required: true },
-      showScrollElement: { type: Boolean, required: true },
-      scrollToIndex: { type: Function as PropType<ScrollToIndex>, required: true },
-    },
-  },
-)
+})
 
 function harnessProps(
   scrollToIndex: ScrollToIndex,

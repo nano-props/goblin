@@ -77,8 +77,11 @@ export const AlertDialogHeader: FunctionalComponent<HTMLAttributes> = (props, { 
 }
 AlertDialogHeader.inheritAttrs = false
 
-export const AlertDialogFooter = defineComponent<HTMLAttributes>(
-  (_props, { attrs, slots }) => {
+export const AlertDialogFooter = defineComponent<HTMLAttributes>({
+  name: 'AlertDialogFooter',
+  inheritAttrs: false,
+
+  setup(_props, { attrs, slots }) {
     const compact = useIsCompactUi()
     return () => {
       const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
@@ -98,11 +101,7 @@ export const AlertDialogFooter = defineComponent<HTMLAttributes>(
       )
     }
   },
-  {
-    name: 'AlertDialogFooter',
-    inheritAttrs: false,
-  },
-)
+})
 
 type AlertDialogTitleProps = Omit<InstanceType<typeof RekaAlertDialogTitle>['$props'], 'class'> & {
   class?: HTMLAttributes['class']

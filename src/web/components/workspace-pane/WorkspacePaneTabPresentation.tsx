@@ -45,8 +45,11 @@ interface WorkspacePaneTabSwitcherPopoverProps {
   t: WorkspacePaneT
 }
 
-export const WorkspacePaneTabSwitcherPopover = defineComponent(
-  (props: WorkspacePaneTabSwitcherPopoverProps) => {
+export const WorkspacePaneTabSwitcherPopover = defineComponent<WorkspacePaneTabSwitcherPopoverProps>({
+  name: 'WorkspacePaneTabSwitcherPopover',
+  props: ['items', 'activeTabIdentity', 'label', 'createAction', 'tabInteractionBlocked', 'onSelect', 'onClose', 't'],
+
+  setup(props) {
     const open = ref(false)
     const selectView = (identity: string) => {
       if (props.tabInteractionBlocked) return
@@ -163,11 +166,7 @@ export const WorkspacePaneTabSwitcherPopover = defineComponent(
       </Popover>
     )
   },
-  {
-    name: 'WorkspacePaneTabSwitcherPopover',
-    props: ['items', 'activeTabIdentity', 'label', 'createAction', 'tabInteractionBlocked', 'onSelect', 'onClose', 't'],
-  },
-)
+})
 
 interface WorkspacePaneNewButtonProps {
   id?: string
@@ -374,8 +373,30 @@ interface SortableWorkspacePaneTabProps extends WorkspacePaneTabProps {
   sortableIndex: number
 }
 
-export const SortableWorkspacePaneTab = defineComponent(
-  (props: SortableWorkspacePaneTabProps) => {
+export const SortableWorkspacePaneTab = defineComponent<SortableWorkspacePaneTabProps>({
+  name: 'SortableWorkspacePaneTab',
+  props: [
+    'sortableIdentity',
+    'sortableIndex',
+    'item',
+    'isActive',
+    'isSelected',
+    'isFocusable',
+    'index',
+    'total',
+    'tabId',
+    'focusRegistry',
+    'onSelect',
+    'onClose',
+    'onKeyDown',
+    't',
+    'interactionDisabled',
+    'compact',
+    'showSeparator',
+    'onHoverChange',
+  ],
+
+  setup(props) {
     const sortable = useSortableTab(
       () => props.sortableIdentity,
       () => props.sortableIndex,
@@ -412,30 +433,7 @@ export const SortableWorkspacePaneTab = defineComponent(
       </div>
     )
   },
-  {
-    name: 'SortableWorkspacePaneTab',
-    props: [
-      'sortableIdentity',
-      'sortableIndex',
-      'item',
-      'isActive',
-      'isSelected',
-      'isFocusable',
-      'index',
-      'total',
-      'tabId',
-      'focusRegistry',
-      'onSelect',
-      'onClose',
-      'onKeyDown',
-      't',
-      'interactionDisabled',
-      'compact',
-      'showSeparator',
-      'onHoverChange',
-    ],
-  },
-)
+})
 
 interface WorkspacePaneTabIconProps {
   item: WorkspacePaneTabItem

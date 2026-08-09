@@ -5,8 +5,14 @@ interface CollapseTransitionProps {
   present?: boolean
 }
 
-export const CollapseTransition = defineComponent(
-  (props: CollapseTransitionProps, { slots }) => {
+export const CollapseTransition = defineComponent<CollapseTransitionProps>({
+  name: 'CollapseTransition',
+  props: {
+    duration: Number,
+    present: { type: Boolean, default: true },
+  },
+
+  setup(props, { slots }) {
     const outerRef = ref<HTMLDivElement | null>(null)
     const innerRef = ref<HTMLDivElement | null>(null)
     const rendered = ref(props.present ?? true)
@@ -85,11 +91,4 @@ export const CollapseTransition = defineComponent(
       </div>
     )
   },
-  {
-    name: 'CollapseTransition',
-    props: {
-      duration: Number,
-      present: { type: Boolean, default: true },
-    },
-  },
-)
+})

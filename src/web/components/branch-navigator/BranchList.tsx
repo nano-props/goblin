@@ -33,8 +33,18 @@ interface Props {
   emptyState: VNodeChild
 }
 
-export const BranchList = defineComponent(
-  (props: Props) => {
+export const BranchList = defineComponent<Props>({
+  name: 'BranchList',
+  props: {
+    repo: { type: Object as PropType<BranchListRepo | null>, default: null },
+    branches: { type: Array as PropType<BranchSnapshotInfo[]>, required: true },
+    highlightedBranch: { type: String, default: null },
+    onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
+    onOpenBranchStatus: { type: Function as PropType<(branch: string) => void>, required: true },
+    emptyState: { type: null, required: true },
+  },
+
+  setup(props) {
     const actionMenuOpen = ref<string | null>(null)
     const selectedRef = ref<HTMLLIElement | null>(null)
 
@@ -80,15 +90,4 @@ export const BranchList = defineComponent(
       )
     }
   },
-  {
-    name: 'BranchList',
-    props: {
-      repo: { type: Object as PropType<BranchListRepo | null>, default: null },
-      branches: { type: Array as PropType<BranchSnapshotInfo[]>, required: true },
-      highlightedBranch: { type: String, default: null },
-      onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
-      onOpenBranchStatus: { type: Function as PropType<(branch: string) => void>, required: true },
-      emptyState: { type: null, required: true },
-    },
-  },
-)
+})

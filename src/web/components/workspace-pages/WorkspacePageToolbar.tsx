@@ -22,8 +22,11 @@ interface WorkspacePageToolbarProps {
   onBack?: () => void
 }
 
-export const WorkspacePageToolbar = defineComponent(
-  (props: WorkspacePageToolbarProps) => {
+export const WorkspacePageToolbar = defineComponent<WorkspacePageToolbarProps>({
+  name: 'WorkspacePageToolbar',
+  props: ['icon', 'label', 'compact', 'trafficLightOffset', 'onBack'],
+
+  setup(props) {
     const t = useT()
     return () => {
       const Icon = props.icon
@@ -89,8 +92,4 @@ export const WorkspacePageToolbar = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspacePageToolbar',
-    props: ['icon', 'label', 'compact', 'trafficLightOffset', 'onBack'],
-  },
-)
+})

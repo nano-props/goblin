@@ -6,8 +6,11 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
-export const WorkspaceZenModeToggle = defineComponent(
-  (props: { class?: HTMLAttributes['class'] }, { attrs }) => {
+export const WorkspaceZenModeToggle = defineComponent<{ class?: HTMLAttributes['class'] }>({
+  name: 'WorkspaceZenModeToggle',
+  inheritAttrs: false,
+  props: { class: null },
+  setup(props, { attrs }) {
     const t = useT()
     const zenMode = useStoreSelector(workspacesStore, (state) => state.zenMode)
     const toggleZenMode = workspacesStore.getState().toggleZenMode
@@ -27,5 +30,4 @@ export const WorkspaceZenModeToggle = defineComponent(
       </Button>
     )
   },
-  { name: 'WorkspaceZenModeToggle', inheritAttrs: false, props: { class: null } },
-)
+})

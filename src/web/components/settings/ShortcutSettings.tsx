@@ -8,8 +8,9 @@ import { useShortcutSettingsController, useShortcutSettings } from '#/web/runtim
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { DEFAULT_GLOBAL_SHORTCUT, formatAccelerator, globalShortcutFromKeyboardEvent } from '#/shared/accelerator.ts'
-export const ShortcutSettings = defineComponent(
-  () => {
+export const ShortcutSettings = defineComponent({
+  name: 'ShortcutSettings',
+  setup() {
     const t = useT()
     const shortcutStatusId = 'global-shortcut-status'
     const shortcutSettings = useShortcutSettings()
@@ -165,5 +166,4 @@ export const ShortcutSettings = defineComponent(
       )
     }
   },
-  { name: 'ShortcutSettings' },
-)
+})

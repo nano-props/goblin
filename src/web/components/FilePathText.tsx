@@ -25,8 +25,10 @@ function createTextWidthMeasurer(element: HTMLElement): (text: string) => number
   }
 }
 
-export const FilePathText = defineComponent(
-  (props: { path: string; class?: string }) => {
+export const FilePathText = defineComponent<{ path: string; class?: string }>({
+  name: 'FilePathText',
+  props: { path: { type: String, required: true }, class: String },
+  setup(props) {
     const element = ref<HTMLSpanElement | null>(null)
     const displayPath = ref(props.path)
 
@@ -63,5 +65,4 @@ export const FilePathText = defineComponent(
       </span>
     )
   },
-  { name: 'FilePathText', props: { path: { type: String, required: true }, class: String } },
-)
+})

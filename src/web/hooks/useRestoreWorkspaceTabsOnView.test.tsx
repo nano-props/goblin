@@ -61,8 +61,10 @@ vi.mock('#/web/stores/workspaces/store.ts', () => ({
   },
 }))
 
-const RestoreHost = defineComponent(
-  (props: { workspaceId: WorkspaceId | null; presentation?: 'none' | 'state' | 'retry' }) => {
+const RestoreHost = defineComponent<{ workspaceId: WorkspaceId | null; presentation?: 'none' | 'state' | 'retry' }>({
+  name: 'RestoreWorkspaceTabsHost',
+  props: ['workspaceId', 'presentation'],
+  setup(props) {
     const restore = useRestoreWorkspaceTabsOnView({ workspaceId: () => props.workspaceId })
     return () => {
       if (props.presentation === 'retry') {
@@ -80,8 +82,7 @@ const RestoreHost = defineComponent(
       return null
     }
   },
-  { name: 'RestoreWorkspaceTabsHost', props: ['workspaceId', 'presentation'] },
-)
+})
 
 function stubRepo(
   id: WorkspaceId,

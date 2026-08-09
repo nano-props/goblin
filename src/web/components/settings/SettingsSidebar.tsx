@@ -16,16 +16,27 @@ export interface SettingsSidebarItem {
   Icon: FunctionalComponent<SVGAttributes>
 }
 
-export const SettingsSidebar = defineComponent(
-  (props: {
-    page: SettingsPage
-    items: readonly SettingsSidebarItem[]
-    topInset?: number
-    autoFocusSelected?: boolean
-    ariaLabel: string
-    onBack?: () => void
-    onPageChange: (page: SettingsPage) => void
-  }) => {
+export const SettingsSidebar = defineComponent<{
+  page: SettingsPage
+  items: readonly SettingsSidebarItem[]
+  topInset?: number
+  autoFocusSelected?: boolean
+  ariaLabel: string
+  onBack?: () => void
+  onPageChange: (page: SettingsPage) => void
+}>({
+  name: 'SettingsSidebar',
+  props: {
+    page: { type: String as PropType<SettingsPage>, required: true },
+    items: { type: Array as PropType<readonly SettingsSidebarItem[]>, required: true },
+    topInset: Number,
+    autoFocusSelected: { type: Boolean, default: true },
+    ariaLabel: { type: String, required: true },
+    onBack: Function as PropType<() => void>,
+    onPageChange: { type: Function as PropType<(page: SettingsPage) => void>, required: true },
+  },
+
+  setup(props) {
     const t = useT()
     const uiMode = useResponsiveUiMode()
     const navigation = ref<HTMLElement | null>(null)
@@ -100,16 +111,4 @@ export const SettingsSidebar = defineComponent(
       )
     }
   },
-  {
-    name: 'SettingsSidebar',
-    props: {
-      page: { type: String as PropType<SettingsPage>, required: true },
-      items: { type: Array as PropType<readonly SettingsSidebarItem[]>, required: true },
-      topInset: Number,
-      autoFocusSelected: { type: Boolean, default: true },
-      ariaLabel: { type: String, required: true },
-      onBack: Function as PropType<() => void>,
-      onPageChange: { type: Function as PropType<(page: SettingsPage) => void>, required: true },
-    },
-  },
-)
+})

@@ -14,8 +14,20 @@ import {
 import { branchActionDisplayPhase } from '#/web/hooks/branch-action-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 
-export const BranchListRow = defineComponent(
-  (props: BranchRowProps) => {
+export const BranchListRow = defineComponent<BranchRowProps>({
+  name: 'BranchListRow',
+  props: {
+    repo: { type: Object as PropType<BranchActionRepo>, required: true },
+    branch: { type: Object as PropType<BranchSnapshotInfo>, required: true },
+    selected: { type: String, default: null },
+    onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
+    onOpenBranchStatus: { type: Function as PropType<(branch: string) => void>, required: true },
+    selectedRef: { type: null, required: true },
+    actionMenuOpen: Boolean,
+    onActionMenuOpenChange: Function as PropType<(open: boolean) => void>,
+  },
+
+  setup(props) {
     const terminalSessionId = computed(() =>
       props.branch.worktree?.path
         ? formatTerminalFilesystemTargetKeyForPath(props.repo.id, props.branch.worktree.path)
@@ -40,17 +52,4 @@ export const BranchListRow = defineComponent(
       />
     )
   },
-  {
-    name: 'BranchListRow',
-    props: {
-      repo: { type: Object as PropType<BranchActionRepo>, required: true },
-      branch: { type: Object as PropType<BranchSnapshotInfo>, required: true },
-      selected: { type: String, default: null },
-      onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
-      onOpenBranchStatus: { type: Function as PropType<(branch: string) => void>, required: true },
-      selectedRef: { type: null, required: true },
-      actionMenuOpen: Boolean,
-      onActionMenuOpenChange: Function as PropType<(open: boolean) => void>,
-    },
-  },
-)
+})

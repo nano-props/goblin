@@ -65,30 +65,43 @@ interface WorkspaceViewProps {
   ) => void
 }
 
-export const WorkspaceView = defineComponent(
-  (props: WorkspaceViewProps) => {
+export const WorkspaceView = defineComponent<WorkspaceViewProps>({
+  name: 'WorkspaceView',
+  props: [
+    'workspaceId',
+    'routeView',
+    'onOpenSettings',
+    'onOpenWorkspaceNavigator',
+    'onOpenWorkspaceRootPane',
+    'onOpenWorkspaceDashboard',
+    'onOpenRepoBranch',
+    'onOpenRepoNewWorktree',
+    'onCancelRepoNewWorktree',
+    'onReplaceRepoBranch',
+  ],
+
+  setup(props) {
     provideWorkspacePaneTabStripScrollMemory()
     return () => <WorkspaceViewContent {...props} />
   },
-  {
-    name: 'WorkspaceView',
-    props: [
-      'workspaceId',
-      'routeView',
-      'onOpenSettings',
-      'onOpenWorkspaceNavigator',
-      'onOpenWorkspaceRootPane',
-      'onOpenWorkspaceDashboard',
-      'onOpenRepoBranch',
-      'onOpenRepoNewWorktree',
-      'onCancelRepoNewWorktree',
-      'onReplaceRepoBranch',
-    ],
-  },
-)
+})
 
-const WorkspaceViewContent = defineComponent(
-  (props: WorkspaceViewProps) => {
+const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
+  name: 'WorkspaceViewContent',
+  props: [
+    'workspaceId',
+    'routeView',
+    'onOpenSettings',
+    'onOpenWorkspaceNavigator',
+    'onOpenWorkspaceRootPane',
+    'onOpenWorkspaceDashboard',
+    'onOpenRepoBranch',
+    'onOpenRepoNewWorktree',
+    'onCancelRepoNewWorktree',
+    'onReplaceRepoBranch',
+  ],
+
+  setup(props) {
     const uiMode = useResponsiveUiMode()
     const compact = computed(() => uiMode.value === 'compact')
     const view = useStoreSelector(
@@ -427,22 +440,7 @@ const WorkspaceViewContent = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspaceViewContent',
-    props: [
-      'workspaceId',
-      'routeView',
-      'onOpenSettings',
-      'onOpenWorkspaceNavigator',
-      'onOpenWorkspaceRootPane',
-      'onOpenWorkspaceDashboard',
-      'onOpenRepoBranch',
-      'onOpenRepoNewWorktree',
-      'onCancelRepoNewWorktree',
-      'onReplaceRepoBranch',
-    ],
-  },
-)
+})
 
 function workspaceRouteViewIsTerminal(routeView: WorkspaceRouteView | null): boolean {
   return (
@@ -456,17 +454,20 @@ interface GitWorkspaceEffectsProps {
   renderWorkspace: (projectionRestore: WorkspaceProjectionRestoreController) => VNodeChild
 }
 
-const GitWorkspaceEffects = defineComponent(
-  (props: GitWorkspaceEffectsProps) => {
+const GitWorkspaceEffects = defineComponent<GitWorkspaceEffectsProps>({
+  name: 'GitWorkspaceEffects',
+  props: ['workspaceId', 'renderWorkspace'],
+  setup(props) {
     useRepoToasts(() => props.workspaceId)
     const projectionRestore = useRestoreWorkspaceTabsOnView({ workspaceId: () => props.workspaceId })
     return () => props.renderWorkspace({ state: projectionRestore.state.value, retry: projectionRestore.retry })
   },
-  { name: 'GitWorkspaceEffects', props: ['workspaceId', 'renderWorkspace'] },
-)
+})
 
-const RoutedWorkspaceNotFound = defineComponent(
-  (props: { workspaceId: WorkspaceId }) => {
+const RoutedWorkspaceNotFound = defineComponent<{ workspaceId: WorkspaceId }>({
+  name: 'RoutedWorkspaceNotFound',
+  props: ['workspaceId'],
+  setup(props) {
     const t = useT()
     return () => (
       // An explicit URL remains navigation authority even when its target was
@@ -481,5 +482,4 @@ const RoutedWorkspaceNotFound = defineComponent(
       </section>
     )
   },
-  { name: 'RoutedWorkspaceNotFound', props: ['workspaceId'] },
-)
+})

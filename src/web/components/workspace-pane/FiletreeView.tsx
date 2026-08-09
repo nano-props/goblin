@@ -56,8 +56,33 @@ const FILE_TREE_I18N_KEYS = {
   stale: 'filetree.stale-title',
 } as const satisfies Record<string, string>
 
-export const FiletreeView = defineComponent(
-  (props: FiletreeViewProps) => {
+export const FiletreeView = defineComponent<FiletreeViewProps>({
+  name: 'FiletreeView',
+  props: [
+    'tree',
+    'isInitialLoading',
+    'isReading',
+    'loadingKeys',
+    'openingFileKeys',
+    'error',
+    'onSelect',
+    'onActivate',
+    'onOpenFile',
+    'onDownloadFile',
+    'onRequestTrashFile',
+    'selectedKeys',
+    'expandedKeys',
+    'onSelectedKeysChange',
+    'onDirectoryRowToggle',
+    'onPruneKeys',
+    'onRetry',
+    'initialTopVisibleRowIndex',
+    'scrollRestoreKey',
+    'scrollRestoreReady',
+    'onTopVisibleRowIndexChange',
+  ],
+
+  setup(props) {
     const t = useT()
     const collection = computed(() => buildFiletreeCollection(props.tree, props.expandedKeys))
     const scrollViewportRef = ref<HTMLDivElement | null>(null)
@@ -270,36 +295,12 @@ export const FiletreeView = defineComponent(
       )
     }
   },
-  {
-    name: 'FiletreeView',
-    props: [
-      'tree',
-      'isInitialLoading',
-      'isReading',
-      'loadingKeys',
-      'openingFileKeys',
-      'error',
-      'onSelect',
-      'onActivate',
-      'onOpenFile',
-      'onDownloadFile',
-      'onRequestTrashFile',
-      'selectedKeys',
-      'expandedKeys',
-      'onSelectedKeysChange',
-      'onDirectoryRowToggle',
-      'onPruneKeys',
-      'onRetry',
-      'initialTopVisibleRowIndex',
-      'scrollRestoreKey',
-      'scrollRestoreReady',
-      'onTopVisibleRowIndexChange',
-    ],
-  },
-)
+})
 
-const FiletreeStaleNotice = defineComponent(
-  (props: { isReading: boolean; onRetry?: () => void }) => {
+const FiletreeStaleNotice = defineComponent<{ isReading: boolean; onRetry?: () => void }>({
+  name: 'FiletreeStaleNotice',
+  props: ['isReading', 'onRetry'],
+  setup(props) {
     const t = useT()
     return () => (
       <div
@@ -316,8 +317,7 @@ const FiletreeStaleNotice = defineComponent(
       </div>
     )
   },
-  { name: 'FiletreeStaleNotice', props: ['isReading', 'onRetry'] },
-)
+})
 
 const FiletreeShell: FunctionalComponent<{ loading: boolean }> = (props, { slots }) => (
   <div data-filetree="" aria-busy={props.loading || undefined} class="flex min-h-0 flex-1 flex-col">

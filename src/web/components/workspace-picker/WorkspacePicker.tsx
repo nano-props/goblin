@@ -84,117 +84,131 @@ interface WorkspaceMenuContentProps extends Omit<WorkspacePickerProps, 'surface'
   onSelectAction: (action: () => void) => void
 }
 
-const WorkspaceMenuContent = defineComponent(
-  (props: WorkspaceMenuContentProps) => () => {
-    const showWorkspaceList = props.workspaces.length > 0
-    return (
-      <PopoverContent
-        side="bottom"
-        align="start"
-        class="flex w-max max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0"
-        style={{ minWidth: 'max(16rem, var(--reka-popover-trigger-width))' }}
-        aria-label={props.labels.workspaces}
-        tabindex={-1}
-        onOpenAutoFocus={(event: Event) => {
-          event.preventDefault()
-          if (event.currentTarget instanceof HTMLElement) {
-            event.currentTarget.focus({ preventScroll: true })
-          }
-        }}
-      >
-        {showWorkspaceList ? (
-          <ScrollArea class="max-h-80" scrollbarMode="compact">
-            <div class="space-y-0.5 p-1" role="list">
-              {props.workspaces.map((workspace) => {
-                const selected = workspace.id === props.currentWorkspaceId
-                const WorkspaceIcon = isRemoteWorkspaceId(workspace.id)
-                  ? Server
-                  : workspace.gitCapability === 'available'
-                    ? FolderGit2
-                    : Folder
-                const remoteTarget = remoteWorkspaceConnectionTarget(workspace.lifecycle)
-                return (
-                  <div key={workspace.id} class="group relative flex items-center" role="listitem">
-                    <MenuRowButton
-                      size="roomy"
-                      selected={selected}
-                      onClick={() => props.onSelectWorkspace(workspace.id)}
-                      aria-current={selected ? 'true' : undefined}
-                      leading={<WorkspaceIcon size={13} class="text-muted-foreground" aria-hidden="true" />}
-                      contentClass="whitespace-normal"
-                      trailing={
-                        (workspace.terminalBellCount ?? 0) > 0 ? (
-                          <TerminalBellBadge count={workspace.terminalBellCount ?? 0} />
-                        ) : null
-                      }
-                    >
-                      <div class="truncate font-medium leading-5">{workspace.name}</div>
-                      <div class="truncate font-mono text-xs leading-4 text-muted-foreground">
-                        {formatWorkspaceDisplayLocation(workspace.id, remoteTarget)}
-                      </div>
-                    </MenuRowButton>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      class="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
-                      onPointerdown={(event: PointerEvent) => event.stopPropagation()}
-                      onClick={(event: MouseEvent) => {
-                        event.stopPropagation()
-                        props.onClose(workspace.id)
-                      }}
-                      title={props.labels.closeWithName(workspace.name)}
-                      aria-label={props.labels.closeWithName(workspace.name)}
-                    >
-                      <X size={13} />
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-          </ScrollArea>
-        ) : null}
-        <div class={showWorkspaceList ? 'border-t border-separator p-1' : 'p-1'}>
-          <WorkspaceSwitcherAction
-            icon={<FolderOpen size={14} />}
-            label={props.labels.openLocal}
-            shortcut={props.labels.openLocalShortcut}
-            onSelect={() => props.onSelectAction(props.onOpenLocal)}
-          />
-          <WorkspaceSwitcherAction
-            icon={<Server size={14} />}
-            label={props.labels.openRemote}
-            shortcut={props.labels.openRemoteShortcut}
-            onSelect={() => props.onSelectAction(props.onOpenRemote)}
-          />
-          <WorkspaceSwitcherAction
-            icon={<Download size={14} />}
-            label={props.labels.clone}
-            shortcut={props.labels.cloneShortcut}
-            onSelect={() => props.onSelectAction(props.onClone)}
-          />
-        </div>
-      </PopoverContent>
-    )
-  },
-  {
-    name: 'WorkspaceMenuContent',
-    props: [
-      'workspaces',
-      'currentWorkspaceId',
-      'labels',
-      'onClose',
-      'onOpenLocal',
-      'onOpenRemote',
-      'onClone',
-      'onSelectWorkspace',
-      'onSelectAction',
-    ],
-  },
-)
+const WorkspaceMenuContent = defineComponent<WorkspaceMenuContentProps>({
+  name: 'WorkspaceMenuContent',
+  props: [
+    'workspaces',
+    'currentWorkspaceId',
+    'labels',
+    'onClose',
+    'onOpenLocal',
+    'onOpenRemote',
+    'onClone',
+    'onSelectWorkspace',
+    'onSelectAction',
+  ],
 
-export const WorkspacePicker = defineComponent(
-  (props: WorkspacePickerProps) => {
+  setup(props) {
+    return () => {
+      const showWorkspaceList = props.workspaces.length > 0
+      return (
+        <PopoverContent
+          side="bottom"
+          align="start"
+          class="flex w-max max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0"
+          style={{ minWidth: 'max(16rem, var(--reka-popover-trigger-width))' }}
+          aria-label={props.labels.workspaces}
+          tabindex={-1}
+          onOpenAutoFocus={(event: Event) => {
+            event.preventDefault()
+            if (event.currentTarget instanceof HTMLElement) {
+              event.currentTarget.focus({ preventScroll: true })
+            }
+          }}
+        >
+          {showWorkspaceList ? (
+            <ScrollArea class="max-h-80" scrollbarMode="compact">
+              <div class="space-y-0.5 p-1" role="list">
+                {props.workspaces.map((workspace) => {
+                  const selected = workspace.id === props.currentWorkspaceId
+                  const WorkspaceIcon = isRemoteWorkspaceId(workspace.id)
+                    ? Server
+                    : workspace.gitCapability === 'available'
+                      ? FolderGit2
+                      : Folder
+                  const remoteTarget = remoteWorkspaceConnectionTarget(workspace.lifecycle)
+                  return (
+                    <div key={workspace.id} class="group relative flex items-center" role="listitem">
+                      <MenuRowButton
+                        size="roomy"
+                        selected={selected}
+                        onClick={() => props.onSelectWorkspace(workspace.id)}
+                        aria-current={selected ? 'true' : undefined}
+                        leading={<WorkspaceIcon size={13} class="text-muted-foreground" aria-hidden="true" />}
+                        contentClass="whitespace-normal"
+                        trailing={
+                          (workspace.terminalBellCount ?? 0) > 0 ? (
+                            <TerminalBellBadge count={workspace.terminalBellCount ?? 0} />
+                          ) : null
+                        }
+                      >
+                        <div class="truncate font-medium leading-5">{workspace.name}</div>
+                        <div class="truncate font-mono text-xs leading-4 text-muted-foreground">
+                          {formatWorkspaceDisplayLocation(workspace.id, remoteTarget)}
+                        </div>
+                      </MenuRowButton>
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        class="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
+                        onPointerdown={(event: PointerEvent) => event.stopPropagation()}
+                        onClick={(event: MouseEvent) => {
+                          event.stopPropagation()
+                          props.onClose(workspace.id)
+                        }}
+                        title={props.labels.closeWithName(workspace.name)}
+                        aria-label={props.labels.closeWithName(workspace.name)}
+                      >
+                        <X size={13} />
+                      </Button>
+                    </div>
+                  )
+                })}
+              </div>
+            </ScrollArea>
+          ) : null}
+          <div class={showWorkspaceList ? 'border-t border-separator p-1' : 'p-1'}>
+            <WorkspaceSwitcherAction
+              icon={<FolderOpen size={14} />}
+              label={props.labels.openLocal}
+              shortcut={props.labels.openLocalShortcut}
+              onSelect={() => props.onSelectAction(props.onOpenLocal)}
+            />
+            <WorkspaceSwitcherAction
+              icon={<Server size={14} />}
+              label={props.labels.openRemote}
+              shortcut={props.labels.openRemoteShortcut}
+              onSelect={() => props.onSelectAction(props.onOpenRemote)}
+            />
+            <WorkspaceSwitcherAction
+              icon={<Download size={14} />}
+              label={props.labels.clone}
+              shortcut={props.labels.cloneShortcut}
+              onSelect={() => props.onSelectAction(props.onClone)}
+            />
+          </div>
+        </PopoverContent>
+      )
+    }
+  },
+})
+
+export const WorkspacePicker = defineComponent<WorkspacePickerProps>({
+  name: 'WorkspacePicker',
+  props: [
+    'workspaces',
+    'currentWorkspaceId',
+    'labels',
+    'onActivate',
+    'onClose',
+    'onOpenLocal',
+    'onOpenRemote',
+    'onClone',
+    'surface',
+  ],
+
+  setup(props) {
     const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
     const menuOpen = ref(false)
 
@@ -314,18 +328,4 @@ export const WorkspacePicker = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspacePicker',
-    props: [
-      'workspaces',
-      'currentWorkspaceId',
-      'labels',
-      'onActivate',
-      'onClose',
-      'onOpenLocal',
-      'onOpenRemote',
-      'onClone',
-      'surface',
-    ],
-  },
-)
+})

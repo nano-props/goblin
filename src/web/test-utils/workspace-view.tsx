@@ -100,8 +100,9 @@ vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', async () => {
     toolbarTrafficLightOffset?: boolean
   }
   return {
-    WorkspacePane: defineComponent(
-      (props: WorkspacePaneMockProps) => {
+    WorkspacePane: defineComponent<WorkspacePaneMockProps>({
+      props: ['currentBranchName', 'workspacePaneRouteContext', 'shortcutsEnabled', 'toolbarTrafficLightOffset'],
+      setup(props) {
         const scrollMemory = useWorkspacePaneTabStripScrollMemoryController()
         return () => (
           <div
@@ -136,8 +137,7 @@ vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', async () => {
           </div>
         )
       },
-      { props: ['currentBranchName', 'workspacePaneRouteContext', 'shortcutsEnabled', 'toolbarTrafficLightOffset'] },
-    ),
+    }),
   }
 })
 

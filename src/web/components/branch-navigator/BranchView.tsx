@@ -26,8 +26,11 @@ interface Props {
   onAfterOpenStatus?: (branch: string) => void
 }
 
-export const BranchView = defineComponent(
-  (props: Props) => {
+export const BranchView = defineComponent<Props>({
+  name: 'BranchView',
+  props: ['repoId', 'onSelectBranch', 'currentBranchName', 'onAfterSelect', 'onAfterOpenStatus'],
+
+  setup(props) {
     const storeProjection = useStoreSelector(
       workspacesStore,
       (state) => ({
@@ -63,11 +66,7 @@ export const BranchView = defineComponent(
         <BranchNavigatorSkeleton />
       )
   },
-  {
-    name: 'BranchView',
-    props: ['repoId', 'onSelectBranch', 'currentBranchName', 'onAfterSelect', 'onAfterOpenStatus'],
-  },
-)
+})
 
 interface BranchViewReadModelProps extends Omit<Props, 'repoId'> {
   repo: BranchListRepoShell

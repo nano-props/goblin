@@ -13,8 +13,10 @@ interface EmptyWorkspaceViewProps {
   onOpenSettings?: () => void
 }
 
-export const EmptyWorkspaceView = defineComponent(
-  (props: EmptyWorkspaceViewProps) => {
+export const EmptyWorkspaceView = defineComponent<EmptyWorkspaceViewProps>({
+  name: 'EmptyWorkspaceView',
+  props: ['onOpenSettings'],
+  setup(props) {
     const t = useT()
     const uiMode = useResponsiveUiMode()
     const workspacePaneSize = useStoreSelector(workspacesStore, (state) => state.workspacePaneSize)
@@ -55,5 +57,4 @@ export const EmptyWorkspaceView = defineComponent(
       )
     }
   },
-  { name: 'EmptyWorkspaceView', props: ['onOpenSettings'] },
-)
+})

@@ -39,7 +39,9 @@ vi.mock('#/web/Layout.tsx', () => ({
   Layout: defineComponent({
     name: 'LayoutMock',
     inheritAttrs: false,
-    setup: () => () => <RouterView />,
+    setup() {
+      return () => <RouterView />
+    },
   }),
 }))
 import {

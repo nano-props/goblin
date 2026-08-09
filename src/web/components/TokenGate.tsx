@@ -10,8 +10,9 @@ import { useT } from '#/web/stores/i18n-vue.ts'
 
 const LOGIN_TIMEOUT_MS = 15_000
 
-export const TokenGate = defineComponent(
-  (_props, { slots }) => {
+export const TokenGate = defineComponent({
+  name: 'TokenGate',
+  setup(_props, { slots }) {
     const auth = useAuth()
     return () => {
       if (auth.state === 'checking') return <CenteredLoadingStatus label="Checking authentication" />
@@ -19,11 +20,15 @@ export const TokenGate = defineComponent(
       return slots.default?.()
     }
   },
-  { name: 'TokenGate' },
-)
+})
 
-const LoginForm = defineComponent(
-  (props: { onSuccess: () => void }) => {
+const LoginForm = defineComponent<{ onSuccess: () => void }>({
+  name: 'LoginForm',
+  props: {
+    onSuccess: { type: Function as PropType<() => void>, required: true },
+  },
+
+  setup(props) {
     const t = useT()
     const value = ref('')
     const error = ref<string | null>(null)
@@ -102,10 +107,4 @@ const LoginForm = defineComponent(
       </div>
     )
   },
-  {
-    name: 'LoginForm',
-    props: {
-      onSuccess: { type: Function as PropType<() => void>, required: true },
-    },
-  },
-)
+})

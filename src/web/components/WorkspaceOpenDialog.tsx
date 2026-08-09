@@ -9,8 +9,10 @@ interface WorkspaceOpenDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-export const WorkspaceOpenDialog = defineComponent(
-  (props: WorkspaceOpenDialogProps) => {
+export const WorkspaceOpenDialog = defineComponent<WorkspaceOpenDialogProps>({
+  name: 'WorkspaceOpenDialog',
+  props: ['open', 'onOpenChange'],
+  setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
 
@@ -34,5 +36,4 @@ export const WorkspaceOpenDialog = defineComponent(
       />
     )
   },
-  { name: 'WorkspaceOpenDialog', props: ['open', 'onOpenChange'] },
-)
+})

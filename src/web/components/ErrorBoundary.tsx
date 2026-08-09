@@ -6,8 +6,10 @@ import { goblinLog } from '#/web/logger.ts'
 import { markRenderErrorLogged } from '#/web/render-error-logging.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
-export const ErrorBoundary = defineComponent(
-  (props: { resetKey?: string }, { slots }) => {
+export const ErrorBoundary = defineComponent<{ resetKey?: string }>({
+  name: 'ErrorBoundary',
+  props: ['resetKey'],
+  setup(props, { slots }) {
     const error = shallowRef<unknown | null>(null)
 
     onErrorCaptured((caught, _instance, info) => {
@@ -32,11 +34,16 @@ export const ErrorBoundary = defineComponent(
       return <ErrorFallback error={error.value} onReset={() => (error.value = null)} />
     }
   },
-  { name: 'ErrorBoundary', props: ['resetKey'] },
-)
+})
 
-const ErrorFallback = defineComponent(
-  (props: { error: unknown; onReset: () => void }) => {
+const ErrorFallback = defineComponent<{ error: unknown; onReset: () => void }>({
+  name: 'ErrorFallback',
+  props: {
+    error: { type: null, required: true },
+    onReset: { type: Function as PropType<() => void>, required: true },
+  },
+
+  setup(props) {
     const t = useT()
     return () => {
       const message = props.error instanceof Error ? props.error.message : t('error.render-crash-unknown')
@@ -59,11 +66,4 @@ const ErrorFallback = defineComponent(
       )
     }
   },
-  {
-    name: 'ErrorFallback',
-    props: {
-      error: { type: null, required: true },
-      onReset: { type: Function as PropType<() => void>, required: true },
-    },
-  },
-)
+})

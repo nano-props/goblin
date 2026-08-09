@@ -30,17 +30,23 @@ const SETTINGS_PAGE_ICONS = {
   about: Info,
 } as const satisfies Record<SettingsPage, LucideIcon | typeof GitHubMark>
 
-export const SettingsLayout = defineComponent(
-  (
-    props: {
-      page: SettingsPage
-      topInset?: number
-      autoFocusSelected?: boolean
-      onBack?: () => void
-      onPageChange?: (page: SettingsPage) => void
-    },
-    { slots },
-  ) => {
+export const SettingsLayout = defineComponent<{
+  page: SettingsPage
+  topInset?: number
+  autoFocusSelected?: boolean
+  onBack?: () => void
+  onPageChange?: (page: SettingsPage) => void
+}>({
+  name: 'SettingsLayout',
+  props: {
+    page: { type: String as PropType<SettingsPage>, required: true },
+    topInset: Number,
+    autoFocusSelected: { type: Boolean, default: true },
+    onBack: Function as PropType<() => void>,
+    onPageChange: Function as PropType<(page: SettingsPage) => void>,
+  },
+
+  setup(props, { slots }) {
     const t = useT()
     return () => {
       const items = SETTINGS_PAGES.map((pageKey) => {
@@ -71,14 +77,4 @@ export const SettingsLayout = defineComponent(
       )
     }
   },
-  {
-    name: 'SettingsLayout',
-    props: {
-      page: { type: String as PropType<SettingsPage>, required: true },
-      topInset: Number,
-      autoFocusSelected: { type: Boolean, default: true },
-      onBack: Function as PropType<() => void>,
-      onPageChange: Function as PropType<(page: SettingsPage) => void>,
-    },
-  },
-)
+})

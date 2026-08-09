@@ -26,8 +26,28 @@ interface DirectoryPathSuggestionsProps {
   ariaDescribedby?: string
 }
 
-export const DirectoryPathSuggestions = defineComponent(
-  (props: DirectoryPathSuggestionsProps) => {
+export const DirectoryPathSuggestions = defineComponent<DirectoryPathSuggestionsProps>({
+  name: 'DirectoryPathSuggestions',
+  props: {
+    value: { type: String, required: true },
+    onChange: { type: Function as PropType<(next: string) => void>, required: true },
+    suggestions: { type: Array as PropType<readonly string[]>, required: true },
+    isLoading: Boolean,
+    hasFetched: Boolean,
+    emptyLabel: { type: String, required: true },
+    disabled: Boolean,
+    id: String,
+    placeholder: String,
+    autofocus: Boolean,
+    class: String,
+    inputClass: String,
+    onPopupOpenChange: Function as PropType<(open: boolean) => void>,
+    inputRef: [Object, Function] as PropType<ElementRef<HTMLInputElement>>,
+    ariaInvalid: Boolean,
+    ariaDescribedby: String,
+  },
+
+  setup(props) {
     const innerRef = ref<HTMLInputElement | null>(null)
     const containerRef = ref<HTMLDivElement | null>(null)
     const open = ref(false)
@@ -249,25 +269,4 @@ export const DirectoryPathSuggestions = defineComponent(
       </div>
     )
   },
-  {
-    name: 'DirectoryPathSuggestions',
-    props: {
-      value: { type: String, required: true },
-      onChange: { type: Function as PropType<(next: string) => void>, required: true },
-      suggestions: { type: Array as PropType<readonly string[]>, required: true },
-      isLoading: Boolean,
-      hasFetched: Boolean,
-      emptyLabel: { type: String, required: true },
-      disabled: Boolean,
-      id: String,
-      placeholder: String,
-      autofocus: Boolean,
-      class: String,
-      inputClass: String,
-      onPopupOpenChange: Function as PropType<(open: boolean) => void>,
-      inputRef: [Object, Function] as PropType<ElementRef<HTMLInputElement>>,
-      ariaInvalid: Boolean,
-      ariaDescribedby: String,
-    },
-  },
-)
+})

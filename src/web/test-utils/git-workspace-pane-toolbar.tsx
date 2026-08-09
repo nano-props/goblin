@@ -177,8 +177,11 @@ type GitWorkspacePaneToolbarHarnessProps = Omit<
   'workspacePaneTabModel'
 > & { workspacePaneRoute: WorkspacePaneRoute | null | undefined }
 
-const GitWorkspacePaneToolbarHarness = defineComponent(
-  (props: GitWorkspacePaneToolbarHarnessProps) => {
+const GitWorkspacePaneToolbarHarness = defineComponent<GitWorkspacePaneToolbarHarnessProps>({
+  name: 'GitWorkspacePaneToolbarHarness',
+  props: ['repo', 'detail', 'workspacePaneId', 'workspacePaneRoute', 'trafficLightOffset', 'onBackToBranchNavigator'],
+
+  setup(props) {
     const workspacePaneTabModel = useGitWorkspacePaneTabModel(
       () => props.repo,
       () => props.detail,
@@ -196,11 +199,7 @@ const GitWorkspacePaneToolbarHarness = defineComponent(
       />
     )
   },
-  {
-    name: 'GitWorkspacePaneToolbarHarness',
-    props: ['repo', 'detail', 'workspacePaneId', 'workspacePaneRoute', 'trafficLightOffset', 'onBackToBranchNavigator'],
-  },
-)
+})
 
 function getTestGitWorkspacePanePresentation(repo: GitWorkspacePaneProjection) {
   return buildGitWorkspacePanePresentation(repo, { loading: false, error: null, stale: false }, undefined, {
@@ -263,14 +262,15 @@ afterEach(() => {
   setTerminalSessionCommandBridge(null)
 })
 
-export const WorkspaceExternalAppLauncherHarness = defineComponent(
-  (props: { target: WorkspacePaneFilesystemTarget }) => {
+export const WorkspaceExternalAppLauncherHarness = defineComponent<{ target: WorkspacePaneFilesystemTarget }>({
+  name: 'WorkspaceExternalAppLauncherHarness',
+  props: ['target'],
+  setup(props) {
     const items = useWorkspaceExternalAppItems(() => props.target)
     return () =>
       items.value.length > 0 ? <WorkspaceExternalAppLauncher target={props.target} items={items.value} /> : null
   },
-  { name: 'WorkspaceExternalAppLauncherHarness', props: ['target'] },
-)
+})
 
 export function renderToolbar(options: {
   terminalCount: number

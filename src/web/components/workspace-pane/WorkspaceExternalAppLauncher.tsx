@@ -49,8 +49,17 @@ export function useWorkspaceExternalAppItems(
   })
 }
 
-export const WorkspaceExternalAppLauncher = defineComponent(
-  (props: { target: WorkspacePaneFilesystemTarget; items: readonly WorkspaceExternalAppItem[] }) => {
+export const WorkspaceExternalAppLauncher = defineComponent<{
+  target: WorkspacePaneFilesystemTarget
+  items: readonly WorkspaceExternalAppItem[]
+}>({
+  name: 'WorkspaceExternalAppLauncher',
+  props: {
+    target: { type: Object as PropType<WorkspacePaneFilesystemTarget>, required: true },
+    items: { type: Array as PropType<readonly WorkspaceExternalAppItem[]>, required: true },
+  },
+
+  setup(props) {
     const t = useT()
     const open = ref(false)
     const { pending, run } = useAsyncPending<string>()
@@ -175,14 +184,7 @@ export const WorkspaceExternalAppLauncher = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspaceExternalAppLauncher',
-    props: {
-      target: { type: Object as PropType<WorkspacePaneFilesystemTarget>, required: true },
-      items: { type: Array as PropType<readonly WorkspaceExternalAppItem[]>, required: true },
-    },
-  },
-)
+})
 
 function externalAppPreferenceTarget(target: WorkspacePaneFilesystemTarget): WorkspaceExternalAppTarget {
   return target.kind === 'workspace-root' ? { kind: 'workspace-root' } : { kind: 'git-worktree', root: target.rootId }
@@ -197,38 +199,48 @@ interface PrimaryAction {
   onSelect: () => void
 }
 
-const PrimaryButton = defineComponent(
-  (props: { action: PrimaryAction }) => () => (
-    <button
-      type="button"
-      data-testid="workspace-external-app-launcher-primary"
-      class={cn(
-        'flex h-full w-8 cursor-pointer items-center justify-center outline-none transition-colors duration-100 hover:bg-control-hover disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
-        focusRing,
-      )}
-      title={props.action.title}
-      aria-label={props.action.ariaLabel}
-      aria-busy={props.action.busy || undefined}
-      disabled={props.action.disabled}
-      onClick={props.action.onSelect}
-    >
-      {props.action.busy ? <Loader2 class="animate-spin" /> : props.action.icon}
-    </button>
-  ),
-  {
-    name: 'PrimaryButton',
-    props: { action: { type: Object as PropType<PrimaryAction>, required: true } },
-  },
-)
+const PrimaryButton = defineComponent<{ action: PrimaryAction }>({
+  name: 'PrimaryButton',
+  props: { action: { type: Object as PropType<PrimaryAction>, required: true } },
 
-const WorkspaceExternalAppLauncherItem = defineComponent(
-  (props: {
-    item: WorkspaceExternalAppItem
-    pending: string | null
-    disabled: boolean
-    selected: boolean
-    onSelect: () => void
-  }) => {
+  setup(props) {
+    return () => (
+      <button
+        type="button"
+        data-testid="workspace-external-app-launcher-primary"
+        class={cn(
+          'flex h-full w-8 cursor-pointer items-center justify-center outline-none transition-colors duration-100 hover:bg-control-hover disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
+          focusRing,
+        )}
+        title={props.action.title}
+        aria-label={props.action.ariaLabel}
+        aria-busy={props.action.busy || undefined}
+        disabled={props.action.disabled}
+        onClick={props.action.onSelect}
+      >
+        {props.action.busy ? <Loader2 class="animate-spin" /> : props.action.icon}
+      </button>
+    )
+  },
+})
+
+const WorkspaceExternalAppLauncherItem = defineComponent<{
+  item: WorkspaceExternalAppItem
+  pending: string | null
+  disabled: boolean
+  selected: boolean
+  onSelect: () => void
+}>({
+  name: 'WorkspaceExternalAppLauncherItem',
+  props: {
+    item: { type: Object as PropType<WorkspaceExternalAppItem>, required: true },
+    pending: String,
+    disabled: Boolean,
+    selected: Boolean,
+    onSelect: { type: Function as PropType<() => void>, required: true },
+  },
+
+  setup(props) {
     const t = useT()
     return () => {
       const itemBusy = props.pending === props.item.id
@@ -255,17 +267,7 @@ const WorkspaceExternalAppLauncherItem = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspaceExternalAppLauncherItem',
-    props: {
-      item: { type: Object as PropType<WorkspaceExternalAppItem>, required: true },
-      pending: String,
-      disabled: Boolean,
-      selected: Boolean,
-      onSelect: { type: Function as PropType<() => void>, required: true },
-    },
-  },
-)
+})
 
 function workspaceExternalAppItemVisible(input: {
   item: WorkspaceExternalAppItem

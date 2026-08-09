@@ -93,8 +93,10 @@ function SyncValue({
   )
 }
 
-const StatusCopyPatchButton = defineComponent(
-  (props: { action: BranchCopyPatchAction }) => {
+const StatusCopyPatchButton = defineComponent<{ action: BranchCopyPatchAction }>({
+  name: 'StatusCopyPatchButton',
+  props: ['action'],
+  setup(props) {
     const t = useT()
     const { succeeded, trigger } = useActionFeedback()
 
@@ -118,8 +120,7 @@ const StatusCopyPatchButton = defineComponent(
       )
     }
   },
-  { name: 'StatusCopyPatchButton', props: ['action'] },
-)
+})
 
 // Clickable upstream ref (e.g. `origin/main`). Routes through
 // `openUpstreamBranchExternalTarget` so the helper resolves the named
@@ -132,8 +133,10 @@ interface UpstreamLinkProps {
   tone?: Tone
 }
 
-const UpstreamLink = defineComponent(
-  (props: UpstreamLinkProps) => {
+const UpstreamLink = defineComponent<UpstreamLinkProps>({
+  name: 'UpstreamLink',
+  props: ['repoId', 'workspaceRuntimeId', 'tracking', 'title', 'tone'],
+  setup(props) {
     const controller = new AbortController()
     const openExternally = throttle(
       () => {
@@ -150,11 +153,12 @@ const UpstreamLink = defineComponent(
       </StatusLink>
     )
   },
-  { name: 'UpstreamLink', props: ['repoId', 'workspaceRuntimeId', 'tracking', 'title', 'tone'] },
-)
+})
 
-export const BranchStatus = defineComponent(
-  (props: Props) => {
+export const BranchStatus = defineComponent<Props>({
+  name: 'BranchStatus',
+  props: ['detail', 'workspaceRuntimeId'],
+  setup(props) {
     const branchActionSurface = useBranchActionSurface()
     const t = useT()
     const lang = useStoreSelector(i18nStore, (state) => state.lang)
@@ -429,5 +433,4 @@ export const BranchStatus = defineComponent(
       )
     }
   },
-  { name: 'BranchStatus', props: ['detail', 'workspaceRuntimeId'] },
-)
+})

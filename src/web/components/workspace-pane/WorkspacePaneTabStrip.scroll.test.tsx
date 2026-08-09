@@ -498,8 +498,9 @@ describe('WorkspacePaneTabStrip scroll', () => {
   })
 
   test('scrolls the right neighbour into view after closing the active tab', async () => {
-    const CloseActiveHarness = defineComponent(
-      () => {
+    const CloseActiveHarness = defineComponent({
+      name: 'CloseActiveHarness',
+      setup() {
         const sessions = shallowRef([
           session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
           session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: true }),
@@ -526,8 +527,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
           />
         )
       },
-      { name: 'CloseActiveHarness' },
-    )
+    })
 
     render(<CloseActiveHarness />)
     const scrollIntoView = scrollIntoViewMock()
@@ -555,8 +555,9 @@ describe('WorkspacePaneTabStrip scroll', () => {
   })
 
   test('focuses the actual active tab after closing the active tab', async () => {
-    const CloseActiveSelectsLeftHarness = defineComponent(
-      () => {
+    const CloseActiveSelectsLeftHarness = defineComponent({
+      name: 'CloseActiveSelectsLeftHarness',
+      setup() {
         const sessions = shallowRef([
           session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
           session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: true }),
@@ -583,8 +584,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
           />
         )
       },
-      { name: 'CloseActiveSelectsLeftHarness' },
-    )
+    })
 
     render(<CloseActiveSelectsLeftHarness />)
     const closeButton = document.body.querySelector<HTMLElement>(
@@ -600,8 +600,9 @@ describe('WorkspacePaneTabStrip scroll', () => {
   })
 
   test('does not scroll when the active tab stays visible after a non-active terminal session is removed', async () => {
-    const CloseInactiveHarness = defineComponent(
-      () => {
+    const CloseInactiveHarness = defineComponent({
+      name: 'CloseInactiveHarness',
+      setup() {
         const sessions = shallowRef([
           session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: true }),
           session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
@@ -625,8 +626,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
           />
         )
       },
-      { name: 'CloseInactiveHarness' },
-    )
+    })
 
     setTabStripScrollGeometry({
       viewport: { left: 0, right: 200 },

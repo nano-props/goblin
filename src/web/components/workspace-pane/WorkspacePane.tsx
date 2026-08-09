@@ -30,8 +30,18 @@ interface WorkspacePaneShell {
   admission: WorkspaceState['admission']
 }
 
-export const WorkspacePane = defineComponent(
-  (props: WorkspacePaneProps) => {
+export const WorkspacePane = defineComponent<WorkspacePaneProps>({
+  name: 'WorkspacePane',
+  props: [
+    'workspaceId',
+    'currentBranchName',
+    'workspacePaneRouteContext',
+    'shortcutsEnabled',
+    'toolbarTrafficLightOffset',
+    'onBackToBranchNavigator',
+  ],
+
+  setup(props) {
     const workspacePaneId = useId()
     const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
     const workspaceShell = computed<WorkspacePaneShell | undefined>(() => {
@@ -61,18 +71,7 @@ export const WorkspacePane = defineComponent(
         />
       ) : null
   },
-  {
-    name: 'WorkspacePane',
-    props: [
-      'workspaceId',
-      'currentBranchName',
-      'workspacePaneRouteContext',
-      'shortcutsEnabled',
-      'toolbarTrafficLightOffset',
-      'onBackToBranchNavigator',
-    ],
-  },
-)
+})
 
 interface WorkspacePaneLoadedProps {
   workspaceShell: WorkspacePaneShell

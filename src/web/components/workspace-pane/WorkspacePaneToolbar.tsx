@@ -37,8 +37,24 @@ interface WorkspacePaneToolbarProps {
   onReorder: (tabs: WorkspacePaneTabEntry[]) => void
 }
 
-export const WorkspacePaneToolbar = defineComponent(
-  (props: WorkspacePaneToolbarProps) => {
+export const WorkspacePaneToolbar = defineComponent<WorkspacePaneToolbarProps>({
+  name: 'WorkspacePaneToolbar',
+  props: [
+    'workspacePaneTabTargetKey',
+    'workspacePaneId',
+    'items',
+    'activeTabIdentity',
+    'createAction',
+    'trafficLightOffset',
+    'onBackToNavigator',
+    'trailingActions',
+    'onSelect',
+    'onReselect',
+    'onClose',
+    'onReorder',
+  ],
+
+  setup(props) {
     const t = useT()
     const compact = useIsCompactUi()
     const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
@@ -92,21 +108,4 @@ export const WorkspacePaneToolbar = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspacePaneToolbar',
-    props: [
-      'workspacePaneTabTargetKey',
-      'workspacePaneId',
-      'items',
-      'activeTabIdentity',
-      'createAction',
-      'trafficLightOffset',
-      'onBackToNavigator',
-      'trailingActions',
-      'onSelect',
-      'onReselect',
-      'onClose',
-      'onReorder',
-    ],
-  },
-)
+})

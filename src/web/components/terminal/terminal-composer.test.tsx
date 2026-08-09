@@ -49,8 +49,9 @@ function render(
     closeAccepted?: boolean
   } = {},
 ) {
-  const ControlledComposer = defineComponent(
-    () => {
+  const ControlledComposer = defineComponent({
+    name: 'ControlledTerminalComposer',
+    setup() {
       const expanded = ref(false)
       const mode = ref<TerminalComposerMode>(props.initialMode ?? 'keys')
       const draft = ref(props.initialDraft ?? '')
@@ -103,8 +104,7 @@ function render(
         />
       )
     },
-    { name: 'ControlledTerminalComposer' },
-  )
+  })
   return renderInJsdom(<ControlledComposer />)
 }
 
@@ -149,12 +149,15 @@ function menuItemByText(text: string) {
   return within(content).getByRole('button', { name: text })
 }
 
-const ExpandedComposerForTest = defineComponent(
-  (props: {
-    historyEntries: readonly string[]
-    initialDraft: string
-    onDraftReplaceObserved?: (expectedDraft: string, nextDraft: string) => void
-  }) => {
+const ExpandedComposerForTest = defineComponent<{
+  historyEntries: readonly string[]
+  initialDraft: string
+  onDraftReplaceObserved?: (expectedDraft: string, nextDraft: string) => void
+}>({
+  name: 'ExpandedComposerForTest',
+  props: ['historyEntries', 'initialDraft', 'onDraftReplaceObserved'],
+
+  setup(props) {
     const draft = ref(props.initialDraft)
     return () => (
       <TerminalComposer
@@ -185,11 +188,7 @@ const ExpandedComposerForTest = defineComponent(
       />
     )
   },
-  {
-    name: 'ExpandedComposerForTest',
-    props: ['historyEntries', 'initialDraft', 'onDraftReplaceObserved'],
-  },
-)
+})
 
 function expandedComposerForTest(sessionId: string, historyEntries: readonly string[] = [], draft = '') {
   return <ExpandedComposerForTest key={sessionId} historyEntries={historyEntries} initialDraft={draft} />
@@ -392,15 +391,18 @@ describe('TerminalComposer', () => {
   })
 
   test('does not claim focus when an expanded session shell is restored on mount', async () => {
-    const FocusHarness = defineComponent(
-      (props: { showComposer: boolean }) => () => (
-        <>
-          <button type="button">terminal focus owner</button>
-          {props.showComposer ? expandedComposerForTest('session-one') : null}
-        </>
-      ),
-      { name: 'TerminalComposerFocusHarness', props: ['showComposer'] },
-    )
+    const FocusHarness = defineComponent<{ showComposer: boolean }>({
+      name: 'TerminalComposerFocusHarness',
+      props: ['showComposer'],
+      setup(props) {
+        return () => (
+          <>
+            <button type="button">terminal focus owner</button>
+            {props.showComposer ? expandedComposerForTest('session-one') : null}
+          </>
+        )
+      },
+    })
     const { container, rerender } = renderInJsdom(<FocusHarness showComposer={false} />)
     const focusOwner = buttonByAccessibleName(container, 'terminal focus owner')
     focusOwner.focus()
@@ -438,26 +440,30 @@ describe('TerminalComposer', () => {
         originalUpdateEntries.call(this, entries)
       })
 
-    const LayoutObserver = defineComponent(
-      (props: { historyEntries: readonly string[] }) => {
+    const LayoutObserver = defineComponent<{ historyEntries: readonly string[] }>({
+      name: 'TerminalComposerPostRenderObserver',
+      props: ['historyEntries'],
+      setup(props) {
         onUpdated(() => commitOrder.push('observer'))
         return () => {
           void props.historyEntries
           return null
         }
       },
-      { name: 'TerminalComposerPostRenderObserver', props: ['historyEntries'] },
-    )
+    })
 
-    const Harness = defineComponent(
-      (props: { historyEntries: readonly string[] }) => () => (
-        <>
-          {expandedComposerForTest('session-one', props.historyEntries)}
-          <LayoutObserver historyEntries={props.historyEntries} />
-        </>
-      ),
-      { name: 'TerminalComposerHistoryHarness', props: ['historyEntries'] },
-    )
+    const Harness = defineComponent<{ historyEntries: readonly string[] }>({
+      name: 'TerminalComposerHistoryHarness',
+      props: ['historyEntries'],
+      setup(props) {
+        return () => (
+          <>
+            {expandedComposerForTest('session-one', props.historyEntries)}
+            <LayoutObserver historyEntries={props.historyEntries} />
+          </>
+        )
+      },
+    })
 
     try {
       const { rerender } = renderInJsdom(<Harness historyEntries={['old command']} />)

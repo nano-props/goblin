@@ -157,8 +157,11 @@ function useZenModeSidebarPanelTransition(
   return panelState
 }
 
-export const ZenModeSidebarChrome = defineComponent(
-  (props: ZenModeSidebarChromeProps) => {
+export const ZenModeSidebarChrome = defineComponent<ZenModeSidebarChromeProps>({
+  name: 'ZenModeSidebarChrome',
+  props: ['workspaceId', 'sidebarPane', 'zenModeToggleEnabled', 'revealEnabled', 'sidebarSize', 'onSidebarSizeChange'],
+
+  setup(props) {
     const reveal = useZenModeSidebarReveal(() => props.revealEnabled)
 
     return () => {
@@ -187,21 +190,21 @@ export const ZenModeSidebarChrome = defineComponent(
       )
     }
   },
-  {
-    name: 'ZenModeSidebarChrome',
-    props: [
-      'workspaceId',
-      'sidebarPane',
-      'zenModeToggleEnabled',
-      'revealEnabled',
-      'sidebarSize',
-      'onSidebarSizeChange',
-    ],
-  },
-)
+})
 
-const ZenModeSidebarReveal = defineComponent(
-  (props: ZenModeSidebarRevealProps) => {
+const ZenModeSidebarReveal = defineComponent<ZenModeSidebarRevealProps>({
+  name: 'ZenModeSidebarReveal',
+  props: [
+    'sidebarPane',
+    'open',
+    'interactive',
+    'sidebarSize',
+    'onSidebarSizeChange',
+    'onSurfaceEnter',
+    'onSurfaceLeave',
+  ],
+
+  setup(props) {
     const hostRef = ref<HTMLDivElement | null>(null)
     const panelRef = ref<HTMLDivElement | null>(null)
     const hitAreaRef = ref<HTMLDivElement | null>(null)
@@ -425,19 +428,7 @@ const ZenModeSidebarReveal = defineComponent(
       )
     }
   },
-  {
-    name: 'ZenModeSidebarReveal',
-    props: [
-      'sidebarPane',
-      'open',
-      'interactive',
-      'sidebarSize',
-      'onSidebarSizeChange',
-      'onSurfaceEnter',
-      'onSurfaceLeave',
-    ],
-  },
-)
+})
 
 interface ZenModeSidebarDragPlateProps {
   mounted: boolean

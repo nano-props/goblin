@@ -19,8 +19,11 @@ import { WorkspacePaneTabsRecovery } from '#/web/runtime/workspace-pane-tabs-rec
 import { WorkspaceRuntimeReconnectRecovery } from '#/web/runtime/workspace-runtime-reconnect-recovery.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
-export const AppRuntimeProjectionProvider = defineComponent(
-  (props: { currentWorkspaceId: WorkspaceId | null }, { slots }) => {
+export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId: WorkspaceId | null }>({
+  name: 'AppRuntimeProjectionProvider',
+  props: ['currentWorkspaceId'],
+
+  setup(props, { slots }) {
     const workspaceState = useStoreSelector(workspacesStore, (state) => state)
     const currentWorkspaceRuntimeId = computed(() =>
       props.currentWorkspaceId
@@ -148,11 +151,7 @@ export const AppRuntimeProjectionProvider = defineComponent(
 
     return () => slots.default?.()
   },
-  {
-    name: 'AppRuntimeProjectionProvider',
-    props: ['currentWorkspaceId'],
-  },
-)
+})
 
 function currentScopeForWorkspace(
   registry: RuntimeProjectionScopeRegistry,

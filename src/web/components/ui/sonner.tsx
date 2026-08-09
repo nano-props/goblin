@@ -14,8 +14,12 @@ const ToastLoadingIcon: FunctionalComponent = () => <Loader2Icon class="size-4 a
 
 type ToastStyle = CSSProperties & Record<`--${string}`, string>
 
-export const Toaster = defineComponent<ToasterProps>(
-  (props, { attrs }) => {
+export const Toaster = defineComponent<ToasterProps>({
+  name: 'Toaster',
+  inheritAttrs: false,
+  props: ['toastOptions', 'class', 'style'],
+
+  setup(props, { attrs }) {
     const theme = useStoreSelector(themeStore, (state) => state.resolved)
 
     return () => {
@@ -68,9 +72,4 @@ export const Toaster = defineComponent<ToasterProps>(
       )
     }
   },
-  {
-    name: 'Toaster',
-    inheritAttrs: false,
-    props: ['toastOptions', 'class', 'style'],
-  },
-)
+})

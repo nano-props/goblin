@@ -3,8 +3,10 @@ import { AppleTerminalIcon } from '#/web/components/ExternalAppIcon/AppleTermina
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { cn } from '#/web/lib/cn.ts'
 
-export const TerminalOutputActivityIndicator = defineComponent(
-  (props: { class?: string }) => {
+export const TerminalOutputActivityIndicator = defineComponent<{ class?: string }>({
+  name: 'TerminalOutputActivityIndicator',
+  props: { class: String },
+  setup(props) {
     const t = useT()
     return () => {
       const label = t('terminal.output-active')
@@ -26,5 +28,4 @@ export const TerminalOutputActivityIndicator = defineComponent(
       )
     }
   },
-  { name: 'TerminalOutputActivityIndicator', props: { class: String } },
-)
+})

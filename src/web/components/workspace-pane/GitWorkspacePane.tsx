@@ -42,8 +42,18 @@ interface GitWorkspacePaneProps {
   onBackToBranchNavigator?: () => void
 }
 
-export const GitWorkspacePane = defineComponent(
-  (props: GitWorkspacePaneProps) => {
+export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
+  name: 'GitWorkspacePane',
+  props: [
+    'gitWorkspace',
+    'workspacePaneRouteContext',
+    'workspacePaneId',
+    'shortcutsEnabled',
+    'toolbarTrafficLightOffset',
+    'onBackToBranchNavigator',
+  ],
+
+  setup(props) {
     const snapshotReadModel = useRepoSnapshotReadModel(
       () => props.gitWorkspace.id,
       () => props.gitWorkspace.workspaceRuntimeId,
@@ -157,18 +167,7 @@ export const GitWorkspacePane = defineComponent(
       )
     }
   },
-  {
-    name: 'GitWorkspacePane',
-    props: [
-      'gitWorkspace',
-      'workspacePaneRouteContext',
-      'workspacePaneId',
-      'shortcutsEnabled',
-      'toolbarTrafficLightOffset',
-      'onBackToBranchNavigator',
-    ],
-  },
-)
+})
 
 interface BranchPullRequestProjection {
   pullRequest: PullRequestInfo | undefined
@@ -239,8 +238,19 @@ interface GitWorkspacePaneSurfaceProps {
   readFailures: RepoReadFailure[]
 }
 
-const GitWorkspacePaneSurface = defineComponent(
-  (props: GitWorkspacePaneSurfaceProps) => {
+const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
+  name: 'GitWorkspacePaneSurface',
+  props: [
+    'repo',
+    'detail',
+    'workspacePaneRouteContext',
+    'workspacePaneId',
+    'toolbarTrafficLightOffset',
+    'onBackToBranchNavigator',
+    'readFailures',
+  ],
+
+  setup(props) {
     const workspacePaneTabModel = useGitWorkspacePaneTabModel(
       () => props.repo,
       () => props.detail,
@@ -288,27 +298,28 @@ const GitWorkspacePaneSurface = defineComponent(
       )
     }
   },
-  {
-    name: 'GitWorkspacePaneSurface',
-    props: [
-      'repo',
-      'detail',
-      'workspacePaneRouteContext',
-      'workspacePaneId',
-      'toolbarTrafficLightOffset',
-      'onBackToBranchNavigator',
-      'readFailures',
-    ],
-  },
-)
+})
 
 interface GitBranchActionWorkspacePaneProps extends GitWorkspacePaneSurfaceProps {
   branch: NonNullable<CurrentGitWorkspacePanePresentation['branch']>
   shortcutsEnabled: boolean
 }
 
-const GitBranchActionWorkspacePane = defineComponent(
-  (props: GitBranchActionWorkspacePaneProps) => {
+const GitBranchActionWorkspacePane = defineComponent<GitBranchActionWorkspacePaneProps>({
+  name: 'GitBranchActionWorkspacePane',
+  props: [
+    'repo',
+    'detail',
+    'workspacePaneRouteContext',
+    'branch',
+    'workspacePaneId',
+    'shortcutsEnabled',
+    'toolbarTrafficLightOffset',
+    'onBackToBranchNavigator',
+    'readFailures',
+  ],
+
+  setup(props) {
     const branchActions = useBranchActions(
       () => props.repo,
       () => props.branch,
@@ -338,18 +349,4 @@ const GitBranchActionWorkspacePane = defineComponent(
       </BranchActionSurfaceProvider>
     )
   },
-  {
-    name: 'GitBranchActionWorkspacePane',
-    props: [
-      'repo',
-      'detail',
-      'workspacePaneRouteContext',
-      'branch',
-      'workspacePaneId',
-      'shortcutsEnabled',
-      'toolbarTrafficLightOffset',
-      'onBackToBranchNavigator',
-      'readFailures',
-    ],
-  },
-)
+})

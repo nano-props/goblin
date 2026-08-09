@@ -6,19 +6,28 @@ import { StatusLink } from '#/web/components/workspace-pane/status-ui.tsx'
 import type { Tone } from '#/web/components/workspace-pane/status-ui.tsx'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-export const CommitHashLink = defineComponent(
-  (
-    props: {
-      repoId: string
-      workspaceRuntimeId: string
-      hash: string
-      shortHash?: string
-      tone?: Tone
-      title?: string
-      class?: HTMLAttributes['class']
-    },
-    { attrs },
-  ) => {
+export const CommitHashLink = defineComponent<{
+  repoId: string
+  workspaceRuntimeId: string
+  hash: string
+  shortHash?: string
+  tone?: Tone
+  title?: string
+  class?: HTMLAttributes['class']
+}>({
+  name: 'CommitHashLink',
+  inheritAttrs: false,
+  props: {
+    repoId: { type: String, required: true },
+    workspaceRuntimeId: { type: String, required: true },
+    hash: { type: String, required: true },
+    shortHash: String,
+    tone: String as PropType<Tone>,
+    title: String,
+    class: null,
+  },
+
+  setup(props, { attrs }) {
     const controller = new AbortController()
     const handleClick = throttle(
       () => {
@@ -37,17 +46,4 @@ export const CommitHashLink = defineComponent(
       </StatusLink>
     )
   },
-  {
-    name: 'CommitHashLink',
-    inheritAttrs: false,
-    props: {
-      repoId: { type: String, required: true },
-      workspaceRuntimeId: { type: String, required: true },
-      hash: { type: String, required: true },
-      shortHash: String,
-      tone: String as PropType<Tone>,
-      title: String,
-      class: null,
-    },
-  },
-)
+})

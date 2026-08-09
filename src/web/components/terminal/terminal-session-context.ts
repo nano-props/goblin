@@ -36,31 +36,29 @@ export function provideTerminalSessionReadContext(value: TerminalSessionReadCont
   provide(terminalSessionReadContextKey, value)
 }
 
-export const TerminalSessionCommandScope = defineComponent(
-  (props: { value: TerminalSessionContextValue }, { slots }) => {
+export const TerminalSessionCommandScope = defineComponent<{ value: TerminalSessionContextValue }>({
+  name: 'TerminalSessionCommandScope',
+  props: {
+    value: { type: Object as PropType<TerminalSessionContextValue>, required: true },
+  },
+
+  setup(props, { slots }) {
     provideTerminalSessionContext(props.value)
     return () => slots.default?.()
   },
-  {
-    name: 'TerminalSessionCommandScope',
-    props: {
-      value: { type: Object as PropType<TerminalSessionContextValue>, required: true },
-    },
-  },
-)
+})
 
-export const TerminalSessionReadScope = defineComponent(
-  (props: { value: TerminalSessionReadContextValue }, { slots }) => {
+export const TerminalSessionReadScope = defineComponent<{ value: TerminalSessionReadContextValue }>({
+  name: 'TerminalSessionReadScope',
+  props: {
+    value: { type: Object as PropType<TerminalSessionReadContextValue>, required: true },
+  },
+
+  setup(props, { slots }) {
     provideTerminalSessionReadContext(props.value)
     return () => slots.default?.()
   },
-  {
-    name: 'TerminalSessionReadScope',
-    props: {
-      value: { type: Object as PropType<TerminalSessionReadContextValue>, required: true },
-    },
-  },
-)
+})
 
 export function useTerminalSessionContext(): TerminalSessionContextValue {
   const value = inject(terminalSessionContextKey, null)

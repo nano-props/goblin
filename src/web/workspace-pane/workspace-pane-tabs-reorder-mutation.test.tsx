@@ -232,13 +232,14 @@ function renderMutationHook(
   )
 }
 
-const HookHost = defineComponent(
-  (props: { input: WorkspacePaneTabsReorderMutationInput }) => {
+const HookHost = defineComponent<{ input: WorkspacePaneTabsReorderMutationInput }>({
+  name: 'WorkspacePaneTabsReorderMutationTestHost',
+  props: ['input'],
+  setup(props) {
     controls = useWorkspacePaneTabsReorderMutation(() => props.input)
     return () => null
   },
-  { name: 'WorkspacePaneTabsReorderMutationTestHost', props: ['input'] },
-)
+})
 
 function currentControls(): WorkspacePaneTabsReorderMutationResult {
   if (!controls) throw new Error('missing workspace pane tabs mutation controls')

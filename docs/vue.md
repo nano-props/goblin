@@ -12,9 +12,9 @@ Keep component contracts explicit, ownership local, and rendering declarative.
 - Use `class`, not `className`, in JSX.
 - Give inline CSS lengths explicit units. Vue does not infer `px` from numeric
   values; keep numbers only for genuinely unitless CSS values.
-- Define Vue components in TSX. Prefer the object form of `defineComponent` so
-  the public contract, lifecycle, behavior, and render function stay visible in
-  one place.
+- Define setup-based Vue components with the object form of `defineComponent`
+  so the public contract, lifecycle, behavior, and render function stay visible
+  in one place.
 - Prefer the explicit `FunctionalComponent` type name over a generic `FC`
   alias. When local repetition warrants an alias, name it for its role rather
   than introducing a project-wide abbreviation.
@@ -23,8 +23,10 @@ Keep component contracts explicit, ownership local, and rendering declarative.
   when defaults, coercion, or runtime validation are part of the contract.
 - Required domain inputs remain required and non-null. Component convenience
   must not weaken a domain invariant.
-- Set `inheritAttrs: false` and forward attrs deliberately. A component should
-  make clear which element, if any, owns caller-provided attrs.
+- Treat fallthrough attrs as component behavior, not definition boilerplate.
+  Use `inheritAttrs: false` when a component rejects attrs or forwards them to
+  one chosen owner; otherwise Vue's default fallthrough remains part of its
+  contract.
 
 ```tsx
 import { defineComponent } from 'vue'
@@ -63,6 +65,8 @@ export const ConfirmDialog = defineComponent<ConfirmDialogProps>({
 
 - Port React components to Vue with TSX first. Preserve reviewable structure and
   data flow while functional parity is being established.
+- Preserve runtime props, emits, slots, and attrs behavior when changing a
+  component's definition form. Review fallthrough-boundary changes separately.
 - Do not mix the framework port with broad component redesign. Remove the React
   path atomically rather than maintaining parallel implementations.
 - SFCs are not part of the current toolchain. Introduce SFC compilation, type

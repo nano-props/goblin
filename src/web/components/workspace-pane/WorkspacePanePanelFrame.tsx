@@ -1,8 +1,21 @@
 import { defineComponent } from 'vue'
 
-export const WorkspacePanePanelFrame = defineComponent(
-  (props: { id: string; labelledById?: string; label?: string; busy?: boolean }, { slots }) =>
-    () => (
+export const WorkspacePanePanelFrame = defineComponent<{
+  id: string
+  labelledById?: string
+  label?: string
+  busy?: boolean
+}>({
+  name: 'WorkspacePanePanelFrame',
+  props: {
+    id: { type: String, required: true },
+    labelledById: String,
+    label: String,
+    busy: Boolean,
+  },
+
+  setup(props, { slots }) {
+    return () => (
       <div
         id={props.id}
         role="tabpanel"
@@ -13,14 +26,6 @@ export const WorkspacePanePanelFrame = defineComponent(
       >
         {slots.default?.()}
       </div>
-    ),
-  {
-    name: 'WorkspacePanePanelFrame',
-    props: {
-      id: { type: String, required: true },
-      labelledById: String,
-      label: String,
-      busy: Boolean,
-    },
+    )
   },
-)
+})

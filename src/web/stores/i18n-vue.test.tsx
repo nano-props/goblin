@@ -6,13 +6,13 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { startI18nProjection, useT } from '#/web/stores/i18n-vue.ts'
 import { i18nStore } from '#/web/stores/i18n.ts'
 
-const TranslatedMessage = defineComponent(
-  () => {
+const TranslatedMessage = defineComponent({
+  name: 'TranslatedMessage',
+  setup() {
     const t = useT()
     return () => <p>{t('status.ready', { count: 2 })}</p>
   },
-  { name: 'TranslatedMessage' },
-)
+})
 
 let stopProjection: (() => void) | null = null
 

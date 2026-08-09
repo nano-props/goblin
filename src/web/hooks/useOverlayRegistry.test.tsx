@@ -6,28 +6,30 @@ import { defineComponent } from 'vue'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useOverlayRegistry } from '#/web/hooks/useOverlayRegistry.ts'
 
-const Harness = defineComponent(() => {
-  const overlays = useOverlayRegistry(['settings', 'clone', 'openWorkspace'] as const)
-  return () => (
-    <>
-      <button id="open-settings" type="button" onClick={() => overlays.open('settings')}>
-        open settings
-      </button>
-      <button id="set-clone-open" type="button" onClick={() => overlays.setOpen('clone', true)}>
-        open clone
-      </button>
-      <button id="close-settings" type="button" onClick={() => overlays.close('settings')}>
-        close settings
-      </button>
-      <button id="close-all" type="button" onClick={overlays.closeAll}>
-        close all
-      </button>
-      <output id="settings-open">{overlays.state.settings ? 'open' : 'closed'}</output>
-      <output id="clone-open">{overlays.state.clone ? 'open' : 'closed'}</output>
-      <output id="open-workspace-open">{overlays.state.openWorkspace ? 'open' : 'closed'}</output>
-      <output id="any-open">{overlays.anyOpen.value ? 'open' : 'closed'}</output>
-    </>
-  )
+const Harness = defineComponent({
+  setup() {
+    const overlays = useOverlayRegistry(['settings', 'clone', 'openWorkspace'] as const)
+    return () => (
+      <>
+        <button id="open-settings" type="button" onClick={() => overlays.open('settings')}>
+          open settings
+        </button>
+        <button id="set-clone-open" type="button" onClick={() => overlays.setOpen('clone', true)}>
+          open clone
+        </button>
+        <button id="close-settings" type="button" onClick={() => overlays.close('settings')}>
+          close settings
+        </button>
+        <button id="close-all" type="button" onClick={overlays.closeAll}>
+          close all
+        </button>
+        <output id="settings-open">{overlays.state.settings ? 'open' : 'closed'}</output>
+        <output id="clone-open">{overlays.state.clone ? 'open' : 'closed'}</output>
+        <output id="open-workspace-open">{overlays.state.openWorkspace ? 'open' : 'closed'}</output>
+        <output id="any-open">{overlays.anyOpen.value ? 'open' : 'closed'}</output>
+      </>
+    )
+  },
 })
 
 describe('useOverlayRegistry', () => {

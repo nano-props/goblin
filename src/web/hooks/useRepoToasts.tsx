@@ -118,17 +118,18 @@ function repoResultDescription(
   return [resultMessage, ...translatedRecoveryMessages, bootstrapSummary].filter(Boolean).join('\n')
 }
 
-const ToastDescription = defineComponent(
-  (_props, { slots }) =>
-    () => (
+const ToastDescription = defineComponent({
+  name: 'ToastDescription',
+  setup(_props, { slots }) {
+    return () => (
       <ScrollArea class="max-h-32 w-full max-w-full min-w-0" viewportClass="max-h-32">
         <pre class="block w-full max-w-full min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] font-mono text-[11px] leading-relaxed">
           {slots.default?.()}
         </pre>
       </ScrollArea>
-    ),
-  { name: 'ToastDescription' },
-)
+    )
+  },
+})
 
 function formatTranslatedWorktreeBootstrapSummary(
   summary: WorktreeBootstrapSummary | undefined,

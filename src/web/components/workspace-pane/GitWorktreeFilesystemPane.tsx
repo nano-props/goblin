@@ -32,8 +32,19 @@ interface GitWorktreeFilesystemPaneProps {
   onBackToNavigator?: () => void
 }
 
-export const GitWorktreeFilesystemPane = defineComponent(
-  (props: GitWorktreeFilesystemPaneProps) => {
+export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPaneProps>({
+  name: 'GitWorktreeFilesystemPane',
+  props: [
+    'repo',
+    'workspaceProbe',
+    'worktreePath',
+    'route',
+    'workspacePaneId',
+    'toolbarTrafficLightOffset',
+    'onBackToNavigator',
+  ],
+
+  setup(props) {
     const t = useT()
     const statusReadModel = useRepoWorktreeStatusReadModel(
       () => props.repo.id,
@@ -86,19 +97,7 @@ export const GitWorktreeFilesystemPane = defineComponent(
       )
     }
   },
-  {
-    name: 'GitWorktreeFilesystemPane',
-    props: [
-      'repo',
-      'workspaceProbe',
-      'worktreePath',
-      'route',
-      'workspacePaneId',
-      'toolbarTrafficLightOffset',
-      'onBackToNavigator',
-    ],
-  },
-)
+})
 
 interface GitWorktreeFilesystemPaneReadyProps {
   workspaceRuntime: WorkspacePaneRuntimeContext
@@ -115,8 +114,24 @@ interface GitWorktreeFilesystemPaneReadyProps {
   onBackToNavigator?: () => void
 }
 
-const GitWorktreeFilesystemPaneReady = defineComponent(
-  (props: GitWorktreeFilesystemPaneReadyProps) => {
+const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPaneReadyProps>({
+  name: 'GitWorktreeFilesystemPaneReady',
+  props: [
+    'workspaceRuntime',
+    'workspaceProbe',
+    'head',
+    'status',
+    'statusError',
+    'statusRetrying',
+    'onRetryStatus',
+    'target',
+    'route',
+    'workspacePaneId',
+    'toolbarTrafficLightOffset',
+    'onBackToNavigator',
+  ],
+
+  setup(props) {
     const t = useT()
     const model = useGitWorktreeWorkspacePaneTabModel(
       () => props.workspaceRuntime,
@@ -195,21 +210,4 @@ const GitWorktreeFilesystemPaneReady = defineComponent(
       )
     }
   },
-  {
-    name: 'GitWorktreeFilesystemPaneReady',
-    props: [
-      'workspaceRuntime',
-      'workspaceProbe',
-      'head',
-      'status',
-      'statusError',
-      'statusRetrying',
-      'onRetryStatus',
-      'target',
-      'route',
-      'workspacePaneId',
-      'toolbarTrafficLightOffset',
-      'onBackToNavigator',
-    ],
-  },
-)
+})

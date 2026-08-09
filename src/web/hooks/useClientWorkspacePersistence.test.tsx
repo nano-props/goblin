@@ -341,10 +341,11 @@ describe('useClientWorkspacePersistence', () => {
   })
 })
 
-const Harness = defineComponent(
-  (props: { routedWorkspaceId?: WorkspaceId | null }) => {
+const Harness = defineComponent<{ routedWorkspaceId?: WorkspaceId | null }>({
+  name: 'ClientWorkspacePersistenceTestHarness',
+  props: ['routedWorkspaceId'],
+  setup(props) {
     useClientWorkspacePersistence({ routedWorkspaceId: () => props.routedWorkspaceId ?? null })
     return () => null
   },
-  { name: 'ClientWorkspacePersistenceTestHarness', props: ['routedWorkspaceId'] },
-)
+})

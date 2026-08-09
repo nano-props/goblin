@@ -12,8 +12,15 @@ interface RepoStatusFailureViewProps {
   onRetry: () => void
 }
 
-export const RepoStatusFailureView = defineComponent(
-  (props: RepoStatusFailureViewProps) => {
+export const RepoStatusFailureView = defineComponent<RepoStatusFailureViewProps>({
+  name: 'RepoStatusFailureView',
+  props: {
+    messageKey: { type: String, required: true },
+    retrying: { type: Boolean, required: true },
+    onRetry: { type: Function as PropType<() => void>, required: true },
+  },
+
+  setup(props) {
     const t = useT()
     return () => {
       if (props.messageKey === REPO_MEMBERSHIP_READ_CONFLICT_KEY) {
@@ -39,15 +46,7 @@ export const RepoStatusFailureView = defineComponent(
       )
     }
   },
-  {
-    name: 'RepoStatusFailureView',
-    props: {
-      messageKey: { type: String, required: true },
-      retrying: { type: Boolean, required: true },
-      onRetry: { type: Function as PropType<() => void>, required: true },
-    },
-  },
-)
+})
 
 interface RepoStatusNoticeProps {
   messageKey: string
@@ -55,8 +54,15 @@ interface RepoStatusNoticeProps {
   onRetry?: () => void
 }
 
-export const RepoStatusStaleNotice = defineComponent(
-  (props: RepoStatusNoticeProps) => {
+export const RepoStatusStaleNotice = defineComponent<RepoStatusNoticeProps>({
+  name: 'RepoStatusStaleNotice',
+  props: {
+    messageKey: { type: String, required: true },
+    retrying: Boolean,
+    onRetry: Function as PropType<() => void>,
+  },
+
+  setup(props) {
     const t = useT()
     return () => {
       if (props.messageKey === REPO_MEMBERSHIP_READ_CONFLICT_KEY) {
@@ -84,18 +90,17 @@ export const RepoStatusStaleNotice = defineComponent(
       )
     }
   },
-  {
-    name: 'RepoStatusStaleNotice',
-    props: {
-      messageKey: { type: String, required: true },
-      retrying: Boolean,
-      onRetry: Function as PropType<() => void>,
-    },
-  },
-)
+})
 
-export const RepoReadFailureNotice = defineComponent(
-  (props: RepoStatusNoticeProps) => {
+export const RepoReadFailureNotice = defineComponent<RepoStatusNoticeProps>({
+  name: 'RepoReadFailureNotice',
+  props: {
+    messageKey: { type: String, required: true },
+    retrying: Boolean,
+    onRetry: Function as PropType<() => void>,
+  },
+
+  setup(props) {
     const t = useT()
     return () => {
       if (props.messageKey === REPO_MEMBERSHIP_READ_CONFLICT_KEY) {
@@ -117,18 +122,16 @@ export const RepoReadFailureNotice = defineComponent(
       )
     }
   },
-  {
-    name: 'RepoReadFailureNotice',
-    props: {
-      messageKey: { type: String, required: true },
-      retrying: Boolean,
-      onRetry: Function as PropType<() => void>,
-    },
-  },
-)
+})
 
-const RepoMembershipChangingView = defineComponent(
-  (props: { retrying: boolean; onRetry: () => void }) => {
+const RepoMembershipChangingView = defineComponent<{ retrying: boolean; onRetry: () => void }>({
+  name: 'RepoMembershipChangingView',
+  props: {
+    retrying: { type: Boolean, required: true },
+    onRetry: { type: Function as PropType<() => void>, required: true },
+  },
+
+  setup(props) {
     const t = useT()
     return () => (
       <div role="status" class="flex min-h-0 flex-1">
@@ -145,17 +148,16 @@ const RepoMembershipChangingView = defineComponent(
       </div>
     )
   },
-  {
-    name: 'RepoMembershipChangingView',
-    props: {
-      retrying: { type: Boolean, required: true },
-      onRetry: { type: Function as PropType<() => void>, required: true },
-    },
-  },
-)
+})
 
-const RepoMembershipChangingNotice = defineComponent(
-  (props: { retrying?: boolean; onRetry?: () => void }) => {
+const RepoMembershipChangingNotice = defineComponent<{ retrying?: boolean; onRetry?: () => void }>({
+  name: 'RepoMembershipChangingNotice',
+  props: {
+    retrying: Boolean,
+    onRetry: Function as PropType<() => void>,
+  },
+
+  setup(props) {
     const t = useT()
     return () => (
       <div
@@ -172,11 +174,4 @@ const RepoMembershipChangingNotice = defineComponent(
       </div>
     )
   },
-  {
-    name: 'RepoMembershipChangingNotice',
-    props: {
-      retrying: Boolean,
-      onRetry: Function as PropType<() => void>,
-    },
-  },
-)
+})

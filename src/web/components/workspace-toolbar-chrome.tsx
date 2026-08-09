@@ -17,9 +17,13 @@ function workspaceToolbarClass({ draggable = true }: Pick<WorkspaceToolbarChrome
   return cn(WORKSPACE_TOOLBAR_BASE_CLASS, !draggable && 'goblin-workspace-toolbar--non-draggable')
 }
 
-export const WorkspaceToolbar = defineComponent(
-  (props: WorkspaceToolbarChromeOptions, { attrs, slots }) =>
-    () => {
+export const WorkspaceToolbar = defineComponent<WorkspaceToolbarChromeOptions>({
+  name: 'WorkspaceToolbar',
+  props: ['draggable', 'trafficLightOffset'],
+  inheritAttrs: false,
+
+  setup(props, { attrs, slots }) {
+    return () => {
       const { class: classValue, style, ...elementAttrs } = attrs as HTMLAttributes
       const toolbarProps: HTMLAttributes = {
         ...elementAttrs,
@@ -36,27 +40,25 @@ export const WorkspaceToolbar = defineComponent(
           {slots.default?.()}
         </TitleBarDragRegion>
       )
-    },
-  {
-    name: 'WorkspaceToolbar',
-    props: ['draggable', 'trafficLightOffset'],
-    inheritAttrs: false,
+    }
   },
-)
+})
 
 function toolbarSection(name: string, baseClass: string) {
-  return defineComponent(
-    (_props, { attrs, slots }) =>
-      () => {
+  return defineComponent<HTMLAttributes>({
+    name,
+    inheritAttrs: false,
+    setup(_props, { attrs, slots }) {
+      return () => {
         const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
         return (
           <div {...elementAttrs} class={cn(baseClass, classValue)}>
             {slots.default?.()}
           </div>
         )
-      },
-    { name, inheritAttrs: false },
-  )
+      }
+    },
+  })
 }
 
 export const WorkspaceToolbarContent = toolbarSection('WorkspaceToolbarContent', 'goblin-workspace-toolbar__content')
@@ -70,9 +72,13 @@ interface WorkspaceToolbarLeadingSpacerProps {
   noDrag?: boolean
 }
 
-export const WorkspaceToolbarLeadingSpacer = defineComponent(
-  (props: WorkspaceToolbarLeadingSpacerProps, { attrs }) =>
-    () => {
+export const WorkspaceToolbarLeadingSpacer = defineComponent<WorkspaceToolbarLeadingSpacerProps>({
+  name: 'WorkspaceToolbarLeadingSpacer',
+  props: ['reserve', 'noDrag'],
+  inheritAttrs: false,
+
+  setup(props, { attrs }) {
+    return () => {
       const noDrag = props.noDrag ?? props.reserve
       const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
       return (
@@ -95,23 +101,20 @@ export const WorkspaceToolbarLeadingSpacer = defineComponent(
           ) : null}
         </div>
       )
-    },
-  {
-    name: 'WorkspaceToolbarLeadingSpacer',
-    props: ['reserve', 'noDrag'],
-    inheritAttrs: false,
+    }
   },
-)
+})
 
-export const WorkspaceChrome = defineComponent(
-  (props: WorkspaceToolbarChromeOptions) => () => (
-    <WorkspaceToolbar draggable={props.draggable} trafficLightOffset={props.trafficLightOffset}>
-      <WorkspaceToolbarLeadingSpacer reserve={!!props.trafficLightOffset} />
-      <WorkspaceToolbarPrimary />
-    </WorkspaceToolbar>
-  ),
-  {
-    name: 'WorkspaceChrome',
-    props: ['draggable', 'trafficLightOffset'],
+export const WorkspaceChrome = defineComponent<WorkspaceToolbarChromeOptions>({
+  name: 'WorkspaceChrome',
+  props: ['draggable', 'trafficLightOffset'],
+
+  setup(props) {
+    return () => (
+      <WorkspaceToolbar draggable={props.draggable} trafficLightOffset={props.trafficLightOffset}>
+        <WorkspaceToolbarLeadingSpacer reserve={!!props.trafficLightOffset} />
+        <WorkspaceToolbarPrimary />
+      </WorkspaceToolbar>
+    )
   },
-)
+})

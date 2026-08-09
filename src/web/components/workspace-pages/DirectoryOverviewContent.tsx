@@ -13,8 +13,10 @@ interface DirectoryOverviewContentProps {
   compact?: boolean
 }
 
-export const DirectoryOverviewContent = defineComponent(
-  (props: DirectoryOverviewContentProps) => {
+export const DirectoryOverviewContent = defineComponent<DirectoryOverviewContentProps>({
+  name: 'DirectoryOverviewContent',
+  props: ['overview', 'compact'],
+  setup(props) {
     const t = useT()
     const lang = useStoreSelector(i18nStore, (state) => state.lang)
     return () => {
@@ -44,5 +46,4 @@ export const DirectoryOverviewContent = defineComponent(
       )
     }
   },
-  { name: 'DirectoryOverviewContent', props: ['overview', 'compact'] },
-)
+})

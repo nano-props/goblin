@@ -9,8 +9,9 @@ import { useT } from '#/web/stores/i18n-vue.ts'
 import { cn } from '#/web/lib/cn.ts'
 const appIconUrl = new URL('../../../../../assets/icon.png', import.meta.url).href
 
-export const AboutSettings = defineComponent(
-  () => {
+export const AboutSettings = defineComponent({
+  name: 'AboutSettings',
+  setup() {
     const t = useT()
     const commit = __BUILD_INFO__.commit
 
@@ -69,5 +70,4 @@ export const AboutSettings = defineComponent(
       </SettingsCard>
     )
   },
-  { name: 'AboutSettings' },
-)
+})

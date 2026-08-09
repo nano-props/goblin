@@ -111,8 +111,9 @@ describe('runtime settings hooks', () => {
   })
 })
 
-const AppVueQueryClientScope = defineComponent(
-  (_props, { slots }) =>
-    () => <VueQueryClientScope client={appQueryClient}>{slots.default?.()}</VueQueryClientScope>,
-  { name: 'AppVueQueryClientScope' },
-)
+const AppVueQueryClientScope = defineComponent({
+  name: 'AppVueQueryClientScope',
+  setup(_props, { slots }) {
+    return () => <VueQueryClientScope client={appQueryClient}>{slots.default?.()}</VueQueryClientScope>
+  },
+})

@@ -5,13 +5,13 @@ import type { AccessTokenStatusState } from '#/web/hooks/useAccessTokenStatus.ts
 
 const authKey: InjectionKey<AccessTokenStatusState> = Symbol('auth')
 
-export const AuthProvider = defineComponent(
-  (_props, { slots }) => {
+export const AuthProvider = defineComponent({
+  name: 'AuthProvider',
+  setup(_props, { slots }) {
     provide(authKey, useAccessTokenStatus())
     return () => slots.default?.()
   },
-  { name: 'AuthProvider' },
-)
+})
 
 export function useAuth(): AccessTokenStatusState {
   const auth = inject(authKey, null)

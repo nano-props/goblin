@@ -761,8 +761,9 @@ async function renderHookHost() {
   return renderInJsdom(<HookHost />)
 }
 
-const HookHost = defineComponent(
-  () => {
+const HookHost = defineComponent({
+  name: 'ClientEffectIntentRouterTestHost',
+  setup() {
     useClientEffectIntentRouter({
       navigation: () => navigation,
       currentWorkspaceId: () => currentWorkspaceId,
@@ -784,8 +785,7 @@ const HookHost = defineComponent(
     })
     return () => null
   },
-  { name: 'ClientEffectIntentRouterTestHost' },
-)
+})
 
 function terminalFilesystemTargetSnapshot(
   terminalFilesystemTargetKey: string,

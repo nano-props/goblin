@@ -7,9 +7,13 @@ interface TitleBarDragRegionProps {
   reserveWindowControls?: boolean
 }
 
-export const TitleBarDragRegion = defineComponent(
-  (props: TitleBarDragRegionProps, { attrs, slots }) =>
-    () => {
+export const TitleBarDragRegion = defineComponent<TitleBarDragRegionProps>({
+  name: 'TitleBarDragRegion',
+  props: ['reserveWindowControls'],
+  inheritAttrs: false,
+
+  setup(props, { attrs, slots }) {
+    return () => {
       const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
       return (
         <div
@@ -20,17 +24,15 @@ export const TitleBarDragRegion = defineComponent(
           {slots.default?.()}
         </div>
       )
-    },
-  {
-    name: 'TitleBarDragRegion',
-    props: ['reserveWindowControls'],
-    inheritAttrs: false,
+    }
   },
-)
+})
 
-export const NativeDragPlate = defineComponent(
-  (_props, { attrs }) =>
-    () => {
+export const NativeDragPlate = defineComponent<HTMLAttributes>({
+  name: 'NativeDragPlate',
+  inheritAttrs: false,
+  setup(_props, { attrs }) {
+    return () => {
       const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
       return (
         <TitleBarDragRegion
@@ -40,17 +42,21 @@ export const NativeDragPlate = defineComponent(
           class={cn('pointer-events-auto absolute left-0 top-0 bg-transparent', classValue)}
         />
       )
-    },
-  { name: 'NativeDragPlate', inheritAttrs: false },
-)
+    }
+  },
+})
 
 interface TitleBarInteractiveRegionProps {
   asChild?: boolean
 }
 
-export const TitleBarInteractiveRegion = defineComponent(
-  (props: TitleBarInteractiveRegionProps, { attrs, slots }) =>
-    () => (
+export const TitleBarInteractiveRegion = defineComponent<TitleBarInteractiveRegionProps>({
+  name: 'TitleBarInteractiveRegion',
+  props: ['asChild'],
+  inheritAttrs: false,
+
+  setup(props, { attrs, slots }) {
+    return () => (
       <Primitive
         {...attrs}
         as="div"
@@ -60,17 +66,17 @@ export const TitleBarInteractiveRegion = defineComponent(
       >
         {slots.default?.()}
       </Primitive>
-    ),
-  {
-    name: 'TitleBarInteractiveRegion',
-    props: ['asChild'],
-    inheritAttrs: false,
+    )
   },
-)
+})
 
-export const TitleBarScrollableInteractiveRegion = defineComponent(
-  (props: TitleBarInteractiveRegionProps, { attrs, slots }) =>
-    () => {
+export const TitleBarScrollableInteractiveRegion = defineComponent<TitleBarInteractiveRegionProps>({
+  name: 'TitleBarScrollableInteractiveRegion',
+  props: ['asChild'],
+  inheritAttrs: false,
+
+  setup(props, { attrs, slots }) {
+    return () => {
       const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
       return (
         <Primitive
@@ -85,24 +91,20 @@ export const TitleBarScrollableInteractiveRegion = defineComponent(
           {slots.default?.()}
         </Primitive>
       )
-    },
-  {
-    name: 'TitleBarScrollableInteractiveRegion',
-    props: ['asChild'],
-    inheritAttrs: false,
+    }
   },
-)
+})
 
-export const TitleBarNoDragRegion = defineComponent(
-  (props: TitleBarInteractiveRegionProps, { attrs, slots }) =>
-    () => (
+export const TitleBarNoDragRegion = defineComponent<TitleBarInteractiveRegionProps>({
+  name: 'TitleBarNoDragRegion',
+  props: ['asChild'],
+  inheritAttrs: false,
+
+  setup(props, { attrs, slots }) {
+    return () => (
       <Primitive {...attrs} as="div" asChild={props.asChild ?? false} data-title-bar-chrome-region="no-drag">
         {slots.default?.()}
       </Primitive>
-    ),
-  {
-    name: 'TitleBarNoDragRegion',
-    props: ['asChild'],
-    inheritAttrs: false,
+    )
   },
-)
+})

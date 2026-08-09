@@ -75,8 +75,9 @@ describe('FloatingSurfaceBoundary', () => {
   })
 })
 
-const UncontrolledPopoverBoundary = defineComponent(
-  () => {
+const UncontrolledPopoverBoundary = defineComponent({
+  name: 'UncontrolledPopoverBoundary',
+  setup() {
     const pinned = ref(false)
 
     return () => (
@@ -93,11 +94,11 @@ const UncontrolledPopoverBoundary = defineComponent(
       </FloatingSurfaceBoundary>
     )
   },
-  { name: 'UncontrolledPopoverBoundary' },
-)
+})
 
-const UnmountOpenPopoverBoundary = defineComponent(
-  () => {
+const UnmountOpenPopoverBoundary = defineComponent({
+  name: 'UnmountOpenPopoverBoundary',
+  setup() {
     const mounted = ref(true)
     const pinned = ref(false)
 
@@ -117,11 +118,11 @@ const UnmountOpenPopoverBoundary = defineComponent(
       </FloatingSurfaceBoundary>
     )
   },
-  { name: 'UnmountOpenPopoverBoundary' },
-)
+})
 
-const MultiplePopoverBoundary = defineComponent(
-  () => {
+const MultiplePopoverBoundary = defineComponent({
+  name: 'MultiplePopoverBoundary',
+  setup() {
     const firstOpen = ref(false)
     const secondOpen = ref(false)
     const pinned = ref(false)
@@ -148,5 +149,4 @@ const MultiplePopoverBoundary = defineComponent(
       </FloatingSurfaceBoundary>
     )
   },
-  { name: 'MultiplePopoverBoundary' },
-)
+})

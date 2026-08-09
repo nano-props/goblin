@@ -39,8 +39,26 @@ const BEFORE_PANEL_ID = 'before'
 const AFTER_PANEL_ID = 'after'
 const RESIZE_HIT_AREA_MARGINS = { fine: 7, coarse: 20 }
 
-export const SplitPane = defineComponent(
-  (props: SplitPaneProps) => {
+export const SplitPane = defineComponent<SplitPaneProps>({
+  name: 'SplitPane',
+  props: {
+    before: { type: null, required: true },
+    after: { type: null, required: true },
+    afterSize: { type: Number, required: true },
+    onAfterSizeChange: Function as PropType<(size: number) => void>,
+    class: String,
+    beforeClass: String,
+    afterClass: String,
+    beforeMinSize: [Number, String] as PropType<SplitterSize>,
+    beforeContentMinSize: String,
+    afterMinSize: [Number, String] as PropType<SplitterSize>,
+    afterMaxSize: [Number, String] as PropType<SplitterSize>,
+    beforeCollapsed: Boolean,
+    animateBeforeCollapse: Boolean,
+    disabled: Boolean,
+  },
+
+  setup(props) {
     const splitPaneRef = ref<HTMLElement | null>(null)
     const beforeClipRef = ref<HTMLElement | null>(null)
     const beforePanelRef = ref<SplitterPanelHandle | null>(null)
@@ -215,26 +233,7 @@ export const SplitPane = defineComponent(
       </div>
     )
   },
-  {
-    name: 'SplitPane',
-    props: {
-      before: { type: null, required: true },
-      after: { type: null, required: true },
-      afterSize: { type: Number, required: true },
-      onAfterSizeChange: Function as PropType<(size: number) => void>,
-      class: String,
-      beforeClass: String,
-      afterClass: String,
-      beforeMinSize: [Number, String] as PropType<SplitterSize>,
-      beforeContentMinSize: String,
-      afterMinSize: [Number, String] as PropType<SplitterSize>,
-      afterMaxSize: [Number, String] as PropType<SplitterSize>,
-      beforeCollapsed: Boolean,
-      animateBeforeCollapse: Boolean,
-      disabled: Boolean,
-    },
-  },
-)
+})
 
 function useStableBeforeContentSize(
   beforeClipRef: Ref<HTMLElement | null>,

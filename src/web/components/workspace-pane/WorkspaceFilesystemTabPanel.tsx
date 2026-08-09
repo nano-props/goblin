@@ -53,8 +53,11 @@ interface ExecutionTargetFilesystemTabPanelProps extends WorkspaceFilesystemTabP
   executionTarget: WorkspacePaneFilesystemExecutionTarget
 }
 
-const ExecutionTargetFilesystemTabPanel = defineComponent(
-  (props: ExecutionTargetFilesystemTabPanelProps) => {
+const ExecutionTargetFilesystemTabPanel = defineComponent<ExecutionTargetFilesystemTabPanelProps>({
+  name: 'ExecutionTargetFilesystemTabPanel',
+  props: ['routeTarget', 'target', 'executionTarget'],
+
+  setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
     const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
@@ -184,11 +187,7 @@ const ExecutionTargetFilesystemTabPanel = defineComponent(
       />
     )
   },
-  {
-    name: 'ExecutionTargetFilesystemTabPanel',
-    props: ['routeTarget', 'target', 'executionTarget'],
-  },
-)
+})
 
 function usePendingKeySet(): {
   pendingKeys: Readonly<ShallowRef<ReadonlySet<string>>>

@@ -21,12 +21,12 @@ const readyState: AuthenticatedAppBootstrapState = { status: 'ready' }
 const failedState: AuthenticatedAppBootstrapState = { status: 'failed', message: 'restore failed' }
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 vi.mock('#/web/components/TokenGate.tsx', () => ({
-  TokenGate: defineComponent(
-    (_props, { slots }) =>
-      () =>
-        slots.default?.(),
-    { name: 'TokenGateMock' },
-  ),
+  TokenGate: defineComponent({
+    name: 'TokenGateMock',
+    setup(_props, { slots }) {
+      return () => slots.default?.()
+    },
+  }),
 }))
 
 vi.mock('#/web/hooks/useAuthenticatedAppBootstrap.ts', () => ({
@@ -100,15 +100,16 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     retryPresentation: vi.fn(() => false),
   }
   return {
-    TerminalSessionProvider: defineComponent(
-      (_props, { slots }) =>
-        () => (
+    TerminalSessionProvider: defineComponent({
+      name: 'TerminalSessionProviderMock',
+      setup(_props, { slots }) {
+        return () => (
           <TerminalSessionCommandScope value={commandContext}>
             <TerminalSessionReadScope value={readContext}>{slots.default?.()}</TerminalSessionReadScope>
           </TerminalSessionCommandScope>
-        ),
-      { name: 'TerminalSessionProviderMock' },
-    ),
+        )
+      },
+    }),
   }
 })
 
@@ -121,13 +122,13 @@ vi.mock('#/web/components/SplitPane.tsx', () => ({
   ),
 }))
 
-const SettingsRetainedOutletTerminalConsumer = defineComponent(
-  () => {
+const SettingsRetainedOutletTerminalConsumer = defineComponent({
+  name: 'SettingsRetainedOutletTerminalConsumer',
+  setup() {
     const bellCounts = useWorkspaceTerminalBellCounts([WORKSPACE_ID])
     return () => <span data-testid="settings-retained-terminal-consumer">{bellCounts.value[WORKSPACE_ID]}</span>
   },
-  { name: 'SettingsRetainedOutletTerminalConsumer' },
-)
+})
 
 describe('Layout shell providers', () => {
   test('keeps terminal read context above the settings shell outlet', async () => {

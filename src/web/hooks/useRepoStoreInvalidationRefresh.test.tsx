@@ -63,22 +63,22 @@ vi.mock('#/web/stores/workspaces/store.ts', () => ({
   },
 }))
 
-const Harness = defineComponent(
-  () => {
+const Harness = defineComponent({
+  name: 'RepoStoreInvalidationHarness',
+  setup() {
     useRepoStoreInvalidationRefresh()
     return () => null
   },
-  { name: 'RepoStoreInvalidationHarness' },
-)
+})
 
-const ProjectionObserverHarness = defineComponent(
-  () => {
+const ProjectionObserverHarness = defineComponent({
+  name: 'RepoStoreInvalidationProjectionObserver',
+  setup() {
     useRepoStoreInvalidationRefresh()
     const projection = useQuery(repoSnapshotQueryOptions(WORKSPACE_ID, 'repo-runtime-test-7'), appQueryClient)
     return () => <output>{projection.data.value?.snapshot.current ?? 'loading'}</output>
   },
-  { name: 'RepoStoreInvalidationProjectionObserver' },
-)
+})
 
 describe('useRepoStoreInvalidationRefresh', () => {
   beforeEach(() => {

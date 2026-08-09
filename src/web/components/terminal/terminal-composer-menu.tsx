@@ -45,8 +45,22 @@ function preventMouseFocus(event: MouseEvent): void {
   event.preventDefault()
 }
 
-export const TerminalComposerMenu = defineComponent(
-  (props: TerminalComposerMenuProps) => {
+export const TerminalComposerMenu = defineComponent<TerminalComposerMenuProps>({
+  name: 'TerminalComposerMenu',
+  props: [
+    'labels',
+    'mode',
+    'canUploadFiles',
+    'resolvingFiles',
+    'copyingContent',
+    'onUpload',
+    'onVirtualKey',
+    'onCopyContent',
+    'onClose',
+    'onRestoreComposerTriggerFocus',
+  ],
+
+  setup(props) {
     const open = ref(false)
     let closeFocusIntent: ComposerMenuCloseFocusIntent = 'popover-default'
 
@@ -146,22 +160,7 @@ export const TerminalComposerMenu = defineComponent(
       </Popover>
     )
   },
-  {
-    name: 'TerminalComposerMenu',
-    props: [
-      'labels',
-      'mode',
-      'canUploadFiles',
-      'resolvingFiles',
-      'copyingContent',
-      'onUpload',
-      'onVirtualKey',
-      'onCopyContent',
-      'onClose',
-      'onRestoreComposerTriggerFocus',
-    ],
-  },
-)
+})
 
 interface ComposerMenuItemProps {
   closeMenu: () => void

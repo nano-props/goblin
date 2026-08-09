@@ -13,8 +13,11 @@ type PopoverProps = Omit<RekaPopoverRootProps, 'onUpdate:open'> & {
   onOpenChange?: (open: boolean) => void
 }
 
-export const Popover = defineComponent<PopoverProps>(
-  (props, { slots }) => {
+export const Popover = defineComponent<PopoverProps>({
+  name: 'Popover',
+  props: ['open', 'defaultOpen', 'modal', 'onOpenChange'],
+
+  setup(props, { slots }) {
     const internalOpen = ref(props.defaultOpen ?? false)
     const effectiveOpen = computed(() => props.open ?? internalOpen.value)
     useFloatingSurfaceBoundaryPin(effectiveOpen)
@@ -30,11 +33,7 @@ export const Popover = defineComponent<PopoverProps>(
       </RekaPopoverRoot>
     )
   },
-  {
-    name: 'Popover',
-    props: ['open', 'defaultOpen', 'modal', 'onOpenChange'],
-  },
-)
+})
 
 type PopoverContentProps = Omit<InstanceType<typeof RekaPopoverContent>['$props'], 'class'> &
   HTMLAttributes & {

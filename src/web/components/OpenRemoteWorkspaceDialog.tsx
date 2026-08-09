@@ -30,8 +30,10 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
-export const OpenRemoteWorkspaceDialog = defineComponent(
-  (props: Props) => {
+export const OpenRemoteWorkspaceDialog = defineComponent<Props>({
+  name: 'OpenRemoteWorkspaceDialog',
+  props: ['open', 'onOpenChange'],
+  setup(props) {
     const t = useT()
     const compact = useIsCompactUi()
     const navigation = useAppNavigation()
@@ -332,8 +334,7 @@ export const OpenRemoteWorkspaceDialog = defineComponent(
       )
     }
   },
-  { name: 'OpenRemoteWorkspaceDialog', props: ['open', 'onOpenChange'] },
-)
+})
 
 export function remoteDiagnosticsAllowWorkspaceOpen(result: Pick<RemoteDiagnosticsResult, 'stages'>): boolean {
   return result.stages.some((stage) => stage.name === 'path' && stage.status === 'passed')

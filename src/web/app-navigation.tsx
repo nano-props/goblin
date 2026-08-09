@@ -4,18 +4,17 @@ import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 
 const appNavigationKey: InjectionKey<Readonly<Ref<AppNavigationActions>>> = Symbol('app-navigation')
 
-export const AppNavigationProvider = defineComponent(
-  (props: { value: AppNavigationActions }, { slots }) => {
+export const AppNavigationProvider = defineComponent<{ value: AppNavigationActions }>({
+  name: 'AppNavigationProvider',
+  props: {
+    value: { type: Object as PropType<AppNavigationActions>, required: true },
+  },
+
+  setup(props, { slots }) {
     provide(appNavigationKey, toRef(props, 'value'))
     return () => slots.default?.()
   },
-  {
-    name: 'AppNavigationProvider',
-    props: {
-      value: { type: Object as PropType<AppNavigationActions>, required: true },
-    },
-  },
-)
+})
 
 export function useAppNavigation(): AppNavigationActions {
   const source = inject(appNavigationKey, null)

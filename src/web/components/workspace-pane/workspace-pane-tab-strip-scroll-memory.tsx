@@ -10,13 +10,13 @@ const workspacePaneTabStripScrollMemoryKey: InjectionKey<WorkspacePaneTabStripSc
   'workspace-pane-tab-strip-scroll-memory',
 )
 
-export const WorkspacePaneTabStripScrollMemoryProvider = defineComponent(
-  (_props, { slots }) => {
+export const WorkspacePaneTabStripScrollMemoryProvider = defineComponent({
+  name: 'WorkspacePaneTabStripScrollMemoryProvider',
+  setup(_props, { slots }) {
     provideWorkspacePaneTabStripScrollMemory()
     return () => slots.default?.()
   },
-  { name: 'WorkspacePaneTabStripScrollMemoryProvider' },
-)
+})
 
 export function provideWorkspacePaneTabStripScrollMemory(): void {
   provide(workspacePaneTabStripScrollMemoryKey, createWorkspacePaneTabStripScrollMemory())

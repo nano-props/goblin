@@ -23,8 +23,9 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
 
-const AppRouteView = defineComponent(
-  () => {
+const AppRouteView = defineComponent({
+  name: 'AppRouteView',
+  setup() {
     const route = useRoute()
     useAppRouteAdmission(route)
     const callbacks = appRouterCallbacks(useAppRouteNavigation())
@@ -36,8 +37,7 @@ const AppRouteView = defineComponent(
       />
     )
   },
-  { name: 'AppRouteView' },
-)
+})
 
 const appRouteChildren: RouteRecordRaw[] = [
   { path: '', name: 'home', component: AppRouteView },
@@ -148,7 +148,12 @@ export const appRouter = createRouter({
   routes,
 })
 
-export const AppRouterProvider = defineComponent(() => () => <RouterView />, { name: 'AppRouterProvider' })
+export const AppRouterProvider = defineComponent({
+  name: 'AppRouterProvider',
+  setup() {
+    return () => <RouterView />
+  },
+})
 
 function workspaceRouteViewFromRoute(route: RouteLocationNormalized): WorkspaceRouteView | null {
   const workspaceSlug = route.params.workspaceSlug

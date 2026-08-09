@@ -79,8 +79,10 @@ export function WorkspaceLayoutSkeleton({
   )
 }
 
-export const WorkspacePaneSkeleton = defineComponent(
-  (props: { toolbarTrafficLightOffset?: boolean }) => {
+export const WorkspacePaneSkeleton = defineComponent<{ toolbarTrafficLightOffset?: boolean }>({
+  name: 'WorkspacePaneSkeleton',
+  props: { toolbarTrafficLightOffset: Boolean },
+  setup(props) {
     const compact = useIsCompactUi()
     return () => (
       <section
@@ -125,8 +127,7 @@ export const WorkspacePaneSkeleton = defineComponent(
       </section>
     )
   },
-  { name: 'WorkspacePaneSkeleton', props: { toolbarTrafficLightOffset: Boolean } },
-)
+})
 
 export function EmptyWorkspacePaneSkeleton() {
   return (

@@ -41,8 +41,26 @@ interface WorkspaceLayoutSidebarProps {
   onSelectWorkspaceRoot?: () => void
 }
 
-export const WorkspaceLayoutSidebar = defineComponent(
-  (props: WorkspaceLayoutSidebarProps) => {
+export const WorkspaceLayoutSidebar = defineComponent<WorkspaceLayoutSidebarProps>({
+  name: 'WorkspaceLayoutSidebar',
+  props: [
+    'workspaceId',
+    'git',
+    'compact',
+    'branchContent',
+    'chromeRegion',
+    'onOpenSettings',
+    'onSelectBranch',
+    'onCreateWorktree',
+    'onOpenDashboard',
+    'dashboardSelected',
+    'newWorktreeSelected',
+    'currentBranchName',
+    'workspaceRootSelected',
+    'onSelectWorkspaceRoot',
+  ],
+
+  setup(props) {
     const t = useT()
 
     return () => {
@@ -103,26 +121,7 @@ export const WorkspaceLayoutSidebar = defineComponent(
       )
     }
   },
-  {
-    name: 'WorkspaceLayoutSidebar',
-    props: [
-      'workspaceId',
-      'git',
-      'compact',
-      'branchContent',
-      'chromeRegion',
-      'onOpenSettings',
-      'onSelectBranch',
-      'onCreateWorktree',
-      'onOpenDashboard',
-      'dashboardSelected',
-      'newWorktreeSelected',
-      'currentBranchName',
-      'workspaceRootSelected',
-      'onSelectWorkspaceRoot',
-    ],
-  },
-)
+})
 
 interface WorkspaceShellPrimaryActionsProps {
   workspaceId?: WorkspaceId
@@ -162,8 +161,10 @@ WorkspaceShellPrimaryActions.props = [
   'gitAvailable',
 ]
 
-const WorkspacePickerRow = defineComponent(
-  (props: { workspaceId?: WorkspaceId }) => {
+const WorkspacePickerRow = defineComponent<{ workspaceId?: WorkspaceId }>({
+  name: 'WorkspacePickerRow',
+  props: ['workspaceId'],
+  setup(props) {
     const overlayActions = useLayoutOverlayActions()
     return () => (
       <div class="flex h-8 min-w-0 shrink-0 items-center">
@@ -177,8 +178,7 @@ const WorkspacePickerRow = defineComponent(
       </div>
     )
   },
-  { name: 'WorkspacePickerRow', props: ['workspaceId'] },
-)
+})
 
 interface WorkspaceShellNavigatorHeaderProps {
   workspaceId: WorkspaceId
@@ -202,8 +202,10 @@ const WorkspaceShellNavigatorHeader: FunctionalComponent<WorkspaceShellNavigator
 
 WorkspaceShellNavigatorHeader.props = ['workspaceId', 'title', 'gitAvailable']
 
-const SidebarSettingsButton = defineComponent(
-  (props: { backgroundClass: string; onOpenSettings?: () => void }) => {
+const SidebarSettingsButton = defineComponent<{ backgroundClass: string; onOpenSettings?: () => void }>({
+  name: 'SidebarSettingsButton',
+  props: ['backgroundClass', 'onOpenSettings'],
+  setup(props) {
     const t = useT()
     return () => (
       <div class={cn('relative z-10 shrink-0 p-2', props.backgroundClass)}>
@@ -217,5 +219,4 @@ const SidebarSettingsButton = defineComponent(
       </div>
     )
   },
-  { name: 'SidebarSettingsButton', props: ['backgroundClass', 'onOpenSettings'] },
-)
+})

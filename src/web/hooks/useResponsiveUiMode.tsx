@@ -11,16 +11,16 @@ interface ResponsiveUiContextValue {
 
 const responsiveUiKey: InjectionKey<ResponsiveUiContextValue> = Symbol('responsive-ui')
 
-const ResponsiveUiProvider = defineComponent(
-  (_props, { slots }) => {
+const ResponsiveUiProvider = defineComponent({
+  name: 'ResponsiveUiProvider',
+  setup(_props, { slots }) {
     const compact = useIsSmallScreen()
     const mode = computed<ResponsiveUiMode>(() => (compact.value ? 'compact' : 'default'))
     provide(responsiveUiKey, { mode, compact })
 
     return () => slots.default?.()
   },
-  { name: 'ResponsiveUiProvider' },
-)
+})
 
 export function useResponsiveUi(): ResponsiveUiContextValue {
   const context = inject(responsiveUiKey, null)

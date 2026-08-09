@@ -6,15 +6,25 @@ import { IconCopyButton } from '#/web/components/IconCopyButton.tsx'
 import { useActionFeedback } from '#/web/hooks/useActionFeedback.ts'
 import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 
-export const CopyButton = defineComponent(
-  (props: {
-    value: string
-    copyLabel: string
-    copiedLabel: string
-    class?: string
-    disabled?: boolean
-    side?: 'top' | 'right' | 'bottom' | 'left'
-  }) => {
+export const CopyButton = defineComponent<{
+  value: string
+  copyLabel: string
+  copiedLabel: string
+  class?: string
+  disabled?: boolean
+  side?: 'top' | 'right' | 'bottom' | 'left'
+}>({
+  name: 'CopyButton',
+  props: {
+    value: { type: String, required: true },
+    copyLabel: { type: String, required: true },
+    copiedLabel: { type: String, required: true },
+    class: String,
+    disabled: Boolean,
+    side: String as PropType<'top' | 'right' | 'bottom' | 'left'>,
+  },
+
+  setup(props) {
     const feedback = useActionFeedback()
     const copying = ref(false)
     const t = useT()
@@ -67,15 +77,4 @@ export const CopyButton = defineComponent(
       />
     )
   },
-  {
-    name: 'CopyButton',
-    props: {
-      value: { type: String, required: true },
-      copyLabel: { type: String, required: true },
-      copiedLabel: { type: String, required: true },
-      class: String,
-      disabled: Boolean,
-      side: String as PropType<'top' | 'right' | 'bottom' | 'left'>,
-    },
-  },
-)
+})

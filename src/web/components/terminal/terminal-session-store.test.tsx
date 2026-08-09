@@ -61,13 +61,13 @@ function renderValue<T>(
   composable: () => Ref<T>,
   format: (value: T) => string = String,
 ): HTMLElement {
-  const Probe = defineComponent(
-    () => {
+  const Probe = defineComponent({
+    name: 'TerminalStoreValueProbe',
+    setup() {
       const value = composable()
       return () => <span data-testid="v">{format(value.value)}</span>
     },
-    { name: 'TerminalStoreValueProbe' },
-  )
+  })
   const { container } = renderInJsdom(withRead(context, <Probe />))
   const value = container.querySelector<HTMLElement>('[data-testid="v"]')
   if (!value) throw new Error('terminal store value probe did not render')
@@ -75,13 +75,13 @@ function renderValue<T>(
 }
 
 function expectMissingReadProvider(composable: () => unknown): void {
-  const Probe = defineComponent(
-    () => {
+  const Probe = defineComponent({
+    name: 'MissingTerminalStoreProviderProbe',
+    setup() {
       composable()
       return () => null
     },
-    { name: 'MissingTerminalStoreProviderProbe' },
-  )
+  })
   expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
 }
 
@@ -166,8 +166,9 @@ describe('null targets', () => {
 
 describe('useTerminalFilesystemTargetField selector reactivity', () => {
   test('tracks reactive values captured by the selector', async () => {
-    const Parent = defineComponent(
-      () => {
+    const Parent = defineComponent({
+      name: 'ReactiveTerminalSelectorProbe',
+      setup() {
         const multiplier = ref(1)
         const value = useTerminalFilesystemTargetField(WORKTREE_KEY, (snapshot) => snapshot.count * multiplier.value)
         return () => (
@@ -182,8 +183,7 @@ describe('useTerminalFilesystemTargetField selector reactivity', () => {
           </>
         )
       },
-      { name: 'ReactiveTerminalSelectorProbe' },
-    )
+    })
     const { getByTestId } = renderInJsdom(withRead(makeReadContext({ count: 3 }), <Parent />))
     expect(getByTestId('v').textContent).toBe('3')
 
@@ -194,8 +194,9 @@ describe('useTerminalFilesystemTargetField selector reactivity', () => {
   })
 
   test('keeps a stable projection across unrelated rerenders', async () => {
-    const Parent = defineComponent(
-      () => {
+    const Parent = defineComponent({
+      name: 'StableTerminalSelectorProbe',
+      setup() {
         const tick = ref(0)
         const value = useTerminalFilesystemTargetField(
           WORKTREE_KEY,
@@ -213,8 +214,7 @@ describe('useTerminalFilesystemTargetField selector reactivity', () => {
           </>
         )
       },
-      { name: 'StableTerminalSelectorProbe' },
-    )
+    })
     const { getByTestId } = renderInJsdom(withRead(makeReadContext({ count: 9 }), <Parent />))
     expect(getByTestId('v').textContent).toBe('9')
     await flushTestUpdates(() => getByTestId('bump').click())

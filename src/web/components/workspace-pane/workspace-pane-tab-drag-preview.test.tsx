@@ -125,20 +125,22 @@ describe('useWorkspacePaneTabDragPreview', () => {
   })
 })
 
-const HookHost = defineComponent(
-  (props: { canonicalTabs: readonly WorkspacePaneTabEntry[] }) => {
+const HookHost = defineComponent<{ canonicalTabs: readonly WorkspacePaneTabEntry[] }>({
+  name: 'WorkspacePaneTabDragPreviewHarness',
+  props: ['canonicalTabs'],
+  setup(props) {
     controls = useWorkspacePaneTabDragPreview(() => props.canonicalTabs)
     return () => null
   },
-  { name: 'WorkspacePaneTabDragPreviewHarness', props: ['canonicalTabs'] },
-)
+})
 
-const KeyedHookHost = defineComponent(
-  (props: { targetKey: string; canonicalTabs: readonly WorkspacePaneTabEntry[] }) => () => (
-    <HookHost key={props.targetKey} canonicalTabs={props.canonicalTabs} />
-  ),
-  { name: 'KeyedWorkspacePaneTabDragPreviewHarness', props: ['targetKey', 'canonicalTabs'] },
-)
+const KeyedHookHost = defineComponent<{ targetKey: string; canonicalTabs: readonly WorkspacePaneTabEntry[] }>({
+  name: 'KeyedWorkspacePaneTabDragPreviewHarness',
+  props: ['targetKey', 'canonicalTabs'],
+  setup(props) {
+    return () => <HookHost key={props.targetKey} canonicalTabs={props.canonicalTabs} />
+  },
+})
 
 function renderPreviewHook(canonicalTabs: readonly WorkspacePaneTabEntry[]) {
   return renderInJsdom(<HookHost canonicalTabs={canonicalTabs} />)

@@ -28,8 +28,10 @@ interface Props {
   onChange: (viewMode: BranchViewMode) => void
 }
 
-export const BranchViewModeControl = defineComponent(
-  (props: Props) => {
+export const BranchViewModeControl = defineComponent<Props>({
+  name: 'BranchViewModeControl',
+  props: ['value', 'disabled', 'onChange'],
+  setup(props) {
     const t = useT()
     return () => {
       const worktreesOnly = props.value === 'worktrees'
@@ -56,5 +58,4 @@ export const BranchViewModeControl = defineComponent(
       )
     }
   },
-  { name: 'BranchViewModeControl', props: ['value', 'disabled', 'onChange'] },
-)
+})

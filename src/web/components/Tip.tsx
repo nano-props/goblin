@@ -6,18 +6,25 @@ import { TooltipContent } from '#/web/components/ui/tooltip.tsx'
 type TooltipSide = 'top' | 'right' | 'bottom' | 'left'
 type TooltipAlign = 'start' | 'center' | 'end'
 
-export const Tip = defineComponent(
-  (
-    props: {
-      label: VNodeChild
-      side?: TooltipSide
-      align?: TooltipAlign
-      delayMs?: number
-      collisionPadding?: number | Partial<Record<TooltipSide, number>>
-      forceOpen?: boolean
-    },
-    { slots },
-  ) => {
+export const Tip = defineComponent<{
+  label: VNodeChild
+  side?: TooltipSide
+  align?: TooltipAlign
+  delayMs?: number
+  collisionPadding?: number | Partial<Record<TooltipSide, number>>
+  forceOpen?: boolean
+}>({
+  name: 'Tip',
+  props: {
+    label: null,
+    side: String as PropType<TooltipSide>,
+    align: String as PropType<TooltipAlign>,
+    delayMs: Number,
+    collisionPadding: [Number, Object] as PropType<number | Partial<Record<TooltipSide, number>>>,
+    forceOpen: Boolean,
+  },
+
+  setup(props, { slots }) {
     const hoverOpen = ref(false)
     return () => (
       <TooltipProvider delayDuration={props.delayMs ?? 200}>
@@ -40,15 +47,4 @@ export const Tip = defineComponent(
       </TooltipProvider>
     )
   },
-  {
-    name: 'Tip',
-    props: {
-      label: null,
-      side: String as PropType<TooltipSide>,
-      align: String as PropType<TooltipAlign>,
-      delayMs: Number,
-      collisionPadding: [Number, Object] as PropType<number | Partial<Record<TooltipSide, number>>>,
-      forceOpen: Boolean,
-    },
-  },
-)
+})

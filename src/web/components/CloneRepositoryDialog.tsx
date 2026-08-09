@@ -24,8 +24,10 @@ interface Props {
   onClone: (input: CloneRepositoryInput, signal: AbortSignal) => Promise<CloneRepoResult>
 }
 
-export const CloneRepositoryDialog = defineComponent(
-  (props: Props) => {
+export const CloneRepositoryDialog = defineComponent<Props>({
+  name: 'CloneRepositoryDialog',
+  props: ['open', 'onClose', 'onClone'],
+  setup(props) {
     const t = useT()
     const compact = useIsCompactUi()
     const url = ref('')
@@ -239,8 +241,7 @@ export const CloneRepositoryDialog = defineComponent(
       </FormDialog>
     )
   },
-  { name: 'CloneRepositoryDialog', props: ['open', 'onClose', 'onClone'] },
-)
+})
 
 function directoryNameFromGitUrl(url: string): string {
   if (!url) return ''
