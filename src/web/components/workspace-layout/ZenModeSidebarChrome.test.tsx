@@ -108,6 +108,97 @@ describe('ZenModeSidebarChrome', () => {
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
   })
 
+  test('commits the opening CSS baseline before scheduling the open frame', async () => {
+    const { container } = renderInJsdom(
+      <ZenModeSidebarChrome
+        workspaceId={WORKSPACE_ID}
+        zenModeToggleEnabled
+        revealEnabled
+        sidebarSize={36}
+        onSidebarSizeChange={() => {}}
+        sidebarPane={mockSidebarPane()}
+      />,
+    )
+    const reveal = zenModeSidebarReveal(container)!
+    const originalGetBoundingClientRect = reveal.getBoundingClientRect.bind(reveal)
+    const order: string[] = []
+    const frames: FrameRequestCallback[] = []
+    const resolveOpeningStyle = vi.spyOn(reveal, 'getBoundingClientRect').mockImplementation(() => {
+      expect(reveal.dataset.state).toBe('opening')
+      order.push('resolve-opening-style')
+      return originalGetBoundingClientRect()
+    })
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      order.push('request-open-frame')
+      frames.push(callback)
+      return frames.length
+    })
+
+    try {
+      await flushTestUpdates(() => {
+        screen.getByTestId('zen-mode-sidebar-trigger').dispatchEvent(new MouseEvent('mouseenter'))
+      })
+
+      expect(reveal.dataset.state).toBe('opening')
+      expect(order).toEqual(['resolve-opening-style', 'request-open-frame'])
+      expect(frames).toHaveLength(1)
+
+      frames[0]?.(16)
+      await flushTestUpdates(() => {})
+      expect(reveal.dataset.state).toBe('open')
+    } finally {
+      requestFrame.mockRestore()
+      resolveOpeningStyle.mockRestore()
+    }
+  })
+
+  test('does not let a cancelled opening frame reopen the reveal', async () => {
+    const { container } = renderInJsdom(
+      <ZenModeSidebarChrome
+        workspaceId={WORKSPACE_ID}
+        zenModeToggleEnabled
+        revealEnabled
+        sidebarSize={36}
+        onSidebarSizeChange={() => {}}
+        sidebarPane={mockSidebarPane()}
+      />,
+    )
+    const frames: FrameRequestCallback[] = []
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame')
+
+    try {
+      await flushTestUpdates(() => {
+        screen.getByTestId('zen-mode-sidebar-trigger').dispatchEvent(new MouseEvent('mouseenter'))
+      })
+      const reveal = zenModeSidebarReveal(container)
+      expect(reveal?.dataset.state).toBe('opening')
+      expect(frames).toHaveLength(1)
+
+      await flushTestUpdates(() => {
+        reveal?.dispatchEvent(
+          new MouseEvent('mouseleave', {
+            clientX: 900,
+            clientY: 24,
+            relatedTarget: document.body,
+          }),
+        )
+      })
+      expect(reveal?.dataset.state).toBe('closing')
+      expect(cancelFrame).toHaveBeenCalledWith(1)
+
+      frames[0]?.(16)
+      await flushTestUpdates(() => {})
+      expect(reveal?.dataset.state).toBe('closing')
+    } finally {
+      cancelFrame.mockRestore()
+      requestFrame.mockRestore()
+    }
+  })
+
   test('retains the reveal through the closing animation state', async () => {
     useFakeTimers()
     const { container } = renderInJsdom(
@@ -146,6 +237,45 @@ describe('ZenModeSidebarChrome', () => {
     expect(reveal?.dataset.state).toBe('closing')
     await advanceTimersAndFlush(1)
     expect(reveal?.dataset.state).toBe('closed')
+  })
+
+  test('cancels the closing timer when the reveal reopens', async () => {
+    useFakeTimers()
+    const { container } = renderInJsdom(
+      <ZenModeSidebarChrome
+        workspaceId={WORKSPACE_ID}
+        zenModeToggleEnabled
+        revealEnabled
+        sidebarSize={36}
+        onSidebarSizeChange={() => {}}
+        sidebarPane={mockSidebarPane()}
+      />,
+    )
+
+    await flushTestUpdates(() => {
+      zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseenter'))
+    })
+    await advanceTimersAndFlush(16)
+    const reveal = zenModeSidebarReveal(container)
+    expect(reveal?.dataset.state).toBe('open')
+
+    await flushTestUpdates(() => {
+      reveal?.dispatchEvent(
+        new MouseEvent('mouseleave', {
+          clientX: 900,
+          clientY: 24,
+          relatedTarget: document.body,
+        }),
+      )
+    })
+    expect(reveal?.dataset.state).toBe('closing')
+
+    await flushTestUpdates(() => {
+      zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseenter'))
+    })
+    expect(reveal?.dataset.state).toBe('opening')
+    await advanceTimersAndFlush(260)
+    expect(reveal?.dataset.state).toBe('open')
   })
 
   test('uses a top-level drag plate for the revealed sidebar titlebar', async () => {
@@ -200,6 +330,15 @@ describe('ZenModeSidebarChrome', () => {
     expect(resizeHandle.dataset.titleBarChromeRegion).toBe('interactive')
     expect(resizeHandle.style.top).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
     expect(resizeHandle.style.height).toBe(`calc(100% - ${TITLE_BAR_HEIGHT_PX}px)`)
+
+    await flushTestUpdates(() => {
+      resizeHandle.dispatchEvent(new MouseEvent('mouseenter'))
+    })
+    expect(resizeVisual.dataset.state).toBe('hover')
+    expect(resizeHandle.dataset.state).toBe('hover')
+    const resizeLine = resizeVisual.querySelector('span')
+    expect(resizeLine?.className).toContain('group-data-[state=hover]:bg-brand')
+    expect(resizeLine?.className).toContain('group-data-[state=drag]:bg-brand')
   })
 
   test('forwards route actions to the revealed sidebar controls', async () => {

@@ -192,7 +192,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
     })
   })
 
-  test('shows a testing tip while connection test is running', async () => {
+  test('shows a testing tip and restores input focus when the connection test settles', async () => {
     let resolveTest: ((value: { ok: true; target: typeof target; stages: [] }) => void) | undefined
     mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(fetchInputUrl(input))
@@ -231,13 +231,17 @@ describe('OpenRemoteWorkspaceDialog', () => {
 
     await setInputValue('#remote-ssh-host', 'prod')
     await setInputValue('#remote-path', '/srv/repo')
+    const testButton = findButtonByText('workspace-picker.open-remote-test-connection')
+    testButton.focus()
     await clickButtonByText('workspace-picker.open-remote-test-connection')
     await flush()
 
     expect(document.body.textContent).toContain('workspace-picker.open-remote-diagnostics-testing')
+    expect(document.activeElement).toBe(testButton)
 
     if (resolveTest) resolveTest({ ok: true, target, stages: [] })
     await flush()
+    expect(document.activeElement).toBe(input('#remote-ssh-host'))
   })
 
   test('does not publish a connection result into a later open cycle', async () => {

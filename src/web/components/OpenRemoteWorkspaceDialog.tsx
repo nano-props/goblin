@@ -1,4 +1,4 @@
-import { computed, defineComponent, nextTick, ref, watch } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import { SelectRoot } from 'reka-ui'
 import type { RemoteDiagnosticsResult, RemoteWorkspaceTarget, SshConfigHost } from '#/shared/remote-workspace.ts'
 import { isResolvableRemotePathInput, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
@@ -85,11 +85,6 @@ export const OpenRemoteWorkspaceDialog = defineComponent(
             hosts.value = result.hosts
             hasInclude.value = result.hasInclude
             alias.value = result.hasInclude ? '' : (result.hosts[0]?.alias ?? '')
-            void nextTick(() => {
-              if (controller.signal.aborted) return
-              if (hasInclude.value) hostInput.value?.focus()
-              else if (hosts.value.length > 0) pathInput.value?.focus()
-            })
           })
           .catch((caught) => {
             if (!controller.signal.aborted) loadError.value = formatRemoteDialogError(t, caught)
@@ -100,6 +95,18 @@ export const OpenRemoteWorkspaceDialog = defineComponent(
         })
       },
       { immediate: true },
+    )
+
+    // Focus follows the editable target after its DOM is committed. This also
+    // restores focus after a pending test/open operation re-enables the form.
+    watch(
+      [() => props.open, loading, hasInclude, () => hosts.value.length],
+      ([open, pending, include, hostCount]) => {
+        if (!open || pending) return
+        if (include) hostInput.value?.focus()
+        else if (hostCount > 0) pathInput.value?.focus()
+      },
+      { flush: 'post' },
     )
 
     function clearResolvedRemoteState(): void {

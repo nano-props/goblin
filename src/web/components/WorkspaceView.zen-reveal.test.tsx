@@ -314,14 +314,14 @@ describe('WorkspaceView Zen reveal', () => {
       )
     })
 
-    expect(zenModeSidebarResizeHandle(container)?.dataset.separator).toBe('active')
+    expect(zenModeSidebarResizeHandle(container)?.dataset.state).toBe('drag')
 
     await flushTestUpdates(() => {
       window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: 420, pointerId: 1 }))
     })
 
     expect(workspacesStore.getState().workspacePaneSize).toBe(58)
-    expect(zenModeSidebarResizeHandle(container)?.dataset.separator).toBeUndefined()
+    expect(zenModeSidebarResizeHandle(container)?.dataset.state).toBeUndefined()
   })
 
   test('large-screen collapsed Zen Mode cleans resize listeners if the reveal unmounts mid-drag', async () => {
@@ -344,7 +344,7 @@ describe('WorkspaceView Zen reveal', () => {
       )
     })
 
-    expect(zenModeSidebarResizeHandle(result.container)?.dataset.separator).toBe('active')
+    expect(zenModeSidebarResizeHandle(result.container)?.dataset.state).toBe('drag')
 
     await flushTestUpdates(() => {
       cleanup()

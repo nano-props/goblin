@@ -10,6 +10,7 @@ export function useActionFeedback(): {
 } {
   const succeeded = ref(false)
   let timeout: number | null = null
+  let scopeActive = true
 
   function reset(): void {
     if (timeout !== null) window.clearTimeout(timeout)
@@ -18,6 +19,7 @@ export function useActionFeedback(): {
   }
 
   function trigger(onSelect: () => boolean | Promise<boolean> | void | Promise<void>): void {
+    if (!scopeActive) return
     let result: ReturnType<typeof onSelect>
     try {
       result = onSelect()
@@ -27,7 +29,7 @@ export function useActionFeedback(): {
 
     void Promise.resolve(result)
       .then((accepted) => {
-        if (!accepted) return
+        if (!scopeActive || !accepted) return
         reset()
         succeeded.value = true
         timeout = window.setTimeout(reset, ACTION_FEEDBACK_MS)
@@ -35,6 +37,9 @@ export function useActionFeedback(): {
       .catch(() => {})
   }
 
-  onScopeDispose(reset)
+  onScopeDispose(() => {
+    scopeActive = false
+    reset()
+  })
   return { succeeded: readonly(succeeded), trigger, reset }
 }

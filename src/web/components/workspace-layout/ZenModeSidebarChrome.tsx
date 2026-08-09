@@ -1,4 +1,4 @@
-import { computed, defineComponent, onMounted, onScopeDispose, ref, watch } from 'vue'
+import { computed, defineComponent, nextTick, onMounted, onScopeDispose, ref, watch } from 'vue'
 import type { CSSProperties, ComputedRef, FunctionalComponent, Ref, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
@@ -105,6 +105,58 @@ function useZenModeSidebarReveal(enabled: () => boolean): ZenModeSidebarRevealSt
   }
 }
 
+function useZenModeSidebarPanelTransition(
+  open: () => boolean,
+  panel: Readonly<Ref<HTMLElement | null>>,
+): Readonly<Ref<RevealPanelState>> {
+  const panelState = ref<RevealPanelState>(open() ? 'open' : 'closed')
+
+  // React commits the controlled `open` value before its effect creates the
+  // CSS transition state. Preserve that boundary in Vue, then commit and
+  // resolve the `opening` styles before advancing to `open` on the next frame.
+  watch(
+    open,
+    (nextOpen, _previousOpen, onCleanup) => {
+      let cancelled = false
+      let animationFrame: number | null = null
+      let closeTimer: number | null = null
+
+      onCleanup(() => {
+        cancelled = true
+        if (animationFrame !== null) window.cancelAnimationFrame(animationFrame)
+        if (closeTimer !== null) window.clearTimeout(closeTimer)
+      })
+
+      if (nextOpen) {
+        if (panelState.value === 'open') return
+        panelState.value = 'opening'
+        void nextTick(() => {
+          if (cancelled || !open() || panelState.value !== 'opening') return
+          const panelElement = panel.value
+          if (!panelElement) return
+
+          panelElement.getBoundingClientRect()
+          animationFrame = window.requestAnimationFrame(() => {
+            animationFrame = null
+            if (!cancelled && open() && panelState.value === 'opening') panelState.value = 'open'
+          })
+        })
+        return
+      }
+
+      if (panelState.value === 'closed') return
+      panelState.value = 'closing'
+      closeTimer = window.setTimeout(() => {
+        closeTimer = null
+        if (!cancelled && !open() && panelState.value === 'closing') panelState.value = 'closed'
+      }, ZEN_REVEAL_CLOSE_MS)
+    },
+    { flush: 'post' },
+  )
+
+  return panelState
+}
+
 export const ZenModeSidebarChrome = defineComponent(
   (props: ZenModeSidebarChromeProps) => {
     const reveal = useZenModeSidebarReveal(() => props.revealEnabled)
@@ -154,30 +206,18 @@ const ZenModeSidebarReveal = defineComponent(
     const panelRef = ref<HTMLDivElement | null>(null)
     const hitAreaRef = ref<HTMLDivElement | null>(null)
     const resizeRailState = ref<ResizeRailState>('idle')
-    const panelState = ref<RevealPanelState>(props.open ? 'open' : 'closed')
     const pinnedByDescendantSurface = ref(false)
     const rootFontSizePx = useRootFontSizePx()
     const hostWidth = useElementInlineSize(hostRef, true)
     const panelInteractive = computed(() => props.open && props.interactive)
+    const panelState = useZenModeSidebarPanelTransition(() => props.open, panelRef)
     let resizing = false
     let resizeDragCleanup: (() => void) | null = null
-    let closeAnimationTimer: number | null = null
-    let openAnimationFrame: number | null = null
     let unpinRecheckFrame: number | null = null
     let lastPointer = { x: 0, y: 0 }
     let lastPointerKnown = false
     let previousDescendantSurfacePinned = false
 
-    const clearCloseAnimationTimer = () => {
-      if (closeAnimationTimer === null) return
-      window.clearTimeout(closeAnimationTimer)
-      closeAnimationTimer = null
-    }
-    const clearOpenAnimationFrame = () => {
-      if (openAnimationFrame === null) return
-      window.cancelAnimationFrame(openAnimationFrame)
-      openAnimationFrame = null
-    }
     const clearUnpinRecheckFrame = () => {
       if (unpinRecheckFrame === null) return
       window.cancelAnimationFrame(unpinRecheckFrame)
@@ -195,7 +235,7 @@ const ZenModeSidebarReveal = defineComponent(
       resizing = true
       lastPointer = { x: event.clientX, y: event.clientY }
       lastPointerKnown = true
-      resizeRailState.value = 'active'
+      resizeRailState.value = 'drag'
       props.onSurfaceEnter()
 
       const update = (clientX: number) => {
@@ -239,37 +279,10 @@ const ZenModeSidebarReveal = defineComponent(
 
     onScopeDispose(() => {
       resizeDragCleanup?.()
-      clearCloseAnimationTimer()
-      clearOpenAnimationFrame()
       clearUnpinRecheckFrame()
       resizeDragCleanup = null
       resizing = false
     })
-
-    // The panel's retained mount and visual open state deliberately differ;
-    // this watcher owns the requestAnimationFrame/timeout animation bridge.
-    watch(
-      () => props.open,
-      (open) => {
-        clearCloseAnimationTimer()
-        clearOpenAnimationFrame()
-        if (open) {
-          if (panelState.value === 'open') return
-          panelState.value = 'opening'
-          openAnimationFrame = window.requestAnimationFrame(() => {
-            openAnimationFrame = null
-            panelState.value = 'open'
-          })
-          return
-        }
-        if (panelState.value === 'closed') return
-        panelState.value = 'closing'
-        closeAnimationTimer = window.setTimeout(() => {
-          closeAnimationTimer = null
-          panelState.value = 'closed'
-        }, ZEN_REVEAL_CLOSE_MS)
-      },
-    )
 
     const handleSurfaceLeave = (event: MouseEvent) => {
       lastPointer = { x: event.clientX, y: event.clientY }

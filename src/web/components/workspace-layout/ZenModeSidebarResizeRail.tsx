@@ -9,7 +9,7 @@ const ZEN_REVEAL_RESIZE_HIT_TARGET_STYLE = {
   height: `calc(100% - ${TITLE_BAR_HEIGHT_PX}px)`,
 } satisfies CSSProperties
 
-export type ResizeRailState = 'idle' | 'hover' | 'active'
+export type ResizeRailState = 'idle' | 'hover' | 'drag'
 
 interface ZenModeSidebarResizeRailProps {
   interactive: boolean
@@ -20,10 +20,10 @@ interface ZenModeSidebarResizeRailProps {
 }
 
 export const ZenModeSidebarResizeRail: FunctionalComponent<ZenModeSidebarResizeRailProps> = (props) => {
-  const separatorState = props.resizeRailState === 'idle' ? undefined : props.resizeRailState
+  const dataState = props.resizeRailState === 'idle' ? undefined : props.resizeRailState
   const handleProps = {
     'data-testid': 'zen-mode-sidebar-resize-handle',
-    'data-separator': separatorState,
+    'data-state': dataState,
     role: 'separator' as const,
     'aria-orientation': 'vertical' as const,
     style: ZEN_REVEAL_RESIZE_HIT_TARGET_STYLE,
@@ -37,7 +37,7 @@ export const ZenModeSidebarResizeRail: FunctionalComponent<ZenModeSidebarResizeR
     <>
       <div
         data-testid="zen-mode-sidebar-resize-visual"
-        data-separator={separatorState}
+        data-state={dataState}
         aria-hidden="true"
         class="group pointer-events-none absolute inset-y-0 right-0 z-20 w-px"
       >
