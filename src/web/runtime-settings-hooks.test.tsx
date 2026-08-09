@@ -1,25 +1,25 @@
 // @vitest-environment jsdom
 
-import { QueryClientProvider } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
+import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { renderHookInJsdom } from '#/test-utils/render.tsx'
+import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 import { useExternalAppSettings } from '#/web/runtime-settings-external-apps.ts'
 import { useFetchSettings } from '#/web/runtime-settings-fetch.ts'
 import { useLanSettings } from '#/web/runtime-settings-lan.ts'
 import { useRuntimeRecentWorkspaces } from '#/web/settings-read-projection.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
-import { useI18nStore } from '#/web/stores/i18n.ts'
-import { useThemeStore } from '#/web/stores/theme.ts'
+import { i18nStore } from '#/web/stores/i18n.ts'
+import { themeStore } from '#/web/stores/theme.ts'
 
 beforeEach(() => {
   appQueryClient.clear()
-  useThemeStore.setState({
+  themeStore.setState({
     pref: 'auto',
     resolved: 'light',
     colorTheme: DEFAULT_COLOR_THEME,
@@ -27,7 +27,7 @@ beforeEach(() => {
     setPref: async () => {},
     setColorTheme: async () => {},
   })
-  useI18nStore.setState({
+  i18nStore.setState({
     lang: 'en',
     pref: 'auto',
     dict: {},
@@ -50,29 +50,27 @@ describe('runtime settings hooks', () => {
         lanEnabled: true,
       }),
     )
-    const { result } = renderHookInJsdom(
+    const { result } = renderComposableInJsdom(
       () => ({
         fetch: useFetchSettings(),
         shortcuts: useShortcutSettings(),
         lan: useLanSettings(),
       }),
-      { wrapper: AppQueryClientProvider },
+      { wrapper: AppVueQueryClientScope },
     )
 
-    expect(result.current).toMatchObject({
-      fetch: {
-        fetchIntervalSec: 300,
-        terminalNotificationsEnabled: true,
-      },
-      shortcuts: {
-        shortcutsDisabled: true,
-        globalShortcutDisabled: true,
-        globalShortcut: 'CommandOrControl+Shift+K',
-        globalShortcutRegistered: true,
-      },
-      lan: {
-        lanEnabled: true,
-      },
+    expect(result.value.fetch.value).toMatchObject({
+      fetchIntervalSec: 300,
+      terminalNotificationsEnabled: true,
+    })
+    expect(result.value.shortcuts.value).toMatchObject({
+      shortcutsDisabled: true,
+      globalShortcutDisabled: true,
+      globalShortcut: 'CommandOrControl+Shift+K',
+      globalShortcutRegistered: true,
+    })
+    expect(result.value.lan.value).toMatchObject({
+      lanEnabled: true,
     })
   })
 
@@ -89,9 +87,9 @@ describe('runtime settings hooks', () => {
         detectedAt: 1,
       },
     })
-    const { result } = renderHookInJsdom(() => useExternalAppSettings(), { wrapper: AppQueryClientProvider })
+    const { result } = renderComposableInJsdom(() => useExternalAppSettings(), { wrapper: AppVueQueryClientScope })
 
-    expect(result.current).toMatchObject({
+    expect(result.value.value).toMatchObject({
       terminalAvailable: true,
       editorAvailable: true,
     })
@@ -107,12 +105,14 @@ describe('runtime settings hooks', () => {
         ],
       }),
     )
-    const { result } = renderHookInJsdom(() => useRuntimeRecentWorkspaces(), { wrapper: AppQueryClientProvider })
+    const { result } = renderComposableInJsdom(() => useRuntimeRecentWorkspaces(), { wrapper: AppVueQueryClientScope })
 
-    expect(result.current).toEqual([{ id: 'goblin+file:///tmp/repo-a' }, { id: 'goblin+file:///tmp/repo-b' }])
+    expect(result.value.value).toEqual([{ id: 'goblin+file:///tmp/repo-a' }, { id: 'goblin+file:///tmp/repo-b' }])
   })
 })
 
-function AppQueryClientProvider({ children }: { children: ReactNode }) {
-  return <QueryClientProvider client={appQueryClient}>{children}</QueryClientProvider>
-}
+const AppVueQueryClientScope = defineComponent(
+  (_props, { slots }) =>
+    () => <VueQueryClientScope client={appQueryClient}>{slots.default?.()}</VueQueryClientScope>,
+  { name: 'AppVueQueryClientScope' },
+)

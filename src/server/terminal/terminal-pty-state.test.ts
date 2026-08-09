@@ -10,7 +10,7 @@ import {
 } from '#/server/terminal/terminal-pty-state.ts'
 
 describe('terminal PTY state', () => {
-  test('projects prepared-state defaults without inventing a binding', () => {
+  test('projects prepared-state defaults without inventing a binding', async () => {
     const session = { ptyState: { kind: 'prepared' as const } }
 
     expect(terminalPtyBoundState(session)).toBeNull()
@@ -19,7 +19,7 @@ describe('terminal PTY state', () => {
     expect(terminalPtyProcessName(session)).toBe('terminal')
   })
 
-  test('reads and advances identity within the expected generation', () => {
+  test('reads and advances identity within the expected generation', async () => {
     const state = boundState()
     const session = { ptyState: state }
     try {
@@ -37,7 +37,7 @@ describe('terminal PTY state', () => {
     }
   })
 
-  test('rejects identity revision overflow', () => {
+  test('rejects identity revision overflow', async () => {
     const state = boundState()
     state.identityRevision = Number.MAX_SAFE_INTEGER
     try {

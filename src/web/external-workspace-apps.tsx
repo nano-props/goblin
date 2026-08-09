@@ -1,7 +1,10 @@
-import type { ComponentType } from 'react'
-import type { EditorAppAvailability, EditorApp, TerminalApp, TerminalAppAvailability } from '#/shared/api-types.ts'
+import type { FunctionalComponent, SVGAttributes } from 'vue'
+import type { EditorAppAvailability, EditorApp, TerminalApp, TerminalAppAvailability } from '#/shared/settings.ts'
 import type { WorkspaceExternalAppId } from '#/shared/workspace-settings.ts'
-import { AppleTerminalIcon, FinderIcon, GhosttyIcon, VSCodeIcon } from '#/web/components/ExternalAppIcon/index.tsx'
+import { AppleTerminalIcon } from '#/web/components/ExternalAppIcon/AppleTerminalIcon.tsx'
+import { FinderIcon } from '#/web/components/ExternalAppIcon/FinderIcon.tsx'
+import { GhosttyIcon } from '#/web/components/ExternalAppIcon/GhosttyIcon.tsx'
+import { VSCodeIcon } from '#/web/components/ExternalAppIcon/VSCodeIcon.tsx'
 
 export type WorkspaceExternalTerminalApp = Extract<TerminalApp, 'ghostty' | 'terminal'>
 export type WorkspaceExternalEditorApp = EditorApp
@@ -10,7 +13,7 @@ interface WorkspaceExternalAppBase<TKind extends 'terminal' | 'editor' | 'finder
   kind: TKind
   id: string
   labelKey: string
-  Icon: ComponentType<{ className?: string }>
+  Icon: FunctionalComponent<SVGAttributes>
   supportsRemote: boolean
 }
 

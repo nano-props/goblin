@@ -19,7 +19,7 @@ const GIT_FILESYSTEM_CAPABILITIES = {
 }
 
 describe('workspace pane filesystem target', () => {
-  test('derives the native root path from the canonical Workspace identity', () => {
+  test('derives the native root path from the canonical Workspace identity', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace/example')
     const target = workspaceRootPaneFilesystemTarget({
       workspaceId,
@@ -35,7 +35,7 @@ describe('workspace pane filesystem target', () => {
     })
   })
 
-  test('admits a Git worktree only when it shares the Workspace transport', () => {
+  test('admits a Git worktree only when it shares the Workspace transport', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://host-a/workspace/example')
 
     expect(() =>

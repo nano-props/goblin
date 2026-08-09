@@ -20,11 +20,11 @@ vi.mock('electron', () => ({
 }))
 
 describe('trusted app web contents', () => {
-  test('does not trust arbitrary app origins before registration', () => {
+  test('does not trust arbitrary app origins before registration', async () => {
     expect(isTrustedAppUrl('http://127.0.0.1:4173/?theme=light')).toBe(false)
   })
 
-  test('does not trust an app URL from an unregistered webContents id', () => {
+  test('does not trust an app URL from an unregistered webContents id', async () => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
     registerTrustedWebContents({ id: 1, once: vi.fn() })
 
@@ -36,7 +36,7 @@ describe('trusted app web contents', () => {
     ).toBe(false)
   })
 
-  test('trusts registered webContents only on the registered app origin', () => {
+  test('trusts registered webContents only on the registered app origin', async () => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
     registerTrustedWebContents({ id: 7, once: vi.fn() })
 
@@ -54,7 +54,7 @@ describe('trusted app web contents', () => {
     ).toBe(false)
   })
 
-  test('trusts IPC from a registered window surface without explicit webContents registration', () => {
+  test('trusts IPC from a registered window surface without explicit webContents registration', async () => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
     registerClientWindowSurface(
       {
@@ -72,7 +72,7 @@ describe('trusted app web contents', () => {
     ).toBe(true)
   })
 
-  test('trusts the registered dev server app origin across history-routed paths', () => {
+  test('trusts the registered dev server app origin across history-routed paths', async () => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
     registerTrustedWebContents({ id: 8, once: vi.fn() })
 
@@ -98,7 +98,7 @@ describe('trusted app web contents', () => {
     ).toBe(false)
   })
 
-  test('scopes a trusted webContents to the specific app origin it loaded', () => {
+  test('scopes a trusted webContents to the specific app origin it loaded', async () => {
     const webContents = { id: 18, once: vi.fn() }
     registerTrustedAppUrl('http://127.0.0.1:5173/')
     registerTrustedWebContents(webContents)

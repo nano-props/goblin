@@ -1,4 +1,4 @@
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { formatTranslatableReason } from '#/web/lib/remote-diagnostics.ts'
 import type { WorkspaceRefreshOutcome } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 

@@ -1,6 +1,8 @@
-import { useEffect } from 'react'
+import { computed, toValue, watch } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
+import type { QueryClient } from '@tanstack/query-core'
+import { useQuery } from '@tanstack/vue-query'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 import { isWorkspacePaneRuntimeTabEntry, type WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
@@ -32,31 +34,39 @@ export function workspacePaneTabsQueryKey(workspaceId: WorkspaceId, workspaceRun
 }
 
 export function workspacePaneTabsQueryOptions(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
-  return queryOptions({
+  return {
     queryKey: workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
     queryFn: async () => await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId),
-    structuralSharing: (oldData, newData) =>
+    structuralSharing: (oldData: unknown, newData: unknown) =>
       acceptedWorkspacePaneTabsSnapshot(
         oldData as WorkspacePaneTabsSnapshot | undefined,
         newData as WorkspacePaneTabsSnapshot,
       ),
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: Number.POSITIVE_INFINITY,
-  })
+  }
 }
 
 export function useWorkspacePaneTabsQuery(
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-  options: { enabled?: boolean } = {},
+  workspaceId: MaybeRefOrGetter<WorkspaceId>,
+  workspaceRuntimeId: MaybeRefOrGetter<string>,
+  options: { enabled?: MaybeRefOrGetter<boolean | undefined> } = {},
 ) {
-  const query = useQuery({
-    ...workspacePaneTabsQueryOptions(workspaceId, workspaceRuntimeId),
-    enabled: options.enabled !== false,
-  })
-  useEffect(() => {
-    if (query.status === 'success') notifyWorkspacePaneTabsPersistenceChanged()
-  }, [query.dataUpdatedAt, query.status])
+  const query = useQuery(
+    computed(() => ({
+      ...workspacePaneTabsQueryOptions(toValue(workspaceId), toValue(workspaceRuntimeId)),
+      enabled: toValue(options.enabled) !== false,
+    })),
+  )
+  // The persistence projection is an external subscriber boundary: publish
+  // after TanStack Query has accepted a successful snapshot, including cache hydration.
+  watch(
+    [query.status, query.dataUpdatedAt],
+    ([status]) => {
+      if (status === 'success') notifyWorkspacePaneTabsPersistenceChanged()
+    },
+    { immediate: true },
+  )
   return query
 }
 

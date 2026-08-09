@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { TerminalComposerHistoryCursor } from '#/web/components/terminal/terminal-composer-history-cursor.ts'
 
 describe('TerminalComposerHistoryCursor', () => {
-  test('browses supplied entries from an empty draft and returns to the original draft', () => {
+  test('browses supplied entries from an empty draft and returns to the original draft', async () => {
     const cursor = new TerminalComposerHistoryCursor()
     cursor.updateEntries(['first', 'second'])
 
@@ -14,7 +14,7 @@ describe('TerminalComposerHistoryCursor', () => {
     expect(cursor.next()).toBeUndefined()
   })
 
-  test('does not enter history while the user is editing a non-empty draft', () => {
+  test('does not enter history while the user is editing a non-empty draft', async () => {
     const cursor = new TerminalComposerHistoryCursor()
     cursor.updateEntries(['previous'])
 
@@ -22,7 +22,7 @@ describe('TerminalComposerHistoryCursor', () => {
     expect(cursor.isBrowsing()).toBe(false)
   })
 
-  test('leaves browsing when supplied entries change', () => {
+  test('leaves browsing when supplied entries change', async () => {
     const cursor = new TerminalComposerHistoryCursor()
     cursor.updateEntries(['previous'])
     expect(cursor.previous('')).toBe('previous')

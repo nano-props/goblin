@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import type { ReactNode } from 'react'
-import type * as ReactModule from 'react'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
+import { defineComponent } from 'vue'
+import type { VNodeChild } from 'vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { CompactWorkspaceLayout, WorkspaceSplitLayout } from '#/web/components/Layout.tsx'
 import { Layout } from '#/web/Layout.tsx'
@@ -14,60 +15,36 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
-import type * as TerminalSessionContextModule from '#/web/components/terminal/terminal-session-context.ts'
-import type * as WorkspaceNavigationHistoryModule from '#/web/workspace-navigation-history.ts'
 
 const restoringWorkspaceState: AuthenticatedAppBootstrapState = { status: 'restoring-workspace' }
 const readyState: AuthenticatedAppBootstrapState = { status: 'ready' }
 const failedState: AuthenticatedAppBootstrapState = { status: 'failed', message: 'restore failed' }
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
-const layoutRouterMock = vi.hoisted(() => ({
-  pathname: '/settings/general',
-  href: '/settings/general',
-  matches: [] as Array<{ routeId: string; params: Record<string, string> }>,
-  outlet: null as ReactNode | null,
-}))
-
-vi.mock('@tanstack/react-router', () => ({
-  Outlet: () => layoutRouterMock.outlet,
-  useRouterState: (options?: { select?: (state: unknown) => unknown }) => {
-    const state = {
-      location: { pathname: layoutRouterMock.pathname, href: layoutRouterMock.href },
-      matches: layoutRouterMock.matches,
-    }
-    return options?.select ? options.select(state) : state
-  },
-}))
-
-vi.mock('@tanstack/react-router-devtools', () => ({
-  TanStackRouterDevtools: () => null,
-}))
-
 vi.mock('#/web/components/TokenGate.tsx', () => ({
-  TokenGate: ({ children }: { children: ReactNode }) => <>{children}</>,
+  TokenGate: defineComponent(
+    (_props, { slots }) =>
+      () =>
+        slots.default?.(),
+    { name: 'TokenGateMock' },
+  ),
 }))
 
 vi.mock('#/web/hooks/useAuthenticatedAppBootstrap.ts', () => ({
-  useAuthenticatedAppBootstrap: () => ({ state: { status: 'ready' }, retry: vi.fn() }),
+  useAuthenticatedAppBootstrap: () => ({ state: { value: { status: 'ready' } }, retry: vi.fn() }),
 }))
 
 vi.mock('#/web/hooks/useSettingsWriteErrorToast.ts', () => ({
   useSettingsWriteErrorToast: () => undefined,
 }))
 
-vi.mock('#/web/workspace-navigation-history.ts', async () => {
-  const actual = await vi.importActual<typeof WorkspaceNavigationHistoryModule>('#/web/workspace-navigation-history.ts')
-  return {
-    ...actual,
-    useAppHistoryPresentationObserver: () => undefined,
-  }
-})
+vi.mock('#/web/app-history-presentation.ts', () => ({
+  useAppHistoryPresentationObserver: () => undefined,
+}))
 
 vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
-  const React = await vi.importActual<typeof ReactModule>('react')
-  const context = await vi.importActual<typeof TerminalSessionContextModule>(
-    '#/web/components/terminal/terminal-session-context.ts',
-  )
+  const { defineComponent } = await import('vue')
+  const { TerminalSessionCommandScope, TerminalSessionReadScope } =
+    await import('#/web/components/terminal/terminal-session-context.ts')
   const readContext: TerminalSessionReadContextValue = {
     terminalFilesystemTargetSnapshot: () => ({
       terminalFilesystemTargetKey: '',
@@ -122,17 +99,20 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     retryPresentation: vi.fn(() => false),
   }
   return {
-    TerminalSessionProvider: ({ children }: { children: ReactNode }) =>
-      React.createElement(
-        context.TerminalSessionContext,
-        { value: commandContext },
-        React.createElement(context.TerminalSessionReadContext, { value: readContext }, children),
-      ),
+    TerminalSessionProvider: defineComponent(
+      (_props, { slots }) =>
+        () => (
+          <TerminalSessionCommandScope value={commandContext}>
+            <TerminalSessionReadScope value={readContext}>{slots.default?.()}</TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
+        ),
+      { name: 'TerminalSessionProviderMock' },
+    ),
   }
 })
 
 vi.mock('#/web/components/SplitPane.tsx', () => ({
-  SplitPane: ({ before, after, afterSize }: { before: ReactNode; after: ReactNode; afterSize: number }) => (
+  SplitPane: ({ before, after, afterSize }: { before: VNodeChild; after: VNodeChild; afterSize: number }) => (
     <div data-testid="mock-split-pane" data-after-size={afterSize}>
       {before}
       {after}
@@ -140,30 +120,30 @@ vi.mock('#/web/components/SplitPane.tsx', () => ({
   ),
 }))
 
-beforeEach(() => {
-  layoutRouterMock.pathname = '/settings/general'
-  layoutRouterMock.href = '/settings/general'
-  layoutRouterMock.matches = []
-  layoutRouterMock.outlet = null
-})
-
-function SettingsRetainedOutletTerminalConsumer() {
-  const bellCounts = useWorkspaceTerminalBellCounts([WORKSPACE_ID])
-  return <span data-testid="settings-retained-terminal-consumer">{bellCounts[WORKSPACE_ID]}</span>
-}
+const SettingsRetainedOutletTerminalConsumer = defineComponent(
+  () => {
+    const bellCounts = useWorkspaceTerminalBellCounts([WORKSPACE_ID])
+    return () => <span data-testid="settings-retained-terminal-consumer">{bellCounts.value[WORKSPACE_ID]}</span>
+  },
+  { name: 'SettingsRetainedOutletTerminalConsumer' },
+)
 
 describe('Layout shell providers', () => {
-  test('keeps terminal read context above the settings shell outlet', () => {
-    layoutRouterMock.outlet = <SettingsRetainedOutletTerminalConsumer />
-
-    const { getByTestId } = renderInJsdom(<Layout />)
+  test('keeps terminal read context above the settings shell outlet', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/settings/general', component: SettingsRetainedOutletTerminalConsumer }],
+    })
+    await router.push('/settings/general')
+    await router.isReady()
+    const { getByTestId } = renderInJsdom(<Layout />, { global: { plugins: [router] } })
 
     expect(getByTestId('settings-retained-terminal-consumer').textContent).toBe('4')
   })
 })
 
 describe('CompactWorkspaceLayout', () => {
-  test('marks the inactive pane inert while sharing workspace motion tokens', () => {
+  test('marks the inactive pane inert while sharing workspace motion tokens', async () => {
     const { container, rerender } = renderCompactWorkspace('navigator')
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
@@ -175,7 +155,7 @@ describe('CompactWorkspaceLayout', () => {
     expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBe('true')
     expect(compactPane(container, 'workspace')?.hasAttribute('inert')).toBe(true)
 
-    rerender(
+    await rerender(
       <CompactWorkspaceLayout
         activePane="workspace"
         sidebarPane={<button type="button">navigator</button>}
@@ -190,7 +170,7 @@ describe('CompactWorkspaceLayout', () => {
     expect(compactPane(container, 'workspace')?.hasAttribute('inert')).toBe(false)
   })
 
-  test('retains the outgoing workspace pane content for the slide-out transition', () => {
+  test('retains the outgoing workspace pane content for the slide-out transition', async () => {
     useFakeTimers()
     const { container, rerender } = renderInJsdom(
       <CompactWorkspaceLayout
@@ -203,7 +183,7 @@ describe('CompactWorkspaceLayout', () => {
 
     expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
 
-    rerender(
+    await rerender(
       <CompactWorkspaceLayout
         activePane="navigator"
         sidebarPane={<button type="button">navigator</button>}
@@ -216,7 +196,7 @@ describe('CompactWorkspaceLayout', () => {
     expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
     expect(compactPane(container, 'workspace')?.textContent).not.toContain('workspace-b')
 
-    act(() => {
+    await flushTestUpdates(() => {
       vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
     })
 
@@ -225,7 +205,7 @@ describe('CompactWorkspaceLayout', () => {
 })
 
 describe('WorkspaceSplitLayout', () => {
-  test('defaults the split layout to a 30/70 sidebar/workspace ratio', () => {
+  test('defaults the split layout to a 30/70 sidebar/workspace ratio', async () => {
     const { container } = renderInJsdom(
       <WorkspaceSplitLayout sidebarPane={<div>navigator</div>} workspacePane={<div>workspace</div>} />,
     )
@@ -235,12 +215,12 @@ describe('WorkspaceSplitLayout', () => {
 })
 
 describe('authenticatedAppShellMode', () => {
-  test('settings routes render outside the workspace boot gate', () => {
+  test('settings routes render outside the workspace boot gate', async () => {
     expect(authenticatedAppShellMode('/settings/general', restoringWorkspaceState)).toBe('settings')
     expect(authenticatedAppShellMode('/settings/shortcuts', readyState)).toBe('settings')
   })
 
-  test('workspace routes wait for authenticated boot before mounting runtime', () => {
+  test('workspace routes wait for authenticated boot before mounting runtime', async () => {
     expect(authenticatedAppShellMode('/', restoringWorkspaceState)).toBe('workspace-restore')
     expect(authenticatedAppShellMode('/workspace/repo/dashboard', restoringWorkspaceState)).toBe('workspace-restore')
     expect(authenticatedAppShellMode('/workspace/repo/dashboard', readyState)).toBe('workspace-ready')

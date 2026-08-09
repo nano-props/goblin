@@ -1,3 +1,4 @@
+import { computed } from 'vue'
 import {
   currentRuntimeSettingsSnapshot,
   readRuntimeShortcutSettings,
@@ -12,7 +13,8 @@ export function getRuntimeShortcutSettings() {
 }
 
 export function useShortcutSettings() {
-  return readRuntimeShortcutSettings(useRuntimeSettingsSnapshot())
+  const snapshot = useRuntimeSettingsSnapshot()
+  return computed(() => readRuntimeShortcutSettings(snapshot.value))
 }
 
 export function useShortcutSettingsController() {

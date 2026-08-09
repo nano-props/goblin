@@ -49,7 +49,7 @@ afterEach(() => {
 })
 
 describe('canStartRemoteFetch', () => {
-  test('requires a repo that is not already busy with network or branch action work', () => {
+  test('requires a repo that is not already busy with network or branch action work', async () => {
     expect(canStartRemoteFetch(undefined)).toBe(false)
     expect(canStartRemoteFetch(repo())).toBe(true)
     expect(canStartRemoteFetch(repo({ fetchBusy: true }))).toBe(false)

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { refreshStatusLog } from '#/web/logger.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { REPO_ID, branch, ipcHandlers, resetRefreshTest, seedRepo } from '#/web/stores/workspaces/refresh-test-utils.ts'
 
 beforeEach(resetRefreshTest)
@@ -23,7 +23,7 @@ describe('independent worktree status refresh', () => {
       loadedAt: Date.now(),
     })
 
-    await refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, REPO_ID, workspaceRuntimeId)
+    await refreshRepoWorktreeStatus({ get: workspacesStore.getState }, REPO_ID, workspaceRuntimeId)
 
     expect(getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)?.status[0]?.entries).toHaveLength(1)
     expect(getRepoSnapshotQueryData(REPO_ID, workspaceRuntimeId)).toBe(snapshotBefore)
@@ -37,7 +37,7 @@ describe('independent worktree status refresh', () => {
     }
     const warn = vi.spyOn(refreshStatusLog, 'warn').mockImplementation(() => {})
 
-    await refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, REPO_ID, workspaceRuntimeId)
+    await refreshRepoWorktreeStatus({ get: workspacesStore.getState }, REPO_ID, workspaceRuntimeId)
 
     expect(getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId)).toBe(acceptedStatus)
     expect(warn).toHaveBeenCalledWith('failed', expect.objectContaining({ err: expect.any(Error) }))
@@ -48,7 +48,7 @@ describe('independent worktree status refresh', () => {
     const handler = vi.fn()
     ipcHandlers['repo.worktreeStatus'] = handler
 
-    await refreshRepoWorktreeStatus({ get: useWorkspacesStore.getState }, REPO_ID, 'repo-runtime-stale')
+    await refreshRepoWorktreeStatus({ get: workspacesStore.getState }, REPO_ID, 'repo-runtime-stale')
 
     expect(handler).not.toHaveBeenCalled()
   })

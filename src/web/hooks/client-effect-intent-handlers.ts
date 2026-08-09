@@ -1,12 +1,12 @@
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
-import { useThemeStore } from '#/web/stores/theme.ts'
-import { useI18nStore } from '#/web/stores/i18n.ts'
+import { themeStore } from '#/web/stores/theme.ts'
+import { i18nStore } from '#/web/stores/i18n.ts'
 import { clearRecentWorkspaceHistory } from '#/web/settings-actions.ts'
 import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
@@ -26,7 +26,7 @@ import {
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -71,7 +71,7 @@ export function handleTerminalBellClickIntent(
   deps: TerminalBellIntentDeps,
 ): void {
   const workspaceId = terminalSessionCoordinates(event.session).workspaceId
-  const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+  const workspace = workspacesStore.getState().workspaces[workspaceId]
   const snapshot = workspace ? getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId) : undefined
   const repositoryFacts = snapshot ? { snapshot } : null
   const plan = createTerminalBellIntentPlan(workspace, repositoryFacts, event)
@@ -114,10 +114,10 @@ export async function handleAppLevelClientIntent(
       deps.navigation.openSettings(plan.page)
       return true
     case 'set-theme-pref':
-      await useThemeStore.getState().setPref(plan.pref)
+      await themeStore.getState().setPref(plan.pref)
       return true
     case 'set-lang-pref':
-      await useI18nStore.getState().setPref(plan.pref)
+      await i18nStore.getState().setPref(plan.pref)
       return true
     case 'clear-recent-workspaces':
       await clearRecentWorkspaceHistory()
@@ -143,7 +143,7 @@ export async function handleWorkspaceClientIntent(
   // Workspace intents are route-aware and may be gated by overlays, shortcut
   // suppression, or terminal focus before they execute.
   const currentWorkspace = deps.currentWorkspaceId
-    ? (useWorkspacesStore.getState().workspaces[deps.currentWorkspaceId] ?? null)
+    ? (workspacesStore.getState().workspaces[deps.currentWorkspaceId] ?? null)
     : null
   const plan = createWorkspaceIntentPlan(event, {
     overlayBlocked: deps.isOverlayOpen() || isShortcutBlockingLayerOpen(),
@@ -219,7 +219,7 @@ export async function handleWorkspaceClientIntent(
       return true
     case 'refresh-workspace':
       const refreshOutcome = await runWorkspaceRefresh(
-        { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
+        { get: workspacesStore.getState, set: workspacesStore.setState },
         plan.workspaceId,
         {
           workspaceRuntimeId: plan.workspaceRuntimeId,

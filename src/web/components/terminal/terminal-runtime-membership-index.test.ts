@@ -8,7 +8,7 @@ import {
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/example-workspace')
 
 describe('terminal repo index', () => {
-  test('projects open runtime membership without loading Git data', () => {
+  test('projects open runtime membership without loading Git data', async () => {
     const entries: TerminalRuntimeMembershipEntry[] = [
       {
         id: REPO_ID,

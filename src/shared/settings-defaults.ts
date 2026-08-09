@@ -1,13 +1,7 @@
 import { DEFAULT_GLOBAL_SHORTCUT } from '#/shared/accelerator.ts'
-import { DEFAULT_COLOR_THEME, type ColorTheme } from '#/shared/color-theme.ts'
-import type {
-  ClientWorkspaceState,
-  LangPref,
-  ServerWorkspaceState,
-  UserSettings,
-  SettingsSnapshot,
-  ThemePref,
-} from '#/shared/api-types.ts'
+import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'
+import type { ClientWorkspaceState, ServerWorkspaceState, SettingsSnapshot } from '#/shared/api-types.ts'
+import type { LangPref, UserSettings, ThemePref } from '#/shared/settings.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 
 export const DEFAULT_FETCH_INTERVAL_SEC = 120
@@ -58,6 +52,3 @@ export function defaultSettingsSnapshot(overrides: Partial<SettingsSnapshot> = {
     workspaceSettings: overrides.workspaceSettings ?? [],
   }
 }
-
-export { DEFAULT_COLOR_THEME, DEFAULT_GLOBAL_SHORTCUT }
-export type { ColorTheme }

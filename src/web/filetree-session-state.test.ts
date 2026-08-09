@@ -7,7 +7,7 @@ import {
 import {
   filetreeInteractionScopeKey,
   resetFiletreeInteractionStore,
-  useFiletreeInteractionStore,
+  filetreeInteractionStore,
 } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/example-repo')
@@ -19,7 +19,7 @@ describe('filetree-session-state', () => {
     resetFiletreeInteractionStore()
   })
 
-  test('maps file tree interaction state into session view state for open worktrees', () => {
+  test('maps file tree interaction state into session view state for open worktrees', async () => {
     const scopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/tmp/worktree')
     const staleScopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/tmp/stale-worktree')
     const closedRepoScopeKey = filetreeInteractionScopeKey(CLOSED_WORKSPACE_ID, '/tmp/worktree')
@@ -61,7 +61,7 @@ describe('filetree-session-state', () => {
     })
   })
 
-  test('restores session view state into the file tree interaction store', () => {
+  test('restores session view state into the file tree interaction store', async () => {
     restoreFiletreeViewStateFromSession({
       [WORKSPACE_ID]: {
         'goblin+file:///tmp/worktree': {
@@ -73,7 +73,7 @@ describe('filetree-session-state', () => {
     })
 
     expect(
-      useFiletreeInteractionStore.getState().interactionByScope[
+      filetreeInteractionStore.getState().interactionByScope[
         filetreeInteractionScopeKey(WORKSPACE_ID, '/tmp/worktree')
       ],
     ).toEqual({
@@ -83,7 +83,7 @@ describe('filetree-session-state', () => {
     })
   })
 
-  test('persists the workspace-root file tree without a synthetic branch', () => {
+  test('persists the workspace-root file tree without a synthetic branch', async () => {
     const persisted = persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession(
       {
         [filetreeInteractionScopeKey(PLAIN_WORKSPACE_ID, '/tmp/plain-workspace')]: {

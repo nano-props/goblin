@@ -37,7 +37,7 @@ function browserRemote(url: string, provider: BrowserRemoteProvider) {
 }
 
 describe('parseRemoteVerbose', () => {
-  test('parses complete remotes in first-seen order and retains distinct fetch and push URLs', () => {
+  test('parses complete remotes in first-seen order and retains distinct fetch and push URLs', async () => {
     expect(
       parseRemoteVerbose(
         [
@@ -62,7 +62,7 @@ describe('parseRemoteVerbose', () => {
     ])
   })
 
-  test('uses the last URL for a repeated remote role', () => {
+  test('uses the last URL for a repeated remote role', async () => {
     expect(
       parseRemoteVerbose(
         [
@@ -80,7 +80,7 @@ describe('parseRemoteVerbose', () => {
     ])
   })
 
-  test('rejects malformed and incomplete remote output', () => {
+  test('rejects malformed and incomplete remote output', async () => {
     expect(() => parseRemoteVerbose('origin https://example.test/sample/repo.git')).toThrow('Invalid remote output')
     expect(() => parseRemoteVerbose('origin\thttps://example.test/sample/repo.git (fetch)')).toThrow(
       'Incomplete remote output',
@@ -183,7 +183,7 @@ describe('getBrowserRepoUrl', () => {
 })
 
 describe('commitUrlForBrowserRemote', () => {
-  test('returns GitHub and GitLab commit URLs', () => {
+  test('returns GitHub and GitLab commit URLs', async () => {
     expect(commitUrlForBrowserRemote(browserRemote('https://github.com/acme/project', 'github'), 'abcdef1')).toBe(
       'https://github.com/acme/project/commit/abcdef1',
     )
@@ -192,7 +192,7 @@ describe('commitUrlForBrowserRemote', () => {
     )
   })
 
-  test('returns null for unsupported providers and invalid hashes', () => {
+  test('returns null for unsupported providers and invalid hashes', async () => {
     expect(
       commitUrlForBrowserRemote(browserRemote('https://example.com/acme/project', 'external'), 'abcdef1'),
     ).toBeNull()
@@ -203,29 +203,29 @@ describe('commitUrlForBrowserRemote', () => {
 })
 
 describe('branchUrlForBrowserRemote', () => {
-  test('returns null when the remote is null', () => {
+  test('returns null when the remote is null', async () => {
     expect(branchUrlForBrowserRemote(null, 'main')).toBeNull()
   })
 
-  test('returns the GitHub branch URL', () => {
+  test('returns the GitHub branch URL', async () => {
     expect(branchUrlForBrowserRemote(browserRemote('https://github.com/acme/project', 'github'), 'main')).toBe(
       'https://github.com/acme/project/tree/main',
     )
   })
 
-  test('encodes each GitHub branch path segment individually', () => {
+  test('encodes each GitHub branch path segment individually', async () => {
     expect(
       branchUrlForBrowserRemote(browserRemote('https://github.com/acme/project', 'github'), 'feature/with space'),
     ).toBe('https://github.com/acme/project/tree/feature/with%20space')
   })
 
-  test('returns the GitLab branch URL', () => {
+  test('returns the GitLab branch URL', async () => {
     expect(branchUrlForBrowserRemote(browserRemote('https://gitlab.com/acme/project', 'gitlab'), 'feature/test')).toBe(
       'https://gitlab.com/acme/project/-/tree/feature/test',
     )
   })
 
-  test('returns null for unsupported providers', () => {
+  test('returns null for unsupported providers', async () => {
     expect(
       branchUrlForBrowserRemote(browserRemote('https://bitbucket.org/acme/project', 'external'), 'main'),
     ).toBeNull()
@@ -233,7 +233,7 @@ describe('branchUrlForBrowserRemote', () => {
 })
 
 describe('getRepoUrlForRemotes', () => {
-  test('returns the branch URL for the preferred remote', () => {
+  test('returns the branch URL for the preferred remote', async () => {
     expect(
       getRepoUrlForRemotes([remote('origin', 'git@github.com:acme/project.git')], {
         type: 'branch',
@@ -242,7 +242,7 @@ describe('getRepoUrlForRemotes', () => {
     ).toBe('https://github.com/acme/project/tree/feature/test')
   })
 
-  test('prefers the configured upstream remote when present', () => {
+  test('prefers the configured upstream remote when present', async () => {
     expect(
       getRepoUrlForRemotes(
         [remote('origin', 'git@github.com:acme/origin.git'), remote('fork', 'git@github.com:acme/fork.git')],
@@ -252,7 +252,7 @@ describe('getRepoUrlForRemotes', () => {
     ).toBe('https://github.com/acme/fork/tree/topic')
   })
 
-  test('returns null when no remotes are configured', () => {
+  test('returns null when no remotes are configured', async () => {
     expect(getRepoUrlForRemotes([], { type: 'branch', branch: 'main' })).toBeNull()
   })
 })
@@ -261,7 +261,7 @@ describe('resolvePushTargetForRemotes', () => {
   const origin = remote('origin')
   const fork = remote('fork')
 
-  test('prefers an existing upstream remote and branch', () => {
+  test('prefers an existing upstream remote and branch', async () => {
     expect(
       resolvePushTargetForRemotes([origin, fork], { remote: 'fork', branch: 'topic/feature-test' }, 'feature/test'),
     ).toEqual({
@@ -271,7 +271,7 @@ describe('resolvePushTargetForRemotes', () => {
     })
   })
 
-  test('falls back to origin and sets upstream when no upstream is configured', () => {
+  test('falls back to origin and sets upstream when no upstream is configured', async () => {
     expect(resolvePushTargetForRemotes([origin, fork], null, 'feature/test')).toEqual({
       remote: 'origin',
       branch: 'feature/test',
@@ -279,7 +279,7 @@ describe('resolvePushTargetForRemotes', () => {
     })
   })
 
-  test('falls back to the sole remote when origin is absent', () => {
+  test('falls back to the sole remote when origin is absent', async () => {
     expect(resolvePushTargetForRemotes([fork], null, 'feature/test')).toEqual({
       remote: 'fork',
       branch: 'feature/test',
@@ -287,21 +287,21 @@ describe('resolvePushTargetForRemotes', () => {
     })
   })
 
-  test('reports an ambiguous remote when multiple remotes exist without origin or upstream', () => {
+  test('reports an ambiguous remote when multiple remotes exist without origin or upstream', async () => {
     expect(resolvePushTargetForRemotes([fork, remote('backup')], null, 'feature/test')).toEqual({
       ok: false,
       message: 'error.push-ambiguous-remote',
     })
   })
 
-  test('reports no remote when none are configured', () => {
+  test('reports no remote when none are configured', async () => {
     expect(resolvePushTargetForRemotes([], null, 'feature/test')).toEqual({
       ok: false,
       message: 'error.push-no-remote',
     })
   })
 
-  test('falls back when the configured upstream remote no longer exists', () => {
+  test('falls back when the configured upstream remote no longer exists', async () => {
     expect(
       resolvePushTargetForRemotes([origin], { remote: 'fork', branch: 'topic/feature-test' }, 'feature/test'),
     ).toEqual({
@@ -316,19 +316,19 @@ describe('resolveFetchRemoteForRemotes', () => {
   const origin = remote('origin')
   const fork = remote('fork')
 
-  test('prefers the upstream remote when present', () => {
+  test('prefers the upstream remote when present', async () => {
     expect(resolveFetchRemoteForRemotes([origin, fork], { remote: 'fork', branch: 'feature/test' })).toBe('fork')
   })
 
-  test('falls back to origin when upstream is absent', () => {
+  test('falls back to origin when upstream is absent', async () => {
     expect(resolveFetchRemoteForRemotes([origin, fork], null)).toBe('origin')
   })
 
-  test('falls back to the sole remote when origin is absent', () => {
+  test('falls back to the sole remote when origin is absent', async () => {
     expect(resolveFetchRemoteForRemotes([fork], null)).toBe('fork')
   })
 
-  test('returns null when no remotes exist', () => {
+  test('returns null when no remotes exist', async () => {
     expect(resolveFetchRemoteForRemotes([], null)).toBeNull()
   })
 })

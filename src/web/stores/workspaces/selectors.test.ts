@@ -21,7 +21,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 
 describe('workspace selectors', () => {
-  test('builds explicit runtime-coherent and local state slices from store fields', () => {
+  test('builds explicit runtime-coherent and local state slices from store fields', async () => {
     expect(
       runtimeCoherentWorkspaceStateFromStore({
         workspaces: {
@@ -39,7 +39,7 @@ describe('workspace selectors', () => {
     })
   })
 
-  test('builds restorable workspace state from store fields', () => {
+  test('builds restorable workspace state from store fields', async () => {
     expect(
       restorableWorkspaceStateFromStore({
         workspaceOrder: [WORKSPACE_ID],
@@ -63,7 +63,7 @@ describe('workspace selectors', () => {
     })
   })
 
-  test('compares action bundles by function identity', () => {
+  test('compares action bundles by function identity', async () => {
     const fnA = () => {}
     expect(
       restorableWorkspaceLayoutStoreActionsFromStore({
@@ -137,7 +137,7 @@ describe('workspace selectors', () => {
     })
   })
 
-  test('builds keyboard runtime state from the current workspace selection', () => {
+  test('builds keyboard runtime state from the current workspace selection', async () => {
     expect(
       keyboardRuntimeStateFromStore(
         {
@@ -164,7 +164,7 @@ describe('workspace selectors', () => {
     })
   })
 
-  test('derives workspace restore status from membership and persistence gates', () => {
+  test('derives workspace restore status from membership and persistence gates', async () => {
     expect(
       workspaceRestoreStatusFromStore({
         workspaceMembershipReady: false,
@@ -195,7 +195,7 @@ describe('workspace selectors', () => {
     ).toBe('ready')
   })
 
-  test('opens session persistence only after workspace restore is ready', () => {
+  test('opens session persistence only after workspace restore is ready', async () => {
     expect(
       workspaceSessionPersistenceOpenFromStore({
         workspaceMembershipReady: true,

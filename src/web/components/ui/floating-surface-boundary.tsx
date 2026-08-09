@@ -1,43 +1,80 @@
-import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
+import { defineComponent, inject, onMounted, onScopeDispose, provide, ref, toValue, watch } from 'vue'
+import type { InjectionKey, MaybeRefOrGetter } from 'vue'
 
 interface FloatingSurfaceBoundaryContextValue {
   registerOpenSurface: () => () => void
 }
 
 interface FloatingSurfaceBoundaryProps {
-  children: ReactNode
   onPinnedChange?: (pinned: boolean) => void
 }
 
-const FloatingSurfaceBoundaryContext = createContext<FloatingSurfaceBoundaryContextValue | null>(null)
+const floatingSurfaceBoundaryKey: InjectionKey<FloatingSurfaceBoundaryContextValue> =
+  Symbol('floating-surface-boundary')
 
-export function FloatingSurfaceBoundary({ children, onPinnedChange }: FloatingSurfaceBoundaryProps) {
-  const [openDescendantCount, setOpenDescendantCount] = useState(0)
-  const pinned = openDescendantCount > 0
-  const registerOpenSurface = useCallback(() => {
-    let registered = true
-    setOpenDescendantCount((count) => count + 1)
+const FloatingSurfaceBoundary = defineComponent<FloatingSurfaceBoundaryProps>(
+  (props, { slots }) => {
+    const openDescendantCount = ref(0)
+    let mounted = false
+    let lastPinned: boolean | undefined
 
-    return () => {
-      if (!registered) return
-      registered = false
-      setOpenDescendantCount((count) => Math.max(0, count - 1))
+    function notifyPinnedChange(): void {
+      if (!mounted) return
+      const pinned = openDescendantCount.value > 0
+      if (pinned === lastPinned) return
+      lastPinned = pinned
+      props.onPinnedChange?.(pinned)
     }
-  }, [])
-  const value = useMemo<FloatingSurfaceBoundaryContextValue>(() => ({ registerOpenSurface }), [registerOpenSurface])
 
-  useLayoutEffect(() => {
-    onPinnedChange?.(pinned)
-  }, [onPinnedChange, pinned])
+    function registerOpenSurface(): () => void {
+      let registered = true
+      openDescendantCount.value += 1
+      notifyPinnedChange()
 
-  return <FloatingSurfaceBoundaryContext value={value}>{children}</FloatingSurfaceBoundaryContext>
+      return () => {
+        if (!registered) return
+        registered = false
+        openDescendantCount.value = Math.max(0, openDescendantCount.value - 1)
+        notifyPinnedChange()
+      }
+    }
+
+    provide(floatingSurfaceBoundaryKey, { registerOpenSurface })
+    onMounted(() => {
+      mounted = true
+      notifyPinnedChange()
+    })
+
+    return () => slots.default?.()
+  },
+  {
+    name: 'FloatingSurfaceBoundary',
+    props: ['onPinnedChange'],
+  },
+)
+
+export function useFloatingSurfaceBoundaryPin(open: MaybeRefOrGetter<boolean>): void {
+  const boundary = inject(floatingSurfaceBoundaryKey, null)
+  let unregister: (() => void) | undefined
+
+  function release(): void {
+    unregister?.()
+    unregister = undefined
+  }
+
+  // A controlled Popover can change `open` without emitting an update event,
+  // so this is the one state edge that must be observed rather than handled
+  // only by the Popover's own events.
+  watch(
+    () => toValue(open),
+    (nextOpen) => {
+      release()
+      if (nextOpen && boundary) unregister = boundary.registerOpenSurface()
+    },
+    { immediate: true, flush: 'sync' },
+  )
+  onScopeDispose(release)
 }
 
-export function useFloatingSurfaceBoundaryPin(open: boolean) {
-  const boundary = useContext(FloatingSurfaceBoundaryContext)
-
-  useLayoutEffect(() => {
-    if (!open || !boundary) return
-    return boundary.registerOpenSurface()
-  }, [boundary, open])
-}
+export { FloatingSurfaceBoundary }
+export type { FloatingSurfaceBoundaryProps }

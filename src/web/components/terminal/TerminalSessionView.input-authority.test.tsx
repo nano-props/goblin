@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/terminal-snapshot.ts'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
+  TerminalSessionCommandScope,
+  TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import {
@@ -82,16 +82,16 @@ describe('TerminalSessionView input authority', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
@@ -184,16 +184,16 @@ describe('TerminalSessionView input authority', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
@@ -210,7 +210,7 @@ describe('TerminalSessionView input authority', () => {
       Object.defineProperty(dragOver, 'dataTransfer', { value: dataTransfer })
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
-      await act(async () => {
+      await flushTestUpdates(async () => {
         sessionRoot.dispatchEvent(dragEnter)
         sessionRoot.dispatchEvent(dragOver)
         sessionRoot.dispatchEvent(dropEvent)
@@ -308,16 +308,16 @@ describe('TerminalSessionView input authority', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
@@ -328,7 +328,7 @@ describe('TerminalSessionView input authority', () => {
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         sessionRoot.dispatchEvent(dropEvent)
         // processDrop -> resolvePastedFiles -> setTimeout-free, but
         // the handler awaits a Promise chain. Let it drain.
@@ -358,7 +358,7 @@ describe('TerminalSessionView input authority', () => {
     //
     // jsdom does not implement ClipboardEvent, so we synthesise one:
     // a plain Event with `clipboardData` grafted on via defineProperty,
-    // bubbling so it reaches the session's React listener. We only need
+    // bubbling so it reaches the session's DOM listener. We only need
     // a `files`-like accessor for the paste handler's happy/early-exit
     // paths.
     const writeInput = vi.fn()
@@ -421,16 +421,16 @@ describe('TerminalSessionView input authority', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
@@ -439,7 +439,7 @@ describe('TerminalSessionView input authority', () => {
       const clipboardData = clipboardDataWithFiles([file])
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
-      await act(async () => {
+      await flushTestUpdates(async () => {
         sessionRoot.dispatchEvent(pasteEvent)
         await waitForNextMacrotask()
       })
@@ -518,16 +518,16 @@ describe('TerminalSessionView input authority', () => {
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
@@ -537,7 +537,7 @@ describe('TerminalSessionView input authority', () => {
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardData })
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         sessionRoot.dispatchEvent(pasteEvent)
         await waitForNextMacrotask()
       })

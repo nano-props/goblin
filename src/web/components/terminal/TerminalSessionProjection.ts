@@ -97,7 +97,7 @@ type AcceptedTerminalRetirementListener = (retirement: AcceptedTerminalRetiremen
  * liveness from its local session map.
  *
  * **Lifetime**: client-level singleton — one instance per client process,
- * independent of React provider mounts, that lives until process teardown.
+ * independent of Vue provider mounts, that lives until process teardown.
  * This matches its ownership of cross-cutting session projection, selection,
  * notification, and command-admission state.
  *
@@ -165,7 +165,7 @@ export class TerminalSessionProjection {
   // echoes that arrive before the close command settles.
   private readonly closeOperationByRuntimeBindingKey = new Map<string, TerminalCloseOperation>()
   // Selector publication caches only. They memoize lightweight UI snapshots
-  // for React subscribers and do not contain terminal render buffers.
+  // for view subscribers and do not contain terminal render buffers.
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
   private readonly filesystemTargetSnapshotCache = new Map<string, TerminalFilesystemTargetSnapshot>()
   private readonly filesystemTargetListeners = new Map<string, Set<() => void>>()

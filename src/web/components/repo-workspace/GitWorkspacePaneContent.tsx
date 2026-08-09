@@ -1,27 +1,25 @@
-import { useT } from '#/web/stores/i18n.ts'
+import { defineComponent } from 'vue'
 import { EmptyState } from '#/web/components/Layout.tsx'
+import { RepoReadNotice } from '#/web/components/RepoReadNotice.tsx'
+import { Button } from '#/web/components/ui/button.tsx'
+import { renderGitWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 import type {
   CurrentGitWorkspacePanePresentation,
   GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import type {
-  WorkspacePaneTabModel,
-  WorkspacePaneTab,
-  WorkspacePaneSelection,
-  WorkspacePaneRuntimeTabStateByType,
-} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import {
-  workspacePaneRuntimeTabProvider,
-  workspacePaneStaticTabProvider,
-  type WorkspacePanePanelLabel,
-} from '#/web/workspace-pane/tab-providers.ts'
-import { renderGitWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
-import { RepoReadNotice } from '#/web/components/RepoReadNotice.tsx'
 import type { RepoReadFailure } from '#/web/repo-read-failure.ts'
-import { Button } from '#/web/components/ui/button.tsx'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
+import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
+import type {
+  WorkspacePaneRuntimeTabStateByType,
+  WorkspacePaneSelection,
+  WorkspacePaneTab,
+  WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 
-interface Props {
+interface GitWorkspacePaneContentProps {
   repo: Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'snapshot' | 'status' | 'ui' | 'probe'>
   detail: CurrentGitWorkspacePanePresentation
   workspacePaneId: string
@@ -31,88 +29,95 @@ interface Props {
   onBackToBranchNavigator?: () => void
 }
 
-// Pure view: the workspace pane body is derived from the repos store's
-// target-scoped preferred tab and the live terminal session truth. The store
-// never re-projects on snapshot refresh, branch switch, or session restore.
-// The tab model keeps the body render target separate from the active
-// materialized tab.
-export function GitWorkspacePaneContent({
-  repo,
-  detail,
-  workspacePaneId,
-  workspacePaneTabModel,
-  readFailures = [],
-  onRetryStatus,
-  onBackToBranchNavigator,
-}: Props) {
-  const t = useT()
-  const compact = useIsCompactUi()
-  const { branch } = detail
-  const selection = workspacePaneTabModel.selection
-  const renderedTab = selection?.tab ?? null
-  const statusFailure: RepoReadFailure | null =
-    (renderedTab === 'status' || renderedTab === 'changes') && detail.errors.status
-      ? {
-          message: detail.errors.status,
-          stale: detail.stale.status,
-          retrying: detail.loading.status,
-          retry: onRetryStatus,
-        }
-      : null
-  const visibleReadFailures = [...readFailures, statusFailure].filter((failure) => failure !== null)
-  const panelLabel = workspacePanePanelLabel({
-    selection,
-    tabs: workspacePaneTabModel.tabs,
-    workspacePaneId,
-    compact,
-    t,
-    runtimeTabStateByType: workspacePaneTabModel.runtimeTabStateByType,
-  })
-  if (!branch) {
-    const missingRoutedBranch = repo.ui.currentBranchName !== null
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <RepoReadNotice failures={visibleReadFailures} />
-        <EmptyState
-          title={t(missingRoutedBranch ? 'branches.missing' : 'branches.empty')}
-          body={
-            compact && missingRoutedBranch && onBackToBranchNavigator ? (
-              <Button type="button" variant="outline" size="sm" onClick={onBackToBranchNavigator}>
-                {t('branches.back-to-list')}
-              </Button>
-            ) : undefined
-          }
-        />
-      </div>
-    )
-  }
+// Pure view: the workspace pane body is derived from the workspace store's
+// target-scoped preferred tab and live terminal truth.
+export const GitWorkspacePaneContent = defineComponent(
+  (props: GitWorkspacePaneContentProps) => {
+    const t = useT()
+    const compact = useIsCompactUi()
 
-  if (!selection) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <RepoReadNotice failures={visibleReadFailures} />
-        <EmptyState title={t('workspace-pane-tabs.empty')} />
-      </div>
-    )
-  }
+    return () => {
+      const { branch } = props.detail
+      const selection = props.workspacePaneTabModel.selection
+      const renderedTab = selection?.tab ?? null
+      const statusFailure: RepoReadFailure | null =
+        (renderedTab === 'status' || renderedTab === 'changes') && props.detail.errors.status
+          ? {
+              message: props.detail.errors.status,
+              stale: props.detail.stale.status,
+              retrying: props.detail.loading.status,
+              retry: props.onRetryStatus,
+            }
+          : null
+      const visibleReadFailures = [...(props.readFailures ?? []), statusFailure].filter((failure) => failure !== null)
+      const panelLabel = workspacePanePanelLabel({
+        selection,
+        tabs: props.workspacePaneTabModel.tabs,
+        workspacePaneId: props.workspacePaneId,
+        compact: compact.value,
+        t,
+        runtimeTabStateByType: props.workspacePaneTabModel.runtimeTabStateByType,
+      })
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <RepoReadNotice failures={visibleReadFailures} />
-      {renderedTab
-        ? renderGitWorkspacePanePanel({
-            type: renderedTab,
-            repo,
-            detail,
-            workspacePaneId,
-            panelLabel,
-            selection,
-            runtimeTabStateByType: workspacePaneTabModel.runtimeTabStateByType,
-          })
-        : null}
-    </div>
-  )
-}
+      if (!branch) {
+        const missingRoutedBranch = props.repo.ui.currentBranchName !== null
+        return (
+          <div class="flex min-h-0 flex-1 flex-col">
+            <RepoReadNotice failures={visibleReadFailures} />
+            <EmptyState
+              title={t(missingRoutedBranch ? 'branches.missing' : 'branches.empty')}
+              body={
+                compact.value && missingRoutedBranch && props.onBackToBranchNavigator ? (
+                  <Button type="button" variant="outline" size="sm" onClick={props.onBackToBranchNavigator}>
+                    {t('branches.back-to-list')}
+                  </Button>
+                ) : undefined
+              }
+            />
+          </div>
+        )
+      }
+
+      if (!selection) {
+        return (
+          <div class="flex min-h-0 flex-1 flex-col">
+            <RepoReadNotice failures={visibleReadFailures} />
+            <EmptyState title={t('workspace-pane-tabs.empty')} />
+          </div>
+        )
+      }
+
+      return (
+        <div class="flex min-h-0 flex-1 flex-col">
+          <RepoReadNotice failures={visibleReadFailures} />
+          {renderedTab
+            ? renderGitWorkspacePanePanel({
+                type: renderedTab,
+                repo: props.repo,
+                detail: props.detail,
+                workspacePaneId: props.workspacePaneId,
+                panelLabel,
+                selection,
+                runtimeTabStateByType: props.workspacePaneTabModel.runtimeTabStateByType,
+              })
+            : null}
+        </div>
+      )
+    }
+  },
+  {
+    name: 'GitWorkspacePaneContent',
+    props: [
+      'repo',
+      'detail',
+      'workspacePaneId',
+      'workspacePaneTabModel',
+      'readFailures',
+      'onRetryStatus',
+      'onBackToBranchNavigator',
+    ],
+  },
+)
 
 function workspacePanePanelLabel(input: {
   selection: WorkspacePaneSelection | null
@@ -137,9 +142,7 @@ function workspacePanePanelLabel(input: {
     return { labelledById: workspacePaneStaticTabProvider(tab.type).buttonId(input.workspacePaneId) }
   }
   const pendingTab = input.tabs.find((candidate) => candidate.kind === 'pending')
-  if (pendingTab) {
-    return { labelledById: `${input.workspacePaneId}-${pendingTab.type}-pending-tab` }
-  }
+  if (pendingTab) return { labelledById: `${input.workspacePaneId}-${pendingTab.type}-pending-tab` }
   if (input.selection?.kind !== 'runtime-host') return { label: input.t('workspace-pane-tabs.tabs') }
   const runtimeState = input.runtimeTabStateByType[input.selection.runtimeType]
   return {

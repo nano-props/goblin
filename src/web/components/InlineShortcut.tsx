@@ -1,3 +1,4 @@
+import type { FunctionalComponent, HTMLAttributes } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
 
 interface InlineShortcutProps {
@@ -5,26 +6,23 @@ interface InlineShortcutProps {
   /** When true, the shortcut is hidden until the parent element is hovered.
    * The parent must have the `group` class (or another group utility). */
   showOnHover?: boolean
-  className?: string
-  'aria-hidden'?: boolean
+  class?: HTMLAttributes['class']
+  ariaHidden?: boolean
 }
 
-export function InlineShortcut({
-  shortcut,
-  showOnHover = false,
-  className,
-  'aria-hidden': ariaHidden,
-}: InlineShortcutProps) {
+export const InlineShortcut: FunctionalComponent<InlineShortcutProps> = (props) => {
   return (
     <span
-      aria-hidden={ariaHidden}
-      className={cn(
+      aria-hidden={props.ariaHidden}
+      class={cn(
         'ml-auto min-w-6 pl-8 text-right text-xs tracking-widest text-muted-foreground',
-        showOnHover && 'opacity-0 transition-opacity duration-100 group-hover:opacity-100',
-        className,
+        props.showOnHover && 'opacity-0 transition-opacity duration-100 group-hover:opacity-100',
+        props.class,
       )}
     >
-      {shortcut}
+      {props.shortcut}
     </span>
   )
 }
+InlineShortcut.props = ['shortcut', 'showOnHover', 'class', 'ariaHidden']
+InlineShortcut.inheritAttrs = false

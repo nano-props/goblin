@@ -1,36 +1,44 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { computed, defineComponent, inject, provide } from 'vue'
+import type { ComputedRef, InjectionKey } from 'vue'
 import { useIsSmallScreen } from '#/web/hooks/useIsSmallScreen.ts'
 
 export type ResponsiveUiMode = 'default' | 'compact'
+
 interface ResponsiveUiContextValue {
-  mode: ResponsiveUiMode
-  compact: boolean
+  mode: ComputedRef<ResponsiveUiMode>
+  compact: ComputedRef<boolean>
 }
 
-const ResponsiveUiContext = createContext<ResponsiveUiContextValue | null>(null)
+const responsiveUiKey: InjectionKey<ResponsiveUiContextValue> = Symbol('responsive-ui')
 
-export function ResponsiveUiProvider({ children }: { children: ReactNode }) {
-  const isSmallScreen = useIsSmallScreen()
-  const value = useMemo<ResponsiveUiContextValue>(
-    () => ({
-      mode: isSmallScreen ? 'compact' : 'default',
-      compact: isSmallScreen,
-    }),
-    [isSmallScreen],
-  )
-  return <ResponsiveUiContext value={value}>{children}</ResponsiveUiContext>
-}
+const ResponsiveUiProvider = defineComponent(
+  (_props, { slots }) => {
+    const compact = useIsSmallScreen()
+    const mode = computed<ResponsiveUiMode>(() => (compact.value ? 'compact' : 'default'))
+    provide(responsiveUiKey, { mode, compact })
+
+    return () => slots.default?.()
+  },
+  { name: 'ResponsiveUiProvider' },
+)
 
 export function useResponsiveUi(): ResponsiveUiContextValue {
-  const context = useContext(ResponsiveUiContext)
-  const isSmallScreen = useIsSmallScreen()
-  return context ?? { mode: isSmallScreen ? 'compact' : 'default', compact: isSmallScreen }
+  const context = inject(responsiveUiKey, null)
+  if (context) return context
+
+  const compact = useIsSmallScreen()
+  return {
+    compact,
+    mode: computed<ResponsiveUiMode>(() => (compact.value ? 'compact' : 'default')),
+  }
 }
 
-export function useResponsiveUiMode(): ResponsiveUiMode {
+export function useResponsiveUiMode(): ComputedRef<ResponsiveUiMode> {
   return useResponsiveUi().mode
 }
 
-export function useIsCompactUi(): boolean {
+export function useIsCompactUi(): ComputedRef<boolean> {
   return useResponsiveUi().compact
 }
+
+export { ResponsiveUiProvider }

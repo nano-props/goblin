@@ -1,5 +1,3 @@
-import { useCallback, useMemo, useRef } from 'react'
-
 export interface FocusRegistry<TKey extends string = string, TElement extends HTMLElement = HTMLElement> {
   setRef: (key: TKey) => (node: TElement | null) => void
   getRef: (key: TKey) => TElement | null
@@ -10,26 +8,19 @@ export function useFocusRegistry<TKey extends string, TElement extends HTMLEleme
   TKey,
   TElement
 > {
-  const nodesRef = useRef(new Map<TKey, TElement>())
+  const nodes = new Map<TKey, TElement>()
 
-  const setRef = useCallback(
-    (key: TKey) => (node: TElement | null) => {
+  return {
+    setRef: (key) => (node) => {
       if (node) {
-        nodesRef.current.set(key, node)
+        nodes.set(key, node)
         return
       }
-      nodesRef.current.delete(key)
+      nodes.delete(key)
     },
-    [],
-  )
-
-  const getRef = useCallback((key: TKey) => nodesRef.current.get(key) ?? null, [])
-
-  const focus = useCallback((key: TKey, options?: FocusOptions) => {
-    window.requestAnimationFrame(() => {
-      nodesRef.current.get(key)?.focus(options)
-    })
-  }, [])
-
-  return useMemo(() => ({ setRef, getRef, focus }), [focus, getRef, setRef])
+    getRef: (key) => nodes.get(key) ?? null,
+    focus: (key, options) => {
+      window.requestAnimationFrame(() => nodes.get(key)?.focus(options))
+    },
+  }
 }

@@ -1,28 +1,11 @@
-import { useEffect, useState, type RefObject } from 'react'
+import { computed, toValue } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter, Ref } from 'vue'
+import { useElementSize } from '@vueuse/core'
 
-export function useElementInlineSize(ref: RefObject<HTMLElement | null>, enabled: boolean): number | null {
-  const [inlineSize, setInlineSize] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (!enabled) return
-    const element = ref.current
-    if (!element) return
-
-    const update = (next: number) => {
-      if (next <= 0) return
-      setInlineSize((current) => (current !== null && Math.abs(current - next) <= 0.5 ? current : next))
-    }
-
-    update(element.getBoundingClientRect().width)
-    if (typeof ResizeObserver === 'undefined') return
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]
-      if (entry) update(entry.contentRect.width)
-    })
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [enabled, ref])
-
-  return inlineSize
+export function useElementInlineSize(
+  element: Ref<HTMLElement | null>,
+  enabled: MaybeRefOrGetter<boolean>,
+): ComputedRef<number | null> {
+  const { width } = useElementSize(element)
+  return computed(() => (toValue(enabled) && width.value > 0 ? width.value : null))
 }

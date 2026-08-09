@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
+import { defineComponent, onScopeDispose } from 'vue'
+import type { FunctionalComponent } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { Check, Circle, GitPullRequest, RefreshCw, X } from 'lucide-react'
+import { Check, Circle, GitPullRequest, RefreshCw, X } from '@lucide/vue'
 import { throttle } from 'es-toolkit'
-import { useI18nStore, useT } from '#/web/stores/i18n.ts'
+import { i18nStore } from '#/web/stores/i18n.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import {
@@ -12,19 +14,21 @@ import {
 } from '#/web/components/ui/tooltip.tsx'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { cn } from '#/web/lib/cn.ts'
-import { prChipTone, visiblePrHealthSignals, type PrHealthSignal } from '#/web/components/repo-workspace/pr-status.ts'
+import { prChipTone, visiblePrHealthSignals } from '#/web/components/repo-workspace/pr-status.ts'
+import type { PrHealthSignal } from '#/web/components/repo-workspace/pr-status.ts'
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import {
   STATUS_INLINE_GROUP_CLASS,
   ClickableStatusChip,
   StatusChip,
   StatusRow,
-  type Tone,
 } from '#/web/components/workspace-pane/status-ui.tsx'
+import type { Tone } from '#/web/components/workspace-pane/status-ui.tsx'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
-import type { Lang } from '#/shared/api-types.ts'
+import type { Lang } from '#/shared/settings.ts'
 import type { PullRequestReadPresentation } from '#/web/components/repo-workspace/model.ts'
 import { Button } from '#/web/components/ui/button.tsx'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 type TFn = (key: string, params?: Record<string, string | number>) => string
 type TooltipSide = 'top' | 'right' | 'bottom' | 'left'
 const PR_STATE_LABEL_KEYS: Record<PullRequestInfo['state'], string> = {
@@ -93,9 +97,9 @@ function PrSignalIcon({ tone }: { tone: PrHealthSignal['tone'] }) {
 
 function PrSignalChip({ signal }: { signal: PrHealthSignal }) {
   return (
-    <StatusChip tone={signal.tone} className="min-w-0 shrink">
+    <StatusChip tone={signal.tone} class="min-w-0 shrink">
       <PrSignalIcon tone={signal.tone} />
-      <span className="truncate">{signal.label}</span>
+      <span class="truncate">{signal.label}</span>
     </StatusChip>
   )
 }
@@ -114,18 +118,7 @@ function prTooltip(pr: PullRequestInfo, lang: Lang, t: TFn): { title: string; me
   }
 }
 
-function PullRequestValue({
-  summary,
-  summaryTone,
-  signals,
-  tooltip,
-  url,
-  copyLabel,
-  copiedLabel,
-  openExternallyLabel,
-  tooltipSide,
-  onOpenExternally,
-}: {
+interface PullRequestValueProps {
   summary: string
   summaryTone: Tone
   signals: PrHealthSignal[]
@@ -136,20 +129,33 @@ function PullRequestValue({
   openExternallyLabel: string
   tooltipSide: TooltipSide
   onOpenExternally: () => void
-}) {
+}
+
+const PullRequestValue: FunctionalComponent<PullRequestValueProps> = ({
+  summary,
+  summaryTone,
+  signals,
+  tooltip,
+  url,
+  copyLabel,
+  copiedLabel,
+  openExternallyLabel,
+  tooltipSide,
+  onOpenExternally,
+}) => {
   const tooltipAlign = tooltipSide === 'bottom' ? 'center' : 'end'
-  // Radix Tooltip exposes the available-width var; the fallback keeps the
+  // Reka Tooltip exposes the available-width var; the fallback keeps the
   // CSS valid if the implementation ever stops providing it.
-  const tooltipContentClass = `max-w-[min(24rem,calc(100vw-2rem),var(--radix-tooltip-content-available-width,calc(100vw-2rem)))] ${TOOLTIP_STACK_MD_CLASS}`
+  const tooltipContentClass = `max-w-[min(24rem,calc(100vw-2rem),var(--reka-tooltip-content-available-width,calc(100vw-2rem)))] ${TOOLTIP_STACK_MD_CLASS}`
   return (
-    <div className={STATUS_INLINE_GROUP_CLASS}>
+    <div class={STATUS_INLINE_GROUP_CLASS}>
       <Tip
         label={
-          <div className={tooltipContentClass}>
-            <div className="overflow-hidden break-words font-medium leading-snug [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+          <div class={tooltipContentClass}>
+            <div class="overflow-hidden break-words font-medium leading-snug [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
               {tooltip.title}
             </div>
-            <div className={cn(TOOLTIP_STACK_SM_CLASS, 'whitespace-pre-line break-words', TOOLTIP_META_TEXT_CLASS)}>
+            <div class={cn(TOOLTIP_STACK_SM_CLASS, 'whitespace-pre-line break-words', TOOLTIP_META_TEXT_CLASS)}>
               {tooltip.meta.map((line) => (
                 <div key={line}>{line}</div>
               ))}
@@ -160,124 +166,140 @@ function PullRequestValue({
         align={tooltipAlign}
         collisionPadding={16}
       >
-        <div className="flex min-w-0 max-w-full items-center gap-1.5">
+        <div class="flex min-w-0 max-w-full items-center gap-1.5">
           <ClickableStatusChip
             tone={summaryTone}
-            className="min-w-0 shrink"
+            class="min-w-0 shrink"
             data-pull-request-link=""
             title={openExternallyLabel}
             onClick={onOpenExternally}
           >
-            <span className="truncate">{summary}</span>
+            <span class="truncate">{summary}</span>
           </ClickableStatusChip>
           {signals.map((signal) => (
             <PrSignalChip key={`${signal.tone}:${signal.label}`} signal={signal} />
           ))}
         </div>
       </Tip>
-      <CopyButton value={url} copyLabel={copyLabel} copiedLabel={copiedLabel} className="shrink-0" />
+      <CopyButton value={url} copyLabel={copyLabel} copiedLabel={copiedLabel} class="shrink-0" />
     </div>
   )
 }
+PullRequestValue.props = [
+  'summary',
+  'summaryTone',
+  'signals',
+  'tooltip',
+  'url',
+  'copyLabel',
+  'copiedLabel',
+  'openExternallyLabel',
+  'tooltipSide',
+  'onOpenExternally',
+]
+PullRequestValue.inheritAttrs = false
 
-export function PullRequestStatusRow({
-  repoId,
-  workspaceRuntimeId,
-  branchName,
-  pullRequest,
-  read,
-  tooltipSide = 'right',
-}: {
+interface PullRequestStatusRowProps {
   repoId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string
   pullRequest: PullRequestInfo | undefined
   read: PullRequestReadPresentation
   tooltipSide?: TooltipSide
-}) {
-  const t = useT()
-  const lang = useI18nStore((s) => s.lang)
-  // Leading-edge throttle absorbs accidental double-clicks (mouse bounce,
-  // jitter while the OS shell steals focus). Mirrors the
-  // `runUiAction('remote', ...)` re-entrance gate the toolbar's "Open
-  // Externally" entry already uses. `{ edges: ['leading'] }` keeps the
-  // window trailing-edge silent — a delayed re-fire after the OS hands
-  // the URL off would just open a duplicate tab.
-  const handleOpenExternally = useMemo(
-    () =>
-      throttle(
-        () => {
-          void openBranchExternalTarget(repoId, workspaceRuntimeId, { name: branchName, pullRequest }).catch(() => {})
-        },
-        500,
-        { edges: ['leading'] },
-      ),
-    [repoId, workspaceRuntimeId, branchName, pullRequest],
-  )
-  if (!pullRequest) {
-    const labelKey =
-      read.state === 'pending'
-        ? 'branch-status.pr.pending'
-        : read.state === 'unavailable'
-          ? 'branch-status.pr.unavailable'
-          : read.state === 'error'
-            ? 'branch-status.pr.failed'
-            : 'branch-status.pr.none'
-    return (
-      <StatusRow
-        icon={<GitPullRequest size={14} />}
-        label={t('branch-status.signal.pr')}
-        value={
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">{t(labelKey)}</span>
-            {(read.state === 'error' || read.stale) && (
-              <Button type="button" size="sm" variant="ghost" disabled={read.retrying} onClick={read.retry}>
-                <RefreshCw className={read.retrying ? 'animate-spin' : undefined} />
-                {t('error.try-again')}
-              </Button>
-            )}
-          </div>
-        }
-        valueLayout="fill"
-        tone={read.state === 'error' ? 'danger' : 'neutral'}
-      />
-    )
-  }
-
-  const signals = prHealthSignals(pullRequest, t)
-  const tone = prChipTone(pullRequest, signals)
-  const summary = prSummary(pullRequest, t)
-  const summaryTone = prSummaryTone(pullRequest)
-  const tooltip = prTooltip(pullRequest, lang, t)
-
-  return (
-    <StatusRow
-      icon={<GitPullRequest size={14} />}
-      label={t('branch-status.signal.pr')}
-      value={
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <PullRequestValue
-            summary={summary}
-            summaryTone={summaryTone}
-            signals={signals}
-            tooltip={tooltip}
-            url={pullRequest.url}
-            copyLabel={t('branch-status.pr.copy-link')}
-            copiedLabel={t('branch-status.copied')}
-            openExternallyLabel={t('branch-status.pr.open-externally')}
-            tooltipSide={tooltipSide}
-            onOpenExternally={handleOpenExternally}
-          />
-          {read.stale && (
-            <Button type="button" size="sm" variant="ghost" disabled={read.retrying} onClick={read.retry}>
-              <RefreshCw className={read.retrying ? 'animate-spin' : undefined} />
-              {t('error.try-again')}
-            </Button>
-          )}
-        </div>
-      }
-      valueLayout="fill"
-      tone={tone}
-    />
-  )
 }
+
+export const PullRequestStatusRow = defineComponent(
+  (props: PullRequestStatusRowProps) => {
+    const t = useT()
+    const lang = useStoreSelector(i18nStore, (state) => state.lang)
+    const throttleController = new AbortController()
+    // Leading-edge throttling absorbs accidental double-clicks while the OS
+    // opens the external URL. Reading props at invocation keeps it current.
+    const openExternally = throttle(
+      () => {
+        void openBranchExternalTarget(props.repoId, props.workspaceRuntimeId, {
+          name: props.branchName,
+          pullRequest: props.pullRequest,
+        }).catch(() => {})
+      },
+      500,
+      { edges: ['leading'], signal: throttleController.signal },
+    )
+    onScopeDispose(() => throttleController.abort('pull-request-status-row-unmounted'))
+
+    return () => {
+      const pullRequest = props.pullRequest
+      const read = props.read
+      if (!pullRequest) {
+        const labelKey =
+          read.state === 'pending'
+            ? 'branch-status.pr.pending'
+            : read.state === 'unavailable'
+              ? 'branch-status.pr.unavailable'
+              : read.state === 'error'
+                ? 'branch-status.pr.failed'
+                : 'branch-status.pr.none'
+        return (
+          <StatusRow
+            icon={<GitPullRequest size={14} />}
+            label={t('branch-status.signal.pr')}
+            value={
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-muted-foreground">{t(labelKey)}</span>
+                {read.state === 'error' || read.stale ? (
+                  <Button type="button" size="sm" variant="ghost" disabled={read.retrying} onClick={read.retry}>
+                    <RefreshCw class={read.retrying ? 'animate-spin' : undefined} />
+                    {t('error.try-again')}
+                  </Button>
+                ) : null}
+              </div>
+            }
+            valueLayout="fill"
+            tone={read.state === 'error' ? 'danger' : 'neutral'}
+          />
+        )
+      }
+
+      const signals = prHealthSignals(pullRequest, t)
+      const tone = prChipTone(pullRequest, signals)
+      const summary = prSummary(pullRequest, t)
+      const summaryTone = prSummaryTone(pullRequest)
+      const tooltip = prTooltip(pullRequest, lang.value, t)
+
+      return (
+        <StatusRow
+          icon={<GitPullRequest size={14} />}
+          label={t('branch-status.signal.pr')}
+          value={
+            <div class="flex min-w-0 flex-1 items-center gap-2">
+              <PullRequestValue
+                summary={summary}
+                summaryTone={summaryTone}
+                signals={signals}
+                tooltip={tooltip}
+                url={pullRequest.url}
+                copyLabel={t('branch-status.pr.copy-link')}
+                copiedLabel={t('branch-status.copied')}
+                openExternallyLabel={t('branch-status.pr.open-externally')}
+                tooltipSide={props.tooltipSide ?? 'right'}
+                onOpenExternally={openExternally}
+              />
+              {read.stale ? (
+                <Button type="button" size="sm" variant="ghost" disabled={read.retrying} onClick={read.retry}>
+                  <RefreshCw class={read.retrying ? 'animate-spin' : undefined} />
+                  {t('error.try-again')}
+                </Button>
+              ) : null}
+            </div>
+          }
+          valueLayout="fill"
+          tone={tone}
+        />
+      )
+    }
+  },
+  {
+    name: 'PullRequestStatusRow',
+    props: ['repoId', 'workspaceRuntimeId', 'branchName', 'pullRequest', 'read', 'tooltipSide'],
+  },
+)

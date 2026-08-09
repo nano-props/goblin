@@ -11,7 +11,7 @@ Normative rules for workspace-pane commands, queues, routing, and tests.
 - Runtime providers: the only live runtime-session membership authority.
 - Server aggregate: layout commands, target repair/retirement, and deterministic canonical projection.
 - Router: visible repo, branch, and pane route.
-- React Query: canonical-tab projection. Repo store: restorable preferences, selection, and opener facts.
+- TanStack Query: canonical-tab projection. Repo store: restorable preferences, selection, and opener facts.
 - Action queue: ordering only. Navigation generation: only the latest absolute navigation may publish a route result.
 
 Never mirror router currentness or infer server runtime validity from client timing.
@@ -21,7 +21,7 @@ Canonical tabs are a one-way projection:
 ```text
 durable static layout + authoritative repo target projection + epoch placement/index state + provider snapshots
 -> versioned WorkspacePaneTabsSnapshot
--> React Query projection
+-> TanStack Query projection
 ```
 
 The overlay may retain same-epoch placement hints for a temporarily missing runtime session, but it never creates membership or copies durable static order. A missing durable target may synthesize `status`; an explicitly persisted target with `tabs: []` remains empty.

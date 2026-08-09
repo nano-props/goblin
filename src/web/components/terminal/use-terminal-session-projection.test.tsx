@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
-import { StrictMode, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { renderHookInJsdom } from '#/test-utils/render.tsx'
+import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 import {
   getTerminalSessionProjection,
   setTerminalSessionProjectionForTests,
@@ -25,9 +24,9 @@ afterEach(() => {
 })
 
 describe('useTerminalSessionProjection', () => {
-  test('retains the client singleton across StrictMode and a component remount', () => {
-    const firstMount = renderHookInJsdom(() => useTerminalSessionProjection(), { wrapper: StrictModeHarness })
-    projectionForCleanup = firstMount.result.current
+  test('retains the client singleton across a component remount', async () => {
+    const firstMount = renderComposableInJsdom(() => useTerminalSessionProjection())
+    projectionForCleanup = firstMount.result.value
 
     expect(
       getTerminalSessionProjection({
@@ -36,13 +35,9 @@ describe('useTerminalSessionProjection', () => {
     ).toBe(projectionForCleanup)
 
     firstMount.unmount()
-    const secondMount = renderHookInJsdom(() => useTerminalSessionProjection(), { wrapper: StrictModeHarness })
+    const secondMount = renderComposableInJsdom(() => useTerminalSessionProjection())
 
-    expect(secondMount.result.current).toBe(projectionForCleanup)
+    expect(secondMount.result.value).toBe(projectionForCleanup)
     secondMount.unmount()
   })
 })
-
-function StrictModeHarness({ children }: { children: ReactNode }) {
-  return <StrictMode>{children}</StrictMode>
-}

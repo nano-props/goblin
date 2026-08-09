@@ -6,15 +6,16 @@ import {
   seedRepoWithReadModelForTest,
   createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { defineComponent } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 
-vi.mock('sonner', () => ({
+vi.mock('vue-sonner', () => ({
   toast: {
     error: vi.fn(),
     success: vi.fn(),
@@ -26,8 +27,8 @@ import {
   seedInitialObservedWorkspacePaneRouteForTest,
   type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
@@ -104,7 +105,7 @@ describe('useKeyboard', () => {
     document.body.appendChild(host)
     textarea.focus()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 'p', code: 'KeyP' }))
       await Promise.resolve()
     })
@@ -125,7 +126,7 @@ describe('useKeyboard', () => {
     })
     await Promise.resolve()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       document.body.dispatchEvent(keydown)
       await Promise.resolve()
     })
@@ -141,7 +142,7 @@ describe('useKeyboard', () => {
       onExitSettings,
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 'Escape' }))
       await Promise.resolve()
     })
@@ -173,7 +174,7 @@ describe('useKeyboard', () => {
       route: { kind: 'static', tab: 'status' },
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 'ArrowRight' }))
       await Promise.resolve()
     })
@@ -198,7 +199,7 @@ describe('useKeyboard', () => {
       },
     })
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
-      useWorkspacesStore.getState().setWorkspacePaneTab(repoId, branch, tab)
+      workspacesStore.getState().setWorkspacePaneTab(repoId, branch, tab)
       return true
     })
     await renderHookHost({
@@ -214,7 +215,7 @@ describe('useKeyboard', () => {
       route: { kind: 'static', tab: 'status' },
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 'ArrowRight' }))
       await Promise.resolve()
     })
@@ -243,7 +244,7 @@ describe('useKeyboard', () => {
       navigation: navigationWith({ selectRepoBranch }),
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 'j', code: 'KeyJ' }))
       await Promise.resolve()
     })
@@ -259,7 +260,7 @@ describe('useKeyboard', () => {
       navigation: navigationWith({ goBack, goForward }),
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', altKey: true }))
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 'ArrowRight', code: 'ArrowRight', altKey: true }))
       await Promise.resolve()
@@ -280,7 +281,7 @@ describe('useKeyboard', () => {
         navigation: navigationWith({ goBack, goForward }),
       })
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         window.dispatchEvent(keyboardEventForTest('keydown', { key: '[', code: 'BracketLeft', metaKey: true }))
         window.dispatchEvent(keyboardEventForTest('keydown', { key: ']', code: 'BracketRight', metaKey: true }))
         await Promise.resolve()
@@ -365,7 +366,7 @@ describe('useKeyboard', () => {
       bubbles: true,
       cancelable: true,
     })
-    await act(async () => {
+    await flushTestUpdates(async () => {
       window.dispatchEvent(initialShortcut)
       window.dispatchEvent(repeatedShortcut)
       await Promise.resolve()
@@ -406,7 +407,7 @@ describe('useKeyboard', () => {
       bubbles: true,
       cancelable: true,
     })
-    await act(async () => {
+    await flushTestUpdates(async () => {
       document.body.dispatchEvent(
         keyboardEventForTest('keydown', { key: 'Control', code: 'ControlLeft', ctrlKey: true }),
       )
@@ -422,7 +423,7 @@ describe('useKeyboard', () => {
 
     expect(shortcut.defaultPrevented).toBe(true)
     expect(createTerminal).toHaveBeenCalledOnce()
-    expect(focusTerminal).toHaveBeenCalledOnce()
+    await vi.waitFor(() => expect(focusTerminal).toHaveBeenCalledOnce())
     expect(focusTerminal.mock.calls[0]![1]?.isCurrent()).toBe(true)
     focusTerminal.mock.calls[0]![1]?.onSettled?.()
   })
@@ -531,7 +532,7 @@ describe('useKeyboard', () => {
       cancelable: true,
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       document.body.dispatchEvent(copy)
       await Promise.resolve()
     })
@@ -541,7 +542,7 @@ describe('useKeyboard', () => {
 
   test('primary modifier plus n does not open create worktree while a branch action is busy', async () => {
     seedCurrentWorktreeRepoForTest()
-    useWorkspacesStore.setState((state) => {
+    workspacesStore.setState((state) => {
       const repo = state.workspaces[REPO_ID]
       if (repo?.capability.kind !== 'git') return state
       const branchAction = {
@@ -621,7 +622,7 @@ describe('useKeyboard', () => {
     })
     await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 't', code: 'KeyT', ctrlKey: true }))
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 'n', code: 'KeyN', ctrlKey: true }))
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 'w', code: 'KeyW', ctrlKey: true }))
@@ -648,7 +649,7 @@ describe('useKeyboard', () => {
 
     await renderHookHost({ currentWorkspaceId: REPO_ID, currentWorkspacePaneCommandTarget: null })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 't', code: 'KeyT', ctrlKey: true }))
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 'w', code: 'KeyW', ctrlKey: true }))
       window.dispatchEvent(keyboardEventForTest('keydown', { key: '1', code: 'Digit1', ctrlKey: true }))
@@ -675,7 +676,7 @@ describe('useKeyboard', () => {
       currentWorkspacePaneCommandTarget: currentTerminalPaneCommandTargetForTest(),
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       window.dispatchEvent(keyboardEventForTest('keydown', { key: 'w', code: 'KeyW', ctrlKey: true }))
       await Promise.resolve()
     })
@@ -698,7 +699,7 @@ describe('useKeyboard', () => {
       bubbles: true,
       cancelable: true,
     })
-    await act(async () => {
+    await flushTestUpdates(async () => {
       window.dispatchEvent(repeatedClose)
       await Promise.resolve()
     })
@@ -713,7 +714,7 @@ describe('useKeyboard', () => {
       bubbles: true,
       cancelable: true,
     })
-    await act(async () => {
+    await flushTestUpdates(async () => {
       document.body.dispatchEvent(keyboardEventForTest('keyup', { key: 'w', code: 'KeyW', ctrlKey: true }))
       document.body.dispatchEvent(secondClose)
       await Promise.resolve()
@@ -776,7 +777,7 @@ async function dispatchPrimaryShortcut(
 ): Promise<KeyboardEvent> {
   Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
   const shortcut = keyboardEventForTest('keydown', { ...init, key, code, ctrlKey: true })
-  await act(async () => {
+  await flushTestUpdates(async () => {
     window.dispatchEvent(shortcut)
     await Promise.resolve()
   })
@@ -812,57 +813,72 @@ function serverOperation(
   }
 }
 
-function HookHost(overrides: Partial<HookHostOptions>) {
-  const repo = overrides.currentWorkspaceId
-    ? useWorkspacesStore.getState().workspaces[overrides.currentWorkspaceId]
-    : null
-  const branch =
-    repo && overrides.currentBranchName
-      ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches.find(
-          (candidate) => candidate.name === overrides.currentBranchName,
-        )
+const HookHost = defineComponent(
+  (overrides: Partial<HookHostOptions>) => {
+    const repo = overrides.currentWorkspaceId
+      ? workspacesStore.getState().workspaces[overrides.currentWorkspaceId]
       : null
-  const defaultCommandTarget =
-    repo?.capability.kind === 'git' && overrides.currentBranchName && branch?.worktree
-      ? {
-          routeTarget: {
-            kind: 'git-branch' as const,
-            workspaceId: repo.id,
-            branchName: overrides.currentBranchName,
-          },
-          workspacePaneRoute: null,
-          filesystemTarget: gitWorktreePaneFilesystemTarget({
-            workspaceId: repo.id,
-            workspaceRuntimeId: repo.workspaceRuntimeId,
-            worktreePath: branch.worktree.path,
-            head: { kind: 'branch' as const, branchName: overrides.currentBranchName },
-            capabilities: repo.capability.probe.capabilities,
-          }),
-        }
-      : overrides.currentBranchName
+    const branch =
+      repo && overrides.currentBranchName
+        ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches.find(
+            (candidate) => candidate.name === overrides.currentBranchName,
+          )
+        : null
+    const defaultCommandTarget =
+      repo?.capability.kind === 'git' && overrides.currentBranchName && branch?.worktree
         ? {
             routeTarget: {
               kind: 'git-branch' as const,
-              workspaceId: repo?.id ?? REPO_ID,
+              workspaceId: repo.id,
               branchName: overrides.currentBranchName,
             },
             workspacePaneRoute: null,
-            filesystemTarget: null,
+            filesystemTarget: gitWorktreePaneFilesystemTarget({
+              workspaceId: repo.id,
+              workspaceRuntimeId: repo.workspaceRuntimeId,
+              worktreePath: branch.worktree.path,
+              head: { kind: 'branch' as const, branchName: overrides.currentBranchName },
+              capabilities: repo.capability.probe.capabilities,
+            }),
           }
-        : null
-  useKeyboard({
-    navigation: overrides.navigation ?? navigationWith(),
-    currentWorkspaceId: overrides.currentWorkspaceId ?? null,
-    currentBranchName: overrides.currentBranchName ?? null,
-    currentWorkspacePaneCommandTarget: overrides.currentWorkspacePaneCommandTarget ?? defaultCommandTarget,
-    onShowHelp: () => {},
-    isWorkspaceShortcutSuppressed: overrides.isWorkspaceShortcutSuppressed ?? (() => false),
-    isSettingsOpen: overrides.isSettingsOpen ?? (() => false),
-    onExitSettings: overrides.onExitSettings ?? (() => {}),
-    openCreateWorktree: overrides.openCreateWorktree ?? (() => {}),
-  })
-  return null
-}
+        : overrides.currentBranchName
+          ? {
+              routeTarget: {
+                kind: 'git-branch' as const,
+                workspaceId: repo?.id ?? REPO_ID,
+                branchName: overrides.currentBranchName,
+              },
+              workspacePaneRoute: null,
+              filesystemTarget: null,
+            }
+          : null
+    useKeyboard({
+      navigation: overrides.navigation ?? navigationWith(),
+      currentWorkspaceId: overrides.currentWorkspaceId ?? null,
+      currentBranchName: overrides.currentBranchName ?? null,
+      currentWorkspacePaneCommandTarget: overrides.currentWorkspacePaneCommandTarget ?? defaultCommandTarget,
+      onShowHelp: () => {},
+      isWorkspaceShortcutSuppressed: overrides.isWorkspaceShortcutSuppressed ?? (() => false),
+      isSettingsOpen: overrides.isSettingsOpen ?? (() => false),
+      onExitSettings: overrides.onExitSettings ?? (() => {}),
+      openCreateWorktree: overrides.openCreateWorktree ?? (() => {}),
+    })
+    return () => null
+  },
+  {
+    name: 'KeyboardTestHost',
+    props: [
+      'currentWorkspaceId',
+      'currentBranchName',
+      'currentWorkspacePaneCommandTarget',
+      'isWorkspaceShortcutSuppressed',
+      'isSettingsOpen',
+      'onExitSettings',
+      'openCreateWorktree',
+      'navigation',
+    ],
+  },
+)
 
 function navigationWith(overrides: AppNavigationOverridesForTest = {}): AppNavigationActions {
   return observedAppNavigationActionsForTest({
@@ -883,7 +899,7 @@ function navigationWith(overrides: AppNavigationOverridesForTest = {}): AppNavig
 }
 
 function workspaceRuntimeIdForTest(): string {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+  const repo = workspacesStore.getState().workspaces[REPO_ID]
   if (!repo) throw new Error(`expected seeded repo ${REPO_ID}`)
   return repo.workspaceRuntimeId
 }

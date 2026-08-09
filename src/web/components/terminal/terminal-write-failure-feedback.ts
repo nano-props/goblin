@@ -1,8 +1,8 @@
-import { t } from 'i18next'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
+import { translate } from '#/web/stores/i18n-vue.ts'
 
 export interface TerminalWriteFailureInput {
   terminalRuntimeSessionId: string
@@ -28,7 +28,7 @@ export function createTerminalWriteFailureReporter(): TerminalWriteFailureReport
 
       terminalLog.warn('write failed for session', { terminalRuntimeSessionId, failure, outageId })
       const messageKey = terminalWriteFailureKey(failure)
-      toast.warning(t(messageKey), { id: `terminal-write-failure:${messageKey}` })
+      toast.warning(translate(messageKey), { id: `terminal-write-failure:${messageKey}` })
     },
   }
 }

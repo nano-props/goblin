@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { isReservedGlobalShortcut, normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 
 describe('accelerator helpers', () => {
-  test('reserves app-level terminal and workspace tab shortcuts from global shortcut capture', () => {
+  test('reserves app-level terminal and workspace tab shortcuts from global shortcut capture', async () => {
     expect(isReservedGlobalShortcut('Command+N')).toBe(true)
     expect(isReservedGlobalShortcut('Control+N')).toBe(true)
     expect(isReservedGlobalShortcut('Command+T')).toBe(true)
@@ -14,7 +14,7 @@ describe('accelerator helpers', () => {
     expect(isReservedGlobalShortcut('Command+Shift+R')).toBe(true)
   })
 
-  test('normalizes reserved global shortcuts back to the default', () => {
+  test('normalizes reserved global shortcuts back to the default', async () => {
     expect(normalizeGlobalShortcut('Command+N')).toBe('Alt+G')
     expect(normalizeGlobalShortcut('Control+T')).toBe('Alt+G')
     expect(normalizeGlobalShortcut('Control+9')).toBe('Alt+G')

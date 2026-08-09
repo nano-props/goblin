@@ -1,4 +1,3 @@
-import { type Key } from 'react-aria-components'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspace-filesystem-lazy-state.ts'
 
@@ -18,7 +17,7 @@ export interface FiletreeCollection {
 
 export function buildFiletreeCollection(
   result: LazyWorkspaceFilesystemTreeAggregate | null,
-  expandedKeys: ReadonlySet<Key>,
+  expandedKeys: ReadonlySet<string>,
 ): FiletreeCollection {
   const byId = new Map<string, WorkspaceFilesystemNode>()
   const childrenByParent = new Map<string | null, WorkspaceFilesystemNode[]>()

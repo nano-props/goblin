@@ -12,15 +12,16 @@
 // is suppressed — including `?`, otherwise pressing it with Settings
 // open would stack the Help modal on top.
 
-import { useEffect, useRef } from 'react'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useUiTransitionStore } from '#/web/stores/ui-transition.ts'
+import { onScopeDispose, toValue } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { uiTransitionStore } from '#/web/stores/ui-transition.ts'
 import { branchViewModeForWorkspace, visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchClientKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
 import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { BranchViewMode } from '#/shared/api-types.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
@@ -32,8 +33,8 @@ import {
   runSelectWorkspacePaneTabByIndexCommand,
 } from '#/web/commands/workspace-commands.ts'
 import { getClientBridge } from '#/web/client-bridge.ts'
-import { translate } from '#/web/stores/i18n.ts'
-import { toast } from 'sonner'
+import { translate } from '#/web/stores/i18n-vue.ts'
+import { toast } from 'vue-sonner'
 import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import {
   workspacePaneCommandCoordinates,
@@ -49,10 +50,10 @@ const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
   'button,a,input,textarea,select,[role="button"],[role="tab"],[role="menuitem"],[data-interactive]'
 
 interface Options {
-  navigation: AppNavigationActions
-  currentWorkspaceId: WorkspaceId | null
-  currentBranchName?: string | null
-  currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
+  navigation: MaybeRefOrGetter<AppNavigationActions>
+  currentWorkspaceId: MaybeRefOrGetter<WorkspaceId | null>
+  currentBranchName?: MaybeRefOrGetter<string | null>
+  currentWorkspacePaneCommandTarget: MaybeRefOrGetter<WorkspacePaneCommandTarget | null>
   onShowHelp: () => void
   /** Returns true when workspace shortcuts should not affect the workspace view. */
   isWorkspaceShortcutSuppressed: () => boolean
@@ -138,215 +139,184 @@ function moveBranchSelection(
   return true
 }
 
-export function useKeyboard({
-  navigation,
-  currentWorkspaceId,
-  currentBranchName = null,
-  currentWorkspacePaneCommandTarget,
-  onShowHelp,
-  isWorkspaceShortcutSuppressed,
-  isSettingsOpen,
-  onExitSettings,
-  openCreateWorktree,
-}: Options) {
-  // Stash changing callbacks and route inputs in refs so the listener
-  // only follows the navigation facade instead of being replaced on
-  // every App render.
-  const onShowHelpRef = useRef(onShowHelp)
-  const isWorkspaceShortcutSuppressedRef = useRef(isWorkspaceShortcutSuppressed)
-  const isSettingsOpenRef = useRef(isSettingsOpen)
-  const onExitSettingsRef = useRef(onExitSettings)
-  const currentWorkspaceIdRef = useRef(currentWorkspaceId)
-  const currentBranchNameRef = useRef(currentBranchName)
-  const currentWorkspacePaneCommandTargetRef = useRef(currentWorkspacePaneCommandTarget)
-  const openCreateWorktreeRef = useRef(openCreateWorktree)
-  onShowHelpRef.current = onShowHelp
-  isWorkspaceShortcutSuppressedRef.current = isWorkspaceShortcutSuppressed
-  isSettingsOpenRef.current = isSettingsOpen
-  onExitSettingsRef.current = onExitSettings
-  currentWorkspaceIdRef.current = currentWorkspaceId
-  currentBranchNameRef.current = currentBranchName
-  currentWorkspacePaneCommandTargetRef.current = currentWorkspacePaneCommandTarget
-  openCreateWorktreeRef.current = openCreateWorktree
+export function useKeyboard(options: Options) {
+  const onKey = (e: KeyboardEvent) => {
+    if (e.defaultPrevented) return
+    if (getRuntimeShortcutSettings().shortcutsDisabled) return
+    const navigation = toValue(options.navigation)
+    const settingsOpen = options.isSettingsOpen()
+    const compactWorkspaceTransitioning = uiTransitionStore.getState().isCompactWorkspaceTransitioning
+    const workspaceShortcutsSuppressed =
+      options.isWorkspaceShortcutSuppressed() || isShortcutBlockingLayerOpen() || compactWorkspaceTransitioning
+    const action = matchClientKeyboardShortcut(e)
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return
-      if (getRuntimeShortcutSettings().shortcutsDisabled) return
-      const settingsOpen = isSettingsOpenRef.current()
-      const compactWorkspaceTransitioning = useUiTransitionStore.getState().isCompactWorkspaceTransitioning
-      const workspaceShortcutsSuppressed =
-        isWorkspaceShortcutSuppressedRef.current() || isShortcutBlockingLayerOpen() || compactWorkspaceTransitioning
-      const action = matchClientKeyboardShortcut(e)
+    if (settingsOpen && action === 'dismiss') {
+      e.preventDefault()
+      options.onExitSettings()
+      return
+    }
 
-      if (settingsOpen && action === 'dismiss') {
+    if (!workspaceShortcutsSuppressed && !isTypingTarget(e.target)) {
+      const workspaceId = toValue(options.currentWorkspaceId)
+      const navigationDirection = workspaceHistoryNavigationDirection(e)
+      if (workspaceId && navigationDirection !== 0) {
         e.preventDefault()
-        onExitSettingsRef.current()
+        if (navigationDirection === -1) navigation.goBack(workspaceId)
+        else navigation.goForward(workspaceId)
         return
-      }
-
-      if (!workspaceShortcutsSuppressed && !isTypingTarget(e.target)) {
-        const workspaceId = currentWorkspaceIdRef.current
-        const navigationDirection = workspaceHistoryNavigationDirection(e)
-        if (workspaceId && navigationDirection !== 0) {
-          e.preventDefault()
-          if (navigationDirection === -1) navigation.goBack(workspaceId)
-          else navigation.goForward(workspaceId)
-          return
-        }
-      }
-
-      if (primaryModifierPressed(e) && !e.altKey) {
-        const workspaceId = currentWorkspaceIdRef.current
-        const paneTarget = currentWorkspacePaneCommandTargetRef.current
-        const menuBackedShortcut = hasNativeMenuAccelerators()
-        const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
-        const rendererOwnedShortcut =
-          tabIndex !== null ||
-          (!menuBackedShortcut && !e.shiftKey && (e.code === 'KeyT' || e.code === 'KeyN' || e.code === 'KeyW'))
-        if (rendererOwnedShortcut) {
-          e.preventDefault()
-          e.stopPropagation()
-          if (workspaceShortcutsSuppressed) return
-        }
-        if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
-          if (!paneTarget) return
-          const workspace = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
-          if (!workspace || !workspaceCanExecute(workspace) || !workspaceTerminalAvailable(workspace.capability.probe))
-            return
-          // Cmd+T is a generic entry → new terminal appends to the end.
-          void runNewTerminalTabCommand({
-            workspaceId,
-            target: paneTarget,
-            navigation,
-            t: translate,
-          })
-          return
-        }
-        if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
-          const repo = workspaceId ? useWorkspacesStore.getState().workspaces[workspaceId] : null
-          if (
-            !repo ||
-            !workspaceCanExecute(repo) ||
-            repo.capability.kind !== 'git' ||
-            !workspaceWorktreesAvailable(repo.capability.probe)
-          )
-            return
-          const branchAction = projectBranchActionOperation(
-            repo.capability.git.operations.branchAction,
-            getRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId)?.operations,
-          )
-          if (branchAction.phase === 'idle') {
-            openCreateWorktreeRef.current()
-          } else {
-            toast.error(translate('action.create-worktree-busy'))
-          }
-          return
-        }
-        if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
-          if (!paneTarget) return
-          void runCloseCurrentWorkspacePaneTabCommand({
-            workspaceId,
-            target: paneTarget,
-            navigation,
-          })
-          return
-        }
-        if (tabIndex !== null) {
-          if (!paneTarget) return
-          void runSelectWorkspacePaneTabByIndexCommand({
-            workspaceId,
-            target: paneTarget,
-            tabIndex,
-            navigation,
-          })
-          return
-        }
-      }
-
-      if (terminalHasKeyboardFocus()) return
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      if (isTypingTarget(e.target)) return
-
-      const state = useWorkspacesStore.getState()
-      const keyboardState = keyboardRuntimeStateFromStore(state, currentWorkspaceIdRef.current)
-      const repo = keyboardState.workspace
-      const overlayOpen = workspaceShortcutsSuppressed
-      const interactiveTarget = isInteractiveTarget(e.target)
-
-      if (action === 'dismiss') {
-        if (overlayOpen) return
-        const active = activeElement()
-        if (!active || active === document.body || active === document.documentElement) return
-        e.preventDefault()
-        active.blur()
-        return
-      }
-
-      if (interactiveTarget) return
-
-      switch (action) {
-        case 'show-help': {
-          if (overlayOpen) break
-          e.preventDefault()
-          onShowHelpRef.current()
-          break
-        }
-        case 'pull':
-        case 'push': {
-          if (overlayOpen || !repo || !currentBranchNameRef.current) break
-          e.preventDefault()
-          runBranchActionShortcut(action)
-          break
-        }
-        case 'next-branch': {
-          if (overlayOpen || !repo || repo.capability.kind !== 'git') break
-          if (
-            moveBranchSelection(
-              {
-                repo,
-                viewMode: branchViewModeForWorkspace(useWorkspacesStore.getState().branchViewModeByWorkspace, repo.id),
-                currentBranchName: currentBranchNameRef.current,
-              },
-              1,
-              navigation,
-            )
-          )
-            e.preventDefault()
-          break
-        }
-        case 'prev-branch': {
-          if (overlayOpen || !repo || repo.capability.kind !== 'git') break
-          if (
-            moveBranchSelection(
-              {
-                repo,
-                viewMode: branchViewModeForWorkspace(useWorkspacesStore.getState().branchViewModeByWorkspace, repo.id),
-                currentBranchName: currentBranchNameRef.current,
-              },
-              -1,
-              navigation,
-            )
-          )
-            e.preventDefault()
-          break
-        }
-        case 'next-workspace-pane-tab':
-        case 'prev-workspace-pane-tab': {
-          const paneTarget = currentWorkspacePaneCommandTargetRef.current
-          if (overlayOpen || !repo || !paneTarget) break
-          e.preventDefault()
-          void runMoveWorkspacePaneTabCommand({
-            workspaceId: repo.id,
-            target: paneTarget,
-            direction: action === 'next-workspace-pane-tab' ? 1 : -1,
-            navigation,
-          })
-          break
-        }
       }
     }
-    window.addEventListener('keydown', onKey, { capture: true })
-    return () => window.removeEventListener('keydown', onKey, { capture: true })
-  }, [navigation])
+
+    if (primaryModifierPressed(e) && !e.altKey) {
+      const workspaceId = toValue(options.currentWorkspaceId)
+      const paneTarget = toValue(options.currentWorkspacePaneCommandTarget)
+      const menuBackedShortcut = hasNativeMenuAccelerators()
+      const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
+      const rendererOwnedShortcut =
+        tabIndex !== null ||
+        (!menuBackedShortcut && !e.shiftKey && (e.code === 'KeyT' || e.code === 'KeyN' || e.code === 'KeyW'))
+      if (rendererOwnedShortcut) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (workspaceShortcutsSuppressed) return
+      }
+      if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
+        if (!paneTarget) return
+        const workspace = workspaceId ? workspacesStore.getState().workspaces[workspaceId] : null
+        if (!workspace || !workspaceCanExecute(workspace) || !workspaceTerminalAvailable(workspace.capability.probe))
+          return
+        // Cmd+T is a generic entry → new terminal appends to the end.
+        void runNewTerminalTabCommand({
+          workspaceId,
+          target: paneTarget,
+          navigation,
+          t: translate,
+        })
+        return
+      }
+      if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
+        const repo = workspaceId ? workspacesStore.getState().workspaces[workspaceId] : null
+        if (
+          !repo ||
+          !workspaceCanExecute(repo) ||
+          repo.capability.kind !== 'git' ||
+          !workspaceWorktreesAvailable(repo.capability.probe)
+        )
+          return
+        const branchAction = projectBranchActionOperation(
+          repo.capability.git.operations.branchAction,
+          getRepoOperationsQueryData(repo.id, repo.workspaceRuntimeId)?.operations,
+        )
+        if (branchAction.phase === 'idle') {
+          options.openCreateWorktree()
+        } else {
+          toast.error(translate('action.create-worktree-busy'))
+        }
+        return
+      }
+      if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
+        if (!paneTarget) return
+        void runCloseCurrentWorkspacePaneTabCommand({
+          workspaceId,
+          target: paneTarget,
+          navigation,
+        })
+        return
+      }
+      if (tabIndex !== null) {
+        if (!paneTarget) return
+        void runSelectWorkspacePaneTabByIndexCommand({
+          workspaceId,
+          target: paneTarget,
+          tabIndex,
+          navigation,
+        })
+        return
+      }
+    }
+
+    if (terminalHasKeyboardFocus()) return
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    if (isTypingTarget(e.target)) return
+
+    const state = workspacesStore.getState()
+    const keyboardState = keyboardRuntimeStateFromStore(state, toValue(options.currentWorkspaceId))
+    const repo = keyboardState.workspace
+    const overlayOpen = workspaceShortcutsSuppressed
+    const interactiveTarget = isInteractiveTarget(e.target)
+
+    if (action === 'dismiss') {
+      if (overlayOpen) return
+      const active = activeElement()
+      if (!active || active === document.body || active === document.documentElement) return
+      e.preventDefault()
+      active.blur()
+      return
+    }
+
+    if (interactiveTarget) return
+
+    switch (action) {
+      case 'show-help': {
+        if (overlayOpen) break
+        e.preventDefault()
+        options.onShowHelp()
+        break
+      }
+      case 'pull':
+      case 'push': {
+        if (overlayOpen || !repo || !toValue(options.currentBranchName)) break
+        e.preventDefault()
+        runBranchActionShortcut(action)
+        break
+      }
+      case 'next-branch': {
+        if (overlayOpen || !repo || repo.capability.kind !== 'git') break
+        if (
+          moveBranchSelection(
+            {
+              repo,
+              viewMode: branchViewModeForWorkspace(workspacesStore.getState().branchViewModeByWorkspace, repo.id),
+              currentBranchName: toValue(options.currentBranchName) ?? null,
+            },
+            1,
+            navigation,
+          )
+        )
+          e.preventDefault()
+        break
+      }
+      case 'prev-branch': {
+        if (overlayOpen || !repo || repo.capability.kind !== 'git') break
+        if (
+          moveBranchSelection(
+            {
+              repo,
+              viewMode: branchViewModeForWorkspace(workspacesStore.getState().branchViewModeByWorkspace, repo.id),
+              currentBranchName: toValue(options.currentBranchName) ?? null,
+            },
+            -1,
+            navigation,
+          )
+        )
+          e.preventDefault()
+        break
+      }
+      case 'next-workspace-pane-tab':
+      case 'prev-workspace-pane-tab': {
+        const paneTarget = toValue(options.currentWorkspacePaneCommandTarget)
+        if (overlayOpen || !repo || !paneTarget) break
+        e.preventDefault()
+        void runMoveWorkspacePaneTabCommand({
+          workspaceId: repo.id,
+          target: paneTarget,
+          direction: action === 'next-workspace-pane-tab' ? 1 : -1,
+          navigation,
+        })
+        break
+      }
+    }
+  }
+  window.addEventListener('keydown', onKey, { capture: true })
+  onScopeDispose(() => window.removeEventListener('keydown', onKey, { capture: true }))
 }

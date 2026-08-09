@@ -1,19 +1,6 @@
 import '#/web/components/terminal/terminal-composer.css'
-import {
-  useEffect,
-  useId,
-  useImperativeHandle,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type ButtonHTMLAttributes,
-  type KeyboardEvent,
-  type MouseEventHandler,
-  type ReactNode,
-  type Ref,
-} from 'react'
-import { flushSync } from 'react-dom'
+import { defineComponent, nextTick, onMounted, onScopeDispose, ref, useId, watch } from 'vue'
+import type { ButtonHTMLAttributes, FunctionalComponent, HTMLAttributes, VNodeChild } from 'vue'
 import {
   ArrowDown,
   ArrowLeft,
@@ -25,26 +12,28 @@ import {
   Delete,
   Keyboard,
   TextCursorInput,
-} from 'lucide-react'
-import { Button } from '#/web/components/ui/button.tsx'
-import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { cn } from '#/web/lib/cn.ts'
-import { TerminalComposerMenu } from '#/web/components/terminal/terminal-composer-menu.tsx'
-import { TerminalComposerHistoryCursor } from '#/web/components/terminal/terminal-composer-history-cursor.ts'
+} from '@lucide/vue'
 import {
   TERMINAL_COMPOSER_COPY_ACTION,
   TERMINAL_COMPOSER_OPTIONAL_ACTIONS,
   TERMINAL_COMPOSER_PINNED_COMMAND_KEYS,
-  type TerminalComposerActionLabelKey,
 } from '#/web/components/terminal/terminal-composer-command-keys.ts'
-import { isDesktopMacNavigatorPlatform, isImeOwnedKeyboardEvent } from '#/web/components/terminal/terminal-keyboard.ts'
+import type { TerminalComposerActionLabelKey } from '#/web/components/terminal/terminal-composer-command-keys.ts'
 import {
   draftOffsetToTextareaOffset,
   planTerminalComposerEdit,
   textareaOffsetToDraftOffset,
   terminalComposerEditCommandForEvent,
 } from '#/web/components/terminal/terminal-composer-editing.ts'
+import { TerminalComposerHistoryCursor } from '#/web/components/terminal/terminal-composer-history-cursor.ts'
+import { isDesktopMacNavigatorPlatform, isImeOwnedKeyboardEvent } from '#/web/components/terminal/terminal-keyboard.ts'
+import { TerminalComposerMenu } from '#/web/components/terminal/terminal-composer-menu.tsx'
 import type { TerminalComposerMode, TerminalVirtualKey } from '#/web/components/terminal/types.ts'
+import { Button } from '#/web/components/ui/button.tsx'
+import type { ElementRef } from '#/web/components/ui/refs.ts'
+import { toButtonVNodeRef } from '#/web/components/ui/refs.ts'
+import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
+import { cn } from '#/web/lib/cn.ts'
 
 export interface TerminalComposerLabels {
   composer: string
@@ -70,7 +59,6 @@ export interface TerminalComposerLabels {
 }
 
 interface TerminalComposerProps {
-  ref?: Ref<TerminalComposerHandle>
   labels: TerminalComposerLabels
   expanded: boolean
   mode: TerminalComposerMode
@@ -89,7 +77,7 @@ interface TerminalComposerProps {
   onResolveFiles: (files: File[]) => Promise<string | null>
   onFileInsertionRejected: () => void
   hidden?: boolean
-  className?: string
+  class?: HTMLAttributes['class']
 }
 
 export interface TerminalComposerHandle {
@@ -103,42 +91,33 @@ type AccessibleName = Exclude<
 
 interface PrimaryKeyAction {
   accessibleName: AccessibleName
-  icon: ReactNode
+  icon: VNodeChild
   key: TerminalVirtualKey
 }
 
 const PRIMARY_KEY_ACTIONS: PrimaryKeyAction[] = [
-  {
-    icon: <ArrowLeft className="size-4" />,
-    key: 'arrow-left',
-    accessibleName: 'arrowLeft',
-  },
-  {
-    icon: <ArrowDown className="size-4" />,
-    key: 'arrow-down',
-    accessibleName: 'arrowDown',
-  },
-  { icon: <ArrowUp className="size-4" />, key: 'arrow-up', accessibleName: 'arrowUp' },
-  {
-    icon: <ArrowRight className="size-4" />,
-    key: 'arrow-right',
-    accessibleName: 'arrowRight',
-  },
+  { icon: <ArrowLeft class="size-4" />, key: 'arrow-left', accessibleName: 'arrowLeft' },
+  { icon: <ArrowDown class="size-4" />, key: 'arrow-down', accessibleName: 'arrowDown' },
+  { icon: <ArrowUp class="size-4" />, key: 'arrow-up', accessibleName: 'arrowUp' },
+  { icon: <ArrowRight class="size-4" />, key: 'arrow-right', accessibleName: 'arrowRight' },
 ]
 
-const COMMAND_KEY_ICONS: Partial<Record<TerminalComposerActionLabelKey, ReactNode>> = {
-  tab: <ArrowRightToLine className="size-4" />,
-  enter: <CornerDownLeft className="size-4" />,
-  backspace: <Delete className="size-4" />,
+const COMMAND_KEY_ICONS: Partial<Record<TerminalComposerActionLabelKey, VNodeChild>> = {
+  tab: <ArrowRightToLine class="size-4" />,
+  enter: <CornerDownLeft class="size-4" />,
+  backspace: <Delete class="size-4" />,
 }
 
 const COMPOSER_INPUT_MIN_HEIGHT_PX = 40
 const COMPOSER_INPUT_MAX_HEIGHT_PX = 160
 
-function resizeComposerInput(input: HTMLTextAreaElement, hasContent: boolean) {
+function resizeComposerInput(input: HTMLTextAreaElement, hasContent: boolean): void {
   input.style.height = `${COMPOSER_INPUT_MIN_HEIGHT_PX}px`
   if (!hasContent) return
-  input.style.height = `${Math.min(COMPOSER_INPUT_MAX_HEIGHT_PX, Math.max(COMPOSER_INPUT_MIN_HEIGHT_PX, input.scrollHeight))}px`
+  input.style.height = `${Math.min(
+    COMPOSER_INPUT_MAX_HEIGHT_PX,
+    Math.max(COMPOSER_INPUT_MIN_HEIGHT_PX, input.scrollHeight),
+  )}px`
 }
 
 function insertComposerText(value: string, insertion: string, start: number, end: number) {
@@ -153,403 +132,432 @@ function insertComposerText(value: string, insertion: string, start: number, end
   }
 }
 
-function isImeCompositionEvent(event: KeyboardEvent<HTMLElement>) {
-  return isImeOwnedKeyboardEvent(event.nativeEvent)
+function isImeCompositionEvent(event: KeyboardEvent): boolean {
+  return isImeOwnedKeyboardEvent(event)
 }
 
 function focusComposerInput(input: HTMLTextAreaElement): void {
   input.focus()
 }
 
-export function TerminalComposer({
-  ref,
-  labels,
-  expanded,
-  mode,
-  draft,
-  historyEntries,
-  shortcut,
-  canUploadFiles,
-  onVirtualKey,
-  onCopyContent,
-  onSendText,
-  onOpen,
-  onClose,
-  onModeChange,
-  onDraftChange,
-  onDraftReplace,
-  onResolveFiles,
-  onFileInsertionRejected,
-  hidden,
-  className,
-}: TerminalComposerProps) {
-  const [resolvingFiles, setResolvingFiles] = useState(false)
-  const [copyingContent, setCopyingContent] = useState(false)
-  const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const modeToggleRef = useRef<HTMLButtonElement | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const inputRef = useRef<HTMLTextAreaElement | null>(null)
-  const fileInsertionRef = useRef({ start: 0, end: 0 })
-  const pendingCaretRef = useRef<number | null>(null)
-  const pendingFocusRef = useRef<'control' | 'trigger' | null>(null)
-  const [history] = useState(() => new TerminalComposerHistoryCursor())
-  const composerId = useId()
+export const TerminalComposer = defineComponent(
+  (props: TerminalComposerProps, { expose }) => {
+    const resolvingFiles = ref(false)
+    const copyingContent = ref(false)
+    const trigger = ref<HTMLButtonElement | null>(null)
+    const root = ref<HTMLDivElement | null>(null)
+    const modeToggle = ref<HTMLButtonElement | null>(null)
+    const fileInput = ref<HTMLInputElement | null>(null)
+    const input = ref<HTMLTextAreaElement | null>(null)
+    const history = new TerminalComposerHistoryCursor()
+    const composerId = useId()
+    let fileInsertion = { start: 0, end: 0 }
+    let pendingCaret: number | null = null
+    let pendingFocus: 'control' | 'trigger' | null = null
 
-  const focusComposerControl = () => {
-    if (mode === 'input') {
-      const input = inputRef.current
-      if (!input) return
-      focusComposerInput(input)
-      return
+    function focusComposerControl(): void {
+      if (props.mode === 'input') {
+        if (input.value) focusComposerInput(input.value)
+        return
+      }
+      modeToggle.value?.focus()
     }
-    modeToggleRef.current?.focus()
-  }
-  const requestComposerFocus = () => {
-    pendingFocusRef.current = 'control'
-    if (!expanded || hidden) return
-    pendingFocusRef.current = null
-    focusComposerControl()
-  }
-  const requestTriggerFocus = () => {
-    pendingFocusRef.current = 'trigger'
-    if (expanded) return
-    pendingFocusRef.current = null
-    triggerRef.current?.focus()
-  }
 
-  useImperativeHandle(ref, () => ({ focus: requestComposerFocus }))
-
-  useLayoutEffect(() => {
-    history.updateEntries(historyEntries)
-  }, [history, historyEntries])
-
-  useLayoutEffect(() => {
-    const input = inputRef.current
-    if (!input || !expanded || mode !== 'input') return
-    resizeComposerInput(input, draft.length > 0)
-    const pendingCaret = pendingCaretRef.current
-    if (pendingCaret !== null) {
-      pendingCaretRef.current = null
-      focusComposerInput(input)
-      input.setSelectionRange(pendingCaret, pendingCaret)
-    }
-  }, [draft, expanded, mode])
-
-  useLayoutEffect(() => {
-    if (hidden) {
-      pendingFocusRef.current = null
-      return
-    }
-    if (pendingFocusRef.current === 'control' && expanded) {
-      pendingFocusRef.current = null
+    function requestComposerFocus(): void {
+      pendingFocus = 'control'
+      if (!props.expanded || props.hidden) return
+      pendingFocus = null
       focusComposerControl()
-      return
     }
-    if (pendingFocusRef.current === 'trigger' && !expanded) {
-      pendingFocusRef.current = null
-      triggerRef.current?.focus()
+
+    function requestTriggerFocus(): void {
+      pendingFocus = 'trigger'
+      if (props.expanded) return
+      pendingFocus = null
+      trigger.value?.focus()
     }
-  }, [expanded, hidden, mode])
 
-  useEffect(() => {
-    const input = inputRef.current
-    if (!input || !expanded || mode !== 'input' || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(() => resizeComposerInput(input, input.value.length > 0))
-    observer.observe(input)
-    return () => observer.disconnect()
-  }, [expanded, mode])
+    expose<TerminalComposerHandle>({ focus: requestComposerFocus })
 
-  const submitDraft = async () => {
-    if (!draft || resolvingFiles) return
-    const submittedDraft = draft
-    if (!(await onSendText(submittedDraft))) return
-    history.leaveBrowsing()
-    onDraftReplace(submittedDraft, '')
-  }
-  const handleDraftKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (isImeCompositionEvent(event)) return
-    const editingCommand = terminalComposerEditCommandForEvent(
-      event,
-      isDesktopMacNavigatorPlatform(globalThis.navigator?.platform ?? ''),
+    watch(
+      () => props.historyEntries,
+      (entries) => history.updateEntries(entries),
+      { immediate: true },
     )
-    if (editingCommand) {
-      event.preventDefault()
-      if (resolvingFiles) return
-      const selectionStart = textareaOffsetToDraftOffset(draft, event.currentTarget.selectionStart)
-      const selectionEnd = textareaOffsetToDraftOffset(draft, event.currentTarget.selectionEnd)
-      const plan = planTerminalComposerEdit(draft, selectionStart, selectionEnd, editingCommand)
-      if (plan.start === plan.end) return
-      if (onDraftReplace(draft, plan.value)) {
-        history.leaveBrowsing()
-        pendingCaretRef.current = draftOffsetToTextareaOffset(plan.value, plan.caret)
-      }
-      return
-    }
-    if (resolvingFiles) return
-    const plainVerticalNavigation = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
-    if (plainVerticalNavigation && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
-      const historicalDraft = event.key === 'ArrowUp' ? history.previous(draft) : history.next()
-      if (historicalDraft !== undefined) {
-        event.preventDefault()
-        if (historicalDraft !== draft) {
-          pendingCaretRef.current = historicalDraft.length
-          onDraftChange(historicalDraft)
-        }
-        return
-      }
-    } else if (history.isBrowsing()) {
-      history.leaveBrowsing()
-    }
-    if (event.key !== 'Enter' || event.shiftKey) return
-    event.preventDefault()
-    void submitDraft()
-  }
-  const closeComposer = () => {
-    if (!onClose()) return false
-    requestTriggerFocus()
-    return true
-  }
 
-  const openComposer = () => {
-    let accepted = false
-    flushSync(() => {
-      accepted = onOpen()
-    })
-    if (!accepted) return
-    pendingFocusRef.current = null
-    const input = inputRef.current
-    if (input) focusComposerInput(input)
-  }
-  const switchMode = (nextMode: TerminalComposerMode) => {
-    let accepted = false
-    flushSync(() => {
-      accepted = onModeChange(nextMode)
-    })
-    if (!accepted) return
-    if (nextMode === 'input') {
-      const input = inputRef.current
-      if (input) focusComposerInput(input)
-      return
-    }
-    modeToggleRef.current?.focus()
-  }
-  const currentFileInsertion = () => {
-    const input = inputRef.current
-    return {
-      start: textareaOffsetToDraftOffset(draft, input?.selectionStart ?? draft.length),
-      end: textareaOffsetToDraftOffset(draft, input?.selectionEnd ?? draft.length),
-    }
-  }
-  const openFilePicker = () => {
-    fileInsertionRef.current = currentFileInsertion()
-    fileInputRef.current?.click()
-  }
-  const resolveFilesIntoDraft = async (files: File[], insertionRange: { start: number; end: number }) => {
-    if (files.length === 0 || resolvingFiles) return
-    setResolvingFiles(true)
-    try {
-      const insertion = await onResolveFiles(files)
-      if (!insertion) return
-      history.leaveBrowsing()
-      const start = Math.min(insertionRange.start, draft.length)
-      const end = Math.min(Math.max(insertionRange.end, start), draft.length)
-      const next = insertComposerText(draft, insertion, start, end)
-      if (!onDraftReplace(draft, next.value)) {
-        // The current draft is authoritative. Never overwrite edits made while
-        // files resolved; leave recovery to an explicit user retry.
-        onFileInsertionRejected()
-        return
-      }
-      pendingCaretRef.current = draftOffsetToTextareaOffset(next.value, next.caret)
-    } finally {
-      setResolvingFiles(false)
-    }
-  }
-  const handleFileSelection = async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? [])
-    event.target.value = ''
-    await resolveFilesIntoDraft(files, fileInsertionRef.current)
-  }
-  const copyContent = async () => {
-    if (copyingContent) return
-    setCopyingContent(true)
-    try {
-      await onCopyContent()
-    } finally {
-      setCopyingContent(false)
-    }
-  }
-  return (
-    <div
-      className={cn('goblin-terminal-composer', expanded && 'goblin-terminal-composer--expanded', className)}
-      data-expanded={expanded}
-      hidden={hidden}
-      role="group"
-      aria-label={labels.composer}
-      onKeyDownCapture={(event) => {
-        if (!expanded || event.key !== 'Escape' || isImeCompositionEvent(event)) return
-        if (
-          event.target instanceof Element &&
-          (event.target.closest('[data-slot="popover-content"]') ||
-            event.target.closest('[data-slot="popover-trigger"][data-state="open"]'))
-        ) {
+    // Draft, mode, and visibility changes alter the mounted control. This
+    // post-render synchronization applies the pending caret/focus exactly once.
+    watch(
+      [() => props.draft, () => props.expanded, () => props.mode, () => props.hidden, input],
+      () => {
+        const textarea = input.value
+        if (textarea && props.expanded && props.mode === 'input') {
+          resizeComposerInput(textarea, props.draft.length > 0)
+          if (pendingCaret !== null) {
+            const caret = pendingCaret
+            pendingCaret = null
+            focusComposerInput(textarea)
+            textarea.setSelectionRange(caret, caret)
+          }
+        }
+        if (props.hidden) {
+          pendingFocus = null
           return
         }
+        if (pendingFocus === 'control' && props.expanded) {
+          pendingFocus = null
+          focusComposerControl()
+        } else if (pendingFocus === 'trigger' && !props.expanded) {
+          pendingFocus = null
+          trigger.value?.focus()
+        }
+      },
+      { flush: 'post' },
+    )
+
+    // The observer belongs to the currently mounted input-mode textarea.
+    watch(
+      [() => props.expanded, () => props.mode, input],
+      (_state, _previous, onCleanup) => {
+        const textarea = input.value
+        if (!textarea || !props.expanded || props.mode !== 'input' || typeof ResizeObserver === 'undefined') return
+        const observer = new ResizeObserver(() => resizeComposerInput(textarea, textarea.value.length > 0))
+        observer.observe(textarea)
+        onCleanup(() => observer.disconnect())
+      },
+      { flush: 'post' },
+    )
+
+    async function submitDraft(): Promise<void> {
+      const submittedDraft = props.draft
+      if (!submittedDraft || resolvingFiles.value) return
+      const onSendText = props.onSendText
+      const onDraftReplace = props.onDraftReplace
+      if (!(await onSendText(submittedDraft))) return
+      history.leaveBrowsing()
+      onDraftReplace(submittedDraft, '')
+    }
+
+    function handleDraftKeyDown(event: KeyboardEvent): void {
+      if (!(event.currentTarget instanceof HTMLTextAreaElement) || isImeCompositionEvent(event)) return
+      const editingCommand = terminalComposerEditCommandForEvent(
+        event,
+        isDesktopMacNavigatorPlatform(globalThis.navigator?.platform ?? ''),
+      )
+      const draft = props.draft
+      if (editingCommand) {
         event.preventDefault()
-        event.stopPropagation()
-        closeComposer()
-      }}
-    >
-      <ComposerButton
-        buttonRef={triggerRef}
-        className="goblin-terminal-composer__toggle"
-        accessibleName={labels.open}
-        aria-expanded={expanded}
-        aria-controls={composerId}
-        aria-hidden={expanded}
-        aria-keyshortcuts={shortcut}
-        tabIndex={expanded ? -1 : undefined}
-        onClick={openComposer}
-      >
-        <Keyboard className="size-5" />
-      </ComposerButton>
+        if (resolvingFiles.value) return
+        const selectionStart = textareaOffsetToDraftOffset(draft, event.currentTarget.selectionStart)
+        const selectionEnd = textareaOffsetToDraftOffset(draft, event.currentTarget.selectionEnd)
+        const plan = planTerminalComposerEdit(draft, selectionStart, selectionEnd, editingCommand)
+        if (plan.start === plan.end) return
+        if (props.onDraftReplace(draft, plan.value)) {
+          history.leaveBrowsing()
+          pendingCaret = draftOffsetToTextareaOffset(plan.value, plan.caret)
+        }
+        return
+      }
+      if (resolvingFiles.value) return
+      const plainVerticalNavigation = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey
+      if (plainVerticalNavigation && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        const historicalDraft = event.key === 'ArrowUp' ? history.previous(draft) : history.next()
+        if (historicalDraft !== undefined) {
+          event.preventDefault()
+          if (historicalDraft !== draft) {
+            pendingCaret = historicalDraft.length
+            props.onDraftChange(historicalDraft)
+          }
+          return
+        }
+      } else if (history.isBrowsing()) {
+        history.leaveBrowsing()
+      }
+      if (event.key !== 'Enter' || event.shiftKey) return
+      event.preventDefault()
+      void submitDraft()
+    }
+
+    function closeComposer(): boolean {
+      if (!props.onClose()) return false
+      requestTriggerFocus()
+      return true
+    }
+
+    function openComposer(): void {
+      if (!props.onOpen()) return
+      pendingFocus = 'control'
+      void nextTick(() => {
+        if (pendingFocus === 'control' && props.expanded && !props.hidden) {
+          pendingFocus = null
+          focusComposerControl()
+        }
+      })
+    }
+
+    function switchMode(nextMode: TerminalComposerMode): void {
+      if (!props.onModeChange(nextMode)) return
+      pendingFocus = 'control'
+      void nextTick(() => {
+        if (pendingFocus === 'control' && props.expanded && !props.hidden) {
+          pendingFocus = null
+          focusComposerControl()
+        }
+      })
+    }
+
+    function currentFileInsertion(): { start: number; end: number } {
+      const textarea = input.value
+      return {
+        start: textareaOffsetToDraftOffset(props.draft, textarea?.selectionStart ?? props.draft.length),
+        end: textareaOffsetToDraftOffset(props.draft, textarea?.selectionEnd ?? props.draft.length),
+      }
+    }
+
+    function openFilePicker(): void {
+      fileInsertion = currentFileInsertion()
+      fileInput.value?.click()
+    }
+
+    async function resolveFilesIntoDraft(files: File[], insertionRange: { start: number; end: number }): Promise<void> {
+      if (files.length === 0 || resolvingFiles.value) return
+      const expectedDraft = props.draft
+      const onResolveFiles = props.onResolveFiles
+      const onDraftReplace = props.onDraftReplace
+      const onFileInsertionRejected = props.onFileInsertionRejected
+      resolvingFiles.value = true
+      try {
+        const insertion = await onResolveFiles(files)
+        if (!insertion) return
+        history.leaveBrowsing()
+        const start = Math.min(insertionRange.start, expectedDraft.length)
+        const end = Math.min(Math.max(insertionRange.end, start), expectedDraft.length)
+        const nextDraft = insertComposerText(expectedDraft, insertion, start, end)
+        if (!onDraftReplace(expectedDraft, nextDraft.value)) {
+          onFileInsertionRejected()
+          return
+        }
+        pendingCaret = draftOffsetToTextareaOffset(nextDraft.value, nextDraft.caret)
+      } finally {
+        resolvingFiles.value = false
+      }
+    }
+
+    async function handleFileSelection(event: Event): Promise<void> {
+      if (!(event.currentTarget instanceof HTMLInputElement)) return
+      const files = Array.from(event.currentTarget.files ?? [])
+      event.currentTarget.value = ''
+      await resolveFilesIntoDraft(files, fileInsertion)
+    }
+
+    async function copyContent(): Promise<void> {
+      if (copyingContent.value) return
+      copyingContent.value = true
+      try {
+        await props.onCopyContent()
+      } finally {
+        copyingContent.value = false
+      }
+    }
+
+    function handleComposerKeyDown(event: KeyboardEvent): void {
+      if (!props.expanded || event.key !== 'Escape' || isImeCompositionEvent(event)) return
+      if (
+        event.target instanceof Element &&
+        (event.target.closest('[data-slot="popover-content"]') ||
+          event.target.closest('[data-terminal-composer-menu-trigger][data-state="open"]'))
+      ) {
+        return
+      }
+      event.preventDefault()
+      event.stopPropagation()
+      closeComposer()
+    }
+
+    onMounted(() => root.value?.addEventListener('keydown', handleComposerKeyDown, true))
+    onScopeDispose(() => root.value?.removeEventListener('keydown', handleComposerKeyDown, true))
+
+    return () => (
       <div
-        id={composerId}
-        className="goblin-terminal-composer__surface"
-        aria-hidden={!expanded}
-        inert={!expanded ? true : undefined}
+        ref={root}
+        class={cn('goblin-terminal-composer', props.expanded && 'goblin-terminal-composer--expanded', props.class)}
+        data-expanded={props.expanded}
+        hidden={props.hidden}
+        role="group"
+        aria-label={props.labels.composer}
       >
-        <div className="goblin-terminal-composer__mode-row">
-          <ComposerButton
-            buttonRef={modeToggleRef}
-            accessibleName={mode === 'input' ? labels.showKeys : labels.showInput}
-            onClick={() => {
-              const nextMode = mode === 'input' ? 'keys' : 'input'
-              switchMode(nextMode)
-            }}
-          >
-            {mode === 'input' ? <Keyboard className="size-4" /> : <TextCursorInput className="size-4" />}
-          </ComposerButton>
-          {mode === 'input' ? (
-            <textarea
-              ref={inputRef}
-              rows={1}
-              value={draft}
-              readOnly={resolvingFiles}
-              aria-busy={resolvingFiles || undefined}
-              aria-label={labels.inputPlaceholder}
-              placeholder={labels.inputPlaceholder}
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              enterKeyHint="send"
-              className="goblin-terminal-composer__input font-mono"
-              onChange={(event) => {
-                history.leaveBrowsing()
-                onDraftChange(event.target.value)
-              }}
-              onPointerDown={() => history.leaveBrowsing()}
-              onKeyDown={handleDraftKeyDown}
-            />
-          ) : (
-            <ScrollArea
-              orientation="horizontal"
-              scrollbarMode="compact"
-              className="goblin-terminal-composer__key-scroll"
+        <ComposerButton
+          buttonRef={trigger}
+          class="goblin-terminal-composer__toggle"
+          accessibleName={props.labels.open}
+          aria-expanded={props.expanded}
+          aria-controls={composerId}
+          aria-hidden={props.expanded}
+          aria-keyshortcuts={props.shortcut}
+          tabindex={props.expanded ? -1 : undefined}
+          onClick={openComposer}
+        >
+          <Keyboard class="size-5" />
+        </ComposerButton>
+        <div
+          id={composerId}
+          class="goblin-terminal-composer__surface"
+          aria-hidden={!props.expanded}
+          inert={!props.expanded ? true : undefined}
+        >
+          <div class="goblin-terminal-composer__mode-row">
+            <ComposerButton
+              buttonRef={modeToggle}
+              accessibleName={props.mode === 'input' ? props.labels.showKeys : props.labels.showInput}
+              onClick={() => switchMode(props.mode === 'input' ? 'keys' : 'input')}
             >
-              <div className="goblin-terminal-composer__key-row">
-                <ComposerButton
-                  className="goblin-terminal-composer__key-action--optional-6"
-                  accessibleName={labels[TERMINAL_COMPOSER_COPY_ACTION.labelKey]}
-                  disabled={copyingContent}
-                  aria-busy={copyingContent || undefined}
-                  onPointerDown={(event) => event.preventDefault()}
-                  onClick={() => void copyContent()}
-                >
-                  <Copy className="size-4" />
-                </ComposerButton>
-                {TERMINAL_COMPOSER_OPTIONAL_ACTIONS.map((action, index) => (
+              {props.mode === 'input' ? <Keyboard class="size-4" /> : <TextCursorInput class="size-4" />}
+            </ComposerButton>
+            {props.mode === 'input' ? (
+              <textarea
+                ref={input}
+                rows={1}
+                value={props.draft}
+                readonly={resolvingFiles.value}
+                aria-busy={resolvingFiles.value || undefined}
+                aria-label={props.labels.inputPlaceholder}
+                placeholder={props.labels.inputPlaceholder}
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck={false}
+                enterkeyhint="send"
+                class="goblin-terminal-composer__input font-mono"
+                onInput={(event) => {
+                  if (!(event.currentTarget instanceof HTMLTextAreaElement)) return
+                  history.leaveBrowsing()
+                  props.onDraftChange(event.currentTarget.value)
+                }}
+                onPointerdown={() => history.leaveBrowsing()}
+                onKeydown={handleDraftKeyDown}
+              />
+            ) : (
+              <ScrollArea orientation="horizontal" scrollbarMode="compact" class="goblin-terminal-composer__key-scroll">
+                <div class="goblin-terminal-composer__key-row">
                   <ComposerButton
-                    key={action.key}
-                    className={`goblin-terminal-composer__key-action--optional-${index + 1}`}
-                    accessibleName={labels[action.labelKey]}
-                    onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => onVirtualKey(action.key)}
+                    class="goblin-terminal-composer__key-action--optional-6"
+                    accessibleName={props.labels[TERMINAL_COMPOSER_COPY_ACTION.labelKey]}
+                    disabled={copyingContent.value}
+                    aria-busy={copyingContent.value || undefined}
+                    onPointerdown={(event) => event.preventDefault()}
+                    onClick={() => void copyContent()}
                   >
-                    {COMMAND_KEY_ICONS[action.labelKey] ?? action.keycap}
+                    <Copy class="size-4" />
                   </ComposerButton>
-                ))}
-                {TERMINAL_COMPOSER_PINNED_COMMAND_KEYS.map((key) => (
-                  <ComposerButton
-                    key={key.key}
-                    accessibleName={labels[key.labelKey]}
-                    onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => onVirtualKey(key.key)}
-                  >
-                    {COMMAND_KEY_ICONS[key.labelKey] ?? key.keycap}
-                  </ComposerButton>
-                ))}
-                {PRIMARY_KEY_ACTIONS.map((key) => (
-                  <ComposerButton
-                    key={key.accessibleName}
-                    accessibleName={labels[key.accessibleName]}
-                    onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => onVirtualKey(key.key)}
-                  >
-                    {key.icon}
-                  </ComposerButton>
-                ))}
-              </div>
-            </ScrollArea>
-          )}
-          {canUploadFiles && (
-            <input
-              ref={fileInputRef}
-              hidden
-              tabIndex={-1}
-              aria-hidden="true"
-              type="file"
-              multiple
-              onChange={handleFileSelection}
+                  {TERMINAL_COMPOSER_OPTIONAL_ACTIONS.map((action, index) => (
+                    <ComposerButton
+                      key={action.key}
+                      class={`goblin-terminal-composer__key-action--optional-${index + 1}`}
+                      accessibleName={props.labels[action.labelKey]}
+                      onPointerdown={(event) => event.preventDefault()}
+                      onClick={() => props.onVirtualKey(action.key)}
+                    >
+                      {COMMAND_KEY_ICONS[action.labelKey] ?? action.keycap}
+                    </ComposerButton>
+                  ))}
+                  {TERMINAL_COMPOSER_PINNED_COMMAND_KEYS.map((key) => (
+                    <ComposerButton
+                      key={key.key}
+                      accessibleName={props.labels[key.labelKey]}
+                      onPointerdown={(event) => event.preventDefault()}
+                      onClick={() => props.onVirtualKey(key.key)}
+                    >
+                      {COMMAND_KEY_ICONS[key.labelKey] ?? key.keycap}
+                    </ComposerButton>
+                  ))}
+                  {PRIMARY_KEY_ACTIONS.map((key) => (
+                    <ComposerButton
+                      key={key.accessibleName}
+                      accessibleName={props.labels[key.accessibleName]}
+                      onPointerdown={(event) => event.preventDefault()}
+                      onClick={() => props.onVirtualKey(key.key)}
+                    >
+                      {key.icon}
+                    </ComposerButton>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+            {props.canUploadFiles ? (
+              <input
+                ref={fileInput}
+                hidden
+                tabindex={-1}
+                aria-hidden="true"
+                type="file"
+                multiple
+                onChange={(event) => void handleFileSelection(event)}
+              />
+            ) : null}
+            <TerminalComposerMenu
+              labels={props.labels}
+              mode={props.mode}
+              canUploadFiles={props.canUploadFiles}
+              resolvingFiles={resolvingFiles.value}
+              copyingContent={copyingContent.value}
+              onUpload={openFilePicker}
+              onVirtualKey={props.onVirtualKey}
+              onCopyContent={() => void copyContent()}
+              onClose={closeComposer}
+              onRestoreComposerTriggerFocus={requestTriggerFocus}
             />
-          )}
-          <TerminalComposerMenu
-            labels={labels}
-            mode={mode}
-            canUploadFiles={canUploadFiles}
-            resolvingFiles={resolvingFiles}
-            copyingContent={copyingContent}
-            onUpload={openFilePicker}
-            onVirtualKey={onVirtualKey}
-            onCopyContent={() => void copyContent()}
-            onClose={closeComposer}
-            onRestoreComposerTriggerFocus={requestTriggerFocus}
-          />
+          </div>
         </div>
       </div>
-    </div>
-  )
-}
+    )
+  },
+  {
+    name: 'TerminalComposer',
+    props: [
+      'labels',
+      'expanded',
+      'mode',
+      'draft',
+      'historyEntries',
+      'shortcut',
+      'canUploadFiles',
+      'onVirtualKey',
+      'onCopyContent',
+      'onSendText',
+      'onOpen',
+      'onClose',
+      'onModeChange',
+      'onDraftChange',
+      'onDraftReplace',
+      'onResolveFiles',
+      'onFileInsertionRejected',
+      'hidden',
+      'class',
+    ],
+  },
+)
 
-interface ComposerButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ComposerButtonProps extends ButtonHTMLAttributes {
   accessibleName: string
-  children: ReactNode
-  buttonRef?: Ref<HTMLButtonElement>
-  onClick: MouseEventHandler<HTMLButtonElement>
+  buttonRef?: ElementRef<HTMLButtonElement>
+  onClick: (event: MouseEvent) => void
 }
 
-function ComposerButton({ accessibleName, children, buttonRef, className, ...buttonProps }: ComposerButtonProps) {
+const ComposerButton: FunctionalComponent<ComposerButtonProps> = (props, { attrs, slots }) => {
+  const { class: classValue, ...buttonAttrs } = attrs as ButtonHTMLAttributes
   return (
     <Button
-      {...buttonProps}
-      ref={buttonRef}
+      {...buttonAttrs}
+      ref={toButtonVNodeRef(props.buttonRef)}
       type="button"
       size="icon"
       variant="secondary"
-      className={cn('goblin-terminal-composer__btn', className)}
+      onClick={props.onClick}
+      class={cn('goblin-terminal-composer__btn', classValue)}
     >
-      <span aria-hidden="true">{children}</span>
-      <span className="sr-only">{accessibleName}</span>
+      <span aria-hidden="true">{slots.default?.()}</span>
+      <span class="sr-only">{props.accessibleName}</span>
     </Button>
   )
 }
+ComposerButton.props = ['accessibleName', 'buttonRef', 'onClick']
+ComposerButton.inheritAttrs = false

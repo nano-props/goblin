@@ -1,23 +1,24 @@
 // @vitest-environment jsdom
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { act, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
-import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { hostInfoStore } from '#/web/stores/host-info.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 const mocks = vi.hoisted(() => ({
-  t: vi.fn((key: string) => key),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
 }))
@@ -25,11 +26,7 @@ const mocks = vi.hoisted(() => ({
 const CLONE_URL = 'https://example.com/repo.git'
 const CLONED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/cloned-repo')
 
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useT: () => mocks.t,
-}))
-
-vi.mock('sonner', () => ({
+vi.mock('vue-sonner', () => ({
   toast: {
     error: mocks.toastError,
     success: mocks.toastSuccess,
@@ -50,7 +47,6 @@ const fetchMock = mockFetch(async (input: RequestInfo | URL) => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.t.mockImplementation((key: string) => key)
   mocks.toastError.mockImplementation(() => {})
   resetWorkspacesStore()
   setClientBridgeForTests(null)
@@ -67,7 +63,7 @@ beforeEach(() => {
     configurable: true,
     value: currentNativeBridge(),
   })
-  useHostInfoStore.setState({
+  hostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
     status: 'ready',
     error: null,
@@ -94,7 +90,7 @@ describe('RepoCloneDialog', () => {
 
     renderRepoCloneDialog(vi.fn(), onOpenChange)
 
-    submitClone()
+    await submitClone()
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
     const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined
@@ -119,13 +115,13 @@ describe('RepoCloneDialog', () => {
       ok: true as const,
       workspaceId: CLONED_WORKSPACE_ID,
     }))
-    useWorkspacesStore.setState({ openWorkspaceMembership })
+    workspacesStore.setState({ openWorkspaceMembership })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
     renderRepoCloneDialog(activateWorkspace, onOpenChange)
 
-    submitClone()
+    await submitClone()
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
     expect(openWorkspaceMembership).toHaveBeenCalledWith('/tmp/cloned-repo')
@@ -143,20 +139,20 @@ describe('RepoCloneDialog', () => {
       workspaceId: ReturnType<typeof workspaceIdForTest>
     }>()
     const openWorkspaceMembership = vi.fn(() => opening.promise)
-    useWorkspacesStore.setState({ openWorkspaceMembership })
+    workspacesStore.setState({ openWorkspaceMembership })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
     renderRepoCloneDialog(activateWorkspace, onOpenChange)
 
-    submitClone()
+    await submitClone()
     await waitFor(() => expect(openWorkspaceMembership).toHaveBeenCalledWith('/tmp/cloned-repo'))
 
     await user.click(screen.getByRole('button', { name: 'dialog.cancel' }))
     expect(onOpenChange).toHaveBeenCalledTimes(1)
     expect(onOpenChange).toHaveBeenCalledWith(false)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       opening.resolve({
         ok: true,
         workspaceId: CLONED_WORKSPACE_ID,
@@ -186,13 +182,13 @@ describe('RepoCloneDialog', () => {
     },
   ])('preserves clone success $name', async ({ open, message }) => {
     const openWorkspaceMembership = vi.fn(open)
-    useWorkspacesStore.setState({ openWorkspaceMembership })
+    workspacesStore.setState({ openWorkspaceMembership })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
     renderRepoCloneDialog(activateWorkspace, onOpenChange)
 
-    submitClone()
+    await submitClone()
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
     expect(openWorkspaceMembership).toHaveBeenCalledWith('/tmp/cloned-repo')
@@ -210,7 +206,7 @@ describe('RepoCloneDialog', () => {
       ok: true as const,
       workspaceId: CLONED_WORKSPACE_ID,
     }))
-    useWorkspacesStore.setState({ openWorkspaceMembership })
+    workspacesStore.setState({ openWorkspaceMembership })
     const activateWorkspace = vi.fn(() => {
       throw new Error('workspace presentation crashed')
     })
@@ -218,7 +214,7 @@ describe('RepoCloneDialog', () => {
 
     renderRepoCloneDialog(activateWorkspace, onOpenChange)
 
-    submitClone()
+    await submitClone()
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
     expect(openWorkspaceMembership).toHaveBeenCalledWith('/tmp/cloned-repo')
@@ -236,11 +232,11 @@ describe('RepoCloneDialog', () => {
       workspaceId: CLONED_WORKSPACE_ID,
       postOpenEffects: Promise.resolve([{ kind: 'recent-workspace' as const, message: 'recent write failed' }]),
     }))
-    useWorkspacesStore.setState({ openWorkspaceMembership })
+    workspacesStore.setState({ openWorkspaceMembership })
 
     renderRepoCloneDialog()
 
-    submitClone()
+    await submitClone()
 
     await waitFor(() => {
       expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.recent-save-failed', {
@@ -268,10 +264,10 @@ function renderRepoCloneDialog(
   )
 }
 
-function submitClone() {
-  setInputValue('#clone-url', CLONE_URL)
-  setInputValue('#clone-directory-name', 'repo')
-  click('button[type="submit"]')
+async function submitClone(): Promise<void> {
+  await setInputValue('#clone-url', CLONE_URL)
+  await setInputValue('#clone-directory-name', 'repo')
+  await click('button[type="submit"]')
 }
 
 function input(selector: string): HTMLInputElement {
@@ -286,19 +282,21 @@ function button(selector: string): HTMLButtonElement {
   return element
 }
 
-function setInputValue(selector: string, value: string) {
+async function setInputValue(selector: string, value: string): Promise<void> {
+  await flushTestUpdates(() => {})
   const element = input(selector)
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
   descriptor?.set?.call(element, value)
-  act(() => {
+  await flushTestUpdates(() => {
     element.dispatchEvent(new Event('input', { bubbles: true }))
     element.dispatchEvent(new Event('change', { bubbles: true }))
   })
 }
 
-function click(selector: string) {
+async function click(selector: string): Promise<void> {
+  await flushTestUpdates(() => {})
   const element = button(selector)
-  act(() => {
+  await flushTestUpdates(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
 }

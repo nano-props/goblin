@@ -3,7 +3,7 @@ import { parseClientWorkspaceStateJson, stringifyClientWorkspaceState } from '#/
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 
 describe('client workspace state JSON codec', () => {
-  test('persists the state object directly without a version envelope', () => {
+  test('persists the state object directly without a version envelope', async () => {
     const state = { ...defaultClientWorkspaceState(), zenMode: true }
     const serialized = stringifyClientWorkspaceState(state)
 
@@ -13,13 +13,13 @@ describe('client workspace state JSON codec', () => {
     expect(parseClientWorkspaceStateJson(serialized)).toEqual(state)
   })
 
-  test('rejects a version envelope instead of creating a second persistence format', () => {
+  test('rejects a version envelope instead of creating a second persistence format', async () => {
     const enveloped = JSON.stringify({ version: 1, state: defaultClientWorkspaceState() })
 
     expect(() => parseClientWorkspaceStateJson(enveloped)).toThrow()
   })
 
-  test('rejects a branch view preference with a non-canonical workspace identity', () => {
+  test('rejects a branch view preference with a non-canonical workspace identity', async () => {
     const state = {
       ...defaultClientWorkspaceState(),
       branchViewModeByWorkspace: { '/tmp/repo': 'worktrees' as const },

@@ -9,7 +9,7 @@ import type {
   NativeHostProjection,
   NativeSettingsProjectionPatch,
   NativeSettingsProjectionState,
-} from '#/shared/api-types.ts'
+} from '#/shared/native-host-projection.ts'
 
 // Native-host application of server-owned settings changes.
 //

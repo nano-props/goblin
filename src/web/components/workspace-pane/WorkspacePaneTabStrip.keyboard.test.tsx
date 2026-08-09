@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type { FunctionalComponent } from 'vue'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import {
   createRuntimeWorkspacePaneTabItem,
@@ -15,46 +15,26 @@ import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/Workspace
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 
 const dndMocks = vi.hoisted(() => ({
-  keyboardSensorToken: {},
-  pointerSensorToken: {},
-  sortableOnKeyDown: vi.fn(),
-  sortableOnPointerDown: vi.fn(),
-  useSensor: vi.fn((sensor, options) => ({ sensor, options })),
+  useSortable: vi.fn(),
   sortableDragging: false,
 }))
 
-vi.mock('@dnd-kit/core', () => ({
-  DndContext: ({ children }: { children: unknown }) => children,
-  KeyboardSensor: dndMocks.keyboardSensorToken,
-  PointerSensor: dndMocks.pointerSensorToken,
-  closestCenter: vi.fn(),
-  useSensor: (sensor: unknown, options: unknown) => dndMocks.useSensor(sensor, options),
-  useSensors: (...sensors: unknown[]) => sensors,
-}))
-
-vi.mock('@dnd-kit/sortable', () => ({
-  SortableContext: ({ children }: { children: unknown }) => children,
-  horizontalListSortingStrategy: {},
-  sortableKeyboardCoordinates: vi.fn(),
-  useSortable: () => ({
-    attributes: {},
-    listeners: {
-      onKeyDown: dndMocks.sortableOnKeyDown,
-      onPointerDown: dndMocks.sortableOnPointerDown,
-    },
-    setNodeRef: vi.fn(),
-    setActivatorNodeRef: vi.fn(),
-    transform: null,
-    transition: undefined,
-    isDragging: dndMocks.sortableDragging,
-  }),
+vi.mock('@dnd-kit/vue/sortable', () => ({
+  isSortable: () => false,
+  useSortable: (input: unknown) => {
+    dndMocks.useSortable(input)
+    return {
+      isDragging: {
+        get value() {
+          return dndMocks.sortableDragging
+        },
+      },
+    }
+  },
 }))
 
 beforeEach(() => {
-  dndMocks.sortableOnKeyDown.mockReset()
-  dndMocks.sortableOnPointerDown.mockReset()
-  dndMocks.useSensor.mockReset()
-  dndMocks.useSensor.mockImplementation((sensor, options) => ({ sensor, options }))
+  dndMocks.useSortable.mockReset()
   dndMocks.sortableDragging = false
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
     configurable: true,
@@ -95,11 +75,11 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
     expect(tabChrome.className).not.toContain('bg-card')
   })
 
-  test('registers a KeyboardSensor and preserves sortable onKeyDown listeners', async () => {
+  test('registers sortable elements and preserves tab keyboard navigation', async () => {
     const user = userEvent.setup()
     const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip()
 
-    renderInJsdom(
+    const rendered = renderInJsdom(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
@@ -116,14 +96,6 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
       { wrapper: WorkspacePaneTabStripScrollMemoryProvider },
     )
 
-    expect(dndMocks.useSensor).toHaveBeenCalledWith(dndMocks.pointerSensorToken, {
-      activationConstraint: { distance: 6 },
-    })
-    expect(dndMocks.useSensor).toHaveBeenCalledWith(
-      dndMocks.keyboardSensorToken,
-      expect.objectContaining({ coordinateGetter: expect.any(Function) }),
-    )
-
     const tab = document.body.querySelector('#workspace-workspace-pane-tab')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal tab')
     const tabChrome = document.body.querySelector(
@@ -132,43 +104,74 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
     if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal chrome')
 
     expect(tabChrome.dataset.titleBarChromeRegion).toBe('interactive')
+    expect(dndMocks.useSortable).toHaveBeenCalledTimes(2)
+    const sortableInput = dndMocks.useSortable.mock.calls[0]?.[0] as {
+      id: () => string
+      group: string
+      element: { value: HTMLElement | null }
+      handle: { value: HTMLElement | null }
+    }
+    expect(sortableInput.id()).toBe('terminal:term-111111111111111111111')
+    expect(sortableInput.group).toBe('workspace-pane-tabs')
+    expect(sortableInput.element.value).toBe(tabChrome.parentElement)
+    expect(sortableInput.handle.value).toBe(tab)
 
     tab.focus()
     await user.keyboard('{ArrowRight}')
+    await rendered.flushAnimationFrames()
 
-    expect(dndMocks.sortableOnKeyDown).toHaveBeenCalledTimes(1)
+    expect(document.activeElement?.id).toBe('workspace-workspace-pane-tab-1')
+  })
 
-    act(() => {
-      tabChrome.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    })
+  test('closes the focused closable tab with Delete', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip()
 
-    expect(dndMocks.sortableOnPointerDown).toHaveBeenCalledTimes(1)
+    renderInJsdom(
+      <TestWorkspacePaneTabStrip
+        terminalFilesystemTargetKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        panelActive
+        sessions={[session({ terminalSessionId: 'term-111111111111111111111', selected: true })]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={onClose}
+        onReorder={() => {}}
+      />,
+      { wrapper: WorkspacePaneTabStripScrollMemoryProvider },
+    )
 
-    const closeButton = tabChrome.querySelector('button[aria-label="close term-1"]')
-    if (!(closeButton instanceof HTMLButtonElement)) throw new Error('missing close button')
+    const tab = document.body.querySelector('#workspace-workspace-pane-tab')
+    if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal tab')
 
-    act(() => {
-      closeButton.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    })
+    expect(tab.getAttribute('aria-keyshortcuts')).toBe('Delete')
+    tab.focus()
+    await user.keyboard('{Delete}')
 
-    expect(dndMocks.sortableOnPointerDown).toHaveBeenCalledTimes(1)
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(onClose).toHaveBeenCalledWith(expect.objectContaining({ terminalSessionId: 'term-111111111111111111111' }))
   })
 })
 
-function makeWorkspacePaneTabStrip() {
-  return function TestWorkspacePaneTabStrip(props: {
-    terminalFilesystemTargetKey: string
-    sessions: TerminalSessionSummary[]
-    workspacePaneId: string
-    panelActive?: boolean
-    onNew: () => void
-    onSelect: (terminalFilesystemTargetKey: string, tab: TerminalSessionSummary) => void
-    onScrollToBottom: (key: string) => void
-    onClose: (tab: TerminalSessionSummary) => void
-    onReorder: (tabs: WorkspacePaneTabEntry[]) => void
-  }) {
+interface TestWorkspacePaneTabStripProps {
+  terminalFilesystemTargetKey: string
+  sessions: TerminalSessionSummary[]
+  workspacePaneId: string
+  panelActive?: boolean
+  onNew: () => void
+  onSelect: (terminalFilesystemTargetKey: string, tab: TerminalSessionSummary) => void
+  onScrollToBottom: (key: string) => void
+  onClose: (tab: TerminalSessionSummary) => void
+  onReorder: (tabs: WorkspacePaneTabEntry[]) => void
+}
+
+function makeWorkspacePaneTabStrip(): FunctionalComponent<TestWorkspacePaneTabStripProps> {
+  const TestWorkspacePaneTabStrip: FunctionalComponent<TestWorkspacePaneTabStripProps> = (props) => {
     const selected = props.sessions.find((candidate) => candidate.selected) ?? null
-    const { sessions, terminalFilesystemTargetKey, onNew, onScrollToBottom, ...workspacePaneProps } = props
+    const { sessions, terminalFilesystemTargetKey, onNew, onSelect, onScrollToBottom, onClose, ...workspacePaneProps } =
+      props
     const items = sessions.map((tab) =>
       createRuntimeWorkspacePaneTabItem({
         view: tab,
@@ -186,7 +189,7 @@ function makeWorkspacePaneTabStrip() {
         activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalSessionId) : null}
         onSelect={(item) => {
           if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
-            props.onSelect(terminalFilesystemTargetKey, item.view)
+            onSelect(terminalFilesystemTargetKey, item.view)
           }
         }}
         onReselect={(item) => {
@@ -196,12 +199,24 @@ function makeWorkspacePaneTabStrip() {
         }}
         onClose={(item) => {
           if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
-            props.onClose(item.view)
+            onClose(item.view)
           }
         }}
       />
     )
   }
+  TestWorkspacePaneTabStrip.props = [
+    'terminalFilesystemTargetKey',
+    'sessions',
+    'workspacePaneId',
+    'panelActive',
+    'onNew',
+    'onSelect',
+    'onScrollToBottom',
+    'onClose',
+    'onReorder',
+  ]
+  return TestWorkspacePaneTabStrip
 }
 
 function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {

@@ -5,13 +5,13 @@ import { createRouteApp, parseHttpBody, parseHttpInput } from '#/server/common/h
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 
 describe('parseHttpInput', () => {
-  test('returns the parsed output for valid input', () => {
+  test('returns the parsed output for valid input', async () => {
     const schema = v.object({ cwd: v.string(), branch: v.optional(v.string()) })
     const result = parseHttpInput(schema, { cwd: '/tmp/repo', branch: 'main' })
     expect(result).toEqual({ cwd: '/tmp/repo', branch: 'main' })
   })
 
-  test('throws BAD_REQUEST IpcError for missing required field', () => {
+  test('throws BAD_REQUEST IpcError for missing required field', async () => {
     const schema = v.object({ cwd: v.string() })
     expect(() => parseHttpInput(schema, {})).toThrow(IpcError)
     try {
@@ -23,12 +23,12 @@ describe('parseHttpInput', () => {
     }
   })
 
-  test('throws BAD_REQUEST IpcError for wrong type', () => {
+  test('throws BAD_REQUEST IpcError for wrong type', async () => {
     const schema = v.object({ cwd: v.string() })
     expect(() => parseHttpInput(schema, { cwd: 123 })).toThrow(IpcError)
   })
 
-  test('rejects null and non-object inputs', () => {
+  test('rejects null and non-object inputs', async () => {
     const schema = v.object({ cwd: v.string() })
     expect(() => parseHttpInput(schema, null)).toThrow(IpcError)
     expect(() => parseHttpInput(schema, 'string')).toThrow(IpcError)

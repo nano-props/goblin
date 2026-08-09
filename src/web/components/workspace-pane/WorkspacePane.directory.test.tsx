@@ -1,16 +1,17 @@
 // @vitest-environment jsdom
 
-import { act, screen, waitFor } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { screen, waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
+  TerminalSessionCommandScope,
+  TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import { AppNavigationProvider } from '#/web/app-navigation.tsx'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
@@ -27,7 +28,7 @@ import { gitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { externalAppsQueryKey } from '#/web/settings-query-cache.ts'
 import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { hostInfoStore } from '#/web/stores/host-info.ts'
 import {
   directoryWorkspaceProbe,
   navigation,
@@ -40,12 +41,20 @@ import {
 
 const responsiveMocks = vi.hoisted(() => ({ compact: false }))
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useIsCompactUi: () => responsiveMocks.compact,
+  useIsCompactUi: () => ({
+    get value() {
+      return responsiveMocks.compact
+    },
+  }),
 }))
 
 beforeEach(() => {
   responsiveMocks.compact = false
 })
+
+function queryObserverCount(queryKey: readonly unknown[]): number {
+  return appQueryClient.getQueryCache().find({ queryKey, exact: true })?.getObserversCount() ?? 0
+}
 
 describe('WorkspacePane directory workspaces', () => {
   test('renders a remote non-Git workspace with canonical Status, Files, and Terminal targets', async () => {
@@ -56,7 +65,7 @@ describe('WorkspacePane directory workspaces', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
     const commitWorkspaceRootTerminalSession = vi.fn(async () => true)
     const terminalCreate = Promise.withResolvers<string>()
     const createTerminal = vi.fn(async () => await terminalCreate.promise)
@@ -67,23 +76,24 @@ describe('WorkspacePane directory workspaces', () => {
     })
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={{ ...navigation, commitWorkspaceRootTerminalSession }}>
-          <TerminalSessionContext value={deferredTerminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={deferredTerminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
                 workspacePaneRouteContext={{ kind: 'workspace-root', route: { kind: 'static', tab: 'files' } }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(screen.getByText('tab.files')).toBeTruthy()
     expect(screen.getByText('tab.status')).toBeTruthy()
     expect(screen.queryByText('branches.empty')).toBeNull()
+    expect(queryObserverCount(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId))).toBe(0)
     const newTerminalButton = screen.getByRole('button', { name: 'terminal.new' }) as HTMLButtonElement
     await waitFor(() => expect(newTerminalButton.disabled).toBe(false))
     newTerminalButton.click()
@@ -108,7 +118,7 @@ describe('WorkspacePane directory workspaces', () => {
     )
   })
 
-  test('renders shared external app actions for a local non-Git workspace', () => {
+  test('renders shared external app actions for a local non-Git workspace', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/filesystem-toolbar-workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
@@ -124,25 +134,25 @@ describe('WorkspacePane directory workspaces', () => {
       },
       editor: { available: true, appAvailability: { vscode: true }, detectedAt: 1 },
     })
-    useHostInfoStore.setState({
+    hostInfoStore.setState({
       snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
       status: 'ready',
       error: null,
     })
 
     const { container } = render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
                 workspacePaneRouteContext={{ kind: 'workspace-root', route: { kind: 'static', tab: 'files' } }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(container.querySelector('[data-testid="workspace-external-app-launcher-primary"]')).not.toBeNull()
@@ -159,24 +169,24 @@ describe('WorkspacePane directory workspaces', () => {
     })
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
                 currentBranchName={null}
                 workspacePaneRouteContext={{ kind: 'workspace-root', route: null }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(screen.getByText('tab.files')).toBeTruthy()
-    act(() => {
-      useWorkspacesStore.setState((state) => {
+    await flushTestUpdates(() => {
+      workspacesStore.setState((state) => {
         const repo = state.workspaces[workspaceId]
         if (!repo) return state
         return {
@@ -227,10 +237,10 @@ describe('WorkspacePane directory workspaces', () => {
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(workspaceId, worktreePath)
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope
               value={terminalReadContextWithSession(terminalFilesystemTargetKey, terminalSessionId)}
             >
               <WorkspacePane
@@ -242,10 +252,10 @@ describe('WorkspacePane directory workspaces', () => {
                   route: { kind: 'terminal', terminalSessionId },
                 }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
@@ -276,10 +286,10 @@ describe('WorkspacePane directory workspaces', () => {
     statusQuery.setState({ ...statusQuery.state, status: 'error', error: new Error('status refresh failed') })
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
                 currentBranchName={null}
@@ -289,10 +299,10 @@ describe('WorkspacePane directory workspaces', () => {
                   route: { kind: 'static', tab: 'files' },
                 }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
@@ -320,32 +330,32 @@ describe('WorkspacePane directory workspaces', () => {
       workspaceRuntimeId: repo.workspaceRuntimeId,
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
+    workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
                 currentBranchName={null}
                 workspacePaneRouteContext={{ kind: 'git-worktree', worktreePath, route: null }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
-    await act(async () => await Promise.resolve())
+    await flushTestUpdates(async () => await Promise.resolve())
     expect(screen.getByRole('tab', { name: 'tab.files' }).getAttribute('aria-selected')).toBe('true')
-    const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+    const workspace = workspacesStore.getState().workspaces[workspaceId]
     expect(workspace && preferredWorkspacePaneTabForTarget(workspace.ui, target)).toBe('files')
   })
 
-  test('uses the shared compact workspace toolbar back action for a non-Git workspace', () => {
+  test('uses the shared compact workspace toolbar back action for a non-Git workspace', async () => {
     responsiveMocks.compact = true
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-compact-workspace')
     seedRepoWithReadModelForTest({
@@ -357,26 +367,26 @@ describe('WorkspacePane directory workspaces', () => {
     const onBackToNavigator = vi.fn()
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
                 workspacePaneRouteContext={{ kind: 'routed', route: null }}
                 onBackToBranchNavigator={onBackToNavigator}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     screen.getByRole('button', { name: 'workspace.back-to-workspace-navigator' }).click()
     expect(onBackToNavigator).toHaveBeenCalledOnce()
   })
 
-  test('renders directory overview data in the non-Git Status tab without a Git projection', () => {
+  test('renders directory overview data in the non-Git Status tab without a Git projection', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-status-workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
@@ -384,8 +394,8 @@ describe('WorkspacePane directory workspaces', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
-    const repo = useWorkspacesStore.getState().workspaces[workspaceId]!
-    useWorkspacesStore
+    const repo = workspacesStore.getState().workspaces[workspaceId]!
+    workspacesStore
       .getState()
       .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: workspaceId }, 'status')
     appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
@@ -395,15 +405,15 @@ describe('WorkspacePane directory workspaces', () => {
     })
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('true')
@@ -423,6 +433,7 @@ describe('WorkspacePane directory workspaces', () => {
     expect(lastModifiedValue?.textContent).toBe(lastModifiedValue?.title)
     expect(lastModifiedValue?.textContent).toMatch(/ ago$/u)
     expect(lastModifiedValue?.className).toContain('truncate')
+    expect(queryObserverCount(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId))).toBe(1)
   })
 
   test('opens Files from the working-directory row in a non-Git Status tab', async () => {
@@ -433,7 +444,7 @@ describe('WorkspacePane directory workspaces', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
+    workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
     appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
       topLevelFileCount: 1,
       topLevelDirectoryCount: 2,
@@ -445,15 +456,15 @@ describe('WorkspacePane directory workspaces', () => {
     })
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={{ ...navigation, commitFilesystemWorkspacePaneRoute }}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     screen.getByRole('button', { name: 'dashboard.directory.open-files' }).click()
@@ -479,27 +490,27 @@ describe('WorkspacePane directory workspaces', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
+    workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
                 workspacePaneRouteContext={{ kind: 'workspace-root', route: { kind: 'static', tab: 'files' } }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(screen.getByRole('tab', { name: 'tab.files' }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('false')
     await waitFor(() => {
-      const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+      const workspace = workspacesStore.getState().workspaces[workspaceId]
       expect(
         workspace &&
           preferredWorkspacePaneTabForTarget(workspace.ui, {
@@ -518,32 +529,32 @@ describe('WorkspacePane directory workspaces', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
+    workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
                 workspacePaneRouteContext={{ kind: 'workspace-root', route: null }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
-    await act(async () => await Promise.resolve())
+    await flushTestUpdates(async () => await Promise.resolve())
     expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('true')
-    const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+    const workspace = workspacesStore.getState().workspaces[workspaceId]
     expect(workspace && preferredWorkspacePaneTabForTarget(workspace.ui, { kind: 'workspace-root', workspaceId })).toBe(
       'status',
     )
   })
 
-  test('does not expose a terminal surface when the workspace capability is unavailable', () => {
+  test('does not expose a terminal surface when the workspace capability is unavailable', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/terminal-unavailable-workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
@@ -556,15 +567,15 @@ describe('WorkspacePane directory workspaces', () => {
     })
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(screen.getByText('tab.files')).toBeTruthy()

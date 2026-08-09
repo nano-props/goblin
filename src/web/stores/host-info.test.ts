@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test } from 'vitest'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 const fetchMock = mockFetch()
 
-describe('useHostInfoStore', () => {
+describe('hostInfoStore', () => {
   beforeEach(() => {
     fetchMock.mockReset()
-    useHostInfoStore.setState({ snapshot: null, status: 'pending', error: null })
+    hostInfoStore.setState({ snapshot: null, status: 'pending', error: null })
   })
 
   test('hydrates from the public /api/host endpoint', async () => {
@@ -23,17 +23,17 @@ describe('useHostInfoStore', () => {
       }),
     })
 
-    await useHostInfoStore.getState().hydrate()
+    await hostInfoStore.getState().hydrate()
 
-    const snapshot = useHostInfoStore.getState().snapshot
+    const snapshot = hostInfoStore.getState().snapshot
     expect(snapshot).toEqual({
       homeDir: '/Users/tester',
       platform: 'darwin',
       hostname: 'tester-host',
       pid: 1,
     })
-    expect(useHostInfoStore.getState().status).toBe('ready')
-    expect(useHostInfoStore.getState().error).toBeNull()
+    expect(hostInfoStore.getState().status).toBe('ready')
+    expect(hostInfoStore.getState().error).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const url = fetchMock.mock.calls[0]?.[0]
     const urlString = typeof url === 'string' ? url : (url as URL).toString()
@@ -50,14 +50,14 @@ describe('useHostInfoStore', () => {
       json: async () => ({ homeDir: '/Users/recovered', platform: 'darwin', hostname: 'host', pid: 2 }),
     })
 
-    await expect(useHostInfoStore.getState().hydrate()).rejects.toBe(failure)
+    await expect(hostInfoStore.getState().hydrate()).rejects.toBe(failure)
 
-    expect(useHostInfoStore.getState().snapshot).toBeNull()
-    expect(useHostInfoStore.getState().status).toBe('error')
-    expect(useHostInfoStore.getState().error).toBe(failure)
+    expect(hostInfoStore.getState().snapshot).toBeNull()
+    expect(hostInfoStore.getState().status).toBe('error')
+    expect(hostInfoStore.getState().error).toBe(failure)
 
-    await expect(useHostInfoStore.getState().hydrate()).resolves.toBeUndefined()
-    expect(useHostInfoStore.getState()).toMatchObject({
+    await expect(hostInfoStore.getState().hydrate()).resolves.toBeUndefined()
+    expect(hostInfoStore.getState()).toMatchObject({
       status: 'ready',
       error: null,
       snapshot: { homeDir: '/Users/recovered', platform: 'darwin' },
@@ -75,17 +75,17 @@ describe('useHostInfoStore', () => {
       })
     })
 
-    const hydrate = useHostInfoStore.getState().hydrate({ signal: controller.signal })
+    const hydrate = hostInfoStore.getState().hydrate({ signal: controller.signal })
     controller.abort(new Error('cancelled'))
     await expect(hydrate).rejects.toBe(controller.signal.reason)
 
-    expect(useHostInfoStore.getState().snapshot).toBeNull()
-    expect(useHostInfoStore.getState().status).toBe('error')
-    expect(useHostInfoStore.getState().error).toBe(controller.signal.reason)
+    expect(hostInfoStore.getState().snapshot).toBeNull()
+    expect(hostInfoStore.getState().status).toBe('error')
+    expect(hostInfoStore.getState().error).toBe(controller.signal.reason)
   })
 
   test('returns the cached snapshot via the homeDirectory / getPlatform helpers', async () => {
-    useHostInfoStore.setState({
+    hostInfoStore.setState({
       snapshot: { homeDir: '/Users/cached', platform: 'linux', hostname: 'cache', pid: 7 },
       status: 'ready',
       error: null,

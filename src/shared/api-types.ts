@@ -34,29 +34,6 @@ import type {
   WorkspaceProbeState,
 } from '#/shared/workspace-runtime.ts'
 
-export type {
-  EditorApp,
-  EditorAppAvailability,
-  Lang,
-  LangPref,
-  ResolvedTheme,
-  UserSettings,
-  TerminalApp,
-  TerminalAppAvailability,
-  ThemePref,
-} from '#/shared/settings.ts'
-export type {
-  NativeRecentWorkspacesProjection,
-  NativeSettingsProjectionPatch,
-  NativeSettingsProjectionState,
-  NativeHostProjection,
-} from '#/shared/native-host-projection.ts'
-export type {
-  WorkspaceSettingsEntry,
-  WorktreeBootstrapTrust,
-  WorkspaceExternalAppRecent,
-} from '#/shared/workspace-settings.ts'
-
 export interface LanInfo {
   host: string
   port: number

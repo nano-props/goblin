@@ -2,12 +2,12 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import { useBranchActionItems, visibleBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
+import { useBranchActionItems, visibleBranchActionItems } from '#/web/hooks/useBranchActionItems.tsx'
 import type { BranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { idleOperation } from '#/web/stores/workspaces/operations.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { renderHookInJsdom } from '#/test-utils/render.tsx'
+import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 
 const mocks = vi.hoisted(() => ({
   setDetailCollapsed: vi.fn(),
@@ -37,7 +37,7 @@ vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
 }))
 
 vi.mock('#/web/stores/workspaces/store.ts', () => ({
-  useWorkspacesStore: (selector: (state: { setDetailCollapsed: typeof mocks.setDetailCollapsed }) => unknown) =>
+  workspacesStore: (selector: (state: { setDetailCollapsed: typeof mocks.setDetailCollapsed }) => unknown) =>
     selector({ setDetailCollapsed: mocks.setDetailCollapsed }),
 }))
 
@@ -62,9 +62,9 @@ describe('useBranchActionItems', () => {
     })
   })
 
-  test('orders visible branch actions by high-frequency workflow before destructive actions', () => {
+  test('orders visible branch actions by high-frequency workflow before destructive actions', async () => {
     const { result } = renderBranchActionItems()
-    const actionIds = visibleBranchActionItems(result.current).map((item) => item.id)
+    const actionIds = visibleBranchActionItems(result.value.value).map((item) => item.id)
 
     expect(actionIds).toEqual([
       'pull',
@@ -78,16 +78,16 @@ describe('useBranchActionItems', () => {
     ])
   })
 
-  test('exposes copy patch as a changes-tab action instead of a menu item', () => {
+  test('exposes copy patch as a changes-tab action instead of a menu item', async () => {
     const { result } = renderBranchActionItems()
 
-    expect(result.current.copyPatchAction.visible).toBe(true)
-    expect(visibleBranchActionItems(result.current).map((item) => item.id)).not.toContain('copyPatch')
+    expect(result.value.value.copyPatchAction.visible).toBe(true)
+    expect(visibleBranchActionItems(result.value.value).map((item) => item.id)).not.toContain('copyPatch')
   })
 
-  test('keeps branch-static tabs visible for a branch without a worktree but hides changes and files', () => {
+  test('keeps branch-static tabs visible for a branch without a worktree but hides changes and files', async () => {
     const { result } = renderBranchActionItems({ branch: { ...branch(), worktree: undefined } })
-    const actionIds = visibleBranchActionItems(result.current).map((item) => item.id)
+    const actionIds = visibleBranchActionItems(result.value.value).map((item) => item.id)
 
     expect(actionIds).toContain('status')
     expect(actionIds).toContain('history')
@@ -98,9 +98,9 @@ describe('useBranchActionItems', () => {
     expect(actionIds).not.toContain('files')
   })
 
-  test('opens tab actions through destination navigation', () => {
+  test('opens tab actions through destination navigation', async () => {
     const { result } = renderBranchActionItems()
-    const historyAction = result.current.mainItems.find((item) => item.id === 'history')
+    const historyAction = result.value.value.mainItems.find((item) => item.id === 'history')
     if (!historyAction) throw new Error('history action not rendered')
     historyAction.onSelect()
 
@@ -114,7 +114,7 @@ describe('useBranchActionItems', () => {
   })
 
   function renderBranchActionItems(options: { branch?: BranchSnapshotInfo } = {}) {
-    return renderHookInJsdom(() => {
+    return renderComposableInJsdom(() => {
       const branchActions = mocks.useBranchActions()
       return useBranchActionItems(repo(), options.branch ?? branch(), branchActions, {
         workspacePaneRoute: undefined,

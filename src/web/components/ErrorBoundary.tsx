@@ -1,59 +1,69 @@
-// React error boundary for the current workspace surface. Without this, a render
-// crash inside any workspace view (navigator / status / files / terminal
-// detail) would unmount the whole shell and show a blank window.
-//
-// We re-mount on `resetKey` change — App.tsx passes the current workspace id
-// as the key, so navigating to a different workspace clears any prior crash
-// without the user having to restart the app.
-
-import type { ErrorInfo, ReactNode } from 'react'
-import { ErrorBoundary as ReactErrorBoundary, getErrorMessage, type FallbackProps } from 'react-error-boundary'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, RefreshCw } from '@lucide/vue'
+import { defineComponent, onErrorCaptured, shallowRef, watch } from 'vue'
+import type { PropType } from 'vue'
 import { Button } from '#/web/components/ui/button.tsx'
-import { useT } from '#/web/stores/i18n.ts'
 import { goblinLog } from '#/web/logger.ts'
-import { markReactRenderErrorLogged } from '#/web/react-error-logging.ts'
+import { markRenderErrorLogged } from '#/web/render-error-logging.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 
-interface Props {
-  /** When this prop changes (e.g. route identity), state is reset. */
-  resetKey?: string | null
-  children: ReactNode
-}
+export const ErrorBoundary = defineComponent(
+  (props: { resetKey?: string }, { slots }) => {
+    const error = shallowRef<unknown | null>(null)
 
-function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
-  const t = useT()
-  const message = getErrorMessage(error) ?? t('error.render-crash-unknown')
+    onErrorCaptured((caught, _instance, info) => {
+      // Once this boundary is rendering its own fallback, a descendant error
+      // belongs to the next outer boundary (or the application handler).
+      if (error.value !== null) return
+      if (!markRenderErrorLogged(caught)) goblinLog.error('render crash', { error: caught, componentTrace: info })
+      error.value = caught
+      return false
+    })
 
-  return (
-    <div className="flex flex-1 items-center justify-center p-8">
-      <div className="max-w-md space-y-3 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-danger-surface text-danger">
-          <AlertTriangle size={22} />
+    // A new routed surface is an explicit recovery boundary for a prior render failure.
+    watch(
+      () => props.resetKey,
+      () => {
+        error.value = null
+      },
+    )
+
+    return () => {
+      if (error.value === null) return slots.default?.()
+      return <ErrorFallback error={error.value} onReset={() => (error.value = null)} />
+    }
+  },
+  { name: 'ErrorBoundary', props: ['resetKey'] },
+)
+
+const ErrorFallback = defineComponent(
+  (props: { error: unknown; onReset: () => void }) => {
+    const t = useT()
+    return () => {
+      const message = props.error instanceof Error ? props.error.message : t('error.render-crash-unknown')
+      return (
+        <div class="flex flex-1 items-center justify-center p-8">
+          <div class="max-w-md space-y-3 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-danger-surface text-danger">
+              <AlertTriangle size={22} />
+            </div>
+            <div class="space-y-1">
+              <div class="text-sm font-semibold text-foreground">{t('error.render-crash-title')}</div>
+              <div class="text-xs leading-relaxed text-muted-foreground">{message}</div>
+            </div>
+            <Button type="button" variant="outline" onClick={props.onReset} class="h-8 px-3">
+              <RefreshCw class="size-3" />
+              {t('error.try-again')}
+            </Button>
+          </div>
         </div>
-        <div className="space-y-1">
-          <div className="text-sm font-semibold text-foreground">{t('error.render-crash-title')}</div>
-          <div className="text-xs leading-relaxed text-muted-foreground">{message}</div>
-        </div>
-        <Button type="button" variant="outline" onClick={resetErrorBoundary} className="h-8 px-3">
-          <RefreshCw className="size-3" />
-          {t('error.try-again')}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-function logRenderError(error: unknown, info: ErrorInfo): void {
-  if (markReactRenderErrorLogged(error)) return
-  // Log to console — packaged builds don't ship a remote error sink, so
-  // the next-best signal is the local devtools.
-  goblinLog.error('render crash', { error, componentStack: info.componentStack })
-}
-
-export function ErrorBoundary({ resetKey, children }: Props): ReactNode {
-  return (
-    <ReactErrorBoundary FallbackComponent={ErrorFallback} onError={logRenderError} resetKeys={[resetKey]}>
-      {children}
-    </ReactErrorBoundary>
-  )
-}
+      )
+    }
+  },
+  {
+    name: 'ErrorFallback',
+    props: {
+      error: { type: null, required: true },
+      onReset: { type: Function as PropType<() => void>, required: true },
+    },
+  },
+)

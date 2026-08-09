@@ -1,4 +1,4 @@
-import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
+import type { EditorApp, TerminalApp } from '#/shared/settings.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import {
@@ -10,7 +10,7 @@ import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspa
 import { workspacePaneFilesystemRuntimeTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { runWorkspaceUiAction } from '#/web/stores/workspaces/workspace-ui-action.ts'
 import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 export interface WorkspaceFilesystemExternalActions {
   capabilities: {
@@ -33,7 +33,7 @@ export function workspaceFilesystemExternalCapabilities(
   }
 }
 
-export function useWorkspaceFilesystemExternalActions(
+export function workspaceFilesystemExternalActions(
   target: WorkspacePaneFilesystemTarget,
 ): WorkspaceFilesystemExternalActions {
   const executionTarget = workspacePaneFilesystemRuntimeTarget(target)
@@ -44,8 +44,8 @@ export function useWorkspaceFilesystemExternalActions(
 
   return {
     capabilities: workspaceFilesystemExternalCapabilities(target),
-    openTerminal: async (app) => await run(async () => await openWorkspaceTerminal(executionTarget, app)),
-    openEditor: async (app) => await run(async () => await openWorkspaceEditor(executionTarget, app)),
+    openTerminal: async (app: TerminalApp) => await run(async () => await openWorkspaceTerminal(executionTarget, app)),
+    openEditor: async (app: EditorApp) => await run(async () => await openWorkspaceEditor(executionTarget, app)),
     openFinder: async () => await run(async () => await openWorkspaceInFinder(executionTarget)),
   }
 }
@@ -56,7 +56,7 @@ export async function runWorkspaceFilesystemExternalAction(
 ): Promise<ExecResult | null> {
   const result = await runWorkspaceUiAction(action)
   if (!result) return null
-  return currentWorkspaceRuntimeId(useWorkspacesStore.getState(), target.workspaceId) === target.workspaceRuntimeId
+  return currentWorkspaceRuntimeId(workspacesStore.getState(), target.workspaceId) === target.workspaceRuntimeId
     ? result
     : null
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { screen } from '@testing-library/react'
+import { screen } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -37,7 +37,7 @@ describe('RepoReadNotice', () => {
     expect(retryFetchingSource).not.toHaveBeenCalled()
     expect(retryIdleSource).toHaveBeenCalledOnce()
 
-    rerender(
+    await rerender(
       <RepoReadNotice
         failures={[
           { message: 'snapshot failed', stale: true, retrying: true, retry: retryFetchingSource },
@@ -51,7 +51,7 @@ describe('RepoReadNotice', () => {
     expect(retryIdleSource).toHaveBeenCalledOnce()
   })
 
-  test('reports a mixed stale and unavailable failure as unavailable', () => {
+  test('reports a mixed stale and unavailable failure as unavailable', async () => {
     renderInJsdom(
       <RepoReadNotice
         failures={[
@@ -65,7 +65,7 @@ describe('RepoReadNotice', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  test('preserves a shared message and generalizes distinct messages', () => {
+  test('preserves a shared message and generalizes distinct messages', async () => {
     const { rerender } = renderInJsdom(
       <RepoReadNotice
         failures={[
@@ -76,7 +76,7 @@ describe('RepoReadNotice', () => {
     )
 
     expect(screen.getByText(/snapshot failed/)).toBeTruthy()
-    rerender(
+    await rerender(
       <RepoReadNotice
         failures={[
           { message: 'snapshot failed', stale: true, retrying: false },

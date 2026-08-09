@@ -1,111 +1,72 @@
-import { useCallback, useMemo } from 'react'
+import { computed, toValue } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import { useOverlayRegistry } from '#/web/hooks/useOverlayRegistry.ts'
+
 export const APP_OVERLAY_KEYS = ['clone', 'openWorkspace', 'openRemoteWorkspace'] as const
 export type AppOverlayKey = (typeof APP_OVERLAY_KEYS)[number]
 
 interface AppOverlayRouteOptions {
-  routeOverlay?: AppOverlayKey | null
+  routeOverlay?: MaybeRefOrGetter<AppOverlayKey | null | undefined>
   onRouteOverlayChange?: (overlay: AppOverlayKey | null) => void
 }
 
-export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
-  // App-level orchestration layer: compose the generic open/close registry with
-  // any overlay-specific payload (such as settingsPage). New app overlays
-  // should usually be wired here rather than expanding useOverlayRegistry.
+interface AppOverlayState {
+  clone: { open: boolean }
+  openWorkspace: { open: boolean }
+  openRemoteWorkspace: { open: boolean }
+}
+
+export function useAppOverlays(options: AppOverlayRouteOptions = {}): {
+  state: ComputedRef<AppOverlayState>
+  anyOpen: ComputedRef<boolean>
+  openCloneRepo: () => void
+  setCloneOpen: (open: boolean) => void
+  openWorkspacePathDialog: () => void
+  setOpenWorkspaceOpen: (open: boolean) => void
+  openRemoteWorkspace: () => void
+  setOpenRemoteWorkspaceOpen: (open: boolean) => void
+  closeAllOverlays: () => void
+} {
   const registry = useOverlayRegistry<AppOverlayKey>(APP_OVERLAY_KEYS)
-  const { closeAll, open, setOpen, state: openByKey } = registry
-  const routeOverlay = options.routeOverlay ?? null
-  const onRouteOverlayChange = options.onRouteOverlayChange
-  const routeDriven = typeof onRouteOverlayChange === 'function'
+  const routeDriven = typeof options.onRouteOverlayChange === 'function'
+  const routeOverlay = () => toValue(options.routeOverlay) ?? null
 
-  const openCloneRepo = useCallback(() => {
+  function openOverlay(key: AppOverlayKey): void {
+    if (routeDriven) options.onRouteOverlayChange?.(key)
+    else registry.open(key)
+  }
+
+  function setOverlayOpen(key: AppOverlayKey, open: boolean): void {
     if (routeDriven) {
-      onRouteOverlayChange?.('clone')
-      return
+      options.onRouteOverlayChange?.(open ? key : routeOverlay() === key ? null : routeOverlay())
+    } else {
+      registry.setOpen(key, open)
     }
-    open('clone')
-  }, [onRouteOverlayChange, open, routeDriven])
+  }
 
-  const setCloneOpen = useCallback(
-    (open: boolean) => {
-      if (routeDriven) {
-        onRouteOverlayChange?.(open ? 'clone' : routeOverlay === 'clone' ? null : routeOverlay)
-        return
-      }
-      setOpen('clone', open)
+  const state = computed<AppOverlayState>(() => ({
+    clone: { open: routeDriven ? routeOverlay() === 'clone' : registry.state.clone },
+    openWorkspace: { open: routeDriven ? routeOverlay() === 'openWorkspace' : registry.state.openWorkspace },
+    openRemoteWorkspace: {
+      open: routeDriven ? routeOverlay() === 'openRemoteWorkspace' : registry.state.openRemoteWorkspace,
     },
-    [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
+  }))
+  const anyOpen = computed(
+    () => state.value.clone.open || state.value.openWorkspace.open || state.value.openRemoteWorkspace.open,
   )
-
-  const openWorkspacePathDialog = useCallback(() => {
-    if (routeDriven) {
-      onRouteOverlayChange?.('openWorkspace')
-      return
-    }
-    open('openWorkspace')
-  }, [onRouteOverlayChange, open, routeDriven])
-
-  const setOpenWorkspaceOpen = useCallback(
-    (open: boolean) => {
-      if (routeDriven) {
-        onRouteOverlayChange?.(open ? 'openWorkspace' : routeOverlay === 'openWorkspace' ? null : routeOverlay)
-        return
-      }
-      setOpen('openWorkspace', open)
-    },
-    [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
-  )
-
-  const openRemoteWorkspace = useCallback(() => {
-    if (routeDriven) {
-      onRouteOverlayChange?.('openRemoteWorkspace')
-      return
-    }
-    open('openRemoteWorkspace')
-  }, [onRouteOverlayChange, open, routeDriven])
-
-  const setOpenRemoteWorkspaceOpen = useCallback(
-    (open: boolean) => {
-      if (routeDriven) {
-        onRouteOverlayChange?.(
-          open ? 'openRemoteWorkspace' : routeOverlay === 'openRemoteWorkspace' ? null : routeOverlay,
-        )
-        return
-      }
-      setOpen('openRemoteWorkspace', open)
-    },
-    [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
-  )
-
-  const closeAllOverlays = useCallback(() => {
-    if (routeDriven) {
-      onRouteOverlayChange?.(null)
-      return
-    }
-    closeAll()
-  }, [closeAll, onRouteOverlayChange, routeDriven])
-
-  const state = useMemo(
-    () => ({
-      clone: { open: routeDriven ? routeOverlay === 'clone' : openByKey.clone },
-      openWorkspace: { open: routeDriven ? routeOverlay === 'openWorkspace' : openByKey.openWorkspace },
-      openRemoteWorkspace: {
-        open: routeDriven ? routeOverlay === 'openRemoteWorkspace' : openByKey.openRemoteWorkspace,
-      },
-    }),
-    [openByKey.clone, openByKey.openWorkspace, openByKey.openRemoteWorkspace, routeDriven, routeOverlay],
-  )
-  const anyOverlayOpen = state.clone.open || state.openWorkspace.open || state.openRemoteWorkspace.open
 
   return {
     state,
-    anyOpen: anyOverlayOpen,
-    openCloneRepo,
-    setCloneOpen,
-    openWorkspacePathDialog,
-    setOpenWorkspaceOpen,
-    openRemoteWorkspace,
-    setOpenRemoteWorkspaceOpen,
-    closeAllOverlays,
+    anyOpen,
+    openCloneRepo: () => openOverlay('clone'),
+    setCloneOpen: (open) => setOverlayOpen('clone', open),
+    openWorkspacePathDialog: () => openOverlay('openWorkspace'),
+    setOpenWorkspaceOpen: (open) => setOverlayOpen('openWorkspace', open),
+    openRemoteWorkspace: () => openOverlay('openRemoteWorkspace'),
+    setOpenRemoteWorkspaceOpen: (open) => setOverlayOpen('openRemoteWorkspace', open),
+    closeAllOverlays() {
+      if (routeDriven) options.onRouteOverlayChange?.(null)
+      else registry.closeAll()
+    },
   }
 }

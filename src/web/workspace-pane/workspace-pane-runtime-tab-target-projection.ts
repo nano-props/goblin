@@ -8,8 +8,6 @@ import {
   type WorkspacePaneRuntimeTabProviderProjection,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
-export type { WorkspacePaneRuntimeTabTargetSelectionByType } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
-
 export interface WorkspacePaneRuntimeTabTargetProjection {
   runtimeTabViews: WorkspacePaneTabSummary[]
   runtimeTabStateByType: Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabStateInput>

@@ -4,7 +4,7 @@ import {
   normalizeRemoteTarget,
   remoteWorkspaceSessionEntry,
 } from '#/shared/remote-workspace.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
@@ -61,7 +61,7 @@ beforeEach(resetLifecycleTest)
 describe('repo session hydration', () => {
   test('restores a workspace-root terminal preference without a Git branch projection', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ kind: 'workspace-root', workspaceId: REPO_A })
-    await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime(
+    await workspacesStore.getState().hydrateRestoredWorkspaceRuntime(
       {
         workspaces: [
           {
@@ -102,13 +102,11 @@ describe('repo session hydration', () => {
       },
     )
 
-    const restoredWorkspace = useWorkspacesStore.getState().workspaces[REPO_A]
+    const restoredWorkspace = workspacesStore.getState().workspaces[REPO_A]
     expect(restoredWorkspace?.capability.kind).toBe('filesystem')
     expect(restoredWorkspace?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe('terminal')
     expect(
-      useWorkspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[
-        REPO_A
-      ],
+      workspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[REPO_A],
     ).toBeUndefined()
   })
 
@@ -118,7 +116,7 @@ describe('repo session hydration', () => {
       workspaceId: REPO_A,
       branchName: 'main',
     })
-    await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime(
+    await workspacesStore.getState().hydrateRestoredWorkspaceRuntime(
       {
         workspaces: [
           {
@@ -160,15 +158,13 @@ describe('repo session hydration', () => {
       },
     )
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_A]?.capability.kind).toBe('git')
+    expect(workspacesStore.getState().workspaces[REPO_A]?.capability.kind).toBe('git')
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_A]?.ui.preferredWorkspacePaneTabByTarget).toEqual({
+    expect(workspacesStore.getState().workspaces[REPO_A]?.ui.preferredWorkspacePaneTabByTarget).toEqual({
       [targetKey]: 'history',
     })
     expect(
-      useWorkspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[
-        REPO_A
-      ],
+      workspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[REPO_A],
     ).toBeUndefined()
   })
 
@@ -198,17 +194,17 @@ describe('repo session hydration', () => {
       restoredWorkspaceId: REPO_A,
     }
 
-    await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime(runtime)
+    await workspacesStore.getState().hydrateRestoredWorkspaceRuntime(runtime)
 
-    const repo = useWorkspacesStore.getState().workspaces[REPO_A]
+    const repo = workspacesStore.getState().workspaces[REPO_A]
     expect(repo?.workspaceRuntimeId).toBe('repo-runtime-server-a')
     expect(repo?.session).toEqual({
       entry: localWorkspaceSessionEntry(REPO_A),
       projectionState: 'projected',
     })
-    expect(useWorkspacesStore.getState().workspaceOrder).toEqual([REPO_A])
-    expect(useWorkspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
-    expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(true)
+    expect(workspacesStore.getState().workspaceOrder).toEqual([REPO_A])
+    expect(workspacesStore.getState().restoredWorkspaceId).toBe(REPO_A)
+    expect(workspacesStore.getState().workspaceMembershipReady).toBe(true)
     expect(getRepoSnapshotQueryData(repo!.id, repo!.workspaceRuntimeId)?.current).toBe('server-main')
     expect(appQueryClient.getQueryData<WorkspaceRuntimesSnapshot>(workspaceRuntimesQueryKey())).toEqual({
       runtimes: [
@@ -228,17 +224,17 @@ describe('repo session hydration', () => {
   })
 
   test('hydrateRestoredWorkspaceRuntime clears the workspace restore skeleton for an empty snapshot', async () => {
-    await useWorkspacesStore
+    await workspacesStore
       .getState()
       .hydrateRestoredWorkspaceRuntime({ workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: null })
 
-    expect(useWorkspacesStore.getState().workspaceOrder).toEqual([])
-    expect(useWorkspacesStore.getState().restoredWorkspaceId).toBeNull()
-    expect(useWorkspacesStore.getState().workspaceMembershipReady).toBe(true)
+    expect(workspacesStore.getState().workspaceOrder).toEqual([])
+    expect(workspacesStore.getState().restoredWorkspaceId).toBeNull()
+    expect(workspacesStore.getState().workspaceMembershipReady).toBe(true)
   })
 
   test('promotes only the matching existing stub without changing workspace membership', async () => {
-    await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime({
+    await workspacesStore.getState().hydrateRestoredWorkspaceRuntime({
       workspaces: [
         {
           entry: localWorkspaceSessionEntry(REPO_A),
@@ -255,7 +251,7 @@ describe('repo session hydration', () => {
     const projection = snapshotForTest('main')
 
     expect(
-      useWorkspacesStore.getState().promoteRestoredWorkspace({
+      workspacesStore.getState().promoteRestoredWorkspace({
         workspace: {
           entry: localWorkspaceSessionEntry(REPO_A),
           workspaceId: REPO_A,
@@ -268,7 +264,7 @@ describe('repo session hydration', () => {
       }),
     ).toBe(true)
 
-    const state = useWorkspacesStore.getState()
+    const state = workspacesStore.getState()
     expect(state.workspaceOrder).toEqual([REPO_A])
     expect(state.restoredWorkspaceId).toBe(REPO_A)
     expect(state.workspaces[REPO_A]?.session.projectionState).toBe('projected')
@@ -287,7 +283,7 @@ describe('repo session hydration', () => {
       workspaceId: REPO_A,
       branchName: 'main',
     })
-    await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime(
+    await workspacesStore.getState().hydrateRestoredWorkspaceRuntime(
       {
         workspaces: [
           {
@@ -310,7 +306,7 @@ describe('repo session hydration', () => {
       },
     )
 
-    useWorkspacesStore.getState().promoteRestoredWorkspace({
+    workspacesStore.getState().promoteRestoredWorkspace({
       workspace: {
         entry: localWorkspaceSessionEntry(REPO_A),
         workspaceId: REPO_A,
@@ -335,18 +331,16 @@ describe('repo session hydration', () => {
       },
     })
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_A]?.ui.preferredWorkspacePaneTabByTarget).toEqual({
+    expect(workspacesStore.getState().workspaces[REPO_A]?.ui.preferredWorkspacePaneTabByTarget).toEqual({
       [targetKey]: 'history',
     })
     expect(
-      useWorkspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[
-        REPO_A
-      ],
+      workspacesStore.getState().restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[REPO_A],
     ).toBeUndefined()
   })
 
   test('rejects a late promotion after the stub closes or changes runtime epoch', async () => {
-    await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime({
+    await workspacesStore.getState().hydrateRestoredWorkspaceRuntime({
       workspaces: [
         {
           entry: localWorkspaceSessionEntry(REPO_A),
@@ -372,19 +366,19 @@ describe('repo session hydration', () => {
       snapshot: null,
     }
 
-    useWorkspacesStore.setState((state) => ({
+    workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
         [REPO_A]: { ...state.workspaces[REPO_A]!, workspaceRuntimeId: 'repo-runtime-new' },
       },
     }))
-    expect(useWorkspacesStore.getState().promoteRestoredWorkspace(result)).toBe(false)
-    expect(useWorkspacesStore.getState().workspaces[REPO_A]?.session.projectionState).toBe('stub')
+    expect(workspacesStore.getState().promoteRestoredWorkspace(result)).toBe(false)
+    expect(workspacesStore.getState().workspaces[REPO_A]?.session.projectionState).toBe('stub')
 
-    useWorkspacesStore.setState({ workspaces: {}, workspaceOrder: [], restoredWorkspaceId: null })
-    expect(useWorkspacesStore.getState().promoteRestoredWorkspace(result)).toBe(false)
-    expect(useWorkspacesStore.getState().workspaces[REPO_A]).toBeUndefined()
-    expect(useWorkspacesStore.getState().workspaceOrder).toEqual([])
+    workspacesStore.setState({ workspaces: {}, workspaceOrder: [], restoredWorkspaceId: null })
+    expect(workspacesStore.getState().promoteRestoredWorkspace(result)).toBe(false)
+    expect(workspacesStore.getState().workspaces[REPO_A]).toBeUndefined()
+    expect(workspacesStore.getState().workspaceOrder).toEqual([])
   })
 
   test('restores the authoritative failed remote lifecycle', async () => {
@@ -398,7 +392,7 @@ describe('repo session hydration', () => {
     const entry = remoteWorkspaceSessionEntry(target)
     const workspaceId = workspaceIdForTest(entry.id)
 
-    await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime({
+    await workspacesStore.getState().hydrateRestoredWorkspaceRuntime({
       workspaces: [
         {
           entry,
@@ -416,7 +410,7 @@ describe('repo session hydration', () => {
       restoredWorkspaceId: workspaceId,
     })
 
-    expect(useWorkspacesStore.getState().workspaces[workspaceId]).toMatchObject({
+    expect(workspacesStore.getState().workspaces[workspaceId]).toMatchObject({
       capability: {
         kind: 'unavailable',
         probe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
@@ -440,7 +434,7 @@ describe('repo session hydration', () => {
     const entry = remoteWorkspaceSessionEntry(target)
     const workspaceId = workspaceIdForTest(entry.id)
     const workspaceRuntimeId = 'repo-runtime-remote'
-    await useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime({
+    await workspacesStore.getState().hydrateRestoredWorkspaceRuntime({
       workspaces: [
         {
           entry,
@@ -455,7 +449,7 @@ describe('repo session hydration', () => {
       restoredWorkspaceId: entry.id,
     })
     expect(
-      acceptRemoteWorkspaceLifecycleProjection(useWorkspacesStore.setState, useWorkspacesStore.getState, {
+      acceptRemoteWorkspaceLifecycleProjection(workspacesStore.setState, workspacesStore.getState, {
         workspaceId,
         workspaceRuntimeId,
         remoteLifecycle: { kind: 'ready', attemptId: 5, target },
@@ -463,7 +457,7 @@ describe('repo session hydration', () => {
     ).toBe(true)
 
     expect(
-      useWorkspacesStore.getState().promoteRestoredWorkspace({
+      workspacesStore.getState().promoteRestoredWorkspace({
         workspace: {
           entry,
           workspaceId,
@@ -479,9 +473,9 @@ describe('repo session hydration', () => {
       }),
     ).toBe(false)
 
-    expect(useWorkspacesStore.getState().workspaces[entry.id]?.session.projectionState).toBe('stub')
-    expect(useWorkspacesStore.getState().workspaces[entry.id]?.capability.kind).toBe('git')
-    expect(useWorkspacesStore.getState().workspaces[entry.id]?.admission).toMatchObject({
+    expect(workspacesStore.getState().workspaces[entry.id]?.session.projectionState).toBe('stub')
+    expect(workspacesStore.getState().workspaces[entry.id]?.capability.kind).toBe('git')
+    expect(workspacesStore.getState().workspaces[entry.id]?.admission).toMatchObject({
       kind: 'remote',
       lifecycleAttemptId: 5,
       lifecycle: { kind: 'ready', target },

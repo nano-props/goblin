@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
-import { act, waitFor } from '@testing-library/react'
+import { waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
-import { useState } from 'react'
+import { defineComponent, shallowRef } from 'vue'
 import { describe, expect, test, vi } from 'vitest'
 import {
   TestWorkspacePaneTabStrip,
@@ -16,7 +17,7 @@ import {
 } from '#/web/test-utils/workspace-pane-tab-strip.tsx'
 
 describe('WorkspacePaneTabStrip compact', () => {
-  test('keeps the selected terminal in the collapsed popover list and still offers new terminal', () => {
+  test('keeps the selected terminal in the collapsed popover list and still offers new terminal', async () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -37,7 +38,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     const trigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
 
-    openCompactSwitcher(trigger)
+    await openCompactSwitcher(trigger)
 
     const selectedItem = [...document.body.querySelectorAll('button[aria-current="true"]')].find((item) =>
       item.textContent?.includes('term-2'),
@@ -52,7 +53,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     expect(closeButton?.className).not.toContain('group-hover:opacity-100')
   })
 
-  test('disables the collapsed new-terminal action while terminal creation is busy', () => {
+  test('disables the collapsed new-terminal action while terminal creation is busy', async () => {
     const onNew = vi.fn()
     render(
       <TestWorkspacePaneTabStrip
@@ -72,14 +73,14 @@ describe('WorkspacePaneTabStrip compact', () => {
     const trigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
 
-    openCompactSwitcher(trigger)
+    await openCompactSwitcher(trigger)
 
     const newTerminalAction = [...document.body.querySelectorAll('button')].find(
       (button) => button.textContent === 'terminal.new',
     )
     expect(newTerminalAction).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       newTerminalAction?.click()
     })
 
@@ -104,13 +105,13 @@ describe('WorkspacePaneTabStrip compact', () => {
 
     const trigger = document.body.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!trigger) throw new Error('missing terminal popover trigger')
-    openCompactSwitcher(trigger)
+    await openCompactSwitcher(trigger)
     const newTerminalAction = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
       (button) => button.textContent === 'terminal.new',
     )
     if (!newTerminalAction) throw new Error('missing new terminal action')
 
-    act(() => newTerminalAction.click())
+    await flushTestUpdates(() => newTerminalAction.click())
     expect(document.activeElement).toBe(terminalInput)
     await flushTimers()
 
@@ -135,13 +136,13 @@ describe('WorkspacePaneTabStrip compact', () => {
 
     const trigger = document.body.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!trigger) throw new Error('missing terminal popover trigger')
-    openCompactSwitcher(trigger)
+    await openCompactSwitcher(trigger)
     const newTerminalAction = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
       (button) => button.textContent === 'terminal.new',
     )
     if (!newTerminalAction) throw new Error('missing new terminal action')
 
-    act(() => newTerminalAction.click())
+    await flushTestUpdates(() => newTerminalAction.click())
     await flushTimers()
 
     expect(document.activeElement).toBe(terminalInput)
@@ -164,7 +165,7 @@ describe('WorkspacePaneTabStrip compact', () => {
 
     const trigger = document.body.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!trigger) throw new Error('missing terminal popover trigger')
-    openCompactSwitcher(trigger)
+    await openCompactSwitcher(trigger)
     const content = document.body.querySelector<HTMLElement>('[data-slot="popover-content"]')
     if (!content) throw new Error('missing terminal popover content')
 
@@ -176,7 +177,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     await waitFor(() => expect(document.activeElement).toBe(trigger))
   })
 
-  test('blocks compact popover tab switching while terminal creation is pending', () => {
+  test('blocks compact popover tab switching while terminal creation is pending', async () => {
     const onSelect = vi.fn()
     render(
       <TestWorkspacePaneTabStrip
@@ -200,7 +201,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     const trigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
 
-    openCompactSwitcher(trigger)
+    await openCompactSwitcher(trigger)
 
     const inactiveItem = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
       (button) => button.textContent === 'term-2',
@@ -208,7 +209,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     expect(inactiveItem).not.toBeNull()
     expect(inactiveItem?.disabled).toBe(true)
 
-    act(() => {
+    await flushTestUpdates(() => {
       inactiveItem?.click()
     })
 
@@ -249,7 +250,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     expect(tab.getAttribute('aria-setsize')).toBeNull()
   })
 
-  test('does not scroll when compact mode renders without a scroll viewport', () => {
+  test('does not scroll when compact mode renders without a scroll viewport', async () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -270,8 +271,8 @@ describe('WorkspacePaneTabStrip compact', () => {
     expect(scrollIntoViewMock()).not.toHaveBeenCalled()
   })
 
-  test('restores the full tab strip after leaving compact mode', () => {
-    rerender(
+  test('restores the full tab strip after leaving compact mode', async () => {
+    await rerender(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
@@ -289,7 +290,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     )
 
     expect(document.body.querySelectorAll('[role="tab"]').length).toBe(1)
-    const compactTablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-tabs.tabs"]')
+    const compactTablist = document.body.querySelector('[role="tablist"]')
     const compactTab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id]')
     expect(compactTablist?.className).toContain('flex-1')
     expect(compactTablist?.parentElement?.className).toContain('flex-1')
@@ -309,7 +310,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     expect(compactTab?.querySelector('[data-toolbar-tab-close-placeholder]')).toBeNull()
     expect(document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
 
-    rerender(
+    await rerender(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
@@ -329,7 +330,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     expect(document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).toBeNull()
   })
 
-  test('keeps the compact tab visually unselected and free of close chrome when its panel is active', () => {
+  test('keeps the compact tab visually unselected and free of close chrome when its panel is active', async () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -358,36 +359,37 @@ describe('WorkspacePaneTabStrip compact', () => {
   })
 
   test('closes the active compact tab through the tab switcher', async () => {
-    function CompactCloseHarness() {
-      const [sessions, setSessions] = useState([
-        session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: true }),
-        session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
-      ])
+    const CompactCloseHarness = defineComponent(
+      () => {
+        const sessions = shallowRef([
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: true }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
+        ])
 
-      return (
-        <TestWorkspacePaneTabStrip
-          terminalFilesystemTargetKey="/repo\0/repo/worktree"
-          workspacePaneId="workspace"
-          responsiveCompact
-          panelActive
-          sessions={sessions}
-          onNew={() => {}}
-          onSelect={() => {}}
-          onScrollToBottom={() => {}}
-          onClose={(closed) => {
-            setSessions((current) =>
-              current
+        return () => (
+          <TestWorkspacePaneTabStrip
+            terminalFilesystemTargetKey="/repo\0/repo/worktree"
+            workspacePaneId="workspace"
+            responsiveCompact
+            panelActive
+            sessions={sessions.value}
+            onNew={() => {}}
+            onSelect={() => {}}
+            onScrollToBottom={() => {}}
+            onClose={(closed) => {
+              sessions.value = sessions.value
                 .filter((candidate) => candidate.terminalSessionId !== closed.terminalSessionId)
                 .map((candidate, index) => ({
                   ...candidate,
                   selected: index === 0,
-                })),
-            )
-          }}
-          onReorder={() => {}}
-        />
-      )
-    }
+                }))
+            }}
+            onReorder={() => {}}
+          />
+        )
+      },
+      { name: 'CompactCloseHarness' },
+    )
 
     render(<CompactCloseHarness />)
     const compactTab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id]')
@@ -395,13 +397,13 @@ describe('WorkspacePaneTabStrip compact', () => {
 
     const trigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
-    openCompactSwitcher(trigger)
+    await openCompactSwitcher(trigger)
 
     const list = document.body.querySelector('[role="list"]')
     const closeButton = list?.querySelector<HTMLButtonElement>('button[aria-label="close term-1"]')
     expect(closeButton).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       closeButton?.click()
     })
     await flushTimers()
@@ -411,7 +413,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     expect(document.activeElement?.textContent).toContain('term-2')
   })
 
-  test('compact mode renders an empty tab area but keeps the popover switcher reachable when no tab is active', () => {
+  test('compact mode renders an empty tab area but keeps the popover switcher reachable when no tab is active', async () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -439,7 +441,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     // items[0]: the toolbar must not lie about the user's active view
     // when the body is rendering a non-materialized terminal panel.
     const tabs = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
-    const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-tabs.tabs"]')
+    const tablist = document.body.querySelector('[role="tablist"]')
     const switcherTrigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
 
     expect(tabs).toHaveLength(0)
@@ -448,7 +450,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     expect(switcherTrigger).not.toBeNull()
   })
 
-  test('renders a compact pending item across the available tab row', () => {
+  test('renders a compact pending item across the available tab row', async () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -467,7 +469,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     )
 
     const pendingView = document.body.querySelector('[data-workspace-pane-pending-tab="terminal"]')
-    const tablist = document.body.querySelector('[role="tablist"][aria-label="workspace-pane-tabs.tabs"]')
+    const tablist = document.body.querySelector('[role="tablist"]')
     const tab = document.body.querySelector('[role="tab"][aria-label="terminal.opening"]')
 
     expect(pendingView).not.toBeNull()

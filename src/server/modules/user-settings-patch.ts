@@ -1,4 +1,4 @@
-import type { UserSettings } from '#/shared/api-types.ts'
+import type { UserSettings } from '#/shared/settings.ts'
 import { parseAllowedGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme } from '#/shared/color-theme.ts'
 import {

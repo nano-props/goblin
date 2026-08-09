@@ -8,7 +8,8 @@ import { pullBranch } from '#/system/git/remote.ts'
 import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
 import { wireNativeHostIpc } from '#/main/native-host-ipc-router.ts'
 import { getUserSettings } from '#/main/settings-server-client.ts'
-import type { IpcResponse, UserSettings } from '#/shared/api-types.ts'
+import type { IpcResponse } from '#/shared/api-types.ts'
+import type { UserSettings } from '#/shared/settings.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<unknown>>()

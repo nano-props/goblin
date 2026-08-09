@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import { launchStandaloneServer } from '#/server/standalone/standalone-launch.ts'
 
 if (import.meta.main) {
@@ -9,7 +9,7 @@ if (import.meta.main) {
     repoRoot: path.resolve(import.meta.dirname, '../..'),
     runtimeEntryDir: import.meta.dirname,
   }).catch((error: unknown) => {
-    serverLogger.fatal({ err: error }, 'failed to launch standalone server')
+    serverNodeLog.fatal({ err: error }, 'failed to launch standalone server')
     process.exitCode = 1
   })
 }

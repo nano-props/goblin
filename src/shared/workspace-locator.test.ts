@@ -24,13 +24,13 @@ describe('toSafeCanonicalWorkspaceId', () => {
     expect(toSafeCanonicalWorkspaceId(locator)).toBeNull()
   })
 
-  it('rejects canonical-looking locators beyond the wire identity limit', () => {
+  it('rejects canonical-looking locators beyond the wire identity limit', async () => {
     expect(toSafeCanonicalWorkspaceId(`goblin+file:///${'a'.repeat(4096)}`)).toBeNull()
   })
 })
 
 describe('workspace locator codec', () => {
-  it('rejects a locator whose encoded representation exceeds the canonical length limit', () => {
+  it('rejects a locator whose encoded representation exceeds the canonical length limit', async () => {
     expect(
       formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: `/${' '.repeat(1400)}` }, 'posix'),
     ).toBeNull()
@@ -52,7 +52,7 @@ describe('workspace locator codec', () => {
     expect(formatWorkspaceLocator(parsed, platform)).toBe(input)
   })
 
-  it('preserves canonically distinct NFC and NFD paths', () => {
+  it('preserves canonically distinct NFC and NFD paths', async () => {
     const nfc = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/caf\u00e9' }, 'posix')
     const nfd = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/cafe\u0301' }, 'posix')
     expect(nfc).toBe('goblin+file:///caf%C3%A9')
@@ -116,7 +116,7 @@ describe('workspace locator codec', () => {
     expect(parseWorkspaceLocator(input, 'posix')).toBeNull()
   })
 
-  it('decodes a percent escape exactly once', () => {
+  it('decodes a percent escape exactly once', async () => {
     expect(parseWorkspaceLocator('goblin+ssh://host/srv/%252Fetc', 'posix')).toEqual({
       transport: 'ssh',
       profile: 'host',
@@ -137,7 +137,7 @@ describe('workspace locator codec', () => {
     expect(formatWorkspaceLocator(locator, platform)).toBeNull()
   })
 
-  it('never throws or replaces malformed runtime input', () => {
+  it('never throws or replaces malformed runtime input', async () => {
     expect(formatWorkspaceLocator(null as never, 'posix')).toBeNull()
     expect(formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: 42 } as never, 'posix')).toBeNull()
     expect(

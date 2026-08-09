@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { focusManager } from '@tanstack/react-query'
+import { focusManager } from '@tanstack/query-core'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import '#/web/app-query-client.ts'
 
@@ -10,7 +10,7 @@ describe('app query focus events', () => {
     vi.restoreAllMocks()
   })
 
-  test('coalesces overlapping browser activation events into focus state transitions', () => {
+  test('coalesces overlapping browser activation events into focus state transitions', async () => {
     let focused = true
     let visibility: DocumentVisibilityState = 'visible'
     vi.spyOn(document, 'hasFocus').mockImplementation(() => focused)

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
 
 describe('resolveKnownWorktree', () => {
-  test('resolves a known worktree without a branch constraint', () => {
+  test('resolves a known worktree without a branch constraint', async () => {
     const result = resolveKnownWorktree(
       [
         { path: '/repo', branch: 'main', isBare: false, isPrimary: true },
@@ -13,7 +13,7 @@ describe('resolveKnownWorktree', () => {
     expect(result).toEqual({ ok: true, path: '/repo-linked' })
   })
 
-  test('rejects an unknown worktree path', () => {
+  test('rejects an unknown worktree path', async () => {
     const result = resolveKnownWorktree(
       [{ path: '/repo', branch: 'main', isBare: false, isPrimary: true }],
       '/tmp/other',
@@ -21,7 +21,7 @@ describe('resolveKnownWorktree', () => {
     expect(result).toEqual({ ok: false, message: 'error.invalid-worktree-path' })
   })
 
-  test('rejects a known path checked out on a different branch', () => {
+  test('rejects a known path checked out on a different branch', async () => {
     const result = resolveKnownWorktree(
       [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }],
       '/repo-linked',
@@ -36,17 +36,17 @@ describe('resolveRemovableWorktree', () => {
   const main = { path: '/repo', branch: 'main', isBare: false, isPrimary: true }
   const linked = { path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }
 
-  test('resolves a non-primary worktree', () => {
+  test('resolves a non-primary worktree', async () => {
     const result = resolveRemovableWorktree([main, linked], 'feature', '/repo-linked', repoRoot)
     expect(result).toEqual({ ok: true, target: linked })
   })
 
-  test('refuses the primary worktree by isPrimary flag', () => {
+  test('refuses the primary worktree by isPrimary flag', async () => {
     const result = resolveRemovableWorktree([main, linked], 'main', '/repo', repoRoot)
     expect(result).toEqual({ ok: false, message: 'error.cannot-remove-main-worktree' })
   })
 
-  test('refuses when path resolves to the repo root even if isPrimary missed it', () => {
+  test('refuses when path resolves to the repo root even if isPrimary missed it', async () => {
     // Defensive: parser should always set isPrimary for the first entry,
     // but if it didn't, the repo-root path check still catches it.
     const odd = { path: '/repo', branch: 'main', isBare: false, isPrimary: false }
@@ -54,12 +54,12 @@ describe('resolveRemovableWorktree', () => {
     expect(result).toEqual({ ok: false, message: 'error.cannot-remove-main-worktree' })
   })
 
-  test('rejects when no worktree matches both branch and path', () => {
+  test('rejects when no worktree matches both branch and path', async () => {
     const result = resolveRemovableWorktree([linked], 'feature', '/somewhere/else', repoRoot)
     expect(result).toEqual({ ok: false, message: 'error.worktree-not-found-for-branch' })
   })
 
-  test('rejects when path matches but branch does not', () => {
+  test('rejects when path matches but branch does not', async () => {
     const result = resolveRemovableWorktree([linked], 'main', '/repo-linked', repoRoot)
     expect(result).toEqual({ ok: false, message: 'error.worktree-not-found-for-branch' })
   })

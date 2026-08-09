@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
-import { act } from '@testing-library/react'
-import { QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { useQuery } from '@tanstack/vue-query'
+import { defineComponent } from 'vue'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -55,22 +57,28 @@ vi.mock('#/web/repo-read-invalidation-ingress.ts', () => ({
 }))
 
 vi.mock('#/web/stores/workspaces/store.ts', () => ({
-  useWorkspacesStore: {
+  workspacesStore: {
     getState: () => storeState,
     setState: vi.fn(),
   },
 }))
 
-function Harness() {
-  useRepoStoreInvalidationRefresh()
-  return null
-}
+const Harness = defineComponent(
+  () => {
+    useRepoStoreInvalidationRefresh()
+    return () => null
+  },
+  { name: 'RepoStoreInvalidationHarness' },
+)
 
-function ProjectionObserverHarness() {
-  useRepoStoreInvalidationRefresh()
-  const projection = useQuery(repoSnapshotQueryOptions(WORKSPACE_ID, 'repo-runtime-test-7'), appQueryClient)
-  return <output>{projection.data?.snapshot?.current ?? 'loading'}</output>
-}
+const ProjectionObserverHarness = defineComponent(
+  () => {
+    useRepoStoreInvalidationRefresh()
+    const projection = useQuery(repoSnapshotQueryOptions(WORKSPACE_ID, 'repo-runtime-test-7'), appQueryClient)
+    return () => <output>{projection.data.value?.snapshot.current ?? 'loading'}</output>
+  },
+  { name: 'RepoStoreInvalidationProjectionObserver' },
+)
 
 describe('useRepoStoreInvalidationRefresh', () => {
   beforeEach(() => {
@@ -92,7 +100,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       for (const listener of listeners)
         listener({ type: 'repo-read-invalidated', repoId: WORKSPACE_ID, domain: 'metadata' })
     })
@@ -128,16 +136,16 @@ describe('useRepoStoreInvalidationRefresh', () => {
       }
     })
     renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <ProjectionObserverHarness />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
     await vi.waitFor(() => {
       expect(projectionReads).toBe(1)
       expect(document.body.textContent).toContain('before-fetch')
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       for (const listener of listeners) {
         listener({ type: 'repo-read-invalidated', repoId: WORKSPACE_ID, domain: 'metadata' })
       }
@@ -174,13 +182,13 @@ describe('useRepoStoreInvalidationRefresh', () => {
       }
     })
     renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <ProjectionObserverHarness />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
     await vi.waitFor(() => expect(projectionReads).toBe(1))
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       for (const listener of openListeners) listener()
       resolveFirstRead({
         snapshot: {
@@ -207,7 +215,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       for (const listener of listeners)
         listener({ type: 'repo-read-invalidated', repoId: WORKSPACE_ID, domain: 'operations' })
     })
@@ -227,7 +235,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       for (const listener of listeners)
         listener({
           type: 'repo-read-invalidated',

@@ -1,31 +1,33 @@
-import type { Ref, RefCallback } from 'react'
+import type { Ref, VNodeRef } from 'vue'
 
-type RefCleanup = () => void
+export type ElementRef<T> = Ref<T | null> | ((value: T | null) => void)
 
-export function composeRefs<T>(...refs: Array<Ref<T> | undefined>): RefCallback<T> {
-  return (node) => {
-    const cleanups: RefCleanup[] = []
-    const callbacksWithoutCleanup: RefCallback<T>[] = []
-
-    for (const ref of refs) {
-      if (!ref) continue
-      if (typeof ref === 'function') {
-        const cleanup = ref(node)
-        if (typeof cleanup === 'function') cleanups.push(cleanup)
-        else callbacksWithoutCleanup.push(ref)
-        continue
-      }
-      ref.current = node
-    }
-
-    if (node === null) return
-
-    return () => {
-      for (let i = cleanups.length - 1; i >= 0; i -= 1) cleanups[i]?.()
-      for (let i = callbacksWithoutCleanup.length - 1; i >= 0; i -= 1) callbacksWithoutCleanup[i]?.(null)
-      for (const ref of refs) {
-        if (ref && typeof ref !== 'function') ref.current = null
-      }
+export function composeRefs<T>(...refs: Array<ElementRef<T> | undefined>): (value: T | null) => void {
+  return (value) => {
+    for (const target of refs) {
+      if (!target) continue
+      if (typeof target === 'function') target(value)
+      else target.value = value
     }
   }
+}
+
+export function toButtonVNodeRef(target: ElementRef<HTMLButtonElement> | undefined): VNodeRef | undefined {
+  if (!target) return undefined
+  return (value) => setElementRef(target, value instanceof HTMLButtonElement ? value : null)
+}
+
+export function toDivVNodeRef(target: ElementRef<HTMLDivElement> | undefined): VNodeRef | undefined {
+  if (!target) return undefined
+  return (value) => setElementRef(target, value instanceof HTMLDivElement ? value : null)
+}
+
+export function toLiVNodeRef(target: ElementRef<HTMLLIElement> | undefined): VNodeRef | undefined {
+  if (!target) return undefined
+  return (value) => setElementRef(target, value instanceof HTMLLIElement ? value : null)
+}
+
+function setElementRef<T>(target: ElementRef<T>, value: T | null): void {
+  if (typeof target === 'function') target(value)
+  else target.value = value
 }

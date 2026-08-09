@@ -40,34 +40,13 @@ function createMediaQuery(initialMatches = false): FakeMediaQueryList {
   return mql
 }
 
-interface FakeDocumentElement {
-  setAttribute(name: string, value: string): void
-  getAttribute(name: string): string | null
-}
-
-function createDocumentElement(initial: Record<string, string> = {}): FakeDocumentElement {
-  const attrs = new Map<string, string>(Object.entries(initial))
-  return {
-    setAttribute(name, value) {
-      attrs.set(name, value)
-    },
-    getAttribute(name) {
-      return attrs.get(name) ?? null
-    },
-  }
-}
-
 interface InstallWindowOptions {
-  documentElement?: FakeDocumentElement
   matchMedia?: FakeMediaQueryList | 'absent'
 }
 
 function installWindow(options: InstallWindowOptions = {}): void {
-  const documentElement = options.documentElement ?? createDocumentElement()
-  Object.defineProperty(globalThis, 'document', {
-    configurable: true,
-    value: { visibilityState: 'visible', documentElement },
-  })
+  document.documentElement.removeAttribute('data-theme')
+  document.documentElement.removeAttribute('data-color-theme')
   const windowValue: Record<string, unknown> = {
     __GOBLIN_BOOTSTRAP__: webBootstrap(),
     location: {
@@ -82,10 +61,7 @@ function installWindow(options: InstallWindowOptions = {}): void {
   if (options.matchMedia !== 'absent') {
     windowValue.matchMedia = vi.fn(() => options.matchMedia ?? null)
   }
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: windowValue,
-  })
+  vi.stubGlobal('window', windowValue)
 }
 
 function webBootstrap(overrides: Partial<ClientBootstrapSnapshot> = {}): ClientBootstrapSnapshot {
@@ -128,18 +104,18 @@ describe('theme store OS-appearance sync', () => {
       ok: true,
       json: async () => settingsResponse({ theme: 'auto', colorTheme: 'macos' }),
     }))
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useThemeStore.getState().hydrate()
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    await themeStore.getState().hydrate()
 
     // After hydrate with OS=dark, store/attr should be dark.
-    expect(useThemeStore.getState().resolved).toBe('dark')
+    expect(themeStore.getState().resolved).toBe('dark')
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
 
     // OS flips dark→light.
     mql.matches = false
     mql.emitChange()
 
-    expect(useThemeStore.getState().resolved).toBe('light')
+    expect(themeStore.getState().resolved).toBe('light')
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
     // No new fetch — the sync must be purely local.
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -153,17 +129,17 @@ describe('theme store OS-appearance sync', () => {
       json: async () => settingsResponse({ theme: 'light', colorTheme: 'macos' }),
     }))
 
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useThemeStore.getState().hydrate()
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    await themeStore.getState().hydrate()
 
-    expect(useThemeStore.getState().resolved).toBe('light')
+    expect(themeStore.getState().resolved).toBe('light')
 
     // OS flips to dark while user pinned light — store must NOT follow.
     mql.matches = true
     mql.emitChange()
 
-    expect(useThemeStore.getState().pref).toBe('light')
-    expect(useThemeStore.getState().resolved).toBe('light')
+    expect(themeStore.getState().pref).toBe('light')
+    expect(themeStore.getState().resolved).toBe('light')
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
   })
 
@@ -175,17 +151,17 @@ describe('theme store OS-appearance sync', () => {
       json: async () => settingsResponse({ theme: 'dark', colorTheme: 'github' }),
     }))
 
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useThemeStore.getState().hydrate()
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    await themeStore.getState().hydrate()
 
-    expect(useThemeStore.getState().resolved).toBe('dark')
+    expect(themeStore.getState().resolved).toBe('dark')
 
     // OS flips to light while user pinned dark — store must NOT follow.
     mql.matches = false
     mql.emitChange()
 
-    expect(useThemeStore.getState().pref).toBe('dark')
-    expect(useThemeStore.getState().resolved).toBe('dark')
+    expect(themeStore.getState().pref).toBe('dark')
+    expect(themeStore.getState().resolved).toBe('dark')
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
     expect(document.documentElement.getAttribute('data-color-theme')).toBe('github')
   })
@@ -200,14 +176,14 @@ describe('theme store OS-appearance sync', () => {
       json: async () => settingsResponse({ theme: 'auto', colorTheme: 'macos' }),
     }))
 
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
+    const { themeStore } = await import('#/web/stores/theme.ts')
 
-    await useThemeStore.getState().hydrate()
+    await themeStore.getState().hydrate()
     expect(addSpy).toHaveBeenCalledTimes(1)
     expect(removeSpy).toHaveBeenCalledTimes(0)
     expect(mql.listenerCount()).toBe(1)
 
-    await useThemeStore.getState().hydrate()
+    await themeStore.getState().hydrate()
     // Second hydrate disposes the first listener and installs a fresh one.
     expect(removeSpy).toHaveBeenCalledTimes(1)
     expect(addSpy).toHaveBeenCalledTimes(2)
@@ -235,10 +211,10 @@ describe('theme store OS-appearance sync', () => {
       json: async () => settingsResponse({ theme: 'light', colorTheme: 'macos' }),
     }))
 
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useThemeStore.getState().hydrate()
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    await themeStore.getState().hydrate()
 
-    expect(useThemeStore.getState()).toMatchObject({ pref: 'light', resolved: 'light', colorTheme: 'macos' })
+    expect(themeStore.getState()).toMatchObject({ pref: 'light', resolved: 'light', colorTheme: 'macos' })
     // No throw, store remains valid.
   })
 
@@ -250,30 +226,30 @@ describe('theme store OS-appearance sync', () => {
       json: async () => settingsResponse({ theme: 'auto', colorTheme: 'macos' }),
     }))
 
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useThemeStore.getState().hydrate()
-    expect(useThemeStore.getState().resolved).toBe('dark')
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    await themeStore.getState().hydrate()
+    expect(themeStore.getState().resolved).toBe('dark')
 
     // Simulate the user picking 'light' by mutating the store
     // directly — `setPref`'s server round-trip is covered by
     // `web-invalidation-sync.test.ts`, and the listener contract
     // here is what we actually want to lock in.
-    useThemeStore.setState({ pref: 'light', resolved: 'light' })
+    themeStore.setState({ pref: 'light', resolved: 'light' })
     document.documentElement.setAttribute('data-theme', 'light')
 
     // OS stays dark — listener must be inert while pref is explicit.
     mql.emitChange()
-    expect(useThemeStore.getState().resolved).toBe('light')
+    expect(themeStore.getState().resolved).toBe('light')
 
     // User switches back to auto. Re-derive resolved from matchMedia
     // at this moment (matchMedia.matches is true → dark) and apply.
-    useThemeStore.setState({ pref: 'auto', resolved: mql.matches ? 'dark' : 'light' })
+    themeStore.setState({ pref: 'auto', resolved: mql.matches ? 'dark' : 'light' })
     document.documentElement.setAttribute('data-theme', mql.matches ? 'dark' : 'light')
 
     // Subsequent OS flip still drives the store.
     mql.matches = false
     mql.emitChange()
-    expect(useThemeStore.getState().resolved).toBe('light')
+    expect(themeStore.getState().resolved).toBe('light')
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
   })
 
@@ -288,10 +264,10 @@ describe('theme store OS-appearance sync', () => {
       json: async () => settingsResponse({ theme: 'light', colorTheme: 'github' }),
     }))
 
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useThemeStore.getState().hydrate()
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    await themeStore.getState().hydrate()
 
-    expect(useThemeStore.getState()).toMatchObject({
+    expect(themeStore.getState()).toMatchObject({
       pref: 'light',
       resolved: 'light',
       colorTheme: 'github',
@@ -316,14 +292,14 @@ describe('theme store OS-appearance sync', () => {
       }),
     }))
 
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useThemeStore.getState().setPref('dark')
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    await themeStore.getState().setPref('dark')
 
     expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       theme: 'dark',
       colorTheme: 'github',
     })
-    expect(useThemeStore.getState()).toMatchObject({
+    expect(themeStore.getState()).toMatchObject({
       pref: 'dark',
       colorTheme: 'github',
     })

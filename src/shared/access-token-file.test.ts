@@ -36,7 +36,7 @@ afterEach(async () => {
 })
 
 describe('generateAccessToken', () => {
-  test('produces a 25-char base36 string in [0-9a-z]', () => {
+  test('produces a 25-char base36 string in [0-9a-z]', async () => {
     for (let i = 0; i < 50; i++) {
       const token = generateAccessToken()
       expect(token).toMatch(TOKEN_PATTERN)

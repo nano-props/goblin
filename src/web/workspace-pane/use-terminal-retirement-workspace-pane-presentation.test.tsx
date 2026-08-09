@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { AcceptedTerminalRetirement } from '#/web/components/terminal/TerminalSessionProjection.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
-import { renderHookInJsdom } from '#/test-utils/render.tsx'
+import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 
 const mocks = vi.hoisted(() => ({
   listener: null as ((retirement: AcceptedTerminalRetirement) => void) | null,
@@ -49,7 +49,7 @@ describe('terminal retirement workspace pane presentation', () => {
       workspacePaneRoute: { kind: 'terminal' as const, terminalSessionId: 'term-111111111111111111111' },
       filesystemTarget: null,
     }
-    const { unmount } = renderHookInJsdom(() =>
+    const { unmount } = renderComposableInJsdom(() =>
       useTerminalRetirementWorkspacePanePresentation({
         currentTarget: target,
         navigation,
@@ -60,7 +60,7 @@ describe('terminal retirement workspace pane presentation', () => {
     const terminalSessionId = 'term-111111111111111111111'
     const tabsBeforeRetirement = [{ type: 'terminal' as const, runtimeSessionId: terminalSessionId }]
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       listener({ terminalSessionId, tabsBeforeRetirement })
       await Promise.resolve()
     })
@@ -76,8 +76,8 @@ describe('terminal retirement workspace pane presentation', () => {
     expect(mocks.unsubscribe).toHaveBeenCalledOnce()
   })
 
-  test('ignores an accepted exit without a current command target', () => {
-    renderHookInJsdom(() =>
+  test('ignores an accepted exit without a current command target', async () => {
+    renderComposableInJsdom(() =>
       useTerminalRetirementWorkspacePanePresentation({
         currentTarget: null,
         navigation: appNavigationActionsForTest(),
@@ -86,7 +86,7 @@ describe('terminal retirement workspace pane presentation', () => {
     const listener = mocks.listener
     if (!listener) throw new Error('missing accepted-exit listener')
 
-    act(() => {
+    await flushTestUpdates(() => {
       listener({
         terminalSessionId: 'term-222222222222222222222',
         tabsBeforeRetirement: [],

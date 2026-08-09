@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import { act, type RenderResult } from '@testing-library/react'
-import { StrictMode, type ReactNode } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { defineComponent } from 'vue'
+import type { VNode } from 'vue'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
+import type { JsdomRenderResult } from '#/test-utils/render.tsx'
+import { QueryClient } from '@tanstack/vue-query'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { renderInJsdom } from '#/test-utils/render.tsx'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { useWorkspaceFilesystemTree } from '#/web/hooks/useWorkspaceFilesystemTree.ts'
 import type { WorkspaceFilesystemNode, WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
@@ -55,38 +57,43 @@ interface HarnessProps {
   readonly onSnapshot: (snapshot: HarnessSnapshot) => void
 }
 
-function Harness({
-  workspaceRootPath,
-  workspaceRuntimeId = WORKSPACE_RUNTIME_ID,
-  worktreePath,
-  targetKind = 'git-worktree',
-  expandedKeys,
-  onSnapshot,
-}: HarnessProps) {
-  const target = mockExecutionTarget(workspaceRootPath, workspaceRuntimeId, worktreePath, targetKind)
-  return (
-    <ExecutionTargetHarness
-      key={workspacePaneFilesystemExecutionTargetKey(target)}
-      target={target}
-      expandedKeys={expandedKeys}
-      onSnapshot={onSnapshot}
-    />
-  )
-}
+const Harness = defineComponent(
+  (props: HarnessProps) => () => {
+    const target = mockExecutionTarget(
+      props.workspaceRootPath,
+      props.workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID,
+      props.worktreePath,
+      props.targetKind ?? 'git-worktree',
+    )
+    return (
+      <ExecutionTargetHarness
+        key={workspacePaneFilesystemExecutionTargetKey(target)}
+        target={target}
+        expandedKeys={props.expandedKeys}
+        onSnapshot={props.onSnapshot}
+      />
+    )
+  },
+  {
+    name: 'WorkspaceFilesystemTreeHarness',
+    props: ['workspaceRootPath', 'workspaceRuntimeId', 'worktreePath', 'targetKind', 'expandedKeys', 'onSnapshot'],
+  },
+)
 
-function ExecutionTargetHarness({
-  target,
-  expandedKeys,
-  onSnapshot,
-}: {
+interface ExecutionTargetHarnessProps {
   readonly target: WorkspacePaneFilesystemExecutionTarget
   readonly expandedKeys?: readonly string[]
   readonly onSnapshot: (snapshot: HarnessSnapshot) => void
-}) {
-  const result = useWorkspaceFilesystemTree({ target, expandedKeys })
-  onSnapshot(result)
-  return null
 }
+
+const ExecutionTargetHarness = defineComponent(
+  (props: ExecutionTargetHarnessProps) => {
+    const result = useWorkspaceFilesystemTree({ target: props.target, expandedKeys: () => props.expandedKeys ?? [] })
+    props.onSnapshot(result)
+    return () => null
+  },
+  { name: 'ExecutionTargetHarness', props: ['target', 'expandedKeys', 'onSnapshot'] },
+)
 
 function mockExecutionTarget(
   workspaceRootPath: string,
@@ -134,13 +141,13 @@ function mainHarnessProps(overrides: Partial<HarnessProps> = {}): HarnessProps {
 }
 
 async function emitFilesystemInvalidation(target = mainExecutionTarget()): Promise<void> {
-  await act(async () => {
+  await flushTestUpdates(async () => {
     for (const listener of listeners) listener({ type: 'workspace-filesystem-invalidated', target })
     await Promise.resolve()
   })
 }
 
-let rendered: RenderResult | null = null
+let rendered: JsdomRenderResult | null = null
 let lastSnapshot: HarnessSnapshot | null = null
 let queryClient: QueryClient
 let stopInvalidationSync: (() => void) | null = null
@@ -168,19 +175,19 @@ function render(props: HarnessProps): Promise<void> {
 }
 
 function setProps(props: HarnessProps): Promise<void> {
-  return act(async () => {
+  return flushTestUpdates(async () => {
     if (!rendered) throw new Error('expected rendered filesystem tree harness')
-    rendered.rerender(
-      <QueryClientProvider client={queryClient}>
+    await rendered.rerender(
+      <VueQueryClientScope client={queryClient}>
         <Harness {...props} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
   })
 }
 
-function renderElement(element: ReactNode): Promise<void> {
-  return act(async () => {
-    rendered = renderInJsdom(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>)
+function renderElement(element: VNode): Promise<void> {
+  return flushTestUpdates(async () => {
+    rendered = renderInJsdom(<VueQueryClientScope client={queryClient}>{element}</VueQueryClientScope>)
   })
 }
 
@@ -191,7 +198,7 @@ function unmountRenderedTree(): void {
 }
 
 async function flush() {
-  await act(async () => {
+  await flushTestUpdates(async () => {
     await Promise.resolve()
     await waitForNextMacrotask()
   })
@@ -346,7 +353,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
 
     rootRefreshFailure = true
-    await act(async () => {
+    await flushTestUpdates(async () => {
       lastSnapshot?.refresh()
     })
     await flush()
@@ -354,13 +361,13 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.isReading).toBe(false)
 
     rootRefreshFailure = false
-    await act(async () => {
+    await flushTestUpdates(async () => {
       lastSnapshot?.refresh()
     })
     await flush()
     expect(lastSnapshot?.error).toBeNull()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       webChildren.reject(new Error('hidden child failed'))
       await Promise.resolve()
     })
@@ -375,7 +382,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
 
     webRecovered = true
-    await act(async () => {
+    await flushTestUpdates(async () => {
       lastSnapshot?.refresh()
     })
     await flush()
@@ -399,7 +406,7 @@ describe('useWorkspaceFilesystemTree', () => {
       truncated: false,
     }
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       deferred.resolve(result)
       await deferred.promise
     })
@@ -410,7 +417,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.error).toBeNull()
   })
 
-  test('revalidates cached restored children once under StrictMode', async () => {
+  test('revalidates cached restored children once for one mounted observer', async () => {
     const target = mockExecutionTarget('/repo-a', WORKSPACE_RUNTIME_ID, '/repo-a/main')
     const root = filesystemTree(directoryNode('src'))
     queryClient.setQueryData(workspaceFilesystemTreeChildrenQueryKey(target, ''), root)
@@ -423,16 +430,14 @@ describe('useWorkspaceFilesystemTree', () => {
     )
 
     await renderElement(
-      <StrictMode>
-        <Harness
-          workspaceRootPath="/repo-a"
-          worktreePath="/repo-a/main"
-          expandedKeys={['src']}
-          onSnapshot={(snapshot) => {
-            lastSnapshot = snapshot
-          }}
-        />
-      </StrictMode>,
+      <Harness
+        workspaceRootPath="/repo-a"
+        worktreePath="/repo-a/main"
+        expandedKeys={['src']}
+        onSnapshot={(snapshot) => {
+          lastSnapshot = snapshot
+        }}
+      />,
     )
     await flush()
 
@@ -485,7 +490,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await render(props)
     expect(filesystemReadCount()).toBe(1)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       rootRead.resolve(root)
       await rootRead.promise
     })
@@ -539,14 +544,14 @@ describe('useWorkspaceFilesystemTree', () => {
 
     // Resolving the first superseded promise must not clobber the
     // hook's state.
-    await act(async () => {
+    await flushTestUpdates(async () => {
       first.resolve({ nodes: [], truncated: false })
       await Promise.resolve()
     })
     expect(lastSnapshot?.tree).toBeNull()
 
     // Resolving the second promise applies the new state.
-    await act(async () => {
+    await flushTestUpdates(async () => {
       second.resolve({
         nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
         truncated: false,
@@ -592,7 +597,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await render(mainHarnessProps())
     await flush()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       await lastSnapshot?.loadChildren('src')
     })
     await flush()
@@ -617,7 +622,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
 
     let childLoad: Promise<void> | undefined
-    await act(async () => {
+    await flushTestUpdates(async () => {
       childLoad = lastSnapshot?.loadChildren('src')
       await Promise.resolve()
     })
@@ -635,7 +640,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
     expect(lastSnapshot?.loadingKeys.has('src')).toBe(true)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       child.resolve({
         nodes: [
           {
@@ -674,7 +679,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(false)
 
     webChildren.resolve(filesystemTree(fileNode('src/web/index.ts', 'src/web')))
-    await act(async () => {
+    await flushTestUpdates(async () => {
       sourceChildren.resolve(filesystemTree(directoryNode('src/web', 'src')))
       await sourceChildren.promise
     })
@@ -712,14 +717,14 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
     expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       lastSnapshot?.refresh()
     })
     await flush()
     expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
 
     rootRefreshFailure = true
-    await act(async () => {
+    await flushTestUpdates(async () => {
       lastSnapshot?.refresh()
     })
     await flush()
@@ -750,14 +755,14 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
 
     removed = true
-    await act(async () => {
+    await flushTestUpdates(async () => {
       lastSnapshot?.refresh()
       await Promise.resolve()
     })
     await flush()
     expect(lastSnapshot?.tree?.nodes).toEqual([])
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       lateChildren.resolve(filesystemTree(fileNode('src/late.ts', 'src')))
       await lateChildren.promise
     })
@@ -805,7 +810,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.expandedDirectoryReadsSettled).toBe(true)
 
     phase = 'recovered'
-    await act(async () => {
+    await flushTestUpdates(async () => {
       lastSnapshot?.refresh()
     })
     await flush()
@@ -825,7 +830,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
 
     failing = true
-    await act(async () => {
+    await flushTestUpdates(async () => {
       lastSnapshot?.refresh()
     })
     await flush()
@@ -885,7 +890,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.isReading).toBe(true)
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       refreshedRoot.resolve(root)
       refreshedChildren.resolve(newChildren)
       await Promise.all([refreshedRoot.promise, refreshedChildren.promise])
@@ -902,14 +907,14 @@ describe('useWorkspaceFilesystemTree', () => {
 
     await render(mainHarnessProps())
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       lastSnapshot?.refresh()
       await Promise.resolve()
     })
 
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(1)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       first.resolve({
         nodes: [
           {
@@ -949,7 +954,7 @@ describe('useWorkspaceFilesystemTree', () => {
     await emitFilesystemInvalidation()
     expect(mocks.getWorkspaceFilesystemTree).toHaveBeenCalledOnce()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       first.resolve({
         nodes: [{ id: 'stale.ts', path: 'stale.ts', name: 'stale.ts', parentId: null, kind: 'file', status: 'clean' }],
         truncated: false,
@@ -986,7 +991,7 @@ describe('useWorkspaceFilesystemTree', () => {
     expect(lastSnapshot?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
 
     await emitFilesystemInvalidation(target)
-    await act(async () => {
+    await flushTestUpdates(async () => {
       firstRootRead.resolve(root)
       await firstRootRead.promise
     })
@@ -1045,13 +1050,13 @@ describe('useWorkspaceFilesystemTree', () => {
     await flush()
     expect(snapshots.first?.tree?.nodes.map((node) => node.id).sort()).toEqual(['src', 'src/old.ts'])
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       if (!rendered) throw new Error('expected rendered filesystem tree harness')
-      rendered.rerender(
-        <QueryClientProvider client={queryClient}>
+      await rendered.rerender(
+        <VueQueryClientScope client={queryClient}>
           {observer('first')}
           {observer('second')}
-        </QueryClientProvider>,
+        </VueQueryClientScope>,
       )
     })
     await flush()

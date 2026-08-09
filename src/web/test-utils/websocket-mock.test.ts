@@ -13,7 +13,7 @@ describe('installWebSocketMock', () => {
     expect(socket.readyState).toBe(1)
   })
 
-  test('manual-open flavor stays CONNECTING until emitOpen()', () => {
+  test('manual-open flavor stays CONNECTING until emitOpen()', async () => {
     const handle = installWebSocketMock({ autoOpen: false })
     const socket = new handle.MockWebSocket('ws://test/')
     expect(socket.readyState).toBe(0)
@@ -21,7 +21,7 @@ describe('installWebSocketMock', () => {
     expect(socket.readyState).toBe(1)
   })
 
-  test('emitMessage delivers parsed data to onmessage listeners', () => {
+  test('emitMessage delivers parsed data to onmessage listeners', async () => {
     const handle = installWebSocketMock({ autoOpen: false })
     const socket = new handle.MockWebSocket('ws://test/')
     const cb = vi.fn()
@@ -30,7 +30,7 @@ describe('installWebSocketMock', () => {
     expect(cb).toHaveBeenCalledWith({ data: 'hello' })
   })
 
-  test('reset() clears tracked instances', () => {
+  test('reset() clears tracked instances', async () => {
     const handle: WebSocketMockHandle = installWebSocketMock({ autoOpen: false })
     new handle.MockWebSocket('ws://a/')
     new handle.MockWebSocket('ws://b/')

@@ -6,15 +6,15 @@ import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-reque
 
 const mocks = vi.hoisted(() => ({ warning: vi.fn() }))
 
-vi.mock('sonner', () => ({ toast: { warning: mocks.warning } }))
-vi.mock('i18next', () => ({ t: (key: string) => key }))
+vi.mock('vue-sonner', () => ({ toast: { warning: mocks.warning } }))
+vi.mock('#/web/stores/i18n-vue.ts', () => ({ translate: (key: string) => key }))
 
 describe('terminal write failure feedback', () => {
   beforeEach(() => {
     mocks.warning.mockClear()
   })
 
-  test('deduplicates failures from the same realtime outage across sessions', () => {
+  test('deduplicates failures from the same realtime outage across sessions', async () => {
     const reporter = createTerminalWriteFailureReporter()
     const first = new ClientRealtimeRequestError('closed', {
       kind: 'disconnected',
@@ -42,7 +42,7 @@ describe('terminal write failure feedback', () => {
     })
   })
 
-  test('reports a later outage independently and maps failure kinds', () => {
+  test('reports a later outage independently and maps failure kinds', async () => {
     const reporter = createTerminalWriteFailureReporter()
     reporter.report({
       terminalRuntimeSessionId: 'pty_session_first_123456',
@@ -88,7 +88,7 @@ describe('terminal write failure feedback', () => {
     ])
   })
 
-  test('does not report shutdown as an outage', () => {
+  test('does not report shutdown as an outage', async () => {
     const reporter = createTerminalWriteFailureReporter()
     reporter.report({
       terminalRuntimeSessionId: 'pty_session_first_123456',
@@ -105,7 +105,7 @@ describe('terminal write failure feedback', () => {
     expect(mocks.warning).not.toHaveBeenCalled()
   })
 
-  test('does not re-report a delayed failure from an older outage', () => {
+  test('does not re-report a delayed failure from an older outage', async () => {
     const reporter = createTerminalWriteFailureReporter()
     for (const outageId of [2, 1]) {
       reporter.report({

@@ -16,7 +16,7 @@ import {
 } from '#/server/workspace-pane/workspace-pane-physical-admission.ts'
 
 describe('workspace pane physical admission policy', () => {
-  test('sorts and deduplicates capabilities and leases by admission identity', () => {
+  test('sorts and deduplicates capabilities and leases by admission identity', async () => {
     const identityA = testPhysicalWorktreeIdentity('/workspace/a')
     const identityB = testPhysicalWorktreeIdentity('/workspace/b')
     const oldA = issueTestPhysicalWorktreeExecutionCapability({ identity: identityA })
@@ -33,7 +33,7 @@ describe('workspace pane physical admission policy', () => {
     ).toEqual([physicalWorktreeAdmissionLease(currentA), physicalWorktreeAdmissionLease(currentB)])
   })
 
-  test('replaces stale capabilities by stable identity while preserving unrelated capabilities', () => {
+  test('replaces stale capabilities by stable identity while preserving unrelated capabilities', async () => {
     const identityA = testPhysicalWorktreeIdentity('/workspace/a')
     const oldA = issueTestPhysicalWorktreeExecutionCapability({ identity: identityA })
     const currentA = issueTestPhysicalWorktreeExecutionCapability({ identity: identityA })
@@ -47,7 +47,7 @@ describe('workspace pane physical admission policy', () => {
     expect(merged.get(physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(oldA)))).toBe(currentA)
   })
 
-  test('groups indexed leases and the current capability by stable physical identity', () => {
+  test('groups indexed leases and the current capability by stable physical identity', async () => {
     const identity = testPhysicalWorktreeIdentity('/workspace/a')
     const indexed = issueTestPhysicalWorktreeExecutionCapability({ identity })
     const current = issueTestPhysicalWorktreeExecutionCapability({ identity })
@@ -62,7 +62,7 @@ describe('workspace pane physical admission policy', () => {
     ])
   })
 
-  test('collapses repeated captures of one admission identity to the latest capability', () => {
+  test('collapses repeated captures of one admission identity to the latest capability', async () => {
     const identity = testPhysicalWorktreeIdentity('/workspace/a')
     const first = issueTestPhysicalWorktreeExecutionCapability({ identity })
     const second = issueTestPhysicalWorktreeExecutionCapability({ identity })

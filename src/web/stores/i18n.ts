@@ -1,10 +1,6 @@
 // Client-side i18n. The app entrypoint hydrates this store from
-// the public `/api/i18n` endpoint before mounting the normal React
-// tree; setPref writes through and the broadcast keeps every window
-// in sync. React components read translations through react-i18next,
-// while this Zustand store keeps the language preference/snapshot
-// available to non-hook call sites (Settings controls, ErrorBoundary
-// fallback).
+// the public `/api/i18n` endpoint before mounting the normal Vue tree;
+// setPref writes through and the broadcast keeps every window in sync.
 //
 // No initial dictionary is read from the bootstrap: the server
 // stopped inlining it into HTML, so the client always starts
@@ -15,37 +11,20 @@
 // I18n hydration reads the public settings transport; preference writes go
 // through settings-actions.
 
-import i18next from 'i18next'
-import { initReactI18next, useTranslation } from 'react-i18next'
-import { create, type StoreApi } from 'zustand'
-import type { I18nSnapshot, Lang, LangPref } from '#/shared/api-types.ts'
+import { createStore } from 'zustand/vanilla'
+import type { StoreApi } from 'zustand/vanilla'
+import type { I18nSnapshot } from '#/shared/api-types.ts'
+import type { Lang, LangPref } from '#/shared/settings.ts'
 import { getI18nSnapshot } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
 import { setI18nPreference } from '#/web/settings-actions.ts'
 
-export type { Lang, LangPref }
-type Dict = Record<string, string>
-
-void i18next.use(initReactI18next).init({
-  lng: 'en',
-  fallbackLng: 'en',
-  resources: { en: { translation: {} } },
-  defaultNS: 'translation',
-  keySeparator: false,
-  interpolation: {
-    escapeValue: false,
-    prefix: '{',
-    suffix: '}',
-  },
-  react: {
-    useSuspense: false,
-  },
-})
+export type I18nDictionary = Record<string, string>
 
 interface I18nState {
   lang: Lang
   pref: LangPref
-  dict: Dict
+  dict: I18nDictionary
   /**
    * True once `hydrate()` has applied at least one snapshot from
    * `/api/i18n`. UI surfaces that depend on translated
@@ -79,7 +58,7 @@ function ensureI18nSubscription(set: I18nSet): void {
   })
 }
 
-export const useI18nStore = create<I18nState>((set) => ({
+export const i18nStore = createStore<I18nState>((set) => ({
   lang: 'en',
   pref: 'auto',
   dict: {},
@@ -114,13 +93,11 @@ function commitSnapshot(set: I18nSet, snapshot: I18nSnapshot): Promise<void> {
 }
 
 async function commitSnapshotNow(set: I18nSet, snapshot: I18nSnapshot): Promise<void> {
-  const current = useI18nStore.getState()
+  const current = i18nStore.getState()
   if (sameSnapshot(current, snapshot)) return
-  await applySnapshot(snapshot)
   set((s) =>
     sameSnapshot(s, snapshot) ? s : { lang: snapshot.lang, pref: snapshot.pref, dict: snapshot.dict, hydrated: true },
   )
-  document.documentElement.setAttribute('lang', snapshot.lang)
 }
 
 function sameSnapshot(state: Pick<I18nState, 'lang' | 'pref' | 'dict'>, snapshot: I18nSnapshot): boolean {
@@ -129,21 +106,4 @@ function sameSnapshot(state: Pick<I18nState, 'lang' | 'pref' | 'dict'>, snapshot
   const snapshotKeys = Object.keys(snapshot.dict)
   if (stateKeys.length !== snapshotKeys.length) return false
   return stateKeys.every((key) => state.dict[key] === snapshot.dict[key])
-}
-
-async function applySnapshot(snapshot: { lang: Lang; dict: Dict }): Promise<void> {
-  i18next.addResourceBundle(snapshot.lang, 'translation', { ...snapshot.dict }, true, true)
-  await i18next.changeLanguage(snapshot.lang)
-}
-
-/** Render-bound translator backed by react-i18next. */
-export function useT() {
-  const { t } = useTranslation()
-  return (key: string, params?: Record<string, string | number>) => {
-    return t(key, params) as string
-  }
-}
-
-export function translate(key: string, params?: Record<string, string | number>): string {
-  return i18next.t(key, params) as string
 }

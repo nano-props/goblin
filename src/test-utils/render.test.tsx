@@ -6,13 +6,23 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 
 describe('renderInJsdom', () => {
-  test('renders React elements and returns the standard RTL query API', () => {
+  test('renders Vue VNodes and returns the standard testing-library query API', async () => {
     const { getByTestId } = renderInJsdom(
       <div>
         <span data-testid="target">hello</span>
       </div>,
     )
     expect(getByTestId('target').textContent).toBe('hello')
+  })
+
+  test('rerenders VNodes only when the caller creates a new projection', async () => {
+    const initial = <span data-testid="target">before</span>
+    const view = renderInJsdom(initial)
+
+    await expect(view.rerender(initial)).rejects.toThrow('newly created VNode')
+    await view.rerender(<span data-testid="target">after</span>)
+
+    expect(view.getByTestId('target').textContent).toBe('after')
   })
 
   test('flushAnimationFrames awaits the requested number of frames', async () => {
@@ -52,7 +62,7 @@ describe('waitForNextMacrotask', () => {
 })
 
 describe('useFakeTimers', () => {
-  test('fakes the standard timer surface', () => {
+  test('fakes the standard timer surface', async () => {
     useFakeTimers()
     expect(vi.isFakeTimers()).toBe(true)
   })

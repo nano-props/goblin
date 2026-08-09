@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { helpShortcutSections } from '#/web/keyboard/help-shortcuts.ts'
 
 describe('helpShortcutSections', () => {
-  test('formats accelerator-backed help rows for macOS', () => {
+  test('formats accelerator-backed help rows for macOS', async () => {
     const sections = helpShortcutSections('Alt+G', true)
     const nav = sections[0]?.rows
     const branchActions = sections[1]?.rows
@@ -19,7 +19,7 @@ describe('helpShortcutSections', () => {
     expect(app?.find((row) => row.labelKey === 'help.row.settings')?.combos).toEqual([['⌘', ',']])
   })
 
-  test('formats accelerator-backed help rows for non-mac platforms', () => {
+  test('formats accelerator-backed help rows for non-mac platforms', async () => {
     const sections = helpShortcutSections('Alt+G', false)
     const nav = sections[0]?.rows
     const view = sections[2]?.rows

@@ -310,7 +310,7 @@ export function createApp(options: ServerAppOptions): Hono {
     app.use('/*', serveStatic({ root: WEB_DIST_DIR }))
     // SPA fallback: deep links that don't match a real static file
     // (e.g. `/repos/abc123/changes`) get the raw `index.html` so
-    // React Router can take over. `/api/*` and `/ws/*` requests
+    // Vue Router can take over. `/api/*` and `/ws/*` requests
     // fall through to the JSON `notFound` handler below.
     app.get('*', async (c) => {
       if (isServerRoutePath(c.req.path)) {

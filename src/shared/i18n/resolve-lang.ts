@@ -1,4 +1,4 @@
-import type { Lang, LangPref } from '#/shared/api-types.ts'
+import type { Lang, LangPref } from '#/shared/settings.ts'
 
 const SUPPORTED_LANGS = ['zh', 'ko', 'ja', 'en'] as const satisfies readonly Lang[]
 

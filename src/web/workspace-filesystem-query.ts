@@ -1,4 +1,5 @@
-import { hashKey, type QueryClient } from '@tanstack/react-query'
+import { hashKey } from '@tanstack/query-core'
+import type { QueryClient } from '@tanstack/query-core'
 import type { WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 import {
   workspacePaneFilesystemExecutionPath,

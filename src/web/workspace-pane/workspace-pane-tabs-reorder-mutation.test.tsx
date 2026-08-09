@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/vue-query'
+import { defineComponent } from 'vue'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -62,7 +64,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     seedWorkspacePaneTabs(sourceTabs)
     renderMutationHook({ canonicalTabs: sourceTabs })
 
-    act(() => currentControls().reorderTabs(reorderedTabs))
+    await flushTestUpdates(() => currentControls().reorderTabs(reorderedTabs))
     await flushMicrotasks()
     expect(readWorkspacePaneTabs()).toEqual(sourceTabs)
 
@@ -78,9 +80,9 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     seedWorkspacePaneTabs(sourceTabs)
     renderMutationHook({ canonicalTabs: sourceTabs })
 
-    act(() => currentControls().reorderTabs(firstTabs))
+    await flushTestUpdates(() => currentControls().reorderTabs(firstTabs))
     await vi.waitFor(() => expect(requests).toHaveLength(1))
-    act(() => currentControls().reorderTabs(secondTabs))
+    await flushTestUpdates(() => currentControls().reorderTabs(secondTabs))
     await flushMicrotasks()
     expect(requests).toHaveLength(1)
     expect(readWorkspacePaneTabs()).toEqual(sourceTabs)
@@ -98,7 +100,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
   })
 
   test('reports failure without mutating or rolling back the canonical cache', async () => {
-    const onReorderRejected = vi.fn()
+    const onSettled = vi.fn()
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: async () => {
         throw new Error('server unavailable')
@@ -106,21 +108,21 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
     seedWorkspacePaneTabs(sourceTabs)
-    renderMutationHook({ canonicalTabs: sourceTabs, onReorderRejected })
+    renderMutationHook({ canonicalTabs: sourceTabs })
 
-    act(() => currentControls().reorderTabs([...sourceTabs].reverse()))
+    await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs].reverse(), onSettled))
 
-    await vi.waitFor(() => expect(onReorderRejected).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(onSettled).toHaveBeenCalledOnce())
     expect(readWorkspacePaneTabs()).toEqual(sourceTabs)
   })
 
-  test('does not send a no-op reorder', () => {
+  test('does not send a no-op reorder', async () => {
     const updateWorkspaceTabs = vi.fn(async () => [] as WorkspacePaneTabEntry[])
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
     renderMutationHook({ canonicalTabs: sourceTabs })
 
-    act(() => currentControls().reorderTabs([...sourceTabs]))
+    await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs]))
 
     expect(updateWorkspaceTabs).not.toHaveBeenCalled()
   })
@@ -134,8 +136,8 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     const renderResult = renderMutationHook({ canonicalTabs: sourceTabs })
     seedWorkspacePaneTabsRepo(NEXT_WORKSPACE_RUNTIME_ID)
 
-    renderResult.rerender(
-      <QueryClientProvider client={queryClient}>
+    await renderResult.rerender(
+      <VueQueryClientScope client={queryClient}>
         <HookHost
           input={{
             kind: 'git-worktree' as const,
@@ -145,9 +147,9 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
             canonicalTabs: sourceTabs,
           }}
         />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
-    act(() => currentControls().reorderTabs(reorderedTabs))
+    await flushTestUpdates(() => currentControls().reorderTabs(reorderedTabs))
 
     await vi.waitFor(() =>
       expect(updateWorkspaceTabs).toHaveBeenCalledWith({
@@ -183,7 +185,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     )
     renderMutationHook({ kind: 'workspace-root', canonicalTabs: sourceTabs })
 
-    act(() => currentControls().reorderTabs([...sourceTabs].reverse()))
+    await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs].reverse()))
 
     await vi.waitFor(() =>
       expect(updateWorkspaceTabs).toHaveBeenCalledWith({
@@ -207,7 +209,6 @@ function renderMutationHook(
   input: {
     kind?: 'git-worktree' | 'workspace-root'
     canonicalTabs?: WorkspacePaneTabEntry[]
-    onReorderRejected?: () => void
   } = {},
 ) {
   const target =
@@ -219,23 +220,25 @@ function renderMutationHook(
           worktreePath: WORKTREE_PATH,
         }
   return renderInJsdom(
-    <QueryClientProvider client={queryClient}>
+    <VueQueryClientScope client={queryClient}>
       <HookHost
         input={{
           ...target,
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
           canonicalTabs: input.canonicalTabs ?? [],
-          ...(input.onReorderRejected ? { onReorderRejected: input.onReorderRejected } : {}),
         }}
       />
-    </QueryClientProvider>,
+    </VueQueryClientScope>,
   )
 }
 
-function HookHost({ input }: { input: WorkspacePaneTabsReorderMutationInput }) {
-  controls = useWorkspacePaneTabsReorderMutation(input)
-  return null
-}
+const HookHost = defineComponent(
+  (props: { input: WorkspacePaneTabsReorderMutationInput }) => {
+    controls = useWorkspacePaneTabsReorderMutation(() => props.input)
+    return () => null
+  },
+  { name: 'WorkspacePaneTabsReorderMutationTestHost', props: ['input'] },
+)
 
 function currentControls(): WorkspacePaneTabsReorderMutationResult {
   if (!controls) throw new Error('missing workspace pane tabs mutation controls')

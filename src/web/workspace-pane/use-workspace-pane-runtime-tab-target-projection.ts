@@ -1,9 +1,9 @@
-import { useMemo } from 'react'
+import { computed, toValue } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import {
   type WorkspacePaneRuntimeTabTargetProjection,
-  type WorkspacePaneRuntimeTabTargetSelectionByType,
   workspacePaneRuntimeTabTargetProjection,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { workspacePaneRuntimeTabTargetKey } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-key.ts'
@@ -11,12 +11,13 @@ import {
   useWorkspacePaneRuntimeTabProviderProjections,
   workspacePaneRuntimeTabTargetKeyByType,
   type WorkspacePaneRuntimeTabTargetKeyByType,
+  type WorkspacePaneRuntimeTabTargetSelectionByType,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export interface UseWorkspacePaneRuntimeTabTargetProjectionInput {
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
-  filesystemTarget: WorkspacePaneFilesystemExecutionTarget | null
+  workspaceId: MaybeRefOrGetter<WorkspaceId>
+  workspaceRuntimeId: MaybeRefOrGetter<string>
+  filesystemTarget: MaybeRefOrGetter<WorkspacePaneFilesystemExecutionTarget | null>
 }
 
 export interface WorkspacePaneRuntimeTabTargetProjectionHookResult extends WorkspacePaneRuntimeTabTargetProjection {
@@ -25,42 +26,27 @@ export interface WorkspacePaneRuntimeTabTargetProjectionHookResult extends Works
   selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType
 }
 
-export function useWorkspacePaneRuntimeTabTargetProjection({
-  workspaceId,
-  workspaceRuntimeId,
-  filesystemTarget,
-}: UseWorkspacePaneRuntimeTabTargetProjectionInput): WorkspacePaneRuntimeTabTargetProjectionHookResult {
-  const input = useMemo(
-    () => ({ workspaceId, workspaceRuntimeId, filesystemTarget }),
-    [filesystemTarget, workspaceId, workspaceRuntimeId],
-  )
-  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey(input)
-  const runtimeTabTargetKeyByType = useMemo(() => workspacePaneRuntimeTabTargetKeyByType(input), [input])
+export function useWorkspacePaneRuntimeTabTargetProjection(
+  source: UseWorkspacePaneRuntimeTabTargetProjectionInput,
+): ComputedRef<WorkspacePaneRuntimeTabTargetProjectionHookResult> {
+  const input = computed(() => ({
+    workspaceId: toValue(source.workspaceId),
+    workspaceRuntimeId: toValue(source.workspaceRuntimeId),
+    filesystemTarget: toValue(source.filesystemTarget),
+  }))
   const providerProjections = useWorkspacePaneRuntimeTabProviderProjections(input)
-
-  const selectedSessionIdByRuntimeType = useMemo<WorkspacePaneRuntimeTabTargetSelectionByType>(
-    () =>
-      Object.fromEntries(
-        providerProjections.map((provider) => [provider.type, provider.selectedSessionId]),
-      ) as WorkspacePaneRuntimeTabTargetSelectionByType,
-    [providerProjections],
-  )
-
-  const projection = useMemo(
-    () =>
-      workspacePaneRuntimeTabTargetProjection({
-        providers: providerProjections,
-      }),
-    [providerProjections],
-  )
-
-  return useMemo(
-    () => ({
+  return computed(() => {
+    const currentInput = input.value
+    const currentProviders = providerProjections.value
+    const selectedSessionIdByRuntimeType = Object.fromEntries(
+      currentProviders.map((provider) => [provider.type, provider.selectedSessionId]),
+    ) as WorkspacePaneRuntimeTabTargetSelectionByType
+    const projection = workspacePaneRuntimeTabTargetProjection({ providers: currentProviders })
+    return {
       ...projection,
-      runtimeTabTargetKey,
-      runtimeTabTargetKeyByType,
+      runtimeTabTargetKey: workspacePaneRuntimeTabTargetKey(currentInput),
+      runtimeTabTargetKeyByType: workspacePaneRuntimeTabTargetKeyByType(currentInput),
       selectedSessionIdByRuntimeType,
-    }),
-    [projection, runtimeTabTargetKey, runtimeTabTargetKeyByType, selectedSessionIdByRuntimeType],
-  )
+    }
+  })
 }

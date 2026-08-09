@@ -1,7 +1,9 @@
-import type { ComponentProps, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, FunctionalComponent, HTMLAttributes, VNodeChild } from 'vue'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import { STATUS_TONE_CHIP_CLASS, STATUS_TONE_TEXT_CLASS, type StatusTone } from '#/web/components/ui/status-tones.ts'
+import { STATUS_TONE_CHIP_CLASS, STATUS_TONE_TEXT_CLASS } from '#/web/components/ui/status-tones.ts'
+import type { StatusTone } from '#/web/components/ui/status-tones.ts'
+
 export type Tone = StatusTone
 export type StatusRowValueLayout = 'inline' | 'fill' | 'chips'
 
@@ -22,41 +24,37 @@ const ROW_VALUE_CLASS: Record<StatusRowValueLayout, string> = {
   fill: 'min-w-0 flex-1 text-sm text-foreground',
   chips: 'flex min-w-0 max-w-full flex-wrap items-center gap-1.5 text-sm text-foreground',
 }
-type StatusChipProps = ComponentProps<'span'> & {
-  tone?: Tone
-}
 
-export function StatusChip({ children, className, tone = 'neutral', ref, ...props }: StatusChipProps) {
+type StatusChipProps = HTMLAttributes & { tone?: Tone }
+
+export const StatusChip: FunctionalComponent<StatusChipProps> = (props, { attrs, slots }) => {
+  const { class: classValue, ...elementProps } = attrs as HTMLAttributes
+  const tone = props.tone ?? 'neutral'
   return (
-    <span ref={ref} {...props} className={cn(STATUS_CHIP_CLASS, STATUS_TONE_CHIP_CLASS[tone], className)}>
-      {children}
+    <span {...elementProps} class={cn(STATUS_CHIP_CLASS, STATUS_TONE_CHIP_CLASS[tone], classValue)}>
+      {slots.default?.()}
     </span>
   )
 }
 
-type StatusActionProps = Omit<ComponentProps<'button'>, 'type'> & {
+StatusChip.props = ['tone']
+StatusChip.inheritAttrs = false
+
+export type StatusActionProps = Omit<ButtonHTMLAttributes, 'type'> & {
   tone?: Tone
   mono?: boolean
   truncate?: boolean
   variant?: 'text' | 'chip'
 }
 
-export function StatusAction({
-  children,
-  className,
-  tone,
-  mono = false,
-  truncate = false,
-  variant = 'text',
-  ref,
-  ...props
-}: StatusActionProps) {
+export const StatusAction: FunctionalComponent<StatusActionProps> = (props, { attrs, slots }) => {
+  const { tone, mono = false, truncate = false, variant = 'text' } = props
+  const { class: classValue, ...buttonProps } = attrs as ButtonHTMLAttributes
   return (
     <button
-      ref={ref}
+      {...buttonProps}
       type="button"
-      {...props}
-      className={cn(
+      class={cn(
         STATUS_ACTION_BASE_CLASS,
         mono && MONO_VALUE_CLASS,
         truncate && INLINE_TRUNCATE_CLASS,
@@ -65,104 +63,106 @@ export function StatusAction({
         variant === 'chip' && STATUS_CHIP_CLASS,
         variant === 'chip' && tone && STATUS_TONE_CHIP_CLASS[tone],
         variant === 'chip' && 'cursor-pointer',
-        className,
+        classValue,
       )}
     >
-      {children}
+      {slots.default?.()}
     </button>
   )
 }
 
+StatusAction.props = ['tone', 'mono', 'truncate', 'variant']
+StatusAction.inheritAttrs = false
+
 type ClickableStatusChipProps = Omit<StatusActionProps, 'variant' | 'mono' | 'truncate'>
 
-export function ClickableStatusChip(props: ClickableStatusChipProps) {
-  return <StatusAction variant="chip" {...props} />
-}
+export const ClickableStatusChip: FunctionalComponent<ClickableStatusChipProps> = (props, { attrs, slots }) => (
+  <StatusAction {...attrs} tone={props.tone} variant="chip">
+    {slots.default?.()}
+  </StatusAction>
+)
 
-export function StatusRows({ children }: { children: ReactNode }) {
-  return (
-    <div role="list" className={STATUS_ROWS_CLASS}>
-      {children}
-    </div>
-  )
-}
+ClickableStatusChip.props = ['tone']
+ClickableStatusChip.inheritAttrs = false
 
-type StatusRowProps = Omit<ComponentProps<'div'>, 'value'> & {
-  icon: ReactNode
+export const StatusRows: FunctionalComponent = (_props, { slots }) => (
+  <div role="list" class={STATUS_ROWS_CLASS}>
+    {slots.default?.()}
+  </div>
+)
+
+type StatusRowProps = Omit<HTMLAttributes, 'value'> & {
+  icon: VNodeChild
   label: string
-  value: ReactNode
+  value: VNodeChild
   valueLayout?: StatusRowValueLayout
-  after?: ReactNode
+  after?: VNodeChild
   tone?: Tone
 }
 
-export function StatusRow({
-  icon,
-  label,
-  value,
-  valueLayout = 'inline',
-  after,
-  tone = 'neutral',
-  className,
-  ref,
-  ...props
-}: StatusRowProps) {
+export const StatusRow: FunctionalComponent<StatusRowProps> = (props, { attrs }) => {
+  const { icon, label, value, valueLayout = 'inline', after, tone = 'neutral' } = props
+  const { class: classValue, ...elementProps } = attrs as HTMLAttributes
   return (
-    <div ref={ref} role="listitem" className={cn(STATUS_ROW_LAYOUT_CLASS, className)} {...props}>
-      <span className={cn(ROW_ICON_CLASS, STATUS_TONE_TEXT_CLASS[tone])}>{icon}</span>
-      <span className={ROW_LABEL_CLASS}>{label}</span>
-      <div className="flex min-w-0 items-center gap-2">
-        <div className={ROW_VALUE_CLASS[valueLayout]}>{value}</div>
-        {after && <div className="flex shrink-0 items-center gap-1.5">{after}</div>}
+    <div {...elementProps} role="listitem" class={cn(STATUS_ROW_LAYOUT_CLASS, classValue)}>
+      <span class={cn(ROW_ICON_CLASS, STATUS_TONE_TEXT_CLASS[tone])}>{icon}</span>
+      <span class={ROW_LABEL_CLASS}>{label}</span>
+      <div class="flex min-w-0 items-center gap-2">
+        <div class={ROW_VALUE_CLASS[valueLayout]}>{value}</div>
+        {after ? <div class="flex shrink-0 items-center gap-1.5">{after}</div> : null}
       </div>
     </div>
   )
 }
 
-export function MonoValue({
-  children,
-  title,
-  tone,
-  truncate = false,
-}: {
-  children: ReactNode
+StatusRow.props = ['icon', 'label', 'value', 'valueLayout', 'after', 'tone']
+StatusRow.inheritAttrs = false
+
+export const MonoValue: FunctionalComponent<{
   title?: string
   tone?: Tone
   truncate?: boolean
-}) {
-  return (
-    <span
-      className={cn(MONO_VALUE_CLASS, truncate && INLINE_TRUNCATE_CLASS, tone && STATUS_TONE_TEXT_CLASS[tone])}
-      title={title}
-    >
-      {children}
-    </span>
-  )
-}
+}> = (props, { slots }) => (
+  <span
+    class={cn(
+      MONO_VALUE_CLASS,
+      props.truncate && INLINE_TRUNCATE_CLASS,
+      props.tone && STATUS_TONE_TEXT_CLASS[props.tone],
+    )}
+    title={props.title}
+  >
+    {slots.default?.()}
+  </span>
+)
 
-type StatusLinkProps = Omit<StatusActionProps, 'variant'>
+MonoValue.props = ['title', 'tone', 'truncate']
 
-export function StatusLink(props: StatusLinkProps) {
-  return <StatusAction {...props} />
-}
+export const StatusLink: FunctionalComponent<Omit<StatusActionProps, 'variant'>> = (props, { attrs, slots }) => (
+  <StatusAction {...attrs} tone={props.tone} mono={props.mono} truncate={props.truncate}>
+    {slots.default?.()}
+  </StatusAction>
+)
 
-export function CopyableValue({
-  value,
-  copyValue = value,
-  copyLabel,
-  copiedLabel,
-}: {
+StatusLink.props = ['tone', 'mono', 'truncate']
+StatusLink.inheritAttrs = false
+
+export const CopyableValue: FunctionalComponent<{
   value: string
   copyValue?: string
   copyLabel: string
   copiedLabel: string
-}) {
-  return (
-    <div className={STATUS_INLINE_GROUP_CLASS}>
-      <MonoValue title={value} truncate>
-        {value}
-      </MonoValue>
-      <CopyButton value={copyValue} copyLabel={copyLabel} copiedLabel={copiedLabel} className="shrink-0" />
-    </div>
-  )
-}
+}> = (props) => (
+  <div class={STATUS_INLINE_GROUP_CLASS}>
+    <MonoValue title={props.value} truncate>
+      {props.value}
+    </MonoValue>
+    <CopyButton
+      value={props.copyValue ?? props.value}
+      copyLabel={props.copyLabel}
+      copiedLabel={props.copiedLabel}
+      class="shrink-0"
+    />
+  </div>
+)
+
+CopyableValue.props = ['value', 'copyValue', 'copyLabel', 'copiedLabel']

@@ -17,19 +17,21 @@ import {
   workspacePaneTabsTestBridge,
 } from '#/web/test-utils/git-workspace-pane-content.tsx'
 import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
-import { act, screen, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { screen, waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { QueryClient } from '@tanstack/vue-query'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
 import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
+import { BranchActionSurfaceProvider } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
+  TerminalSessionCommandScope,
+  TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import type {
@@ -72,22 +74,22 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const renderSurface = () => {
-      const currentRepo = useWorkspacesStore.getState().workspaces[REPO_ID]!
+      const currentRepo = workspacesStore.getState().workspaces[REPO_ID]!
       const projection = gitWorkspacePaneProjection(currentRepo)
       return (
-        <TerminalSessionContext value={terminalCommandContextWith()}>
-          <TerminalSessionReadContext value={emptyTerminalReadContext}>
-            <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
+        <TerminalSessionCommandScope value={terminalCommandContextWith()}>
+          <TerminalSessionReadScope value={emptyTerminalReadContext}>
+            <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
               <GitWorkspacePaneContentHarness
                 repo={projection}
                 detail={getTestGitWorkspacePanePresentation(projection)}
                 workspacePaneId="workspace"
               />
-            </BranchActionSurfaceContext>
-          </TerminalSessionReadContext>
-        </TerminalSessionContext>
+            </BranchActionSurfaceProvider>
+          </TerminalSessionReadScope>
+        </TerminalSessionCommandScope>
       )
     }
     const rendered = renderInJsdom(renderSurface())
@@ -95,15 +97,15 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     expect(await screen.findByRole('treeitem', { name: 'before.txt' })).toBeTruthy()
     expect(filetreeClientMocks.getWorkspaceFilesystemTree).toHaveBeenCalledOnce()
 
-    act(() => {
-      useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, branchName, 'status')
-      rendered.rerender(renderSurface())
+    await flushTestUpdates(async () => {
+      workspacesStore.getState().setWorkspacePaneTab(REPO_ID, branchName, 'status')
+      await rendered.rerender(renderSurface())
     })
     expect(rendered.container.querySelector('#workspace-status-panel')).not.toBeNull()
 
-    act(() => {
-      useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, branchName, 'files')
-      rendered.rerender(renderSurface())
+    await flushTestUpdates(async () => {
+      workspacesStore.getState().setWorkspacePaneTab(REPO_ID, branchName, 'files')
+      await rendered.rerender(renderSurface())
     })
 
     expect(await screen.findByRole('treeitem', { name: 'after.txt' })).toBeTruthy()
@@ -123,9 +125,9 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       return Promise.resolve(filesystemTree(cleanDirectoryNode('src')))
     })
     const surface = (workspaceRuntimeId: string) => (
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigationWith({})}>
-          <TerminalSessionContext value={terminalCommandContextWith()}>
+          <TerminalSessionCommandScope value={terminalCommandContextWith()}>
             <WorkspaceFilesystemTabPanel
               routeTarget={{ kind: 'workspace-root', workspaceId }}
               target={workspaceRootPaneFilesystemTarget({
@@ -138,26 +140,26 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
                 },
               })}
             />
-          </TerminalSessionContext>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>
+      </VueQueryClientScope>
     )
     const rendered = renderInJsdom(surface(oldRuntimeId))
     const directory = await screen.findByRole('treeitem', { name: 'src' })
 
-    act(() => directory.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await flushTestUpdates(() => directory.dispatchEvent(new MouseEvent('click', { bubbles: true })))
     await waitFor(() => expect(filetreeClientMocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(2))
 
-    rendered.rerender(surface(currentRuntimeId))
+    await rendered.rerender(surface(currentRuntimeId))
     await waitFor(() => expect(filetreeClientMocks.getWorkspaceFilesystemTree).toHaveBeenCalledTimes(4))
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       oldChildren.resolve(filesystemTree(cleanFileNode('src/stale.ts', 'src')))
       await oldChildren.promise
     })
     expect(screen.queryByRole('treeitem', { name: 'stale.ts' })).toBeNull()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       currentChildren.resolve(filesystemTree(cleanFileNode('src/current.ts', 'src')))
       await currentChildren.promise
     })
@@ -165,7 +167,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     expect(screen.queryByRole('treeitem', { name: 'stale.ts' })).toBeNull()
   })
 
-  test('mounts the terminal session while terminal creation is pending with no sessions', () => {
+  test('mounts the terminal session while terminal creation is pending with no sessions', async () => {
     const worktreePath = '/tmp/terminal-pending-worktree'
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
@@ -179,7 +181,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -192,15 +194,15 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     }
 
     const { container } = renderInJsdom(
-      <TerminalSessionContext value={terminalCommandContextWith()}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={terminalCommandContextWith()}>
+        <TerminalSessionReadScope value={readContext}>
           <GitWorkspacePaneContentHarness
             repo={gitWorkspacePaneProjection(repo)}
             detail={detail}
             workspacePaneId="workspace"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     const panel = container.querySelector('#workspace-terminal-panel')
@@ -212,7 +214,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 
-  test('mounts the terminal session while terminal creation is pending after every tab was closed', () => {
+  test('mounts the terminal session while terminal creation is pending after every tab was closed', async () => {
     const worktreePath = '/tmp/terminal-pending-empty-strip-worktree'
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const branchName = 'feature/terminal-pending-empty-strip'
@@ -225,8 +227,8 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { [branchName]: [] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, seededRepo.workspaceRuntimeId)
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]!
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, seededRepo.workspaceRuntimeId)
+    const repo = workspacesStore.getState().workspaces[REPO_ID]!
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -239,22 +241,22 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     }
 
     renderInJsdom(
-      <TerminalSessionContext value={terminalCommandContextWith()}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={terminalCommandContextWith()}>
+        <TerminalSessionReadScope value={readContext}>
           <GitWorkspacePaneContentHarness
             repo={gitWorkspacePaneProjection(repo)}
             detail={detail}
             workspacePaneId="workspace"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     expect(screen.getByRole('tabpanel').id).toBe('workspace-terminal-panel')
     expect(screen.queryByText('workspace-pane-tabs.empty')).toBeNull()
   })
 
-  test('renders terminal loading without a create CTA while initial terminal sync is unresolved', () => {
+  test('renders terminal loading without a create CTA while initial terminal sync is unresolved', async () => {
     const worktreePath = '/tmp/terminal-loading-worktree'
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
@@ -281,15 +283,15 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     }
 
     const { container } = renderInJsdom(
-      <TerminalSessionContext value={terminalCommandContextWith({ createTerminal })}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={terminalCommandContextWith({ createTerminal })}>
+        <TerminalSessionReadScope value={readContext}>
           <GitWorkspacePaneContentHarness
             repo={gitWorkspacePaneProjection(repo)}
             detail={detail}
             workspacePaneId="workspace"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     const panel = container.querySelector('#workspace-terminal-panel')
@@ -302,7 +304,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     expect(createTerminal).not.toHaveBeenCalled()
   })
 
-  test('labels terminal panels from the mixed tab list, not runtime session list', () => {
+  test('labels terminal panels from the mixed tab list, not runtime session list', async () => {
     const worktreePath = '/tmp/terminal-reordered-worktree'
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
@@ -322,7 +324,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
         ],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     const terminalFilesystemTargetSnapshot: TerminalFilesystemTargetSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -339,15 +341,15 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     }
 
     const { container } = renderInJsdom(
-      <TerminalSessionContext value={terminalCommandContextWith()}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={terminalCommandContextWith()}>
+        <TerminalSessionReadScope value={readContext}>
           <GitWorkspacePaneContentHarness
             repo={gitWorkspacePaneProjection(repo)}
             detail={detail}
             workspacePaneId="workspace"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     expect(container.querySelector('#workspace-terminal-panel')?.getAttribute('aria-labelledby')).toBe(
@@ -380,7 +382,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
     let resolvedStartupShellCommand: string | null = null
     const createTerminalWithAdmission: TerminalSessionContextValue['createTerminalWithAdmission'] = vi.fn(
@@ -416,21 +418,20 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
     renderInJsdom(
-      <QueryClientProvider client={queryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
-            <TerminalSessionReadContext value={emptyTerminalReadContext}>
-              <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-                <GitWorkspacePaneContentHarness
-                  repo={gitWorkspacePaneProjection(repo)}
-                  detail={detail}
-                  workspacePaneId="workspace"
-                />
-              </BranchActionSurfaceContext>
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
-        </AppNavigationProvider>
-      </QueryClientProvider>,
+      <VueQueryClientScope client={queryClient}>
+        <TerminalSessionCommandScope value={terminalCommandContextWith({ createTerminalWithAdmission })}>
+          <TerminalSessionReadScope value={emptyTerminalReadContext}>
+            <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
+              <GitWorkspacePaneContentHarness
+                repo={gitWorkspacePaneProjection(repo)}
+                detail={detail}
+                workspacePaneId="workspace"
+                navigation={navigation}
+              />
+            </BranchActionSurfaceProvider>
+          </TerminalSessionReadScope>
+        </TerminalSessionCommandScope>
+      </VueQueryClientScope>,
     )
 
     const row = await screen.findByRole('treeitem', { name: 'README.md' })
@@ -441,7 +442,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       worktreePath,
       route: { kind: 'static', tab: 'files' },
     })
-    await act(async () => {
+    await flushTestUpdates(async () => {
       row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
       await Promise.resolve()
     })
@@ -449,13 +450,13 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     expect(actionButton?.getAttribute('aria-busy')).toBe('true')
     expect(actionButton?.querySelector('svg.animate-spin')).toBeTruthy()
     expect(createTerminalWithAdmission).toHaveBeenCalledTimes(1)
-    await act(async () => {
+    await flushTestUpdates(async () => {
       row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
       await Promise.resolve()
     })
     expect(filetreeClientMocks.getWorkspaceFileViewer).toHaveBeenCalledTimes(1)
-    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/changes', 'status')
-    await act(async () => {
+    workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/changes', 'status')
+    await flushTestUpdates(async () => {
       resolveViewer({ viewer: 'bat', shell: 'posix', executionRoot: worktreePath })
       await Promise.resolve()
     })
@@ -556,9 +557,9 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     )
 
     renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigationWith({ commitWorkspaceRootTerminalSession })}>
-          <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
+          <TerminalSessionCommandScope value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
               routeTarget={{ kind: 'workspace-root', workspaceId }}
               target={workspaceRootPaneFilesystemTarget({
@@ -571,13 +572,13 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
                 },
               })}
             />
-          </TerminalSessionContext>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     const row = await screen.findByRole('treeitem', { name: 'sample-document.md' })
-    await act(async () => {
+    await flushTestUpdates(async () => {
       row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
       await Promise.resolve()
     })
@@ -625,9 +626,9 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     const createTerminalWithAdmission = vi.fn()
 
     renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigationWith({})}>
-          <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission })}>
+          <TerminalSessionCommandScope value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
               routeTarget={{ kind: 'workspace-root', workspaceId }}
               target={workspaceRootPaneFilesystemTarget({
@@ -640,15 +641,15 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
                 },
               })}
             />
-          </TerminalSessionContext>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     const row = await screen.findByRole('treeitem', { name: 'README.md' })
     const actionButton = row.querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
     expect(actionButton).toBeTruthy()
-    await act(async () => actionButton?.click())
+    await flushTestUpdates(async () => actionButton?.click())
     expect(document.body.textContent).toContain('filetree.download')
     expect(document.body.textContent).not.toContain('app-chrome.open')
     expect(document.body.textContent).not.toContain('menu.edit.delete')

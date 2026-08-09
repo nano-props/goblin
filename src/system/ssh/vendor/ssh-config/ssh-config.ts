@@ -764,5 +764,3 @@ export function stringify(config: SSHConfig): string {
   config.forEach(format)
   return str
 }
-
-export { glob, SSHConfig }

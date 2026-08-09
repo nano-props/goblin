@@ -8,7 +8,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 describe('orderWorkspacePaneItemsByTabEntries', () => {
-  test('orders materialized items by tab entries without creating missing items', () => {
+  test('orders materialized items by tab entries without creating missing items', async () => {
     const terminalOne = terminalEntry('term-111111111111111111111')
     const terminalTwo = terminalEntry('term-222222222222222222222')
     const status = staticEntry('status')
@@ -26,7 +26,7 @@ describe('orderWorkspacePaneItemsByTabEntries', () => {
 })
 
 describe('workspacePaneTabsWithDraggedOrder', () => {
-  test('reorders current tabs by dragged tabs while preserving tabs absent from the drag snapshot', () => {
+  test('reorders current tabs by dragged tabs while preserving tabs absent from the drag snapshot', async () => {
     const terminalOne = terminalEntry('term-111111111111111111111')
     const status = staticEntry('status')
     const history = staticEntry('history')
@@ -40,7 +40,7 @@ describe('workspacePaneTabsWithDraggedOrder', () => {
 })
 
 describe('workspacePaneTabsWithoutStaticTab', () => {
-  test('allows closing the final tab', () => {
+  test('allows closing the final tab', async () => {
     expect(workspacePaneTabsWithoutStaticTab([staticEntry('status')], 'status')).toEqual([])
   })
 })

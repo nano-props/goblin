@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   REPO_ID,
   branch,
@@ -27,7 +27,7 @@ describe('repository snapshot refresh', () => {
       'main',
       'feature/a',
     ])
-    const workspace = useWorkspacesStore.getState().workspaces[REPO_ID]
+    const workspace = workspacesStore.getState().workspaces[REPO_ID]
     expect(workspace?.capability.kind).toBe('git')
     expect(workspace && workspace.capability.kind === 'git' ? Object.keys(workspace.capability.git) : []).toEqual(
       expect.not.arrayContaining(['dataLoads', 'remote']),
@@ -43,7 +43,7 @@ describe('repository snapshot refresh', () => {
     await requestRepoSnapshotRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
     expect(cachedRepoSnapshot(workspaceRuntimeId)?.current).toBe('main')
-    const workspace = useWorkspacesStore.getState().workspaces[REPO_ID]
+    const workspace = workspacesStore.getState().workspaces[REPO_ID]
     const events = workspace?.capability.kind === 'git' ? workspace.capability.git.events : []
     expect(events.at(-1)).toMatchObject({ kind: 'error', message: 'error.failed-read-repo' })
   })

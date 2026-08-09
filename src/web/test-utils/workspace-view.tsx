@@ -4,15 +4,33 @@ import { seedRepoWithReadModelForTest, createRepoBranch, resetWorkspacesStore } 
 import { afterEach, beforeEach, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import type { ButtonHTMLAttributes, FunctionalComponent, VNode, VNodeChild } from 'vue'
 
-const responsiveMocks = vi.hoisted(() => ({
-  mode: 'default' as 'default' | 'compact',
-}))
+const responsiveMocks = vi.hoisted(() => {
+  type ResponsiveMode = 'default' | 'compact'
+  let mode: ResponsiveMode = 'default'
+  let publish = (_mode: ResponsiveMode) => {}
+  return {
+    get mode() {
+      return mode
+    },
+    set mode(next: ResponsiveMode) {
+      mode = next
+      publish(next)
+    },
+    connect(nextPublish: (next: ResponsiveMode) => void) {
+      publish = nextPublish
+      publish(mode)
+    },
+  }
+})
 const branchNavigatorMocks = vi.hoisted(() => ({
   activate: vi.fn<(repoId: string) => void>(),
 }))
@@ -28,10 +46,18 @@ const workspacePaneMocks = vi.hoisted(() => ({
   scrollMemoryProbe: false,
 }))
 
-vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useResponsiveUiMode: () => responsiveMocks.mode,
-  useIsCompactUi: () => responsiveMocks.mode === 'compact',
-}))
+vi.mock('#/web/hooks/useResponsiveUiMode.tsx', async () => {
+  // Vitest hoists this factory, so create the reactive test source inside it.
+  const { computed, ref } = await import('vue')
+  const mode = ref(responsiveMocks.mode)
+  responsiveMocks.connect((next) => {
+    mode.value = next
+  })
+  return {
+    useResponsiveUiMode: () => mode,
+    useIsCompactUi: () => computed(() => mode.value === 'compact'),
+  }
+})
 
 vi.mock('#/web/hooks/useRepoToasts.tsx', () => ({
   useRepoToasts: restoreWorkspaceTabsMocks.useRepoToasts,
@@ -41,89 +67,93 @@ vi.mock('#/web/hooks/useRestoreWorkspaceTabsOnView.ts', () => ({
   useRestoreWorkspaceTabsOnView: restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView,
 }))
 
-vi.mock('#/web/components/BranchNavigator.tsx', () => ({
-  BranchNavigator: ({ repoId }: { repoId: string }) => (
+vi.mock('#/web/components/BranchNavigator.tsx', () => {
+  const BranchNavigator: FunctionalComponent<{ repoId: string }> = (props) => (
     <button
       type="button"
       data-testid="branch-navigator"
       onClick={() => {
-        branchNavigatorMocks.activate(repoId)
+        branchNavigatorMocks.activate(props.repoId)
       }}
     >
       branch
     </button>
-  ),
-}))
+  )
+  BranchNavigator.props = ['repoId']
+  return { BranchNavigator }
+})
 
 vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', async () => {
   // Vitest hoists mock factories before this test module's imports, so load
   // the context hook inside the factory that defines the mock.
   const { useWorkspacePaneTabStripScrollMemoryController } =
     await import('#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx')
+  const { defineComponent } = await import('vue')
   const scrollMemoryKey = 'runtime-1\0workspace-1\0branch\0feature-a'
+  interface WorkspacePaneMockProps {
+    currentBranchName?: string | null
+    workspacePaneRouteContext?:
+      | { kind: 'workspace-root'; route: { kind: string; tab?: string } | null }
+      | { kind: 'routed'; route: { kind: string; tab?: string } | null }
+      | { kind: 'inactive' }
+    shortcutsEnabled?: boolean
+    toolbarTrafficLightOffset?: boolean
+  }
   return {
-    WorkspacePane: ({
-      currentBranchName,
-      workspacePaneRouteContext,
-      shortcutsEnabled = true,
-      toolbarTrafficLightOffset = false,
-    }: {
-      currentBranchName?: string | null
-      workspacePaneRouteContext?:
-        | { kind: 'workspace-root'; route: { kind: string } | null }
-        | { kind: 'routed'; route: { kind: string } | null }
-        | { kind: 'inactive' }
-      shortcutsEnabled?: boolean
-      toolbarTrafficLightOffset?: boolean
-    }) => {
-      const scrollMemory = useWorkspacePaneTabStripScrollMemoryController()
-      return (
-        <div
-          data-testid="workspace-pane"
-          data-current-branch-name={currentBranchName ?? ''}
-          data-workspace-pane-route-kind={
-            workspacePaneRouteContext?.kind === 'routed'
-              ? (workspacePaneRouteContext.route?.kind ?? 'bare')
-              : workspacePaneRouteContext?.kind === 'workspace-root'
-                ? (workspacePaneRouteContext.route?.kind ?? 'workspace-root')
-                : (workspacePaneRouteContext?.kind ?? 'inactive')
-          }
-          data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
-          data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
-        >
-          {workspacePaneMocks.scrollMemoryProbe ? (
-            <>
-              <button
-                type="button"
-                data-testid="workspace-pane-scroll-memory-write"
-                onClick={() => scrollMemory.write(scrollMemoryKey, 180)}
-              />
-              <span data-testid="workspace-pane-scroll-memory-value">{scrollMemory.read(scrollMemoryKey)}</span>
-            </>
-          ) : null}
-        </div>
-      )
-    },
+    WorkspacePane: defineComponent(
+      (props: WorkspacePaneMockProps) => {
+        const scrollMemory = useWorkspacePaneTabStripScrollMemoryController()
+        return () => (
+          <div
+            data-testid="workspace-pane"
+            data-current-branch-name={props.currentBranchName ?? ''}
+            data-workspace-pane-route-kind={
+              props.workspacePaneRouteContext?.kind === 'routed'
+                ? (props.workspacePaneRouteContext.route?.kind ?? 'bare')
+                : props.workspacePaneRouteContext?.kind === 'workspace-root'
+                  ? (props.workspacePaneRouteContext.route?.kind ?? 'workspace-root')
+                  : (props.workspacePaneRouteContext?.kind ?? 'inactive')
+            }
+            data-workspace-pane-route-tab={
+              props.workspacePaneRouteContext?.kind !== 'inactive' &&
+              props.workspacePaneRouteContext?.route?.kind === 'static'
+                ? (props.workspacePaneRouteContext.route.tab ?? '')
+                : ''
+            }
+            data-shortcuts-enabled={props.shortcutsEnabled !== false ? 'true' : 'false'}
+            data-traffic-light-offset={props.toolbarTrafficLightOffset ? 'true' : 'false'}
+          >
+            {workspacePaneMocks.scrollMemoryProbe ? (
+              <>
+                <button
+                  type="button"
+                  data-testid="workspace-pane-scroll-memory-write"
+                  onClick={() => scrollMemory.write(scrollMemoryKey, 180)}
+                />
+                <span data-testid="workspace-pane-scroll-memory-value">{scrollMemory.read(scrollMemoryKey)}</span>
+              </>
+            ) : null}
+          </div>
+        )
+      },
+      { props: ['currentBranchName', 'workspacePaneRouteContext', 'shortcutsEnabled', 'toolbarTrafficLightOffset'] },
+    ),
   }
 })
 
-vi.mock('#/web/components/workspace-pages/CreateWorktreePagePane.tsx', () => ({
-  CreateWorktreePagePane: ({
-    compact,
-    onCancel,
-    onCreated,
-  }: {
+vi.mock('#/web/components/workspace-pages/CreateWorktreePagePane.tsx', () => {
+  const CreateWorktreePagePane: FunctionalComponent<{
     compact?: boolean
     onCancel: () => void
     onCreated: (branchName: string, navigationGeneration: AppNavigationGeneration) => void
-  }) => (
-    <div data-testid="create-worktree-page" data-compact={compact ? 'true' : 'false'}>
+  }> = (props) => (
+    <div data-testid="create-worktree-page" data-compact={props.compact ? 'true' : 'false'}>
       <button
         type="button"
         data-testid="create-worktree-cancel"
         onClick={() => {
           createWorktreePageMocks.cancel()
-          onCancel()
+          props.onCancel()
         }}
       />
       <button
@@ -131,25 +161,29 @@ vi.mock('#/web/components/workspace-pages/CreateWorktreePagePane.tsx', () => ({
         data-testid="create-worktree-created"
         onClick={() => {
           createWorktreePageMocks.created('feature/new-worktree')
-          onCreated('feature/new-worktree', 1)
+          props.onCreated('feature/new-worktree', 1)
         }}
       />
     </div>
-  ),
-}))
+  )
+  CreateWorktreePagePane.props = ['compact', 'onCancel', 'onCreated']
+  return { CreateWorktreePagePane }
+})
 
-vi.mock('#/web/components/workspace-pages/WorkspaceDashboardPane.tsx', () => ({
-  WorkspaceDashboardPane: ({ compact, onBack }: { compact?: boolean; onBack?: () => void }) => (
-    <div data-testid="workspace-dashboard-page" data-compact={compact ? 'true' : 'false'}>
+vi.mock('#/web/components/workspace-pages/WorkspaceDashboardPane.tsx', () => {
+  const WorkspaceDashboardPane: FunctionalComponent<{ compact?: boolean; onBack?: () => void }> = (props) => (
+    <div data-testid="workspace-dashboard-page" data-compact={props.compact ? 'true' : 'false'}>
       <button
         type="button"
         data-testid="workspace-dashboard-back"
         aria-label="workspace.back-to-workspace-navigator"
-        onClick={onBack}
+        onClick={props.onBack}
       />
     </div>
-  ),
-}))
+  )
+  WorkspaceDashboardPane.props = ['compact', 'onBack']
+  return { WorkspaceDashboardPane }
+})
 
 vi.mock('#/web/components/WorkspacePickerHost.tsx', () => ({
   WorkspacePickerHost: () => <div data-testid="workspace-picker" />,
@@ -161,47 +195,42 @@ vi.mock('#/web/components/repo-toolbar/RepoToolbarActions.tsx', () => ({
   RepoSyncAction: () => <div data-testid="repo-sync-action" />,
 }))
 
-vi.mock('#/web/components/workspace-layout/WorkspaceDashboardRowAction.tsx', () => ({
-  WorkspaceDashboardRowAction: ({
-    onOpenDashboard,
-    selected = false,
-  }: {
+vi.mock('#/web/components/workspace-layout/WorkspaceDashboardRowAction.tsx', () => {
+  const WorkspaceDashboardRowAction: FunctionalComponent<{
     onOpenDashboard?: () => void
     selected?: boolean
-  }) => (
+  }> = (props) => (
     <button
       data-testid="dashboard-row-action"
-      data-selected={selected ? 'true' : 'false'}
+      data-selected={props.selected ? 'true' : 'false'}
       type="button"
-      onClick={onOpenDashboard}
+      onClick={props.onOpenDashboard}
     />
-  ),
-}))
+  )
+  WorkspaceDashboardRowAction.props = ['onOpenDashboard', 'selected']
+  return { WorkspaceDashboardRowAction }
+})
 
 vi.mock('#/web/components/WorkspaceZenModeToggle.tsx', () => ({
-  WorkspaceZenModeToggle: (props: React.ComponentProps<'button'>) => (
-    <button type="button" {...props}>
+  WorkspaceZenModeToggle: (props: ButtonHTMLAttributes) => (
+    <button {...props} type={props.type ?? 'button'}>
       zen
     </button>
   ),
 }))
 
-vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => ({
-  WorkspaceNavigationControls: ({
-    repoId,
-    zenRevealTriggerEnabled,
-    onZenRevealTriggerEnter,
-  }: {
-    repoId?: string
+vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => {
+  const WorkspaceNavigationControls: FunctionalComponent<{
+    workspaceId?: string
     zenRevealTriggerEnabled?: boolean
     onZenRevealTriggerEnter?: () => void
-  }) => (
-    <div data-testid="workspace-navigation-controls" data-repo-id={repoId} className="pointer-events-auto">
+  }> = (props) => (
+    <div data-testid="workspace-navigation-controls" data-workspace-id={props.workspaceId} class="pointer-events-auto">
       <span
         data-testid="zen-mode-sidebar-trigger-surface"
-        data-zen-reveal-surface={zenRevealTriggerEnabled ? '' : undefined}
+        data-zen-reveal-surface={props.zenRevealTriggerEnabled ? '' : undefined}
       >
-        <button type="button" data-testid="zen-mode-sidebar-trigger" onMouseEnter={onZenRevealTriggerEnter}>
+        <button type="button" data-testid="zen-mode-sidebar-trigger" onMouseenter={props.onZenRevealTriggerEnter}>
           zen
         </button>
       </span>
@@ -212,64 +241,69 @@ vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => ({
         forward
       </button>
     </div>
-  ),
-}))
+  )
+  WorkspaceNavigationControls.props = ['workspaceId', 'zenRevealTriggerEnabled', 'onZenRevealTriggerEnter']
+  return { WorkspaceNavigationControls }
+})
 
-vi.mock('#/web/components/Layout.tsx', () => ({
-  WorkspaceSplitLayout: ({
-    mode,
-    sidebarCollapsed,
-    sidebarPane,
-    workspacePane,
-  }: {
+vi.mock('#/web/components/Layout.tsx', () => {
+  const WorkspaceSplitLayout: FunctionalComponent<{
     mode?: 'split' | 'single-pane'
     sidebarCollapsed?: boolean
-    sidebarPane: React.ReactNode
-    workspacePane: React.ReactNode
-  }) => (
+    sidebarPane: VNodeChild
+    workspacePane: VNodeChild
+  }> = (props) => (
     <div
       data-testid="workspace-layout"
-      data-mode={mode ?? 'split'}
-      data-sidebar-collapsed={sidebarCollapsed ? 'true' : 'false'}
+      data-mode={props.mode ?? 'split'}
+      data-sidebar-collapsed={props.sidebarCollapsed ? 'true' : 'false'}
     >
-      {mode === 'single-pane' ? (
-        workspacePane
+      {props.mode === 'single-pane' ? (
+        props.workspacePane
       ) : (
         <>
-          {sidebarPane}
-          {workspacePane}
+          {props.sidebarPane}
+          {props.workspacePane}
         </>
       )}
     </div>
-  ),
-  WorkspaceLayoutPane: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CompactWorkspaceLayout: ({
-    activePane,
-    sidebarPane,
-    workspacePane,
-  }: {
+  )
+  WorkspaceSplitLayout.props = ['mode', 'sidebarCollapsed', 'sidebarPane', 'workspacePane']
+
+  const WorkspaceLayoutPane: FunctionalComponent = (_props, { slots }) => <div>{slots.default?.()}</div>
+
+  const CompactWorkspaceLayout: FunctionalComponent<{
     activePane: 'navigator' | 'workspace'
-    sidebarPane: React.ReactNode
-    workspacePane: React.ReactNode
-  }) => (
-    <div data-compact-workspace="" data-active-pane={activePane}>
-      <div data-compact-workspace-pane="navigator" aria-hidden={activePane === 'workspace' ? 'true' : undefined}>
-        {sidebarPane}
+    sidebarPane: VNodeChild
+    workspacePane: VNodeChild
+  }> = (props) => (
+    <div data-compact-workspace="" data-active-pane={props.activePane}>
+      <div data-compact-workspace-pane="navigator" aria-hidden={props.activePane === 'workspace' ? 'true' : undefined}>
+        {props.sidebarPane}
       </div>
-      <div data-compact-workspace-pane="workspace" aria-hidden={activePane === 'navigator' ? 'true' : undefined}>
-        {workspacePane}
+      <div data-compact-workspace-pane="workspace" aria-hidden={props.activePane === 'navigator' ? 'true' : undefined}>
+        {props.workspacePane}
       </div>
     </div>
-  ),
-  EmptyState: ({ title, body }: { title: React.ReactNode; body?: React.ReactNode }) => (
+  )
+  CompactWorkspaceLayout.props = ['activePane', 'sidebarPane', 'workspacePane']
+
+  const EmptyState: FunctionalComponent<{ title: VNodeChild; body?: VNodeChild }> = (props) => (
     <div data-testid="empty-state">
-      {title}
-      {body}
+      {props.title}
+      {props.body}
     </div>
-  ),
-}))
+  )
+  EmptyState.props = ['title', 'body']
+
+  return { WorkspaceSplitLayout, WorkspaceLayoutPane, CompactWorkspaceLayout, EmptyState }
+})
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-view-test')
+const workspaceViewNavigation = appNavigationActionsForTest()
+const WorkspaceViewTestScope: FunctionalComponent = (_props, { slots }) => (
+  <AppNavigationProvider value={workspaceViewNavigation}>{slots.default?.()}</AppNavigationProvider>
+)
 
 function filesystemWorkspaceProbe() {
   return {
@@ -304,7 +338,10 @@ beforeEach(() => {
   branchNavigatorMocks.activate.mockImplementation(() => {})
   restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockClear()
   restoreWorkspaceTabsMocks.useRepoToasts.mockClear()
-  restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockReturnValue({ state: { phase: 'idle' }, retry: vi.fn() })
+  restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockReturnValue({
+    state: { value: { phase: 'idle' } },
+    retry: vi.fn(),
+  })
 })
 
 afterEach(() => {
@@ -346,8 +383,8 @@ export {
   setReadModelLoading,
   setRepoUnavailable,
 }
-function render(element: React.ReactNode) {
-  return renderInJsdom(element)
+function render(element: VNode) {
+  return renderInJsdom(element, { wrapper: WorkspaceViewTestScope })
 }
 
 function branchNavigator(container: HTMLElement): HTMLButtonElement | null {
@@ -469,7 +506,7 @@ function domRect({ left, top, width, height }: { left: number; top: number; widt
 }
 
 function setReadModelLoading(repoId: string) {
-  const repo = useWorkspacesStore.getState().workspaces[repoId]
+  const repo = workspacesStore.getState().workspaces[repoId]
   if (!repo) throw new Error(`missing repo ${repoId}`)
   appQueryClient.removeQueries({
     queryKey: repoSnapshotQueryKey(repo.id, repo.workspaceRuntimeId),
@@ -478,9 +515,9 @@ function setReadModelLoading(repoId: string) {
 }
 
 function setRepoUnavailable(repoId: string) {
-  const repo = useWorkspacesStore.getState().workspaces[repoId]
+  const repo = workspacesStore.getState().workspaces[repoId]
   if (!repo) throw new Error(`missing repo ${repoId}`)
-  useWorkspacesStore.setState({
+  workspacesStore.setState({
     workspaces: {
       [repoId]: {
         ...repo,

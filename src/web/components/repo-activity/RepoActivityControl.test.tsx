@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 
 import { seedRepoWithReadModelForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { act, fireEvent, waitFor } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { fireEvent, waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
-import { useI18nStore } from '#/web/stores/i18n.ts'
+import { i18nStore } from '#/web/stores/i18n.ts'
 import {
   markRepoOperationTargets,
   nextRepoOperationId,
@@ -27,7 +28,7 @@ const toastMocks = vi.hoisted(() => ({ error: vi.fn() }))
 vi.mock('#/web/stores/workspaces/workspace-refresh-command.ts', () => ({
   runWorkspaceRefresh: refreshMocks.run,
 }))
-vi.mock('sonner', () => ({ toast: toastMocks }))
+vi.mock('vue-sonner', () => ({ toast: toastMocks }))
 
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace/repo-activity-control-component')
 
@@ -39,7 +40,7 @@ beforeEach(() => {
   // Empty dict so `t('key')` returns the key itself — lets the test
   // assert the exact key the tooltip wires up, independent of the
   // dictionary snapshot (which is hydrated over IPC in production).
-  useI18nStore.setState({
+  i18nStore.setState({
     lang: 'en',
     pref: 'auto',
     dict: {},
@@ -49,7 +50,7 @@ beforeEach(() => {
 })
 
 describe('RepoActivityControl', () => {
-  test('disables the primary refresh button while server projection reports a user fetch', () => {
+  test('disables the primary refresh button while server projection reports a user fetch', async () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'fetch', phase: 'running', source: 'user' })],
@@ -63,7 +64,7 @@ describe('RepoActivityControl', () => {
     expect(button(container).getAttribute('aria-busy')).toBe('true')
   })
 
-  test('keeps the primary refresh button idle while server projection reports a background fetch', () => {
+  test('keeps the primary refresh button idle while server projection reports a background fetch', async () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'fetch', phase: 'running', source: 'background' })],
@@ -95,7 +96,7 @@ describe('RepoActivityControl', () => {
 
     const { container } = renderControl()
 
-    await act(() => advanceTimersAndFlush(120))
+    await flushTestUpdates(() => advanceTimersAndFlush(120))
 
     expect(container.textContent).toContain('action.push-queued')
     expect(button(container).getAttribute('aria-busy')).toBe('true')
@@ -107,13 +108,13 @@ describe('RepoActivityControl', () => {
     seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     const { container } = renderControl()
 
-    fireEvent.click(button(container))
+    await fireEvent.click(button(container))
 
     expect(button(container).disabled).toBe(true)
     expect(button(container).getAttribute('aria-busy')).toBe('true')
     expect(button(container).querySelector('svg')?.classList.contains('animate-spin')).toBe(true)
 
-    fireEvent.click(button(container))
+    await fireEvent.click(button(container))
     expect(refreshMocks.run).toHaveBeenCalledOnce()
 
     refresh.resolve({ ok: true })
@@ -131,7 +132,7 @@ describe('RepoActivityControl', () => {
     seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     const rendered = renderControl()
 
-    fireEvent.click(button(rendered.container))
+    await fireEvent.click(button(rendered.container))
 
     const operationId = nextRepoOperationId(REPO_ID)
     markRepoOperationTargets(
@@ -140,10 +141,10 @@ describe('RepoActivityControl', () => {
       [{ key: 'workspaceRefresh', reason: 'workspace-refresh' }],
       'running',
     )
-    rendered.rerender(control())
+    await rendered.rerender(control())
     settleRepoOperationTargets(REPO_ID, operationId, [{ key: 'workspaceRefresh', reason: 'workspace-refresh' }], null)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       refresh.resolve({ ok: true })
       await refresh.promise
     })
@@ -155,7 +156,7 @@ describe('RepoActivityControl', () => {
     })
   })
 
-  test('renders the primary refresh button for local-only repositories without the local-only label', () => {
+  test('renders the primary refresh button for local-only repositories without the local-only label', async () => {
     seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: false } })
 
     const { container } = renderControl()
@@ -169,7 +170,7 @@ describe('RepoActivityControl', () => {
     refreshMocks.run.mockResolvedValueOnce({ ok: false, message: 'error.workspace-operation-failed' })
     const { container } = renderControl()
 
-    fireEvent.click(button(container))
+    await fireEvent.click(button(container))
 
     await waitFor(() => expect(toastMocks.error).toHaveBeenCalledWith('error.workspace-operation-failed'))
   })
@@ -236,9 +237,9 @@ function renderControl() {
 
 function control() {
   return (
-    <QueryClientProvider client={appQueryClient}>
+    <VueQueryClientScope client={appQueryClient}>
       <RepoActivityControl repoId={REPO_ID} />
-    </QueryClientProvider>
+    </VueQueryClientScope>
   )
 }
 
@@ -288,11 +289,11 @@ function button(container: HTMLElement): HTMLButtonElement {
 }
 
 // Open the tooltip attached to `target` by dispatching a pointermove
-// (Radix's hover trigger fires on this, not pointerover) and advancing
+// (Reka's hover trigger fires on this, not pointerover) and advancing
 // through the Tip's 200ms open delay. Returns the rendered tooltip node.
 async function openTooltip(target: HTMLElement): Promise<HTMLElement> {
   // jsdom doesn't lay out the element, so getBoundingClientRect would
-  // return all zeros; Radix only complains when the value is
+  // return all zeros; Reka only complains when the value is
   // explicitly invalid, so a stub is enough.
   target.getBoundingClientRect = () =>
     ({
@@ -307,10 +308,10 @@ async function openTooltip(target: HTMLElement): Promise<HTMLElement> {
       toJSON: () => ({}),
     }) as DOMRect
 
-  await act(async () => {
+  await flushTestUpdates(async () => {
     target.dispatchEvent(new MouseEvent('pointermove', { bubbles: true }))
   })
-  await act(() => advanceTimersAndFlush(200))
+  await flushTestUpdates(() => advanceTimersAndFlush(200))
   const tooltip = document.body.querySelector('[role="tooltip"]')
   if (!(tooltip instanceof HTMLElement)) throw new Error('Tooltip did not open')
   return tooltip

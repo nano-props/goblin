@@ -465,7 +465,7 @@ export const zh: Record<DictKey, string> = {
   'worktree-bootstrap.summary.more-suffix': '，另有 {count} 个',
   'worktree-bootstrap.summary.setup': '已运行 setup：{command}',
   'action.confirm-push-protected-title': '推送到 {branch}？',
-  'action.confirm-push-protected-body': '你正准备直接推送到 <branch>{branch}</branch>，通常这种分支应该走 PR。继续吗？',
+  'action.confirm-push-protected-body': '你正准备直接推送到 {branch}，通常这种分支应该走 PR。继续吗？',
   'action.confirm-push-confirm': '仍然推送',
   'action.confirm-delete-branch-title': '删除分支？',
   'action.confirm-delete-branch-body': '将会删除本地分支：',

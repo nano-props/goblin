@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoPullRequestsQueryPrefix } from '#/web/repo-query-keys.ts'
@@ -135,7 +135,7 @@ describe('manual workspace refresh', () => {
     resolveFetch({ ok: true, message: 'ok' })
     await refresh
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.workspaceRuntimeId).toBe('repo-runtime-second')
+    expect(workspacesStore.getState().workspaces[REPO_ID]?.workspaceRuntimeId).toBe('repo-runtime-second')
     expect(getRepoSnapshotQueryData(REPO_ID, 'repo-runtime-second')?.current).toBe('reopened')
   })
 })

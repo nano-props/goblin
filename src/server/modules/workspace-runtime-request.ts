@@ -1,4 +1,4 @@
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import { IpcError } from '#/shared/ipc-error.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { isCurrentWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
@@ -13,7 +13,7 @@ import { appendRepoMutationRecoveryMessageKey, type RepoMutationResult } from '#
 import { stopBackgroundSyncRuntime } from '#/server/modules/background-sync.ts'
 import type { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 
-const workspaceRuntimeRequestLogger = serverLogger.child({ module: 'workspace-runtime-request' })
+const workspaceRuntimeRequestLogger = serverNodeLog.child({ module: 'workspace-runtime-request' })
 
 export function requireCurrentWorkspaceRuntime(
   userId: string | null | undefined,

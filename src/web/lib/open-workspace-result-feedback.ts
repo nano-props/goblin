@@ -1,4 +1,4 @@
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { sessionLog } from '#/web/logger.ts'
 

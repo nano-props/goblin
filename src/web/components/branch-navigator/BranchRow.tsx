@@ -1,4 +1,5 @@
-import { type RefObject } from 'react'
+import { defineComponent } from 'vue'
+import type { FunctionalComponent, PropType } from 'vue'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { BranchActionsMenu } from '#/web/components/BranchActionsMenu.tsx'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
@@ -9,6 +10,7 @@ import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.t
 import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
 import { BRANCH_ROW_ACTION_BOX_CLASS } from '#/web/components/branch-navigator/branch-row-metrics.ts'
 import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
+import type { ElementRef } from '#/web/components/ui/refs.ts'
 
 export interface BranchRowProps {
   repo: BranchActionRepo
@@ -16,7 +18,7 @@ export interface BranchRowProps {
   selected: string | null
   onSelectBranch: (branch: string) => void
   onOpenBranchStatus: (branch: string) => void
-  selectedRef: RefObject<HTMLLIElement | null>
+  selectedRef: ElementRef<HTMLLIElement>
   actionMenuOpen?: boolean
   onActionMenuOpenChange?: (open: boolean) => void
   terminalBellCount?: number
@@ -31,109 +33,127 @@ export interface BranchRowProps {
   branchActionBusy?: boolean
 }
 
-export function BranchRow({
-  repo,
-  branch,
-  selected,
-  onSelectBranch,
-  onOpenBranchStatus,
-  selectedRef,
-  actionMenuOpen,
-  onActionMenuOpenChange,
-  terminalBellCount = 0,
-  terminalOutputActive = false,
-  branchActionBusy = false,
-}: BranchRowProps) {
-  const isSelected = branch.name === selected
-  const compact = useIsCompactUi()
-  // The action affordance only appears on hover/focus in non-compact
-  // mode. Keep it visible while the row's own branch action is busy so
-  // the spinner stays anchored to the menu button the user just
-  // clicked, instead of fading out from under the in-flight action.
-  const isActionsHidden = !compact && !actionMenuOpen && !branchActionBusy
-  const leadingTerminalBellCount = compact ? terminalBellCount : 0
-  const showTerminalOutputActive = !isSelected && terminalOutputActive
-  // Compact rows have a single leading status slot. Bell and sustained
-  // terminal output intentionally take that slot over the worktree/dirty
-  // glyph because they are time-sensitive navigation signals in the branch
-  // list, not secondary decoration.
-  const leadingTerminalOutputActive = compact && terminalBellCount <= 0 && showTerminalOutputActive
-  const actionTerminalBellCount = compact ? 0 : terminalBellCount
-  const actionTerminalOutputActive = !compact && terminalBellCount <= 0 && showTerminalOutputActive
-  const worktreeOperationTargetsRow =
-    repo.branchAction.phase !== 'idle' &&
-    repo.branchAction.target === branch.name &&
-    (repo.branchAction.reason === 'branch:createWorktree' || repo.branchAction.reason === 'branch:removeWorktree')
+export const BranchRow = defineComponent(
+  (props: BranchRowProps) => {
+    const compact = useIsCompactUi()
 
-  return (
-    <NavigatorRow
-      rowRef={isSelected ? selectedRef : undefined}
-      selected={isSelected}
-      onClick={() => onSelectBranch(branch.name)}
-      onDoubleClick={() => onOpenBranchStatus(branch.name)}
-      content={
-        <BranchSummaryInline
-          repo={repo}
-          branch={branch}
+    return () => {
+      const isSelected = props.branch.name === props.selected
+      // The action affordance only appears on hover/focus in non-compact
+      // mode. Keep it visible while this row's action is busy.
+      const actionHidden = !compact.value && !props.actionMenuOpen && !props.branchActionBusy
+      const leadingTerminalBellCount = compact.value ? (props.terminalBellCount ?? 0) : 0
+      const showTerminalOutputActive = !isSelected && !!props.terminalOutputActive
+      const leadingTerminalOutputActive =
+        compact.value && (props.terminalBellCount ?? 0) <= 0 && showTerminalOutputActive
+      const actionTerminalBellCount = compact.value ? 0 : (props.terminalBellCount ?? 0)
+      const actionTerminalOutputActive =
+        !compact.value && (props.terminalBellCount ?? 0) <= 0 && showTerminalOutputActive
+      const worktreeOperationTargetsRow =
+        props.repo.branchAction.phase !== 'idle' &&
+        props.repo.branchAction.target === props.branch.name &&
+        (props.repo.branchAction.reason === 'branch:createWorktree' ||
+          props.repo.branchAction.reason === 'branch:removeWorktree')
+
+      return (
+        <NavigatorRow
+          rowRef={isSelected ? props.selectedRef : undefined}
           selected={isSelected}
-          leadingTerminalBellCount={leadingTerminalBellCount}
-          leadingTerminalOutputActive={leadingTerminalOutputActive}
-          worktreeIconDirty={worktreeOperationTargetsRow ? false : undefined}
+          onClick={() => props.onSelectBranch(props.branch.name)}
+          onDblclick={() => props.onOpenBranchStatus(props.branch.name)}
+          content={
+            <BranchSummaryInline
+              repo={props.repo}
+              branch={props.branch}
+              selected={isSelected}
+              leadingTerminalBellCount={leadingTerminalBellCount}
+              leadingTerminalOutputActive={leadingTerminalOutputActive}
+              worktreeIconDirty={worktreeOperationTargetsRow ? false : undefined}
+            />
+          }
+          actions={
+            <BranchRowActionSlot
+              repo={props.repo}
+              branch={props.branch}
+              actionMenuOpen={props.actionMenuOpen}
+              onActionMenuOpenChange={props.onActionMenuOpenChange}
+              actionHidden={actionHidden}
+              terminalBellCount={actionTerminalBellCount}
+              terminalOutputActive={actionTerminalOutputActive}
+            />
+          }
         />
-      }
-      actions={
-        <BranchRowActionSlot
-          repo={repo}
-          branch={branch}
-          actionMenuOpen={actionMenuOpen}
-          onActionMenuOpenChange={onActionMenuOpenChange}
-          actionHidden={isActionsHidden}
-          terminalBellCount={actionTerminalBellCount}
-          terminalOutputActive={actionTerminalOutputActive}
-        />
-      }
-    />
-  )
-}
+      )
+    }
+  },
+  {
+    name: 'BranchRow',
+    props: {
+      repo: { type: Object as PropType<BranchActionRepo>, required: true },
+      branch: { type: Object as PropType<BranchSnapshotInfo>, required: true },
+      selected: { type: String, default: null },
+      onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
+      onOpenBranchStatus: { type: Function as PropType<(branch: string) => void>, required: true },
+      selectedRef: { type: null, required: true },
+      actionMenuOpen: Boolean,
+      onActionMenuOpenChange: Function as PropType<(open: boolean) => void>,
+      terminalBellCount: { type: Number, default: 0 },
+      terminalOutputActive: Boolean,
+      branchActionBusy: Boolean,
+    },
+  },
+)
 
-function BranchRowActionSlot({
-  repo,
-  branch,
-  actionMenuOpen,
-  onActionMenuOpenChange,
-  actionHidden,
-  terminalBellCount,
-  terminalOutputActive,
-}: Pick<BranchRowProps, 'repo' | 'branch' | 'actionMenuOpen' | 'onActionMenuOpenChange'> & {
+type BranchRowActionSlotProps = Pick<
+  BranchRowProps,
+  'repo' | 'branch' | 'actionMenuOpen' | 'onActionMenuOpenChange'
+> & {
   actionHidden: boolean
   terminalBellCount: number
   terminalOutputActive: boolean
-}) {
-  const showBellBadge = terminalBellCount > 0 && actionHidden
-  const showOutputActivity = terminalOutputActive && actionHidden && !showBellBadge
+}
+
+const BranchRowActionSlot: FunctionalComponent<BranchRowActionSlotProps> = (props) => {
+  const showBellBadge = props.terminalBellCount > 0 && props.actionHidden
+  const showOutputActivity = props.terminalOutputActive && props.actionHidden && !showBellBadge
 
   return (
-    <div className={BRANCH_ROW_ACTION_BOX_CLASS}>
+    <div class={BRANCH_ROW_ACTION_BOX_CLASS}>
       {showBellBadge && (
-        <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
-          <TerminalBellBadge count={terminalBellCount} />
+        <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
+          <TerminalBellBadge count={props.terminalBellCount} />
         </div>
       )}
       {showOutputActivity && (
-        <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
+        <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
           <TerminalOutputActivityIndicator />
         </div>
       )}
       <div
-        className={cn(
+        class={cn(
           'relative',
-          !actionHidden && 'pointer-events-auto',
-          actionHidden &&
+          !props.actionHidden && 'pointer-events-auto',
+          props.actionHidden &&
             'pointer-events-none opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
         )}
       >
-        <BranchActionsMenu repo={repo} branch={branch} open={actionMenuOpen} onOpenChange={onActionMenuOpenChange} />
+        <BranchActionsMenu
+          repo={props.repo}
+          branch={props.branch}
+          open={props.actionMenuOpen}
+          onOpenChange={props.onActionMenuOpenChange}
+        />
       </div>
     </div>
   )
 }
+
+BranchRowActionSlot.props = [
+  'repo',
+  'branch',
+  'actionMenuOpen',
+  'onActionMenuOpenChange',
+  'actionHidden',
+  'terminalBellCount',
+  'terminalOutputActive',
+]

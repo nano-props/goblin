@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
 import { describe, expect, test, vi } from 'vitest'
-import { LayoutDashboard } from 'lucide-react'
+import { LayoutDashboard } from '@lucide/vue'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspacePageToolbar } from '#/web/components/workspace-pages/WorkspacePageToolbar.tsx'
 
 describe('WorkspacePageToolbar', () => {
-  test('renders a selected workspace-style tab outside compact mode', () => {
+  test('renders a selected workspace-style tab outside compact mode', async () => {
     const { container } = renderInJsdom(<WorkspacePageToolbar icon={LayoutDashboard} label="Dashboard" />)
 
     expect(container.querySelector('[role="tablist"]')).not.toBeNull()
@@ -14,7 +14,7 @@ describe('WorkspacePageToolbar', () => {
     expect(container.querySelector('button[aria-label="workspace.back-to-workspace-navigator"]')).toBeNull()
   })
 
-  test('renders compact back-title chrome without a tab strip', () => {
+  test('renders compact back-title chrome without a tab strip', async () => {
     const onBack = vi.fn()
     const { container } = renderInJsdom(
       <WorkspacePageToolbar icon={LayoutDashboard} label="Dashboard" compact onBack={onBack} />,

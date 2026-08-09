@@ -1,21 +1,4 @@
 // @vitest-environment jsdom
-// Partial mock of `#/web/stores/i18n.ts`: delegates to the real
-// module so `i18next.use(initReactI18next).init({…})` still runs,
-// then overrides `useT` with a dictionary-based interpolator
-// (`i18nMocks.dict` + `i18nMocks.interpolate`) that the assertions
-// on toast summaries can match against. The simple `stubI18n`
-// helper only covers the `useT → raw key` case; richer overrides
-// write their own `vi.mock(import(...), importOriginal)` and
-// spread `actual` to keep the i18next init side effect live.
-vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
-  const actual = await importOriginal()
-  return {
-    ...actual,
-    useT: (() => (key: string, params?: Record<string, string | number>) =>
-      i18nMocks.interpolate(i18nMocks.dict[key] ?? key, params)) as typeof actual.useT,
-  }
-})
-
 import {
   resetWorkspacesStore,
   seedRepoShellForTest,
@@ -26,7 +9,9 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { appI18n } from '#/web/stores/i18n-vue.ts'
+import { defineComponent, isVNode } from 'vue'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -42,18 +27,17 @@ const i18nMocks = vi.hoisted(() => ({
     'worktree-bootstrap.summary.skipped-missing-other': 'Skipped missing {count} paths: {paths}{moreSuffix}',
     'worktree-bootstrap.summary.setup': 'Ran setup: {command}',
   } as Record<string, string>,
-  interpolate(template: string, params?: Record<string, string | number>): string {
-    return template.replace(/\{(\w+)\}/g, (match, key) => String(params?.[key] ?? match))
-  },
 }))
 
-vi.mock('sonner', () => ({
+vi.mock('vue-sonner', () => ({
   toast: toastMocks,
 }))
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-toasts-test')
 
 beforeEach(() => {
+  appI18n.global.setLocaleMessage('en', i18nMocks.dict)
+  appI18n.global.locale.value = 'en'
   resetWorkspacesStore()
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
@@ -65,7 +49,7 @@ describe('useRepoToasts', () => {
       id: REPO_ID,
       workspaceProbe: createGitWorkspaceProbeForTest(),
     }).workspaceRuntimeId
-    useWorkspacesStore.getState().setLastResult(
+    workspacesStore.getState().setLastResult(
       REPO_ID,
       {
         ok: true,
@@ -86,9 +70,10 @@ describe('useRepoToasts', () => {
 
     expect(toastMocks.success).toHaveBeenCalledTimes(1)
     const [, options] = toastMocks.success.mock.calls[0]!
-    expect(String(options.description.props.children)).toContain('Copied 1 path: .env.local')
-    expect(String(options.description.props.children)).toContain('Skipped missing 1 path: missing.env')
-    expect(String(options.description.props.children)).toContain('Ran setup: bun install')
+    const description = toastDescriptionText(options.description)
+    expect(description).toContain('Copied 1 path: .env.local')
+    expect(description).toContain('Skipped missing 1 path: missing.env')
+    expect(description).toContain('Ran setup: bun install')
   })
 
   test('shows the recovery message before bootstrap details on create-worktree failure', async () => {
@@ -96,7 +81,7 @@ describe('useRepoToasts', () => {
       id: REPO_ID,
       workspaceProbe: createGitWorkspaceProbeForTest(),
     }).workspaceRuntimeId
-    useWorkspacesStore.getState().setLastResult(
+    workspacesStore.getState().setLastResult(
       REPO_ID,
       {
         ok: false,
@@ -117,13 +102,22 @@ describe('useRepoToasts', () => {
 
     expect(toastMocks.error).toHaveBeenCalledTimes(1)
     const [, options] = toastMocks.error.mock.calls[0]!
-    expect(String(options.description.props.children)).toBe(
+    expect(toastDescriptionText(options.description)).toBe(
       'setup exited with status 1\nThe worktree was created, but saving trust failed.\nCopied 1 path: .env.local',
     )
   })
 })
 
-function Harness({ repoId }: { repoId: WorkspaceId }) {
-  useRepoToasts(repoId)
-  return null
+const Harness = defineComponent(
+  (props: { repoId: WorkspaceId }) => {
+    useRepoToasts(() => props.repoId)
+    return () => null
+  },
+  { name: 'RepoToastsHarness', props: ['repoId'] },
+)
+
+function toastDescriptionText(description: unknown): string {
+  if (!isVNode(description)) throw new Error('expected a Vue toast description')
+  const { container } = renderInJsdom(description)
+  return container.querySelector('pre')?.textContent ?? ''
 }

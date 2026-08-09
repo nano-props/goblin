@@ -4,7 +4,7 @@ import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type {
   WorkspaceNavigationHistoryEntry,
   WorkspaceNavigationHistoryTraversal,
@@ -40,7 +40,7 @@ export function setupAppNavigationActionsTests() {
 }
 
 export function preferredWorkspacePaneTab() {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+  const repo = workspacesStore.getState().workspaces[REPO_ID]
   return repo
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
@@ -89,13 +89,13 @@ type AppNavigationActionTestOptions = Omit<
   Partial<Pick<AppNavigationActionOptions, 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>>
 
 export function createAppNavigationActions(options: AppNavigationActionTestOptions) {
-  if (options.currentWorkspaceId && !useWorkspacesStore.getState().workspaces[options.currentWorkspaceId]) {
+  if (options.currentWorkspaceId && !workspacesStore.getState().workspaces[options.currentWorkspaceId]) {
     const workspace = emptyWorkspace(options.currentWorkspaceId, 'navigation-actions-runtime')
-    useWorkspacesStore.setState((state) => ({
+    workspacesStore.setState((state) => ({
       workspaces: { ...state.workspaces, [workspace.id]: workspace },
     }))
   }
-  const store = useWorkspacesStore.getState()
+  const store = workspacesStore.getState()
   return createAppNavigationActionsCore({
     peekWorkspaceNavigation: store.peekWorkspaceNavigation,
     commitWorkspaceNavigation: store.commitWorkspaceNavigation,
@@ -104,7 +104,7 @@ export function createAppNavigationActions(options: AppNavigationActionTestOptio
 }
 
 export function markRepoGitUnavailable(workspaceId: string): void {
-  useWorkspacesStore.setState((state) => {
+  workspacesStore.setState((state) => {
     const repo = state.workspaces[workspaceId]
     if (!repo) return state
     return {

@@ -1,16 +1,10 @@
 import { execa } from 'execa'
 import { getRemotes, getUpstreamParts, pickPreferredRemote } from '#/system/git/remote.ts'
 import { isGitHubHost, parseGitRemoteUrl } from '#/system/git/remote-url.ts'
-import {
-  enqueueGitHubApiRequest,
-  GITHUB_API_CONCURRENCY,
-  GITHUB_API_INTERVAL_CAP,
-  GITHUB_API_INTERVAL_MS,
-} from '#/system/github/queue.ts'
+import { enqueueGitHubApiRequest } from '#/system/github/queue.ts'
 import { buildGitHubCliPath } from '#/system/github-cli.ts'
 
 export const GITHUB_API_TIMEOUT_MS = 17_000
-export { GITHUB_API_CONCURRENCY, GITHUB_API_INTERVAL_CAP, GITHUB_API_INTERVAL_MS }
 
 export interface GitHubRepoRef {
   host: string

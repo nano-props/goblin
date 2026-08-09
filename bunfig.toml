@@ -16,3 +16,8 @@
 
 [test]
 preload = ["./scripts/bun-test-guard.ts"]
+
+# Every peer required by this application is pinned explicitly in package.json.
+# Do not materialize optional peer bindings that the application does not use.
+[install]
+peer = false

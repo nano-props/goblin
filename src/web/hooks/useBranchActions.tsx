@@ -1,10 +1,12 @@
-import { useMutation } from '@tanstack/react-query'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { computed, reactive, toValue } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
+import { useMutation } from '@tanstack/vue-query'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
-import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
+import type { EditorApp, TerminalApp } from '#/shared/settings.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import { getRepoPatch } from '#/web/repo-client.ts'
 import {
@@ -17,7 +19,7 @@ import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 import { branchWorktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
 import { dispatchRepoBranchAction, isPushProtected } from '#/web/stores/workspaces/branch-action-write-paths.ts'
 import { dispatchWorkspaceUiAction } from '#/web/stores/workspaces/workspace-ui-action.ts'
-import { useBranchActionDialogsStore } from '#/web/stores/workspaces/branch-action-dialogs.ts'
+import { branchActionDialogsStore } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import {
   branchActionBusyItemId,
   type BranchActionRepo,
@@ -86,31 +88,34 @@ export function getBranchActionCapabilities(
 /**
  * Per-(repoId, branchName) request surface — capabilities and the
  * "request" actions that open a confirm dialog. Dialog state itself
- * lives in `useBranchActionDialogsStore` so it survives the surface
+ * lives in `branchActionDialogsStore` so it survives the surface
  * that requested it; see `BranchActionDialogHost` for the
  * workspace-level render point and `branchActionDispatch` for the
  * dispatch functions the dialog uses to commit a confirmed action.
  */
-export function useBranchActions(repo: BranchActionRepo, branch: BranchSnapshotInfo): BranchActions {
-  const setLastResult = useWorkspacesStore((s) => s.setLastResult)
-  const runBranchAction = useWorkspacesStore((s) => s.runBranchAction)
+export function useBranchActions(
+  repo: MaybeRefOrGetter<BranchActionRepo>,
+  branch: MaybeRefOrGetter<BranchSnapshotInfo>,
+): BranchActions {
+  const { setLastResult, runBranchAction } = workspacesStore.getState()
   const copyPatchMutation = useMutation({
-    mutationKey: ['repo-data', repo.id, repo.workspaceRuntimeId, 'patch'],
-    mutationFn: async (worktreePath: string) => await getRepoPatch(repo.id, repo.workspaceRuntimeId, worktreePath),
+    mutationKey: ['repo-data', 'patch'],
+    mutationFn: async (input: { repoId: BranchActionRepo['id']; workspaceRuntimeId: string; worktreePath: string }) =>
+      await getRepoPatch(input.repoId, input.workspaceRuntimeId, input.worktreePath),
   })
-  const branchActionBusy = isBranchActionBlocked(repo)
-  const branchBusyAction = branchActionBusyItemId(repo, branch.name)
-  const localActionScopeKey = workspacePaneTabsTargetIdentityKey(
-    requiredGitWorkspacePaneTabsTarget(repo.id, branch.name, branch.worktree?.path ?? null),
-  )
-  const {
-    pending: pendingLocalAction,
-    hasPending: hasPendingLocalAction,
-    run: runPendingLocalAction,
-  } = useAsyncPending<BranchUiActionOpId>({ resetKey: localActionScopeKey })
+  const localActionScopeKey = computed(() => {
+    const currentRepo = toValue(repo)
+    const currentBranch = toValue(branch)
+    return workspacePaneTabsTargetIdentityKey(
+      requiredGitWorkspacePaneTabsTarget(currentRepo.id, currentBranch.name, currentBranch.worktree?.path ?? null),
+    )
+  })
+  const { pending, hasPending, run } = useAsyncPending<BranchUiActionOpId>({
+    resetKey: localActionScopeKey,
+  })
 
   function guardBusy(): boolean {
-    return branchActionBusy || hasPendingLocalAction()
+    return isBranchActionBlocked(toValue(repo)) || hasPending()
   }
 
   function runRepoAction(
@@ -118,7 +123,8 @@ export function useBranchActions(repo: BranchActionRepo, branch: BranchSnapshotI
     options?: { deferResultMessages?: string[]; handleResult?: (result: ExecResult) => boolean },
   ): void {
     if (guardBusy()) return
-    void dispatchRepoBranchAction(repo.id, repo.workspaceRuntimeId, action, runBranchAction, {
+    const currentRepo = toValue(repo)
+    void dispatchRepoBranchAction(currentRepo.id, currentRepo.workspaceRuntimeId, action, runBranchAction, {
       deferResultMessages: options?.deferResultMessages,
       handleResult: options?.handleResult,
     })
@@ -130,29 +136,28 @@ export function useBranchActions(repo: BranchActionRepo, branch: BranchSnapshotI
     options?: { handleResult?: (result: ExecResult) => boolean },
   ): Promise<ExecResult | null> {
     if (guardBusy()) return Promise.resolve(null)
-    const pending = runPendingLocalAction(op, async () => {
-      const result = await dispatchWorkspaceUiAction(repo.id, repo.workspaceRuntimeId, op, fn, {
+    const currentRepo = toValue(repo)
+    const request = run(op, async () => {
+      return await dispatchWorkspaceUiAction(currentRepo.id, currentRepo.workspaceRuntimeId, op, fn, {
         silentSuccessOps: SILENT_SUCCESS_OPS,
         handleResult: options?.handleResult,
         reportResult: setLastResult,
       })
-      return result
     })
-    // useAsyncPending.run returns Promise<unknown>; the inner async fn
-    // above is statically known to resolve to ExecResult | null, so
-    // narrow once.
-    return (pending ?? Promise.resolve(null)) as Promise<ExecResult | null>
+    return (request ?? Promise.resolve(null)) as Promise<ExecResult | null>
   }
 
   function copyPatch(): Promise<boolean> {
-    const worktreePath = branch.worktree?.path
+    const currentRepo = toValue(repo)
+    const currentBranch = toValue(branch)
+    const worktreePath = currentBranch.worktree?.path
     if (!worktreePath) return Promise.resolve(false)
     if (!globalThis.navigator?.clipboard?.writeText) {
       if (guardBusy()) return Promise.resolve(false)
       setLastResult(
-        repo.id,
+        currentRepo.id,
         { ok: false, message: 'status.copy-patch-secure-context-required' },
-        repo.workspaceRuntimeId,
+        currentRepo.workspaceRuntimeId,
       )
       return Promise.resolve(false)
     }
@@ -162,7 +167,11 @@ export function useBranchActions(repo: BranchActionRepo, branch: BranchSnapshotI
       // the original user-activation window, which may expire while this
       // asynchronous patch request runs. We accept that compatibility limit
       // here instead of adding a two-stage generate-then-copy interaction.
-      const result = await copyPatchMutation.mutateAsync(worktreePath)
+      const result = await copyPatchMutation.mutateAsync({
+        repoId: currentRepo.id,
+        workspaceRuntimeId: currentRepo.workspaceRuntimeId,
+        worktreePath,
+      })
       if (!result.ok) return { ok: false, message: result.message }
       if (!result.message) return { ok: false, message: 'status.copy-patch-empty' }
       try {
@@ -175,85 +184,99 @@ export function useBranchActions(repo: BranchActionRepo, branch: BranchSnapshotI
   }
 
   function pull() {
-    runRepoAction({ kind: 'pull', branch: branch.name, worktreePath: branch.worktree?.path })
+    const currentBranch = toValue(branch)
+    runRepoAction({ kind: 'pull', branch: currentBranch.name, worktreePath: currentBranch.worktree?.path })
   }
 
   function push() {
     if (guardBusy()) return
-    if (isPushProtected(branch.name)) {
-      // Open the protected-branch confirm dialog through the central
-      // store. State outlives any temporary surface (e.g. zen-mode
-      // HoverCard popover), so the dialog stays open even after the
-      // trigger surface unmounts. The dialog's Confirm button calls
-      // `dispatchPush` from `branchActionDispatch` to commit.
-      useBranchActionDialogsStore.getState().openPushConfirm({
-        repoId: repo.id,
-        branchName: branch.name,
-        payload: branch.name,
+    const currentRepo = toValue(repo)
+    const currentBranch = toValue(branch)
+    if (isPushProtected(currentBranch.name)) {
+      branchActionDialogsStore.getState().openPushConfirm({
+        repoId: currentRepo.id,
+        branchName: currentBranch.name,
+        payload: currentBranch.name,
       })
       return
     }
-    runRepoAction({ kind: 'push', branch: branch.name })
+    runRepoAction({ kind: 'push', branch: currentBranch.name })
   }
 
   function openTerminal(app: TerminalApp) {
-    if (!branch.worktree?.path) return
-    const target = gitWorktreeFilesystemExecutionTarget(repo.id, repo.workspaceRuntimeId, branch.worktree.path)
+    const currentRepo = toValue(repo)
+    const worktreePath = toValue(branch).worktree?.path
+    if (!worktreePath) return
+    const target = gitWorktreeFilesystemExecutionTarget(currentRepo.id, currentRepo.workspaceRuntimeId, worktreePath)
     if (!target) return
     return runUiAction('terminal', () => openWorkspaceTerminal(target, app))
   }
 
   function openEditor(app: EditorApp) {
-    if (!branch.worktree?.path) return
-    const target = gitWorktreeFilesystemExecutionTarget(repo.id, repo.workspaceRuntimeId, branch.worktree.path)
+    const currentRepo = toValue(repo)
+    const worktreePath = toValue(branch).worktree?.path
+    if (!worktreePath) return
+    const target = gitWorktreeFilesystemExecutionTarget(currentRepo.id, currentRepo.workspaceRuntimeId, worktreePath)
     if (!target) return
     return runUiAction('editor', () => openWorkspaceEditor(target, app))
   }
 
   function openFinder() {
-    if (!branch.worktree?.path) return
-    if (isRemoteWorkspaceId(repo.id)) return
-    const target = gitWorktreeFilesystemExecutionTarget(repo.id, repo.workspaceRuntimeId, branch.worktree.path)
+    const currentRepo = toValue(repo)
+    const worktreePath = toValue(branch).worktree?.path
+    if (!worktreePath || isRemoteWorkspaceId(currentRepo.id)) return
+    const target = gitWorktreeFilesystemExecutionTarget(currentRepo.id, currentRepo.workspaceRuntimeId, worktreePath)
     if (!target) return
     return runUiAction('finder', () => openWorkspaceInFinder(target))
   }
 
   function requestDeleteBranch() {
     if (guardBusy()) return
-    useBranchActionDialogsStore.getState().openDeleteConfirm({
-      repoId: repo.id,
-      branchName: branch.name,
-      payload: branch.name,
+    const currentRepo = toValue(repo)
+    const currentBranch = toValue(branch)
+    branchActionDialogsStore.getState().openDeleteConfirm({
+      repoId: currentRepo.id,
+      branchName: currentBranch.name,
+      payload: currentBranch.name,
     })
   }
 
   function requestRemoveWorktree() {
-    if (guardBusy() || !branch.worktree?.path) return
-    useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
+    const currentRepo = toValue(repo)
+    const currentBranch = toValue(branch)
+    if (guardBusy() || !currentBranch.worktree?.path) return
+    branchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
-        repoId: repo.id,
-        branchName: branch.name,
-        payload: { branch: branch.name, path: branch.worktree.path },
+        repoId: currentRepo.id,
+        branchName: currentBranch.name,
+        payload: { branch: currentBranch.name, path: currentBranch.worktree.path },
       },
-      { isProtectedBranch: PROTECTED_BRANCHES.has(branch.name) },
+      { isProtectedBranch: PROTECTED_BRANCHES.has(currentBranch.name) },
     )
   }
 
-  const capabilities = getBranchActionCapabilities(repo, branch)
-
-  return {
-    blocked: branchActionBusy || pendingLocalAction !== null,
-    busyAction: pendingLocalAction ?? branchBusyAction,
-    capabilities,
-    actions: {
-      copyPatch,
-      pull,
-      push,
-      openTerminal,
-      openEditor,
-      openFinder,
-      requestDeleteBranch,
-      requestRemoveWorktree,
-    },
+  const actions: BranchActions['actions'] = {
+    copyPatch,
+    pull,
+    push,
+    openTerminal,
+    openEditor,
+    openFinder,
+    requestDeleteBranch,
+    requestRemoveWorktree,
   }
+
+  return reactive({
+    get blocked() {
+      return isBranchActionBlocked(toValue(repo)) || pending.value !== null
+    },
+    get busyAction() {
+      const currentRepo = toValue(repo)
+      return pending.value ?? branchActionBusyItemId(currentRepo, toValue(branch).name)
+    },
+    get capabilities() {
+      return getBranchActionCapabilities(toValue(repo), toValue(branch))
+    },
+    actions,
+  }) as BranchActions
 }

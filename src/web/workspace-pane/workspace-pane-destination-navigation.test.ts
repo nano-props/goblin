@@ -17,7 +17,7 @@ import { resolveWorkspacePaneDestinationTargetLease } from '#/web/workspace-pane
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { createAppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import {
@@ -44,7 +44,7 @@ describe('workspace pane destination navigation', () => {
   test('commits branch-scoped tabs for a destination without a worktree', async () => {
     seedNoWorktreeRepo()
     const commitWorkspacePaneRoute = acceptedRouteCommit()
-    const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
+    const setWorkspacePaneTab = vi.spyOn(workspacesStore.getState(), 'setWorkspacePaneTab')
 
     await expect(
       dispatchWorkspacePaneDestinationRoute({
@@ -76,7 +76,7 @@ describe('workspace pane destination navigation', () => {
   test('rejects a stale runtime lease before route commit', async () => {
     seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
-    useWorkspacesStore.setState((state) => {
+    workspacesStore.setState((state) => {
       const repo = state.workspaces[REPO_ID]
       if (!repo) return state
       return {
@@ -96,7 +96,7 @@ describe('workspace pane destination navigation', () => {
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
     const routeNavigation = deferredRouteCommit(routeCommit.promise)
-    const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
+    const setWorkspacePaneTab = vi.spyOn(workspacesStore.getState(), 'setWorkspacePaneTab')
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
       commitWorkspacePaneRoute: routeNavigation.commit,
     })
@@ -123,7 +123,7 @@ describe('workspace pane destination navigation', () => {
     const presentation = beginPresentation('feature/destination')
     const routeCommit = Promise.withResolvers<boolean>()
     const routeNavigation = deferredRouteCommit(routeCommit.promise)
-    const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
+    const setWorkspacePaneTab = vi.spyOn(workspacesStore.getState(), 'setWorkspacePaneTab')
     const committed = commitWorkspacePaneDestinationRoute(presentation, DESTINATION_ROUTE, {
       commitWorkspacePaneRoute: routeNavigation.commit,
     })
@@ -252,7 +252,7 @@ describe('workspace pane destination navigation', () => {
 })
 
 function primaryNavigationActions() {
-  const store = useWorkspacesStore.getState()
+  const store = workspacesStore.getState()
   const routeNavigation = {
     openHome: vi.fn(),
     openWorkspaceDashboard: vi.fn(),

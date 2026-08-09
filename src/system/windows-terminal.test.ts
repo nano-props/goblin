@@ -56,7 +56,7 @@ afterEach(() => {
 })
 
 describe('isWindowsTerminalInstalled', () => {
-  test('returns false on non-win32 platforms even when an executable is on PATH', () => {
+  test('returns false on non-win32 platforms even when an executable is on PATH', async () => {
     withPlatform('darwin', () => {
       using temporaryDirectory = makeTempDir()
       const dir = temporaryDirectory.path
@@ -70,7 +70,7 @@ describe('isWindowsTerminalInstalled', () => {
     })
   })
 
-  test('returns true on win32 when wt.exe is on PATH', () => {
+  test('returns true on win32 when wt.exe is on PATH', async () => {
     withPlatform('win32', () => {
       using temporaryDirectory = makeTempDir()
       const dir = temporaryDirectory.path
@@ -82,7 +82,7 @@ describe('isWindowsTerminalInstalled', () => {
     })
   })
 
-  test('returns false on win32 when neither wt.exe nor WindowsApps fallback resolves', () => {
+  test('returns false on win32 when neither wt.exe nor WindowsApps fallback resolves', async () => {
     withPlatform('win32', () => {
       using temporaryDirectory = makeTempDir()
       const dir = temporaryDirectory.path
@@ -94,7 +94,7 @@ describe('isWindowsTerminalInstalled', () => {
     })
   })
 
-  test('does not fall back to cmd.exe when wt.exe is missing', () => {
+  test('does not fall back to cmd.exe when wt.exe is missing', async () => {
     withPlatform('win32', () => {
       using temporaryDirectory = makeTempDir()
       const dir = temporaryDirectory.path

@@ -1,4 +1,4 @@
-import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import { QueryClient, QueryObserver } from '@tanstack/query-core'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type {
   RepoOperationsSnapshot,
@@ -18,10 +18,10 @@ import {
   repoWorktreeStatusQueryKey,
 } from '#/web/repo-query-keys.ts'
 import {
-  repoOperationsReadModelQueryOptions,
-  repoPullRequestsReadModelQueryOptions,
-  repoSnapshotReadModelQueryOptions,
-  repoWorktreeStatusReadModelQueryOptions,
+  repoOperationsQueryOptions,
+  repoPullRequestsQueryOptions,
+  repoSnapshotQueryOptions,
+  repoWorktreeStatusQueryOptions,
 } from '#/web/repo-query-options.ts'
 import {
   invalidateRepoOperationsQueries,
@@ -64,7 +64,7 @@ beforeEach(() => {
 })
 
 describe('repository query authorities', () => {
-  test('stores the runtime snapshot under a branch-independent key', () => {
+  test('stores the runtime snapshot under a branch-independent key', async () => {
     const client = new QueryClient()
     setRepoSnapshotQueryData(WORKSPACE_ID, 'repo-runtime-1', snapshot('main').snapshot, client)
 
@@ -72,7 +72,7 @@ describe('repository query authorities', () => {
     expect(client.getQueryData(repoSnapshotQueryKey(WORKSPACE_ID, 'repo-runtime-1'))).toEqual(snapshot('main'))
   })
 
-  test('uses exact, non-overlapping pull-request scope keys', () => {
+  test('uses exact, non-overlapping pull-request scope keys', async () => {
     const branchA = repoPullRequestsQueryKey(WORKSPACE_ID, 'repo-runtime-1', {
       kind: 'branch-detail',
       branch: 'feature/a',
@@ -91,12 +91,10 @@ describe('repository query authorities', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const read = Promise.withResolvers<RepoPullRequestsResponse>()
     repoClientMocks.getRepoPullRequests.mockReturnValue(read.promise)
-    const options = repoPullRequestsReadModelQueryOptions(
-      WORKSPACE_ID,
-      'repo-runtime-1',
-      { kind: 'branch-detail', branch: 'main' },
-      true,
-    )
+    const options = repoPullRequestsQueryOptions(WORKSPACE_ID, 'repo-runtime-1', {
+      kind: 'branch-detail',
+      branch: 'main',
+    })
     const firstObserver = new QueryObserver(client, options)
     const unsubscribeFirst = firstObserver.subscribe(() => {})
     await vi.waitFor(() => expect(repoClientMocks.getRepoPullRequests).toHaveBeenCalledOnce())
@@ -129,10 +127,7 @@ describe('repository query authorities', () => {
       })
     })
     client.setQueryData(key, { pullRequests: null })
-    const observer = new QueryObserver(
-      client,
-      repoPullRequestsReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', scope, true),
-    )
+    const observer = new QueryObserver(client, repoPullRequestsQueryOptions(WORKSPACE_ID, 'repo-runtime-1', scope))
     const unsubscribe = observer.subscribe(() => {})
 
     const firstRefresh = refreshActiveRepoPullRequestQueries(WORKSPACE_ID, 'repo-runtime-1', {
@@ -165,10 +160,7 @@ describe('repository query authorities', () => {
     const failure = new Error('pull-request transport unavailable')
     repoClientMocks.getRepoPullRequests.mockRejectedValue(failure)
     client.setQueryData(key, { pullRequests: null })
-    const observer = new QueryObserver(
-      client,
-      repoPullRequestsReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', scope, true),
-    )
+    const observer = new QueryObserver(client, repoPullRequestsQueryOptions(WORKSPACE_ID, 'repo-runtime-1', scope))
     const unsubscribe = observer.subscribe(() => {})
 
     await refreshActiveRepoPullRequestQueries(WORKSPACE_ID, 'repo-runtime-1', { queryClient: client })
@@ -191,7 +183,7 @@ describe('repository query authorities', () => {
       })
       return read.promise
     })
-    const options = repoOperationsReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1')
+    const options = repoOperationsQueryOptions(WORKSPACE_ID, 'repo-runtime-1')
     const firstObserver = new QueryObserver(client, options)
     const unsubscribeFirst = firstObserver.subscribe(() => {})
     await vi.waitFor(() => expect(reads).toHaveLength(1))
@@ -220,7 +212,7 @@ describe('repository query authorities', () => {
       })
       return read.promise
     })
-    const options = repoWorktreeStatusReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', true)
+    const options = repoWorktreeStatusQueryOptions(WORKSPACE_ID, 'repo-runtime-1')
     const firstObserver = new QueryObserver(client, options)
     const unsubscribeFirst = firstObserver.subscribe(() => {})
     await vi.waitFor(() => expect(reads).toHaveLength(1))
@@ -303,7 +295,7 @@ describe('repository query authorities', () => {
       reads.push(read)
       return read.promise
     })
-    const observer = new QueryObserver(client, repoSnapshotReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', true))
+    const observer = new QueryObserver(client, repoSnapshotQueryOptions(WORKSPACE_ID, 'repo-runtime-1'))
     const unsubscribe = observer.subscribe(() => {})
     await vi.waitFor(() => expect(reads).toHaveLength(1))
 
@@ -325,7 +317,7 @@ describe('repository query authorities', () => {
       reads.push(read)
       return read.promise
     })
-    const observer = new QueryObserver(client, repoSnapshotReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', true))
+    const observer = new QueryObserver(client, repoSnapshotQueryOptions(WORKSPACE_ID, 'repo-runtime-1'))
     const unsubscribe = observer.subscribe(() => {})
     await vi.waitFor(() => expect(reads).toHaveLength(1))
 
@@ -352,7 +344,7 @@ describe('repository query authorities', () => {
 
     const initialLoad = ensureRepoSnapshotReadModel(WORKSPACE_ID, 'repo-runtime-1', { queryClient: client })
     await vi.waitFor(() => expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledOnce())
-    const options = repoSnapshotReadModelQueryOptions(WORKSPACE_ID, 'repo-runtime-1', true)
+    const options = repoSnapshotQueryOptions(WORKSPACE_ID, 'repo-runtime-1')
     const firstObserver = new QueryObserver(client, options)
     const unsubscribeFirst = firstObserver.subscribe(() => {})
     unsubscribeFirst()
@@ -384,7 +376,7 @@ describe('repository query authorities', () => {
     read.resolve(snapshot('main'))
   })
 
-  test('does not expose retained operations data after its query enters an error state', () => {
+  test('does not expose retained operations data after its query enters an error state', async () => {
     const client = new QueryClient()
     const key = repoOperationsQueryKey(WORKSPACE_ID, 'repo-runtime-1')
     client.setQueryData(key, repoOperationsForTest(1))

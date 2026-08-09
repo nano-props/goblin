@@ -476,7 +476,7 @@ export const ko: Record<DictKey, string> = {
   'worktree-bootstrap.summary.setup': 'setup 실행: {command}',
   'action.confirm-push-protected-title': '{branch} 에 푸시할까요?',
   'action.confirm-push-protected-body':
-    '<branch>{branch}</branch> 브랜치로 직접 푸시하려고 합니다. 보통은 PR 을 거치는 게 좋습니다. 계속할까요?',
+    '{branch} 브랜치로 직접 푸시하려고 합니다. 보통은 PR 을 거치는 게 좋습니다. 계속할까요?',
   'action.confirm-push-confirm': '그래도 푸시',
   'action.confirm-delete-branch-title': '브랜치를 삭제할까요?',
   'action.confirm-delete-branch-body': '로컬 브랜치를 삭제합니다:',

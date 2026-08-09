@@ -30,7 +30,7 @@ export function getCurrentGitWorkspacePane(workspace: GitWorkspacePaneProjection
   // union via `remoteWorkspaceTarget`; we don't mirror it on the
   // `remote` shape anymore (Phase 4 removed the legacy
   // `target` field). `workspaceId` is forwarded so consumers can
-  // re-resolve the live lifecycle via `useWorkspacesStore` (the
+  // re-resolve the live lifecycle via `workspacesStore` (the
   // presentation object is a snapshot — it doesn't re-render on
   // lifecycle transitions).
   return { workspaceId: workspace.id, branch, pullRequest, currentBranchStatus, statusCount, worktreeChanges }

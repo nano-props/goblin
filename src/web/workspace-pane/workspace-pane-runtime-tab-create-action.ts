@@ -25,7 +25,7 @@ import {
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import {
@@ -259,7 +259,7 @@ function terminalWorkspacePaneCoordinatorTarget(base: TerminalSessionBase) {
 function terminalCreateTargetRuntimeIsCurrent(base: TerminalSessionBase): boolean {
   const coordinates = terminalExecutionCoordinates(base.target)
   return (
-    currentWorkspaceRuntimeId(useWorkspacesStore.getState(), coordinates.workspaceId) === coordinates.workspaceRuntimeId
+    currentWorkspaceRuntimeId(workspacesStore.getState(), coordinates.workspaceId) === coordinates.workspaceRuntimeId
   )
 }
 

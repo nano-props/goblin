@@ -1,5 +1,5 @@
 import { acceleratorToKeyLabels } from '#/shared/accelerator.ts'
-import type { DictKey } from '#/shared/i18n/dictionaries.ts'
+import type { DictKey } from '#/shared/i18n/en.ts'
 import {
   APP_SHORTCUTS,
   BRANCH_ACTION_SHORTCUTS,

@@ -9,7 +9,7 @@ function makeTmpDir() {
 }
 
 describe('g terminal command', () => {
-  test('builds the terminal environment from static launcher resources', () => {
+  test('builds the terminal environment from static launcher resources', async () => {
     using temporaryDirectory = makeTmpDir()
     const binDir = temporaryDirectory.path
     writeFileSync(path.join(binDir, process.platform === 'win32' ? 'g.cmd' : 'g'), '')
@@ -35,7 +35,7 @@ describe('g terminal command', () => {
     })
   })
 
-  test('refuses to build an environment when the packaged entrypoint is missing', () => {
+  test('refuses to build an environment when the packaged entrypoint is missing', async () => {
     using temporaryDirectory = makeTmpDir()
     const binDir = temporaryDirectory.path
     writeFileSync(path.join(binDir, process.platform === 'win32' ? 'g.cmd' : 'g'), '')
@@ -50,7 +50,7 @@ describe('g terminal command', () => {
     expect(env).toBeNull()
   })
 
-  test('resolves built command entry before source fallback', () => {
+  test('resolves built command entry before source fallback', async () => {
     using temporaryDirectory = makeTmpDir()
     const dir = temporaryDirectory.path
     const built = path.join(dir, 'g-command.js')

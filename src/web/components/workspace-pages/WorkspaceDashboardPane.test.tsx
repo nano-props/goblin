@@ -7,8 +7,8 @@ import {
   setWorkspaceProbeForTest,
   createPullRequest,
 } from '#/web/test-utils/repo-store.ts'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, screen } from '@testing-library/react'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
+import { cleanup, screen } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
@@ -17,7 +17,6 @@ import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQuery
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import type * as RepoClient from '#/web/repo-client.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepoSnapshot: vi.fn(),
@@ -25,17 +24,17 @@ const repoClientMocks = vi.hoisted(() => ({
   getRepoPullRequests: vi.fn(),
 }))
 
-vi.mock('#/web/repo-client.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof RepoClient>()
-  return {
-    ...actual,
-    getRepoSnapshot: repoClientMocks.getRepoSnapshot,
-    getRepoWorktreeStatus: repoClientMocks.getRepoWorktreeStatus,
-    getRepoPullRequests: repoClientMocks.getRepoPullRequests,
-  }
-})
+vi.mock('#/web/repo-client.ts', () => ({
+  getRepoSnapshot: repoClientMocks.getRepoSnapshot,
+  getRepoWorktreeStatus: repoClientMocks.getRepoWorktreeStatus,
+  getRepoPullRequests: repoClientMocks.getRepoPullRequests,
+}))
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
+
+function queryObserverCount(queryKey: readonly unknown[]): number {
+  return appQueryClient.getQueryCache().find({ queryKey, exact: true })?.getObserversCount() ?? 0
+}
 
 beforeEach(() => {
   appQueryClient.clear()
@@ -57,7 +56,7 @@ afterEach(() => {
 })
 
 describe('WorkspaceDashboardPane', () => {
-  test('does not admit Git or directory reads before workspace capability settles', () => {
+  test('does not admit Git or directory reads before workspace capability settles', async () => {
     const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID })
     setWorkspaceProbeForTest(WORKSPACE_ID, { status: 'probing' })
     appQueryClient.removeQueries({
@@ -68,9 +67,9 @@ describe('WorkspaceDashboardPane', () => {
     })
 
     renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     const projectionState = appQueryClient.getQueryState(
@@ -86,9 +85,12 @@ describe('WorkspaceDashboardPane', () => {
       expect(queryState?.fetchStatus).not.toBe('fetching')
       expect(queryState?.dataUpdateCount ?? 0).toBe(0)
     }
+    expect(queryObserverCount(repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))).toBe(0)
+    expect(queryObserverCount(repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))).toBe(0)
+    expect(queryObserverCount(workspaceDirectoryOverviewQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))).toBe(0)
   })
 
-  test('shows directory metrics without mounting Git reads for a non-Git workspace', () => {
+  test('shows directory metrics without mounting Git reads for a non-Git workspace', async () => {
     const workspace = seedRepoWithReadModelForTest({ id: WORKSPACE_ID })
     setWorkspaceProbeForTest(WORKSPACE_ID, {
       status: 'ready',
@@ -106,9 +108,9 @@ describe('WorkspaceDashboardPane', () => {
     })
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(container.textContent).toContain('dashboard.directory.files4')
@@ -125,6 +127,9 @@ describe('WorkspaceDashboardPane', () => {
     expect(
       appQueryClient.getQueryState(repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))?.fetchStatus,
     ).not.toBe('fetching')
+    expect(queryObserverCount(workspaceDirectoryOverviewQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))).toBe(1)
+    expect(queryObserverCount(repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))).toBe(0)
+    expect(queryObserverCount(repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))).toBe(0)
   })
 
   test('keeps dashboard snapshot content visible with unknown dirty state when status is unavailable', async () => {
@@ -140,9 +145,9 @@ describe('WorkspaceDashboardPane', () => {
     })
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     await vi.waitFor(() => expect(container.textContent).toContain('status failed'))
@@ -161,9 +166,9 @@ describe('WorkspaceDashboardPane', () => {
     repoClientMocks.getRepoSnapshot.mockRejectedValue(new Error('snapshot failed'))
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     await vi.waitFor(() => expect(container.textContent).toContain('snapshot failed'))
@@ -183,9 +188,9 @@ describe('WorkspaceDashboardPane', () => {
     repoClientMocks.getRepoPullRequests.mockRejectedValue(new Error('pull requests failed'))
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     await vi.waitFor(() => expect(container.textContent).toContain('pull requests failed'))
@@ -206,9 +211,9 @@ describe('WorkspaceDashboardPane', () => {
     })
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
@@ -246,9 +251,9 @@ describe('WorkspaceDashboardPane', () => {
     ])
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     await vi.waitFor(() => {
@@ -267,24 +272,32 @@ describe('WorkspaceDashboardPane', () => {
     })
   })
 
-  test('hides the attention section when no branch needs attention', () => {
-    seedRepoWithReadModelForTest({
+  test('hides the attention section when no branch needs attention', async () => {
+    const workspace = seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
       branches: [createRepoBranch('main')],
       currentBranchName: 'main',
     })
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(container.textContent).not.toContain('dashboard.attention.title')
     expect(container.textContent).not.toContain('dashboard.attention.empty')
+    expect(queryObserverCount(repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))).toBe(1)
+    expect(queryObserverCount(repoWorktreeStatusQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))).toBe(1)
+    expect(
+      queryObserverCount(
+        repoPullRequestsQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId, { kind: 'repository-summary' }),
+      ),
+    ).toBe(1)
+    expect(queryObserverCount(workspaceDirectoryOverviewQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId))).toBe(0)
   })
 
-  test('uses projection pull request data for PR metrics and attention badges', () => {
+  test('uses projection pull request data for PR metrics and attention badges', async () => {
     const featureBranch = createRepoBranch('feature/pr')
     const mainBranch = createRepoBranch('main')
     const workspace = seedRepoWithReadModelForTest({
@@ -308,9 +321,9 @@ describe('WorkspaceDashboardPane', () => {
     )
 
     const { container } = renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(container.textContent).toContain('dashboard.metric.prs')
@@ -319,7 +332,7 @@ describe('WorkspaceDashboardPane', () => {
     expect(container.textContent).toContain('feature/pr')
   })
 
-  test('opens a branch from dashboard branch rows', () => {
+  test('opens a branch from dashboard branch rows', async () => {
     const onSelectBranch = vi.fn()
     const workspace = seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
@@ -328,9 +341,9 @@ describe('WorkspaceDashboardPane', () => {
     })
 
     const { getByTestId } = renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <WorkspaceDashboardPane workspaceId={WORKSPACE_ID} onSelectBranch={onSelectBranch} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     getByTestId('dashboard-branch-link').click()

@@ -1,32 +1,36 @@
-import * as React from 'react'
-import { CheckIcon } from 'lucide-react'
-import { Checkbox as CheckboxPrimitive } from 'radix-ui'
+import { CheckIcon } from '@lucide/vue'
+import { CheckboxIndicator, CheckboxRoot } from 'reka-ui'
+import type { CheckboxRootProps } from 'reka-ui'
+import type { FunctionalComponent, HTMLAttributes } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
 import { focusRingVisibleInset } from '#/web/components/ui/focus.ts'
-type CheckboxProps = React.ComponentProps<typeof CheckboxPrimitive.Root> & {
-  variant?: 'default' | 'destructive'
-}
 
-function Checkbox({ className, variant = 'default', ...props }: CheckboxProps) {
+type CheckboxProps = Omit<CheckboxRootProps<boolean>, 'class'> &
+  HTMLAttributes & {
+    variant?: 'default' | 'destructive'
+    'onUpdate:modelValue'?: (value: boolean | 'indeterminate') => void
+  }
+
+export const Checkbox: FunctionalComponent<CheckboxProps> = (props) => {
+  const { class: classValue, variant = 'default', ...rootProps } = props
   return (
-    <CheckboxPrimitive.Root
+    <CheckboxRoot
+      {...rootProps}
       data-slot="checkbox"
       data-variant={variant}
-      className={cn(
+      class={cn(
         'peer size-4 shrink-0 rounded-sm border border-input bg-control shadow-xs transition-[color,background-color,border-color,box-shadow] duration-100 outline-none focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-danger-border aria-invalid:ring-danger/20 dark:aria-invalid:ring-danger/40',
         focusRingVisibleInset,
         variant === 'destructive'
           ? 'data-[state=checked]:border-destructive data-[state=checked]:bg-destructive data-[state=checked]:text-destructive-foreground'
           : 'data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
-        className,
+        classValue,
       )}
-      {...props}
     >
-      <CheckboxPrimitive.Indicator data-slot="checkbox-indicator" className="flex items-center justify-center">
-        <CheckIcon className="size-3" />
-      </CheckboxPrimitive.Indicator>
-    </CheckboxPrimitive.Root>
+      <CheckboxIndicator data-slot="checkbox-indicator" class="flex items-center justify-center">
+        <CheckIcon class="size-3" />
+      </CheckboxIndicator>
+    </CheckboxRoot>
   )
 }
-
-export { Checkbox }
+Checkbox.inheritAttrs = false

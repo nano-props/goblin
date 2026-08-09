@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties } from 'vue'
 
 export const WORKSPACE_PANE_TRANSITION_MS = 240
 const WORKSPACE_PANE_TRANSITION_EASING = 'cubic-bezier(0.2, 0, 0, 1)'

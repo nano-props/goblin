@@ -18,19 +18,19 @@ describe('planTerminalComposerEdit', () => {
     expect(plan.caret).toBe(caret)
   })
 
-  test('deletes to the logical line start while preserving CRLF', () => {
+  test('deletes to the logical line start while preserving CRLF', async () => {
     const value = 'first line\r\nsecond line'
     const plan = planTerminalComposerEdit(value, 19, 19, 'line')
     expect(plan.value).toBe('first line\r\nline')
     expect(plan.caret).toBe(12)
   })
 
-  test('replaces a non-collapsed selection for either command', () => {
+  test('replaces a non-collapsed selection for either command', async () => {
     expect(planTerminalComposerEdit('abcdef', 2, 4, 'word').value).toBe('abef')
     expect(planTerminalComposerEdit('abcdef', 2, 4, 'line').value).toBe('abef')
   })
 
-  test('returns an empty plan at a line boundary', () => {
+  test('returns an empty plan at a line boundary', async () => {
     const plan = planTerminalComposerEdit('one\r\ntwo', 4, 4, 'word')
     expect(plan.start).toBe(plan.end)
     expect(plan.value).toBe('one\r\ntwo')
@@ -40,7 +40,7 @@ describe('planTerminalComposerEdit', () => {
 describe('terminalComposerEditCommandForEvent', () => {
   const baseEvent = { code: 'KeyW', ctrlKey: true, altKey: false, metaKey: false, shiftKey: false }
 
-  test('recognizes only exact desktop Mac Ctrl+W/Ctrl+U chords', () => {
+  test('recognizes only exact desktop Mac Ctrl+W/Ctrl+U chords', async () => {
     expect(terminalComposerEditCommandForEvent(baseEvent, true)).toBe('word')
     expect(terminalComposerEditCommandForEvent({ ...baseEvent, code: 'KeyU' }, true)).toBe('line')
     expect(terminalComposerEditCommandForEvent(baseEvent, false)).toBeNull()
@@ -52,7 +52,7 @@ describe('terminalComposerEditCommandForEvent', () => {
 })
 
 describe('textarea newline offset mapping', () => {
-  test('maps CRLF and CR offsets between draft and normalized textarea values', () => {
+  test('maps CRLF and CR offsets between draft and normalized textarea values', async () => {
     const value = 'a\r\nb\rc'
     expect(textareaOffsetToDraftOffset(value, 2)).toBe(3)
     expect(textareaOffsetToDraftOffset(value, 4)).toBe(5)

@@ -4,10 +4,12 @@
 // projection for UI rendering; this store records whether that server ->
 // client projection has hydrated for each live workspace runtime.
 
-import { useMemo } from 'react'
-import { create } from 'zustand'
+import { computed, toValue } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter } from 'vue'
+import { createStore } from 'zustand/vanilla'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
 const DEFAULT_REFRESH_COOLDOWN_MS = 2000
 
@@ -37,7 +39,7 @@ interface TerminalProjectionHydrationState {
   isProjectionFocusRefreshDue: (workspaceId: WorkspaceId, workspaceRuntimeId: string) => boolean
 }
 
-export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydrationState>((set, get) => ({
+export const terminalProjectionHydrationStore = createStore<TerminalProjectionHydrationState>((set, get) => ({
   refreshCooldownMs: DEFAULT_REFRESH_COOLDOWN_MS,
   hydrationByWorkspace: new Map(),
   lastSuccessfulRecoveryByWorkspace: new Map(),
@@ -82,32 +84,39 @@ export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydr
 }))
 
 export function useTerminalProjectionHydrationPhase(
-  workspaceId: WorkspaceId | null | undefined,
-  workspaceRuntimeId: string | null | undefined,
-): TerminalProjectionHydrationPhase {
-  return useTerminalProjectionHydrationEntry(workspaceId, workspaceRuntimeId).phase
+  workspaceId: MaybeRefOrGetter<WorkspaceId | null | undefined>,
+  workspaceRuntimeId: MaybeRefOrGetter<string | null | undefined>,
+): ComputedRef<TerminalProjectionHydrationPhase> {
+  const entry = useTerminalProjectionHydrationEntry(workspaceId, workspaceRuntimeId)
+  return computed(() => entry.value.phase)
 }
 
 export function useTerminalProjectionHydrationEntry(
-  workspaceId: WorkspaceId | null | undefined,
-  workspaceRuntimeId: string | null | undefined,
-): TerminalProjectionHydrationEntry {
-  const hydrationByWorkspace = useTerminalProjectionHydrationStore((s) => s.hydrationByWorkspace)
-  return useMemo(() => {
-    if (!workspaceId || !workspaceRuntimeId) return { workspaceRuntimeId: workspaceRuntimeId ?? '', phase: 'pending' }
-    const current = hydrationByWorkspace.get(workspaceId)
-    return current?.workspaceRuntimeId === workspaceRuntimeId ? current : { workspaceRuntimeId, phase: 'pending' }
-  }, [hydrationByWorkspace, workspaceRuntimeId, workspaceId])
+  workspaceId: MaybeRefOrGetter<WorkspaceId | null | undefined>,
+  workspaceRuntimeId: MaybeRefOrGetter<string | null | undefined>,
+): ComputedRef<TerminalProjectionHydrationEntry> {
+  const hydrationByWorkspace = useStoreSelector(terminalProjectionHydrationStore, (state) => state.hydrationByWorkspace)
+  return computed(() => {
+    const currentWorkspaceId = toValue(workspaceId)
+    const currentRuntimeId = toValue(workspaceRuntimeId)
+    if (!currentWorkspaceId || !currentRuntimeId) {
+      return { workspaceRuntimeId: currentRuntimeId ?? '', phase: 'pending' }
+    }
+    const current = hydrationByWorkspace.value.get(currentWorkspaceId)
+    return current?.workspaceRuntimeId === currentRuntimeId
+      ? current
+      : { workspaceRuntimeId: currentRuntimeId, phase: 'pending' }
+  })
 }
 
 export function useIsInitialTerminalProjectionHydrating(
-  workspaceId: WorkspaceId | null | undefined,
-  workspaceRuntimeId: string | null | undefined,
-): boolean {
-  const hydrationByWorkspace = useTerminalProjectionHydrationStore((s) => s.hydrationByWorkspace)
-  return useMemo(() => {
-    if (!workspaceId || !workspaceRuntimeId) return false
-    const current = hydrationByWorkspace.get(workspaceId)
-    return (current?.workspaceRuntimeId === workspaceRuntimeId ? current.phase : 'pending') === 'pending'
-  }, [hydrationByWorkspace, workspaceRuntimeId, workspaceId])
+  workspaceId: MaybeRefOrGetter<WorkspaceId | null | undefined>,
+  workspaceRuntimeId: MaybeRefOrGetter<string | null | undefined>,
+): ComputedRef<boolean> {
+  const entry = useTerminalProjectionHydrationEntry(workspaceId, workspaceRuntimeId)
+  return computed(() => {
+    const currentWorkspaceId = toValue(workspaceId)
+    const currentRuntimeId = toValue(workspaceRuntimeId)
+    return !!currentWorkspaceId && !!currentRuntimeId && entry.value.phase === 'pending'
+  })
 }

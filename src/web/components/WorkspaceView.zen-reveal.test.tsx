@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { act, cleanup } from '@testing-library/react'
+import { cleanup } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import '#/web/test-utils/workspace-view.tsx'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import {
   REPO_ID,
@@ -25,9 +26,9 @@ import {
 } from '#/web/test-utils/workspace-view.tsx'
 
 describe('WorkspaceView Zen reveal', () => {
-  test('large-screen collapsed Zen Mode reveals the sidebar on left-edge hover below the titlebar', () => {
-    useWorkspacesStore.getState().setZenMode(true)
-    useWorkspacesStore.getState().setWorkspacePaneSize(55)
+  test('large-screen collapsed Zen Mode reveals the sidebar on left-edge hover below the titlebar', async () => {
+    workspacesStore.getState().setZenMode(true)
+    workspacesStore.getState().setWorkspacePaneSize(55)
     const { container } = render(branchWorkspaceView())
 
     const reveal = zenModeSidebarReveal(container)
@@ -39,8 +40,8 @@ describe('WorkspaceView Zen reveal', () => {
     expect(reveal?.getAttribute('aria-hidden')).toBe('true')
     expect(reveal?.hasAttribute('inert')).toBe(true)
 
-    act(() => {
-      zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseenter'))
     })
 
     expect(zenModeSidebarHitArea(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
@@ -54,8 +55,8 @@ describe('WorkspaceView Zen reveal', () => {
     expect(zenModeSidebarTrigger(container)?.tagName).toBe('BUTTON')
   })
 
-  test('large-screen collapsed Zen Mode reveals the sidebar when the zen toggle is hovered', () => {
-    useWorkspacesStore.getState().setZenMode(true)
+  test('large-screen collapsed Zen Mode reveals the sidebar when the zen toggle is hovered', async () => {
+    workspacesStore.getState().setZenMode(true)
     const { container } = render(branchWorkspaceView())
 
     const revealLayer = zenModeSidebarLayer(container)
@@ -79,8 +80,8 @@ describe('WorkspaceView Zen reveal', () => {
     expect(zenModeSidebarTriggerSurface(container)?.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
 
-    act(() => {
-      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseenter'))
     })
 
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
@@ -106,9 +107,9 @@ describe('WorkspaceView Zen reveal', () => {
     expect(floatingSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
   })
 
-  test('large-screen collapsed Zen Mode opens the dashboard from the revealed sidebar', () => {
+  test('large-screen collapsed Zen Mode opens the dashboard from the revealed sidebar', async () => {
     const onOpenWorkspaceDashboard = vi.fn()
-    useWorkspacesStore.getState().setZenMode(true)
+    workspacesStore.getState().setZenMode(true)
     const { container } = render(
       <WorkspaceView
         workspaceId={REPO_ID}
@@ -117,15 +118,15 @@ describe('WorkspaceView Zen reveal', () => {
       />,
     )
 
-    act(() => {
-      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseenter'))
     })
 
     const revealedDashboardAction =
       zenModeSidebarReveal(container)?.querySelector<HTMLButtonElement>('[data-testid="dashboard-row-action"]') ?? null
     expect(revealedDashboardAction).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       revealedDashboardAction?.click()
     })
 
@@ -133,12 +134,12 @@ describe('WorkspaceView Zen reveal', () => {
     expect(onOpenWorkspaceDashboard).toHaveBeenCalledTimes(1)
   })
 
-  test('large-screen collapsed Zen Mode keeps the sidebar open across the title-bar-chrome reveal surface', () => {
-    useWorkspacesStore.getState().setZenMode(true)
+  test('large-screen collapsed Zen Mode keeps the sidebar open across the title-bar-chrome reveal surface', async () => {
+    workspacesStore.getState().setZenMode(true)
     const { container } = render(branchWorkspaceView())
 
-    act(() => {
-      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseenter'))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
@@ -147,10 +148,9 @@ describe('WorkspaceView Zen reveal', () => {
       panelWidth: 360,
     })
 
-    act(() => {
+    await flushTestUpdates(() => {
       zenModeSidebarReveal(container)?.dispatchEvent(
-        new MouseEvent('mouseout', {
-          bubbles: true,
+        new MouseEvent('mouseleave', {
           relatedTarget: zenModeSidebarTriggerSurface(container),
           clientX: 355,
           clientY: 24,
@@ -164,110 +164,106 @@ describe('WorkspaceView Zen reveal', () => {
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Zen Mode does not close from the trigger mouseout alone', () => {
-    useWorkspacesStore.getState().setZenMode(true)
+  test('large-screen collapsed Zen Mode does not close from the trigger mouseleave alone', async () => {
+    workspacesStore.getState().setZenMode(true)
     const { container } = render(branchWorkspaceView())
 
     const toggle = zenModeSidebarTrigger(container)
-    act(() => {
-      toggle?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      toggle?.dispatchEvent(new MouseEvent('mouseenter'))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-    act(() => {
-      toggle?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }))
+    await flushTestUpdates(() => {
+      toggle?.dispatchEvent(new MouseEvent('mouseleave', { relatedTarget: document.body }))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-    act(() => {
+    await flushTestUpdates(() => {
       document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 800, clientY: 24 }))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
   })
 
-  test('large-screen collapsed Zen Mode stays open while the pointer remains on the zen trigger', () => {
-    useWorkspacesStore.getState().setZenMode(true)
+  test('large-screen collapsed Zen Mode stays open while the pointer remains on the zen trigger', async () => {
+    workspacesStore.getState().setZenMode(true)
     const { container } = render(branchWorkspaceView())
 
     const trigger = zenModeSidebarTrigger(container)
     expect(workspaceNavigationControls(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(zenModeSidebarTriggerSurface(container)?.hasAttribute('data-zen-reveal-surface')).toBe(true)
 
-    act(() => {
-      trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      trigger?.dispatchEvent(new MouseEvent('mouseenter'))
       trigger?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
     })
 
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Zen Mode opens reveal on first trigger hover', () => {
+  test('large-screen collapsed Zen Mode opens reveal on first trigger hover', async () => {
     const { container } = render(branchWorkspaceView())
 
-    act(() => {
-      useWorkspacesStore.getState().setZenMode(true)
+    await flushTestUpdates(() => {
+      workspacesStore.getState().setZenMode(true)
     })
 
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
 
     const trigger = zenModeSidebarTrigger(container)
-    act(() => {
-      trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      trigger?.dispatchEvent(new MouseEvent('mouseenter'))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Zen Mode stays open while moving from trigger into the revealed sidebar', () => {
-    useWorkspacesStore.getState().setZenMode(true)
+  test('large-screen collapsed Zen Mode stays open while moving from trigger into the revealed sidebar', async () => {
+    workspacesStore.getState().setZenMode(true)
     const { container } = render(branchWorkspaceView())
 
     const toggle = zenModeSidebarTrigger(container)
-    act(() => {
-      toggle?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      toggle?.dispatchEvent(new MouseEvent('mouseenter'))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
     const reveal = zenModeSidebarReveal(container)
-    act(() => {
-      toggle?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: reveal }))
-      reveal?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      toggle?.dispatchEvent(new MouseEvent('mouseleave', { relatedTarget: reveal }))
+      reveal?.dispatchEvent(new MouseEvent('mouseenter'))
     })
 
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-    act(() => {
-      zenModeSidebarReveal(container)?.dispatchEvent(
-        new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }),
-      )
+    await flushTestUpdates(() => {
+      zenModeSidebarReveal(container)?.dispatchEvent(new MouseEvent('mouseleave', { relatedTarget: document.body }))
     })
 
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
   })
 
-  test('large-screen collapsed Zen Mode stays open while pointer moves into a portal floating surface', () => {
+  test('large-screen collapsed Zen Mode stays open while pointer moves into a portal floating surface', async () => {
     const floatingSurface = document.createElement('div')
     floatingSurface.setAttribute('data-floating-surface', '')
     document.body.appendChild(floatingSurface)
 
     try {
-      useWorkspacesStore.getState().setZenMode(true)
+      workspacesStore.getState().setZenMode(true)
       const { container } = render(branchWorkspaceView())
 
-      act(() => {
-        zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      await flushTestUpdates(() => {
+        zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseenter'))
       })
       expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-      act(() => {
-        zenModeSidebarReveal(container)?.dispatchEvent(
-          new MouseEvent('mouseout', { bubbles: true, relatedTarget: floatingSurface }),
-        )
+      await flushTestUpdates(() => {
+        zenModeSidebarReveal(container)?.dispatchEvent(new MouseEvent('mouseleave', { relatedTarget: floatingSurface }))
         floatingSurface.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
       })
 
       expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-      act(() => {
+      await flushTestUpdates(() => {
         document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
       })
 
@@ -277,12 +273,12 @@ describe('WorkspaceView Zen reveal', () => {
     }
   })
 
-  test('large-screen collapsed Zen Mode stays open when pointer coordinates remain inside the reveal', () => {
-    useWorkspacesStore.getState().setZenMode(true)
+  test('large-screen collapsed Zen Mode stays open when pointer coordinates remain inside the reveal', async () => {
+    workspacesStore.getState().setZenMode(true)
     const { container } = render(branchWorkspaceView())
 
-    act(() => {
-      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseenter'))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
@@ -291,16 +287,16 @@ describe('WorkspaceView Zen reveal', () => {
       panelWidth: 360,
     })
 
-    act(() => {
+    await flushTestUpdates(() => {
       document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 355, clientY: 24 }))
     })
 
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
   })
 
-  test('large-screen collapsed Zen Mode resizes the same sidebar width state from the reveal edge', () => {
-    useWorkspacesStore.getState().setZenMode(true)
-    useWorkspacesStore.getState().setWorkspacePaneSize(70)
+  test('large-screen collapsed Zen Mode resizes the same sidebar width state from the reveal edge', async () => {
+    workspacesStore.getState().setZenMode(true)
+    workspacesStore.getState().setWorkspacePaneSize(70)
     const { container } = render(branchWorkspaceView())
 
     Object.defineProperty(container.firstElementChild!, 'getBoundingClientRect', {
@@ -308,11 +304,11 @@ describe('WorkspaceView Zen reveal', () => {
       value: () => ({ left: 0, width: 1000, top: 0, right: 1000, bottom: 800, height: 800 }),
     })
 
-    act(() => {
-      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseenter'))
     })
 
-    act(() => {
+    await flushTestUpdates(() => {
       zenModeSidebarResizeHandle(container)?.dispatchEvent(
         new PointerEvent('pointerdown', { bubbles: true, clientX: 420, pointerId: 1 }),
       )
@@ -320,17 +316,17 @@ describe('WorkspaceView Zen reveal', () => {
 
     expect(zenModeSidebarResizeHandle(container)?.dataset.separator).toBe('active')
 
-    act(() => {
+    await flushTestUpdates(() => {
       window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: 420, pointerId: 1 }))
     })
 
-    expect(useWorkspacesStore.getState().workspacePaneSize).toBe(58)
+    expect(workspacesStore.getState().workspacePaneSize).toBe(58)
     expect(zenModeSidebarResizeHandle(container)?.dataset.separator).toBeUndefined()
   })
 
-  test('large-screen collapsed Zen Mode cleans resize listeners if the reveal unmounts mid-drag', () => {
+  test('large-screen collapsed Zen Mode cleans resize listeners if the reveal unmounts mid-drag', async () => {
     const removeEventListener = vi.spyOn(window, 'removeEventListener')
-    useWorkspacesStore.getState().setZenMode(true)
+    workspacesStore.getState().setZenMode(true)
     const result = render(branchWorkspaceView())
 
     Object.defineProperty(result.container.firstElementChild!, 'getBoundingClientRect', {
@@ -338,11 +334,11 @@ describe('WorkspaceView Zen reveal', () => {
       value: () => ({ left: 0, width: 1000, top: 0, right: 1000, bottom: 800, height: 800 }),
     })
 
-    act(() => {
-      zenModeSidebarTrigger(result.container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      zenModeSidebarTrigger(result.container)?.dispatchEvent(new MouseEvent('mouseenter'))
     })
 
-    act(() => {
+    await flushTestUpdates(() => {
       zenModeSidebarResizeHandle(result.container)?.dispatchEvent(
         new PointerEvent('pointerdown', { bubbles: true, clientX: 420, pointerId: 1 }),
       )
@@ -350,7 +346,7 @@ describe('WorkspaceView Zen reveal', () => {
 
     expect(zenModeSidebarResizeHandle(result.container)?.dataset.separator).toBe('active')
 
-    act(() => {
+    await flushTestUpdates(() => {
       cleanup()
     })
 
@@ -359,18 +355,18 @@ describe('WorkspaceView Zen reveal', () => {
     expect(removeEventListener).toHaveBeenCalledWith('pointercancel', expect.any(Function))
   })
 
-  test('large-screen collapsed Zen Mode keeps the open reveal mounted while zen mode exits', () => {
+  test('large-screen collapsed Zen Mode keeps the open reveal mounted while zen mode exits', async () => {
     useFakeTimers()
-    useWorkspacesStore.getState().setZenMode(true)
+    workspacesStore.getState().setZenMode(true)
     const { container } = render(branchWorkspaceView())
 
-    act(() => {
-      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseenter'))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-    act(() => {
-      useWorkspacesStore.getState().setZenMode(false)
+    await flushTestUpdates(() => {
+      workspacesStore.getState().setZenMode(false)
     })
 
     expect(workspaceLayout(container)?.dataset.sidebarCollapsed).toBe('false')
@@ -385,32 +381,32 @@ describe('WorkspaceView Zen reveal', () => {
     expect(retainedSidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(retainedSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }))
       vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS - 1)
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
-    act(() => {
+    await flushTestUpdates(() => {
       vi.advanceTimersByTime(1)
     })
     expect(zenModeSidebarReveal(container)).toBeNull()
   })
 
-  test('large-screen collapsed Zen Mode does not reopen the reveal while zen mode is exiting', () => {
+  test('large-screen collapsed Zen Mode does not reopen the reveal while zen mode is exiting', async () => {
     useFakeTimers()
-    useWorkspacesStore.getState().setZenMode(true)
+    workspacesStore.getState().setZenMode(true)
     const { container } = render(branchWorkspaceView())
 
-    act(() => {
-      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseenter'))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
     mockZenRevealLayout(container, { panelLeft: 0, panelWidth: 360 })
 
-    act(() => {
-      useWorkspacesStore.getState().setZenMode(false)
+    await flushTestUpdates(() => {
+      workspacesStore.getState().setZenMode(false)
     })
 
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
@@ -418,7 +414,7 @@ describe('WorkspaceView Zen reveal', () => {
     expect(zenModeSidebarReveal(container)?.hasAttribute('data-interactive')).toBe(false)
     expect(zenModeSidebarHitArea(container)?.className).toContain('pointer-events-none')
 
-    act(() => {
+    await flushTestUpdates(() => {
       document.body.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 120, clientY: 24 }))
       vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
     })

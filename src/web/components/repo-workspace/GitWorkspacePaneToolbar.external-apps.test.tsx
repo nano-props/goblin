@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
-import { act, waitFor } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { describe, expect, test } from 'vitest'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import {
@@ -11,7 +12,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import {
   REPO_ID,
@@ -35,7 +36,7 @@ import {
 } from '#/web/test-utils/git-workspace-pane-toolbar.tsx'
 
 describe('GitWorkspacePaneToolbar external-apps', () => {
-  test('renders the external app launcher at the workspace toolbar right edge', () => {
+  test('renders the external app launcher at the workspace toolbar right edge', async () => {
     runtimeExternalAppSettings.value = {
       ...defaultRuntimeExternalAppSettings(),
       editorAppAvailability: { vscode: true },
@@ -51,7 +52,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     expect(trailingActions).not.toBeNull()
     expect(trailingActions?.contains(trigger)).toBe(true)
 
-    openPopover(trigger)
+    await openPopover(trigger)
 
     const menuItems = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="listitem"] button')).map(
       (button) => button.textContent,
@@ -76,16 +77,16 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
       },
     })
     const { container } = renderInJsdom(
-      <QueryClientProvider client={seededQueryClientWithWorkspaceSettings([])}>
+      <VueQueryClientScope client={seededQueryClientWithWorkspaceSettings([])}>
         <WorkspaceExternalAppLauncherHarness target={target} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     const primary = container.querySelector<HTMLButtonElement>(
       '[data-testid="workspace-external-app-launcher-primary"]',
     )
     if (!primary) throw new Error('missing external app primary action')
-    act(() => {
+    await flushTestUpdates(() => {
       primary.click()
     })
 
@@ -120,16 +121,16 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
       capabilities: projection.probe.capabilities,
     })
     const { container } = renderInJsdom(
-      <QueryClientProvider client={seededQueryClientWithWorkspaceSettings([])}>
+      <VueQueryClientScope client={seededQueryClientWithWorkspaceSettings([])}>
         <WorkspaceExternalAppLauncherHarness target={target} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     const primary = container.querySelector<HTMLButtonElement>(
       '[data-testid="workspace-external-app-launcher-primary"]',
     )
     if (!primary) throw new Error('missing external app primary action')
-    act(() => {
+    await flushTestUpdates(() => {
       primary.click()
     })
 
@@ -146,7 +147,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     )
   })
 
-  test('does not render the external app launcher for a branch without a filesystem target', () => {
+  test('does not render the external app launcher for a branch without a filesystem target', async () => {
     const { container } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -158,7 +159,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     expect(container.querySelector('[data-workspace-toolbar-trailing-actions]')).toBeNull()
   })
 
-  test('keeps remote-capable apps and hides Finder for a remote workspace root', () => {
+  test('keeps remote-capable apps and hides Finder for a remote workspace root', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example.test/workspace')
     const target = workspaceRootPaneFilesystemTarget({
       workspaceId,
@@ -170,16 +171,16 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
       },
     })
     const { container } = renderInJsdom(
-      <QueryClientProvider client={seededQueryClientWithWorkspaceSettings([])}>
+      <VueQueryClientScope client={seededQueryClientWithWorkspaceSettings([])}>
         <WorkspaceExternalAppLauncherHarness target={target} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     const trigger = container.querySelector<HTMLButtonElement>(
       '[data-testid="workspace-external-app-launcher-trigger"]',
     )
     if (!trigger) throw new Error('missing external app launcher trigger')
-    openPopover(trigger)
+    await openPopover(trigger)
 
     const labels = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="listitem"] button')).map(
       (button) => button.textContent,
@@ -189,7 +190,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
   })
 
   test('hides the external app launcher when no local external apps are available', async () => {
-    useHostInfoStore.setState({
+    hostInfoStore.setState({
       snapshot: { homeDir: '/Users/tester', platform: 'win32', hostname: 'test-host', pid: 1 },
       status: 'ready',
       error: null,
@@ -213,7 +214,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     expect(c.querySelector('[data-workspace-toolbar-trailing-actions]')).toBeNull()
   })
 
-  test('uses the first visible external app as the split-button primary action without recent state', () => {
+  test('uses the first visible external app as the split-button primary action without recent state', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -234,14 +235,14 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-trigger"]')
     if (!trigger) throw new Error('missing external app launcher trigger')
 
-    openPopover(trigger)
+    await openPopover(trigger)
 
     const finderItem = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
       (button) => button.textContent === 'worktrees.reveal-title',
     )
     expect(finderItem).not.toBeNull()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       finderItem?.click()
       await flush()
     })
@@ -269,7 +270,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     // `publishSettingsInvalidation(['settings-snapshot'])` would push to
     // the client in production. The refetch then picks up the new recent
     // written by the mock.
-    await act(async () => {
+    await flushTestUpdates(async () => {
       await queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
       await flush()
     })
@@ -277,7 +278,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     const primary = c.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')
     expect(primary).not.toBeNull()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       primary?.click()
       await flush()
     })
@@ -304,14 +305,14 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     const trigger = c.querySelector<HTMLButtonElement>('[data-testid="workspace-external-app-launcher-trigger"]')
     if (!trigger) throw new Error('missing external app launcher trigger')
 
-    openPopover(trigger)
+    await openPopover(trigger)
 
     const finderItem = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
       (button) => button.textContent === 'worktrees.reveal-title',
     )
     expect(finderItem).not.toBeNull()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       finderItem?.click()
       await flush()
     })
@@ -329,6 +330,59 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     expect(c.querySelector<HTMLButtonElement>('button[aria-label="settings.terminal.ghostty"]')).not.toBeNull()
   })
 
+  test('keeps the admitted worktree target while the recent-app write is pending', async () => {
+    const nextWorktreePath = '/tmp/goblin-repo-workspace-toolbar-worktree-next'
+    const preferenceWrite = Promise.withResolvers<void>()
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [
+        createBranchSnapshot('feature/worktree', {
+          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+        }),
+      ],
+    })
+    const queryClient = seededQueryClientWithWorkspaceSettings([])
+    const fetchSpy = installRecentAppFetch(defaultSettingsSnapshot({ workspaceSettings: [] }), {
+      beforePostResponse: preferenceWrite.promise,
+    })
+    const { container, rerender } = renderInJsdom(
+      <VueQueryClientScope client={queryClient}>
+        <WorkspaceExternalAppLauncherHarness target={externalAppLauncherTarget(repo, WORKTREE_PATH)} />
+      </VueQueryClientScope>,
+    )
+    const primary = container.querySelector<HTMLButtonElement>(
+      '[data-testid="workspace-external-app-launcher-primary"]',
+    )
+    if (!primary) throw new Error('missing external app primary action')
+
+    await flushTestUpdates(() => primary.click())
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/api/settings/workspace-external-app-recent'),
+        expect.anything(),
+      ),
+    )
+    await rerender(
+      <VueQueryClientScope client={queryClient}>
+        <WorkspaceExternalAppLauncherHarness target={externalAppLauncherTarget(repo, nextWorktreePath)} />
+      </VueQueryClientScope>,
+    )
+
+    preferenceWrite.resolve()
+
+    await waitFor(() =>
+      expect(workspaceExternalAppMocks.openWorkspaceTerminal).toHaveBeenCalledWith(
+        {
+          kind: 'git-worktree',
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          root: canonicalWorkspaceLocator(`goblin+file://${WORKTREE_PATH}`),
+        },
+        'ghostty',
+      ),
+    )
+  })
+
   test('reloads the scoped recent external app when the worktree path changes', async () => {
     const nextWorktreePath = '/tmp/goblin-repo-workspace-toolbar-worktree-next'
     const repo = seedRepoWithReadModelForTest({
@@ -339,49 +393,36 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
         }),
       ],
     })
-    const { container, rerender } = renderInJsdom(
-      <QueryClientProvider
-        client={seededQueryClientWithWorkspaceSettings([
-          {
-            workspaceId: REPO_ID,
-            workspaceExternalAppRecent: {
-              byTarget: {
-                [externalAppTargetKey(WORKTREE_PATH)]: 'finder',
-                [externalAppTargetKey(nextWorktreePath)]: 'editor:vscode',
-              },
-            },
+    const queryClient = seededQueryClientWithWorkspaceSettings([
+      {
+        workspaceId: REPO_ID,
+        workspaceExternalAppRecent: {
+          byTarget: {
+            [externalAppTargetKey(WORKTREE_PATH)]: 'finder',
+            [externalAppTargetKey(nextWorktreePath)]: 'editor:vscode',
           },
-        ])}
-      >
+        },
+      },
+    ])
+    const { container, rerender } = renderInJsdom(
+      <VueQueryClientScope client={queryClient}>
         <WorkspaceExternalAppLauncherHarness target={externalAppLauncherTarget(repo, WORKTREE_PATH)} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).not.toBeNull()
 
-    rerender(
-      <QueryClientProvider
-        client={seededQueryClientWithWorkspaceSettings([
-          {
-            workspaceId: REPO_ID,
-            workspaceExternalAppRecent: {
-              byTarget: {
-                [externalAppTargetKey(WORKTREE_PATH)]: 'finder',
-                [externalAppTargetKey(nextWorktreePath)]: 'editor:vscode',
-              },
-            },
-          },
-        ])}
-      >
+    await rerender(
+      <VueQueryClientScope client={queryClient}>
         <WorkspaceExternalAppLauncherHarness target={externalAppLauncherTarget(repo, nextWorktreePath)} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="settings.editor.vscode"]')).not.toBeNull()
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).toBeNull()
   })
 
-  test('hides the external app launcher in compact filesystem toolbars', () => {
+  test('hides the external app launcher in compact filesystem toolbars', async () => {
     toolbarResponsiveMocks.compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 1,

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -29,7 +29,7 @@ import {
 beforeEach(setupAppNavigationActionsTests)
 
 describe('createAppNavigationActions presentation', () => {
-  test('presents a workspace-root tab through the workspace route and commits its preference', () => {
+  test('presents a workspace-root tab through the workspace route and commits its preference', async () => {
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
@@ -46,7 +46,7 @@ describe('createAppNavigationActions presentation', () => {
       expect.objectContaining({ navigationGeneration: expect.any(Number), onCommit: expect.any(Function) }),
     )
     expect(
-      preferredWorkspacePaneTabForTarget(useWorkspacesStore.getState().workspaces[REPO_ID]!.ui, {
+      preferredWorkspacePaneTabForTarget(workspacesStore.getState().workspaces[REPO_ID]!.ui, {
         kind: 'workspace-root',
         workspaceId: REPO_ID,
       }),
@@ -62,10 +62,8 @@ describe('createAppNavigationActions presentation', () => {
     (_state, accepted, commit) => {
       const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
       const terminalKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, REPO_ID)
-      useWorkspacesStore.getState().setSelectedTerminal(terminalKey, 'term-111111111111111111111')
-      useWorkspacesStore
-        .getState()
-        .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
+      workspacesStore.getState().setSelectedTerminal(terminalKey, 'term-111111111111111111111')
+      workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
       const navigation = routeNavigation()
       vi.mocked(navigation.openWorkspaceRootTerminal).mockImplementation((_repoId, _sessionId, options) => {
         if (accepted && commit) options?.onCommit?.()
@@ -84,11 +82,11 @@ describe('createAppNavigationActions presentation', () => {
           terminalSessionId: 'term-222222222222222222222',
         }),
       ).toBe(accepted)
-      expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalKey]).toBe(
+      expect(workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalKey]).toBe(
         commit ? 'term-222222222222222222222' : 'term-111111111111111111111',
       )
       expect(
-        preferredWorkspacePaneTabForTarget(useWorkspacesStore.getState().workspaces[repo.id]!.ui, {
+        preferredWorkspacePaneTabForTarget(workspacesStore.getState().workspaces[repo.id]!.ui, {
           kind: 'workspace-root',
           workspaceId: repo.id,
         }),
@@ -121,7 +119,7 @@ describe('createAppNavigationActions presentation', () => {
       { kind: 'static', tab: 'files' },
       { onAbandon },
     )
-    useWorkspacesStore.setState((state) => ({
+    workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
         [REPO_ID]: replaceWorkspace(repo, (draft) => {
@@ -134,7 +132,7 @@ describe('createAppNavigationActions presentation', () => {
     await expect(commit).resolves.toBe(false)
     expect(onAbandon).toHaveBeenCalledOnce()
     expect(
-      preferredWorkspacePaneTabForTarget(useWorkspacesStore.getState().workspaces[REPO_ID]!.ui, {
+      preferredWorkspacePaneTabForTarget(workspacesStore.getState().workspaces[REPO_ID]!.ui, {
         kind: 'workspace-root',
         workspaceId: REPO_ID,
       }),
@@ -191,7 +189,7 @@ describe('createAppNavigationActions presentation', () => {
       routeNavigation: navigation,
     })
     const onAbandon = vi.fn()
-    vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTabForTarget').mockImplementationOnce(() => {
+    vi.spyOn(workspacesStore.getState(), 'setWorkspacePaneTabForTarget').mockImplementationOnce(() => {
       throw new Error('projection commit failed')
     })
 
@@ -209,10 +207,10 @@ describe('createAppNavigationActions presentation', () => {
     expect(onAbandon).toHaveBeenCalledOnce()
   })
 
-  test('activates a non-Git workspace at its Dashboard without restoring Git navigation history', () => {
+  test('activates a non-Git workspace at its Dashboard without restoring Git navigation history', async () => {
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     markRepoGitUnavailable(REPO_ID)
-    useWorkspacesStore.setState((state) => ({
+    workspacesStore.setState((state) => ({
       navigationHistoryByWorkspace: {
         ...state.navigationHistoryByWorkspace,
         [REPO_ID]: {
@@ -242,7 +240,7 @@ describe('createAppNavigationActions presentation', () => {
     (kind) => {
       seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
       markRepoGitUnavailable(REPO_ID)
-      useWorkspacesStore.getState().recordWorkspaceNavigation({
+      workspacesStore.getState().recordWorkspaceNavigation({
         workspaceId: REPO_ID,
         route: kind === 'workspace-root' ? { kind, workspacePaneTab: null, terminalSessionId: null } : { kind },
       })
@@ -271,7 +269,7 @@ describe('createAppNavigationActions presentation', () => {
     (tab, terminalSessionId) => {
       seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
       markRepoGitUnavailable(REPO_ID)
-      useWorkspacesStore.getState().recordWorkspaceNavigation({
+      workspacesStore.getState().recordWorkspaceNavigation({
         workspaceId: REPO_ID,
         route: { kind: 'workspace-root', workspacePaneTab: tab, terminalSessionId },
       })
@@ -320,7 +318,7 @@ describe('createAppNavigationActions presentation', () => {
     (route) => {
       seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
       markRepoGitUnavailable(REPO_ID)
-      useWorkspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route })
+      workspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route })
       const navigation = routeNavigation()
       const openRepoWorktreeTab = vi.fn(() => true)
       navigation.openRepoWorktreeTab = openRepoWorktreeTab
@@ -342,7 +340,7 @@ describe('createAppNavigationActions presentation', () => {
     },
   )
 
-  test('selects branches by resolving the branch workspace pane route', () => {
+  test('selects branches by resolving the branch workspace pane route', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -373,7 +371,7 @@ describe('createAppNavigationActions presentation', () => {
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
   })
 
-  test('opens the branch root while workspace pane tabs are still loading', () => {
+  test('opens the branch root while workspace pane tabs are still loading', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -431,7 +429,7 @@ describe('createAppNavigationActions presentation', () => {
     expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
-  test('selects branches by falling back when the preferred workspace pane tab is stale', () => {
+  test('selects branches by falling back when the preferred workspace pane tab is stale', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -457,7 +455,7 @@ describe('createAppNavigationActions presentation', () => {
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
   })
 
-  test('selects branches with an intentional empty workspace pane route', () => {
+  test('selects branches with an intentional empty workspace pane route', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -583,7 +581,7 @@ describe('createAppNavigationActions presentation', () => {
     expect(onAbandon).toHaveBeenCalledOnce()
   })
 
-  test('blocks workspace history restore before mutating history while terminal creation is pending', () => {
+  test('blocks workspace history restore before mutating history while terminal creation is pending', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -606,15 +604,15 @@ describe('createAppNavigationActions presentation', () => {
         terminalSessionId: null,
       },
     } satisfies WorkspaceNavigationHistoryEntry
-    useWorkspacesStore.getState().recordWorkspaceNavigation(dashboard)
-    useWorkspacesStore.getState().recordWorkspaceNavigation(branch)
+    workspacesStore.getState().recordWorkspaceNavigation(dashboard)
+    workspacesStore.getState().recordWorkspaceNavigation(branch)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
     const peekWorkspaceNavigation = vi.fn((workspaceId: WorkspaceId, direction: 'back' | 'forward') =>
-      useWorkspacesStore.getState().peekWorkspaceNavigation(workspaceId, direction),
+      workspacesStore.getState().peekWorkspaceNavigation(workspaceId, direction),
     )
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
@@ -622,7 +620,7 @@ describe('createAppNavigationActions presentation', () => {
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
       peekWorkspaceNavigation,
-      commitWorkspaceNavigation: useWorkspacesStore.getState().commitWorkspaceNavigation,
+      commitWorkspaceNavigation: workspacesStore.getState().commitWorkspaceNavigation,
       routeNavigation: navigation,
     })
 
@@ -630,6 +628,6 @@ describe('createAppNavigationActions presentation', () => {
 
     expect(peekWorkspaceNavigation).not.toHaveBeenCalled()
     expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
-    expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(branch)
+    expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(branch)
   })
 })

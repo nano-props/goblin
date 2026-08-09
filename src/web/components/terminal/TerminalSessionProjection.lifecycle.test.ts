@@ -20,7 +20,7 @@ import {
 } from '#/web/test-utils/terminal-session-projection.ts'
 
 describe('TerminalSessionProjection lifecycle', () => {
-  test('returns cached snapshot without calling session.snapshot() repeatedly', () => {
+  test('returns cached snapshot without calling session.snapshot() repeatedly', async () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -41,7 +41,7 @@ describe('TerminalSessionProjection lifecycle', () => {
     expect(snapshotSpy).toHaveBeenCalledTimes(1)
   })
 
-  test('invalidates snapshot cache on metadata notify', () => {
+  test('invalidates snapshot cache on metadata notify', async () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -58,7 +58,7 @@ describe('TerminalSessionProjection lifecycle', () => {
     expect(s1).not.toBe(s2)
   })
 
-  test('getTerminalSessionProjection returns the same instance across calls with the same deps', () => {
+  test('getTerminalSessionProjection returns the same instance across calls with the same deps', async () => {
     // The session was filled by `beforeEach` with the per-test
     // `projection`. The getter must return that exact instance, not
     // construct a new one.
@@ -72,7 +72,7 @@ describe('TerminalSessionProjection lifecycle', () => {
     expect(first).toBe(projection)
   })
 
-  test('setTerminalSessionProjectionForTests(null) clears the session so the next getter constructs a fresh instance', () => {
+  test('setTerminalSessionProjectionForTests(null) clears the session so the next getter constructs a fresh instance', async () => {
     const original = projection
     setTerminalSessionProjectionForTests(null)
     const fresh = getTerminalSessionProjection({
@@ -83,7 +83,7 @@ describe('TerminalSessionProjection lifecycle', () => {
     setTerminalSessionProjectionForTests(projection)
   })
 
-  test('destroy clears the singleton session when destroying the installed instance', () => {
+  test('destroy clears the singleton session when destroying the installed instance', async () => {
     const original = getTerminalSessionProjection({
       onSelectedFilesystemTargetChange: () => {},
     })

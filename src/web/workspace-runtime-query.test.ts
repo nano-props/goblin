@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/query-core'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   invalidateWorkspaceRuntimes,

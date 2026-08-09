@@ -5,8 +5,12 @@ import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 describe('SidebarRowButton', () => {
-  test('uses compact full-width chrome without growing in a vertical flex stack', () => {
-    const { container } = renderInJsdom(<SidebarRowButton aria-label="Sidebar row">Sidebar row</SidebarRowButton>)
+  test('uses compact full-width chrome without growing in a vertical flex stack', async () => {
+    const { container } = renderInJsdom(
+      <SidebarRowButton aria-label="Sidebar row" class="caller-marker">
+        Sidebar row
+      </SidebarRowButton>,
+    )
 
     const button = container.querySelector('button[aria-label="Sidebar row"]')
     if (!(button instanceof HTMLButtonElement)) throw new Error('missing sidebar row button')
@@ -15,9 +19,10 @@ describe('SidebarRowButton', () => {
     expect(button.className).toContain('shrink-0')
     expect(button.className).toContain('h-10')
     expect(button.className).not.toContain('flex-1')
+    expect(button.className.split(/\s+/).filter((token) => token === 'caller-marker')).toHaveLength(1)
   })
 
-  test('owns compact and icon row sizes without caller class overrides', () => {
+  test('owns compact and icon row sizes without caller class overrides', async () => {
     const { container } = renderInJsdom(
       <div>
         <SidebarRowButton aria-label="Compact row" size="compact">

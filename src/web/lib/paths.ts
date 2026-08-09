@@ -6,8 +6,6 @@ import {
 import { tildifyPath, untildifyPath } from '#/shared/paths.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-export { tildifyPath, untildifyPath } from '#/shared/paths.ts'
-
 /** Last segment of a path. Tolerant of either separator so worktree
  *  paths and repo roots render correctly on both POSIX and Windows. */
 export function lastPathSegment(p: string): string {

@@ -1,6 +1,7 @@
 // Query options are the read boundary for server-backed settings projections.
-import { useEffect } from 'react'
-import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
+import { computed, onScopeDispose, toValue } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { ExternalAppsSnapshot, GitHubCliState, LanInfo, SettingsSnapshot } from '#/shared/api-types.ts'
 import { getExternalAppsSnapshot, getGitHubCliState, getLanInfo, getSettingsSnapshot } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidation } from '#/web/settings-invalidation-ingress.ts'
@@ -20,17 +21,10 @@ function initialGitHubCliState(): GitHubCliState {
   }
 }
 
-export {
-  externalAppsQueryKey,
-  githubCliQueryKey,
-  lanInfoQueryKey,
-  settingsSnapshotQueryKey,
-} from '#/web/settings-query-cache.ts'
-
 export function settingsSnapshotQueryOptions() {
-  return queryOptions<SettingsSnapshot>({
+  return {
     queryKey: settingsSnapshotQueryKey(),
-    queryFn: ({ signal }) => getSettingsSnapshot({ signal }),
+    queryFn: ({ signal }: { signal: AbortSignal }) => getSettingsSnapshot({ signal }),
     // No initial data from the bootstrap — the server no longer
     // inlines it. The query starts pending and the authenticated
     // bootstrap pass populates the cache.
@@ -39,52 +33,53 @@ export function settingsSnapshotQueryOptions() {
     // fresh lets bootstrap and mounted consumers share one authoritative read.
     staleTime: Infinity,
     gcTime: 5 * 60_000,
-  })
+  }
 }
 
 export function externalAppsQueryOptions() {
-  return queryOptions<ExternalAppsSnapshot>({
+  return {
     queryKey: externalAppsQueryKey(),
-    queryFn: ({ signal }) => getExternalAppsSnapshot({ signal }),
+    queryFn: ({ signal }: { signal: AbortSignal }) => getExternalAppsSnapshot({ signal }),
     // See settingsSnapshotQueryOptions — same rationale.
     staleTime: Infinity,
     gcTime: 5 * 60_000,
-  })
+  }
 }
 
 function githubCliQueryOptions(hosts?: string[]) {
-  return queryOptions<GitHubCliState>({
+  return {
     queryKey: githubCliQueryKey(hosts),
     queryFn: () => getGitHubCliState(hosts),
     initialData: initialGitHubCliState,
     staleTime: 0,
     gcTime: 5 * 60_000,
-  })
+  }
 }
 
 function lanInfoQueryOptions() {
-  return queryOptions<LanInfo>({
+  return {
     queryKey: lanInfoQueryKey(),
     queryFn: async () => await getLanInfo(),
     staleTime: 5 * 60_000,
     gcTime: 10 * 60_000,
-  })
+  }
 }
 
 export function useSettingsSnapshotQuery() {
   return useQuery(settingsSnapshotQueryOptions())
 }
 
-export function useSettingsSnapshotReadModel(): SettingsSnapshot | undefined {
-  return useSettingsSnapshotQuery().data
+export function useSettingsSnapshotReadModel(): ComputedRef<SettingsSnapshot | undefined> {
+  const query = useSettingsSnapshotQuery()
+  return computed(() => query.data.value)
 }
 
 export function useExternalAppsQuery() {
   return useQuery(externalAppsQueryOptions())
 }
 
-export function useGitHubCliQuery(hosts?: string[]) {
-  return useQuery(githubCliQueryOptions(hosts))
+export function useGitHubCliQuery(hosts?: MaybeRefOrGetter<string[] | undefined>) {
+  return useQuery(computed(() => githubCliQueryOptions(toValue(hosts))))
 }
 
 export function useLanInfoQuery() {
@@ -93,16 +88,13 @@ export function useLanInfoQuery() {
 
 export function useSettingsQueryInvalidationSync() {
   const queryClient = useQueryClient()
-  useEffect(
-    () =>
-      subscribeSettingsInvalidation((event) => {
-        if (event.scopes.includes('settings-snapshot')) {
-          void queryClient.refetchQueries({ queryKey: settingsSnapshotQueryKey(), exact: true, type: 'active' })
-        }
-        if (event.scopes.includes('external-apps')) {
-          void queryClient.refetchQueries({ queryKey: externalAppsQueryKey(), exact: true, type: 'active' })
-        }
-      }),
-    [queryClient],
-  )
+  const unsubscribe = subscribeSettingsInvalidation((event) => {
+    if (event.scopes.includes('settings-snapshot')) {
+      void queryClient.refetchQueries({ queryKey: settingsSnapshotQueryKey(), exact: true, type: 'active' })
+    }
+    if (event.scopes.includes('external-apps')) {
+      void queryClient.refetchQueries({ queryKey: externalAppsQueryKey(), exact: true, type: 'active' })
+    }
+  })
+  onScopeDispose(unsubscribe)
 }

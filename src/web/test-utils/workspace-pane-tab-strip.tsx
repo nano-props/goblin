@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
-import { act } from '@testing-library/react'
-import type { RenderResult } from '@testing-library/react'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
+import type { JsdomRenderResult } from '#/test-utils/render.tsx'
+import { defineComponent } from 'vue'
+import type { VNode } from 'vue'
 import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import {
@@ -14,10 +15,9 @@ import {
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
 
 // RTL has no reusable harness for tab-strip geometry, scroll memory, and terminal item adaptation.
-const reactActEnvironment = globalThis as typeof globalThis & {
+const testHostEnvironment = globalThis as typeof globalThis & {
   goblinNative?: unknown
   __GOBLIN_BOOTSTRAP__?: unknown
 }
@@ -32,7 +32,7 @@ beforeEach(() => {
     configurable: true,
     writable: true,
     value(this: HTMLElement) {
-      if (this.matches('[data-radix-scroll-area-viewport]') && tabStripViewportRect) return tabStripViewportRect
+      if (this.matches('[data-reka-scroll-area-viewport]') && tabStripViewportRect) return tabStripViewportRect
       if (this.matches('[data-workspace-pane-new-button]') && tabStripNewButtonRect) return tabStripNewButtonRect
       if (this.matches('[data-workspace-pane-tab-scroll-target]')) {
         const tabButton = this.querySelector<HTMLButtonElement>('[role="tab"][id]')
@@ -47,11 +47,11 @@ beforeEach(() => {
     configurable: true,
     value: vi.fn(),
   })
-  reactActEnvironment.__GOBLIN_BOOTSTRAP__ = {
+  testHostEnvironment.__GOBLIN_BOOTSTRAP__ = {
     runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
     initialServer: null,
   }
-  reactActEnvironment.goblinNative = {
+  testHostEnvironment.goblinNative = {
     pathForFile: () => '',
     invokeIpc: async () => null,
     abortIpc: async () => true,
@@ -60,8 +60,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete reactActEnvironment.goblinNative
-  delete reactActEnvironment.__GOBLIN_BOOTSTRAP__
+  delete testHostEnvironment.goblinNative
+  delete testHostEnvironment.__GOBLIN_BOOTSTRAP__
   Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
     configurable: true,
     writable: true,
@@ -78,7 +78,7 @@ afterEach(() => {
   lastRender = null
 })
 
-export function TestWorkspacePaneTabStrip(props: {
+interface TestWorkspacePaneTabStripProps {
   terminalFilesystemTargetKey: string
   workspacePaneTabTargetKey?: string
   sessions: TerminalSessionSummary[]
@@ -94,79 +94,99 @@ export function TestWorkspacePaneTabStrip(props: {
   onClose: (tab: TerminalSessionSummary) => void
   onReorder: (tabs: WorkspacePaneTabEntry[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
-}) {
-  const selected = props.sessions.find((candidate) => candidate.selected) ?? null
-  const {
-    sessions,
-    terminalFilesystemTargetKey,
-    newTerminalBusy,
-    newTerminalBlocksTabInteraction,
-    onNew,
-    onScrollToBottom,
-    ...workspacePaneProps
-  } = props
-  const items: WorkspacePaneTabItem[] = sessions.map((tab) =>
-    createRuntimeWorkspacePaneTabItem({
-      view: tab,
-      label: tab.originalTitle ?? tab.fullTitle ?? tab.title,
-      tooltip: tab.originalTitle ?? tab.fullTitle ?? tab.title,
-      closeLabel: `close ${tab.title}`,
-    }),
-  )
-  if (props.pendingTerminal) {
-    items.push(
-      createPendingWorkspacePaneTabItem({
-        type: 'terminal',
-        label: 'terminal.opening',
-        tooltip: 'terminal.opening',
-      }),
-    )
-  }
-  return (
-    <WorkspacePaneTabStrip
-      {...workspacePaneProps}
-      createAction={
-        terminalFilesystemTargetKey
-          ? {
-              label: 'terminal.new',
-              busy: newTerminalBusy ?? false,
-              blocksTabInteraction: newTerminalBlocksTabInteraction ?? false,
-              onCreate: onNew,
-            }
-          : null
-      }
-      workspacePaneTabTargetKey={props.workspacePaneTabTargetKey ?? '/repo\0branch\0main'}
-      items={items}
-      activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalSessionId) : null}
-      onSelect={(item) => {
-        if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
-          props.onSelect(terminalFilesystemTargetKey, item.view)
-        }
-      }}
-      onReselect={(item) => {
-        if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
-          onScrollToBottom(item.view.terminalSessionId)
-        }
-      }}
-      onClose={(item) => {
-        if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
-          props.onClose(item.view)
-        }
-      }}
-    />
-  )
 }
 
-let lastRender: RenderResult | null = null
+export const TestWorkspacePaneTabStrip = defineComponent(
+  (props: TestWorkspacePaneTabStripProps) => () => {
+    const selected = props.sessions.find((candidate) => candidate.selected) ?? null
+    const items: WorkspacePaneTabItem[] = props.sessions.map((tab) =>
+      createRuntimeWorkspacePaneTabItem({
+        view: tab,
+        label: tab.originalTitle ?? tab.fullTitle ?? tab.title,
+        tooltip: tab.originalTitle ?? tab.fullTitle ?? tab.title,
+        closeLabel: `close ${tab.title}`,
+      }),
+    )
+    if (props.pendingTerminal) {
+      items.push(
+        createPendingWorkspacePaneTabItem({
+          type: 'terminal',
+          label: 'terminal.opening',
+          tooltip: 'terminal.opening',
+        }),
+      )
+    }
+    return (
+      <WorkspacePaneTabStrip
+        workspacePaneId={props.workspacePaneId}
+        responsiveCompact={props.responsiveCompact}
+        panelActive={props.panelActive}
+        onReorder={props.onReorder}
+        onNavigateOut={props.onNavigateOut}
+        createAction={
+          props.terminalFilesystemTargetKey
+            ? {
+                label: 'terminal.new',
+                busy: props.newTerminalBusy ?? false,
+                blocksTabInteraction: props.newTerminalBlocksTabInteraction ?? false,
+                onCreate: props.onNew,
+              }
+            : null
+        }
+        workspacePaneTabTargetKey={props.workspacePaneTabTargetKey ?? '/repo\0branch\0main'}
+        items={items}
+        activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalSessionId) : null}
+        onSelect={(item) => {
+          if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+            props.onSelect(props.terminalFilesystemTargetKey, item.view)
+          }
+        }}
+        onReselect={(item) => {
+          if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+            props.onScrollToBottom(item.view.terminalSessionId)
+          }
+        }}
+        onClose={(item, presentationEffects) => {
+          if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+            props.onClose(item.view)
+            presentationEffects?.onCommit()
+          }
+        }}
+      />
+    )
+  },
+  {
+    name: 'TestWorkspacePaneTabStrip',
+    props: [
+      'terminalFilesystemTargetKey',
+      'workspacePaneTabTargetKey',
+      'sessions',
+      'workspacePaneId',
+      'pendingTerminal',
+      'responsiveCompact',
+      'panelActive',
+      'newTerminalBusy',
+      'newTerminalBlocksTabInteraction',
+      'onNew',
+      'onSelect',
+      'onScrollToBottom',
+      'onClose',
+      'onReorder',
+      'onNavigateOut',
+    ],
+  },
+)
 
-export function render(element: ReactNode): RenderResult {
+let lastRender: JsdomRenderResult | null = null
+
+export function render(element: VNode): JsdomRenderResult {
   lastRender = renderInJsdom(element, { wrapper: WorkspacePaneTabStripScrollMemoryProvider })
   return lastRender
 }
 
-export function rerender(element: ReactNode): RenderResult {
+export async function rerender(element: VNode): Promise<JsdomRenderResult> {
   if (!lastRender) return render(element)
-  lastRender.rerender(element)
+  await lastRender.rerender(element)
   return lastRender
 }
 
@@ -182,7 +202,7 @@ export function workspacePaneTabScrollTarget(tabId: string): HTMLElement {
 }
 
 export function workspacePaneTabViewport(): HTMLDivElement {
-  const viewport = document.body.querySelector<HTMLDivElement>('[data-radix-scroll-area-viewport]')
+  const viewport = document.body.querySelector<HTMLDivElement>('[data-reka-scroll-area-viewport]')
   if (!viewport) throw new Error('missing workspace pane tab viewport')
   return viewport
 }
@@ -234,13 +254,13 @@ export function session(overrides: Partial<TerminalSessionSummary> = {}): Termin
 }
 
 export async function flushTimers() {
-  await act(async () => {
+  await flushTestUpdates(async () => {
     await vi.runAllTimersAsync()
   })
 }
 
-export function openCompactSwitcher(trigger: HTMLButtonElement) {
-  act(() => {
+export async function openCompactSwitcher(trigger: HTMLButtonElement) {
+  await flushTestUpdates(() => {
     trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
     trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
   })

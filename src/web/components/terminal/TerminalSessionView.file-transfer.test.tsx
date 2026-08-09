@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import { MAX_PASTE_BATCH_BYTES, MAX_PASTE_UPLOAD_FILES, PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
@@ -8,8 +8,8 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/terminal-snapshot.ts'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
+  TerminalSessionCommandScope,
+  TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
@@ -34,7 +34,7 @@ describe('TerminalSessionView file transfer', () => {
     try {
       const dragEnter = new Event('dragenter', { bubbles: true, cancelable: true })
       Object.defineProperty(dragEnter, 'dataTransfer', { value: transfer })
-      await act(async () => rendered.sessionRoot.dispatchEvent(dragEnter))
+      await flushTestUpdates(async () => rendered.sessionRoot.dispatchEvent(dragEnter))
       expect(rendered.container.querySelector('.goblin-terminal-session__drop-overlay')).not.toBeNull()
 
       const snapshot = {
@@ -56,7 +56,7 @@ describe('TerminalSessionView file transfer', () => {
   test('paste with an oversized blob fails without upload or xterm fallback', async () => {
     const shellClient = await import('#/web/app-shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
-    const { toast } = await import('sonner')
+    const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
     const oversized = new File([new Uint8Array([1])], 'huge.bin', { type: 'application/octet-stream' })
     Object.defineProperty(oversized, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
@@ -65,7 +65,7 @@ describe('TerminalSessionView file transfer', () => {
     try {
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
       Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardDataWithFiles([oversized]) })
-      await act(async () => {
+      await flushTestUpdates(async () => {
         rendered.sessionRoot.dispatchEvent(pasteEvent)
         await waitForNextMacrotask()
       })
@@ -83,7 +83,7 @@ describe('TerminalSessionView file transfer', () => {
     ['drop', 1],
   ] as const)('remote %s rejects files before local resolution or terminal input', async (kind, fileSize) => {
     const shellClient = await import('#/web/app-shell-client.ts')
-    const { toast } = await import('sonner')
+    const { toast } = await import('vue-sonner')
     vi.mocked(shellClient.pathForDroppedFile).mockClear()
     vi.mocked(shellClient.saveClipboardFiles).mockClear()
     vi.mocked(toast.error).mockClear()
@@ -115,7 +115,7 @@ describe('TerminalSessionView file transfer', () => {
       Object.defineProperty(event, kind === 'paste' ? 'clipboardData' : 'dataTransfer', {
         value: kind === 'paste' ? clipboardDataWithFiles([file]) : transfer,
       })
-      await act(async () => {
+      await flushTestUpdates(async () => {
         rendered.sessionRoot.dispatchEvent(event)
         await waitForNextMacrotask()
       })
@@ -132,7 +132,7 @@ describe('TerminalSessionView file transfer', () => {
 
   test.each(['paste', 'drop'] as const)('%s reports when the selected terminal cannot accept input', async (kind) => {
     const shellClient = await import('#/web/app-shell-client.ts')
-    const { toast } = await import('sonner')
+    const { toast } = await import('vue-sonner')
     vi.mocked(shellClient.pathForDroppedFile).mockClear()
     vi.mocked(shellClient.saveClipboardFiles).mockClear()
     vi.mocked(toast.warning).mockClear()
@@ -164,7 +164,7 @@ describe('TerminalSessionView file transfer', () => {
     const shellClient = await import('#/web/app-shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockRejectedValue(new Error('network down'))
-    const { toast } = await import('sonner')
+    const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
     const rendered = await renderTerminalSession()
     const file = new File([new Uint8Array([1])], 'foo.png')
@@ -174,7 +174,7 @@ describe('TerminalSessionView file transfer', () => {
       else {
         const event = new Event('drop', { bubbles: true, cancelable: true })
         Object.defineProperty(event, 'dataTransfer', { value: dropDataWithFiles([file]) })
-        await act(async () => {
+        await flushTestUpdates(async () => {
           rendered.sessionRoot.dispatchEvent(event)
           await waitForNextMacrotask()
         })
@@ -205,7 +205,7 @@ describe('TerminalSessionView file transfer', () => {
         })
         rendered.sessionRoot.dispatchEvent(event)
       }
-      await act(async () => {
+      await flushTestUpdates(async () => {
         dispatchPendingPaste('first.txt')
         dispatchPendingPaste('second.txt')
         await Promise.resolve()
@@ -214,13 +214,13 @@ describe('TerminalSessionView file transfer', () => {
       const pendingProgress = () => rendered.container.querySelector('[aria-label="terminal.file-resolution-progress"]')
       expect(pendingProgress()).not.toBeNull()
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         first.resolve(['/tmp/first.txt'])
         await waitForNextMacrotask()
       })
       expect(pendingProgress()).not.toBeNull()
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         second.resolve(['/tmp/second.txt'])
         await waitForNextMacrotask()
       })
@@ -233,7 +233,7 @@ describe('TerminalSessionView file transfer', () => {
   test('drop fast-fails an oversized blob batch with the batch limit error', async () => {
     const shellClient = await import('#/web/app-shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
-    const { toast } = await import('sonner')
+    const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
     const rendered = await renderTerminalSession()
     const first = new File([new Uint8Array([1])], 'first.bin')
@@ -245,7 +245,7 @@ describe('TerminalSessionView file transfer', () => {
       const dataTransfer = dropDataWithFiles([first, second])
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
-      await act(async () => {
+      await flushTestUpdates(async () => {
         rendered.sessionRoot.dispatchEvent(dropEvent)
         await waitForNextMacrotask()
       })
@@ -261,7 +261,7 @@ describe('TerminalSessionView file transfer', () => {
   test('drop fast-fails an excessive blob count before upload', async () => {
     const shellClient = await import('#/web/app-shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
-    const { toast } = await import('sonner')
+    const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
     const rendered = await renderTerminalSession()
     const files = Array.from({ length: MAX_PASTE_UPLOAD_FILES + 1 }, (_, index) => new File([], `empty-${index}.txt`))
@@ -269,7 +269,7 @@ describe('TerminalSessionView file transfer', () => {
     try {
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dropDataWithFiles(files) })
-      await act(async () => {
+      await flushTestUpdates(async () => {
         rendered.sessionRoot.dispatchEvent(dropEvent)
         await waitForNextMacrotask()
       })
@@ -286,7 +286,7 @@ describe('TerminalSessionView file transfer', () => {
     const shellClient = await import('#/web/app-shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue(`/abs/${'a'.repeat(1024 * 1024)}`)
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
-    const { toast } = await import('sonner')
+    const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
     const rendered = await renderTerminalSession()
 
@@ -304,7 +304,7 @@ describe('TerminalSessionView file transfer', () => {
     const shellClient = await import('#/web/app-shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue(['/tmp/a.png', '/tmp/b\n.png'])
-    const { toast } = await import('sonner')
+    const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
     const rendered = await renderTerminalSession()
 
@@ -324,7 +324,7 @@ describe('TerminalSessionView file transfer', () => {
   test('paste reports when the captured terminal stops accepting input before the write', async () => {
     const shellClient = await import('#/web/app-shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('/abs/a.png')
-    const { toast } = await import('sonner')
+    const { toast } = await import('vue-sonner')
     vi.mocked(toast.warning).mockClear()
     const rendered = await renderTerminalSession({ captureInputWriter: vi.fn(() => () => false) })
 
@@ -446,16 +446,16 @@ describe('TerminalSessionView file transfer', () => {
     )
 
     const { container, rerender, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
@@ -465,7 +465,7 @@ describe('TerminalSessionView file transfer', () => {
       const dropEvent = new Event('drop', { bubbles: true, cancelable: true })
       Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer })
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         sessionRoot.dispatchEvent(dropEvent)
         // Yield to let the resolver start awaiting the (still-pending)
         // saveClipboardFiles Promise.
@@ -477,17 +477,17 @@ describe('TerminalSessionView file transfer', () => {
       // the new descriptor, but the in-flight drop keeps the target captured
       // at the event boundary.
       activeFilesystemTargetSnapshot = filesystemTargetSnapshotB
-      rerender(
-        <TerminalSessionContext value={context}>
-          <TerminalSessionReadContext value={readContext}>
+      await rerender(
+        <TerminalSessionCommandScope value={context}>
+          <TerminalSessionReadScope value={readContext}>
             <TerminalSessionView
               repoRoot="/repo"
               workspaceRuntimeId={'repo-runtime-test'}
               branch="feature"
               worktreePath="/worktree-other"
             />
-          </TerminalSessionReadContext>
-        </TerminalSessionContext>,
+          </TerminalSessionReadScope>
+        </TerminalSessionCommandScope>,
       )
       expect(container.querySelector('[aria-label="terminal.file-resolution-progress"]')).toBeNull()
 
@@ -496,7 +496,7 @@ describe('TerminalSessionView file transfer', () => {
       // resolvePastedFiles.then → processDrop.then → handler.then);
       // Cross one macrotask so the integration promise chain drains inside
       // the same act boundary as the deferred bridge response.
-      await act(async () => {
+      await flushTestUpdates(async () => {
         resolveSave(['/tmp/a.png'])
         await waitForNextMacrotask()
       })

@@ -5,7 +5,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { SettingsContentFrame } from '#/web/components/settings/SettingsContentFrame.tsx'
 
 describe('SettingsContentFrame', () => {
-  test('keeps a fixed draggable chrome above the scrollable settings content', () => {
+  test('keeps a fixed draggable chrome above the scrollable settings content', async () => {
     const { container } = renderInJsdom(
       <SettingsContentFrame title="Keyboard" topInset={52}>
         <div>content</div>

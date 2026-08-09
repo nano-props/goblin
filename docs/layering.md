@@ -211,7 +211,7 @@ It also shows a feature where a separate source layer makes sense.
 
 - boundary: validates repository procedures and transports requests
 - query identity and cache projection: identify authoritative repository reads
-  without coupling them to React
+  without coupling them to Vue
 - read bindings: expose snapshot lifecycles to UI consumers
 - write: coordinate repository mutations and publish invalidation
 - source: owns Git and filesystem access

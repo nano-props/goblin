@@ -86,7 +86,7 @@ afterEach(() => {
 })
 
 describe('pull request normalization', () => {
-  test('normalizes open pull requests', () => {
+  test('normalizes open pull requests', async () => {
     expect(
       normalizeGhPullRequest({
         number: 12,
@@ -118,7 +118,7 @@ describe('pull request normalization', () => {
 })
 
 describe('pull request selection', () => {
-  test('prefers open over merged over closed', () => {
+  test('prefers open over merged over closed', async () => {
     const merged = {
       number: 1,
       title: 'Merged',

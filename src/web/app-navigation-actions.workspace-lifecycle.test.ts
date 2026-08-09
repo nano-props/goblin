@@ -2,7 +2,7 @@ import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   REPO_ID,
   REPO_A_ID,
@@ -23,7 +23,7 @@ import {
 beforeEach(setupAppNavigationActionsTests)
 
 describe('createAppNavigationActions workspace lifecycle', () => {
-  test('cycles repos by navigating from the current repo', () => {
+  test('cycles repos by navigating from the current repo', async () => {
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
@@ -37,14 +37,14 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
   })
 
-  test('activates a repo at its current workspace history entry', () => {
+  test('activates a repo at its current workspace history entry', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_B_ID,
       branches: [createRepoBranch('feature/remembered')],
       currentBranchName: 'feature/remembered',
     })
     const entry = branchHistoryEntry(REPO_B_ID, 'feature/remembered', 'history')
-    useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
+    workspacesStore.getState().recordWorkspaceNavigation(entry)
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
@@ -64,8 +64,8 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
   })
 
-  test('does not resume a repo at its new-worktree workflow', () => {
-    useWorkspacesStore.getState().recordWorkspaceNavigation({
+  test('does not resume a repo at its new-worktree workflow', async () => {
+    workspacesStore.getState().recordWorkspaceNavigation({
       workspaceId: REPO_B_ID,
       route: { kind: 'newWorktree', returnTo: '/workspace/repo-b/branch/main' },
     })
@@ -83,7 +83,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     expect(navigation.openRepoNewWorktree).not.toHaveBeenCalled()
   })
 
-  test('does not replace a blocked repo history restore with the dashboard', () => {
+  test('does not replace a blocked repo history restore with the dashboard', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -93,7 +93,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
       preferredWorkspacePaneTab: 'status',
     })
     const entry = branchHistoryEntry(REPO_ID, BRANCH_NAME, 'status')
-    useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
+    workspacesStore.getState().recordWorkspaceNavigation(entry)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
@@ -111,12 +111,12 @@ describe('createAppNavigationActions workspace lifecycle', () => {
 
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
     expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
-    expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(entry)
+    expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(entry)
   })
 
-  test('falls back to the dashboard when a repo history route is unavailable', () => {
+  test('falls back to the dashboard when a repo history route is unavailable', async () => {
     const entry = branchHistoryEntry(REPO_B_ID, 'feature/remembered', 'history')
-    useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
+    workspacesStore.getState().recordWorkspaceNavigation(entry)
     const navigation = routeNavigation()
     vi.mocked(navigation.openRepoBranchTab).mockReturnValue(false)
     const actions = createAppNavigationActions({
@@ -131,10 +131,10 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_B_ID, presentationOptions())
   })
 
-  test('falls back to the dashboard when workspace-root history cannot be presented', () => {
+  test('falls back to the dashboard when workspace-root history cannot be presented', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/workspace-b')
     const currentWorkspaceId = workspaceIdForTest('goblin+file:///tmp/workspace-a')
-    useWorkspacesStore.getState().recordWorkspaceNavigation({
+    workspacesStore.getState().recordWorkspaceNavigation({
       workspaceId: workspaceId,
       route: { kind: 'workspace-root', workspacePaneTab: null, terminalSessionId: null },
     })
@@ -152,14 +152,14 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(workspaceId, presentationOptions())
   })
 
-  test('cycles to the target repo current workspace history entry', () => {
+  test('cycles to the target repo current workspace history entry', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_B_ID,
       branches: [createRepoBranch('feature/remembered')],
       currentBranchName: 'feature/remembered',
     })
     const entry = branchHistoryEntry(REPO_B_ID, 'feature/remembered', 'status')
-    useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
+    workspacesStore.getState().recordWorkspaceNavigation(entry)
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
@@ -178,7 +178,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     )
   })
 
-  test('cycles repos backward and wraps around', () => {
+  test('cycles repos backward and wraps around', async () => {
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
@@ -230,9 +230,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
       branches: [createRepoBranch('feature/remembered')],
       currentBranchName: 'feature/remembered',
     })
-    useWorkspacesStore
-      .getState()
-      .recordWorkspaceNavigation(branchHistoryEntry(REPO_C_ID, 'feature/remembered', 'history'))
+    workspacesStore.getState().recordWorkspaceNavigation(branchHistoryEntry(REPO_C_ID, 'feature/remembered', 'history'))
     const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
@@ -263,7 +261,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
       preferredWorkspacePaneTab: 'status',
     })
     const entry = branchHistoryEntry(REPO_ID, BRANCH_NAME, 'status')
-    useWorkspacesStore.getState().recordWorkspaceNavigation(entry)
+    workspacesStore.getState().recordWorkspaceNavigation(entry)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
@@ -283,7 +281,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     expect(closeWorkspace).toHaveBeenCalledWith(REPO_A_ID)
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
     expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
-    expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(entry)
+    expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(entry)
   })
 
   test('closes the final current repo and navigates home', async () => {
@@ -331,7 +329,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith(REPO_A_ID, presentationOptions())
   })
 
-  test('restores a saved new-worktree return target when navigating workspace history', () => {
+  test('restores a saved new-worktree return target when navigating workspace history', async () => {
     const navigation = routeNavigation()
     const target = {
       workspaceId: REPO_A_ID,
@@ -359,7 +357,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     )
   })
 
-  test('restores a saved bare branch workspace history entry', () => {
+  test('restores a saved bare branch workspace history entry', async () => {
     const navigation = routeNavigation()
     const target = {
       workspaceId: REPO_A_ID,

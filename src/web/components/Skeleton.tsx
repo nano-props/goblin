@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { defineComponent } from 'vue'
+import type { FunctionalComponent, VNodeChild } from 'vue'
 // Skeleton placeholders used while a list loads.  We keep the shapes
 // coarse — a few large blocks per row — rather than mirroring every
 // badge, icon, and label.  This matches the shadcn/ui Skeleton style
@@ -40,11 +41,7 @@ interface WorkspaceSkeletonProps {
 
 export function BranchNavigatorSkeleton({ rows = 6 }: BranchNavigatorSkeletonProps) {
   return (
-    <SkeletonList
-      rows={rows}
-      className={BRANCH_ROW_LIST_CLASS}
-      renderRow={(i) => <BranchNavigatorSkeletonRow key={i} />}
-    />
+    <SkeletonList rows={rows} class={BRANCH_ROW_LIST_CLASS} renderRow={(i) => <BranchNavigatorSkeletonRow key={i} />} />
   )
 }
 
@@ -69,97 +66,108 @@ export function WorkspaceLayoutSkeleton({
 
   if (singlePane) {
     return (
-      <section className="flex min-w-0 flex-1 flex-col">
+      <section class="flex min-w-0 flex-1 flex-col">
         {singlePaneView === 'workspace' ? workspacePane : sidebarPane}
       </section>
     )
   }
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col">
+    <section class="flex min-w-0 flex-1 flex-col">
       <WorkspaceSplitLayout mode="split" sidebarPane={sidebarPane} workspacePane={workspacePane} />
     </section>
   )
 }
 
-export function WorkspacePaneSkeleton({ toolbarTrafficLightOffset = false }: { toolbarTrafficLightOffset?: boolean }) {
-  const compact = useIsCompactUi()
-  return (
-    <section
-      data-testid="workspace-pane-skeleton"
-      aria-busy="true"
-      className="flex min-h-0 flex-1 flex-col bg-background"
-    >
-      <WorkspaceToolbar draggable={!compact} trafficLightOffset={toolbarTrafficLightOffset} aria-hidden="true">
-        <WorkspaceToolbarLeadingSpacer reserve={toolbarTrafficLightOffset} />
-        <WorkspaceToolbarContent>
-          <WorkspaceToolbarPrimary>
-            {compact ? (
-              <>
-                <Skeleton data-testid="workspace-pane-skeleton-back" className="h-7 w-7 shrink-0" />
-                <Skeleton
-                  data-testid="workspace-pane-skeleton-tab"
-                  className={WORKSPACE_PANE_TAB_COMPACT_GEOMETRY_CLASS}
-                />
-                <Skeleton data-testid="workspace-pane-skeleton-switcher" className="h-7 w-7 shrink-0" />
-              </>
-            ) : (
-              Array.from({ length: 2 }, (_, index) => (
-                <Skeleton
-                  key={index}
-                  data-testid="workspace-pane-skeleton-tab"
-                  className={WORKSPACE_PANE_TAB_EXPANDED_GEOMETRY_CLASS}
-                />
-              ))
-            )}
-          </WorkspaceToolbarPrimary>
-          <WorkspaceToolbarActions aria-hidden="true" />
-        </WorkspaceToolbarContent>
-      </WorkspaceToolbar>
+export const WorkspacePaneSkeleton = defineComponent(
+  (props: { toolbarTrafficLightOffset?: boolean }) => {
+    const compact = useIsCompactUi()
+    return () => (
+      <section
+        data-testid="workspace-pane-skeleton"
+        aria-busy="true"
+        class="flex min-h-0 flex-1 flex-col bg-background"
+      >
+        <WorkspaceToolbar
+          draggable={!compact.value}
+          trafficLightOffset={!!props.toolbarTrafficLightOffset}
+          aria-hidden="true"
+        >
+          <WorkspaceToolbarLeadingSpacer reserve={!!props.toolbarTrafficLightOffset} />
+          <WorkspaceToolbarContent>
+            <WorkspaceToolbarPrimary>
+              {compact.value ? (
+                <>
+                  <Skeleton data-testid="workspace-pane-skeleton-back" class="h-7 w-7 shrink-0" />
+                  <Skeleton
+                    data-testid="workspace-pane-skeleton-tab"
+                    class={WORKSPACE_PANE_TAB_COMPACT_GEOMETRY_CLASS}
+                  />
+                  <Skeleton data-testid="workspace-pane-skeleton-switcher" class="h-7 w-7 shrink-0" />
+                </>
+              ) : (
+                Array.from({ length: 2 }, (_, index) => (
+                  <Skeleton
+                    key={index}
+                    data-testid="workspace-pane-skeleton-tab"
+                    class={WORKSPACE_PANE_TAB_EXPANDED_GEOMETRY_CLASS}
+                  />
+                ))
+              )}
+            </WorkspaceToolbarPrimary>
+            <WorkspaceToolbarActions aria-hidden="true" />
+          </WorkspaceToolbarContent>
+        </WorkspaceToolbar>
 
-      <div className="flex min-h-0 flex-1 flex-col" aria-hidden="true">
-        <WorkspaceStatusSkeleton rows={8} />
-      </div>
-    </section>
-  )
-}
+        <div class="flex min-h-0 flex-1 flex-col" aria-hidden="true">
+          <WorkspaceStatusSkeleton rows={8} />
+        </div>
+      </section>
+    )
+  },
+  { name: 'WorkspacePaneSkeleton', props: { toolbarTrafficLightOffset: Boolean } },
+)
 
 export function EmptyWorkspacePaneSkeleton() {
   return (
-    <section data-testid="empty-workspace-pane-skeleton" className="flex min-h-0 flex-1 flex-col bg-background">
-      <div className="flex flex-1 items-center justify-center p-6 text-center">
-        <Skeleton className="mx-auto h-4 w-32" />
+    <section data-testid="empty-workspace-pane-skeleton" class="flex min-h-0 flex-1 flex-col bg-background">
+      <div class="flex flex-1 items-center justify-center p-6 text-center">
+        <Skeleton class="mx-auto h-4 w-32" />
       </div>
     </section>
   )
 }
 
-function SkeletonList({
-  rows,
-  className = 'flex-1 divide-y divide-separator',
-  renderRow,
-}: {
+interface SkeletonListProps {
   rows: number
-  className?: string
-  renderRow: (index: number) => ReactNode
-}) {
+  class?: string
+  renderRow: (index: number) => VNodeChild
+}
+
+const SkeletonList: FunctionalComponent<SkeletonListProps> = ({
+  rows,
+  class: classValue = 'flex-1 divide-y divide-separator',
+  renderRow,
+}) => {
   return (
-    <ul className={className} aria-hidden="true">
+    <ul class={classValue} aria-hidden="true">
       {Array.from({ length: rows }).map((_, i) => renderRow(i))}
     </ul>
   )
 }
+SkeletonList.props = ['rows', 'class', 'renderRow']
+SkeletonList.inheritAttrs = false
 
 function BranchNavigatorSkeletonRow() {
   return (
-    <li className={`${BRANCH_ROW_GRID_CLASS} bg-muted/30`}>
-      <div className={`${BRANCH_ROW_CONTENT_CLASS} gap-3`}>
-        <Skeleton className="h-4 w-4 rounded-full" />
-        <Skeleton className="h-4 w-3/5" />
+    <li class={`${BRANCH_ROW_GRID_CLASS} bg-muted/30`}>
+      <div class={`${BRANCH_ROW_CONTENT_CLASS} gap-3`}>
+        <Skeleton class="h-4 w-4 rounded-full" />
+        <Skeleton class="h-4 w-3/5" />
       </div>
-      <div className={BRANCH_ROW_ACTION_SLOT_CLASS}>
-        <div className={BRANCH_ROW_ACTION_BOX_CLASS} data-testid="branch-navigator-skeleton-action">
-          <Skeleton className="h-6 w-7" />
+      <div class={BRANCH_ROW_ACTION_SLOT_CLASS}>
+        <div class={BRANCH_ROW_ACTION_BOX_CLASS} data-testid="branch-navigator-skeleton-action">
+          <Skeleton class="h-6 w-7" />
         </div>
       </div>
     </li>
@@ -168,7 +176,7 @@ function BranchNavigatorSkeletonRow() {
 
 function WorkspaceStatusSkeleton({ rows }: { rows: number }) {
   return (
-    <div className={STATUS_ROWS_CLASS} aria-hidden="true">
+    <div class={STATUS_ROWS_CLASS} aria-hidden="true">
       {Array.from({ length: rows }, (_, index) => (
         <WorkspaceStatusSkeletonRow key={index} />
       ))}
@@ -178,12 +186,12 @@ function WorkspaceStatusSkeleton({ rows }: { rows: number }) {
 
 function WorkspaceStatusSkeletonRow() {
   return (
-    <div data-testid="workspace-status-skeleton-row" className={STATUS_ROW_LAYOUT_CLASS}>
-      <div className="flex size-5 items-center justify-center">
-        <Skeleton className="size-3.5 rounded-sm" />
+    <div data-testid="workspace-status-skeleton-row" class={STATUS_ROW_LAYOUT_CLASS}>
+      <div class="flex size-5 items-center justify-center">
+        <Skeleton class="size-3.5 rounded-sm" />
       </div>
-      <Skeleton className="h-3 w-14 rounded-sm" />
-      <Skeleton className="h-5 w-2/5 rounded-sm" />
+      <Skeleton class="h-3 w-14 rounded-sm" />
+      <Skeleton class="h-5 w-2/5 rounded-sm" />
     </div>
   )
 }

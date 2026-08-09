@@ -9,10 +9,9 @@ import { UnavailableWorkspaceView } from '#/web/components/UnavailableWorkspaceV
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 
-vi.mock('#/web/stores/i18n.ts', () => ({ useT: () => (key: string) => key }))
 vi.mock('#/web/app-navigation.tsx', () => ({
   useAppNavigation: () => ({
     closeWorkspace: vi.fn(async () => ({ ok: true })),
@@ -39,10 +38,8 @@ describe('UnavailableWorkspaceView Retry', () => {
     const workspace = emptyWorkspace(remoteWorkspaceId, 'workspace-runtime-remote')
     if (workspace.admission.kind !== 'remote') throw new Error('expected remote admission')
     workspace.admission.lifecycle = { kind: 'failed', reason: 'unreachable' }
-    const retry = vi
-      .spyOn(useWorkspacesStore.getState(), 'retryRemoteWorkspaceConnection')
-      .mockResolvedValue({ ok: true })
-    useWorkspacesStore.setState({
+    const retry = vi.spyOn(workspacesStore.getState(), 'retryRemoteWorkspaceConnection').mockResolvedValue({ ok: true })
+    workspacesStore.setState({
       workspaces: { [remoteWorkspaceId]: workspace },
       workspaceOrder: [remoteWorkspaceId],
     })
@@ -61,10 +58,10 @@ describe('UnavailableWorkspaceView Retry', () => {
     workspace.admission.lifecycle = { kind: 'failed', reason: 'unreachable' }
     const firstRetry = Promise.withResolvers<{ ok: true }>()
     const retry = vi
-      .spyOn(useWorkspacesStore.getState(), 'retryRemoteWorkspaceConnection')
+      .spyOn(workspacesStore.getState(), 'retryRemoteWorkspaceConnection')
       .mockReturnValueOnce(firstRetry.promise)
       .mockResolvedValueOnce({ ok: true })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [remoteWorkspaceId]: workspace },
       workspaceOrder: [remoteWorkspaceId],
     })
@@ -87,10 +84,8 @@ describe('UnavailableWorkspaceView Retry', () => {
       status: 'unavailable',
       reason: 'error.workspace-path-not-found',
     })
-    const retry = vi
-      .spyOn(useWorkspacesStore.getState(), 'retryRemoteWorkspaceConnection')
-      .mockResolvedValue({ ok: true })
-    useWorkspacesStore.setState({
+    const retry = vi.spyOn(workspacesStore.getState(), 'retryRemoteWorkspaceConnection').mockResolvedValue({ ok: true })
+    workspacesStore.setState({
       workspaces: { [localWorkspaceId]: workspace },
       workspaceOrder: [localWorkspaceId],
     })
@@ -100,7 +95,7 @@ describe('UnavailableWorkspaceView Retry', () => {
 
     await vi.waitFor(() =>
       expect(runWorkspaceRefresh).toHaveBeenCalledWith(
-        { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
+        { get: workspacesStore.getState, set: workspacesStore.setState },
         localWorkspaceId,
         { workspaceRuntimeId: 'workspace-runtime-local' },
       ),
@@ -125,10 +120,8 @@ describe('UnavailableWorkspaceView Retry', () => {
       status: 'unavailable',
       reason: 'error.workspace-transport-unavailable',
     })
-    const retry = vi
-      .spyOn(useWorkspacesStore.getState(), 'retryRemoteWorkspaceConnection')
-      .mockResolvedValue({ ok: true })
-    useWorkspacesStore.setState({
+    const retry = vi.spyOn(workspacesStore.getState(), 'retryRemoteWorkspaceConnection').mockResolvedValue({ ok: true })
+    workspacesStore.setState({
       workspaces: { [remoteWorkspaceId]: workspace },
       workspaceOrder: [remoteWorkspaceId],
     })

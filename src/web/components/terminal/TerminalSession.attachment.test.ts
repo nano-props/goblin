@@ -142,6 +142,11 @@ describe('TerminalSession attachment and presentation', () => {
     attach.resolve(attachResult('pty_session_1_aaaaaaaaa'))
     await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
     expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
+
+    term.emitRender(1, term.rows - 1)
+    await flushMicrotasks()
+    expect(host.querySelector<HTMLElement>('.goblin-managed-terminal-frame')?.style.visibility).toBe('hidden')
+
     await flushTerminalStart()
 
     expect(term.refresh).toHaveBeenCalledWith(0, 29)

@@ -27,7 +27,7 @@ const geometryMocks = terminalGeometryMocks()
 beforeEach(resetTerminalSessionHarness)
 
 describe('TerminalSession input, resize, and controller authority', () => {
-  test('publishes changed Composer session state without notifying for accepted no-ops', () => {
+  test('publishes changed Composer session state without notifying for accepted no-ops', async () => {
     const notify = vi.fn()
     const session = new TerminalSession(descriptor, notify)
 

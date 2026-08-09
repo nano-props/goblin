@@ -1,27 +1,22 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/vue-query'
+import { defineComponent } from 'vue'
 import { afterEach, describe, expect, test } from 'vitest'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
-  type WorkspacePaneTabDragPreviewInput,
-  type WorkspacePaneTabDragPreviewState,
   useWorkspacePaneTabDragPreview,
+  type WorkspacePaneTabDragPreviewState,
 } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 
-const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-drag-preview-repo')
-const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
-const NEXT_WORKSPACE_RUNTIME_ID = 'repo-runtime-next'
-const BRANCH_NAME = 'feature/worktree'
+const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-drag-preview')
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-drag-preview'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-drag-preview-worktree'
-
 let controls: WorkspacePaneTabDragPreviewState | null = null
 
 afterEach(() => {
@@ -29,210 +24,124 @@ afterEach(() => {
 })
 
 describe('useWorkspacePaneTabDragPreview', () => {
-  test('stages reordered tabs synchronously for drag layout only', () => {
+  test('owns one visual preview until its reorder transaction settles', async () => {
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
-    renderPreviewHook({ canonicalTabs: sourceTabs })
+    const reorderedTabs = [...sourceTabs].reverse()
+    renderPreviewHook(sourceTabs)
 
-    expect(currentControls().visualTabs).toEqual(sourceTabs)
+    const release = currentControls().stageDragPreview(reorderedTabs)
 
-    act(() => {
-      expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true)
-    })
+    expect(release).toEqual(expect.any(Function))
+    expect(currentControls().visualTabs.value).toEqual(reorderedTabs)
 
-    expect(currentControls().visualTabs).toEqual(reorderedTabs)
+    await flushTestUpdates(() => release?.())
+
+    expect(currentControls().visualTabs.value).toEqual(sourceTabs)
   })
 
-  test('does not mutate workspace pane tabs query cache', () => {
+  test('does not mutate the authoritative workspace-pane query cache', () => {
     const queryClient = new QueryClient()
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
+    const reorderedTabs = [...sourceTabs].reverse()
     setWorkspacePaneTabsForTargetQueryData(
       {
-        kind: 'git-worktree' as const,
-        workspaceId: REPO_ROOT,
+        kind: 'git-worktree',
+        workspaceId: WORKSPACE_ID,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         worktreePath: WORKTREE_PATH,
         tabs: sourceTabs,
       },
       queryClient,
     )
-    renderPreviewHook({ canonicalTabs: sourceTabs })
+    renderPreviewHook(sourceTabs)
 
-    act(() => {
-      expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true)
-    })
+    currentControls().stageDragPreview(reorderedTabs)
 
-    expect(currentControls().visualTabs).toEqual(reorderedTabs)
-    expect(readWorkspacePaneTabsFromQueryCache(queryClient)).toEqual(sourceTabs)
+    expect(currentControls().visualTabs.value).toEqual(reorderedTabs)
+    expect(
+      readWorkspacePaneTabsForTarget(
+        {
+          kind: 'git-worktree',
+          workspaceId: WORKSPACE_ID,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          worktreePath: WORKTREE_PATH,
+        },
+        queryClient,
+      ),
+    ).toEqual(sourceTabs)
     queryClient.clear()
   })
 
-  test('clears the visual preview when canonical tabs catch up', () => {
+  test('cannot resurrect a settled preview after canonical tabs change again', async () => {
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
-    const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
+    const reorderedTabs = [...sourceTabs].reverse()
+    const rendered = renderPreviewHook(sourceTabs)
+    const release = currentControls().stageDragPreview(reorderedTabs)
 
-    act(() => {
-      expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true)
-    })
-    expect(currentControls().visualTabs).toEqual(reorderedTabs)
+    await rendered.rerender(<HookHost canonicalTabs={reorderedTabs} />)
+    release?.()
+    await rendered.rerender(<HookHost canonicalTabs={sourceTabs} />)
 
-    act(() => {
-      renderResult.rerender(<HookHost input={previewInput({ canonicalTabs: reorderedTabs })} />)
-    })
-
-    expect(currentControls().visualTabs).toEqual(reorderedTabs)
+    expect(currentControls().visualTabs.value).toEqual(sourceTabs)
   })
 
-  test('does not stage a preview when the reorder is a no-op or has no tab target', () => {
-    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
-    const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
+  test('an older reorder settlement cannot clear a newer preview lease', async () => {
+    const sourceTabs = [staticEntry('status'), staticEntry('files'), staticEntry('history')]
+    const firstTabs = [staticEntry('files'), staticEntry('status'), staticEntry('history')]
+    const secondTabs = [staticEntry('history'), staticEntry('files'), staticEntry('status')]
+    renderPreviewHook(sourceTabs)
 
-    act(() => {
-      expect(currentControls().stageDragPreview([...sourceTabs])).toBe(false)
-    })
-    expect(currentControls().visualTabs).toEqual(sourceTabs)
+    const releaseFirst = currentControls().stageDragPreview(firstTabs)
+    const releaseSecond = currentControls().stageDragPreview(secondTabs)
+    await flushTestUpdates(() => releaseFirst?.())
 
-    act(() => {
-      renderResult.rerender(<HookHost input={previewInput({ branchName: null, canonicalTabs: sourceTabs })} />)
-    })
-    act(() => {
-      expect(
-        currentControls().stageDragPreview([staticEntry('status'), terminalEntry('term-111111111111111111111')]),
-      ).toBe(false)
-    })
-    expect(currentControls().visualTabs).toEqual(sourceTabs)
+    expect(currentControls().visualTabs.value).toEqual(secondTabs)
+
+    await flushTestUpdates(() => releaseSecond?.())
+
+    expect(currentControls().visualTabs.value).toEqual(sourceTabs)
   })
 
-  test('stages and clears a workspace-root preview without a branch sentinel', () => {
+  test('does not create a lease for a no-op reorder', () => {
+    const sourceTabs = [staticEntry('status'), staticEntry('files')]
+    renderPreviewHook(sourceTabs)
+
+    expect(currentControls().stageDragPreview([...sourceTabs])).toBeNull()
+    expect(currentControls().visualTabs.value).toEqual(sourceTabs)
+  })
+
+  test('a keyed target owner discards its preview when navigation leaves and returns', async () => {
     const sourceTabs = [staticEntry('status'), staticEntry('files')]
     const reorderedTabs = [...sourceTabs].reverse()
-    renderPreviewHook({ kind: 'workspace-root', canonicalTabs: sourceTabs })
+    const rendered = renderInJsdom(<KeyedHookHost targetKey="target-a" canonicalTabs={sourceTabs} />)
+    currentControls().stageDragPreview(reorderedTabs)
+    expect(currentControls().visualTabs.value).toEqual(reorderedTabs)
 
-    act(() => expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true))
-    expect(currentControls().visualTabs).toEqual(reorderedTabs)
+    await rendered.rerender(<KeyedHookHost targetKey="target-b" canonicalTabs={sourceTabs} />)
+    expect(currentControls().visualTabs.value).toEqual(sourceTabs)
 
-    act(() => currentControls().clearDragPreview())
-    expect(currentControls().visualTabs).toEqual(sourceTabs)
-  })
-
-  test('keeps a staged preview when only a worktree target branch changes', () => {
-    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
-    const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
-
-    act(() => {
-      expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true)
-    })
-    expect(currentControls().visualTabs).toEqual(reorderedTabs)
-
-    act(() => {
-      renderResult.rerender(
-        <HookHost input={previewInput({ branchName: 'feature/other', canonicalTabs: sourceTabs })} />,
-      )
-    })
-
-    expect(currentControls().visualTabs).toEqual(reorderedTabs)
-  })
-
-  test('clears a staged preview when the tab target identity changes', () => {
-    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
-    const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
-
-    act(() => {
-      expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true)
-    })
-    expect(currentControls().visualTabs).toEqual(reorderedTabs)
-
-    act(() => {
-      renderResult.rerender(
-        <HookHost
-          input={previewInput({
-            worktreePath: '/tmp/workspace-pane-tab-drag-preview-other',
-            canonicalTabs: sourceTabs,
-          })}
-        />,
-      )
-    })
-
-    expect(currentControls().visualTabs).toEqual(sourceTabs)
-  })
-
-  test('clears a staged preview when the workspace runtime changes', () => {
-    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
-    const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
-
-    act(() => {
-      expect(currentControls().stageDragPreview(reorderedTabs)).toBe(true)
-    })
-    expect(currentControls().visualTabs).toEqual(reorderedTabs)
-
-    act(() => {
-      renderResult.rerender(
-        <HookHost
-          input={previewInput({
-            workspaceRuntimeId: NEXT_WORKSPACE_RUNTIME_ID,
-            canonicalTabs: sourceTabs,
-          })}
-        />,
-      )
-    })
-
-    expect(currentControls().visualTabs).toEqual(sourceTabs)
+    await rendered.rerender(<KeyedHookHost targetKey="target-a" canonicalTabs={sourceTabs} />)
+    expect(currentControls().visualTabs.value).toEqual(sourceTabs)
   })
 })
 
-interface PreviewInputOverrides {
-  kind?: 'workspace-root' | 'inactive'
-  workspaceId?: WorkspaceId
-  workspaceRuntimeId?: string
-  branchName?: string | null
-  worktreePath?: string | null
-  canonicalTabs?: readonly WorkspacePaneTabEntry[]
-}
+const HookHost = defineComponent(
+  (props: { canonicalTabs: readonly WorkspacePaneTabEntry[] }) => {
+    controls = useWorkspacePaneTabDragPreview(() => props.canonicalTabs)
+    return () => null
+  },
+  { name: 'WorkspacePaneTabDragPreviewHarness', props: ['canonicalTabs'] },
+)
 
-function renderPreviewHook(input: PreviewInputOverrides = {}) {
-  return renderInJsdom(<HookHost input={previewInput(input)} />)
-}
+const KeyedHookHost = defineComponent(
+  (props: { targetKey: string; canonicalTabs: readonly WorkspacePaneTabEntry[] }) => () => (
+    <HookHost key={props.targetKey} canonicalTabs={props.canonicalTabs} />
+  ),
+  { name: 'KeyedWorkspacePaneTabDragPreviewHarness', props: ['targetKey', 'canonicalTabs'] },
+)
 
-function previewInput(input: PreviewInputOverrides = {}): WorkspacePaneTabDragPreviewInput {
-  const workspaceId = input.workspaceId ?? REPO_ROOT
-  const workspaceRuntimeId = input.workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID
-  const canonicalTabs = input.canonicalTabs ?? []
-  if (input.kind === 'workspace-root') {
-    return {
-      kind: 'workspace-root',
-      workspaceId,
-      workspaceRuntimeId,
-
-      canonicalTabs,
-    }
-  }
-  if (input.kind === 'inactive' || input.branchName === null) {
-    return {
-      kind: 'inactive',
-      workspaceId,
-      workspaceRuntimeId,
-      branchName: null,
-      worktreePath: null,
-      canonicalTabs,
-    }
-  }
-  return {
-    kind: 'git-worktree',
-    workspaceId,
-    workspaceRuntimeId,
-    worktreePath: input.worktreePath ?? WORKTREE_PATH,
-    canonicalTabs,
-  }
-}
-
-function HookHost({ input }: { input: WorkspacePaneTabDragPreviewInput }) {
-  controls = useWorkspacePaneTabDragPreview(input)
-  return null
+function renderPreviewHook(canonicalTabs: readonly WorkspacePaneTabEntry[]) {
+  return renderInJsdom(<HookHost canonicalTabs={canonicalTabs} />)
 }
 
 function currentControls(): WorkspacePaneTabDragPreviewState {
@@ -240,22 +149,10 @@ function currentControls(): WorkspacePaneTabDragPreviewState {
   return controls
 }
 
-function readWorkspacePaneTabsFromQueryCache(queryClient: QueryClient): WorkspacePaneTabEntry[] {
-  return readWorkspacePaneTabsForTarget(
-    {
-      kind: 'git-worktree' as const,
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      worktreePath: WORKTREE_PATH,
-    },
-    queryClient,
-  )
-}
-
-function terminalEntry(sessionId: string): WorkspacePaneTabEntry {
-  return workspacePaneRuntimeTabEntry('terminal', sessionId)
-}
-
-function staticEntry(type: Parameters<typeof workspacePaneStaticTabEntry>[0]): WorkspacePaneTabEntry {
+function staticEntry(type: 'status' | 'files' | 'history'): WorkspacePaneTabEntry {
   return workspacePaneStaticTabEntry(type)
+}
+
+function terminalEntry(id: string): WorkspacePaneTabEntry {
+  return workspacePaneRuntimeTabEntry('terminal', id)
 }

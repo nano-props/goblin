@@ -51,25 +51,25 @@ describe('applyApiSecurityHeaders', () => {
 describe('buildCorsOriginPredicate', () => {
   const predicate = buildCorsOriginPredicate('127.0.0.1', 32100)
 
-  test('allows loopback on the same port', () => {
+  test('allows loopback on the same port', async () => {
     expect(predicate('http://localhost:32100')).toBe(true)
     expect(predicate('http://127.0.0.1:32100')).toBe(true)
     expect(predicate('http://[::1]:32100')).toBe(true)
   })
 
-  test('rejects a different port', () => {
+  test('rejects a different port', async () => {
     expect(predicate('http://localhost:8080')).toBe(false)
   })
 
-  test('rejects a different host', () => {
+  test('rejects a different host', async () => {
     expect(predicate('http://attacker.example:32100')).toBe(false)
   })
 
-  test('rejects a malformed origin', () => {
+  test('rejects a malformed origin', async () => {
     expect(predicate('not-a-url')).toBe(false)
   })
 
-  test('allows an absent origin (Electron IPC, same-origin fetches)', () => {
+  test('allows an absent origin (Electron IPC, same-origin fetches)', async () => {
     expect(predicate(undefined)).toBe(true)
   })
 })
@@ -77,15 +77,15 @@ describe('buildCorsOriginPredicate', () => {
 describe('buildCorsOriginPredicate with a specific LAN bind host', () => {
   const predicate = buildCorsOriginPredicate('192.168.1.5', 32100)
 
-  test('allows the bind host on the same port', () => {
+  test('allows the bind host on the same port', async () => {
     expect(predicate('http://192.168.1.5:32100')).toBe(true)
   })
 
-  test('still allows loopback on the same port', () => {
+  test('still allows loopback on the same port', async () => {
     expect(predicate('http://localhost:32100')).toBe(true)
   })
 
-  test('rejects other LAN hosts on the same port', () => {
+  test('rejects other LAN hosts on the same port', async () => {
     // A specific bind address is the only LAN allow entry — the
     // operator is responsible for choosing a specific bind address
     // when they want to expose the server on a particular network.
@@ -96,17 +96,17 @@ describe('buildCorsOriginPredicate with a specific LAN bind host', () => {
 describe('buildCorsOriginPredicate with a wildcard bind host', () => {
   const predicate = buildCorsOriginPredicate('0.0.0.0', 32100)
 
-  test('allows loopback on the same port', () => {
+  test('allows loopback on the same port', async () => {
     expect(predicate('http://localhost:32100')).toBe(true)
     expect(predicate('http://127.0.0.1:32100')).toBe(true)
   })
 
-  test('allows any LAN host on the same port — wildcard bind is explicit cross-network access', () => {
+  test('allows any LAN host on the same port — wildcard bind is explicit cross-network access', async () => {
     expect(predicate('http://192.168.1.5:32100')).toBe(true)
     expect(predicate('http://10.0.0.7:32100')).toBe(true)
   })
 
-  test('still rejects a different port', () => {
+  test('still rejects a different port', async () => {
     expect(predicate('http://192.168.1.5:8080')).toBe(false)
   })
 })

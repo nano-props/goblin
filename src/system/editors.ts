@@ -73,7 +73,7 @@
 //            (mocks `getEditorAppAvailability` directly)
 //      If a new mock site is added, add it to this list too.
 
-import type { EditorAppAvailability, EditorApp } from '#/shared/api-types.ts'
+import type { EditorAppAvailability, EditorApp } from '#/shared/settings.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import { isVSCodeInstalled, openInVSCode, openRemoteInVSCode } from '#/system/vscode.ts'
 

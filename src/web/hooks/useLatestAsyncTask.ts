@@ -1,53 +1,41 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { onScopeDispose, readonly, ref } from 'vue'
+import type { Ref } from 'vue'
 
 export type LatestAsyncTaskResult<T> = { status: 'current'; value: T } | { status: 'stale' }
 
-/**
- * Latest-wins async task helper.
- *
- * Each new run supersedes the previous one. When an older task eventually
- * settles, its result is reported as `stale` so callers can skip applying it.
- * This is useful for dialogs and forms whose newest submission/open cycle
- * should own pending/error state.
- */
-export function useLatestAsyncTask() {
-  const [pending, setPending] = useState(false)
-  const currentTaskIdRef = useRef(0)
-  const mountedRef = useRef(true)
+/** Latest-wins async task state for forms and replaceable projections. */
+export function useLatestAsyncTask(): {
+  pending: Readonly<Ref<boolean>>
+  reset: () => void
+  runLatest: <T>(fn: () => Promise<T>) => Promise<LatestAsyncTaskResult<T>>
+} {
+  const pending = ref(false)
+  let currentTaskId = 0
+  let disposed = false
 
-  useEffect(() => {
-    mountedRef.current = true
-    return () => {
-      mountedRef.current = false
-    }
-  }, [])
+  onScopeDispose(() => {
+    disposed = true
+  })
 
-  // Locally supersede any in-flight task and clear pending UI state. This does
-  // not abort the underlying async work; it only invalidates its eventual
-  // result for this hook consumer.
-  const reset = useCallback(() => {
-    currentTaskIdRef.current += 1
-    if (mountedRef.current) setPending(false)
-  }, [])
+  function reset(): void {
+    currentTaskId += 1
+    if (!disposed) pending.value = false
+  }
 
-  const runLatest = useCallback(async <T>(fn: () => Promise<T>): Promise<LatestAsyncTaskResult<T>> => {
-    const taskId = currentTaskIdRef.current + 1
-    currentTaskIdRef.current = taskId
-    setPending(true)
+  async function runLatest<T>(fn: () => Promise<T>): Promise<LatestAsyncTaskResult<T>> {
+    currentTaskId += 1
+    const taskId = currentTaskId
+    pending.value = true
     try {
       const value = await fn()
-      return currentTaskIdRef.current === taskId ? { status: 'current', value } : { status: 'stale' }
-    } catch (err) {
-      if (currentTaskIdRef.current !== taskId) return { status: 'stale' }
-      throw err
+      return currentTaskId === taskId ? { status: 'current', value } : { status: 'stale' }
+    } catch (error) {
+      if (currentTaskId !== taskId) return { status: 'stale' }
+      throw error
     } finally {
-      if (currentTaskIdRef.current === taskId && mountedRef.current) setPending(false)
+      if (currentTaskId === taskId && !disposed) pending.value = false
     }
-  }, [])
-
-  return {
-    pending,
-    reset,
-    runLatest,
   }
+
+  return { pending: readonly(pending), reset, runLatest }
 }

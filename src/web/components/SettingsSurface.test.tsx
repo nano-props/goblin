@@ -1,17 +1,20 @@
 // @vitest-environment jsdom
-import { act, waitFor } from '@testing-library/react'
+import { waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/vue-query'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { SettingsSurface } from '#/web/components/SettingsSurface.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import type { VNode } from 'vue'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
@@ -55,7 +58,7 @@ function defaultIpcResult(path: string, input?: unknown) {
   return null
 }
 
-vi.mock('sonner', () => ({
+vi.mock('vue-sonner', () => ({
   toast: {
     success: toastMocks.success,
     error: toastMocks.error,
@@ -94,9 +97,9 @@ beforeEach(() => {
   fetchMock.mockClear()
   // Host info used to live in the bootstrap payload; it now lives
   // on the public `/api/host` endpoint and the client-side
-  // `useHostInfoStore`. Seed the store directly so tests don't
+  // `hostInfoStore`. Seed the store directly so tests don't
   // have to mock `fetch('/api/host')` for every scenario.
-  useHostInfoStore.setState({
+  hostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
     status: 'ready',
     error: null,
@@ -126,6 +129,14 @@ afterEach(() => {
 })
 
 describe('SettingsSurface', () => {
+  test('focuses the selected settings row on initial mount', async () => {
+    const { container } = render(<SettingsSurface page="general" onPageChange={() => {}} />)
+    const general = container.querySelector('button[aria-label="settings.group.general"]')
+    if (!(general instanceof HTMLButtonElement)) throw new Error('missing general settings nav row')
+
+    await waitFor(() => expect(document.activeElement).toBe(general))
+  })
+
   test('does not show the removed workspace layout selector on the general page', async () => {
     const { container } = render(<SettingsSurface page="general" onPageChange={() => {}} />)
 
@@ -134,7 +145,7 @@ describe('SettingsSurface', () => {
     expect(container.textContent).not.toContain('settings.workspace-layout-hint')
   })
 
-  test('keeps settings navigation selected state and page changes wired', () => {
+  test('keeps settings navigation selected state and page changes wired', async () => {
     const onPageChange = vi.fn()
     const { container } = render(
       <SettingsSurface page="general" onPageChange={onPageChange} autoFocusSelected={false} />,
@@ -146,7 +157,7 @@ describe('SettingsSurface', () => {
 
     const shortcuts = container.querySelector('button[aria-label="settings.nav.shortcuts"]')
     if (!(shortcuts instanceof HTMLButtonElement)) throw new Error('missing shortcuts settings nav row')
-    act(() => {
+    await flushTestUpdates(() => {
       shortcuts.click()
     })
     expect(onPageChange).toHaveBeenCalledWith('shortcuts')
@@ -155,7 +166,7 @@ describe('SettingsSurface', () => {
   test('can trigger a test terminal notification from settings', async () => {
     const { container } = render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 
-    act(() => {
+    await flushTestUpdates(() => {
       buttonByText(container, 'settings.terminal-notifications-test-button').click()
     })
 
@@ -173,7 +184,7 @@ describe('SettingsSurface', () => {
     sendTestNotification.mockResolvedValueOnce(false)
     const { container } = render(<SettingsSurface page="notifications" onPageChange={() => {}} />)
 
-    act(() => {
+    await flushTestUpdates(() => {
       buttonByText(container, 'settings.terminal-notifications-test-button').click()
     })
 
@@ -223,7 +234,7 @@ describe('SettingsSurface', () => {
   test('refreshes GitHub CLI detection from settings', async () => {
     const { container } = render(<SettingsSurface page="github" onPageChange={() => {}} />)
 
-    act(() => {
+    await flushTestUpdates(() => {
       buttonByText(container, 'settings.github.refresh').click()
     })
 
@@ -272,7 +283,7 @@ describe('SettingsSurface', () => {
   })
 })
 
-function render(element: React.ReactNode) {
+function render(element: VNode) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -281,7 +292,7 @@ function render(element: React.ReactNode) {
       },
     },
   })
-  return renderInJsdom(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>)
+  return renderInJsdom(<VueQueryClientScope client={queryClient}>{element}</VueQueryClientScope>)
 }
 
 async function waitForText(container: HTMLElement, text: string) {

@@ -7,10 +7,10 @@ import {
   createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
 import type { RepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
-import { act } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { ReactNode } from 'react'
+import { defineComponent, ref } from 'vue'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -18,9 +18,9 @@ import type { ExecResult } from '#/shared/git-types.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { requireGitWorkspaceClientState } from '#/web/stores/workspaces/git-workspace-client-state.ts'
-import { renderHookInJsdom } from '#/test-utils/render.tsx'
+import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 
 const mocks = vi.hoisted(() => ({
   getRepoPatch: vi.fn(),
@@ -91,8 +91,8 @@ describe('useBranchActions', () => {
 
     const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
-    await act(async () => {
-      await requiredAction(result.current.actions.openTerminal, 'openTerminal')('ghostty')
+    await flushTestUpdates(async () => {
+      await requiredAction(result.value.actions.openTerminal, 'openTerminal')('ghostty')
     })
 
     expect(mocks.openWorkspaceTerminal).toHaveBeenCalledWith(
@@ -119,8 +119,8 @@ describe('useBranchActions', () => {
     const { result: hookResult } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
     let result = false
-    await act(async () => {
-      result = await requiredAction(hookResult.current.actions.copyPatch, 'copyPatch')()
+    await flushTestUpdates(async () => {
+      result = await requiredAction(hookResult.value.actions.copyPatch, 'copyPatch')()
     })
 
     expect(result).toBe(true)
@@ -143,14 +143,14 @@ describe('useBranchActions', () => {
       const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
       let copied = true
-      await act(async () => {
-        copied = await requiredAction(result.current.actions.copyPatch, 'copyPatch')()
+      await flushTestUpdates(async () => {
+        copied = await requiredAction(result.value.actions.copyPatch, 'copyPatch')()
       })
 
       expect(copied).toBe(false)
       expect(mocks.getRepoPatch).not.toHaveBeenCalled()
       expect(
-        requireGitWorkspaceClientState(useWorkspacesStore.getState().workspaces[REPO_ID]!).events.at(-1),
+        requireGitWorkspaceClientState(workspacesStore.getState().workspaces[REPO_ID]!).events.at(-1),
       ).toMatchObject({
         kind: 'result',
         result: { ok: false, message: 'status.copy-patch-secure-context-required' },
@@ -196,8 +196,8 @@ describe('useBranchActions', () => {
 
     const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
-    await act(async () => {
-      await requiredAction(result.current.actions.openEditor, 'openEditor')('vscode')
+    await flushTestUpdates(async () => {
+      await requiredAction(result.value.actions.openEditor, 'openEditor')('vscode')
     })
 
     expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(
@@ -218,8 +218,8 @@ describe('useBranchActions', () => {
 
     const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
-    await act(async () => {
-      await requiredAction(result.current.actions.openTerminal, 'openTerminal')('ghostty')
+    await flushTestUpdates(async () => {
+      await requiredAction(result.value.actions.openTerminal, 'openTerminal')('ghostty')
     })
 
     expect(mocks.openWorkspaceTerminal).toHaveBeenCalledWith(
@@ -240,8 +240,8 @@ describe('useBranchActions', () => {
 
     const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
-    await act(async () => {
-      await requiredAction(result.current.actions.openEditor, 'openEditor')('vscode')
+    await flushTestUpdates(async () => {
+      await requiredAction(result.value.actions.openEditor, 'openEditor')('vscode')
     })
 
     expect(mocks.openWorkspaceEditor).toHaveBeenCalledWith(
@@ -262,8 +262,8 @@ describe('useBranchActions', () => {
 
     const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
 
-    await act(async () => {
-      await requiredAction(result.current.actions.openFinder, 'openFinder')()
+    await flushTestUpdates(async () => {
+      await requiredAction(result.value.actions.openFinder, 'openFinder')()
     })
 
     expect(mocks.openWorkspaceInFinder).toHaveBeenCalledWith(
@@ -286,30 +286,30 @@ describe('useBranchActions', () => {
     mocks.openWorkspaceTerminal.mockReturnValue(firstOpen.promise)
 
     const presentation = repoPresentationFromQueryForTest(repo)
-    const view = renderHookInJsdom(
-      ({ branchIndex }) => useBranchActions(presentation, presentation.snapshot.branches[branchIndex]!),
-      {
-        initialProps: { branchIndex: 0 },
-        wrapper: AppQueryClientProvider,
-      },
+    const branchIndex = ref(0)
+    const view = renderComposableInJsdom(
+      () => useBranchActions(presentation, () => presentation.snapshot.branches[branchIndex.value]!),
+      { wrapper: AppVueQueryClientScope },
     )
 
-    act(() => {
-      void requiredAction(view.result.current.actions.openTerminal, 'openTerminal')('ghostty')
+    await flushTestUpdates(() => {
+      void requiredAction(view.result.value.actions.openTerminal, 'openTerminal')('ghostty')
     })
-    await act(async () => {
+    await flushTestUpdates(async () => {
       await Promise.resolve()
     })
 
-    expect(view.result.current.busyAction).toBe('terminal')
-    expect(view.result.current.blocked).toBe(true)
+    expect(view.result.value.busyAction).toBe('terminal')
+    expect(view.result.value.blocked).toBe(true)
 
-    view.rerender({ branchIndex: 1 })
+    await flushTestUpdates(() => {
+      branchIndex.value = 1
+    })
 
-    expect(view.result.current.busyAction).toBeNull()
-    expect(view.result.current.blocked).toBe(false)
+    expect(view.result.value.busyAction).toBeNull()
+    expect(view.result.value.blocked).toBe(false)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       firstOpen.resolve({ ok: true, message: '' })
       await firstOpen.promise
     })
@@ -324,12 +324,14 @@ function worktreeTarget(workspaceId: WorkspaceId, workspaceRuntimeId: string, wo
 
 function renderBranchActions(repo: RepoPresentationForTest) {
   const branch = repo.snapshot.branches[0]!
-  return renderHookInJsdom(() => useBranchActions(repo, branch), { wrapper: AppQueryClientProvider })
+  return renderComposableInJsdom(() => useBranchActions(repo, branch), { wrapper: AppVueQueryClientScope })
 }
 
-function AppQueryClientProvider({ children }: { children: ReactNode }) {
-  return <QueryClientProvider client={appQueryClient}>{children}</QueryClientProvider>
-}
+const AppVueQueryClientScope = defineComponent(
+  (_props, { slots }) =>
+    () => <VueQueryClientScope client={appQueryClient}>{slots.default?.()}</VueQueryClientScope>,
+  { name: 'AppVueQueryClientScope' },
+)
 
 function requiredAction<T>(action: T | undefined, name: string): T {
   if (action === undefined) throw new Error(`${name} action unavailable in test fixture`)

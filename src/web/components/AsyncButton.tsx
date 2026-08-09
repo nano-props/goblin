@@ -1,31 +1,45 @@
-import type { ComponentProps, MouseEvent, ReactNode } from 'react'
+import { defineComponent } from 'vue'
+import type { PropType } from 'vue'
 import { Button } from '#/web/components/ui/button.tsx'
+import type { ButtonProps } from '#/web/components/ui/button.tsx'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
+
 interface AsyncButtonState {
   pending: boolean
   busy: boolean
 }
 
-type AsyncButtonProps = Omit<ComponentProps<typeof Button>, 'children' | 'onClick'> & {
+type AsyncButtonProps = Omit<ButtonProps, 'onClick'> & {
   loading?: boolean
-  onClick?: (event: MouseEvent<HTMLButtonElement>) => void | Promise<unknown>
-  children: ReactNode | ((state: AsyncButtonState) => ReactNode)
+  action?: (event: MouseEvent) => void | Promise<unknown>
 }
 
-export function AsyncButton({ children, disabled, loading = false, onClick, ...props }: AsyncButtonProps) {
-  const { isPending, run } = useAsyncPending<'click'>()
-  // `pending` is this button's own click promise and auto-disables to prevent
-  // double-submit. External `loading` is visual only; callers decide whether
-  // that work should also disable the button.
-  const busy = isPending || loading
+export const AsyncButton = defineComponent(
+  (props: AsyncButtonProps, { attrs, slots }) => {
+    const pendingState = useAsyncPending<'click'>()
 
-  function handleClick(event: MouseEvent<HTMLButtonElement>) {
-    void run('click', () => onClick?.(event))
-  }
+    function handleClick(event: MouseEvent): void {
+      void pendingState.run('click', () => props.action?.(event))
+    }
 
-  return (
-    <Button {...props} disabled={disabled || isPending} aria-busy={busy ? true : undefined} onClick={handleClick}>
-      {typeof children === 'function' ? children({ pending: isPending, busy }) : children}
-    </Button>
-  )
-}
+    return () => {
+      const pending = pendingState.isPending.value
+      const busy = pending || !!props.loading
+      const slotState: AsyncButtonState = { pending, busy }
+      return (
+        <Button {...attrs} disabled={props.disabled || pending} aria-busy={busy || undefined} onClick={handleClick}>
+          {slots.default?.(slotState)}
+        </Button>
+      )
+    }
+  },
+  {
+    name: 'AsyncButton',
+    inheritAttrs: false,
+    props: {
+      loading: Boolean,
+      disabled: Boolean,
+      action: Function as PropType<(event: MouseEvent) => void | Promise<unknown>>,
+    },
+  },
+)

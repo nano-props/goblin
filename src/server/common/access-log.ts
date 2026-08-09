@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 
 /**
  * Per-request access log. The server was previously silent about
@@ -17,7 +17,7 @@ export function accessLog(): MiddlewareHandler {
     const startedAt = performance.now()
     await next()
     const durationMs = Math.round((performance.now() - startedAt) * 100) / 100
-    serverLogger.debug(
+    serverNodeLog.debug(
       {
         method: c.req.method,
         path: c.req.path,

@@ -1,30 +1,26 @@
-import type { ReactNode } from 'react'
+import { defineComponent } from 'vue'
 
-export interface WorkspacePanePanelFrameProps {
-  id: string
-  labelledById?: string
-  label?: string
-  busy?: boolean
-  children: ReactNode
-}
-
-export function WorkspacePanePanelFrame({
-  id,
-  labelledById,
-  label,
-  busy = false,
-  children,
-}: WorkspacePanePanelFrameProps) {
-  return (
-    <div
-      id={id}
-      role="tabpanel"
-      aria-busy={busy || undefined}
-      aria-labelledby={labelledById}
-      aria-label={labelledById ? undefined : label}
-      className="flex min-h-0 flex-1 flex-col"
-    >
-      {children}
-    </div>
-  )
-}
+export const WorkspacePanePanelFrame = defineComponent(
+  (props: { id: string; labelledById?: string; label?: string; busy?: boolean }, { slots }) =>
+    () => (
+      <div
+        id={props.id}
+        role="tabpanel"
+        aria-busy={props.busy || undefined}
+        aria-labelledby={props.labelledById}
+        aria-label={props.labelledById ? undefined : props.label}
+        class="flex min-h-0 flex-1 flex-col"
+      >
+        {slots.default?.()}
+      </div>
+    ),
+  {
+    name: 'WorkspacePanePanelFrame',
+    props: {
+      id: { type: String, required: true },
+      labelledById: String,
+      label: String,
+      busy: Boolean,
+    },
+  },
+)

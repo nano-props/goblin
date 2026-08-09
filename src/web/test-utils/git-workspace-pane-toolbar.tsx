@@ -3,14 +3,16 @@ import {
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
-import { act } from '@testing-library/react'
-import type { ComponentProps, ReactNode } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { defineComponent } from 'vue'
+import type { VNode } from 'vue'
+import type { ComponentProps } from 'vue-component-type-helpers'
+import { QueryClient } from '@tanstack/vue-query'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
-import type * as WorkspaceExternalAppClient from '#/web/workspace-external-app-client.ts'
 import { workspaceExternalAppRecentKey, workspaceExternalAppTargetForWorktree } from '#/shared/workspace-settings.ts'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
 import {
@@ -29,8 +31,8 @@ import { useGitWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
-  TerminalSessionContext,
-  TerminalSessionReadContext,
+  TerminalSessionCommandScope,
+  TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   WorkspacePaneStaticTabType,
@@ -49,10 +51,11 @@ import type {
   TerminalDescriptor,
   TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
-import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import {
   terminalExecutionPath,
@@ -61,7 +64,7 @@ import {
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { RepoRemoteInfo } from '#/shared/git-types.ts'
@@ -116,33 +119,37 @@ export const toastMocks = hoistedToastMocks
 let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useIsCompactUi: () => hoistedToolbarResponsiveMocks.compactUi,
+  useIsCompactUi: () => ({
+    get value() {
+      return hoistedToolbarResponsiveMocks.compactUi
+    },
+  }),
 }))
 
 vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
-  useExternalAppSettings: () => hoistedRuntimeExternalAppSettings.value,
+  useExternalAppSettings: () => ({
+    get value() {
+      return hoistedRuntimeExternalAppSettings.value
+    },
+  }),
 }))
 
 vi.mock('#/web/app-shell-client.ts', () => ({
   openExternalUrl: hoistedAppShellMocks.openExternalUrl,
 }))
 
-vi.mock('#/web/workspace-external-app-client.ts', async () => {
-  const actual = (await vi.importActual('#/web/workspace-external-app-client.ts')) as typeof WorkspaceExternalAppClient
-  return {
-    ...actual,
-    openWorkspaceTerminal: hoistedWorkspaceExternalAppMocks.openWorkspaceTerminal,
-    openWorkspaceEditor: hoistedWorkspaceExternalAppMocks.openWorkspaceEditor,
-    openWorkspaceInFinder: hoistedWorkspaceExternalAppMocks.openWorkspaceInFinder,
-  }
-})
+vi.mock('#/web/workspace-external-app-client.ts', () => ({
+  openWorkspaceTerminal: hoistedWorkspaceExternalAppMocks.openWorkspaceTerminal,
+  openWorkspaceEditor: hoistedWorkspaceExternalAppMocks.openWorkspaceEditor,
+  openWorkspaceInFinder: hoistedWorkspaceExternalAppMocks.openWorkspaceInFinder,
+}))
 
 vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
   cb(0)
   return 1
 }) as typeof requestAnimationFrame)
 
-vi.mock('sonner', () => ({
+vi.mock('vue-sonner', () => ({
   toast: {
     error: hoistedToastMocks.error,
   },
@@ -152,7 +159,7 @@ export const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 export const WORKTREE_PATH = '/tmp/goblin-repo-workspace-toolbar-worktree'
 toolbarResponsiveMocks.compactUi = false
 
-export function renderInJsdom(element: ReactNode) {
+export function renderInJsdom(element: VNode) {
   return renderInJsdomWithoutWorkspaceView(element, { wrapper: WorkspacePaneTabStripScrollMemoryProvider })
 }
 
@@ -170,10 +177,30 @@ type GitWorkspacePaneToolbarHarnessProps = Omit<
   'workspacePaneTabModel'
 > & { workspacePaneRoute: WorkspacePaneRoute | null | undefined }
 
-function GitWorkspacePaneToolbarHarness(props: GitWorkspacePaneToolbarHarnessProps) {
-  const workspacePaneTabModel = useGitWorkspacePaneTabModel(props.repo, props.detail, props.workspacePaneRoute)
-  return <GitWorkspacePaneToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} />
-}
+const GitWorkspacePaneToolbarHarness = defineComponent(
+  (props: GitWorkspacePaneToolbarHarnessProps) => {
+    const workspacePaneTabModel = useGitWorkspacePaneTabModel(
+      () => props.repo,
+      () => props.detail,
+      () => props.workspacePaneRoute,
+    )
+    return () => (
+      <GitWorkspacePaneToolbar
+        repo={props.repo}
+        detail={props.detail}
+        workspacePaneId={props.workspacePaneId}
+        workspacePaneRoute={props.workspacePaneRoute}
+        workspacePaneTabModel={workspacePaneTabModel.value}
+        trafficLightOffset={props.trafficLightOffset}
+        onBackToBranchNavigator={props.onBackToBranchNavigator}
+      />
+    )
+  },
+  {
+    name: 'GitWorkspacePaneToolbarHarness',
+    props: ['repo', 'detail', 'workspacePaneId', 'workspacePaneRoute', 'trafficLightOffset', 'onBackToBranchNavigator'],
+  },
+)
 
 function getTestGitWorkspacePanePresentation(repo: GitWorkspacePaneProjection) {
   return buildGitWorkspacePanePresentation(repo, { loading: false, error: null, stale: false }, undefined, {
@@ -206,7 +233,7 @@ beforeEach(() => {
   appShellMocks.openExternalUrl.mockReset()
   workspaceExternalAppMocks.openWorkspaceInFinder.mockReset()
   workspaceExternalAppMocks.openWorkspaceInFinder.mockImplementation(async () => ({ ok: true, message: '' }))
-  useHostInfoStore.setState({
+  hostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
     status: 'ready',
     error: null,
@@ -214,10 +241,10 @@ beforeEach(() => {
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   // T6.1: the toolbar reads `isInitialSyncInFlight` from
-  // useTerminalProjectionHydrationStore; existing tests assume the repo has been
+  // terminalProjectionHydrationStore; existing tests assume the repo has been
   // synced. Mark ready by default so the "+ New" button renders; the
   // loading-state test skips this and expects the same button to be busy.
-  useTerminalProjectionHydrationStore.setState({
+  terminalProjectionHydrationStore.setState({
     hydrationByWorkspace: new Map(),
     lastSuccessfulRecoveryByWorkspace: new Map(),
   })
@@ -227,7 +254,7 @@ afterEach(() => {
   toastMocks.error.mockClear()
   appShellMocks.openExternalUrl.mockReset()
   workspaceExternalAppMocks.openWorkspaceInFinder.mockReset()
-  useHostInfoStore.setState({
+  hostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
     status: 'ready',
     error: null,
@@ -236,10 +263,14 @@ afterEach(() => {
   setTerminalSessionCommandBridge(null)
 })
 
-export function WorkspaceExternalAppLauncherHarness({ target }: { target: WorkspacePaneFilesystemTarget }) {
-  const items = useWorkspaceExternalAppItems(target)
-  return items.length > 0 ? <WorkspaceExternalAppLauncher target={target} items={items} /> : null
-}
+export const WorkspaceExternalAppLauncherHarness = defineComponent(
+  (props: { target: WorkspacePaneFilesystemTarget }) => {
+    const items = useWorkspaceExternalAppItems(() => props.target)
+    return () =>
+      items.value.length > 0 ? <WorkspaceExternalAppLauncher target={props.target} items={items.value} /> : null
+  },
+  { name: 'WorkspaceExternalAppLauncherHarness', props: ['target'] },
+)
 
 export function renderToolbar(options: {
   terminalCount: number
@@ -319,7 +350,7 @@ export function renderToolbar(options: {
   // Mark the repo as already-synced so the toolbar renders the normal
   // "+ New" button. Loading-state tests pass `loading: true` to skip this.
   if (!options.loading) {
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
   }
   const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
@@ -415,7 +446,7 @@ export function renderToolbar(options: {
     ...sessions.map((session) => terminalEntry(session.terminalSessionId)),
   ]
   if (workspacePaneTabs) {
-    const workspaceRuntimeId = useWorkspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId
+    const workspaceRuntimeId = workspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId
     const workspacePaneTabsQueryInput = {
       workspaceId: REPO_ID,
       workspaceRuntimeId,
@@ -436,10 +467,10 @@ export function renderToolbar(options: {
     showRepoBranchTerminalSession,
   })
   const { container, rerender } = renderInJsdom(
-    <QueryClientProvider client={queryClient}>
+    <VueQueryClientScope client={queryClient}>
       <AppNavigationProvider value={navigation}>
-        <TerminalSessionContext value={commandContext}>
-          <TerminalSessionReadContext value={readContext}>
+        <TerminalSessionCommandScope value={commandContext}>
+          <TerminalSessionReadScope value={readContext}>
             <GitWorkspacePaneToolbarHarness
               repo={gitWorkspacePaneProjection(repo)}
               detail={detail}
@@ -447,13 +478,13 @@ export function renderToolbar(options: {
               workspacePaneRoute={workspacePaneRoute}
               trafficLightOffset={options.trafficLightOffset}
             />
-          </TerminalSessionReadContext>
-        </TerminalSessionContext>
+          </TerminalSessionReadScope>
+        </TerminalSessionCommandScope>
       </AppNavigationProvider>
-    </QueryClientProvider>,
+    </VueQueryClientScope>,
   )
 
-  const rerenderWorktreePath = (worktreePath: string) => {
+  const rerenderWorktreePath = async (worktreePath: string) => {
     const nextBranch = createBranchSnapshot(branchName, {
       worktree: { path: worktreePath, isPrimary: false, isLocked: false },
     })
@@ -480,11 +511,11 @@ export function renderToolbar(options: {
       worktreePath,
       route: workspacePaneRoute,
     })
-    rerender(
-      <QueryClientProvider client={queryClient}>
+    await rerender(
+      <VueQueryClientScope client={queryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={commandContext}>
-            <TerminalSessionReadContext value={readContext}>
+          <TerminalSessionCommandScope value={commandContext}>
+            <TerminalSessionReadScope value={readContext}>
               <GitWorkspacePaneToolbarHarness
                 repo={gitWorkspacePaneProjection(nextRepo)}
                 detail={getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(nextRepo))}
@@ -492,10 +523,10 @@ export function renderToolbar(options: {
                 workspacePaneRoute={workspacePaneRoute}
                 trafficLightOffset={options.trafficLightOffset}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
   }
 
@@ -556,21 +587,17 @@ export async function flush() {
   await waitForNextMacrotask()
 }
 
-export function openPopover(trigger: HTMLButtonElement) {
-  act(() => {
+export async function openPopover(trigger: HTMLButtonElement) {
+  await flushTestUpdates(() => {
     trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
     trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
   })
 }
 
-export function closeButtonFor(container: HTMLElement, identity: string): HTMLButtonElement | null {
+export function closeButtonFor(container: HTMLElement, identity: string): HTMLElement | null {
   const chrome = container.querySelector(`[data-workspace-pane-tab-tooltip-id="${identity}"]`)
   if (!chrome) return null
-  return (
-    Array.from(chrome.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
-      /^(workspace-pane-tabs\.close-named|terminal\.close-named)/.test(button.getAttribute('aria-label') ?? ''),
-    ) ?? null
-  )
+  return chrome.querySelector('[data-toolbar-tab-close-action]')
 }
 
 export function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
@@ -578,7 +605,7 @@ export function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 }
 
 export function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+  const repo = workspacesStore.getState().workspaces[REPO_ID]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
         {
@@ -592,7 +619,7 @@ export function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
 }
 
 export function workspaceRuntimeIdForTest(): string {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+  const repo = workspacesStore.getState().workspaces[REPO_ID]
   if (!repo) throw new Error(`expected seeded repo ${REPO_ID}`)
   return repo.workspaceRuntimeId
 }
@@ -607,12 +634,13 @@ export function terminalEntry(id: string): WorkspacePaneTabEntry {
 
 export function installRecentAppFetch(
   initialSnapshot: object,
-  options: { failPost?: boolean } = {},
+  options: { failPost?: boolean; beforePostResponse?: Promise<void> } = {},
 ): ReturnType<typeof vi.fn> {
   let currentSnapshot = initialSnapshot
   return mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
     if (url.endsWith('/api/settings/workspace-external-app-recent')) {
+      await options.beforePostResponse
       if (options.failPost) {
         return new Response(JSON.stringify({ ok: false }), {
           status: 500,

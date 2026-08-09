@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent } from '@testing-library/react'
+import { fireEvent } from '@testing-library/vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -8,6 +8,7 @@ import { PullRequestStatusRow } from '#/web/components/repo-workspace/PullReques
 import { openBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import { createPullRequest } from '#/web/test-utils/repo-store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { appI18n } from '#/web/stores/i18n-vue.ts'
 
 // Pass-through i18n with minimal translations for the keys this component
 // reads at render time. The stub interpolates `{name}` placeholders from
@@ -29,15 +30,6 @@ const TEST_DICT: Record<string, string> = {
   'error.try-again': 'Try again',
 }
 
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useI18nStore: () => ({ lang: 'en' }),
-  useT: () => (key: string, params?: Record<string, string | number>) => {
-    const template = TEST_DICT[key] ?? key
-    if (!params) return template
-    return template.replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? `{${name}}`))
-  },
-}))
-
 vi.mock('#/web/hooks/openBranchExternalTarget.ts', () => ({
   openBranchExternalTarget: vi.fn(async () => ({ ok: true, message: '' })),
 }))
@@ -49,6 +41,8 @@ const WORKSPACE_RUNTIME_ID = 'repo-runtime-pr-row-test'
 const BRANCH_NAME = 'feature/pr'
 
 beforeEach(() => {
+  appI18n.global.setLocaleMessage('en', TEST_DICT)
+  appI18n.global.locale.value = 'en'
   openExternalMock.mockClear()
 })
 
@@ -72,7 +66,7 @@ describe('PullRequestStatusRow', () => {
     expect(document.querySelector('[data-pull-request-link]')).toBeNull()
   })
 
-  test('renders a retryable local error state', () => {
+  test('renders a retryable local error state', async () => {
     const retry = vi.fn()
     renderInJsdom(
       <PullRequestStatusRow
@@ -84,7 +78,7 @@ describe('PullRequestStatusRow', () => {
       />,
     )
 
-    fireEvent.click(document.querySelector<HTMLButtonElement>('button')!)
+    await fireEvent.click(document.querySelector<HTMLButtonElement>('button')!)
     expect(document.body.textContent).toContain('could not load')
     expect(retry).toHaveBeenCalledOnce()
   })
@@ -92,7 +86,7 @@ describe('PullRequestStatusRow', () => {
   test.each([
     ['unavailable', 'unavailable'],
     ['empty', 'none'],
-  ] as const)('preserves the accepted %s result while its refresh is stale', (state, label) => {
+  ] as const)('preserves the accepted %s result while its refresh is stale', async (state, label) => {
     const retry = vi.fn()
     renderInJsdom(
       <PullRequestStatusRow
@@ -105,11 +99,11 @@ describe('PullRequestStatusRow', () => {
     )
 
     expect(document.body.textContent).toContain(label)
-    fireEvent.click(document.querySelector<HTMLButtonElement>('button')!)
+    await fireEvent.click(document.querySelector<HTMLButtonElement>('button')!)
     expect(retry).toHaveBeenCalledOnce()
   })
 
-  test('renders the PR summary chip as a clickable button', () => {
+  test('renders the PR summary chip as a clickable button', async () => {
     const pullRequest = createPullRequest(178, {
       state: 'open',
       url: 'https://github.com/acme/repo/pull/178',
@@ -134,7 +128,7 @@ describe('PullRequestStatusRow', () => {
     expect(chip?.className ?? '').not.toMatch(/\bunderline\b/)
   })
 
-  test('clicking the chip routes through openBranchExternalTarget', () => {
+  test('clicking the chip routes through openBranchExternalTarget', async () => {
     const pullRequest = createPullRequest(105, {
       state: 'open',
       isDraft: true,
@@ -151,13 +145,13 @@ describe('PullRequestStatusRow', () => {
     )
 
     const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')!
-    fireEvent.click(chip)
+    await fireEvent.click(chip)
 
     expect(openExternalMock).toHaveBeenCalledTimes(1)
     expect(openExternalMock).toHaveBeenCalledWith(REPO_ID, WORKSPACE_RUNTIME_ID, { name: BRANCH_NAME, pullRequest })
   })
 
-  test('absorbs accidental double-clicks within the latch window', () => {
+  test('absorbs accidental double-clicks within the latch window', async () => {
     useFakeTimers()
     const pullRequest = createPullRequest(178, {
       state: 'open',
@@ -174,15 +168,15 @@ describe('PullRequestStatusRow', () => {
     )
 
     const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')!
-    fireEvent.click(chip)
-    fireEvent.click(chip)
-    fireEvent.click(chip)
+    await fireEvent.click(chip)
+    await fireEvent.click(chip)
+    await fireEvent.click(chip)
 
     expect(openExternalMock).toHaveBeenCalledTimes(1)
 
     // Once the latch expires (500ms) a fresh click should fire again.
     vi.advanceTimersByTime(500)
-    fireEvent.click(chip)
+    await fireEvent.click(chip)
 
     expect(openExternalMock).toHaveBeenCalledTimes(2)
   })

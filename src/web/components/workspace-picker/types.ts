@@ -1,4 +1,4 @@
-import type { GitRemoteInfo } from '#/web/types.ts'
+import type { GitRemoteInfo } from '#/shared/git-types.ts'
 import type { RemoteWorkspaceConnectionLifecycle } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 export interface WorkspacePickerItem {

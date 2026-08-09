@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from 'zustand/vanilla'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 
@@ -24,7 +24,7 @@ const INITIAL_STATE: FiletreeActionDialogsState = {
   trashFileConfirm: null,
 }
 
-export const useFiletreeActionDialogsStore = create<FiletreeActionDialogsStore>()((set) => ({
+export const filetreeActionDialogsStore = createStore<FiletreeActionDialogsStore>()((set) => ({
   ...INITIAL_STATE,
   openTrashFileConfirm: (payload) => set({ trashFileConfirm: payload }),
   closeTrashFileConfirm: () => set({ trashFileConfirm: null }),
@@ -40,5 +40,5 @@ export const useFiletreeActionDialogsStore = create<FiletreeActionDialogsStore>(
 }))
 
 export function resetFiletreeActionDialogsStore(): void {
-  useFiletreeActionDialogsStore.setState(INITIAL_STATE)
+  filetreeActionDialogsStore.setState(INITIAL_STATE)
 }

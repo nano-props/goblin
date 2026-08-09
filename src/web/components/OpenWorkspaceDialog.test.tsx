@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-import { act, waitFor } from '@testing-library/react'
+import { waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
-import type { ReactNode } from 'react'
+import type { VNode } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { OpenWorkspaceDialog } from '#/web/components/OpenWorkspaceDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { hostInfoStore } from '#/web/stores/host-info.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
@@ -42,10 +43,10 @@ beforeEach(() => {
   }
   // Host info used to live in the bootstrap payload; it now lives
   // on the public `/api/host` endpoint and the client-side
-  // `useHostInfoStore`. Seed the store directly so the dialog's
+  // `hostInfoStore`. Seed the store directly so the dialog's
   // tilde resolution and platform branching work without
   // mocking `fetch`.
-  useHostInfoStore.setState({
+  hostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
     status: 'ready',
     error: null,
@@ -73,7 +74,7 @@ afterEach(() => {
 describe('OpenWorkspaceDialog', () => {
   test('shows local directory suggestions while preserving the picker layout wrapper', async () => {
     mocks.getLocalDirectoryPathSuggestions.mockResolvedValue(['/Users/tester/Developer'])
-    render(
+    await render(
       <OpenWorkspaceDialog
         open
         onClose={vi.fn()}
@@ -96,7 +97,7 @@ describe('OpenWorkspaceDialog', () => {
   test('lets the popup own the first Escape before the dialog owns the second', async () => {
     const onClose = vi.fn()
     mocks.getLocalDirectoryPathSuggestions.mockResolvedValue(['/Users/tester/Developer'])
-    render(
+    await render(
       <OpenWorkspaceDialog
         open
         onClose={onClose}
@@ -119,8 +120,8 @@ describe('OpenWorkspaceDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  test('keeps the inline status row mounted', () => {
-    render(
+  test('keeps the inline status row mounted', async () => {
+    await render(
       <OpenWorkspaceDialog
         open
         onClose={vi.fn()}
@@ -134,8 +135,8 @@ describe('OpenWorkspaceDialog', () => {
     expect(document.body.querySelector('[data-slot="dialog-status-row"]')).not.toBeNull()
   })
 
-  test('focuses the workspace path input when opened', () => {
-    render(
+  test('focuses the workspace path input when opened', async () => {
+    await render(
       <OpenWorkspaceDialog
         open
         onClose={vi.fn()}
@@ -150,7 +151,7 @@ describe('OpenWorkspaceDialog', () => {
   })
 
   test('does not echo the typed path into the inline status row during normal input', async () => {
-    render(
+    await render(
       <OpenWorkspaceDialog
         open
         onClose={vi.fn()}
@@ -173,7 +174,7 @@ describe('OpenWorkspaceDialog', () => {
     const onClose = vi.fn()
     const onOpen = vi.fn(() => deferred.promise)
 
-    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
+    await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
     await setInputValue('#open-workspace-path', '~/Developer/repo')
     await click('button[type="submit"]')
@@ -194,7 +195,7 @@ describe('OpenWorkspaceDialog', () => {
       message: 'error.workspace-git-unavailable',
     }))
 
-    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
+    await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
     await clickButtonByText('workspace-picker.open-path-choose')
     await waitFor(() => expect(input('#open-workspace-path').value).toBe('~/Developer/repo'))
@@ -226,13 +227,13 @@ describe('OpenWorkspaceDialog', () => {
       ok: true,
       workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
     }))
-    const { rerender } = render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
+    const { rerender } = await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
     await clickButtonByText('workspace-picker.open-path-choose')
-    selection.resolve('/tmp/old-selection')
-    rerender(<OpenWorkspaceDialog open={false} onClose={onClose} onOpen={onOpen} />)
-    rerender(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
-    await act(async () => {
+    await rerender(<OpenWorkspaceDialog open={false} onClose={onClose} onOpen={onOpen} />)
+    await rerender(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
+    await flushTestUpdates(async () => {
+      selection.resolve('/tmp/old-selection')
       await selection.promise
     })
 
@@ -254,13 +255,13 @@ describe('OpenWorkspaceDialog', () => {
       ok: true,
       workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
     }))
-    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
+    await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
     await clickButtonByText('workspace-picker.open-path-choose')
     await clickButtonByText('dialog.cancel')
     expect(onClose).toHaveBeenCalledTimes(1)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       selection.resolve('/tmp/old-selection')
       await selection.promise
     })
@@ -277,7 +278,7 @@ describe('OpenWorkspaceDialog', () => {
         workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
       })
 
-    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
+    await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
     await setInputValue('#open-workspace-path', '~/Developer/repo')
     await click('button[type="submit"]')
@@ -297,17 +298,18 @@ describe('OpenWorkspaceDialog', () => {
     const first = Promise.withResolvers<OpenWorkspaceResult>()
     const second = Promise.withResolvers<OpenWorkspaceResult>()
     const onClose = vi.fn()
-    const onOpen = vi.fn(() => (onOpen.mock.calls.length === 0 ? first.promise : second.promise))
+    const onOpen = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
 
-    const { rerender } = render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
+    const { rerender } = await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
     await setInputValue('#open-workspace-path', '~/Developer/repo')
     await click('button[type="submit"]')
+    expect(onOpen).toHaveBeenCalledOnce()
 
-    rerender(<OpenWorkspaceDialog open={false} onClose={onClose} onOpen={onOpen} />)
-    rerender(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
+    await rerender(<OpenWorkspaceDialog open={false} onClose={onClose} onOpen={onOpen} />)
+    await rerender(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       first.resolve({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo') })
       await first.promise
     })
@@ -325,7 +327,7 @@ describe('OpenWorkspaceDialog', () => {
     const onClose = vi.fn()
     const onOpen = vi.fn<() => Promise<OpenWorkspaceResult>>().mockRejectedValueOnce(new Error('boom'))
 
-    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
+    await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
     await setInputValue('#open-workspace-path', '~/Developer/repo')
     await click('button[type="submit"]')
@@ -345,14 +347,16 @@ describe('OpenWorkspaceDialog', () => {
       workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
     }))
 
-    render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
+    await render(<OpenWorkspaceDialog open onClose={onClose} onOpen={onOpen} />)
 
     expect(queryButtonByText('workspace-picker.open-path-choose')).toBeNull()
   })
 })
 
-function render(element: ReactNode) {
-  return renderInJsdom(element)
+async function render(element: VNode) {
+  const result = renderInJsdom(element)
+  await flushTestUpdates(() => {})
+  return result
 }
 
 function input(selector: string): HTMLInputElement {

@@ -13,14 +13,14 @@ import {
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import {
   dispatchCloseWorkspacePaneTabAction,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
   dispatchRetiredTerminalWorkspacePaneTabPresentationAction,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setTerminalSessionCommandBridgeForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
@@ -37,7 +37,7 @@ import {
 } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import {
   claimTerminalAutoFocus,
   fulfillTerminalPresentationFocus,
@@ -92,6 +92,7 @@ describe('workspace pane tab close action', () => {
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
     const commitWorkspacePaneRoute = vi.fn(navigation.commitWorkspacePaneRoute)
     navigation.commitWorkspacePaneRoute = commitWorkspacePaneRoute
+    const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
@@ -101,6 +102,7 @@ describe('workspace pane tab close action', () => {
         workspaceId: REPO_ID,
         workspacePaneRoute: { kind: 'static', tab: 'files' },
         navigation,
+        presentationEffects,
       }),
     ).resolves.toBe(true)
 
@@ -111,6 +113,8 @@ describe('workspace pane tab close action', () => {
       expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status')
+    expect(presentationEffects.onCommit).toHaveBeenCalledOnce()
+    expect(presentationEffects.onAbandon).not.toHaveBeenCalled()
   })
 
   test('keeps a branch-headed worktree close in the worktree route family', async () => {
@@ -170,7 +174,7 @@ describe('workspace pane tab close action', () => {
       ...target,
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget(target, 'status')
+    workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'status')
     const updateWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('files')])
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
 
@@ -199,7 +203,7 @@ describe('workspace pane tab close action', () => {
   test('carries automatic focus from active close through route commit and mount transfer', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const target = {
       kind: 'workspace-root' as const,
       workspaceId: REPO_ID,
@@ -209,7 +213,7 @@ describe('workspace pane tab close action', () => {
       ...target,
       tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
+    workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
     const lifecycle = Promise.withResolvers<WorkspacePaneTabEntry[]>()
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: vi.fn(async () => await lifecycle.promise) })
     const bridgeFocus = installPendingTerminalFocusBridge()
@@ -261,7 +265,7 @@ describe('workspace pane tab close action', () => {
   test('releases terminal focus when active close lifecycle fails', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const target = {
       kind: 'workspace-root' as const,
       workspaceId: REPO_ID,
@@ -271,7 +275,7 @@ describe('workspace pane tab close action', () => {
       ...target,
       tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
+    workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'files')
     const lifecycle = Promise.withResolvers<WorkspacePaneTabEntry[]>()
     const updateWorkspaceTabs = vi.fn(async () => await lifecycle.promise)
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
@@ -279,12 +283,14 @@ describe('workspace pane tab close action', () => {
     const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
       async () => true,
     )
+    const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
     const close = dispatchCloseWorkspacePaneTabAction({
       routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
       paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
       workspaceId: REPO_ID,
       workspacePaneRoute: { kind: 'static', tab: 'files' },
       navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
+      presentationEffects,
     })
 
     await vi.waitFor(() => expect(updateWorkspaceTabs).toHaveBeenCalledOnce())
@@ -294,6 +300,8 @@ describe('workspace pane tab close action', () => {
     await expect(close).resolves.toBe(false)
 
     expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(presentationEffects.onCommit).not.toHaveBeenCalled()
+    expect(presentationEffects.onAbandon).toHaveBeenCalledOnce()
     const nextPresentation = beginAppNavigation()
     const nextFocusLease = claimTerminalAutoFocus(nextPresentation)
     expect(nextFocusLease).not.toBeNull()
@@ -387,6 +395,7 @@ describe('workspace pane tab close action', () => {
       closeTerminalByDescriptor,
     })
     const route = { kind: 'terminal' as const, terminalSessionId }
+    const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
 
     await expect(
       dispatchConfirmCloseTerminalWorkspacePaneTabAction({
@@ -404,9 +413,12 @@ describe('workspace pane tab close action', () => {
             presentation: { kind: 'git-worktree' as const, head: { kind: 'detached' as const } },
           },
         },
+        presentationEffects,
       }),
     ).resolves.toBe(false)
     expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
+    expect(presentationEffects.onCommit).not.toHaveBeenCalled()
+    expect(presentationEffects.onAbandon).toHaveBeenCalledOnce()
   })
 
   test('derives a detached worktree terminal close target through the production dispatch path', async () => {
@@ -500,8 +512,8 @@ describe('workspace pane tab close action', () => {
       ...targetInput,
       tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
     })
-    useWorkspacesStore.getState().setWorkspacePaneTabForTarget(targetInput, 'terminal')
-    useWorkspacesStore
+    workspacesStore.getState().setWorkspacePaneTabForTarget(targetInput, 'terminal')
+    workspacesStore
       .getState()
       .setSelectedTerminal(formatTerminalFilesystemTargetKey(REPO_ID, REPO_ID), terminalSessionId)
     const terminalFilesystemTargetKey = `${REPO_ID}\0${REPO_ID}`
@@ -539,23 +551,24 @@ describe('workspace pane tab close action', () => {
       closeTerminalByDescriptor,
     })
     const targetKey = workspacePaneTabsTargetIdentityKey(targetInput)
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
+    expect(workspacesStore.getState().workspaces[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
       'terminal',
     )
     expect(
-      useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[
+      workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[
         formatTerminalFilesystemTargetKey(REPO_ID, REPO_ID)
       ],
     ).toBe(terminalSessionId)
     const navigation = navigationWith({
       commitFilesystemWorkspacePaneRoute: vi.fn(async (_target, route, options) => {
         if (route?.kind === 'static') {
-          useWorkspacesStore.getState().setWorkspacePaneTabForTarget(targetInput, route.tab)
+          workspacesStore.getState().setWorkspacePaneTabForTarget(targetInput, route.tab)
         }
         options?.onCommit?.()
         return true
       }),
     })
+    const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
 
     await expect(
       dispatchConfirmCloseTerminalWorkspacePaneTabAction({
@@ -573,11 +586,14 @@ describe('workspace pane tab close action', () => {
             presentation: { kind: 'workspace-root' },
           },
         },
+        presentationEffects,
       }),
     ).resolves.toBe(true)
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
+    expect(presentationEffects.onCommit).toHaveBeenCalledOnce()
+    expect(presentationEffects.onAbandon).not.toHaveBeenCalled()
+    expect(workspacesStore.getState().workspaces[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
       'files',
     )
   })
@@ -624,7 +640,7 @@ describe('workspace pane tab close action', () => {
 
     const replacementRuntimeId = 'repo-runtime-replacement'
     const replacementRepo = { ...repo, workspaceRuntimeId: replacementRuntimeId }
-    useWorkspacesStore.setState((state) => ({
+    workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
         [REPO_ID]: replacementRepo,
@@ -670,7 +686,7 @@ describe('workspace pane tab close action', () => {
   test('presents a naturally exited terminal from the server-captured before-state', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
     const runtimeTarget = runtimeWorkspacePaneTargetForTest({
       ...paneTarget,
@@ -777,7 +793,7 @@ describe('workspace pane tab close action', () => {
   test('does not navigate when a background terminal exits naturally', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
     const runtimeTarget = runtimeWorkspacePaneTargetForTest({
       ...paneTarget,

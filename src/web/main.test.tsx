@@ -1,168 +1,140 @@
 // @vitest-environment jsdom
-
-import { act, waitFor } from '@testing-library/react'
+import { userEvent } from '@testing-library/user-event'
+import { defineComponent, onMounted, onUnmounted } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { waitFor } from '@testing-library/vue'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 
-let hydrate: ReturnType<typeof vi.fn>
+let hydrateI18n: ReturnType<typeof vi.fn>
 let hydrateHostInfo: ReturnType<typeof vi.fn>
-let appMount: () => void
-let appUnmount: () => void
+let appMount: ReturnType<typeof vi.fn>
+let appUnmount: ReturnType<typeof vi.fn>
+let disposeWebApp: (() => void) | null
 
 beforeEach(() => {
   vi.resetModules()
   vi.clearAllMocks()
   document.body.innerHTML = '<div id="root"></div>'
-  hydrate = vi.fn()
+  hydrateI18n = vi.fn().mockResolvedValue(undefined)
   hydrateHostInfo = vi.fn().mockResolvedValue(undefined)
   appMount = vi.fn()
   appUnmount = vi.fn()
+  disposeWebApp = null
+
   vi.doMock('#/web/stores/i18n.ts', () => ({
-    useI18nStore: {
-      getState: () => ({ hydrate }),
+    i18nStore: {
+      getState: () => ({ hydrate: hydrateI18n }),
     },
   }))
   vi.doMock('#/web/stores/host-info.ts', () => ({
-    useHostInfoStore: {
+    hostInfoStore: {
       getState: () => ({ hydrate: hydrateHostInfo }),
     },
   }))
+  vi.doMock('#/web/stores/i18n-vue.ts', () => ({
+    appI18n: { install: vi.fn() },
+    startI18nProjection: () => vi.fn(),
+  }))
   vi.doMock('#/web/logger.ts', () => ({
-    bootstrapLog: { warn: vi.fn() },
+    bootstrapLog: { error: vi.fn(), warn: vi.fn() },
   }))
-  vi.doMock('#/web/app-query-client.ts', () => ({
-    appQueryClient: {},
-  }))
-  vi.doMock('@tanstack/react-query', async () => {
-    const React = await import('react')
-    return {
-      QueryClientProvider: ({ children }: { children: React.ReactNode }) =>
-        React.createElement(React.Fragment, null, children),
-    }
-  })
-  vi.doMock('@tanstack/react-query-devtools', () => ({
-    ReactQueryDevtools: () => null,
-  }))
-  vi.doMock('#/web/auth/AuthProvider.tsx', async () => {
-    const React = await import('react')
-    return {
-      AuthProvider: ({ children }: { children: React.ReactNode }) =>
-        React.createElement(React.Fragment, null, children),
-    }
-  })
-  vi.doMock('#/web/hooks/useResponsiveUiMode.tsx', async () => {
-    const React = await import('react')
-    return {
-      ResponsiveUiProvider: ({ children }: { children: React.ReactNode }) =>
-        React.createElement(React.Fragment, null, children),
-    }
-  })
-  vi.doMock('#/web/app-router.tsx', async () => {
-    const React = await import('react')
-    return {
-      AppRouterProvider: () => {
-        React.useEffect(() => {
-          appMount()
-          return appUnmount
-        }, [])
-        return React.createElement('div', null, 'app mounted')
+  vi.doMock('#/web/app-router.tsx', () => ({
+    appRouter: { install: vi.fn() },
+    AppRouterProvider: defineComponent(
+      () => {
+        onMounted(appMount)
+        onUnmounted(appUnmount)
+        return () => <div>app mounted</div>
       },
-    }
-  })
+      { name: 'TestAppRouterProvider' },
+    ),
+  }))
 })
 
 afterEach(() => {
+  disposeWebApp?.()
   document.body.innerHTML = ''
 })
 
+async function loadMain(): Promise<void> {
+  const main = await import('#/web/main.tsx')
+  disposeWebApp = main.disposeWebApp
+}
+
 describe('client entrypoint', () => {
-  test('mounts the app only after the initial i18n hydrate succeeds', async () => {
+  test('mounts the app only after the initial hydration succeeds', async () => {
     let resolveHydrate!: () => void
     const hydratePromise = new Promise<void>((resolve) => {
       resolveHydrate = resolve
     })
-    hydrate.mockReturnValue(hydratePromise)
+    hydrateI18n.mockReturnValue(hydratePromise)
 
-    await act(async () => {
-      await import('#/web/main.tsx')
-    })
+    await loadMain()
 
-    expect(hydrate).toHaveBeenCalledWith({ subscribe: false, signal: expect.any(AbortSignal) })
+    expect(hydrateI18n).toHaveBeenCalledWith({ subscribe: false, signal: expect.any(AbortSignal) })
+    expect(document.querySelector('[role="status"]')?.getAttribute('aria-live')).toBe('polite')
     expect(document.body.textContent).toContain('Loading')
     expect(document.body.textContent).not.toContain('app mounted')
 
-    await act(async () => {
-      resolveHydrate()
-      await hydratePromise
-    })
+    resolveHydrate()
+    await hydratePromise
 
-    expect(document.body.textContent).toContain('app mounted')
-    expect(appMount).toHaveBeenCalledTimes(2)
-    expect(appUnmount).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(document.body.textContent).toContain('app mounted'))
+    expect(appMount).toHaveBeenCalledTimes(1)
+    expect(appUnmount).not.toHaveBeenCalled()
   })
 
-  test('keeps the app unmounted and offers retry when the initial i18n hydrate fails', async () => {
-    hydrate.mockRejectedValueOnce(new Error('i18n unavailable')).mockResolvedValueOnce(undefined)
+  test('offers retry when the initial hydration fails', async () => {
+    const user = userEvent.setup()
+    hydrateI18n.mockRejectedValueOnce(new Error('i18n unavailable')).mockResolvedValueOnce(undefined)
 
-    await act(async () => {
-      await import('#/web/main.tsx')
-    })
+    await loadMain()
 
-    await waitFor(() => {
-      expect(document.body.textContent).toContain('Unable to load application resources.')
-    })
+    await waitFor(() => expect(document.body.textContent).toContain('Unable to load application resources.'))
     expect(document.body.textContent).not.toContain('app mounted')
 
-    act(() => {
-      document.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
+    const retry = document.querySelector('button')
+    if (!retry) throw new Error('retry button missing')
+    await user.click(retry)
 
     await waitFor(() => {
-      expect(hydrate).toHaveBeenCalledTimes(2)
+      expect(hydrateI18n).toHaveBeenCalledTimes(2)
       expect(document.body.textContent).toContain('app mounted')
     })
   })
 
-  test('aborts the initial i18n hydrate and shows retry after the boot timeout', async () => {
+  test('aborts hydration and shows retry after the boot timeout', async () => {
     useFakeTimers()
-    hydrate.mockImplementation(({ signal }: { signal: AbortSignal }) => {
+    hydrateI18n.mockImplementation(({ signal }: { signal: AbortSignal }) => {
       return new Promise<void>((_resolve, reject) => {
         signal.addEventListener('abort', () => reject(signal.reason), { once: true })
       })
     })
 
-    await act(async () => {
-      await import('#/web/main.tsx')
-    })
+    await loadMain()
 
     expect(document.body.textContent).toContain('Loading')
-    expect(hydrate.mock.calls[0]?.[0].signal.aborted).toBe(false)
+    expect(hydrateI18n.mock.calls[0]?.[0].signal.aborted).toBe(false)
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(15_000)
-    })
+    await vi.advanceTimersByTimeAsync(15_000)
 
-    expect(hydrate.mock.calls[0]?.[0].signal.aborted).toBe(true)
+    expect(hydrateI18n.mock.calls[0]?.[0].signal.aborted).toBe(true)
     expect(document.body.textContent).toContain('Unable to load application resources.')
     expect(document.body.textContent).not.toContain('app mounted')
   })
 
-  test('keeps the app unmounted and retries when host info hydration fails', async () => {
-    hydrate.mockResolvedValue(undefined)
+  test('retries when host info hydration fails', async () => {
+    const user = userEvent.setup()
     hydrateHostInfo.mockRejectedValueOnce(new Error('host unavailable')).mockResolvedValueOnce(undefined)
 
-    await act(async () => {
-      await import('#/web/main.tsx')
-    })
+    await loadMain()
 
-    await waitFor(() => {
-      expect(document.body.textContent).toContain('Unable to load application resources.')
-    })
+    await waitFor(() => expect(document.body.textContent).toContain('Unable to load application resources.'))
     expect(document.body.textContent).not.toContain('app mounted')
 
-    act(() => {
-      document.querySelector('button')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
+    const retry = document.querySelector('button')
+    if (!retry) throw new Error('retry button missing')
+    await user.click(retry)
 
     await waitFor(() => {
       expect(hydrateHostInfo).toHaveBeenCalledTimes(2)

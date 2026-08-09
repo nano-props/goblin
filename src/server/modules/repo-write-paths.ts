@@ -1,6 +1,6 @@
 import path from 'node:path'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import { publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import {
   captureRepoWriteExecutionFromPhysicalWorktree,
@@ -30,7 +30,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
 
-const repoWriteLogger = serverLogger.child({ module: 'repo-write-paths' })
+const repoWriteLogger = serverNodeLog.child({ module: 'repo-write-paths' })
 
 async function runUserNetworkMutation(
   cwd: WorkspaceId,

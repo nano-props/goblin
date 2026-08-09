@@ -1,95 +1,69 @@
-// Shared branch-list data layer for BranchNavigator. The persistent
-// sidebar and zen-mode reveal drawer both render that same pane, so
-// branches, route-current branch, view-mode, branch action state,
-// and remote metadata stay on one selector.
+// Shared branch-list data layer for every branch navigator surface.
 
-import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { projectBranchActionRepo, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import type { GitWorkspaceClientState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import { computed, toValue } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
 import type { BranchViewMode } from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   useRepoOperationsReadModel,
   useRepoSnapshotReadModel,
   useRepoWorktreeStatusReadModel,
 } from '#/web/repo-queries.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { branchViewModeForWorkspace } from '#/web/stores/workspaces/branch-view-mode.ts'
+import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import type { RepoOperationState } from '#/web/stores/workspaces/operations.ts'
 
-// Composed projection: branch/status/worktree data comes from the repo
-// data queries; the store contributes only identity, client preference, and
-// operation shell fields for the list.
 export type BranchListRepo = BranchActionRepo
 
 type BranchListDataRepo = BranchListRepo & { branchViewMode: BranchViewMode }
 
-type BranchListRepoShell = Omit<BranchListDataRepo, 'snapshot' | 'status' | 'branchAction'> & {
-  operations: Pick<GitWorkspaceClientState['operations'], 'branchAction'>
+export interface BranchListRepoShell {
+  id: WorkspaceId
+  workspaceRuntimeId: string
+  branchViewMode: BranchViewMode
+  branchAction: RepoOperationState
+  remoteLifecycle: BranchActionRepo['remoteLifecycle']
 }
 
-const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
-  'id',
-  'workspaceRuntimeId',
-  'branchViewMode',
-  'operations',
-  'remoteLifecycle',
-]
-
-function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchListRepoShell | undefined): boolean {
-  if (a === b) return true
-  if (!a || !b) return false
-  for (const field of branchListRepoShellEqualFields) {
-    if (field === 'operations') {
-      // The selector rebuilds `{ branchAction }` on every call, so the
-      // wrapper reference always changes; compare the inner field
-      // directly so unrelated store updates can short-circuit.
-      if (a.operations.branchAction !== b.operations.branchAction) return false
-    } else {
-      if (a[field] !== b[field]) return false
-    }
-  }
-  return true
-}
-
-export function useBranchListRepo(repoId: WorkspaceId): BranchListDataRepo | undefined {
-  const repoShell = useStoreWithEqualityFn(
-    useWorkspacesStore,
-    (s) => {
-      const repo: WorkspaceState | undefined = s.workspaces[repoId]
-      return repo?.capability.kind === 'git'
-        ? {
-            id: repo.id,
-            workspaceRuntimeId: repo.workspaceRuntimeId,
-            branchViewMode: branchViewModeForWorkspace(s.branchViewModeByWorkspace, repo.id),
-            operations: {
-              branchAction: repo.capability.git.operations.branchAction,
-            },
-            remoteLifecycle: repo.admission.kind === 'remote' ? repo.admission.lifecycle : null,
-          }
-        : undefined
-    },
-    branchListRepoShellEqual,
+export function useBranchListReadModel(repoShell: MaybeRefOrGetter<BranchListRepoShell>) {
+  const operationsReadModel = useRepoOperationsReadModel(
+    () => toValue(repoShell).id,
+    () => toValue(repoShell).workspaceRuntimeId,
   )
-  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? null, repoShell?.workspaceRuntimeId ?? '', {
-    enabled: !!repoShell,
-  })
   const snapshotReadModel = useRepoSnapshotReadModel(
-    repoShell?.id ?? null,
-    repoShell?.workspaceRuntimeId ?? '',
-    !!repoShell,
+    () => toValue(repoShell).id,
+    () => toValue(repoShell).workspaceRuntimeId,
   )
   const statusReadModel = useRepoWorktreeStatusReadModel(
-    repoShell?.id ?? null,
-    repoShell?.workspaceRuntimeId ?? '',
-    !!repoShell,
+    () => toValue(repoShell).id,
+    () => toValue(repoShell).workspaceRuntimeId,
   )
-  const snapshot = snapshotReadModel.data?.snapshot
-  if (!repoShell || !snapshot) return undefined
-  return {
-    ...projectBranchActionRepo(
-      { ...repoShell, snapshot, status: statusReadModel.data?.status },
-      operationsReadModel.data?.operations,
-    ),
-    branchViewMode: repoShell.branchViewMode,
-  }
+
+  const repo = computed<BranchListDataRepo | undefined>(() => {
+    const shell = toValue(repoShell)
+    const snapshot = snapshotReadModel.data.value?.snapshot
+    if (!snapshot) return undefined
+    const projected = projectBranchActionRepo(
+      {
+        id: shell.id,
+        workspaceRuntimeId: shell.workspaceRuntimeId,
+        snapshot,
+        status: statusReadModel.data.value?.status,
+        operations: { branchAction: shell.branchAction },
+        remoteLifecycle: shell.remoteLifecycle,
+      },
+      operationsReadModel.data.value?.operations,
+    )
+    return {
+      id: projected.id,
+      workspaceRuntimeId: projected.workspaceRuntimeId,
+      snapshot: projected.snapshot,
+      status: projected.status,
+      branchAction: projected.branchAction,
+      remoteLifecycle: projected.remoteLifecycle,
+      branchViewMode: shell.branchViewMode,
+    }
+  })
+
+  return { repo, snapshotReadModel, statusReadModel }
 }

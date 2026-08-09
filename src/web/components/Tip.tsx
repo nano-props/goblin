@@ -1,45 +1,54 @@
-// Thin wrapper around shadcn/ui Tooltip with the project's preferred
-// defaults (200ms open delay, anchor below the trigger). Wrap any
-// element that needs a hover label; Radix renders into a portal and
-// survives `position: fixed` ancestors. Use this instead of the
-// native `title=` attribute for any tooltip we want to style or
-// compose with inline affordances.
+import { TooltipProvider, TooltipRoot, TooltipTrigger } from 'reka-ui'
+import { defineComponent, ref } from 'vue'
+import type { PropType, VNodeChild } from 'vue'
+import { TooltipContent } from '#/web/components/ui/tooltip.tsx'
 
-import { useState, type ComponentProps, type ReactNode } from 'react'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#/web/components/ui/tooltip.tsx'
+type TooltipSide = 'top' | 'right' | 'bottom' | 'left'
+type TooltipAlign = 'start' | 'center' | 'end'
 
-interface Props {
-  label: ReactNode
-  /** Side of the trigger to anchor against. Default 'bottom'. */
-  side?: 'top' | 'right' | 'bottom' | 'left'
-  /** Alignment along the chosen side. Default 'center'. */
-  align?: 'start' | 'center' | 'end'
-  /** ms before tooltip opens. Default 200. */
-  delayMs?: number
-  collisionPadding?: ComponentProps<typeof TooltipContent>['collisionPadding']
-  forceOpen?: boolean
-  children: ReactNode
-}
-
-export function Tip({
-  label,
-  side = 'bottom',
-  align = 'center',
-  delayMs = 200,
-  collisionPadding,
-  forceOpen = false,
-  children,
-}: Props) {
-  const [hoverOpen, setHoverOpen] = useState(false)
-
-  return (
-    <TooltipProvider delayDuration={delayMs}>
-      <Tooltip open={forceOpen || hoverOpen} onOpenChange={setHoverOpen}>
-        <TooltipTrigger asChild>{children}</TooltipTrigger>
-        <TooltipContent side={side} align={align} sideOffset={6} collisionPadding={collisionPadding}>
-          {label}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  )
-}
+export const Tip = defineComponent(
+  (
+    props: {
+      label: VNodeChild
+      side?: TooltipSide
+      align?: TooltipAlign
+      delayMs?: number
+      collisionPadding?: number | Partial<Record<TooltipSide, number>>
+      forceOpen?: boolean
+    },
+    { slots },
+  ) => {
+    const hoverOpen = ref(false)
+    return () => (
+      <TooltipProvider delayDuration={props.delayMs ?? 200}>
+        <TooltipRoot
+          open={!!props.forceOpen || hoverOpen.value}
+          onUpdate:open={(open) => {
+            hoverOpen.value = open
+          }}
+        >
+          <TooltipTrigger asChild>{slots.default?.()}</TooltipTrigger>
+          <TooltipContent
+            side={props.side ?? 'bottom'}
+            align={props.align ?? 'center'}
+            sideOffset={6}
+            collisionPadding={props.collisionPadding}
+          >
+            {props.label}
+          </TooltipContent>
+        </TooltipRoot>
+      </TooltipProvider>
+    )
+  },
+  {
+    name: 'Tip',
+    props: {
+      label: null,
+      side: String as PropType<TooltipSide>,
+      align: String as PropType<TooltipAlign>,
+      delayMs: Number,
+      collisionPadding: [Number, Object] as PropType<number | Partial<Record<TooltipSide, number>>>,
+      forceOpen: Boolean,
+    },
+  },
+)

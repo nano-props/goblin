@@ -1,4 +1,4 @@
-import { queryOptions, type QueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/query-core'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import type { WorkspaceRuntimeEntry, WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import { listWorkspaceRuntimes } from '#/web/workspace-client.ts'
@@ -26,12 +26,12 @@ export function workspaceRuntimesQueryKey() {
 }
 
 export function workspaceRuntimesQueryOptions() {
-  return queryOptions({
+  return {
     queryKey: workspaceRuntimesQueryKey(),
-    queryFn: ({ signal }) => listWorkspaceRuntimes(signal),
+    queryFn: ({ signal }: { signal: AbortSignal }) => listWorkspaceRuntimes(signal),
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: Number.POSITIVE_INFINITY,
-  })
+  }
 }
 
 export async function refreshWorkspaceRuntimes(

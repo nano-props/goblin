@@ -2,7 +2,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import {
   commitWorkspacePaneCurrentTargetRoute,
@@ -61,7 +61,7 @@ export interface OpenWorkspacePaneTargetStaticTabActionOptions {
 export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
   input: OpenWorkspacePaneTargetStaticTabActionOptions,
 ): Promise<WorkspacePaneActionOutcome> {
-  const workspace = useWorkspacesStore.getState().workspaces[input.workspaceId]
+  const workspace = workspacesStore.getState().workspaces[input.workspaceId]
   if (!workspace || input.paneTarget.workspaceId !== input.workspaceId) return { kind: 'target-missing' }
   const workspaceRuntimeId = workspace.workspaceRuntimeId
   const worktreePath = workspacePaneTabsTargetWorktreePath(input.paneTarget)
@@ -202,7 +202,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
 export async function dispatchOpenWorkspacePaneStaticTabAction(
   input: OpenWorkspacePaneStaticTabActionOptions,
 ): Promise<boolean> {
-  const workspaceRuntimeId = currentWorkspaceRuntimeId(useWorkspacesStore.getState(), input.workspaceId)
+  const workspaceRuntimeId = currentWorkspaceRuntimeId(workspacesStore.getState(), input.workspaceId)
   if (!workspaceRuntimeId) return false
   const sourceRoute = input.workspacePaneRoute
   const paneTarget = requiredGitWorkspacePaneTabsTarget(input.workspaceId, input.branchName, input.worktreePath ?? null)
@@ -270,7 +270,7 @@ async function openWorkspacePaneStaticTabAction(
     })
   )
     return { kind: 'blocked' }
-  const state = useWorkspacesStore.getState()
+  const state = workspacesStore.getState()
   const workspace = state.workspaces[input.workspaceId]
   if (!workspace) return { kind: 'target-missing' }
   if (workspace.workspaceRuntimeId !== input.workspaceRuntimeId) return { kind: 'superseded' }
@@ -297,7 +297,7 @@ async function openWorkspacePaneStaticTabAction(
   if (!committed.ok) return { kind: 'mutation-failed' }
   const liveTarget = resolveWorkspacePaneDestinationTarget(input.workspaceId, branchName)
   if (
-    currentWorkspaceRuntimeId(useWorkspacesStore.getState(), input.workspaceId) !== input.workspaceRuntimeId ||
+    currentWorkspaceRuntimeId(workspacesStore.getState(), input.workspaceId) !== input.workspaceRuntimeId ||
     liveTarget.kind !== 'ready' ||
     liveTarget.lease.workspaceRuntimeId !== input.workspaceRuntimeId ||
     liveTarget.lease.worktreePath !== input.worktreePath

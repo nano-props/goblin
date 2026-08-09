@@ -1,48 +1,44 @@
-import { useCallback, useMemo } from 'react'
+import { computed, defineComponent, onMounted, onScopeDispose, shallowRef } from 'vue'
+import type { FunctionalComponent, PropType } from 'vue'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
-import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import {
-  isPendingWorkspacePaneTabItem,
-  type WorkspacePaneTabItem,
-} from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
-import { WorkspacePaneToolbar } from '#/web/components/workspace-pane/WorkspacePaneToolbar.tsx'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
-import { useT } from '#/web/stores/i18n.ts'
+import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
-import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
-import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
-import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
-import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
-import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import {
-  workspacePaneTabEntryForItem,
-  workspacePaneTabItems,
-} from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
-import {
-  showCreatedTerminalWorkspacePaneRuntimeTab,
-  type CreatedTerminalRouteRequest,
-} from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import type {
-  WorkspacePaneFilesystemTarget,
-  WorkspacePaneSurfaceTarget,
-} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import {
-  workspacePaneFilesystemRootPath,
-  workspacePaneFilesystemTerminalBase,
-} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import {
   WorkspaceExternalAppLauncher,
   useWorkspaceExternalAppItems,
 } from '#/web/components/workspace-pane/WorkspaceExternalAppLauncher.tsx'
-import type { WorkspaceExternalAppItem } from '#/web/external-workspace-apps.tsx'
+import { WorkspacePaneToolbar } from '#/web/components/workspace-pane/WorkspacePaneToolbar.tsx'
+import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
+import type { WorkspacePaneTabDragPreviewState } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
+import { isPendingWorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
+import type { WorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import type { WorkspaceExternalAppItem } from '#/web/external-workspace-apps.tsx'
+import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
+import type {
+  WorkspacePaneFilesystemTarget,
+  WorkspacePaneSurfaceTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import type { CreatedTerminalRouteRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
+import {
+  workspacePaneTabEntryForItem,
+  workspacePaneTabItems,
+} from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
+import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
+import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
+import type { WorkspacePaneTabsReorderMutationInput } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 
 interface WorkspacePaneTargetToolbarProps {
   target: WorkspacePaneSurfaceTarget
@@ -59,57 +55,74 @@ type WorkspacePaneFilesystemTargetToolbarProps = Omit<WorkspacePaneTargetToolbar
   target: WorkspacePaneFilesystemTarget
 }
 
-export function WorkspacePaneTargetToolbar(props: WorkspacePaneTargetToolbarProps) {
-  return props.target.kind === 'git-branch' ? (
+export const WorkspacePaneTargetToolbar: FunctionalComponent<WorkspacePaneTargetToolbarProps> = (props) =>
+  props.target.kind === 'git-branch' ? (
     <WorkspacePaneTargetToolbarContent {...props} externalAppItems={[]} />
   ) : (
     <WorkspacePaneFilesystemTargetToolbar {...props} target={props.target} />
   )
+
+WorkspacePaneTargetToolbar.props = [
+  'target',
+  'model',
+  'workspacePaneId',
+  'workspacePaneRoute',
+  'statusCount',
+  'trafficLightOffset',
+  'onBackToNavigator',
+  'staticTabAvailable',
+]
+
+const WorkspacePaneFilesystemTargetToolbar = defineComponent(
+  (props: WorkspacePaneFilesystemTargetToolbarProps) => {
+    const externalAppItems = useWorkspaceExternalAppItems(() => props.target)
+    return () => <WorkspacePaneTargetToolbarContent {...props} externalAppItems={externalAppItems.value} />
+  },
+  {
+    name: 'WorkspacePaneFilesystemTargetToolbar',
+    props: [
+      'target',
+      'model',
+      'workspacePaneId',
+      'workspacePaneRoute',
+      'statusCount',
+      'trafficLightOffset',
+      'onBackToNavigator',
+      'staticTabAvailable',
+    ],
+  },
+)
+
+interface WorkspacePaneTargetToolbarContentProps extends WorkspacePaneTargetToolbarProps {
+  externalAppItems: readonly WorkspaceExternalAppItem[]
 }
 
-function WorkspacePaneFilesystemTargetToolbar(props: WorkspacePaneFilesystemTargetToolbarProps) {
-  const externalAppItems = useWorkspaceExternalAppItems(props.target)
-  return <WorkspacePaneTargetToolbarContent {...props} externalAppItems={externalAppItems} />
-}
+const WorkspacePaneTargetToolbarContent = defineComponent(
+  (props: WorkspacePaneTargetToolbarContentProps) => {
+    const t = useT()
+    const compact = useIsCompactUi()
+    const navigation = useAppNavigation()
+    const { scrollToBottom } = useTerminalSessionContext()
+    const routeTarget = computed(() => requiredWorkspacePaneModelTarget(props.model.routeTarget, 'route'))
+    const persistenceTarget = computed(() => requiredWorkspacePaneModelTarget(props.model.paneTarget, 'persistence'))
+    const commandTarget = computed(() =>
+      workspacePaneCommandTargetForSurface(routeTarget.value, props.target, props.workspacePaneRoute),
+    )
+    const worktreeHead = computed(() => (props.target.kind === 'git-worktree' ? props.target.head : undefined))
+    // Scroll memory is local to one runtime epoch. A reopened workspace can
+    // reuse the same durable target identity with a different tab projection.
+    const targetKey = computed(
+      () => `${props.target.workspaceRuntimeId}\0${workspacePaneTabsTargetIdentityKey(persistenceTarget.value)}`,
+    )
 
-function WorkspacePaneTargetToolbarContent({
-  target,
-  model,
-  workspacePaneId,
-  workspacePaneRoute,
-  statusCount,
-  trafficLightOffset = false,
-  onBackToNavigator,
-  staticTabAvailable,
-  externalAppItems,
-}: WorkspacePaneTargetToolbarProps & { externalAppItems: readonly WorkspaceExternalAppItem[] }) {
-  const t = useT()
-  const compact = useIsCompactUi()
-  const navigation = useAppNavigation()
-  const { scrollToBottom } = useTerminalSessionContext()
-  const branchName = model.branchName
-  const filesystemTarget = target.kind === 'git-branch' ? null : target
-  const showExternalAppLauncher = !compact && filesystemTarget !== null && externalAppItems.length > 0
-  const routeTarget = requiredWorkspacePaneModelTarget(model.routeTarget, 'route')
-  const persistenceTarget = requiredWorkspacePaneModelTarget(model.paneTarget, 'persistence')
-  const commandTarget = workspacePaneCommandTargetForSurface(routeTarget, target, workspacePaneRoute)
-  const worktreeHead = useMemo(
-    () => (target.kind === 'git-worktree' ? target.head : undefined),
-    [branchName, target.kind],
-  )
-  // Scroll memory is local to one runtime epoch. A reopened workspace can
-  // reuse the same durable target identity with a different tab projection.
-  const targetKey = `${target.workspaceRuntimeId}\0${workspacePaneTabsTargetIdentityKey(persistenceTarget)}`
-  const showCreatedRuntimeTab = useCallback(
-    (
+    const showCreatedRuntimeTab = (
       type: WorkspacePaneRuntimeTabType,
       sessionId: string,
       presentation: TerminalPresentation,
       runtimeTarget: RuntimeWorkspacePaneTarget,
       routeRequest: CreatedTerminalRouteRequest,
-    ) => {
-      if (type !== 'terminal') return false
-      if (target.kind === 'git-branch') return false
+    ): boolean | Promise<boolean> => {
+      if (type !== 'terminal' || props.target.kind === 'git-branch') return false
       if (runtimeTarget.kind === 'workspace-root' && presentation.kind === 'workspace-root') {
         return showCreatedTerminalWorkspacePaneRuntimeTab(
           { target: runtimeTarget, presentation },
@@ -127,96 +140,191 @@ function WorkspacePaneTargetToolbarContent({
         )
       }
       return false
-    },
-    [navigation, target],
-  )
-  const createAction = useWorkspacePaneRuntimeTabCreateAction({
-    routeTarget,
-    base: target.kind === 'git-branch' ? null : workspacePaneFilesystemTerminalBase(target),
-    runtimeTabStateByType: model.runtimeTabStateByType,
-    workspacePaneRoute,
-    showCreatedRuntimeTab,
-    t,
-  })
-  const items = useMemo(
-    () =>
+    }
+
+    const createAction = useWorkspacePaneRuntimeTabCreateAction({
+      routeTarget: () => routeTarget.value,
+      base: () => (props.target.kind === 'git-branch' ? null : workspacePaneFilesystemTerminalBase(props.target)),
+      runtimeTabStateByType: () => props.model.runtimeTabStateByType,
+      workspacePaneRoute: () => props.workspacePaneRoute,
+      showCreatedRuntimeTab,
+      t,
+    })
+    const items = computed(() =>
       workspacePaneTabItems({
-        model,
-        workspacePaneId,
-        branchName,
-        statusCount,
+        model: props.model,
+        workspacePaneId: props.workspacePaneId,
+        branchName: props.model.branchName,
+        statusCount: props.statusCount,
         t,
-        staticTabAvailable,
+        staticTabAvailable: props.staticTabAvailable,
       }),
-    [branchName, model.runtimeTabStateByType, model.tabs, staticTabAvailable, statusCount, t, target, workspacePaneId],
-  )
-  const { visualTabs, stageDragPreview, clearDragPreview } = useWorkspacePaneTabDragPreview({
-    ...persistenceTarget,
-    workspaceRuntimeId: target.workspaceRuntimeId,
-    canonicalTabs: model.tabEntries,
-  })
-  const { reorderTabs } = useWorkspacePaneTabsReorderMutation({
-    ...persistenceTarget,
-    workspaceRuntimeId: target.workspaceRuntimeId,
-    canonicalTabs: model.tabEntries,
-    onReorderRejected: clearDragPreview,
-  })
-  const visualItems = useMemo(
-    () => orderWorkspacePaneItemsByTabEntries(items, visualTabs, workspacePaneTabEntryForItem),
-    [items, visualTabs],
-  )
-  const selectItem = useCallback(
-    (item: WorkspacePaneTabItem, reselect: boolean) => {
+    )
+    const dragPreviewOwner = shallowRef<WorkspacePaneTabDragPreviewOwner | null>(null)
+    const activateDragPreviewOwner = (owner: WorkspacePaneTabDragPreviewOwner) => {
+      dragPreviewOwner.value = owner
+    }
+    const disposeDragPreviewOwner = (owner: WorkspacePaneTabDragPreviewOwner) => {
+      if (dragPreviewOwner.value === owner) dragPreviewOwner.value = null
+    }
+    const tabsReorder = useWorkspacePaneTabsReorderMutation(() =>
+      tabsMutationInput(persistenceTarget.value, props.target.workspaceRuntimeId, props.model.tabEntries),
+    )
+    const visualTabs = computed(() => {
+      const owner = dragPreviewOwner.value
+      return owner?.key === targetKey.value ? owner.preview.visualTabs.value : props.model.tabEntries
+    })
+    const visualItems = computed(() =>
+      orderWorkspacePaneItemsByTabEntries(items.value, visualTabs.value, workspacePaneTabEntryForItem),
+    )
+    const activeTabIdentity = computed(() => props.model.activeTab?.identity ?? activePendingTabIdentity(props.model))
+
+    const selectItem = (item: WorkspacePaneTabItem, reselect: boolean) => {
       if (isPendingWorkspacePaneTabItem(item)) return
       void dispatchSelectWorkspacePaneTabByIdentityAction({
-        workspaceId: target.workspaceId,
-        routeTarget,
-        paneTarget: persistenceTarget,
-        worktreeHead,
-        workspacePaneRoute,
+        workspaceId: props.target.workspaceId,
+        routeTarget: routeTarget.value,
+        paneTarget: persistenceTarget.value,
+        worktreeHead: worktreeHead.value,
+        workspacePaneRoute: props.workspacePaneRoute,
         identity: item.identity,
         navigation,
         onTerminalReselect: scrollToBottom,
         reselect,
       })
-    },
-    [navigation, persistenceTarget, routeTarget, scrollToBottom, target.workspaceId, workspacePaneRoute, worktreeHead],
-  )
-  const activeTabIdentity = model.activeTab?.identity ?? activePendingTabIdentity(model)
+    }
 
-  return (
-    <WorkspacePaneToolbar
-      workspacePaneTabTargetKey={targetKey}
-      items={visualItems}
-      workspacePaneId={workspacePaneId}
-      activeTabIdentity={activeTabIdentity}
-      createAction={target.capabilities.terminal.available ? createAction : null}
-      trafficLightOffset={trafficLightOffset}
-      onBackToNavigator={onBackToNavigator}
-      trailingActions={
-        showExternalAppLauncher ? (
-          <WorkspaceExternalAppLauncher target={filesystemTarget} items={externalAppItems} />
-        ) : null
-      }
-      onSelect={(item) => selectItem(item, false)}
-      onReselect={(item) => selectItem(item, true)}
-      onClose={(item) => {
-        if (isPendingWorkspacePaneTabItem(item)) return
-        void runCloseWorkspacePaneTabCommand({
-          workspaceId: target.workspaceId,
-          target: commandTarget,
-          targetIdentity: item.identity,
-          runtimeView: item.kind === 'runtime' ? item.view : undefined,
-          selectedIdentity: model.selectedIdentity,
-          navigation,
-        })
-      }}
-      onReorder={(tabs: WorkspacePaneTabEntry[]) => {
-        if (!stageDragPreview(tabs)) return
-        reorderTabs(tabs)
-      }}
-    />
-  )
+    return () => {
+      const filesystemTarget = props.target.kind === 'git-branch' ? null : props.target
+      const showExternalAppLauncher = !compact.value && filesystemTarget !== null && props.externalAppItems.length > 0
+
+      return (
+        <>
+          <WorkspacePaneTabDragPreviewOwner
+            key={targetKey.value}
+            ownerKey={targetKey.value}
+            canonicalTabs={props.model.tabEntries}
+            onActivate={activateDragPreviewOwner}
+            onDispose={disposeDragPreviewOwner}
+          />
+          <WorkspacePaneToolbar
+            key="workspace-pane-toolbar"
+            workspacePaneTabTargetKey={targetKey.value}
+            items={visualItems.value}
+            workspacePaneId={props.workspacePaneId}
+            activeTabIdentity={activeTabIdentity.value}
+            createAction={props.target.capabilities.terminal.available ? createAction.value : null}
+            trafficLightOffset={props.trafficLightOffset ?? false}
+            onBackToNavigator={props.onBackToNavigator}
+            trailingActions={
+              showExternalAppLauncher ? (
+                <WorkspaceExternalAppLauncher target={filesystemTarget} items={props.externalAppItems} />
+              ) : null
+            }
+            onSelect={(item) => selectItem(item, false)}
+            onReselect={(item) => selectItem(item, true)}
+            onClose={(item, presentationEffects) => {
+              if (isPendingWorkspacePaneTabItem(item)) {
+                presentationEffects?.onAbandon()
+                return
+              }
+              void runCloseWorkspacePaneTabCommand({
+                workspaceId: props.target.workspaceId,
+                target: commandTarget.value,
+                targetIdentity: item.identity,
+                runtimeView: item.kind === 'runtime' ? item.view : undefined,
+                selectedIdentity: props.model.selectedIdentity,
+                navigation,
+                ...(presentationEffects ? { presentationEffects } : {}),
+              })
+            }}
+            onReorder={(tabs: WorkspacePaneTabEntry[]) => {
+              const owner = dragPreviewOwner.value
+              const releasePreview = owner?.key === targetKey.value ? owner.preview.stageDragPreview(tabs) : null
+              if (!releasePreview) return
+              tabsReorder.reorderTabs(tabs, releasePreview)
+            }}
+          />
+        </>
+      )
+    }
+  },
+  {
+    name: 'WorkspacePaneTargetToolbarContent',
+    props: [
+      'target',
+      'model',
+      'workspacePaneId',
+      'workspacePaneRoute',
+      'statusCount',
+      'trafficLightOffset',
+      'onBackToNavigator',
+      'staticTabAvailable',
+      'externalAppItems',
+    ],
+  },
+)
+
+interface WorkspacePaneTabDragPreviewOwner {
+  key: string
+  preview: WorkspacePaneTabDragPreviewState
+}
+
+const WorkspacePaneTabDragPreviewOwner = defineComponent(
+  (props: {
+    ownerKey: string
+    canonicalTabs: readonly WorkspacePaneTabEntry[]
+    onActivate: (owner: WorkspacePaneTabDragPreviewOwner) => void
+    onDispose: (owner: WorkspacePaneTabDragPreviewOwner) => void
+  }) => {
+    const owner: WorkspacePaneTabDragPreviewOwner = {
+      key: props.ownerKey,
+      preview: useWorkspacePaneTabDragPreview(() => props.canonicalTabs),
+    }
+    onMounted(() => props.onActivate(owner))
+    onScopeDispose(() => props.onDispose(owner))
+    return () => null
+  },
+  {
+    name: 'WorkspacePaneTabDragPreviewOwner',
+    props: {
+      ownerKey: { type: String, required: true },
+      canonicalTabs: { type: Array as PropType<WorkspacePaneTabEntry[]>, required: true },
+      onActivate: { type: Function as PropType<(owner: WorkspacePaneTabDragPreviewOwner) => void>, required: true },
+      onDispose: { type: Function as PropType<(owner: WorkspacePaneTabDragPreviewOwner) => void>, required: true },
+    },
+  },
+)
+
+function tabsMutationInput(
+  target: WorkspacePaneTabsTarget,
+  workspaceRuntimeId: string,
+  canonicalTabs: readonly WorkspacePaneTabEntry[],
+): WorkspacePaneTabsReorderMutationInput {
+  if (target.kind === 'workspace-root') {
+    return {
+      kind: 'workspace-root',
+      workspaceId: target.workspaceId,
+      workspaceRuntimeId,
+      canonicalTabs,
+    }
+  }
+  if (target.kind === 'git-branch') {
+    return {
+      kind: 'git-branch',
+      workspaceId: target.workspaceId,
+      branchName: target.branchName,
+      workspaceRuntimeId,
+      canonicalTabs,
+    }
+  }
+  return {
+    kind: 'git-worktree',
+    workspaceId: target.workspaceId,
+    worktreePath: target.worktreePath,
+    workspaceRuntimeId,
+    canonicalTabs,
+  }
 }
 
 function requiredWorkspacePaneModelTarget(

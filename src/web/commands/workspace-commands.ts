@@ -1,4 +1,4 @@
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import {
   dispatchCloseCurrentWorkspacePaneTabAction,
@@ -35,6 +35,7 @@ import {
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
+import type { WorkspacePaneTabClosePresentationEffects } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
@@ -71,6 +72,7 @@ interface CloseWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTar
   selectedIdentity?: string | null
   skipTerminalCloseConfirm?: boolean
   skipRuntimeCloseConfirm?: boolean
+  presentationEffects?: WorkspacePaneTabClosePresentationEffects
 }
 
 interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
@@ -82,6 +84,7 @@ interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
   selectedIdentity: string | null
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   confirmedTerminal: ConfirmedTerminalWorkspacePaneTabClose
+  presentationEffects?: WorkspacePaneTabClosePresentationEffects
 }
 
 interface RetiredTerminalWorkspacePaneTabPresentationCommandOptions {
@@ -192,43 +195,69 @@ export async function runNewTerminalTabCommand(options: NewTerminalTabCommandOpt
 }
 
 export async function runCloseWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
-  if (!options.workspaceId) return false
-  return await dispatchCloseWorkspacePaneTabAction({
-    ...options,
-    ...workspacePaneCommandCoordinates(options.target),
-    routeTarget: workspacePaneCommandRouteTarget(options.target),
-    paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
-    worktreeHead: workspacePaneCommandWorktreeHead(options.target),
-  })
+  const presentationEffects = options.presentationEffects
+  if (!options.workspaceId) {
+    presentationEffects?.onAbandon()
+    return false
+  }
+  try {
+    return dispatchCloseWorkspacePaneTabAction({
+      ...options,
+      ...workspacePaneCommandCoordinates(options.target),
+      routeTarget: workspacePaneCommandRouteTarget(options.target),
+      paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
+      worktreeHead: workspacePaneCommandWorktreeHead(options.target),
+    })
+  } catch (error) {
+    presentationEffects?.onAbandon()
+    throw error
+  }
 }
 
 export async function runCloseCurrentWorkspacePaneTabCommand(
   options: CloseCurrentWorkspacePaneTabCommandOptions,
 ): Promise<boolean> {
-  if (!options.workspaceId) return false
-  if (options.target.workspacePaneRoute === null) return false
-  return await dispatchCloseCurrentWorkspacePaneTabAction({
-    ...options,
-    ...workspacePaneCommandCoordinates(options.target),
-    routeTarget: workspacePaneCommandRouteTarget(options.target),
-    paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
-    worktreeHead: workspacePaneCommandWorktreeHead(options.target),
-  })
+  const presentationEffects = options.presentationEffects
+  if (!options.workspaceId || options.target.workspacePaneRoute === null) {
+    presentationEffects?.onAbandon()
+    return false
+  }
+  try {
+    return dispatchCloseCurrentWorkspacePaneTabAction({
+      ...options,
+      ...workspacePaneCommandCoordinates(options.target),
+      routeTarget: workspacePaneCommandRouteTarget(options.target),
+      paneTarget: workspacePaneCommandPaneTarget(options.workspaceId, options.target),
+      worktreeHead: workspacePaneCommandWorktreeHead(options.target),
+    })
+  } catch (error) {
+    presentationEffects?.onAbandon()
+    throw error
+  }
 }
 
 export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
   options: ConfirmCloseTerminalWorkspacePaneTabCommandOptions,
 ): Promise<boolean> {
-  const paneTarget = workspacePaneTabsTargetFromRuntime(options.confirmedTerminal.base.target)
-  if (!paneTarget) return false
-  return await dispatchConfirmCloseTerminalWorkspacePaneTabAction({
-    ...options,
-    paneTarget,
-    worktreeHead:
-      options.confirmedTerminal.base.presentation.kind === 'git-worktree'
-        ? options.confirmedTerminal.base.presentation.head
-        : undefined,
-  })
+  const presentationEffects = options.presentationEffects
+  try {
+    const paneTarget = workspacePaneTabsTargetFromRuntime(options.confirmedTerminal.base.target)
+    if (!paneTarget) {
+      presentationEffects?.onAbandon()
+      return false
+    }
+    return dispatchConfirmCloseTerminalWorkspacePaneTabAction({
+      ...options,
+      paneTarget,
+      worktreeHead:
+        options.confirmedTerminal.base.presentation.kind === 'git-worktree'
+          ? options.confirmedTerminal.base.presentation.head
+          : undefined,
+    })
+  } catch (error) {
+    presentationEffects?.onAbandon()
+    throw error
+  }
 }
 
 export function runRetiredTerminalWorkspacePaneTabPresentationCommand(

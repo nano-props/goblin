@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
-import SSHConfig, { LineType, type Line, type Section } from '#/system/ssh/vendor/ssh-config/index.ts'
+import SSHConfig, { LineType, type Line, type Section } from '#/system/ssh/vendor/ssh-config/ssh-config.ts'
 import { buildCanonicalSshConnectionSnapshot } from '#/system/ssh/invocation.ts'
 import { isValidSshProfile } from '#/shared/workspace-locator.ts'
 import {

@@ -7,7 +7,7 @@ import {
   type WorkspacePaneStaticTabType,
   type WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
@@ -50,7 +50,7 @@ export function beginWorkspacePaneTabEntryClose(
 
 function closeStaticTabWithCommit(target: WorkspacePaneTabModel) {
   return async (type: WorkspacePaneStaticTabType): Promise<boolean> => {
-    const workspace = useWorkspacesStore.getState().workspaces[target.workspaceId]
+    const workspace = workspacesStore.getState().workspaces[target.workspaceId]
     if (!workspace) return false
     if (target.paneTarget.kind === 'inactive') return false
     const persistenceTarget = target.paneTarget

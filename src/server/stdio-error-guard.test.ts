@@ -11,11 +11,11 @@ describe('stdio error guard', () => {
     expect(isRecoverableStdioWriteError(Object.assign(new Error('write failed'), { code }))).toBe(true)
   })
 
-  test('does not treat unknown errors as recoverable', () => {
+  test('does not treat unknown errors as recoverable', async () => {
     expect(isRecoverableStdioWriteError(Object.assign(new Error('boom'), { code: 'EINVAL' }))).toBe(false)
   })
 
-  test('swallows recoverable stream error events', () => {
+  test('swallows recoverable stream error events', async () => {
     const stream = new EventEmitter()
     attachRecoverableStdioErrorHandler(stream as never)
 
@@ -24,7 +24,7 @@ describe('stdio error guard', () => {
     }).not.toThrow()
   })
 
-  test('rethrows non-stdio stream errors', () => {
+  test('rethrows non-stdio stream errors', async () => {
     const stream = new EventEmitter()
     attachRecoverableStdioErrorHandler(stream as never)
 
@@ -33,7 +33,7 @@ describe('stdio error guard', () => {
     }).toThrow('bad write')
   })
 
-  test('installs handlers only once per process object', () => {
+  test('installs handlers only once per process object', async () => {
     const stdout = { on: vi.fn() }
     const stderr = { on: vi.fn() }
     const processLike = { stdout, stderr } as never

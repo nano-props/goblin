@@ -601,7 +601,7 @@ describe('TerminalSession recovery, focus, and lifecycle presentation', () => {
     expect(settled).toHaveBeenCalledOnce()
   })
 
-  test('settles a focus lease when its initial currency check throws', () => {
+  test('settles a focus lease when its initial currency check throws', async () => {
     const host = createTerminalHost()
     const session = new TerminalSession(descriptor, vi.fn())
     hydrateManagedSession(session)

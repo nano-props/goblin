@@ -118,7 +118,7 @@ describe('commitWorkspacePaneTabs', () => {
     expect(readTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
-  test('rejects a lower-revision canonical response', () => {
+  test('rejects a lower-revision canonical response', async () => {
     expect(
       writeCanonicalWorkspacePaneTabsSnapshot(
         REPO_ROOT,

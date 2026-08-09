@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
@@ -22,10 +23,6 @@ vi.mock('#/web/lib/server-fetch.ts', () => ({
   postServerJson: vi.fn(),
 }))
 
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useT: () => (key: string) => key,
-}))
-
 beforeEach(() => {
   authMock.status.state = 'unauthenticated'
   authMock.status.refresh = vi.fn()
@@ -33,7 +30,7 @@ beforeEach(() => {
 })
 
 describe('TokenGate', () => {
-  test('passes through authenticated children', () => {
+  test('passes through authenticated children', async () => {
     authMock.status.state = 'authenticated'
 
     renderInJsdom(
@@ -91,7 +88,7 @@ describe('TokenGate', () => {
     })
     expect(screen.queryByText('bad token')).toBeNull()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       retry.resolve({ ok: true })
       await retry.promise
     })

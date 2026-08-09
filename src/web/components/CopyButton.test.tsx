@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CopyButton } from '#/web/components/CopyButton.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -25,13 +25,13 @@ describe('CopyButton', () => {
     writeText.mockReturnValueOnce(firstWrite.promise)
 
     const { container, rerender } = renderInJsdom(<CopyButton value="first" copyLabel="Copy" copiedLabel="Copied" />)
-    act(() => {
+    await flushTestUpdates(() => {
       container.querySelector<HTMLButtonElement>('button[aria-label="Copy"]')!.click()
     })
 
-    rerender(<CopyButton value="second" copyLabel="Copy" copiedLabel="Copied" />)
+    await rerender(<CopyButton value="second" copyLabel="Copy" copiedLabel="Copied" />)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       firstWrite.resolve()
       await firstWrite.promise
     })

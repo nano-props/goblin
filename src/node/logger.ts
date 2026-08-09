@@ -1,12 +1,9 @@
 // Node-side logger (Electron main, preload, system utilities).
 //
 // Mirrors `src/web/logger.ts` for symmetry: one pino instance with tagged
-// children. The Hono server already has `serverLogger` in
-// `src/server/logger.ts`, which is kept as a thin re-export of this
-// module — keeping the established `serverLogger` import path working
-// across `src/server/*` while collapsing the configuration to one place.
+// children shared directly by Electron, the Hono server, and system utilities.
 //
-// Level policy (matches `src/server/logger.ts`):
+// Level policy:
 //   - Test runs: Silent. `bun run test` runs under NODE_ENV=test, and
 //     pino's `silent` level drops every record at the source so the
 //     test output stays free of stack frames that aren't failures.

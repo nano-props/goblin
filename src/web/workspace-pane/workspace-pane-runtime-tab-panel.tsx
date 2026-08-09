@@ -1,19 +1,20 @@
-import { useCallback, type ReactNode } from 'react'
+import { defineComponent } from 'vue'
+import type { VNodeChild } from 'vue'
+import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalPresentation, TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
+import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
 import {
   dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
   showCreatedTerminalWorkspacePaneRuntimeTab,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
-import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
-import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
-import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
-import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface WorkspacePaneRuntimeTabPanelState {
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
@@ -39,43 +40,15 @@ interface WorkspacePaneRuntimeTabPanelProps extends Omit<WorkspacePaneRuntimeTab
   runtimeType: WorkspacePaneRuntimeTabType
 }
 
-type WorkspacePaneRuntimeTabPanelComponent = (props: WorkspacePaneRuntimeTabPanelProps) => ReactNode
+const TerminalWorkspacePaneRuntimeTabPanel = defineComponent(
+  (props: WorkspacePaneRuntimeTabPanelProps) => {
+    const t = useT()
+    const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
+    const navigation = useAppNavigation()
 
-const WORKSPACE_PANE_RUNTIME_TAB_PANEL_BY_TYPE: Record<
-  WorkspacePaneRuntimeTabType,
-  WorkspacePaneRuntimeTabPanelComponent
-> = {
-  terminal: TerminalWorkspacePaneRuntimeTabPanel,
-}
-
-export function renderWorkspacePaneRuntimeTabPanel(input: WorkspacePaneRuntimeTabPanelRenderInput): ReactNode {
-  const Panel = WORKSPACE_PANE_RUNTIME_TAB_PANEL_BY_TYPE[input.type]
-  return (
-    <Panel
-      runtimeType={input.type}
-      workspacePaneId={input.workspacePaneId}
-      panelLabel={input.panelLabel}
-      target={input.target}
-      selectedSessionId={input.selectedSessionId}
-      runtimeState={input.runtimeState}
-    />
-  )
-}
-
-function TerminalWorkspacePaneRuntimeTabPanel({
-  workspacePaneId,
-  panelLabel,
-  target,
-  selectedSessionId,
-  runtimeState,
-}: WorkspacePaneRuntimeTabPanelProps) {
-  const t = useT()
-  const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
-  const navigation = useAppNavigation()
-  const createTerminalForSlot = useCallback(
-    async (base: TerminalSessionBase) => {
+    const createTerminalForSlot = async (base: TerminalSessionBase) => {
       await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        routeTarget: target.routeTarget,
+        routeTarget: props.target.routeTarget,
         base,
         createTerminal: createTerminalWithAdmission,
         openerIdentity: null,
@@ -102,28 +75,46 @@ function TerminalWorkspacePaneRuntimeTabPanel({
         t,
         logMessage: 'workspace pane terminal create failed',
       })
-    },
-    [createTerminalWithAdmission, focusTerminal, navigation, t, target.routeTarget],
-  )
+    }
 
-  const { runtimeTarget, presentation } = target
-  if (runtimeTarget.kind !== presentation.kind) return null
-  const base: TerminalSessionBase | null =
-    runtimeTarget.kind === 'workspace-root' && presentation.kind === 'workspace-root'
-      ? { target: runtimeTarget, presentation }
-      : runtimeTarget.kind === 'git-worktree' && presentation.kind === 'git-worktree'
-        ? { target: runtimeTarget, presentation }
-        : null
-  if (!base) return null
+    return () => {
+      const { runtimeTarget, presentation } = props.target
+      if (runtimeTarget.kind !== presentation.kind) return null
+      const base: TerminalSessionBase | null =
+        runtimeTarget.kind === 'workspace-root' && presentation.kind === 'workspace-root'
+          ? { target: runtimeTarget, presentation }
+          : runtimeTarget.kind === 'git-worktree' && presentation.kind === 'git-worktree'
+            ? { target: runtimeTarget, presentation }
+            : null
+      if (!base) return null
+      return (
+        <WorkspacePanePanelFrame id={`${props.workspacePaneId}-terminal-panel`} {...props.panelLabel}>
+          <TerminalSessionView
+            base={base}
+            selectedTerminalSessionId={props.selectedSessionId}
+            projectionPhase={props.runtimeState.projectionPhase}
+            projectionErrorMessage={props.runtimeState.projectionErrorMessage}
+            createTerminalForSlot={createTerminalForSlot}
+          />
+        </WorkspacePanePanelFrame>
+      )
+    }
+  },
+  {
+    name: 'TerminalWorkspacePaneRuntimeTabPanel',
+    props: ['runtimeType', 'workspacePaneId', 'panelLabel', 'target', 'selectedSessionId', 'runtimeState'],
+  },
+)
+
+export function renderWorkspacePaneRuntimeTabPanel(input: WorkspacePaneRuntimeTabPanelRenderInput): VNodeChild {
   return (
-    <WorkspacePanePanelFrame id={`${workspacePaneId}-terminal-panel`} {...panelLabel}>
-      <TerminalSessionView
-        base={base}
-        selectedTerminalSessionId={selectedSessionId}
-        projectionPhase={runtimeState.projectionPhase}
-        projectionErrorMessage={runtimeState.projectionErrorMessage}
-        createTerminalForSlot={createTerminalForSlot}
-      />
-    </WorkspacePanePanelFrame>
+    <TerminalWorkspacePaneRuntimeTabPanel
+      runtimeType={input.type}
+      workspacePaneId={input.workspacePaneId}
+      panelLabel={input.panelLabel}
+      target={input.target}
+      selectedSessionId={input.selectedSessionId}
+      runtimeState={input.runtimeState}
+    />
   )
 }

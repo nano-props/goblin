@@ -12,7 +12,7 @@ import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
@@ -26,7 +26,7 @@ export type WorkspacePaneRouteResolution =
   | { kind: 'route'; route: WorkspacePaneRoute | null }
 
 export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: string): WorkspacePaneRouteResolution {
-  const state = useWorkspacesStore.getState()
+  const state = workspacesStore.getState()
   const repo = state.workspaces[repoId]
   if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }
   const branchModel = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)

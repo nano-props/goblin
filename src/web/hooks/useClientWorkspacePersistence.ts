@@ -1,20 +1,23 @@
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
+import { onScopeDispose, shallowRef, toValue, watch } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
+import { shallow } from 'zustand/vanilla/shallow'
 import type { ClientWorkspaceState } from '#/shared/api-types.ts'
 import { writeClientWorkspaceState } from '#/web/client-workspace-state.ts'
 import { subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 import { sessionLog } from '#/web/logger.ts'
 import { clientWorkspaceStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
-import { useFiletreeInteractionStore } from '#/web/stores/workspaces/filetree-interaction-state.ts'
+import { filetreeInteractionStore } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import {
   restorableWorkspaceStateFromStore,
   workspaceSessionPersistenceOpenFromStore,
 } from '#/web/stores/workspaces/selector-state.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   subscribeWorkspacePaneTabsPersistenceChanges,
   workspacePaneTabsPersistenceSnapshot,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
 const CLIENT_WORKSPACE_SAVE_DEBOUNCE_MS = 200
 
@@ -22,137 +25,116 @@ interface ClientWorkspacePersistenceInput {
   workspaceMembershipReady: boolean
   sessionPersistenceReady: boolean
   sessionRestoreError: string | null
-  restoredClientWorkspaceBaseline: ReturnType<typeof useWorkspacesStore.getState>['restoredClientWorkspaceBaseline']
-  workspaces: ReturnType<typeof useWorkspacesStore.getState>['workspaces']
+  restoredClientWorkspaceBaseline: ReturnType<typeof workspacesStore.getState>['restoredClientWorkspaceBaseline']
+  workspaces: ReturnType<typeof workspacesStore.getState>['workspaces']
   workspaceOrder: WorkspaceId[]
   restoredWorkspaceId: WorkspaceId | null
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalFilesystemTarget: Record<string, string>
-  branchViewModeByWorkspace: ReturnType<typeof useWorkspacesStore.getState>['branchViewModeByWorkspace']
+  branchViewModeByWorkspace: ReturnType<typeof workspacesStore.getState>['branchViewModeByWorkspace']
   filetreeInteractionByScope: Parameters<
     typeof clientWorkspaceStateFromRestorableWorkspaceState
   >[0]['filetreeInteractionByScope']
 }
 
-export function useClientWorkspacePersistence({ routedWorkspaceId }: { routedWorkspaceId: WorkspaceId | null }) {
-  const restoredWorkspaceId = useWorkspacesStore((s) => s.restoredWorkspaceId)
-  const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
-  const zenMode = useWorkspacesStore((s) => s.zenMode)
-  const workspacePaneSize = useWorkspacesStore((s) => s.workspacePaneSize)
-  const selectedTerminalSessionIdByTerminalFilesystemTarget = useWorkspacesStore(
-    (s) => s.selectedTerminalSessionIdByTerminalFilesystemTarget,
+export function useClientWorkspacePersistence({
+  routedWorkspaceId,
+}: {
+  routedWorkspaceId: MaybeRefOrGetter<WorkspaceId | null>
+}) {
+  const persistenceInput = useStoreSelector(
+    workspacesStore,
+    (state): Omit<ClientWorkspacePersistenceInput, 'filetreeInteractionByScope'> => ({
+      restoredWorkspaceId: state.restoredWorkspaceId,
+      workspaceOrder: state.workspaceOrder,
+      zenMode: state.zenMode,
+      workspacePaneSize: state.workspacePaneSize,
+      selectedTerminalSessionIdByTerminalFilesystemTarget: state.selectedTerminalSessionIdByTerminalFilesystemTarget,
+      branchViewModeByWorkspace: state.branchViewModeByWorkspace,
+      workspaceMembershipReady: state.workspaceMembershipReady,
+      sessionPersistenceReady: state.sessionPersistenceReady,
+      sessionRestoreError: state.sessionRestoreError,
+      restoredClientWorkspaceBaseline: state.restoredClientWorkspaceBaseline,
+      workspaces: state.workspaces,
+    }),
+    shallow,
   )
-  const branchViewModeByWorkspace = useWorkspacesStore((s) => s.branchViewModeByWorkspace)
-  const workspaceMembershipReady = useWorkspacesStore((s) => s.workspaceMembershipReady)
-  const sessionPersistenceReady = useWorkspacesStore((s) => s.sessionPersistenceReady)
-  const sessionRestoreError = useWorkspacesStore((s) => s.sessionRestoreError)
-  const restoredClientWorkspaceBaseline = useWorkspacesStore((s) => s.restoredClientWorkspaceBaseline)
-  const workspaces = useWorkspacesStore((s) => s.workspaces)
   const workspacePaneTabsVersion = useWorkspacePaneTabsCacheVersion()
-  const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
-  const lastImmediateKeyRef = useRef<string | null>(null)
-  const lastRoutedWorkspaceIdRef = useRef<WorkspaceId | null>(null)
-  const debounceTimerRef = useRef<number | null>(null)
+  const filetreeInteractionByScope = useStoreSelector(filetreeInteractionStore, (state) => state.interactionByScope)
+  let lastImmediateKey: string | null = null
+  let lastRoutedWorkspaceId: WorkspaceId | null = null
+  let debounceTimer: number | null = null
 
-  const latestClientWorkspace = useEffectEvent(() =>
+  const latestClientWorkspace = () =>
     clientWorkspaceFromPersistenceInput(
       {
-        workspaceMembershipReady,
-        sessionPersistenceReady,
-        sessionRestoreError,
-        restoredClientWorkspaceBaseline,
-        workspaces,
-        workspaceOrder,
-        restoredWorkspaceId,
-        zenMode,
-        workspacePaneSize,
-        selectedTerminalSessionIdByTerminalFilesystemTarget,
-        branchViewModeByWorkspace,
-        filetreeInteractionByScope,
+        ...persistenceInput.value,
+        filetreeInteractionByScope: filetreeInteractionByScope.value,
       },
-      routedWorkspaceId ?? lastRoutedWorkspaceIdRef.current,
-    ),
-  )
+      toValue(routedWorkspaceId) ?? lastRoutedWorkspaceId,
+    )
 
-  const flushLatestClientWorkspace = useEffectEvent(async () => {
-    if (debounceTimerRef.current !== null) {
-      window.clearTimeout(debounceTimerRef.current)
-      debounceTimerRef.current = null
+  const flushLatestClientWorkspace = async () => {
+    if (debounceTimer !== null) {
+      window.clearTimeout(debounceTimer)
+      debounceTimer = null
     }
     const workspace = latestClientWorkspace()
     if (!workspace) return
     await writeClientWorkspaceState(workspace)
-  })
+  }
 
-  const flushClientWorkspaceInBackground = useEffectEvent(() => {
+  const flushClientWorkspaceInBackground = () => {
     void flushLatestClientWorkspace().catch(() => {})
-  })
+  }
 
-  useLayoutEffect(() => {
-    if (routedWorkspaceId) lastRoutedWorkspaceIdRef.current = routedWorkspaceId
-  }, [routedWorkspaceId])
-
-  useEffect(() => subscribeAppQuitting(flushLatestClientWorkspace), [])
-
-  useEffect(() => {
-    let workspace: ClientWorkspaceState | null
-    try {
-      workspace = latestClientWorkspace()
-    } catch (err) {
-      sessionLog.warn('local workspace save blocked', { err })
-      return
-    }
-    if (!workspace) return
-    const immediateKey = JSON.stringify({
-      restoredWorkspaceId: workspace.restoredWorkspaceId,
-      zenMode: workspace.zenMode,
-      workspacePaneSize: workspace.workspacePaneSize,
-    })
-    const immediate = immediateKey !== lastImmediateKeyRef.current
-    lastImmediateKeyRef.current = immediateKey
-    if (immediate) {
-      flushClientWorkspaceInBackground()
-      return
-    }
-    if (debounceTimerRef.current !== null) window.clearTimeout(debounceTimerRef.current)
-    debounceTimerRef.current = window.setTimeout(flushClientWorkspaceInBackground, CLIENT_WORKSPACE_SAVE_DEBOUNCE_MS)
-    return () => {
-      if (debounceTimerRef.current !== null) {
-        window.clearTimeout(debounceTimerRef.current)
-        debounceTimerRef.current = null
+  const unsubscribeAppQuitting = subscribeAppQuitting(flushLatestClientWorkspace)
+  // This is the persistence boundary: every accepted restorable-state change
+  // schedules exactly one immediate or debounced write of the complete snapshot.
+  watch(
+    [persistenceInput, workspacePaneTabsVersion, filetreeInteractionByScope, () => toValue(routedWorkspaceId)],
+    () => {
+      const currentRoutedWorkspaceId = toValue(routedWorkspaceId)
+      if (currentRoutedWorkspaceId) lastRoutedWorkspaceId = currentRoutedWorkspaceId
+      let workspace: ClientWorkspaceState | null
+      try {
+        workspace = latestClientWorkspace()
+      } catch (err) {
+        sessionLog.warn('local workspace save blocked', { err })
+        return
       }
-    }
-  }, [
-    workspaceMembershipReady,
-    sessionPersistenceReady,
-    sessionRestoreError,
-    workspaceOrder,
-    restoredWorkspaceId,
-    restoredClientWorkspaceBaseline,
-    routedWorkspaceId,
-    workspacePaneSize,
-    zenMode,
-    selectedTerminalSessionIdByTerminalFilesystemTarget,
-    branchViewModeByWorkspace,
-    workspaces,
-    workspacePaneTabsVersion,
-    filetreeInteractionByScope,
-  ])
+      if (!workspace) return
+      const immediateKey = JSON.stringify({
+        restoredWorkspaceId: workspace.restoredWorkspaceId,
+        zenMode: workspace.zenMode,
+        workspacePaneSize: workspace.workspacePaneSize,
+      })
+      const immediate = immediateKey !== lastImmediateKey
+      lastImmediateKey = immediateKey
+      if (immediate) {
+        flushClientWorkspaceInBackground()
+        return
+      }
+      if (debounceTimer !== null) window.clearTimeout(debounceTimer)
+      debounceTimer = window.setTimeout(flushClientWorkspaceInBackground, CLIENT_WORKSPACE_SAVE_DEBOUNCE_MS)
+    },
+    { immediate: true },
+  )
 
-  useEffect(() => {
-    const flushWhenHidden = () => {
-      if (document.visibilityState === 'hidden') flushClientWorkspaceInBackground()
-    }
-    window.addEventListener('pagehide', flushClientWorkspaceInBackground)
-    window.addEventListener('beforeunload', flushClientWorkspaceInBackground)
-    document.addEventListener('visibilitychange', flushWhenHidden)
-    return () => {
-      window.removeEventListener('pagehide', flushClientWorkspaceInBackground)
-      window.removeEventListener('beforeunload', flushClientWorkspaceInBackground)
-      document.removeEventListener('visibilitychange', flushWhenHidden)
-    }
-  }, [])
+  const flushWhenHidden = () => {
+    if (document.visibilityState === 'hidden') flushClientWorkspaceInBackground()
+  }
+  window.addEventListener('pagehide', flushClientWorkspaceInBackground)
+  window.addEventListener('beforeunload', flushClientWorkspaceInBackground)
+  document.addEventListener('visibilitychange', flushWhenHidden)
+  onScopeDispose(() => {
+    unsubscribeAppQuitting()
+    if (debounceTimer !== null) window.clearTimeout(debounceTimer)
+    window.removeEventListener('pagehide', flushClientWorkspaceInBackground)
+    window.removeEventListener('beforeunload', flushClientWorkspaceInBackground)
+    document.removeEventListener('visibilitychange', flushWhenHidden)
+  })
 }
 
 function clientWorkspaceFromPersistenceInput(
@@ -175,6 +157,11 @@ function clientWorkspaceFromPersistenceInput(
   })
 }
 
-function useWorkspacePaneTabsCacheVersion(): number {
-  return useSyncExternalStore(subscribeWorkspacePaneTabsPersistenceChanges, workspacePaneTabsPersistenceSnapshot)
+function useWorkspacePaneTabsCacheVersion() {
+  const version = shallowRef(workspacePaneTabsPersistenceSnapshot())
+  const unsubscribe = subscribeWorkspacePaneTabsPersistenceChanges(() => {
+    version.value = workspacePaneTabsPersistenceSnapshot()
+  })
+  onScopeDispose(unsubscribe)
+  return version
 }

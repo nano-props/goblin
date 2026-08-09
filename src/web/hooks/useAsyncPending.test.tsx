@@ -1,125 +1,44 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
-import { StrictMode } from 'react'
 import { describe, expect, test, vi } from 'vitest'
+import { nextTick, ref } from 'vue'
+import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
 
 describe('useAsyncPending', () => {
-  test('runs when resetKey is omitted', () => {
+  test('runs synchronous actions without entering pending state', async () => {
     const onRun = vi.fn()
-    const apiRef: { current: ReturnType<typeof useAsyncPending<string>> | null } = { current: null }
+    const { result } = renderComposableInJsdom(() => useAsyncPending<string>())
 
-    renderInJsdom(
-      <UseAsyncPendingHarness
-        onReady={(nextApi) => {
-          apiRef.current = nextApi
-        }}
-      />,
-    )
+    result.value.run('sync', onRun)
 
-    act(() => {
-      apiRef.current?.run('sync', onRun)
-    })
-
-    expect(onRun).toHaveBeenCalledTimes(1)
-    expect(apiRef.current?.hasPending()).toBe(false)
+    expect(onRun).toHaveBeenCalledOnce()
+    expect(result.value.hasPending()).toBe(false)
   })
 
-  test('resetKey clears pending without letting older promises clear newer pending', async () => {
+  test('a changed reset key supersedes older pending work', async () => {
+    const resetKey = ref<string | undefined>('a')
     const first = Promise.withResolvers<void>()
     const second = Promise.withResolvers<void>()
-    const apiRef: { current: ReturnType<typeof useAsyncPending<string>> | null } = { current: null }
+    const { result } = renderComposableInJsdom(() => useAsyncPending<string>({ resetKey }))
 
-    const view = renderInJsdom(
-      <UseAsyncPendingHarness
-        resetKey="a"
-        onReady={(nextApi) => {
-          apiRef.current = nextApi
-        }}
-      />,
-    )
+    void result.value.run('first', () => first.promise)
+    expect(result.value.pending.value).toBe('first')
 
-    await act(async () => {
-      apiRef.current?.run('first', () => first.promise)
-    })
+    resetKey.value = 'b'
+    await nextTick()
+    expect(result.value.pending.value).toBeNull()
+    expect(result.value.hasPending()).toBe(false)
 
-    expect(apiRef.current?.pending).toBe('first')
+    void result.value.run('second', () => second.promise)
+    expect(result.value.pending.value).toBe('second')
 
-    act(() => {
-      view.rerender(
-        <UseAsyncPendingHarness
-          resetKey="b"
-          onReady={(nextApi) => {
-            apiRef.current = nextApi
-          }}
-        />,
-      )
-    })
+    first.resolve()
+    await first.promise
+    expect(result.value.pending.value).toBe('second')
 
-    expect(apiRef.current?.pending).toBeNull()
-    expect(apiRef.current?.hasPending()).toBe(false)
-
-    await act(async () => {
-      apiRef.current?.run('second', () => second.promise)
-    })
-
-    expect(apiRef.current?.pending).toBe('second')
-
-    await act(async () => {
-      first.resolve()
-      await first.promise
-    })
-
-    expect(apiRef.current?.pending).toBe('second')
-
-    await act(async () => {
-      second.resolve()
-      await second.promise
-    })
-
-    expect(apiRef.current?.pending).toBeNull()
-  })
-
-  test('clears pending after async work settles under StrictMode', async () => {
-    const work = Promise.withResolvers<void>()
-    const apiRef: { current: ReturnType<typeof useAsyncPending<string>> | null } = { current: null }
-
-    renderInJsdom(
-      <StrictMode>
-        <UseAsyncPendingHarness
-          onReady={(nextApi) => {
-            apiRef.current = nextApi
-          }}
-        />
-      </StrictMode>,
-    )
-
-    await act(async () => {
-      apiRef.current?.run('work', () => work.promise)
-    })
-
-    expect(apiRef.current?.pending).toBe('work')
-
-    await act(async () => {
-      work.resolve()
-      await work.promise
-    })
-
-    expect(apiRef.current?.pending).toBeNull()
-    expect(apiRef.current?.hasPending()).toBe(false)
+    second.resolve()
+    await second.promise
+    expect(result.value.pending.value).toBeNull()
   })
 })
-
-function UseAsyncPendingHarness({
-  resetKey,
-  onReady,
-}: {
-  resetKey?: string
-  onReady: (api: ReturnType<typeof useAsyncPending<string>>) => void
-}) {
-  const api = useAsyncPending<string>({ resetKey })
-  onReady(api)
-  return null
-}

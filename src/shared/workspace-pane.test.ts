@@ -14,7 +14,7 @@ import {
 } from '#/shared/workspace-pane.ts'
 
 describe('workspace pane runtime tab helpers', () => {
-  test('normalizes terminal as the current runtime tab type', () => {
+  test('normalizes terminal as the current runtime tab type', async () => {
     const entry = workspacePaneRuntimeTabEntry('terminal', 'term-AAAAAAAAAAAAAAAAAAAAA')
 
     expect(entry).toEqual({ type: 'terminal', runtimeSessionId: 'term-AAAAAAAAAAAAAAAAAAAAA' })
@@ -26,7 +26,7 @@ describe('workspace pane runtime tab helpers', () => {
     expect(workspacePaneTabEntryIdentity(entry)).toBe('terminal:term-AAAAAAAAAAAAAAAAAAAAA')
   })
 
-  test('parses runtime tab entries through the shared tab parser', () => {
+  test('parses runtime tab entries through the shared tab parser', async () => {
     expect(
       workspacePaneTabEntryFromUnknown({ type: 'terminal', terminalSessionId: 'term-AAAAAAAAAAAAAAAAAAAAA' }),
     ).toBeNull()
@@ -53,60 +53,60 @@ describe('workspacePaneTabsInsertAfterIdentity', () => {
   const termB = workspacePaneRuntimeTabEntry('terminal', 'term-BBBBBBBBBBBBBBBBBBBBB')
   const termC = workspacePaneRuntimeTabEntry('terminal', 'term-CCCCCCCCCCCCCCCCCCCCC')
 
-  test('appends when anchor is null', () => {
+  test('appends when anchor is null', async () => {
     const current: WorkspacePaneTabEntry[] = [status, files, termA]
     const next = workspacePaneTabsInsertAfterIdentity(current, changes, null)
     expect(next).toEqual([status, files, termA, changes])
   })
 
-  test('appends when anchor is undefined', () => {
+  test('appends when anchor is undefined', async () => {
     const current: WorkspacePaneTabEntry[] = [status, files, termA]
     const next = workspacePaneTabsInsertAfterIdentity(current, changes)
     expect(next).toEqual([status, files, termA, changes])
   })
 
-  test('appends when anchor is an empty string', () => {
+  test('appends when anchor is an empty string', async () => {
     const current: WorkspacePaneTabEntry[] = [status, files]
     const next = workspacePaneTabsInsertAfterIdentity(current, changes, '')
     expect(next).toEqual([status, files, changes])
   })
 
-  test('appends when anchor is not in the list', () => {
+  test('appends when anchor is not in the list', async () => {
     const current: WorkspacePaneTabEntry[] = [status, files]
     const next = workspacePaneTabsInsertAfterIdentity(current, changes, 'terminal:missing')
     expect(next).toEqual([status, files, changes])
   })
 
-  test('inserts immediately to the right of a static anchor', () => {
+  test('inserts immediately to the right of a static anchor', async () => {
     const current: WorkspacePaneTabEntry[] = [status, files, history]
     const next = workspacePaneTabsInsertAfterIdentity(current, changes, workspacePaneStaticTabId('files'))
     expect(next).toEqual([status, files, changes, history])
   })
 
-  test('inserts immediately to the right of a terminal anchor', () => {
+  test('inserts immediately to the right of a terminal anchor', async () => {
     const current: WorkspacePaneTabEntry[] = [status, termA, files, termB]
     const next = workspacePaneTabsInsertAfterIdentity(current, termC, 'terminal:term-AAAAAAAAAAAAAAAAAAAAA')
     expect(next).toEqual([status, termA, termC, files, termB])
   })
 
-  test('inserts after the first tab when anchor matches position 0', () => {
+  test('inserts after the first tab when anchor matches position 0', async () => {
     const current: WorkspacePaneTabEntry[] = [status, files, history]
     const next = workspacePaneTabsInsertAfterIdentity(current, changes, workspacePaneStaticTabId('status'))
     expect(next).toEqual([status, changes, files, history])
   })
 
-  test('inserts after the last tab when anchor matches the tail', () => {
+  test('inserts after the last tab when anchor matches the tail', async () => {
     const current: WorkspacePaneTabEntry[] = [status, files, termA]
     const next = workspacePaneTabsInsertAfterIdentity(current, changes, 'terminal:term-AAAAAAAAAAAAAAAAAAAAA')
     expect(next).toEqual([status, files, termA, changes])
   })
 
-  test('appends to an empty list regardless of anchor', () => {
+  test('appends to an empty list regardless of anchor', async () => {
     expect(workspacePaneTabsInsertAfterIdentity([], status, null)).toEqual([status])
     expect(workspacePaneTabsInsertAfterIdentity([], status, workspacePaneStaticTabId('files'))).toEqual([status])
   })
 
-  test('does not mutate the input list', () => {
+  test('does not mutate the input list', async () => {
     const current: WorkspacePaneTabEntry[] = [status, files, termA]
     const snapshot = [...current]
     workspacePaneTabsInsertAfterIdentity(current, changes, 'terminal:term-AAAAAAAAAAAAAAAAAAAAA')
@@ -119,7 +119,7 @@ describe('workspacePaneTabsWithRuntimeTab', () => {
   const history = workspacePaneStaticTabEntry('history')
   const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-AAAAAAAAAAAAAAAAAAAAA')
 
-  test('inserts a new runtime tab after the requested anchor', () => {
+  test('inserts a new runtime tab after the requested anchor', async () => {
     expect(
       workspacePaneTabsWithRuntimeTab([status, history], 'terminal', 'term-AAAAAAAAAAAAAAAAAAAAA', {
         insertAfterIdentity: workspacePaneStaticTabId('status'),
@@ -127,7 +127,7 @@ describe('workspacePaneTabsWithRuntimeTab', () => {
     ).toEqual([status, terminal, history])
   })
 
-  test('moves an existing runtime tab after the requested anchor', () => {
+  test('moves an existing runtime tab after the requested anchor', async () => {
     expect(
       workspacePaneTabsWithRuntimeTab([status, history, terminal], 'terminal', terminal.runtimeSessionId, {
         insertAfterIdentity: workspacePaneStaticTabId('status'),
@@ -135,13 +135,13 @@ describe('workspacePaneTabsWithRuntimeTab', () => {
     ).toEqual([status, terminal, history])
   })
 
-  test('preserves an existing runtime tab position without an anchor', () => {
+  test('preserves an existing runtime tab position without an anchor', async () => {
     expect(workspacePaneTabsWithRuntimeTab([status, history, terminal], 'terminal', terminal.runtimeSessionId)).toEqual(
       [status, history, terminal],
     )
   })
 
-  test('ignores an empty runtime session id', () => {
+  test('ignores an empty runtime session id', async () => {
     expect(workspacePaneTabsWithRuntimeTab([status, history], 'terminal', '')).toEqual([status, history])
   })
 })

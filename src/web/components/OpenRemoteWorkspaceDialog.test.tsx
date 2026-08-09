@@ -3,15 +3,17 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
-import { act } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import type { VNode } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { waitFor } from '@testing-library/vue'
 import { OpenRemoteWorkspaceDialog } from '#/web/components/OpenRemoteWorkspaceDialog.tsx'
-import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
@@ -19,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
 }))
 
-vi.mock('sonner', () => ({
+vi.mock('vue-sonner', () => ({
   toast: {
     error: mocks.toastError,
   },
@@ -133,8 +135,8 @@ describe('OpenRemoteWorkspaceDialog', () => {
     )
     await flush()
 
-    setInputValue('#remote-ssh-host', 'prod')
-    setInputValue('#remote-path', '/srv/repo')
+    await setInputValue('#remote-ssh-host', 'prod')
+    await setInputValue('#remote-path', '/srv/repo')
 
     expect(input('#remote-ssh-host').value).toBe('prod')
     expect(input('#remote-path').value).toBe('/srv/repo')
@@ -180,12 +182,14 @@ describe('OpenRemoteWorkspaceDialog', () => {
     )
     await flush()
 
-    setInputValue('#remote-ssh-host', 'prod')
-    setInputValue('#remote-path', '~/repo')
-    clickButtonByText('workspace-picker.open-remote-test-connection')
+    await setInputValue('#remote-ssh-host', 'prod')
+    await setInputValue('#remote-path', '~/repo')
+    await clickButtonByText('workspace-picker.open-remote-test-connection')
     await flush()
 
-    expect(document.body.textContent).toContain('workspace-picker.open-remote-diagnostics-ok')
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('workspace-picker.open-remote-diagnostics-ok')
+    })
   })
 
   test('shows a testing tip while connection test is running', async () => {
@@ -225,15 +229,103 @@ describe('OpenRemoteWorkspaceDialog', () => {
     )
     await flush()
 
-    setInputValue('#remote-ssh-host', 'prod')
-    setInputValue('#remote-path', '/srv/repo')
-    clickButtonByText('workspace-picker.open-remote-test-connection')
+    await setInputValue('#remote-ssh-host', 'prod')
+    await setInputValue('#remote-path', '/srv/repo')
+    await clickButtonByText('workspace-picker.open-remote-test-connection')
     await flush()
 
     expect(document.body.textContent).toContain('workspace-picker.open-remote-diagnostics-testing')
 
     if (resolveTest) resolveTest({ ok: true, target, stages: [] })
     await flush()
+  })
+
+  test('does not publish a connection result into a later open cycle', async () => {
+    const testResult = Promise.withResolvers<{
+      ok: true
+      target: typeof target
+      stages: [{ name: 'path'; label: string; status: 'passed' }]
+    }>()
+    const testSignals: AbortSignal[] = []
+    mockFetch(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(fetchInputUrl(input))
+      const body =
+        typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, unknown>) : {}
+      if (url.pathname === '/api/remote/ssh-hosts') {
+        return { ok: true, json: async () => ({ hosts: [], hasInclude: true }) }
+      }
+      if (url.pathname === '/api/remote/resolve-target') {
+        return {
+          ok: true,
+          json: async () => ({ target: { ...target, alias: body.alias, remotePath: body.remotePath } }),
+        }
+      }
+      if (url.pathname === '/api/remote/test-workspace') {
+        if (init?.signal) testSignals.push(init.signal)
+        return { ok: true, json: () => testResult.promise }
+      }
+      if (url.pathname === '/api/remote/path-suggestions') {
+        return { ok: true, json: async () => [] }
+      }
+      throw new Error(`Unhandled fetch URL: ${url.pathname}`)
+    })
+    const onOpenChange = vi.fn()
+    const renderDialog = (open: boolean) => (
+      <AppNavigationProvider value={navigationWith({})}>
+        <OpenRemoteWorkspaceDialog open={open} onOpenChange={onOpenChange} />
+      </AppNavigationProvider>
+    )
+    const view = render(renderDialog(true))
+    await flush()
+
+    await setInputValue('#remote-ssh-host', 'prod')
+    await setInputValue('#remote-path', '/srv/repo')
+    await clickButtonByText('workspace-picker.open-remote-test-connection')
+    await waitFor(() => expect(testSignals).toHaveLength(1))
+
+    await view.rerender(renderDialog(false))
+    expect(testSignals[0]?.aborted).toBe(true)
+    await view.rerender(renderDialog(true))
+    testResult.resolve({
+      ok: true,
+      target,
+      stages: [{ name: 'path', label: 'path', status: 'passed' }],
+    })
+    await flush()
+
+    expect(document.body.textContent).toContain('workspace-picker.open-remote-diagnostics-idle-detail')
+    expect(document.body.textContent).not.toContain('workspace-picker.open-remote-diagnostics-ok')
+  })
+
+  test('does not activate or close a later cycle when an earlier open settles', async () => {
+    const opening = Promise.withResolvers<{
+      ok: true
+      workspaceId: ReturnType<typeof workspaceIdForTest>
+    }>()
+    const openWorkspaceMembership = vi.fn(() => opening.promise)
+    workspacesStore.setState({ openWorkspaceMembership })
+    const activateWorkspace = vi.fn()
+    const onOpenChange = vi.fn()
+    const renderDialog = (open: boolean) => (
+      <AppNavigationProvider value={navigationWith({ activateWorkspace })}>
+        <OpenRemoteWorkspaceDialog open={open} onOpenChange={onOpenChange} />
+      </AppNavigationProvider>
+    )
+    const view = render(renderDialog(true))
+    await flush()
+
+    await setInputValue('#remote-ssh-host', 'prod')
+    await setInputValue('#remote-path', '/srv/repo')
+    await click('button[type="submit"]')
+    await waitFor(() => expect(openWorkspaceMembership).toHaveBeenCalledTimes(1))
+
+    await view.rerender(renderDialog(false))
+    await view.rerender(renderDialog(true))
+    opening.resolve({ ok: true, workspaceId: workspaceIdForTest(target.id) })
+    await flush()
+
+    expect(activateWorkspace).not.toHaveBeenCalled()
+    expect(onOpenChange).not.toHaveBeenCalled()
   })
 
   test('shows copy-details next to a failed status tip', async () => {
@@ -276,11 +368,14 @@ describe('OpenRemoteWorkspaceDialog', () => {
     )
     await flush()
 
-    setInputValue('#remote-ssh-host', 'prod')
-    setInputValue('#remote-path', '/srv/repo')
-    clickButtonByText('workspace-picker.open-remote-test-connection')
+    await setInputValue('#remote-ssh-host', 'prod')
+    await setInputValue('#remote-path', '/srv/repo')
+    await clickButtonByText('workspace-picker.open-remote-test-connection')
     await flush()
 
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('workspace-picker.open-remote-diagnostics-copy-details')
+    })
     const copyButton = findButtonByText('workspace-picker.open-remote-diagnostics-copy-details')
     const row = copyButton.parentElement
     expect(row?.textContent).toContain('handshake-failed')
@@ -341,7 +436,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
 
     expect(document.body.textContent).not.toContain('workspace-picker.open-remote-path-required')
 
-    setInputValue('#remote-path', 'repo')
+    await setInputValue('#remote-path', 'repo')
 
     expect(document.body.textContent).toContain('workspace-picker.open-remote-path-absolute')
   })
@@ -407,7 +502,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
       ok: true as const,
       workspaceId: workspaceIdForTest(target.id),
     }))
-    useWorkspacesStore.setState({ openWorkspaceMembership })
+    workspacesStore.setState({ openWorkspaceMembership })
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
 
@@ -418,14 +513,16 @@ describe('OpenRemoteWorkspaceDialog', () => {
     )
     await flush()
 
-    setInputValue('#remote-ssh-host', 'prod')
-    setInputValue('#remote-path', '/srv/repo')
-    click('button[type="submit"]')
+    await setInputValue('#remote-ssh-host', 'prod')
+    await setInputValue('#remote-path', '/srv/repo')
+    await click('button[type="submit"]')
     await flush()
 
-    expect(openWorkspaceMembership).toHaveBeenCalledWith({ id: target.id })
-    expect(activateWorkspace).toHaveBeenCalledWith(target.id)
-    expect(onOpenChange).toHaveBeenCalledWith(false)
+    await waitFor(() => {
+      expect(openWorkspaceMembership).toHaveBeenCalledWith({ id: target.id })
+      expect(activateWorkspace).toHaveBeenCalledWith(target.id)
+      expect(onOpenChange).toHaveBeenCalledWith(false)
+    })
   })
 
   test('reports post-open effect failures after opening a remote workspace', async () => {
@@ -434,7 +531,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
       workspaceId: workspaceIdForTest(target.id),
       postOpenEffects: Promise.resolve([{ kind: 'recent-workspace' as const, message: 'recent write failed' }]),
     }))
-    useWorkspacesStore.setState({ openWorkspaceMembership })
+    workspacesStore.setState({ openWorkspaceMembership })
 
     render(
       <AppNavigationProvider value={navigationWith({})}>
@@ -443,13 +540,15 @@ describe('OpenRemoteWorkspaceDialog', () => {
     )
     await flush()
 
-    setInputValue('#remote-ssh-host', 'prod')
-    setInputValue('#remote-path', '/srv/repo')
-    click('button[type="submit"]')
+    await setInputValue('#remote-ssh-host', 'prod')
+    await setInputValue('#remote-path', '/srv/repo')
+    await click('button[type="submit"]')
     await flush()
 
-    expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.recent-save-failed', {
-      description: 'prod:repo\nrecent write failed',
+    await waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith('workspace-picker.recent-save-failed', {
+        description: 'prod:repo\nrecent write failed',
+      })
     })
   })
 
@@ -483,14 +582,14 @@ describe('OpenRemoteWorkspaceDialog', () => {
     )
     await flush()
 
-    setInputValue('#remote-ssh-host', 'prod')
-    setInputValue('#remote-path', '/srv/repo')
-    click('button[type="submit"]')
+    await setInputValue('#remote-ssh-host', 'prod')
+    await setInputValue('#remote-path', '/srv/repo')
+    await click('button[type="submit"]')
     await flush()
 
     expect(document.body.textContent).toContain('Permission denied')
 
-    setInputValue('#remote-path', '/srv/repo-next')
+    await setInputValue('#remote-path', '/srv/repo-next')
 
     expect(document.body.textContent).not.toContain('Permission denied')
   })
@@ -516,7 +615,7 @@ describe('OpenRemoteWorkspaceDialog', () => {
 
     expect(document.body.textContent).toContain('SSH config unavailable')
 
-    setInputValue('#remote-path', '/srv/repo')
+    await setInputValue('#remote-path', '/srv/repo')
 
     expect(document.body.textContent).toContain('SSH config unavailable')
   })
@@ -533,7 +632,7 @@ function fetchInputUrl(input: RequestInfo | URL): string {
   return typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url
 }
 
-function render(element: ReactNode) {
+function render(element: VNode) {
   return renderInJsdom(element)
 }
 
@@ -549,26 +648,29 @@ function button(selector: string): HTMLButtonElement {
   return element
 }
 
-function setInputValue(selector: string, value: string) {
+async function setInputValue(selector: string, value: string): Promise<void> {
+  await flushTestUpdates(() => {})
   const element = input(selector)
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
   descriptor?.set?.call(element, value)
-  act(() => {
+  await flushTestUpdates(() => {
     element.dispatchEvent(new Event('input', { bubbles: true }))
     element.dispatchEvent(new Event('change', { bubbles: true }))
   })
 }
 
-function click(selector: string) {
+async function click(selector: string): Promise<void> {
+  await flushTestUpdates(() => {})
   const element = button(selector)
-  act(() => {
+  await flushTestUpdates(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
 }
 
-function clickButtonByText(text: string) {
+async function clickButtonByText(text: string): Promise<void> {
+  await flushTestUpdates(() => {})
   const element = findButtonByText(text)
-  act(() => {
+  await flushTestUpdates(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
 }
@@ -580,5 +682,5 @@ function findButtonByText(text: string): HTMLButtonElement {
 }
 
 async function flush() {
-  await act(() => flushMicrotasks())
+  await flushTestUpdates(() => flushMicrotasks())
 }

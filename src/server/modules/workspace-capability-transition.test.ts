@@ -16,7 +16,7 @@ const PLAIN_PROBE: WorkspaceProbeState = {
 }
 
 describe('workspace Git probe conclusion', () => {
-  test('uses only Git-owned diagnostics to decide availability', () => {
+  test('uses only Git-owned diagnostics to decide availability', async () => {
     expect(workspaceGitProbeConclusion(PLAIN_PROBE)).toBe('conclusive-unavailable')
     expect(
       workspaceGitProbeConclusion({
@@ -32,7 +32,7 @@ describe('workspace Git probe conclusion', () => {
     ).toBe('inconclusive')
   })
 
-  test('requires a settled conclusion before cleanup', () => {
+  test('requires a settled conclusion before cleanup', async () => {
     expect(workspaceGitProbeConclusion({ status: 'probing' })).toBe('inconclusive')
     expect(
       workspaceGitCleanupRequired(

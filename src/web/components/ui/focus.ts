@@ -15,7 +15,7 @@ export const compositeFocusRing =
 // flush against the clipping edge).
 //
 // Each component still needs to suppress the browser default outline in
-// the same className (focus:outline-none or focus:outline-hidden) — the
+// the same class (focus:outline-none or focus:outline-hidden) — the
 // ring replaces the outline, not augments it.
 
 // Form-field ring (Input, dialog close, etc.). Used with `:focus` so

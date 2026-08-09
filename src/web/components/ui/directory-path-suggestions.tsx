@@ -1,345 +1,273 @@
-// Typeable path input with a styled suggestion dropdown. Replaces the
-// HTML5 <datalist> autocomplete used by workspace path surfaces —
-// <datalist> renders with browser-native chrome
-// that ignores our design tokens and varies across Electron versions.
-//
-// Visual + interaction parity with the Select dropdown used by
-// Create Worktree branch pickers:
-//   • floating surface shares the same border, shadow, and p-1 inner
-//     padding rhythm
-//   • rows use the SelectItem layout verbatim: pr-8 / pl-2, rounded-sm,
-//     accent fill on the active row, ✓ CheckIcon on the right rail
-//   • keyboard nav: ↓/↑ move the highlight, Home/End jump to ends,
-//     Enter commits, Esc/click-out dismisses, focus re-opens
-//   • the highlighted option is scrolled into view (block: nearest) so
-//     it stays visible while the user pages through long lists
-//
-// The parent owns `value` / `onChange`. No client-side filter is
-// applied — each server adapter already constrains results to entries
-// under the typed prefix, and a second
-// filter on top would drop legitimate siblings as soon as the user
-// commits one and continues typing from the committed path.
-
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { KeyboardEvent, MouseEventHandler, ReactNode, Ref } from 'react'
-import { CheckIcon, ChevronDownIcon, Loader2Icon } from 'lucide-react'
+import { computed, defineComponent, nextTick, onMounted, onScopeDispose, ref, watch } from 'vue'
+import type { PropType } from 'vue'
+import { CheckIcon, ChevronDownIcon, Loader2Icon } from '@lucide/vue'
 import { Input } from '#/web/components/ui/input.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { cn } from '#/web/lib/cn.ts'
+import type { ElementRef } from '#/web/components/ui/refs.ts'
 import { composeRefs } from '#/web/components/ui/refs.ts'
+import { cn } from '#/web/lib/cn.ts'
 
 interface DirectoryPathSuggestionsProps {
-  /** Controlled input value. */
   value: string
   onChange: (next: string) => void
-  /** Suggestion strings to render in the dropdown. */
   suggestions: readonly string[]
-  /** Whether a suggestions request is currently in flight. */
   isLoading?: boolean
-  /** Whether at least one suggestions request has completed. */
   hasFetched?: boolean
-  /** i18n label for the empty state when `suggestions` is empty but the
-   *  dropdown is shown (e.g. the user typed something with no matches). */
   emptyLabel: string
-  /** Disable the input + dropdown (e.g. while a connection test runs). */
   disabled?: boolean
-  /** ARIA / passthrough. */
   id?: string
   placeholder?: string
-  autoFocus?: boolean
-  className?: string
-  inputClassName?: string
+  autofocus?: boolean
+  class?: string
+  inputClass?: string
   onPopupOpenChange?: (open: boolean) => void
-  ref?: Ref<HTMLInputElement>
-  /** Forwarded onto the underlying <input>; mirror the same `aria-invalid`
-   *  you would put on Input so the error styling still applies. */
-  'aria-invalid'?: boolean
-  'aria-describedby'?: string
+  inputRef?: ElementRef<HTMLInputElement>
+  ariaInvalid?: boolean
+  ariaDescribedby?: string
 }
 
-export function DirectoryPathSuggestions({
-  value,
-  onChange,
-  suggestions,
-  isLoading = false,
-  hasFetched = false,
-  emptyLabel,
-  disabled,
-  id,
-  placeholder,
-  autoFocus,
-  className,
-  inputClassName,
-  onPopupOpenChange,
-  ref,
-  'aria-invalid': ariaInvalid,
-  'aria-describedby': ariaDescribedBy,
-}: DirectoryPathSuggestionsProps) {
-  const innerRef = useRef<HTMLInputElement | null>(null)
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const setInnerRef = useCallback((node: HTMLInputElement | null) => {
-    innerRef.current = node
-  }, [])
-  const setInputRef = useMemo(() => composeRefs(setInnerRef, ref), [ref, setInnerRef])
-  const [open, setOpen] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(0)
-  const optionRefs = useRef<(HTMLDivElement | null)[]>([])
-  const shouldScrollActiveIntoViewRef = useRef(false)
+export const DirectoryPathSuggestions = defineComponent(
+  (props: DirectoryPathSuggestionsProps) => {
+    const innerRef = ref<HTMLInputElement | null>(null)
+    const containerRef = ref<HTMLDivElement | null>(null)
+    const open = ref(false)
+    const activeIndex = ref(0)
+    const optionRefs: Array<HTMLDivElement | null> = []
+    let shouldScrollActiveIntoView = false
 
-  // A new result projection always starts from its first row. Drop refs
-  // to options from the previous projection at the same boundary.
-  useEffect(() => {
-    setActiveIndex(0)
-    optionRefs.current.length = suggestions.length
-  }, [suggestions])
+    const hasMatches = computed(() => props.suggestions.length > 0)
+    const showEmptyState = computed(
+      () =>
+        !hasMatches.value &&
+        props.value.trim().length > 0 &&
+        (props.hasFetched ?? false) &&
+        !(props.isLoading ?? false),
+    )
+    const showContent = computed(() => !(props.disabled ?? false) && (hasMatches.value || showEmptyState.value))
+    const isOpen = computed(() => open.value && showContent.value)
+    const listboxId = computed(() => `${props.id ?? 'directory-path'}-suggestions`)
+    const activeOptionId = computed(() =>
+      props.suggestions[activeIndex.value] === undefined ? undefined : `${listboxId.value}-option-${activeIndex.value}`,
+    )
 
-  // Keep the highlighted row in view as the user pages through long
-  // lists. `useLayoutEffect` runs before paint so the highlight never
-  // flashes off-screen. `block: 'nearest'` avoids unnecessary scroll
-  // when the row is already visible.
-  useLayoutEffect(() => {
-    if (!shouldScrollActiveIntoViewRef.current) return
-    shouldScrollActiveIntoViewRef.current = false
-    const activeEl = optionRefs.current[activeIndex]
-    if (activeEl && typeof activeEl.scrollIntoView === 'function') {
-      activeEl.scrollIntoView({ block: 'nearest' })
-    }
-  }, [activeIndex])
+    // The server owns the suggestion projection. A replacement projection
+    // invalidates the prior highlighted row and its element references.
+    watch(
+      () => props.suggestions,
+      (suggestions) => {
+        activeIndex.value = 0
+        optionRefs.length = suggestions.length
+      },
+    )
 
-  // Whether the popover is visible. The popover surfaces two states
-  // inside: the suggestion list, or a "no matches" row (the latter
-  // only once the user has typed something and a server response has
-  // landed — an empty `suggestions` before the first response just
-  // means "haven't queried yet". During loading we keep showing the
-  // prior list, if any, and otherwise keep the popup closed.
-  const hasMatches = suggestions.length > 0
-  const hasTypedQuery = value.trim().length > 0
-  const showEmptyState = !hasMatches && hasTypedQuery && hasFetched && !isLoading
-  const showContent = !disabled && (hasMatches || showEmptyState)
-  const isOpen = open && showContent
+    // The effective popup can also close when an async result changes, so the
+    // parent notification must follow the derived state rather than input events.
+    watch(
+      isOpen,
+      (value) => {
+        props.onPopupOpenChange?.(value)
+      },
+      { immediate: true },
+    )
 
-  useEffect(() => {
-    onPopupOpenChange?.(isOpen)
-    return () => onPopupOpenChange?.(false)
-  }, [isOpen, onPopupOpenChange])
-
-  useEffect(() => {
-    if (!isOpen) return
-    function closeOnOutsideInteraction(event: Event) {
+    const closeOnOutsideInteraction = (event: Event) => {
+      if (!isOpen.value) return
       const target = event.target
-      if (target instanceof Node && containerRef.current?.contains(target)) return
-      setOpen(false)
+      if (target instanceof Node && containerRef.value?.contains(target)) return
+      open.value = false
     }
-    document.addEventListener('pointerdown', closeOnOutsideInteraction, true)
-    document.addEventListener('focusin', closeOnOutsideInteraction)
-    return () => {
+
+    onMounted(() => {
+      document.addEventListener('pointerdown', closeOnOutsideInteraction, true)
+      document.addEventListener('focusin', closeOnOutsideInteraction)
+    })
+    onScopeDispose(() => {
       document.removeEventListener('pointerdown', closeOnOutsideInteraction, true)
       document.removeEventListener('focusin', closeOnOutsideInteraction)
+      props.onPopupOpenChange?.(false)
+    })
+
+    const scrollActiveIntoView = () => {
+      if (!shouldScrollActiveIntoView) return
+      shouldScrollActiveIntoView = false
+      optionRefs[activeIndex.value]?.scrollIntoView?.({ block: 'nearest' })
     }
-  }, [isOpen])
 
-  // Stable ids for the listbox and its options. The listbox id is
-  // hoisted into a const so the input's `aria-controls` /
-  // `aria-activedescendant` and the listbox element stay in sync.
-  const listboxId = `${id ?? 'directory-path'}-suggestions`
-  const activeOptionId = suggestions[activeIndex] !== undefined ? `${listboxId}-option-${activeIndex}` : undefined
+    const selectActiveIndex = (index: number) => {
+      shouldScrollActiveIntoView = true
+      activeIndex.value = index
+      void nextTick(scrollActiveIntoView)
+    }
 
-  const commit = useCallback(
-    (next: string) => {
-      setOpen(false)
-      onChange(next)
-      // Keep focus on the input so the user can keep typing/editing.
-      innerRef.current?.focus()
-    },
-    [onChange],
-  )
+    const commit = (next: string) => {
+      open.value = false
+      props.onChange(next)
+      innerRef.value?.focus()
+    }
 
-  const onKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLInputElement>) => {
+    const onKeydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        if (!isOpen) return
+        if (!isOpen.value) return
         event.preventDefault()
         event.stopPropagation()
-        setOpen(false)
+        open.value = false
         return
       }
-      if (disabled) return
-      const wantsNav = event.key === 'ArrowDown' || event.key === 'ArrowUp'
-      // Re-open the dropdown on navigation keys when the user has
-      // dismissed it — keeps the workflow fluid.
-      if (!open && wantsNav && suggestions.length > 0) {
-        setOpen(true)
-      }
+      if (props.disabled) return
+      const suggestions = props.suggestions
+      const wantsNavigation = event.key === 'ArrowDown' || event.key === 'ArrowUp'
+      if (!open.value && wantsNavigation && suggestions.length > 0) open.value = true
       if (event.key === 'ArrowDown') {
         if (suggestions.length === 0) return
         event.preventDefault()
-        shouldScrollActiveIntoViewRef.current = true
-        setActiveIndex((idx) => (idx + 1) % suggestions.length)
+        selectActiveIndex((activeIndex.value + 1) % suggestions.length)
         return
       }
       if (event.key === 'ArrowUp') {
         if (suggestions.length === 0) return
         event.preventDefault()
-        shouldScrollActiveIntoViewRef.current = true
-        setActiveIndex((idx) => (idx - 1 + suggestions.length) % suggestions.length)
+        selectActiveIndex((activeIndex.value - 1 + suggestions.length) % suggestions.length)
         return
       }
       if (event.key === 'Home') {
-        if (!open || suggestions.length === 0) return
+        if (!open.value || suggestions.length === 0) return
         event.preventDefault()
-        shouldScrollActiveIntoViewRef.current = true
-        setActiveIndex(0)
+        selectActiveIndex(0)
         return
       }
       if (event.key === 'End') {
-        if (!open || suggestions.length === 0) return
+        if (!open.value || suggestions.length === 0) return
         event.preventDefault()
-        shouldScrollActiveIntoViewRef.current = true
-        setActiveIndex(suggestions.length - 1)
+        selectActiveIndex(suggestions.length - 1)
         return
       }
-      if (event.key === 'Enter') {
-        if (!open || suggestions.length === 0) return
-        event.preventDefault()
-        const candidate = suggestions[activeIndex]
-        if (candidate !== undefined) commit(candidate)
-        return
-      }
+      if (event.key !== 'Enter' || !open.value || suggestions.length === 0) return
+      event.preventDefault()
+      const candidate = suggestions[activeIndex.value]
+      if (candidate !== undefined) commit(candidate)
+    }
+
+    const setInputRef = composeRefs(innerRef, (element: HTMLInputElement | null) => {
+      const target = props.inputRef
+      if (!target) return
+      if (typeof target === 'function') target(element)
+      else target.value = element
+    })
+
+    return () => (
+      <div ref={containerRef} class={cn('relative', props.class)}>
+        <Input
+          id={props.id}
+          ref={(element) => {
+            setInputRef(element instanceof HTMLInputElement ? element : null)
+          }}
+          value={props.value}
+          onInput={(event) => {
+            if (!(event.currentTarget instanceof HTMLInputElement)) return
+            props.onChange(event.currentTarget.value)
+            open.value = true
+            activeIndex.value = 0
+          }}
+          onFocus={() => {
+            if (showContent.value) open.value = true
+          }}
+          onKeydown={onKeydown}
+          disabled={props.disabled}
+          placeholder={props.placeholder}
+          autofocus={props.autofocus}
+          spellcheck={false}
+          autocapitalize="off"
+          autocorrect="off"
+          aria-invalid={props.ariaInvalid}
+          aria-describedby={props.ariaDescribedby}
+          aria-autocomplete="list"
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-expanded={isOpen.value}
+          aria-controls={isOpen.value ? listboxId.value : undefined}
+          aria-activedescendant={isOpen.value ? activeOptionId.value : undefined}
+          class={cn('h-10 pr-8 font-mono text-sm', props.inputClass)}
+        />
+        {props.isLoading ? (
+          <Loader2Icon
+            aria-hidden="true"
+            class="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
+          />
+        ) : (
+          <ChevronDownIcon
+            aria-hidden="true"
+            class={cn(
+              'pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-transform',
+              isOpen.value && 'rotate-180',
+            )}
+          />
+        )}
+        {isOpen.value ? (
+          <div class="absolute top-[calc(100%+6px)] z-50 w-full min-w-0 overflow-hidden rounded-md border bg-popover p-0 text-popover-foreground shadow-md">
+            <ScrollArea class="max-h-72" scrollbarMode="compact">
+              <div id={listboxId.value} role="listbox" class="p-1">
+                {showEmptyState.value ? (
+                  <div role="status" class="px-2 py-1.5 text-sm text-muted-foreground">
+                    <span class="truncate">{props.emptyLabel}</span>
+                  </div>
+                ) : (
+                  props.suggestions.map((item, index) => {
+                    const active = index === activeIndex.value
+                    return (
+                      <div
+                        key={item}
+                        ref={(element) => {
+                          optionRefs[index] = element as HTMLDivElement | null
+                        }}
+                        role="option"
+                        id={`${listboxId.value}-option-${index}`}
+                        aria-selected={active}
+                        onMousemove={() => {
+                          if (!active) activeIndex.value = index
+                        }}
+                        onMousedown={(event) => {
+                          event.preventDefault()
+                          commit(item)
+                        }}
+                        class={cn(
+                          'relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none',
+                          active && 'bg-accent text-accent-foreground',
+                        )}
+                      >
+                        <span class="flex-1 truncate font-mono text-sm">{item}</span>
+                        <span class="absolute right-2 flex size-3.5 items-center justify-center">
+                          {active ? <CheckIcon class="size-4 text-current" /> : null}
+                        </span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        ) : null}
+      </div>
+    )
+  },
+  {
+    name: 'DirectoryPathSuggestions',
+    props: {
+      value: { type: String, required: true },
+      onChange: { type: Function as PropType<(next: string) => void>, required: true },
+      suggestions: { type: Array as PropType<readonly string[]>, required: true },
+      isLoading: Boolean,
+      hasFetched: Boolean,
+      emptyLabel: { type: String, required: true },
+      disabled: Boolean,
+      id: String,
+      placeholder: String,
+      autofocus: Boolean,
+      class: String,
+      inputClass: String,
+      onPopupOpenChange: Function as PropType<(open: boolean) => void>,
+      inputRef: [Object, Function] as PropType<ElementRef<HTMLInputElement>>,
+      ariaInvalid: Boolean,
+      ariaDescribedby: String,
     },
-    [activeIndex, commit, disabled, isOpen, open, suggestions],
-  )
-
-  const setOptionRef = useCallback((index: number, node: HTMLDivElement | null) => {
-    optionRefs.current[index] = node
-  }, [])
-
-  return (
-    <div ref={containerRef} className={cn('relative', className)}>
-      <Input
-        id={id}
-        ref={setInputRef}
-        value={value}
-        onChange={(event) => {
-          onChange(event.target.value)
-          setOpen(true)
-          setActiveIndex(0)
-        }}
-        onFocus={() => {
-          if (showContent) setOpen(true)
-        }}
-        onKeyDown={onKeyDown}
-        disabled={disabled}
-        placeholder={placeholder}
-        autoFocus={autoFocus}
-        spellCheck={false}
-        autoCapitalize="off"
-        autoCorrect="off"
-        aria-invalid={ariaInvalid}
-        aria-describedby={ariaDescribedBy}
-        aria-autocomplete="list"
-        role="combobox"
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        aria-controls={isOpen ? listboxId : undefined}
-        // WAI-ARIA combobox pattern: focus stays on the input,
-        // `aria-activedescendant` points at the currently
-        // highlighted option so screen readers announce the move
-        // as the user presses ↑/↓. Only set when the popup is
-        // open and there's a real option to point at.
-        aria-activedescendant={isOpen && activeOptionId ? activeOptionId : undefined}
-        className={cn('h-10 pr-8 font-mono text-sm', inputClassName)}
-      />
-      {isLoading ? (
-        <Loader2Icon
-          aria-hidden
-          className="pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
-        />
-      ) : (
-        <ChevronDownIcon
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute right-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-transform',
-            isOpen && 'rotate-180',
-          )}
-        />
-      )}
-      {isOpen ? (
-        <div className="bg-popover text-popover-foreground absolute top-[calc(100%+6px)] z-50 w-full min-w-0 overflow-hidden rounded-md border p-0 shadow-md">
-          <ScrollArea className="max-h-72" scrollbarMode="compact">
-            <div id={listboxId} role="listbox" className="p-1">
-              {showEmptyState ? (
-                <div role="status" className="px-2 py-1.5 text-sm text-muted-foreground">
-                  <span className="truncate">{emptyLabel}</span>
-                </div>
-              ) : (
-                suggestions.map((item, index) => (
-                  <SuggestionRow
-                    // Suggestions are deduped in useDirectoryPathSuggestions,
-                    // so the path itself is a stable key.
-                    key={item}
-                    id={`${listboxId}-option-${index}`}
-                    active={index === activeIndex}
-                    rowRef={(node) => setOptionRef(index, node)}
-                    onMouseMove={() => {
-                      if (index === activeIndex) return
-                      setActiveIndex(index)
-                    }}
-                    onMouseDown={(event) => {
-                      // mousedown so the input keeps focus and the click
-                      // doesn't first blur the input and lose state.
-                      event.preventDefault()
-                      commit(item)
-                    }}
-                  >
-                    <span className="truncate font-mono text-sm">{item}</span>
-                  </SuggestionRow>
-                ))
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-// Row chrome mirrors SelectItem verbatim — pr-8 / pl-2, rounded-sm,
-// accent fill on the active row, and an absolutely-positioned ✓
-// CheckIcon on the right rail. Keeping the layout identical to
-// SelectItem is what makes the dropdown read as the same UI family as
-// the branch picker.
-function SuggestionRow({
-  active,
-  id,
-  rowRef,
-  onMouseDown,
-  onMouseMove,
-  children,
-}: {
-  active: boolean
-  id: string
-  rowRef: (node: HTMLDivElement | null) => void
-  onMouseDown: MouseEventHandler<HTMLDivElement>
-  onMouseMove: MouseEventHandler<HTMLDivElement>
-  children: ReactNode
-}) {
-  return (
-    <div
-      ref={rowRef}
-      role="option"
-      id={id}
-      aria-selected={active}
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      className={cn(
-        'relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none',
-        active && 'bg-accent text-accent-foreground',
-      )}
-    >
-      <span className="flex-1 truncate">{children}</span>
-      <span className="absolute right-2 flex size-3.5 items-center justify-center">
-        {active ? <CheckIcon className="size-4 text-current" /> : null}
-      </span>
-    </div>
-  )
-}
+  },
+)

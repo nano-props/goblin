@@ -6,7 +6,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import {
   createPtyHandle,
   type PtyHandle,
@@ -28,7 +28,7 @@ const DEFAULT_RESIZE_ACK_TIMEOUT_MS = 5_000
 const MAX_PENDING_WRITE_ACKS = 1_024
 const MAX_PENDING_RESIZE_ACKS = 1_024
 const DEFAULT_MAX_PENDING_WRITE_BYTES = 8 * 1024 * 1024
-const ptyWorkerLogger = serverLogger.child({ module: 'pty-supervisor-worker' })
+const ptyWorkerLogger = serverNodeLog.child({ module: 'pty-supervisor-worker' })
 
 type TerminalWorkerChildProcess = ChildProcess
 type WorkerInvalidationKind = Extract<

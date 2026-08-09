@@ -1,3 +1,5 @@
+import { defineComponent } from 'vue'
+import type { PropType } from 'vue'
 import { RepoReadFailureNotice, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
 import type { RepoReadFailure } from '#/web/repo-read-failure.ts'
 
@@ -35,20 +37,28 @@ function projectRepoReadNotice(failures: readonly RepoReadFailure[]): RepoReadNo
   }
 }
 
-export function RepoReadNotice({ failures }: { failures: readonly RepoReadFailure[] }) {
-  const presentation = projectRepoReadNotice(failures)
-  if (!presentation) return null
-  return presentation.stale ? (
-    <RepoStatusStaleNotice
-      messageKey={presentation.message}
-      retrying={presentation.retrying}
-      onRetry={presentation.retry}
-    />
-  ) : (
-    <RepoReadFailureNotice
-      messageKey={presentation.message}
-      retrying={presentation.retrying}
-      onRetry={presentation.retry}
-    />
-  )
-}
+export const RepoReadNotice = defineComponent(
+  (props: { failures: readonly RepoReadFailure[] }) => () => {
+    const presentation = projectRepoReadNotice(props.failures)
+    if (!presentation) return null
+    return presentation.stale ? (
+      <RepoStatusStaleNotice
+        messageKey={presentation.message}
+        retrying={presentation.retrying}
+        onRetry={presentation.retry}
+      />
+    ) : (
+      <RepoReadFailureNotice
+        messageKey={presentation.message}
+        retrying={presentation.retrying}
+        onRetry={presentation.retry}
+      />
+    )
+  },
+  {
+    name: 'RepoReadNotice',
+    props: {
+      failures: { type: Array as PropType<readonly RepoReadFailure[]>, required: true },
+    },
+  },
+)

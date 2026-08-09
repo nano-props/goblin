@@ -38,7 +38,7 @@ export async function markAppQuitting(): Promise<void> {
 
 // Keep native quit lifecycle wiring at this low level so every Electron
 // client that imports app-lifecycle-aware realtime code inherits it, even if
-// a future surface does not mount the main React intent router.
+// a future surface does not mount the main client intent router.
 //
 // Pure web / serve.sh clients do not receive `app-quitting`; they rely on
 // browser teardown plus server-side graceful shutdown instead. Missing native

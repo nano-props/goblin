@@ -1,35 +1,54 @@
-import * as React from 'react'
+import type { FunctionalComponent, HTMLAttributes, LabelHTMLAttributes } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
-function Field({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="field" className={cn('grid gap-1', className)} {...props} />
-}
 
-function FieldLabel({ className, ...props }: React.ComponentProps<'label'>) {
-  return <label data-slot="field-label" className={cn('text-sm font-medium text-foreground', className)} {...props} />
+export const Field: FunctionalComponent<HTMLAttributes> = (props, { slots }) => {
+  const { class: classValue, ...elementProps } = props
+  return (
+    <div {...elementProps} data-slot="field" class={cn('grid gap-1', classValue)}>
+      {slots.default?.()}
+    </div>
+  )
 }
+Field.inheritAttrs = false
 
-type FieldTextProps = React.ComponentProps<'div'> & {
+export const FieldLabel: FunctionalComponent<LabelHTMLAttributes> = (props, { slots }) => {
+  const { class: classValue, ...labelProps } = props
+  return (
+    <label {...labelProps} data-slot="field-label" class={cn('text-sm font-medium text-foreground', classValue)}>
+      {slots.default?.()}
+    </label>
+  )
+}
+FieldLabel.inheritAttrs = false
+
+type FieldTextProps = HTMLAttributes & {
   reserveHeight?: boolean
 }
 
-function FieldDescription({ className, reserveHeight = false, ...props }: FieldTextProps) {
+export const FieldDescription: FunctionalComponent<FieldTextProps> = (props, { slots }) => {
+  const { class: classValue, reserveHeight = false, ...elementProps } = props
   return (
     <div
+      {...elementProps}
       data-slot="field-description"
-      className={cn(reserveHeight && 'min-h-4', 'text-xs leading-4 text-muted-foreground', className)}
-      {...props}
-    />
+      class={cn(reserveHeight && 'min-h-4', 'text-xs leading-4 text-muted-foreground', classValue)}
+    >
+      {slots.default?.()}
+    </div>
   )
 }
+FieldDescription.inheritAttrs = false
 
-function FieldError({ className, reserveHeight = false, ...props }: FieldTextProps) {
+export const FieldError: FunctionalComponent<FieldTextProps> = (props, { slots }) => {
+  const { class: classValue, reserveHeight = false, ...elementProps } = props
   return (
     <div
+      {...elementProps}
       data-slot="field-error"
-      className={cn(reserveHeight && 'min-h-4', 'text-xs leading-4 text-danger', className)}
-      {...props}
-    />
+      class={cn(reserveHeight && 'min-h-4', 'text-xs leading-4 text-danger', classValue)}
+    >
+      {slots.default?.()}
+    </div>
   )
 }
-
-export { Field, FieldDescription, FieldError, FieldLabel }
+FieldError.inheritAttrs = false

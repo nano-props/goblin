@@ -1,15 +1,16 @@
 // @vitest-environment jsdom
 
 import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
-import { act, screen, waitFor } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { screen, waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx'
 import {
   EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
-  TerminalSessionContext,
-  TerminalSessionReadContext,
+  TerminalSessionCommandScope,
+  TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import {
@@ -18,9 +19,10 @@ import {
   terminalSessionCoordinates,
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
-import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
@@ -50,7 +52,11 @@ import {
 
 const responsiveMocks = vi.hoisted(() => ({ compact: false }))
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useIsCompactUi: () => responsiveMocks.compact,
+  useIsCompactUi: () => ({
+    get value() {
+      return responsiveMocks.compact
+    },
+  }),
 }))
 
 beforeEach(() => {
@@ -73,7 +79,7 @@ describe('WorkspacePane terminal routes', () => {
       workspaceRuntimeId: repo.workspaceRuntimeId,
       tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
     })
-    useWorkspacesStore
+    workspacesStore
       .getState()
       .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: workspaceId }, 'files')
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(workspaceId, workspaceId)
@@ -101,9 +107,9 @@ describe('WorkspacePane terminal routes', () => {
     const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
       async (_target, route, options) => {
         if (route?.kind === 'terminal') {
-          useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, route.terminalSessionId)
+          workspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, route.terminalSessionId)
         }
-        useWorkspacesStore
+        workspacesStore
           .getState()
           .setWorkspacePaneTabForTarget(
             { kind: 'workspace-root', workspaceId: workspaceId },
@@ -119,41 +125,39 @@ describe('WorkspacePane terminal routes', () => {
     }
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={workspaceNavigation}>
-          <TerminalSessionContext value={workspaceTerminalCommands}>
-            <TerminalSessionReadContext value={workspaceTerminalReadContext}>
+          <TerminalSessionCommandScope value={workspaceTerminalCommands}>
+            <TerminalSessionReadScope value={workspaceTerminalReadContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
                 workspacePaneRouteContext={{ kind: 'workspace-root', route: null }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(screen.getByRole('tabpanel', { name: 'tab.files' })).toBeTruthy()
     const terminalTab = screen.getByRole('tab', { name: terminalSessionId })
-    act(() => terminalTab.click())
+    await flushTestUpdates(() => terminalTab.click())
 
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalled()
 
     await waitFor(() => expect(screen.getByRole('tabpanel', { name: 'tab.terminal' })).toBeTruthy())
     expect(
-      useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey],
+      workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey],
     ).toBe(terminalSessionId)
 
     const terminalChrome = document.querySelector(
       `[data-workspace-pane-tab-tooltip-id="terminal:${terminalSessionId}"]`,
     )
-    const closeButton = terminalChrome
-      ? Array.from(terminalChrome.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
-          (button.getAttribute('aria-label') ?? '').startsWith('terminal.close-named'),
-        )
-      : null
+    const closeButton = terminalChrome?.querySelector<HTMLElement>(
+      '[data-toolbar-tab-close-action][title^="terminal.close-named"]',
+    )
     expect(closeButton).not.toBeNull()
-    act(() => closeButton?.click())
+    await flushTestUpdates(() => closeButton?.click())
 
     await waitFor(() => expect(closeTerminalByDescriptor).toHaveBeenCalledWith(terminalSessionId, expect.any(Object)))
     await waitFor(() => expect(screen.getByRole('tabpanel', { name: 'tab.files' })).toBeTruthy())
@@ -172,7 +176,7 @@ describe('WorkspacePane terminal routes', () => {
       workspaceProbe: directoryWorkspaceProbe(),
     })
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(workspaceId, workspaceId)
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
       workspaceId,
@@ -187,10 +191,10 @@ describe('WorkspacePane terminal routes', () => {
     )
     const workspaceNavigation = { ...navigation, commitFilesystemWorkspacePaneRoute }
     const workspace = (readContext: TerminalSessionReadContextValue, routeSessionId = exitedSessionId) => (
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={workspaceNavigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={readContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={readContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
                 workspacePaneRouteContext={{
@@ -198,10 +202,10 @@ describe('WorkspacePane terminal routes', () => {
                   route: { kind: 'terminal', terminalSessionId: routeSessionId },
                 }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>
+      </VueQueryClientScope>
     )
     const { rerender } = render(
       workspace(
@@ -214,25 +218,25 @@ describe('WorkspacePane terminal routes', () => {
     )
 
     await waitFor(() =>
-      expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[workspaceId]?.current).toEqual({
+      expect(workspacesStore.getState().navigationHistoryByWorkspace[workspaceId]?.current).toEqual({
         workspaceId,
         route: { kind: 'workspace-root', workspacePaneTab: 'terminal', terminalSessionId: exitedSessionId },
       }),
     )
 
-    act(() => {
+    await flushTestUpdates(async () => {
       setWorkspacePaneTabsForTargetQueryData({
         kind: 'workspace-root',
         workspaceId,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         tabs: [workspacePaneRuntimeTabEntry('terminal', retainedSessionId)],
       })
-      rerender(workspace(terminalReadContextWithSession(terminalFilesystemTargetKey, retainedSessionId)))
+      await rerender(workspace(terminalReadContextWithSession(terminalFilesystemTargetKey, retainedSessionId)))
     })
 
     expect(screen.getByText('workspace-pane-tabs.empty')).toBeTruthy()
     expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
-    expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[workspaceId]?.current).toEqual({
+    expect(workspacesStore.getState().navigationHistoryByWorkspace[workspaceId]?.current).toEqual({
       workspaceId,
       route: { kind: 'workspace-root', workspacePaneTab: 'terminal', terminalSessionId: exitedSessionId },
     })
@@ -248,7 +252,7 @@ describe('WorkspacePane terminal routes', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
       workspaceId,
@@ -261,10 +265,10 @@ describe('WorkspacePane terminal routes', () => {
     )
     const actions = { ...navigation, commitFilesystemWorkspacePaneRoute }
     const workspace = (readContext: TerminalSessionReadContextValue) => (
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={actions}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={readContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={readContext}>
               <WorkspacePane
                 workspaceId={workspaceId}
                 workspacePaneRouteContext={{
@@ -272,10 +276,10 @@ describe('WorkspacePane terminal routes', () => {
                   route: { kind: 'terminal', terminalSessionId: exitedSessionId },
                 }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>
+      </VueQueryClientScope>
     )
 
     const { rerender } = render(
@@ -286,8 +290,8 @@ describe('WorkspacePane terminal routes', () => {
       ),
     )
 
-    await act(async () => {
-      rerender(
+    await flushTestUpdates(async () => {
+      await rerender(
         workspace(
           terminalReadContextWithSessions(terminalFilesystemTargetKey, [retainedSessionId], retainedSessionId, {
             sessionTitles: { [retainedSessionId]: 'shell after metadata update' },
@@ -299,7 +303,7 @@ describe('WorkspacePane terminal routes', () => {
     expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
-  test('renders the shared empty pane when every workspace-root tab is closed', () => {
+  test('renders the shared empty pane when every workspace-root tab is closed', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/empty-plain-workspace')
     const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
@@ -316,15 +320,15 @@ describe('WorkspacePane terminal routes', () => {
     })
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(screen.getByText('workspace-pane-tabs.empty')).toBeTruthy()
@@ -333,7 +337,7 @@ describe('WorkspacePane terminal routes', () => {
     expect(screen.queryByRole('tree')).toBeNull()
   })
 
-  test('forwards compact missing-branch recovery to the workspace navigation callback', () => {
+  test('forwards compact missing-branch recovery to the workspace navigation callback', async () => {
     responsiveMocks.compact = true
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -343,20 +347,20 @@ describe('WorkspacePane terminal routes', () => {
     const onBackToBranchNavigator = vi.fn()
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/removed"
                 workspacePaneRouteContext={{ kind: 'routed', route: null }}
                 onBackToBranchNavigator={onBackToBranchNavigator}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     screen.getByRole('button', { name: 'branches.back-to-list' }).click()
@@ -378,7 +382,7 @@ describe('WorkspacePane terminal routes', () => {
       },
       status: [{ path: worktreePath, branch: 'feature/a', isMain: false, entries: [] }],
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const statusEntry = {
       workspaceId: REPO_ID,
@@ -431,7 +435,7 @@ describe('WorkspacePane terminal routes', () => {
       })
       terminalCreated = true
       for (const listener of terminalListeners) listener()
-      useWorkspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, terminalSessionId)
+      workspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, terminalSessionId)
       return terminalSessionId
     })
     const route = routeNavigation()
@@ -446,27 +450,27 @@ describe('WorkspacePane terminal routes', () => {
       workspacePaneRoute: WorkspacePaneRoute | null,
       nextReadContext: TerminalSessionReadContextValue = readContext,
     ) => (
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={testNavigation}>
-          <TerminalSessionContext value={commandContext}>
-            <TerminalSessionReadContext value={nextReadContext}>
+          <TerminalSessionCommandScope value={commandContext}>
+            <TerminalSessionReadScope value={nextReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/a"
                 workspacePaneRouteContext={{ kind: 'routed', route: workspacePaneRoute }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>
+      </VueQueryClientScope>
     )
     const { rerender } = render(workspace({ kind: 'static', tab: 'status' }))
 
     await waitFor(() => {
-      expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(statusEntry)
+      expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(statusEntry)
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       screen.getByRole('button', { name: 'terminal.new' }).click()
       await waitForNextMacrotask()
     })
@@ -477,7 +481,7 @@ describe('WorkspacePane terminal routes', () => {
       presentationOptions(),
     )
 
-    rerender(
+    await rerender(
       workspace(
         { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
         terminalReadContextWithSession(terminalFilesystemTargetKey, 'term-111111111111111111111'),
@@ -485,11 +489,11 @@ describe('WorkspacePane terminal routes', () => {
     )
 
     await waitFor(() => {
-      expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.backStack).toEqual([statusEntry])
-      expect(useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(terminalEntry)
+      expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.backStack).toEqual([statusEntry])
+      expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(terminalEntry)
     })
 
-    act(() => {
+    await flushTestUpdates(() => {
       testNavigation.goBack(REPO_ID)
     })
 

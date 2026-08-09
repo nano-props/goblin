@@ -1,4 +1,5 @@
 import path from 'node:path'
+import vueJsx from '@vitejs/plugin-vue-jsx'
 import { defineConfig } from 'vitest/config'
 
 // Two projects, one per environment:
@@ -29,12 +30,6 @@ const alias = {
 const sharedTestOptions = {
   mockReset: true,
   restoreMocks: true,
-  // Keep teardown hooks in reverse registration order. `vitest.setup.ts`
-  // registers the jsdom host-timer drain before each test file is collected,
-  // so stack ordering makes that drain run after the file's own `afterAll`
-  // hooks and immediately before Vitest tears down the environment. This is
-  // part of the temporary Radix FocusScope workaround documented there.
-  sequence: { hooks: 'stack' as const },
   // 10s per test. Most of the suite finishes in milliseconds; the
   // ceiling is for the rare test that starts a real timer / IPC
   // and would otherwise hang the worker indefinitely. Keep it tight
@@ -49,6 +44,7 @@ export default defineConfig({
   test: {
     projects: [
       {
+        plugins: [vueJsx()],
         test: {
           ...sharedTestOptions,
           name: 'node',
@@ -74,6 +70,7 @@ export default defineConfig({
         },
       },
       {
+        plugins: [vueJsx()],
         test: {
           ...sharedTestOptions,
           name: 'jsdom',

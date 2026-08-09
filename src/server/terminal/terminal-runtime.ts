@@ -12,7 +12,7 @@
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionCoordinates, type TerminalSessionsChangedEvent } from '#/shared/terminal-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import {
   createTerminalSessionService,
   terminalWorkspacePaneRuntimeTabsProvider,
@@ -46,7 +46,8 @@ import {
   serverWorkspacePaneLayoutRepository,
   serverWorkspacePaneLayoutRestoreTransaction,
 } from '#/server/modules/settings-source.ts'
-import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
+import { isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
+import { isValidTerminalClientId } from '#/shared/terminal-validators.ts'
 import { TerminalSessionManager, type TerminalSessionCloseReason } from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
@@ -73,7 +74,7 @@ const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 // a normal socket reconnect without retaining an expired page's memberships,
 // background targets, or terminal authority for the terminal session TTL.
 const CLIENT_STATE_DISCONNECT_GRACE_MS = 30_000
-const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
+const terminalRuntimeLogger = serverNodeLog.child({ module: 'terminal-runtime' })
 
 const serverWorkspacePaneTargetProjection = new WorkspacePaneTargetCatalog()
 

@@ -1,7 +1,8 @@
-import type { ComponentProps } from 'react'
+import { computed, defineComponent } from 'vue'
+import type { ComponentProps } from 'vue-component-type-helpers'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { act } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -27,7 +28,7 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import {
   isWorkspacePaneStaticTabType,
@@ -46,7 +47,8 @@ import {
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 
@@ -63,7 +65,11 @@ const hoistedFiletreeClientMocks = vi.hoisted(() => ({
 }))
 const hoistedResponsiveMocks = vi.hoisted(() => ({ compact: false }))
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useIsCompactUi: () => hoistedResponsiveMocks.compact,
+  useIsCompactUi: () => ({
+    get value() {
+      return hoistedResponsiveMocks.compact
+    },
+  }),
 }))
 vi.mock('#/web/repo-client.ts', () => ({
   getRepoLog: hoistedRepoClientMocks.getRepoLog,
@@ -80,25 +86,78 @@ type GitWorkspacePaneContentHarnessProps = Omit<
   'workspacePaneTabModel'
 > & {
   workspacePaneRouteMode?: 'preference-route' | 'bare-branch'
+  navigation?: AppNavigationActions
 }
 
-export function GitWorkspacePaneContentHarness(props: GitWorkspacePaneContentHarnessProps) {
-  return (
-    <QueryClientProvider client={appQueryClient}>
-      <GitWorkspacePaneContentInner {...props} />
-    </QueryClientProvider>
-  )
-}
+export const GitWorkspacePaneContentHarness = defineComponent(
+  (props: GitWorkspacePaneContentHarnessProps) => () => (
+    <AppNavigationProvider value={props.navigation ?? navigationWith({})}>
+      <VueQueryClientScope client={appQueryClient}>
+        <GitWorkspacePaneContentInner
+          repo={props.repo}
+          detail={props.detail}
+          workspacePaneId={props.workspacePaneId}
+          readFailures={props.readFailures}
+          onRetryStatus={props.onRetryStatus}
+          onBackToBranchNavigator={props.onBackToBranchNavigator}
+          workspacePaneRouteMode={props.workspacePaneRouteMode}
+        />
+      </VueQueryClientScope>
+    </AppNavigationProvider>
+  ),
+  {
+    name: 'GitWorkspacePaneContentHarness',
+    props: [
+      'repo',
+      'detail',
+      'workspacePaneId',
+      'readFailures',
+      'onRetryStatus',
+      'onBackToBranchNavigator',
+      'workspacePaneRouteMode',
+      'navigation',
+    ],
+  },
+)
 
-function GitWorkspacePaneContentInner(props: GitWorkspacePaneContentHarnessProps) {
-  const { workspacePaneRouteMode, ...contentProps } = props
-  const workspacePaneRoute = useHarnessWorkspacePaneRoute(props)
-  const workspacePaneTabModel = useGitWorkspacePaneTabModel(contentProps.repo, contentProps.detail, workspacePaneRoute)
-  return <GitWorkspacePaneContent {...contentProps} workspacePaneTabModel={workspacePaneTabModel} />
-}
+const GitWorkspacePaneContentInner = defineComponent(
+  (props: GitWorkspacePaneContentHarnessProps) => {
+    const readContext = useTerminalSessionReadContext()
+    const workspacePaneRoute = computed(() => harnessWorkspacePaneRoute(props, readContext))
+    const workspacePaneTabModel = useGitWorkspacePaneTabModel(
+      () => props.repo,
+      () => props.detail,
+      workspacePaneRoute,
+    )
+    return () => (
+      <GitWorkspacePaneContent
+        repo={props.repo}
+        detail={props.detail}
+        workspacePaneId={props.workspacePaneId}
+        readFailures={props.readFailures}
+        onRetryStatus={props.onRetryStatus}
+        onBackToBranchNavigator={props.onBackToBranchNavigator}
+        workspacePaneTabModel={workspacePaneTabModel.value}
+      />
+    )
+  },
+  {
+    name: 'GitWorkspacePaneContentInner',
+    props: [
+      'repo',
+      'detail',
+      'workspacePaneId',
+      'readFailures',
+      'onRetryStatus',
+      'onBackToBranchNavigator',
+      'workspacePaneRouteMode',
+    ],
+  },
+)
 
-function useHarnessWorkspacePaneRoute(
+function harnessWorkspacePaneRoute(
   props: GitWorkspacePaneContentHarnessProps,
+  readContext: TerminalSessionReadContextValue,
 ): WorkspacePaneRoute | null | undefined {
   if (props.workspacePaneRouteMode === 'bare-branch') return null
   const branch = props.detail.branch
@@ -114,7 +173,6 @@ function useHarnessWorkspacePaneRoute(
         : { kind: 'git-branch' as const, workspaceId: props.repo.id, branchName: branch.name }
       : null,
   )
-  const readContext = useTerminalSessionReadContext()
   if (preferredTab === 'terminal') {
     const terminalFilesystemTargetKey = branch?.worktree?.path
       ? formatTerminalFilesystemTargetKeyForPath(props.repo.id, branch.worktree.path)
@@ -175,7 +233,7 @@ beforeEach(() => {
   appQueryClient.clear()
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
-  useTerminalProjectionHydrationStore.setState({
+  terminalProjectionHydrationStore.setState({
     hydrationByWorkspace: new Map(),
     lastSuccessfulRecoveryByWorkspace: new Map(),
   })
@@ -262,7 +320,7 @@ export function terminalCommandContextWith(
 }
 
 export async function flushAsyncWork() {
-  await act(async () => {
+  await flushTestUpdates(async () => {
     await Promise.resolve()
   })
 }

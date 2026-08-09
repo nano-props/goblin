@@ -1,4 +1,4 @@
-import type { LogEntry } from '#/web/types.ts'
+import type { LogEntry } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
@@ -27,7 +27,7 @@ export function HistoryCommitGraph({
 }) {
   const commits = entries.map(historyCommitNode)
   return (
-    <ol className="min-w-0 px-2 py-1.5" data-history-commit-graph="">
+    <ol class="min-w-0 px-2 py-1.5" data-history-commit-graph="">
       {commits.map((commit, index) => (
         <HistoryCommitRow
           key={commit.key}
@@ -43,16 +43,16 @@ export function HistoryCommitGraph({
 
 export function HistoryCommitGraphSkeleton({ rows = 8 }: { rows?: number }) {
   return (
-    <ol className="min-w-0 px-2 py-1.5" aria-hidden="true">
+    <ol class="min-w-0 px-2 py-1.5" aria-hidden="true">
       {Array.from({ length: rows }).map((_, index) => (
-        <li key={index} className="grid min-w-0 grid-cols-[1.25rem_minmax(0,1fr)] gap-1.5">
+        <li key={index} class="grid min-w-0 grid-cols-[1.25rem_minmax(0,1fr)] gap-1.5">
           <HistoryCommitRail position={commitPosition(index, rows)} />
-          <div className="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-0.5 px-1.5 py-1">
-            <Skeleton className="h-4 w-16 shrink-0 rounded-sm" />
-            <Skeleton className="h-4 w-3/5 rounded-sm" />
-            <div className="col-start-2 flex min-w-0 flex-wrap gap-x-1 gap-y-0.5">
-              <Skeleton className="h-[15px] w-24 rounded-sm" />
-              <Skeleton className="h-[15px] w-32 rounded-sm" />
+          <div class="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-0.5 px-1.5 py-1">
+            <Skeleton class="h-4 w-16 shrink-0 rounded-sm" />
+            <Skeleton class="h-4 w-3/5 rounded-sm" />
+            <div class="col-start-2 flex min-w-0 flex-wrap gap-x-1 gap-y-0.5">
+              <Skeleton class="h-[15px] w-24 rounded-sm" />
+              <Skeleton class="h-[15px] w-32 rounded-sm" />
             </div>
           </div>
         </li>
@@ -73,11 +73,7 @@ function HistoryCommitRow({
   position: CommitPosition
 }) {
   return (
-    <li
-      className="grid min-w-0 grid-cols-[1.25rem_minmax(0,1fr)] gap-1.5"
-      data-history-commit-row=""
-      title={commit.title}
-    >
+    <li class="grid min-w-0 grid-cols-[1.25rem_minmax(0,1fr)] gap-1.5" data-history-commit-row="" title={commit.title}>
       <HistoryCommitRail position={position} />
       <HistoryCommitContent repoId={repoId} workspaceRuntimeId={workspaceRuntimeId} commit={commit} />
     </li>
@@ -86,10 +82,10 @@ function HistoryCommitRow({
 
 function HistoryCommitRail({ position }: { position: CommitPosition }) {
   return (
-    <div className="relative flex justify-center" aria-hidden="true">
-      <span className={cn('absolute top-0 bottom-1/2 w-px bg-border', position.first && 'hidden')} />
-      <span className={cn('absolute top-1/2 bottom-0 w-px bg-border', position.last && 'hidden')} />
-      <span className="relative mt-[0.7rem] size-1.5 rounded-full border border-primary/70 bg-background shadow-[0_0_0_2px_var(--color-background)]" />
+    <div class="relative flex justify-center" aria-hidden="true">
+      <span class={cn('absolute top-0 bottom-1/2 w-px bg-border', position.first && 'hidden')} />
+      <span class={cn('absolute top-1/2 bottom-0 w-px bg-border', position.last && 'hidden')} />
+      <span class="relative mt-[0.7rem] size-1.5 rounded-full border border-primary/70 bg-background shadow-[0_0_0_2px_var(--color-background)]" />
     </div>
   )
 }
@@ -104,10 +100,10 @@ function HistoryCommitContent({
   commit: HistoryCommitNode
 }) {
   return (
-    <div className="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-0.5 rounded-md px-1.5 py-1 hover:bg-muted/70">
+    <div class="grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-0.5 rounded-md px-1.5 py-1 hover:bg-muted/70">
       <HistoryCommitHash repoId={repoId} workspaceRuntimeId={workspaceRuntimeId} commit={commit} />
       {commit.message ? (
-        <span className="min-w-0 truncate text-sm leading-5 text-foreground" data-history-log-message="">
+        <span class="min-w-0 truncate text-sm leading-5 text-foreground" data-history-log-message="">
           {commit.message}
         </span>
       ) : null}
@@ -132,7 +128,7 @@ function HistoryCommitHash({
       hash={commit.fullHash}
       shortHash={commit.hash}
       tone="warning"
-      className="shrink-0 text-sm font-medium leading-5"
+      class="shrink-0 text-sm font-medium leading-5"
       data-history-log-hash=""
       title={commit.fullHash ? `Open commit ${commit.fullHash}` : undefined}
     />
@@ -141,7 +137,7 @@ function HistoryCommitHash({
 
 function HistoryCommitRefs({ refs }: { refs: HistoryRefDisplay[] }) {
   return (
-    <div className="col-start-2 flex min-w-0 flex-wrap gap-x-1 gap-y-0.5" data-history-log-refs="">
+    <div class="col-start-2 flex min-w-0 flex-wrap gap-x-1 gap-y-0.5" data-history-log-refs="">
       {refs.map((ref) => (
         <HistoryCommitRefChip key={historyRefKey(ref)} refDisplay={ref} />
       ))}
@@ -153,14 +149,14 @@ function HistoryCommitRefChip({ refDisplay }: { refDisplay: HistoryRefDisplay })
   if (refDisplay.kind === 'mergedRemote') return <MergedRemoteRefChip refDisplay={refDisplay} />
   return (
     <span
-      className={cn(
+      class={cn(
         'inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-sm border px-1 py-0 font-mono text-[11px] leading-[15px]',
         STATUS_TONE_CHIP_CLASS[refDisplay.tone],
       )}
       data-history-log-ref-token={refDisplay.refName}
       title={refDisplay.refName}
     >
-      <span className="min-w-0 truncate">{refDisplay.refName}</span>
+      <span class="min-w-0 truncate">{refDisplay.refName}</span>
     </span>
   )
 }
@@ -170,7 +166,7 @@ function MergedRemoteRefChip({ refDisplay }: { refDisplay: Extract<HistoryRefDis
   const title = [refDisplay.refName, ...refDisplay.remoteRefs].join(', ')
   return (
     <span
-      className={cn(
+      class={cn(
         'inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-sm border px-1 py-0 font-mono text-[11px] leading-[15px]',
         STATUS_TONE_CHIP_CLASS[refDisplay.tone],
       )}
@@ -178,8 +174,8 @@ function MergedRemoteRefChip({ refDisplay }: { refDisplay: Extract<HistoryRefDis
       data-history-log-ref-remotes={refDisplay.remoteNames.join(',')}
       title={title}
     >
-      <span className="min-w-0 truncate">{refDisplay.label}</span>
-      {remoteLabel ? <span className="shrink-0">&nbsp;· {remoteLabel}</span> : null}
+      <span class="min-w-0 truncate">{refDisplay.label}</span>
+      {remoteLabel ? <span class="shrink-0">&nbsp;· {remoteLabel}</span> : null}
     </span>
   )
 }

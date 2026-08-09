@@ -9,8 +9,16 @@ const responsiveMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useResponsiveUiMode: () => responsiveMocks.mode,
-  useIsCompactUi: () => responsiveMocks.mode === 'compact',
+  useResponsiveUiMode: () => ({
+    get value() {
+      return responsiveMocks.mode
+    },
+  }),
+  useIsCompactUi: () => ({
+    get value() {
+      return responsiveMocks.mode === 'compact'
+    },
+  }),
 }))
 
 vi.mock('#/web/components/workspace-layout/WorkspaceLayoutShell.tsx', () => ({
@@ -48,7 +56,7 @@ function renderEmptyWorkspaceView() {
 }
 
 describe('EmptyWorkspaceView', () => {
-  test('disables zen toggle and pins the navigator pane in compact mode', () => {
+  test('disables zen toggle and pins the navigator pane in compact mode', async () => {
     responsiveMocks.mode = 'compact'
     const { container } = renderEmptyWorkspaceView()
 
@@ -59,7 +67,7 @@ describe('EmptyWorkspaceView', () => {
     expect(shell?.dataset.compact).toBe('true')
   })
 
-  test('keeps workspace inactive by default even outside compact mode', () => {
+  test('keeps workspace inactive by default even outside compact mode', async () => {
     responsiveMocks.mode = 'default'
     const { container } = renderEmptyWorkspaceView()
 

@@ -1,4 +1,4 @@
-import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
+import type { EditorApp, TerminalApp } from '#/shared/settings.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'

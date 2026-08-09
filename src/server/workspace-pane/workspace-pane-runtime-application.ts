@@ -20,7 +20,7 @@ import {
   terminalSessionRuntimeScope,
   terminalSessionTargetExecutionPath,
 } from '#/server/terminal/terminal-session-scope.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
@@ -33,7 +33,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { TerminalCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
 
 type MaybePromise<T> = T | Promise<T>
-const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'workspace-pane-runtime-application' })
+const workspacePaneRuntimeApplicationLogger = serverNodeLog.child({ module: 'workspace-pane-runtime-application' })
 
 interface WorkspacePaneRuntimeApplicationDependencies {
   workspaceTabsCoordinator: WorkspacePaneRuntimeTabsCoordinator

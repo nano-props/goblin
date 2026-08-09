@@ -1,4 +1,4 @@
-import { CancelledError } from '@tanstack/react-query'
+import { CancelledError } from '@tanstack/query-core'
 
 export class RepoOperationCancelledError extends Error {
   constructor() {

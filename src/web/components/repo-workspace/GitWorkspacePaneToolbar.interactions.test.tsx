@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { ObservedBranchRouteNavigationForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
   REPO_ID,
@@ -30,7 +30,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
     })
 
-    act(() => {
+    await flushTestUpdates(() => {
       terminalTab.click()
     })
     await flush()
@@ -51,7 +51,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
       navigation: navigationWith({}),
     })
 
-    act(() => {
+    await flushTestUpdates(() => {
       terminalTab.click()
     })
     await flush()
@@ -67,7 +67,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
     })
     mocks.createTerminal.mockRejectedValueOnce(new Error('error.terminal-create-failed'))
 
-    act(() => {
+    await flushTestUpdates(() => {
       terminalTab.click()
     })
     await flush()
@@ -85,7 +85,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
     })
 
-    act(() => {
+    await flushTestUpdates(() => {
       terminalTab.click()
     })
     await flush()
@@ -109,7 +109,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
     })
 
-    act(() => {
+    await flushTestUpdates(() => {
       terminalTab.click()
     })
     await flush()
@@ -134,7 +134,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
     )
     expect(unselectedTab).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       unselectedTab?.click()
     })
     await flush()
@@ -158,19 +158,19 @@ describe('GitWorkspacePaneToolbar interactions', () => {
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
     })
 
-    rerenderWorktreePath(nextWorktreePath)
+    await rerenderWorktreePath(nextWorktreePath)
     const filesTab = c.querySelector<HTMLButtonElement>(
       '[data-workspace-pane-tab-tooltip-id="workspace-pane:files"] button[role="tab"]',
     )
     expect(filesTab).not.toBeNull()
 
-    act(() => filesTab?.click())
+    await flushTestUpdates(() => filesTab?.click())
     await flush()
 
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'files')
   })
 
-  test('does not show branch actions in the workspace bar (actions moved to branch rows)', () => {
+  test('does not show branch actions in the workspace bar (actions moved to branch rows)', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -295,10 +295,12 @@ describe('GitWorkspacePaneToolbar interactions', () => {
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
     })
 
-    const terminalCloseButton = c.querySelector<HTMLButtonElement>('button[aria-label^="terminal.close-named"]')
+    const terminalCloseButton = c.querySelector<HTMLElement>(
+      '[data-toolbar-tab-close-action][title^="terminal.close-named"]',
+    )
     expect(terminalCloseButton).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       terminalCloseButton?.click()
     })
     await flush()
@@ -329,7 +331,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
     expect(newButton?.getAttribute('aria-busy')).toBeNull()
     expect(newButton?.disabled).toBe(false)
 
-    act(() => {
+    await flushTestUpdates(() => {
       newButton?.click()
     })
     await flush()
@@ -337,7 +339,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
   })
 
   test('opens a terminal for the current runtime when only a stale runtime projection is hydrated', async () => {
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, 'repo-runtime-old')
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, 'repo-runtime-old')
     const { container: c, mocks } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -350,7 +352,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
     expect(newButton?.getAttribute('aria-busy')).toBeNull()
     expect(newButton?.disabled).toBe(false)
 
-    act(() => {
+    await flushTestUpdates(() => {
       newButton?.click()
     })
     await flush()
@@ -372,7 +374,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
     expect(busyNewButton?.disabled).toBe(true)
     expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       busyNewButton?.click()
     })
     await flush()
@@ -394,7 +396,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
     expect(busyNewButton?.disabled).toBe(true)
     expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       busyNewButton?.click()
     })
     await flush()

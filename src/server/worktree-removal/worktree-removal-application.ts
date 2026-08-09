@@ -4,14 +4,14 @@ import type { TerminalSessionManager } from '#/server/terminal/terminal-session-
 import { terminalSessionExecutionPath } from '#/server/terminal/terminal-session-scope.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
 import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
-const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
+const worktreeRemovalLogger = serverNodeLog.child({ module: 'worktree-removal-application' })
 
 interface WorktreeRemovalTerminalSessions {
   closeSessionsForPhysicalWorktree: TerminalSessionManager<string>['closeSessionsForPhysicalWorktree']

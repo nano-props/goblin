@@ -1,207 +1,295 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react'
-import type { ReactNode } from 'react'
-import { useGroupRef } from 'react-resizable-panels'
-import type { Layout } from 'react-resizable-panels'
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '#/web/components/ui/resizable.tsx'
-import { cn } from '#/web/lib/cn.ts'
+import { SplitterPanel } from 'reka-ui'
+import { computed, defineComponent, onScopeDispose, onUpdated, ref, watch } from 'vue'
+import type { ComputedRef, CSSProperties, PropType, Ref, VNodeChild } from 'vue'
+import { ResizableHandle, ResizablePanelGroup } from '#/web/components/ui/resizable.tsx'
 import { WORKSPACE_PANE_MOTION_STYLE, WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
+import { cn } from '#/web/lib/cn.ts'
+
+type SplitterSize = number | string
+type CollapseTransitionDirection = 'collapsing' | 'expanding'
 
 interface SplitPaneProps {
-  before: ReactNode
-  after: ReactNode
+  before: VNodeChild
+  after: VNodeChild
   afterSize: number
   onAfterSizeChange?: (size: number) => void
-  className?: string
-  beforeClassName?: string
-  afterClassName?: string
-  beforeMinSize?: number | string
+  class?: string
+  beforeClass?: string
+  afterClass?: string
+  beforeMinSize?: SplitterSize
   beforeContentMinSize?: string
-  afterMinSize?: number | string
-  afterMaxSize?: number | string
+  afterMinSize?: SplitterSize
+  afterMaxSize?: SplitterSize
   beforeCollapsed?: boolean
   animateBeforeCollapse?: boolean
   disabled?: boolean
 }
 
+interface SplitterPanelHandle {
+  collapse(): void
+  resize(size: number): void
+}
+
+type PendingLayoutCommit =
+  | { kind: 'pane'; collapsed: boolean; afterSize: number; animate: boolean }
+  | { kind: 'after'; afterSize: number; animate: false }
+
 const BEFORE_PANEL_ID = 'before'
 const AFTER_PANEL_ID = 'after'
-const RESIZE_TARGET_MINIMUM_SIZE = { fine: 7, coarse: 20 }
-type CollapseTransitionDirection = 'collapsing' | 'expanding'
+const RESIZE_HIT_AREA_MARGINS = { fine: 7, coarse: 20 }
 
-export function SplitPane({
-  before,
-  after,
-  afterSize,
-  onAfterSizeChange,
-  className,
-  beforeClassName,
-  afterClassName,
-  beforeMinSize = '12rem',
-  beforeContentMinSize,
-  afterMinSize = '12rem',
-  afterMaxSize,
-  beforeCollapsed = false,
-  animateBeforeCollapse = false,
-  disabled = false,
-}: SplitPaneProps) {
-  const groupRef = useGroupRef()
-  const splitPaneRef = useRef<HTMLDivElement | null>(null)
-  const beforeClipRef = useRef<HTMLDivElement | null>(null)
-  const collapseTransition = useCollapseTransition(beforeCollapsed, animateBeforeCollapse)
-  const collapseTransitioning = collapseTransition !== null
-  const measuredBeforeContentSize = useStableBeforeContentSize({
-    beforeClipRef,
-    splitPaneRef,
-    frozen: beforeCollapsed || collapseTransitioning,
-  })
-  const splitPaneStyle = useMemo<CSSProperties>(() => WORKSPACE_PANE_MOTION_STYLE, [])
-  const beforeContentStyle = useMemo<CSSProperties | undefined>(
-    () =>
-      ({
-        '--goblin-split-pane-before-open-size': `${100 - afterSize}cqw`,
-        '--goblin-split-pane-before-measured-size':
-          measuredBeforeContentSize === null ? undefined : `${measuredBeforeContentSize}px`,
-        '--goblin-split-pane-before-min-size':
-          beforeContentMinSize ?? (typeof beforeMinSize === 'string' ? beforeMinSize : undefined),
-        '--goblin-split-pane-after-min-size': typeof afterMinSize === 'string' ? afterMinSize : undefined,
-      }) as CSSProperties,
-    [afterMinSize, afterSize, beforeContentMinSize, beforeMinSize, measuredBeforeContentSize],
-  )
-  const effectiveBeforeMinSize = beforeCollapsed ? 0 : beforeMinSize
-  const layout = useMemo<Layout>(
-    () =>
-      beforeCollapsed
-        ? { [BEFORE_PANEL_ID]: 0, [AFTER_PANEL_ID]: 100 }
-        : { [BEFORE_PANEL_ID]: 100 - afterSize, [AFTER_PANEL_ID]: afterSize },
-    [afterSize, beforeCollapsed],
-  )
-  const handleLayoutChanged = useCallback(
-    (layout: Layout) => {
-      if (beforeCollapsed) return
-      const next = layout[AFTER_PANEL_ID]
-      if (typeof next === 'number') onAfterSizeChange?.(next)
-    },
-    [beforeCollapsed, onAfterSizeChange],
-  )
+export const SplitPane = defineComponent(
+  (props: SplitPaneProps) => {
+    const splitPaneRef = ref<HTMLElement | null>(null)
+    const beforeClipRef = ref<HTMLElement | null>(null)
+    const beforePanelRef = ref<SplitterPanelHandle | null>(null)
+    const afterPanelRef = ref<SplitterPanelHandle | null>(null)
+    const collapseTransition = ref<CollapseTransitionDirection | null>(null)
+    let collapseTimer: number | null = null
+    let pendingLayoutCommit: PendingLayoutCommit | null = null
 
-  useEffect(() => {
-    groupRef.current?.setLayout(layout)
-  }, [groupRef, layout])
+    const beforeCollapsed = computed(() => props.beforeCollapsed ?? false)
+    const collapseTransitioning = computed(() => collapseTransition.value !== null)
+    const frozenBeforeMeasurement = computed(() => beforeCollapsed.value || collapseTransitioning.value)
+    const splitPaneSize = useElementInlineSize(splitPaneRef, true)
+    const measuredBeforeContentSize = useStableBeforeContentSize(beforeClipRef, splitPaneSize, frozenBeforeMeasurement)
+    const rootFontSizePx = readRootFontSizePx()
+    const beforeMin = computed(() =>
+      splitPaneConstraintPercent(
+        beforeCollapsed.value ? 0 : (props.beforeMinSize ?? '12rem'),
+        rootFontSizePx,
+        splitPaneSize.value,
+      ),
+    )
+    const afterMin = computed(() =>
+      splitPaneConstraintPercent(props.afterMinSize ?? '12rem', rootFontSizePx, splitPaneSize.value),
+    )
+    const afterMax = computed(() => splitPaneConstraintPercent(props.afterMaxSize, rootFontSizePx, splitPaneSize.value))
+    const beforeContentStyle = computed<CSSProperties>(() => ({
+      '--goblin-split-pane-before-open-size': `${100 - props.afterSize}cqw`,
+      '--goblin-split-pane-before-measured-size':
+        measuredBeforeContentSize.value === null ? undefined : `${measuredBeforeContentSize.value}px`,
+      '--goblin-split-pane-before-min-size':
+        props.beforeContentMinSize ?? (typeof props.beforeMinSize === 'string' ? props.beforeMinSize : undefined),
+      '--goblin-split-pane-after-min-size': typeof props.afterMinSize === 'string' ? props.afterMinSize : undefined,
+    }))
 
-  return (
-    <div
-      ref={splitPaneRef}
-      data-before-collapsed={beforeCollapsed ? 'true' : undefined}
-      data-collapse-transition={collapseTransition ?? undefined}
-      style={splitPaneStyle}
-      className={cn('goblin-split-pane min-h-0 min-w-0', className)}
-    >
-      <ResizablePanelGroup
-        groupRef={groupRef}
-        orientation="horizontal"
-        disabled={disabled || beforeCollapsed}
-        resizeTargetMinimumSize={RESIZE_TARGET_MINIMUM_SIZE}
-        defaultLayout={layout}
-        onLayoutChanged={handleLayoutChanged}
-        className="min-h-0 min-w-0"
+    const clearCollapseTimer = () => {
+      if (collapseTimer !== null) window.clearTimeout(collapseTimer)
+      collapseTimer = null
+    }
+
+    const applyLayout = (collapsed: boolean, afterSize: number) => {
+      if (collapsed) beforePanelRef.value?.collapse()
+      else beforePanelRef.value?.resize(100 - afterSize)
+    }
+
+    onUpdated(() => {
+      const commit = pendingLayoutCommit
+      if (!commit) return
+      pendingLayoutCommit = null
+
+      if (commit.animate) {
+        // The transition marker is now committed. Resolve its initial style
+        // before asking Reka to change the flex layout, matching React's
+        // render-then-effect ordering without relying on microtask timing.
+        splitPaneRef.value?.getBoundingClientRect()
+      }
+      if (commit.kind === 'pane') applyLayout(commit.collapsed, commit.afterSize)
+      else afterPanelRef.value?.resize(commit.afterSize)
+
+      if (commit.animate) {
+        clearCollapseTimer()
+        collapseTimer = window.setTimeout(() => {
+          collapseTimer = null
+          collapseTransition.value = null
+        }, WORKSPACE_PANE_TRANSITION_MS)
+      }
+    })
+
+    watch(
+      () => [props.beforeCollapsed ?? false, props.animateBeforeCollapse ?? false, props.afterSize] as const,
+      ([collapsed, animate, afterSize], [previousCollapsed, previousAnimate, previousAfterSize]) => {
+        if (!animate) {
+          pendingLayoutCommit = null
+          clearCollapseTimer()
+          collapseTransition.value = null
+          if (collapsed !== previousCollapsed || previousAnimate) {
+            pendingLayoutCommit = { kind: 'pane', collapsed, afterSize, animate: false }
+          } else if (!collapsed && afterSize !== previousAfterSize) {
+            pendingLayoutCommit = { kind: 'after', afterSize, animate: false }
+          }
+          return
+        }
+
+        if (collapsed !== previousCollapsed) {
+          clearCollapseTimer()
+          collapseTransition.value = collapsed ? 'collapsing' : 'expanding'
+          pendingLayoutCommit = { kind: 'pane', collapsed, afterSize, animate: true }
+          return
+        }
+
+        if (pendingLayoutCommit) pendingLayoutCommit.afterSize = afterSize
+        else if (!collapsed && afterSize !== previousAfterSize) {
+          pendingLayoutCommit = { kind: 'after', afterSize, animate: false }
+        }
+      },
+      { flush: 'pre' },
+    )
+
+    onScopeDispose(() => {
+      pendingLayoutCommit = null
+      clearCollapseTimer()
+    })
+
+    const handleLayout = (layout: number[]) => {
+      if (beforeCollapsed.value) return
+      const nextAfterSize = layout[1]
+      if (nextAfterSize === undefined || Math.abs(nextAfterSize - props.afterSize) <= 0.01) return
+      props.onAfterSizeChange?.(nextAfterSize)
+    }
+
+    return () => (
+      <div
+        ref={splitPaneRef}
+        data-before-collapsed={beforeCollapsed.value ? 'true' : undefined}
+        data-collapse-transition={collapseTransition.value ?? undefined}
+        style={WORKSPACE_PANE_MOTION_STYLE}
+        class={cn('goblin-split-pane min-h-0 min-w-0', props.class)}
       >
-        <ResizablePanel
-          id={BEFORE_PANEL_ID}
-          minSize={effectiveBeforeMinSize}
-          aria-hidden={beforeCollapsed || undefined}
-          inert={beforeCollapsed || undefined}
-          className={cn('flex min-h-0 min-w-0 overflow-hidden', beforeClassName)}
-        >
-          <div
-            ref={beforeClipRef}
-            className="goblin-split-pane__before-clip flex min-h-0 min-w-0 flex-1 overflow-hidden"
+        <ResizablePanelGroup direction="horizontal" onLayout={handleLayout} class="min-h-0 min-w-0">
+          <SplitterPanel
+            ref={(value) => {
+              beforePanelRef.value = splitterPanelHandle(value)
+            }}
+            id={BEFORE_PANEL_ID}
+            order={0}
+            defaultSize={beforeCollapsed.value ? 0 : 100 - props.afterSize}
+            minSize={beforeMin.value}
+            collapsible
+            collapsedSize={0}
+            data-slot="resizable-panel"
+            class={cn('flex min-h-0 min-w-0 overflow-hidden', props.beforeClass)}
           >
             <div
-              className={cn(
-                'goblin-split-pane__before-content flex min-h-0 shrink-0',
-                beforeCollapsed && 'goblin-split-pane__before-content--collapsed',
-              )}
-              style={beforeContentStyle}
+              ref={beforeClipRef}
+              aria-hidden={beforeCollapsed.value || undefined}
+              inert={beforeCollapsed.value || undefined}
+              class="goblin-split-pane__before-clip flex min-h-0 min-w-0 flex-1 overflow-hidden"
             >
-              {before}
+              <div
+                class={cn(
+                  'goblin-split-pane__before-content flex min-h-0 shrink-0',
+                  beforeCollapsed.value && 'goblin-split-pane__before-content--collapsed',
+                )}
+                style={beforeContentStyle.value}
+              >
+                {props.before}
+              </div>
             </div>
-          </div>
-        </ResizablePanel>
-        <ResizableHandle
-          disabled={disabled || beforeCollapsed}
-          className={cn(
-            'goblin-split-pane__handle',
-            beforeCollapsed && !collapseTransitioning && 'goblin-split-pane__handle--collapsed',
-          )}
-        />
-        <ResizablePanel
-          id={AFTER_PANEL_ID}
-          minSize={afterMinSize}
-          maxSize={afterMaxSize}
-          className={cn('flex min-h-0 min-w-0 overflow-hidden', afterClassName)}
-        >
-          {after}
-        </ResizablePanel>
-      </ResizablePanelGroup>
-    </div>
+          </SplitterPanel>
+          <ResizableHandle
+            disabled={(props.disabled ?? false) || beforeCollapsed.value}
+            hitAreaMargins={RESIZE_HIT_AREA_MARGINS}
+            class={cn(
+              'goblin-split-pane__handle',
+              beforeCollapsed.value && !collapseTransitioning.value && 'goblin-split-pane__handle--collapsed',
+            )}
+          />
+          <SplitterPanel
+            ref={(value) => {
+              afterPanelRef.value = splitterPanelHandle(value)
+            }}
+            id={AFTER_PANEL_ID}
+            order={1}
+            defaultSize={beforeCollapsed.value ? 100 : props.afterSize}
+            minSize={afterMin.value}
+            maxSize={afterMax.value}
+            data-slot="resizable-panel"
+            class={cn('flex min-h-0 min-w-0 overflow-hidden', props.afterClass)}
+          >
+            {props.after}
+          </SplitterPanel>
+        </ResizablePanelGroup>
+      </div>
+    )
+  },
+  {
+    name: 'SplitPane',
+    props: {
+      before: { type: null, required: true },
+      after: { type: null, required: true },
+      afterSize: { type: Number, required: true },
+      onAfterSizeChange: Function as PropType<(size: number) => void>,
+      class: String,
+      beforeClass: String,
+      afterClass: String,
+      beforeMinSize: [Number, String] as PropType<SplitterSize>,
+      beforeContentMinSize: String,
+      afterMinSize: [Number, String] as PropType<SplitterSize>,
+      afterMaxSize: [Number, String] as PropType<SplitterSize>,
+      beforeCollapsed: Boolean,
+      animateBeforeCollapse: Boolean,
+      disabled: Boolean,
+    },
+  },
+)
+
+function useStableBeforeContentSize(
+  beforeClipRef: Ref<HTMLElement | null>,
+  splitPaneSize: ComputedRef<number | null>,
+  frozen: ComputedRef<boolean>,
+): Ref<number | null> {
+  const measuredBeforeSize = useElementInlineSize(beforeClipRef, () => !frozen.value)
+  const measuredAtSplitPaneSize = ref<number | null>(null)
+  const stableBeforeSize = ref<number | null>(null)
+
+  watch(
+    [frozen, measuredBeforeSize, splitPaneSize],
+    ([isFrozen, beforeSize, paneSize]) => {
+      if (!isFrozen && beforeSize !== null) {
+        measuredAtSplitPaneSize.value = paneSize
+        stableBeforeSize.value = beforeSize
+        return
+      }
+      if (!isFrozen || paneSize === null || measuredAtSplitPaneSize.value === null) return
+      if (Math.abs(measuredAtSplitPaneSize.value - paneSize) > 0.5) stableBeforeSize.value = null
+    },
+    { immediate: true },
   )
-}
-
-function useCollapseTransition(collapsed: boolean, enabled: boolean): CollapseTransitionDirection | null {
-  const previousCollapsedRef = useRef(collapsed)
-  const [transition, setTransition] = useState<CollapseTransitionDirection | null>(null)
-  const changedThisRender = enabled && previousCollapsedRef.current !== collapsed
-  const changeDirection: CollapseTransitionDirection | null = changedThisRender
-    ? collapsed
-      ? 'collapsing'
-      : 'expanding'
-    : null
-
-  useEffect(() => {
-    if (!enabled) {
-      previousCollapsedRef.current = collapsed
-      setTransition(null)
-      return
-    }
-    if (previousCollapsedRef.current === collapsed) return
-
-    const direction: CollapseTransitionDirection = collapsed ? 'collapsing' : 'expanding'
-    previousCollapsedRef.current = collapsed
-    setTransition(direction)
-    const timeout = window.setTimeout(() => setTransition(null), WORKSPACE_PANE_TRANSITION_MS)
-    return () => window.clearTimeout(timeout)
-  }, [collapsed, enabled])
-
-  if (!enabled) return null
-  return changeDirection ?? transition
-}
-
-function useStableBeforeContentSize({
-  beforeClipRef,
-  splitPaneRef,
-  frozen,
-}: {
-  beforeClipRef: RefObject<HTMLElement | null>
-  splitPaneRef: RefObject<HTMLElement | null>
-  frozen: boolean
-}): number | null {
-  const measuredBeforeSize = useElementInlineSize(beforeClipRef, !frozen)
-  const splitPaneSize = useElementInlineSize(splitPaneRef, true)
-  const measuredAtSplitPaneSizeRef = useRef<number | null>(null)
-  const [stableBeforeSize, setStableBeforeSize] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (frozen || measuredBeforeSize === null) return
-    measuredAtSplitPaneSizeRef.current = splitPaneSize
-    setStableBeforeSize(measuredBeforeSize)
-  }, [frozen, measuredBeforeSize, splitPaneSize])
-
-  useEffect(() => {
-    if (!frozen || splitPaneSize === null) return
-    const measuredAt = measuredAtSplitPaneSizeRef.current
-    if (measuredAt !== null && Math.abs(measuredAt - splitPaneSize) > 0.5) setStableBeforeSize(null)
-  }, [frozen, splitPaneSize])
 
   return stableBeforeSize
+}
+
+function splitPaneConstraintPercent(
+  size: SplitterSize | undefined,
+  rootFontSizePx: number,
+  splitPaneSize: number | null,
+): number | undefined {
+  if (size === undefined) return undefined
+  if (typeof size === 'number') return size
+  const value = Number.parseFloat(size)
+  if (!Number.isFinite(value)) throw new Error(`invalid split pane size: ${size}`)
+  if (size.endsWith('%')) return value
+  const pixels = size.endsWith('rem') ? value * rootFontSizePx : size.endsWith('px') ? value : null
+  if (pixels !== null) return splitPaneSize === null ? undefined : (pixels / splitPaneSize) * 100
+  throw new Error(`unsupported split pane size unit: ${size}`)
+}
+
+function readRootFontSizePx(): number {
+  if (typeof window === 'undefined') return 16
+  const value = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize)
+  return Number.isFinite(value) && value > 0 ? value : 16
+}
+
+function splitterPanelHandle(value: unknown): SplitterPanelHandle | null {
+  if (!value || typeof value !== 'object' || !('collapse' in value) || !('resize' in value)) return null
+  const collapse = value.collapse
+  const resize = value.resize
+  if (typeof collapse !== 'function' || typeof resize !== 'function') return null
+  return {
+    collapse: () => collapse(),
+    resize: (size) => resize(size),
+  }
 }

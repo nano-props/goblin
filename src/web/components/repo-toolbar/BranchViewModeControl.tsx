@@ -13,10 +13,12 @@
 // BranchNavigator / persistence / refresh continue to read
 // The value is a restorable per-workspace client preference.
 
-import { FolderTree, ListTree, type LucideIcon } from 'lucide-react'
+import { defineComponent } from 'vue'
+import { FolderTree, ListTree } from '@lucide/vue'
+import type { LucideIcon } from '@lucide/vue'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
-import { useT } from '#/web/stores/i18n.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 import { cn } from '#/web/lib/cn.ts'
 import type { BranchViewMode } from '#/shared/api-types.ts'
 
@@ -26,37 +28,33 @@ interface Props {
   onChange: (viewMode: BranchViewMode) => void
 }
 
-export function BranchViewModeControl({ value, disabled = false, onChange }: Props) {
-  const t = useT()
-  const worktreesOnly = value === 'worktrees'
-  // Icon reflects the *current* state: ListTree when the full
-  // list is shown, FolderTree when only worktree-bearing
-  // branches are. Mirrors the i18n labels under those keys.
-  const Icon: LucideIcon = worktreesOnly ? FolderTree : ListTree
-  // The tooltip uses the verbose form ("All branches" / "Worktree
-  // branches") so the icon-only button is self-explanatory; the
-  // short keys (`branches.filter.*`) are intentionally not used.
-  const labelKey = worktreesOnly ? 'branches.filter-tooltip.worktrees' : 'branches.filter-tooltip.all'
-  const label = t(labelKey)
-
-  return (
-    <Tip label={label}>
-      <Button
-        variant="ghost"
-        size="icon-lg"
-        disabled={disabled}
-        onClick={() => onChange(worktreesOnly ? 'all' : 'worktrees')}
-        aria-pressed={worktreesOnly}
-        aria-label={t('branches.filter-label')}
-        className={cn(
-          // Keep the pressed treatment stable. `hover:bg-accent`
-          // sticks while pressed so the active state doesn't
-          // flicker back to ghost on mouse-over.
-          worktreesOnly && 'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
-        )}
-      >
-        <Icon />
-      </Button>
-    </Tip>
-  )
-}
+export const BranchViewModeControl = defineComponent(
+  (props: Props) => {
+    const t = useT()
+    return () => {
+      const worktreesOnly = props.value === 'worktrees'
+      const Icon: LucideIcon = worktreesOnly ? FolderTree : ListTree
+      const labelKey = worktreesOnly ? 'branches.filter-tooltip.worktrees' : 'branches.filter-tooltip.all'
+      const label = t(labelKey)
+      return (
+        <Tip label={label}>
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            disabled={props.disabled ?? false}
+            onClick={() => props.onChange(worktreesOnly ? 'all' : 'worktrees')}
+            aria-pressed={worktreesOnly}
+            aria-label={t('branches.filter-label')}
+            class={cn(
+              worktreesOnly &&
+                'bg-accent text-accent-foreground shadow-xs hover:bg-accent hover:text-accent-foreground',
+            )}
+          >
+            <Icon />
+          </Button>
+        </Tip>
+      )
+    }
+  },
+  { name: 'BranchViewModeControl', props: ['value', 'disabled', 'onChange'] },
+)

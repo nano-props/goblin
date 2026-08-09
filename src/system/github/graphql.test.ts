@@ -15,12 +15,12 @@ vi.mock('#/system/github-cli.ts', () => ({
 
 import {
   formatGraphqlError,
-  GITHUB_API_CONCURRENCY,
   GITHUB_API_TIMEOUT_MS,
   graphqlRequestResult,
   parseGitHubRemoteUrl,
   type GraphqlRequestError,
 } from '#/system/github/graphql.ts'
+import { GITHUB_API_CONCURRENCY } from '#/system/github/queue.ts'
 
 const repo = { host: 'github.com', owner: 'acme', name: 'repo' }
 
@@ -33,13 +33,13 @@ afterEach(() => {
 })
 
 describe('GitHub GraphQL transport', () => {
-  test('uses the configured GitHub API timeout', () => {
+  test('uses the configured GitHub API timeout', async () => {
     expect(GITHUB_API_TIMEOUT_MS).toBe(17_000)
   })
 })
 
 describe('GitHub repo reference parsing', () => {
-  test('parses https remotes', () => {
+  test('parses https remotes', async () => {
     expect(parseGitHubRemoteUrl('https://github.com/acme/repo.git')).toEqual({
       host: 'github.com',
       owner: 'acme',
@@ -47,7 +47,7 @@ describe('GitHub repo reference parsing', () => {
     })
   })
 
-  test('parses ssh and scp-like remotes', () => {
+  test('parses ssh and scp-like remotes', async () => {
     expect(parseGitHubRemoteUrl('ssh://git@github.example.com/acme/repo.git')).toEqual({
       host: 'github.example.com',
       owner: 'acme',
@@ -60,12 +60,12 @@ describe('GitHub repo reference parsing', () => {
     })
   })
 
-  test('ignores GitLab remotes', () => {
+  test('ignores GitLab remotes', async () => {
     expect(parseGitHubRemoteUrl('https://gitlab.com/acme/repo.git')).toBeNull()
     expect(parseGitHubRemoteUrl('git@gitlab.example.com:acme/repo.git')).toBeNull()
   })
 
-  test('ignores unknown remotes', () => {
+  test('ignores unknown remotes', async () => {
     expect(parseGitHubRemoteUrl('https://code.example.com/acme/repo.git')).toBeNull()
   })
 
@@ -194,7 +194,7 @@ describe('graphqlRequestResult transport', () => {
     expect(results.every((result) => result.ok)).toBe(true)
   })
 
-  test('formats structured errors for logs', () => {
+  test('formats structured errors for logs', async () => {
     const error: GraphqlRequestError = {
       code: 'UNAUTHORIZED',
       message: 'Bad credentials',

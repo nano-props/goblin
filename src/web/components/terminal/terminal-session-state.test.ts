@@ -16,7 +16,7 @@ function applyIdentityAndRuntimeMetadataForTest(
 }
 
 describe('TerminalSessionState', () => {
-  test('owns Composer mode, expansion, verbatim draft, and bounded immutable history', () => {
+  test('owns Composer mode, expansion, verbatim draft, and bounded immutable history', async () => {
     const state = new TerminalSessionState()
     const initialHistory = state.snapshot(null).composer.historyEntries
 
@@ -49,7 +49,7 @@ describe('TerminalSessionState', () => {
     expect(state.snapshot(null).composer.historyEntries).toBe(composer.historyEntries)
   })
 
-  test('keeps Composer facts isolated between logical client sessions', () => {
+  test('keeps Composer facts isolated between logical client sessions', async () => {
     const first = new TerminalSessionState()
     const second = new TerminalSessionState()
 
@@ -67,7 +67,7 @@ describe('TerminalSessionState', () => {
     expect(second.snapshot(null).composer).toEqual(DEFAULT_COMPOSER)
   })
 
-  test('closes without replacing retained state and reopens in input mode', () => {
+  test('closes without replacing retained state and reopens in input mode', async () => {
     const state = new TerminalSessionState()
     state.openComposer()
     state.setComposerMode('keys')
@@ -90,7 +90,7 @@ describe('TerminalSessionState', () => {
     })
   })
 
-  test('initial state has the opening phase, default process name, and no attachment', () => {
+  test('initial state has the opening phase, default process name, and no attachment', async () => {
     const state = new TerminalSessionState()
     expect(state.snapshot(null)).toEqual({
       phase: 'opening',
@@ -104,7 +104,7 @@ describe('TerminalSessionState', () => {
     expect(state.snapshot('pty_session_1_aaaaaaaaa').attachment).toEqual({ role: 'controller' })
   })
 
-  test('identity and runtime metadata produce an open snapshot', () => {
+  test('identity and runtime metadata produce an open snapshot', async () => {
     const state = new TerminalSessionState()
     expect(
       applyIdentityAndRuntimeMetadataForTest(state, {
@@ -131,7 +131,7 @@ describe('TerminalSessionState', () => {
     })
   })
 
-  test('applyIdentity does not touch lifecycle; applyLifecycle does not touch identity', () => {
+  test('applyIdentity does not touch lifecycle; applyLifecycle does not touch identity', async () => {
     // The split is the architectural contract: an identity event
     // updates role/controllerStatus/canonicalSize and returns
     // `changed` only for those fields. A lifecycle event updates
@@ -173,7 +173,7 @@ describe('TerminalSessionState', () => {
     expect(state.getClientController().role).toBe('viewer')
   })
 
-  test('isController reflects role only — a transitional phase does not flip it', () => {
+  test('isController reflects role only — a transitional phase does not flip it', async () => {
     // The split: `isController` is the role-only controller predicate the
     // teardown decision uses. A `canSendInput` (which adds the phase
     // requirement) is the write-path gate. They are intentionally
@@ -202,7 +202,7 @@ describe('TerminalSessionState', () => {
     expect(state.canSendInput()).toBe(false) // Write-path — phase is transitional.
   })
 
-  test('canSendInput requires both role=controller AND phase=open', () => {
+  test('canSendInput requires both role=controller AND phase=open', async () => {
     const state = new TerminalSessionState()
     applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
@@ -240,7 +240,7 @@ describe('TerminalSessionState', () => {
     expect(state.canSendInput()).toBe(false)
   })
 
-  test('applyIdentity is order-independent with applyLifecycle', () => {
+  test('applyIdentity is order-independent with applyLifecycle', async () => {
     // The split is order-independent: applying lifecycle first and
     // identity second produces the same state as the reverse order,
     // as long as the final values are the same. This pins the
@@ -271,7 +271,7 @@ describe('TerminalSessionState', () => {
     expect(a.snapshot('pty_session_1_aaaaaaaaa')).toEqual(b.snapshot('pty_session_1_aaaaaaaaa'))
   })
 
-  test('restarting state is non-interactive until open resumes', () => {
+  test('restarting state is non-interactive until open resumes', async () => {
     const state = new TerminalSessionState()
     applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
@@ -301,7 +301,7 @@ describe('TerminalSessionState', () => {
     })
   })
 
-  test('resetTransientState clears transient state without overwriting identity or lifecycle', () => {
+  test('resetTransientState clears transient state without overwriting identity or lifecycle', async () => {
     const state = new TerminalSessionState()
     applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',
@@ -341,7 +341,7 @@ describe('TerminalSessionState', () => {
     })
   })
 
-  test('clamps progress values at the state boundary', () => {
+  test('clamps progress values at the state boundary', async () => {
     const state = new TerminalSessionState()
 
     expect(state.setProgress(1, 150)).toBe(true)
@@ -350,7 +350,7 @@ describe('TerminalSessionState', () => {
     expect(state.snapshot(null).progress).toEqual({ state: 1, value: 0 })
   })
 
-  test('normalizes empty titles back to null', () => {
+  test('normalizes empty titles back to null', async () => {
     const state = new TerminalSessionState()
 
     expect(state.setCanonicalTitle('  hello   world  ')).toBe(true)
@@ -359,7 +359,7 @@ describe('TerminalSessionState', () => {
     expect(state.snapshot(null).canonicalTitle).toBeNull()
   })
 
-  test('rejects stale identity, accepts an idempotent replay, and fast-fails an equal-revision conflict', () => {
+  test('rejects stale identity, accepts an idempotent replay, and fast-fails an equal-revision conflict', async () => {
     const state = new TerminalSessionState()
     applyIdentityAndRuntimeMetadataForTest(state, {
       processName: 'zsh',

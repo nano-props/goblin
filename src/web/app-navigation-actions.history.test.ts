@@ -1,7 +1,7 @@
 import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type {
   WorkspaceNavigationHistoryEntry,
   WorkspaceNavigationHistoryTraversal,
@@ -126,7 +126,7 @@ describe('createAppNavigationActions history traversal', () => {
     },
   )
 
-  test('does not block bare branch history restore while tabs projection is pending', () => {
+  test('does not block bare branch history restore while tabs projection is pending', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -149,18 +149,18 @@ describe('createAppNavigationActions history traversal', () => {
       workspaceId: REPO_ID,
       route: { kind: 'dashboard' },
     } satisfies WorkspaceNavigationHistoryEntry
-    useWorkspacesStore.getState().recordWorkspaceNavigation(branch)
-    useWorkspacesStore.getState().recordWorkspaceNavigation(dashboard)
+    workspacesStore.getState().recordWorkspaceNavigation(branch)
+    workspacesStore.getState().recordWorkspaceNavigation(dashboard)
     const navigation = routeNavigation()
     const peekWorkspaceNavigation = vi.fn((workspaceId: WorkspaceId, direction: 'back' | 'forward') =>
-      useWorkspacesStore.getState().peekWorkspaceNavigation(workspaceId, direction),
+      workspacesStore.getState().peekWorkspaceNavigation(workspaceId, direction),
     )
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
       closeWorkspace: vi.fn(),
       peekWorkspaceNavigation,
-      commitWorkspaceNavigation: useWorkspacesStore.getState().commitWorkspaceNavigation,
+      commitWorkspaceNavigation: workspacesStore.getState().commitWorkspaceNavigation,
       routeNavigation: navigation,
     })
 
@@ -170,7 +170,7 @@ describe('createAppNavigationActions history traversal', () => {
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, historyRestoreOptions())
   })
 
-  test('restores a malformed terminal history entry as the bare branch route', () => {
+  test('restores a malformed terminal history entry as the bare branch route', async () => {
     const navigation = routeNavigation()
     const target = {
       workspaceId: REPO_A_ID,
@@ -231,7 +231,7 @@ describe('createAppNavigationActions history traversal', () => {
     },
   )
 
-  test('does not open create worktree without a current repo', () => {
+  test('does not open create worktree without a current repo', async () => {
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: null,

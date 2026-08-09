@@ -1,14 +1,13 @@
-import { act } from '@testing-library/react'
-import type { ComponentProps } from 'react'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
+import type { ComponentProps } from 'vue-component-type-helpers'
 import { vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/terminal-snapshot.ts'
 import { TerminalSessionView as TerminalSessionViewComponent } from '#/web/components/terminal/TerminalSessionView.tsx'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
+  TerminalSessionCommandScope,
+  TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
@@ -20,10 +19,6 @@ import type {
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
-import { stubI18n } from '#/test-utils/i18n-mock.ts'
-
-stubI18n()
-
 vi.mock('#/web/app-shell-client.ts', () => ({
   pathForDroppedFile: vi.fn(() => ''),
   saveClipboardFiles: vi.fn(() => Promise.resolve([])),
@@ -36,7 +31,7 @@ const terminalSessionViewToast = vi.hoisted(() => ({
   message: vi.fn(),
 }))
 
-vi.mock('sonner', () => ({ toast: terminalSessionViewToast }))
+vi.mock('vue-sonner', () => ({ toast: terminalSessionViewToast }))
 
 export function terminalSessionViewToastForTest() {
   return terminalSessionViewToast
@@ -263,8 +258,8 @@ export async function renderTerminalSession(
   }
 
   const { container, unmount } = renderInJsdom(
-    <TerminalSessionContext value={context}>
-      <TerminalSessionReadContext value={readContext}>
+    <TerminalSessionCommandScope value={context}>
+      <TerminalSessionReadScope value={readContext}>
         <TerminalSessionView
           repoRoot={repoRoot}
           workspaceRuntimeId={'repo-runtime-test'}
@@ -272,9 +267,10 @@ export async function renderTerminalSession(
           worktreePath={worktreePath}
           projectionPhase={options.projectionPhase}
         />
-      </TerminalSessionReadContext>
-    </TerminalSessionContext>,
+      </TerminalSessionReadScope>
+    </TerminalSessionCommandScope>,
   )
+  await flushTestUpdates(() => {})
 
   return {
     container,
@@ -282,7 +278,7 @@ export async function renderTerminalSession(
     writeInput,
     async publishSnapshot(next: TerminalSnapshot) {
       snapshot = next
-      await act(async () => {
+      await flushTestUpdates(async () => {
         for (const listener of snapshotListeners) listener()
       })
     },
@@ -341,7 +337,7 @@ function clipboardDataWithTextAndFiles(text: string, files: File[]): DataTransfe
 export async function dispatchPaste(sessionRoot: HTMLElement, files: File[]): Promise<void> {
   const pasteEvent = new Event('paste', { bubbles: true, cancelable: true })
   Object.defineProperty(pasteEvent, 'clipboardData', { value: clipboardDataWithFiles(files) })
-  await act(async () => {
+  await flushTestUpdates(async () => {
     sessionRoot.dispatchEvent(pasteEvent)
     await waitForNextMacrotask()
   })
@@ -360,7 +356,7 @@ export async function dispatchPasteWithText(
   Object.defineProperty(pasteEvent, 'clipboardData', {
     value: clipboardDataWithTextAndFiles(text, files),
   })
-  await act(async () => {
+  await flushTestUpdates(async () => {
     sessionRoot.dispatchEvent(pasteEvent)
     await waitForNextMacrotask()
   })

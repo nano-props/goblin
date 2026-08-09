@@ -1,4 +1,4 @@
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 
 // Provider tests need a complete context value, but an unconfigured action must
 // fail instead of silently pretending that navigation was rejected or committed.

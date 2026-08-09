@@ -19,7 +19,7 @@ export function WorkspacePaneTabTitle({ item }: { item: WorkspacePaneTabItem }) 
   const busy = isPendingWorkspacePaneTabItem(item) && item.busy
   const ready = !busy && Boolean(item.label)
   return (
-    <span className={cn('truncate transition-opacity duration-150 ease-out', ready ? 'opacity-100' : 'opacity-0')}>
+    <span class={cn('truncate transition-opacity duration-150 ease-out', ready ? 'opacity-100' : 'opacity-0')}>
       {ready ? item.label : TITLE_PLACEHOLDER}
     </span>
   )

@@ -8,17 +8,17 @@ const branch = createBranchSnapshot('feature/a', {
 })
 
 describe('branch worktree status selectors', () => {
-  test('keeps change facts unknown while status is unavailable', () => {
+  test('keeps change facts unknown while status is unavailable', async () => {
     expect(branchWorktreeChanges(undefined, branch)).toBeUndefined()
     expect(branchWorktreeStatus(undefined, branch)).toBeUndefined()
   })
 
-  test('keeps change facts unknown when accepted status does not contain the snapshot worktree', () => {
+  test('keeps change facts unknown when accepted status does not contain the snapshot worktree', async () => {
     expect(branchWorktreeChanges([], branch)).toBeUndefined()
     expect(branchWorktreeStatus([], branch)).toBeUndefined()
   })
 
-  test('derives dirty and change count only from the matching accepted status entry', () => {
+  test('derives dirty and change count only from the matching accepted status entry', async () => {
     const status: WorktreeStatus[] = [
       {
         path: '/tmp/worktree-a',
@@ -35,7 +35,7 @@ describe('branch worktree status selectors', () => {
     expect(branchWorktreeStatus(status, branch)).toEqual(status)
   })
 
-  test('represents an accepted clean worktree explicitly', () => {
+  test('represents an accepted clean worktree explicitly', async () => {
     const status: WorktreeStatus[] = [{ path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [] }]
     expect(branchWorktreeChanges(status, branch)).toEqual({ dirty: false, changeCount: 0 })
   })

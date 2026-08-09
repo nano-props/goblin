@@ -1,92 +1,48 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { flushSync } from 'react-dom'
+import { computed, shallowRef } from 'vue'
+import type { ComputedRef } from 'vue'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import {
-  workspacePaneTabsTargetIdentityKey,
-  type WorkspacePaneTabsTarget,
-} from '#/shared/workspace-pane-tabs-target.ts'
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 interface WorkspacePaneTabDragPreviewSnapshot {
-  targetKey: string
   baseTabsIdentity: string
   tabs: WorkspacePaneTabEntry[]
 }
 
-type WorkspacePaneTabDragPreviewTarget =
-  WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId; branchName: null; worktreePath: null }
-
-export type WorkspacePaneTabDragPreviewInput = WorkspacePaneTabDragPreviewTarget & {
-  workspaceRuntimeId: string
-  canonicalTabs: readonly WorkspacePaneTabEntry[]
-}
+export type WorkspacePaneTabDragPreviewRelease = () => void
 
 export interface WorkspacePaneTabDragPreviewState {
-  visualTabs: readonly WorkspacePaneTabEntry[]
-  /** Returns true when a non-noop preview was staged for the current tab target. */
-  stageDragPreview: (tabs: readonly WorkspacePaneTabEntry[]) => boolean
-  clearDragPreview: () => void
+  visualTabs: ComputedRef<readonly WorkspacePaneTabEntry[]>
+  /** Returns a transaction-scoped release when a non-noop preview was staged. */
+  stageDragPreview: (tabs: readonly WorkspacePaneTabEntry[]) => WorkspacePaneTabDragPreviewRelease | null
 }
 
 export function useWorkspacePaneTabDragPreview(
-  input: WorkspacePaneTabDragPreviewInput,
+  canonicalTabs: () => readonly WorkspacePaneTabEntry[],
 ): WorkspacePaneTabDragPreviewState {
-  // Visual-only drag state. Runtime tab truth lives on the server and
-  // React Query only caches that server projection; this hook must not
-  // write either one.
-  const targetKey = workspacePaneTabDragPreviewTargetKey(input)
-  const canonicalTabsIdentity = useMemo(
-    () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
-    [input.canonicalTabs],
-  )
-  const [dragPreview, setDragPreview] = useState<WorkspacePaneTabDragPreviewSnapshot | null>(null)
-  const activeDragPreview =
-    dragPreview &&
-    targetKey !== null &&
-    dragPreview.targetKey === targetKey &&
-    dragPreview.baseTabsIdentity === canonicalTabsIdentity
-      ? dragPreview
-      : null
+  // This state is owned by one keyed toolbar target. The server projection
+  // remains authoritative; each accepted reorder owns one preview lease until
+  // its transaction settles.
+  const dragPreview = shallowRef<WorkspacePaneTabDragPreviewSnapshot | null>(null)
+  const visualTabs = computed(() => {
+    const currentTabs = canonicalTabs()
+    const preview = dragPreview.value
+    return preview && preview.baseTabsIdentity === workspacePaneTabEntryListIdentity(currentTabs)
+      ? preview.tabs
+      : currentTabs
+  })
 
-  useEffect(() => {
-    if (dragPreview && !activeDragPreview) setDragPreview(null)
-  }, [activeDragPreview, dragPreview])
+  const stageDragPreview = (tabs: readonly WorkspacePaneTabEntry[]) => {
+    const currentTabs = canonicalTabs()
+    const baseTabsIdentity = workspacePaneTabEntryListIdentity(currentTabs)
+    const nextTabs = [...tabs]
+    if (workspacePaneTabEntryListIdentity(nextTabs) === baseTabsIdentity) return null
 
-  const clearDragPreview = useCallback(() => {
-    setDragPreview(null)
-  }, [])
-
-  const stageDragPreview = useCallback(
-    (tabs: readonly WorkspacePaneTabEntry[]) => {
-      if (!targetKey) return false
-      const nextTabs = [...tabs]
-      if (workspacePaneTabEntryListIdentity(nextTabs) === canonicalTabsIdentity) {
-        setDragPreview(null)
-        return false
-      }
-      flushSync(() => {
-        setDragPreview({
-          targetKey,
-          baseTabsIdentity: canonicalTabsIdentity,
-          tabs: nextTabs,
-        })
-      })
-      return true
-    },
-    [canonicalTabsIdentity, targetKey],
-  )
-
-  return {
-    visualTabs: activeDragPreview ? activeDragPreview.tabs : input.canonicalTabs,
-    stageDragPreview,
-    clearDragPreview,
+    const snapshot: WorkspacePaneTabDragPreviewSnapshot = { baseTabsIdentity, tabs: nextTabs }
+    dragPreview.value = snapshot
+    return () => {
+      if (dragPreview.value === snapshot) dragPreview.value = null
+    }
   }
-}
 
-function workspacePaneTabDragPreviewTargetKey(
-  input: WorkspacePaneTabDragPreviewTarget & { workspaceRuntimeId: string },
-): string | null {
-  if (input.kind === 'inactive') return null
-  return `${workspacePaneTabsTargetIdentityKey(input)}::${input.workspaceRuntimeId}`
+  return { visualTabs, stageDragPreview }
 }

@@ -32,7 +32,7 @@ describe('workspace runtimes', () => {
     clearWorkspaceRuntimesForUser(USER_ID)
   })
 
-  test('shares an epoch until the last client releases it', () => {
+  test('shares an epoch until the last client releases it', async () => {
     const first = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     const badListener = vi.fn(() => {
       throw new Error('listener failed')
@@ -67,7 +67,7 @@ describe('workspace runtimes', () => {
     }
   })
 
-  test('keeps an epoch alive while a server resource retains it', () => {
+  test('keeps an epoch alive while a server resource retains it', async () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     const retention = retainWorkspaceRuntimeResource(USER_ID, REPO_ROOT, runtimeId, 'terminal-a')
 
@@ -85,7 +85,7 @@ describe('workspace runtimes', () => {
     expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, runtimeId)).toBe(false)
   })
 
-  test('does not let a stale resource retention release affect a later epoch', () => {
+  test('does not let a stale resource retention release affect a later epoch', async () => {
     const oldRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     const staleRetention = retainWorkspaceRuntimeResource(USER_ID, REPO_ROOT, oldRuntimeId, 'terminal-a')
     expect(closeWorkspaceRuntimesForDurableRemoval(REPO_ROOT)).toBe(1)
@@ -97,7 +97,7 @@ describe('workspace runtimes', () => {
     expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, newRuntimeId)).toBe(true)
   })
 
-  test('durable removal closes every user epoch regardless of its owners', () => {
+  test('durable removal closes every user epoch regardless of its owners', async () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     retainWorkspaceRuntimeResource(USER_ID, REPO_ROOT, runtimeId, 'terminal-a')
     const otherUserId = `${USER_ID}_other`
@@ -119,7 +119,7 @@ describe('workspace runtimes', () => {
     }
   })
 
-  test('commits probe state only to the current runtime epoch', () => {
+  test('commits probe state only to the current runtime epoch', async () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     const probe = {
       status: 'ready' as const,
@@ -150,7 +150,7 @@ describe('workspace runtimes', () => {
     expect(listWorkspaceRuntimes(USER_ID)[0]?.workspaceProbe).toEqual({ status: 'probing' })
   })
 
-  test('keeps the first committed initial probe as the shared runtime authority', () => {
+  test('keeps the first committed initial probe as the shared runtime authority', async () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-b')
     const first = {
@@ -393,7 +393,7 @@ describe('workspace runtimes', () => {
     await refresh
   })
 
-  test('makes repeated acquire and release idempotent per client', () => {
+  test('makes repeated acquire and release idempotent per client', async () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     expect(acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')).toBe(runtimeId)
     expect(releaseWorkspaceRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({
@@ -406,7 +406,7 @@ describe('workspace runtimes', () => {
     })
   })
 
-  test('checks runtime authority and client lease together', () => {
+  test('checks runtime authority and client lease together', async () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     expect(isCurrentWorkspaceRuntimeMembership(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toBe(true)
     expect(isCurrentWorkspaceRuntimeMembership(USER_ID, REPO_ROOT, runtimeId, 'client-b')).toBe(false)
@@ -416,7 +416,7 @@ describe('workspace runtimes', () => {
     expect(isCurrentWorkspaceRuntimeMembership(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toBe(false)
   })
 
-  test('expires only memberships captured when a client went offline', () => {
+  test('expires only memberships captured when a client went offline', async () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-b')
     const lease = captureWorkspaceRuntimeMembershipLease(USER_ID, 'client-a')
@@ -433,7 +433,7 @@ describe('workspace runtimes', () => {
     })
   })
 
-  test('does not let an old disconnect lease remove a renewed membership', () => {
+  test('does not let an old disconnect lease remove a renewed membership', async () => {
     const runtimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     const staleLease = captureWorkspaceRuntimeMembershipLease(USER_ID, 'client-a')
     expect(acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')).toBe(runtimeId)
@@ -445,7 +445,7 @@ describe('workspace runtimes', () => {
     })
   })
 
-  test('does not let an old explicit membership lease remove a renewed membership', () => {
+  test('does not let an old explicit membership lease remove a renewed membership', async () => {
     const staleLease = acquireWorkspaceRuntimeLease(USER_ID, REPO_ROOT, 'client-a')
     const renewedLease = acquireWorkspaceRuntimeLease(USER_ID, REPO_ROOT, 'client-a')
 
@@ -510,7 +510,7 @@ describe('workspace runtimes', () => {
     }
   })
 
-  test('atomically replaces one client membership set without changing sibling clients', () => {
+  test('atomically replaces one client membership set without changing sibling clients', async () => {
     const firstRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-a')
     acquireWorkspaceRuntime(USER_ID, REPO_ROOT, 'client-b')
     const secondRoot = workspaceIdForTest('goblin+file:///workspace-runtimes/second')
@@ -534,7 +534,7 @@ describe('workspace runtimes', () => {
     })
   })
 
-  test('publishes close events only after the replacement snapshot is complete', () => {
+  test('publishes close events only after the replacement snapshot is complete', async () => {
     const oldRoot = workspaceIdForTest('goblin+file:///workspace-runtimes/old')
     const newRoot = workspaceIdForTest('goblin+file:///workspace-runtimes/new')
     acquireWorkspaceRuntime(USER_ID, oldRoot, 'client-a')
@@ -550,7 +550,7 @@ describe('workspace runtimes', () => {
     }
   })
 
-  test('rejects invalid declaration metadata before changing any memberships', () => {
+  test('rejects invalid declaration metadata before changing any memberships', async () => {
     const oldRoot = workspaceIdForTest('goblin+file:///workspace-runtimes/atomic-old')
     const newRoot = workspaceIdForTest('goblin+file:///workspace-runtimes/atomic-new')
     const oldRuntimeId = acquireWorkspaceRuntime(USER_ID, oldRoot, 'client-a')

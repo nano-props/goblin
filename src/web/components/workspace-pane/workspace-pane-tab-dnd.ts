@@ -1,6 +1,8 @@
-import { useCallback, useMemo, type RefObject } from 'react'
-import { KeyboardSensor, PointerSensor, type DragEndEvent, useSensor, useSensors } from '@dnd-kit/core'
-import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { Accessibility, KeyboardSensor, PointerActivationConstraints, PointerSensor } from '@dnd-kit/dom'
+import type { DragDropManager } from '@dnd-kit/dom'
+import { scheduler } from '@dnd-kit/dom/utilities'
+import type { DragDropProviderProps, DragEndEvent } from '@dnd-kit/vue'
+import { isSortable } from '@dnd-kit/vue/sortable'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 import type {
@@ -9,67 +11,90 @@ import type {
   WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 
-export function useWorkspacePaneTabDnd({
-  sortableItems,
-  newButtonRef,
-  disabled,
-  onReorder,
-}: {
-  sortableItems: readonly (WorkspacePaneStaticTabItem | WorkspacePaneRuntimeTabItem)[]
-  newButtonRef: RefObject<HTMLButtonElement | null>
-  disabled: boolean
-  onReorder: (tabs: WorkspacePaneTabEntry[]) => void
-}) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
-  const restrictToVisibleTabStrip = useMemo(
-    () => createRestrictToTabStripBounds({ rightBoundaryRef: newButtonRef }),
-    [newButtonRef],
-  )
-  // Must be called unconditionally so the hook order stays stable across renders
-  // (e.g. when worktree items go from 0 -> 1 or back).
-  const sortableIds = useMemo(() => sortableItems.map((item) => item.sortableId), [sortableItems])
+type SortableWorkspacePaneTabItem = WorkspacePaneStaticTabItem | WorkspacePaneRuntimeTabItem
 
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      if (disabled) return
-      const { active, over } = event
-      if (!over) return
-      const activeId = String(active.id)
-      const overId = String(over.id)
-      if (activeId === overId) return
-      const oldIndex = sortableItems.findIndex((item) => item.sortableId === activeId)
-      const newIndex = sortableItems.findIndex((item) => item.sortableId === overId)
-      if (oldIndex === -1 || newIndex === -1) return
-      const activeItem = sortableItems[oldIndex]
-      const overItem = sortableItems[newIndex]
-      if (!activeItem || !overItem) return
-      onReorder(
+export interface WorkspacePaneTabDnd {
+  modifiers: DragDropProviderProps['modifiers']
+  plugins: DragDropProviderProps['plugins']
+  sensors: DragDropProviderProps['sensors']
+  handleDragEnd: (event: DragEndEvent) => void
+}
+
+class WorkspacePaneTabAccessibility extends Accessibility {
+  constructor(manager: DragDropManager) {
+    super(manager)
+
+    this.registerEffect(() => {
+      const tabActivators = Array.from(manager.registry.draggables.value, (draggable) => {
+        // Subscribe alongside the built-in accessibility plugin so its
+        // drag-state attribute update is sanitized in the same frame.
+        void draggable.isDragging
+        const activator = draggable.handle ?? draggable.element
+        return activator?.getAttribute('role') === 'tab' ? activator : null
+      }).filter((activator): activator is Element => activator !== null)
+
+      queueMicrotask(() => {
+        void scheduler.schedule(() => {
+          for (const activator of tabActivators) {
+            activator.setAttribute('aria-roledescription', 'sortable')
+            activator.removeAttribute('aria-pressed')
+            activator.removeAttribute('aria-grabbed')
+          }
+        })
+      })
+    })
+  }
+}
+
+const workspacePaneTabPlugins: DragDropProviderProps['plugins'] = (defaultPlugins) =>
+  defaultPlugins.map((plugin) => (plugin === Accessibility ? WorkspacePaneTabAccessibility : plugin))
+
+const workspacePaneTabSensors: DragDropProviderProps['sensors'] = [
+  PointerSensor.configure({
+    activationConstraints: [new PointerActivationConstraints.Distance({ value: 6 })],
+  }),
+  KeyboardSensor,
+]
+
+export function useWorkspacePaneTabDnd(input: {
+  sortableItems: () => readonly SortableWorkspacePaneTabItem[]
+  disabled: () => boolean
+  viewport: () => HTMLElement | null
+  rightBoundary: () => HTMLElement | null
+  onReorder: (tabs: WorkspacePaneTabEntry[]) => void
+}): WorkspacePaneTabDnd {
+  return {
+    modifiers: [
+      createRestrictToTabStripBounds({
+        viewport: input.viewport,
+        rightBoundary: input.rightBoundary,
+      }),
+    ],
+    plugins: workspacePaneTabPlugins,
+    sensors: workspacePaneTabSensors,
+    handleDragEnd: (event) => {
+      if (event.canceled || input.disabled()) return
+      const source = event.operation.source
+      if (!isSortable(source)) return
+
+      const items = input.sortableItems()
+      const oldIndex = source.initialIndex
+      const newIndex = source.index
+      if (oldIndex === newIndex || oldIndex < 0 || newIndex < 0) return
+      if (oldIndex >= items.length || newIndex >= items.length) return
+
+      input.onReorder(
         arrayMove(
-          sortableItems.map((item) => item.tabEntry),
+          items.map((item) => item.tabEntry),
           oldIndex,
           newIndex,
         ),
       )
     },
-    [disabled, onReorder, sortableItems],
-  )
-
-  return {
-    sensors,
-    restrictToVisibleTabStrip,
-    sortableIds,
-    handleDragEnd,
   }
 }
 
-export type WorkspacePaneTabDnd = ReturnType<typeof useWorkspacePaneTabDnd>
-
-export function isSortableWorkspacePaneTabItem(
-  item: WorkspacePaneTabItem,
-): item is WorkspacePaneStaticTabItem | WorkspacePaneRuntimeTabItem {
+export function isSortableWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is SortableWorkspacePaneTabItem {
   return item.kind === 'static' || item.kind === 'runtime'
 }
 

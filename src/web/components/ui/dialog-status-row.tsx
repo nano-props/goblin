@@ -1,5 +1,6 @@
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
+import type { FunctionalComponent } from 'vue'
 
 interface Props {
   message: string
@@ -8,17 +9,17 @@ interface Props {
   onAction?: () => void
 }
 
-function DialogStatusRow({ message, tone = 'default', actionLabel, onAction }: Props) {
+const DialogStatusRow: FunctionalComponent<Props> = ({ message, tone = 'default', actionLabel, onAction }) => {
   return (
     <div
       data-slot="dialog-status-row"
       aria-live="polite"
       aria-atomic="true"
-      className="flex min-h-4 items-center gap-2 overflow-hidden"
+      class="flex min-h-4 items-center gap-2 overflow-hidden"
     >
       <div
         data-slot="dialog-status-text"
-        className={cn(
+        class={cn(
           'min-w-0 flex-1 truncate text-xs leading-4',
           !message && 'invisible',
           tone === 'danger' ? 'text-danger' : tone === 'success' ? 'text-success' : 'text-muted-foreground',
@@ -27,12 +28,14 @@ function DialogStatusRow({ message, tone = 'default', actionLabel, onAction }: P
         {message}
       </div>
       {actionLabel && onAction ? (
-        <Button type="button" variant="link" size="sm" className="h-auto shrink-0 px-0 text-xs" onClick={onAction}>
+        <Button type="button" variant="link" size="sm" class="h-auto shrink-0 px-0 text-xs" onClick={onAction}>
           {actionLabel}
         </Button>
       ) : null}
     </div>
   )
 }
+DialogStatusRow.props = ['message', 'tone', 'actionLabel', 'onAction']
+DialogStatusRow.inheritAttrs = false
 
 export { DialogStatusRow }

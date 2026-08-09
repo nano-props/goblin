@@ -92,7 +92,7 @@ describe('client realtime socket connection', () => {
     expect(wsMock.instances).toHaveLength(2)
   })
 
-  test('notifies callers when the socket opens with the current client id', () => {
+  test('notifies callers when the socket opens with the current client id', async () => {
     const onOpen = vi.fn()
     const connection = createTestConnection({ onRealtimeMessage: vi.fn(), hasRealtimeSubscribers: () => true, onOpen })
     connection.openForRealtime()
@@ -103,7 +103,7 @@ describe('client realtime socket connection', () => {
     expect(onOpen).toHaveBeenCalledWith('client_realtime')
   })
 
-  test('does not open for realtime without socket demand', () => {
+  test('does not open for realtime without socket demand', async () => {
     const connection = createTestConnection({ onRealtimeMessage: vi.fn() })
 
     connection.openForRealtime()
@@ -111,7 +111,7 @@ describe('client realtime socket connection', () => {
     expect(wsMock.instances).toHaveLength(0)
   })
 
-  test('cancels pending reconnect when realtime subscribers drain', () => {
+  test('cancels pending reconnect when realtime subscribers drain', async () => {
     useFakeTimers()
     let subscribed = true
     const connection = createTestConnection({
@@ -235,7 +235,7 @@ describe('client realtime socket connection', () => {
     await expect(promise).resolves.toEqual({ echoed: 'hello' })
   })
 
-  test('times out realtime-only sockets that never open', () => {
+  test('times out realtime-only sockets that never open', async () => {
     useFakeTimers()
     const connection = createTestConnection({
       onRealtimeMessage: vi.fn(),
@@ -255,7 +255,7 @@ describe('client realtime socket connection', () => {
     expect(wsMock.instances[1]?.readyState).toBe(wsMock.CONNECTING)
   })
 
-  test('keeps the open timeout when realtime demand drains before a connecting socket opens', () => {
+  test('keeps the open timeout when realtime demand drains before a connecting socket opens', async () => {
     useFakeTimers()
     let subscribed = true
     const connection = createTestConnection({

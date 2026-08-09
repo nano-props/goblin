@@ -1,11 +1,12 @@
-import { useEffect, useMemo } from 'react'
+import { computed, toValue, watch } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
   useWorkspaceNavigationHistory,
   type WorkspaceNavigationRouteContext,
 } from '#/web/workspace-navigation-history.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
@@ -17,45 +18,36 @@ import {
 } from '#/web/workspace-pane/workspace-pane-route-reconciliation.ts'
 
 export interface GitWorkspacePaneRouteControllerInput {
-  enabled?: boolean
-  workspaceId: WorkspaceId
-  branchName: string | null
-  worktreePath: string | null
-  route: ParsedWorkspacePaneRouteTarget
-  model: WorkspacePaneTabModel
+  enabled?: MaybeRefOrGetter<boolean>
+  workspaceId: MaybeRefOrGetter<WorkspaceId>
+  branchName: MaybeRefOrGetter<string | null>
+  worktreePath: MaybeRefOrGetter<string | null>
+  route: MaybeRefOrGetter<ParsedWorkspacePaneRouteTarget>
+  model: MaybeRefOrGetter<WorkspacePaneTabModel>
 }
 
 // URL is the presentation authority. Reconciliation validates whether the
 // requested route can render; it never chooses another route in an effect.
-export function useGitWorkspacePaneRouteController({
-  enabled = true,
-  workspaceId,
-  branchName,
-  worktreePath,
-  route,
-  model,
-}: GitWorkspacePaneRouteControllerInput): WorkspacePaneRouteReconciliation {
-  const reconciliation = useMemo(
-    () => (enabled ? reconcileWorkspacePaneRoute(route, model) : { kind: 'none' as const }),
-    [enabled, route, model],
+export function useGitWorkspacePaneRouteController(
+  input: GitWorkspacePaneRouteControllerInput,
+): ComputedRef<WorkspacePaneRouteReconciliation> {
+  const enabled = () => toValue(input.enabled ?? true)
+  const reconciliation = computed<WorkspacePaneRouteReconciliation>(() =>
+    enabled() ? reconcileWorkspacePaneRoute(toValue(input.route), toValue(input.model)) : { kind: 'none' },
   )
   useWorkspacePaneNavigationHistory({
+    ...input,
     enabled,
-    workspaceId,
-    branchName,
-    worktreePath,
-    route,
     reconciliation,
   })
   useSyncRoutedWorkspacePaneSelection({
+    ...input,
     enabled,
-    workspaceId,
-    branchName,
-    worktreePath,
-    route,
     reconciliation,
   })
-  useSyncWorkspacePaneRuntimeTabSelection(model, { enabled: enabled && reconciliation.kind === 'none' })
+  useSyncWorkspacePaneRuntimeTabSelection(input.model, {
+    enabled: computed(() => enabled() && reconciliation.value.kind === 'none'),
+  })
   return reconciliation
 }
 
@@ -67,19 +59,27 @@ function useWorkspacePaneNavigationHistory({
   route,
   reconciliation,
 }: {
-  enabled: boolean
-  workspaceId: WorkspaceId
-  branchName: string | null
-  worktreePath: string | null
-  route: ParsedWorkspacePaneRouteTarget
-  reconciliation: WorkspacePaneRouteReconciliation
+  enabled: MaybeRefOrGetter<boolean>
+  workspaceId: MaybeRefOrGetter<WorkspaceId>
+  branchName: MaybeRefOrGetter<string | null>
+  worktreePath: MaybeRefOrGetter<string | null>
+  route: MaybeRefOrGetter<ParsedWorkspacePaneRouteTarget>
+  reconciliation: MaybeRefOrGetter<WorkspacePaneRouteReconciliation>
 }): void {
-  const historyRoute = workspacePaneRouteHistoryResolution(route ?? null, reconciliation)
+  const routeContext = computed(() => {
+    const historyRoute = workspacePaneRouteHistoryResolution(toValue(route) ?? null, toValue(reconciliation))
+    const currentBranchName = toValue(branchName)
+    return toValue(enabled) && currentBranchName && historyRoute.kind === 'record'
+      ? workspacePaneHistoryRouteContext({
+          workspaceId: toValue(workspaceId),
+          branchName: currentBranchName,
+          worktreePath: toValue(worktreePath),
+          route: historyRoute.route,
+        })
+      : null
+  })
   useWorkspaceNavigationHistory({
-    routeContext:
-      enabled && branchName && historyRoute.kind === 'record'
-        ? workspacePaneHistoryRouteContext({ workspaceId, branchName, worktreePath, route: historyRoute.route })
-        : null,
+    routeContext,
   })
 }
 
@@ -111,26 +111,40 @@ function useSyncRoutedWorkspacePaneSelection({
   route,
   reconciliation,
 }: {
-  enabled: boolean
-  workspaceId: WorkspaceId
-  branchName: string | null
-  worktreePath: string | null
-  route: ParsedWorkspacePaneRouteTarget
-  reconciliation: WorkspacePaneRouteReconciliation
+  enabled: MaybeRefOrGetter<boolean>
+  workspaceId: MaybeRefOrGetter<WorkspaceId>
+  branchName: MaybeRefOrGetter<string | null>
+  worktreePath: MaybeRefOrGetter<string | null>
+  route: MaybeRefOrGetter<ParsedWorkspacePaneRouteTarget>
+  reconciliation: MaybeRefOrGetter<WorkspacePaneRouteReconciliation>
 }): void {
-  const setWorkspacePaneTab = useWorkspacesStore((s) => s.setWorkspacePaneTab)
-  useEffect(() => {
-    if (!enabled) return
-    if (!branchName) return
-    if (reconciliation.kind !== 'none') return
-    const state = useWorkspacesStore.getState()
-    const repo = state.workspaces[workspaceId]
-    if (!repo) return
-    const target = requiredGitWorkspacePaneTabsTarget(workspaceId, branchName, worktreePath)
-    if (route?.kind === 'invalid-static') return
-    const routeTab = route === null ? null : route.kind === 'static' ? route.tab : 'terminal'
-    if (preferredWorkspacePaneTabForTarget(repo.ui, target) !== routeTab) {
-      setWorkspacePaneTab(workspaceId, branchName, routeTab)
-    }
-  }, [branchName, enabled, reconciliation.kind, workspaceId, route, setWorkspacePaneTab, worktreePath])
+  const setWorkspacePaneTab = workspacesStore.getState().setWorkspacePaneTab
+  // Persist only a valid settled route selection; reconciliation never chooses it.
+  watch(
+    [
+      () => toValue(enabled),
+      () => toValue(workspaceId),
+      () => toValue(branchName),
+      () => toValue(worktreePath),
+      () => toValue(route),
+      () => toValue(reconciliation),
+    ],
+    () => {
+      if (!toValue(enabled)) return
+      const currentBranchName = toValue(branchName)
+      if (!currentBranchName || toValue(reconciliation).kind !== 'none') return
+      const currentWorkspaceId = toValue(workspaceId)
+      const state = workspacesStore.getState()
+      const repo = state.workspaces[currentWorkspaceId]
+      if (!repo) return
+      const target = requiredGitWorkspacePaneTabsTarget(currentWorkspaceId, currentBranchName, toValue(worktreePath))
+      const currentRoute = toValue(route)
+      if (currentRoute?.kind === 'invalid-static') return
+      const routeTab = currentRoute === null ? null : currentRoute.kind === 'static' ? currentRoute.tab : 'terminal'
+      if (preferredWorkspacePaneTabForTarget(repo.ui, target) !== routeTab) {
+        setWorkspacePaneTab(currentWorkspaceId, currentBranchName, routeTab)
+      }
+    },
+    { immediate: true },
+  )
 }

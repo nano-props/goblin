@@ -20,7 +20,7 @@ Use this doc for UI language and presentation rules.
 - Prefer shadcn/ui primitives in `src/web/components/ui/`.
 - Reuse shared field primitives for forms.
 - Keep layout-level dialog hosts mounted while their dialog is closed, and
-  render the Radix root with `open={false}` so exit motion can run; do not
+  render the Reka root with `open={false}` so exit motion can run; do not
   write `if (!open) return null`. For workspace- or repo-scoped hosts, pass
   the current target as nullable context and close or reconcile stale dialog
   state when that context changes. Capture the initiating workspace or repo
@@ -47,7 +47,7 @@ Use this doc for UI language and presentation rules.
   ```tsx
   const alwaysVisible = useIsCompactUi() || open
 
-  triggerClassName={cn(
+  class={cn(
     'ml-auto size-5 shrink-0 p-0 transition-opacity duration-100',
     alwaysVisible && 'opacity-100',
     !alwaysVisible && 'opacity-0 group-hover/filetree-row:opacity-100',
@@ -71,4 +71,4 @@ Use this doc for UI language and presentation rules.
   the chip in a single stable node across the entire transition window
   — rendering one `<div role="status" aria-live="polite">` per state
   flip causes screen readers to re-announce the same label every time
-  React unmounts and remounts the node.
+  Vue unmounts and remounts the node.

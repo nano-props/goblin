@@ -12,13 +12,12 @@
 //     component applies no client-side filter, so the dropdown mirrors
 //     whatever the host (i.e. the server, after debounce) supplies.
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
-import { useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
+import { defineComponent, ref } from 'vue'
+import type { VNode } from 'vue'
 import { describe, expect, test, vi } from 'vitest'
 import { DirectoryPathSuggestions } from '#/web/components/ui/directory-path-suggestions.tsx'
-import { renderInJsdom } from '#/test-utils/render.tsx'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 
 describe('DirectoryPathSuggestions', () => {
@@ -61,7 +60,7 @@ describe('DirectoryPathSuggestions', () => {
   test('lets a second Enter submit the surrounding form after a suggestion commit', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    const onSubmit = vi.fn((event: FormEvent) => event.preventDefault())
+    const onSubmit = vi.fn((event: SubmitEvent) => event.preventDefault())
     render(
       <form onSubmit={onSubmit}>
         <Harness suggestions={['/srv/repo']} onChange={onChange} hasFetched />
@@ -147,7 +146,7 @@ describe('DirectoryPathSuggestions', () => {
     await pressKey('ArrowDown')
     await flush()
 
-    rerender(<Harness suggestions={['/opt/a', '/opt/b']} onChange={onChange} hasFetched />)
+    await rerender(<Harness suggestions={['/opt/a', '/opt/b']} onChange={onChange} hasFetched />)
     await flush()
     await pressKey('Enter')
     await flush()
@@ -170,7 +169,7 @@ describe('DirectoryPathSuggestions', () => {
 
       // Initial render: the active option is index 0; the useLayoutEffect
       // fires once on mount, so the spy may have 0 or 1 calls already
-      // depending on React scheduling. Reset before the action under test.
+      // depending on Vue scheduling. Reset before the action under test.
       scrollSpy.mockClear()
 
       await pressKey('ArrowDown')
@@ -296,7 +295,7 @@ describe('DirectoryPathSuggestions', () => {
   test('consumes Escape only while the suggestion popup is open', async () => {
     const onKeyDown = vi.fn()
     render(
-      <div onKeyDown={onKeyDown}>
+      <div onKeydown={onKeyDown}>
         <Harness suggestions={['/srv/a']} hasFetched />
       </div>,
     )
@@ -433,27 +432,33 @@ interface HarnessProps {
   ariaInvalid?: boolean
 }
 
-function Harness({ suggestions, onChange = () => {}, disabled, isLoading, hasFetched, ariaInvalid }: HarnessProps) {
-  const [value, setValue] = useState('')
-  return (
-    <DirectoryPathSuggestions
-      id="rps-test"
-      value={value}
-      onChange={(next) => {
-        setValue(next)
-        onChange(next)
-      }}
-      suggestions={suggestions}
-      isLoading={isLoading}
-      hasFetched={hasFetched}
-      emptyLabel="No matching paths"
-      disabled={disabled}
-      aria-invalid={ariaInvalid}
-    />
-  )
-}
+const Harness = defineComponent(
+  (props: HarnessProps) => {
+    const value = ref('')
+    return () => (
+      <DirectoryPathSuggestions
+        id="rps-test"
+        value={value.value}
+        onChange={(next) => {
+          value.value = next
+          props.onChange?.(next)
+        }}
+        suggestions={props.suggestions}
+        isLoading={props.isLoading}
+        hasFetched={props.hasFetched}
+        emptyLabel="No matching paths"
+        disabled={props.disabled}
+        aria-invalid={props.ariaInvalid}
+      />
+    )
+  },
+  {
+    name: 'DirectoryPathSuggestionsHarness',
+    props: ['suggestions', 'onChange', 'disabled', 'isLoading', 'hasFetched', 'ariaInvalid'],
+  },
+)
 
-function render(element: ReactNode) {
+function render(element: VNode) {
   return renderInJsdom(element)
 }
 
@@ -488,5 +493,5 @@ function screenText(): string {
 }
 
 async function flush() {
-  await act(() => flushMicrotasks())
+  await flushTestUpdates(() => flushMicrotasks())
 }

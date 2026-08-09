@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { historyRefDisplays, parseHistoryRefs } from '#/web/components/repo-workspace/history-refs.ts'
 
 describe('parseHistoryRefs', () => {
-  test('splits comma-separated refs and drops blanks', () => {
+  test('splits comma-separated refs and drops blanks', async () => {
     expect(parseHistoryRefs('HEAD -> main, origin/main,  , tag: v1')).toEqual([
       'HEAD -> main',
       'origin/main',
@@ -12,7 +12,7 @@ describe('parseHistoryRefs', () => {
 })
 
 describe('historyRefDisplays', () => {
-  test('merges a local branch with same-name remote refs', () => {
+  test('merges a local branch with same-name remote refs', async () => {
     expect(historyRefDisplays(['origin/main', 'main'])).toEqual([
       {
         kind: 'mergedRemote',
@@ -25,7 +25,7 @@ describe('historyRefDisplays', () => {
     ])
   })
 
-  test('merges HEAD branch labels with same-name remote refs', () => {
+  test('merges HEAD branch labels with same-name remote refs', async () => {
     expect(historyRefDisplays(['HEAD -> feature/a', 'origin/feature/a'])).toEqual([
       {
         kind: 'mergedRemote',
@@ -38,14 +38,14 @@ describe('historyRefDisplays', () => {
     ])
   })
 
-  test('keeps remote refs separate when the local branch is absent', () => {
+  test('keeps remote refs separate when the local branch is absent', async () => {
     expect(historyRefDisplays(['origin/main', 'origin/HEAD'])).toEqual([
       { kind: 'single', refName: 'origin/main', tone: 'warning' },
       { kind: 'single', refName: 'origin/HEAD', tone: 'warning' },
     ])
   })
 
-  test('uses each matching remote ref in only one local display', () => {
+  test('uses each matching remote ref in only one local display', async () => {
     expect(historyRefDisplays(['HEAD -> main', 'origin/main', 'main'])).toEqual([
       {
         kind: 'mergedRemote',
@@ -59,7 +59,7 @@ describe('historyRefDisplays', () => {
     ])
   })
 
-  test('summarizes multiple matching remotes on the local branch', () => {
+  test('summarizes multiple matching remotes on the local branch', async () => {
     expect(historyRefDisplays(['origin/main', 'upstream/main', 'main'])).toEqual([
       {
         kind: 'mergedRemote',

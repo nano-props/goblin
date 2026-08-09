@@ -3,7 +3,7 @@
 // These were previously inlined into `useBranchActions`, where the
 // `(repo, branch)` for the IPC call was captured by closure from the
 // hook call site. That coupling was fine when the host and the request
-// were in the same React subtree, but the layout-level `BranchActionDialogHost`
+// were in the same component subtree, but the layout-level `BranchActionDialogHost`
 // needs to dispatch a confirmation against the dialog payload's
 // `(repo, branch)` — not the host's `(repo, branch)` — so the user can
 // open a dialog for a non-selected branch (e.g. a row in the zen-mode
@@ -15,7 +15,7 @@
 // `useAsyncPending.run`, which then marks the Confirm button as
 // `aria-busy` and rejects duplicate clicks for the duration of the IPC
 // round-trip. The force-promote callbacks dispatch back into
-// `useBranchActionDialogsStore` to open the follow-up confirm dialog
+// `branchActionDialogsStore` to open the follow-up confirm dialog
 // with the same payload.
 
 import {
@@ -24,12 +24,12 @@ import {
   removeWorktreeNeedsForceConfirm,
 } from '#/web/stores/workspaces/branch-action-write-paths.ts'
 import {
-  useBranchActionDialogsStore,
+  branchActionDialogsStore,
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoMutationExecResult } from '#/shared/git-types.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 
 interface BranchActionDispatchContext {
@@ -60,12 +60,12 @@ export function dispatchDeleteBranch({
     actionRepo.id,
     actionRepo.workspaceRuntimeId,
     { kind: 'deleteBranch', branch: branchName, force, deleteUpstream },
-    useWorkspacesStore.getState().runBranchAction,
+    workspacesStore.getState().runBranchAction,
     {
       deferResultMessages: force ? [] : ['error.branch-not-fully-merged'],
       handleResult: (result) => {
         if (deleteBranchNeedsForceConfirm(result, force)) {
-          useBranchActionDialogsStore.getState().openForceDeleteConfirm({
+          branchActionDialogsStore.getState().openForceDeleteConfirm({
             repoId: actionRepo.id,
             branchName,
             payload: branchName,
@@ -107,12 +107,12 @@ export async function dispatchRemoveWorktree({
       forceDeleteBranch,
       deleteUpstream,
     },
-    useWorkspacesStore.getState().runBranchAction,
+    workspacesStore.getState().runBranchAction,
     {
       deferResultMessages: deleteBranch && !forceDeleteBranch ? ['error.cannot-remove-unpushed-worktree'] : [],
       handleResult: (result) => {
         if (removeWorktreeNeedsForceConfirm(result, deleteBranch, forceDeleteBranch)) {
-          useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
+          branchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
             repoId: actionRepo.id,
             branchName: target.branch,
             payload: target,
@@ -139,7 +139,7 @@ export function dispatchPush({
     actionRepo.id,
     actionRepo.workspaceRuntimeId,
     { kind: 'push', branch: branchName },
-    useWorkspacesStore.getState().runBranchAction,
+    workspacesStore.getState().runBranchAction,
   )
 }
 
@@ -156,6 +156,6 @@ function repoForBranchActionDispatch(repo: BranchActionRepo): BranchActionRepo |
 
 function recordRepoDataUnavailable(repo: BranchActionRepo): RepoMutationExecResult {
   const result = { ok: false as const, message: 'error.failed-read-repo' }
-  useWorkspacesStore.getState().setLastResult(repo.id, result, repo.workspaceRuntimeId)
+  workspacesStore.getState().setLastResult(repo.id, result, repo.workspaceRuntimeId)
   return result
 }

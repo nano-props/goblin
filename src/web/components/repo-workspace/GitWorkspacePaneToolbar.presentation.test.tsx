@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import {
@@ -35,7 +35,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(c.querySelector('#workspace-workspace-pane-tab-empty')).toBeNull()
     expect(c.querySelector('button[aria-label="terminal.new"]')).toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       terminalTab.click()
     })
     await flush()
@@ -43,7 +43,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
-  test('keeps the focus-offset leading spacer mounted for width transitions', () => {
+  test('keeps the focus-offset leading spacer mounted for width transitions', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       worktree: false,
@@ -62,7 +62,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     ).toBe('no-drag')
   })
 
-  test('keeps the leading spacer mounted when the focus offset is inactive', () => {
+  test('keeps the leading spacer mounted when the focus offset is inactive', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       worktree: false,
@@ -81,7 +81,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(c.querySelector('[data-testid="workspace-toolbar-leading-no-drag"]')).toBeNull()
   })
 
-  test('does not opt compact toolbar chrome into window dragging', () => {
+  test('does not opt compact toolbar chrome into window dragging', async () => {
     toolbarResponsiveMocks.compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 0,
@@ -94,7 +94,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(c.querySelector('.goblin-workspace-toolbar')?.className).toContain('goblin-workspace-toolbar--non-draggable')
   })
 
-  test('renders status and terminal affordance without a default changes tab', () => {
+  test('renders status and terminal affordance without a default changes tab', async () => {
     const { container: c } = renderToolbar({ terminalCount: 0, changeCount: 3, navigation: navigationWith({}) })
 
     const tabs = Array.from(c.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
@@ -112,7 +112,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="workspace-pane:changes"]')).toBeNull()
   })
 
-  test('renders status and terminal tabs in one workspace tab strip with a separator', () => {
+  test('renders status and terminal tabs in one workspace tab strip with a separator', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 1,
       navigation: navigationWith({}),
@@ -125,7 +125,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(tablist?.querySelector('#workspace-workspace-pane-tab')).not.toBeNull()
   })
 
-  test('renders saved mixed tab list across terminal and static tabs', () => {
+  test('renders saved mixed tab list across terminal and static tabs', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 1,
       workspacePaneTabs: [terminalEntry('term-111111111111111111111'), staticEntry('status')],
@@ -138,7 +138,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(tabs.slice(0, 2)).toEqual(['terminal:term-111111111111111111111', 'workspace-pane:status'])
   })
 
-  test('uses the workspace toolbar spacing primitives without generic toolbar gaps', () => {
+  test('uses the workspace toolbar spacing primitives without generic toolbar gaps', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 3,
       navigation: navigationWith({}),
@@ -189,7 +189,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     const statusCloseButton = closeButtonFor(c, 'workspace-pane:status')
     expect(statusCloseButton).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       statusCloseButton?.click()
     })
     await flush()
@@ -208,7 +208,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     const statusCloseButton = closeButtonFor(c, 'workspace-pane:status')
     expect(statusCloseButton).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       statusCloseButton?.click()
     })
     await flush()
@@ -232,7 +232,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     const terminalCloseButton = closeButtonFor(c, 'terminal:term-111111111111111111111')
     expect(terminalCloseButton).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       terminalCloseButton?.click()
     })
     await flush()
@@ -259,7 +259,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     const historyCloseButton = closeButtonFor(c, 'workspace-pane:history')
     expect(historyCloseButton).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       historyCloseButton?.click()
     })
     await flush()
@@ -267,7 +267,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
 
-  test('compact workspace tab popover merges status and terminal tabs', () => {
+  test('compact workspace tab popover merges status and terminal tabs', async () => {
     toolbarResponsiveMocks.compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 1,
@@ -281,7 +281,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     const trigger = c.querySelector<HTMLButtonElement>('button[aria-label="workspace-pane-tabs.tabs"]')
     if (!trigger) throw new Error('missing workspace tab popover trigger')
 
-    openPopover(trigger)
+    await openPopover(trigger)
 
     const list = document.body.querySelector('[role="list"]')
     expect(list?.textContent).toContain('tab.status')
@@ -289,7 +289,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(document.body.textContent).toContain('terminal.new')
   })
 
-  test('puts compact back at the start of the workspace tab row', () => {
+  test('puts compact back at the start of the workspace tab row', async () => {
     toolbarResponsiveMocks.compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 1,
@@ -314,12 +314,12 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     const tabStripHost = back?.nextElementSibling
     expect(tabStripHost?.querySelector('[role="tablist"]')).toBe(tablist)
 
-    act(() => {
+    await flushTestUpdates(() => {
       back?.click()
     })
   })
 
-  test('compact UI keeps the back button visible when the tab strip is empty', () => {
+  test('compact UI keeps the back button visible when the tab strip is empty', async () => {
     toolbarResponsiveMocks.compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 0,
@@ -337,7 +337,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(back).not.toBeNull()
   })
 
-  test('non-compact UI does not render the back button in the toolbar', () => {
+  test('non-compact UI does not render the back button in the toolbar', async () => {
     toolbarResponsiveMocks.compactUi = false
     const { container: c } = renderToolbar({
       terminalCount: 1,
@@ -351,7 +351,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(c.querySelectorAll('[role="tab"]').length).toBeGreaterThan(0)
   })
 
-  test('compact workspace tab strip keeps the tab switcher available during terminal sync loading', () => {
+  test('compact workspace tab strip keeps the tab switcher available during terminal sync loading', async () => {
     toolbarResponsiveMocks.compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 0,
@@ -365,7 +365,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(c.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
   })
 
-  test('compact workspace tab strip keeps the popover switcher reachable while the terminal tab is loading', () => {
+  test('compact workspace tab strip keeps the popover switcher reachable while the terminal tab is loading', async () => {
     // Regression: when the user is viewing the terminal panel while the
     // terminal session projection is still hydrating (`preferredWorkspacePaneTab =
     // 'terminal'`, no materialized terminal tabs), the toolbar's
@@ -400,7 +400,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(c.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
   })
 
-  test('compact workspace tab strip shows terminal creation as a full-width pending tab', () => {
+  test('compact workspace tab strip shows terminal creation as a full-width pending tab', async () => {
     toolbarResponsiveMocks.compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 0,
@@ -421,7 +421,7 @@ describe('GitWorkspacePaneToolbar presentation', () => {
     expect(c.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
   })
 
-  test('expanded workspace tab strip uses the same pending terminal tab during creation', () => {
+  test('expanded workspace tab strip uses the same pending terminal tab during creation', async () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       preferredWorkspacePaneTab: 'terminal',

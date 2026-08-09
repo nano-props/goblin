@@ -58,7 +58,7 @@ import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-remo
 import { TerminalDirectory } from '#/server/terminal/terminal-directory.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { TerminalSessionAdmission } from '#/server/terminal/terminal-session-ensurer.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { TerminalSessionCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
@@ -75,7 +75,7 @@ interface TerminalSessionRetirementResult {
   outcome: 'detached' | 'already-detached' | 'failed'
   tabsBeforeRetirement: WorkspacePaneTabEntry[] | null
 }
-const terminalSessionManagerLogger = serverLogger.child({ module: 'terminal-session-manager' })
+const terminalSessionManagerLogger = serverNodeLog.child({ module: 'terminal-session-manager' })
 
 export type TerminalSessionCloseReason = 'session' | 'workspace-pane' | 'scope' | 'detached-user' | 'shutdown'
 

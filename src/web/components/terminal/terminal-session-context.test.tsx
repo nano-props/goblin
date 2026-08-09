@@ -4,8 +4,8 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
-  TerminalSessionContext,
-  TerminalSessionReadContext,
+  TerminalSessionCommandScope,
+  TerminalSessionReadScope,
   useTerminalSessionContext,
   useTerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
@@ -56,27 +56,27 @@ function makeCommandContext(overrides: Partial<TerminalSessionContextValue> = {}
 }
 
 describe('useTerminalSessionContext', () => {
-  test('throws when the provider is missing', () => {
+  test('throws when the provider is missing', async () => {
     expect(() => renderInJsdom(<CommandProbe />)).toThrow('Terminal session context is unavailable')
   })
 
-  test('returns the provider value when present', () => {
+  test('returns the provider value when present', async () => {
     const createTerminal = vi.fn(async () => 'real-session-id')
     renderInJsdom(
-      <TerminalSessionContext value={makeCommandContext({ createTerminal })}>
+      <TerminalSessionCommandScope value={makeCommandContext({ createTerminal })}>
         <CommandProbe />
-      </TerminalSessionContext>,
+      </TerminalSessionCommandScope>,
     )
     expect(createTerminal).not.toHaveBeenCalled()
   })
 })
 
 describe('useTerminalSessionReadContext', () => {
-  test('throws when the provider is missing', () => {
+  test('throws when the provider is missing', async () => {
     expect(() => renderInJsdom(<ReadSnapshot />)).toThrow('Terminal session read context is unavailable')
   })
 
-  test('returns the provider value when present', () => {
+  test('returns the provider value when present', async () => {
     const readContext: TerminalSessionReadContextValue = {
       terminalFilesystemTargetSnapshot: () => ({ ...EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT, count: 7 }),
       subscribeTerminalFilesystemTarget: () => () => {},
@@ -91,9 +91,9 @@ describe('useTerminalSessionReadContext', () => {
       subscribeSnapshot: () => () => {},
     }
     const { getByTestId } = renderInJsdom(
-      <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionReadScope value={readContext}>
         <ReadSnapshot />
-      </TerminalSessionReadContext>,
+      </TerminalSessionReadScope>,
     )
     expect(getByTestId('count').textContent).toBe('7')
     expect(getByTestId('bell').textContent).toBe('3')

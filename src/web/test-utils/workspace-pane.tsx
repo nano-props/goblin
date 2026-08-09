@@ -1,7 +1,7 @@
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { cleanup, render as renderTestingLibrary } from '@testing-library/react'
-import type { ReactElement } from 'react'
 import { afterEach, beforeEach, expect, vi } from 'vitest'
+import type { VNode } from 'vue'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
@@ -13,12 +13,12 @@ import type {
   TerminalSessionReadContextValue,
   TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { createAppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -29,17 +29,17 @@ import {
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-workspace-container-repo')
 
-export function render(element: ReactElement) {
-  return renderTestingLibrary(element, { wrapper: WorkspacePaneTabStripScrollMemoryProvider })
+export function render(element: VNode) {
+  return renderInJsdom(element, { wrapper: WorkspacePaneTabStripScrollMemoryProvider })
 }
 
 beforeEach(() => {
-  useHostInfoStore.setState({
+  hostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test-host', pid: 1 },
     status: 'ready',
     error: null,
@@ -97,14 +97,13 @@ beforeEach(() => {
   appQueryClient.clear()
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
-  useTerminalProjectionHydrationStore.setState({
+  terminalProjectionHydrationStore.setState({
     hydrationByWorkspace: new Map(),
     lastSuccessfulRecoveryByWorkspace: new Map(),
   })
 })
 
 afterEach(() => {
-  cleanup()
   vi.clearAllMocks()
 })
 
@@ -132,7 +131,7 @@ export function gitWorktreeFilesystemTarget(repo: WorkspaceState, rootPath: stri
 }
 
 export function scrollViewport(container: HTMLElement): HTMLDivElement {
-  const viewport = container.querySelector<HTMLDivElement>('[data-radix-scroll-area-viewport]')
+  const viewport = container.querySelector<HTMLDivElement>('[data-reka-scroll-area-viewport]')
   if (!viewport) throw new Error('missing workspace tab strip scroll viewport')
   return viewport
 }
@@ -180,7 +179,7 @@ export function navigationWithStore(
   routeNavigationOverrides: AppRouteNavigation = routeNavigation(),
 ): AppNavigationActions {
   seedInitialObservedWorkspacePaneRouteForTest()
-  const store = useWorkspacesStore.getState()
+  const store = workspacesStore.getState()
   const navigation = createAppNavigationActions({
     currentWorkspaceId: REPO_ID,
     workspaceOrder: [REPO_ID],

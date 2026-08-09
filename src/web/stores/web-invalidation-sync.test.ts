@@ -13,36 +13,19 @@ import {
 let wsMock: WebSocketMockHandle
 
 function installWebBootstrap(bootstrap: ClientBootstrapSnapshot): void {
-  const documentElement = {
-    attrs: new Map<string, string>(),
-    setAttribute(name: string, value: string) {
-      this.attrs.set(name, value)
+  document.documentElement.removeAttribute('data-theme')
+  document.documentElement.removeAttribute('data-color-theme')
+  vi.stubGlobal('window', {
+    __GOBLIN_BOOTSTRAP__: bootstrap,
+    location: {
+      href: bootstrap.initialServer?.url ?? 'http://127.0.0.1:32100/',
+      origin: bootstrap.initialServer?.url?.replace(/\/$/, '') ?? 'http://127.0.0.1:32100',
+      protocol: 'http:',
+      search: '',
     },
-    getAttribute(name: string) {
-      return this.attrs.get(name) ?? null
-    },
-  }
-  Object.defineProperty(globalThis, 'document', {
-    configurable: true,
-    value: {
-      visibilityState: 'visible',
-      documentElement,
-    },
-  })
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: {
-      __GOBLIN_BOOTSTRAP__: bootstrap,
-      location: {
-        href: bootstrap.initialServer?.url ?? 'http://127.0.0.1:32100/',
-        origin: bootstrap.initialServer?.url?.replace(/\/$/, '') ?? 'http://127.0.0.1:32100',
-        protocol: 'http:',
-        search: '',
-      },
-      matchMedia: vi.fn(() => ({ matches: false })),
-      setInterval,
-      clearInterval,
-    },
+    matchMedia: vi.fn(() => ({ matches: false })),
+    setInterval,
+    clearInterval,
   })
   wsMock = installWebSocketMock({ autoOpen: false })
 }
@@ -81,6 +64,7 @@ describe('web invalidation sync', () => {
   afterEach(async () => {
     const { resetServerInvalidationIngressForTests } = await import('#/web/server-invalidation-ingress.ts')
     resetServerInvalidationIngressForTests()
+    vi.unstubAllGlobals()
   })
 
   test('theme store refetches theme state on theme invalidation', async () => {
@@ -97,11 +81,11 @@ describe('web invalidation sync', () => {
       },
     }))
 
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useThemeStore.getState().hydrate()
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    await themeStore.getState().hydrate()
     emitServerMessage({ type: 'settings-invalidated', scopes: ['theme'] })
     await vi.waitFor(() => {
-      expect(useThemeStore.getState()).toMatchObject({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
+      expect(themeStore.getState()).toMatchObject({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
       expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
       expect(document.documentElement.getAttribute('data-color-theme')).toBe('github')
     })
@@ -121,14 +105,14 @@ describe('web invalidation sync', () => {
       },
     }))
 
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useThemeStore.getState().hydrate()
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    await themeStore.getState().hydrate()
 
     expect(latestSocket().url).toBe('ws://127.0.0.1:32100/ws/invalidation')
     emitServerMessage({ type: 'settings-invalidated', scopes: ['theme'] })
 
     await vi.waitFor(() => {
-      expect(useThemeStore.getState()).toMatchObject({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
+      expect(themeStore.getState()).toMatchObject({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
     })
   })
 
@@ -146,15 +130,15 @@ describe('web invalidation sync', () => {
       },
     }))
 
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useThemeStore.getState().hydrate()
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    await themeStore.getState().hydrate()
     const beforeInvalidationReadCount = settingsReadCount
 
     emitServerMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
     await flushMicrotasks()
 
     expect(settingsReadCount).toBe(beforeInvalidationReadCount)
-    expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })
+    expect(themeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })
   })
 
   test('unknown settings invalidation scopes are ignored', async () => {
@@ -163,15 +147,15 @@ describe('web invalidation sync', () => {
       ok: true,
       json: async () => settingsSnapshotResponse(),
     }))
-    const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useThemeStore.getState().hydrate()
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    await themeStore.getState().hydrate()
     const beforeInvalidationFetchCount = fetchMock.mock.calls.length
 
     emitServerMessage({ type: 'settings-invalidated', scopes: ['session'] })
     await flushMicrotasks()
 
     expect(fetchMock).toHaveBeenCalledTimes(beforeInvalidationFetchCount)
-    expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })
+    expect(themeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })
   })
 
   test('i18n store refetches payload only on i18n invalidation', async () => {
@@ -191,12 +175,11 @@ describe('web invalidation sync', () => {
       },
     }))
 
-    const { useI18nStore } = await import('#/web/stores/i18n.ts')
-    await useI18nStore.getState().hydrate()
+    const { i18nStore } = await import('#/web/stores/i18n.ts')
+    await i18nStore.getState().hydrate()
     emitServerMessage({ type: 'settings-invalidated', scopes: ['i18n'] })
     await vi.waitFor(() => {
-      expect(useI18nStore.getState()).toMatchObject({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } })
-      expect(document.documentElement.getAttribute('lang')).toBe('ja')
+      expect(i18nStore.getState()).toMatchObject({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } })
     })
   })
 

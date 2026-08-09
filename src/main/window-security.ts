@@ -21,7 +21,7 @@ import {
 import { getTheme } from '#/main/theme.ts'
 import { getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
 import { WINDOW_BACKGROUND_BY_COLOR_THEME } from '#/shared/theme-tokens.ts'
-import { DEFAULT_COLOR_THEME } from '#/shared/settings-defaults.ts'
+import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'
 
 const webDevUrl = process.env.GOBLIN_WEB_DEV_URL?.trim()
 const WEB_DIST_DIR = path.join(app.getAppPath(), 'dist/web')

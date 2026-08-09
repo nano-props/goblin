@@ -9,7 +9,7 @@ import { describe, expect, test, vi } from 'vitest'
 import '#/web/test-utils/workspace-commands.ts'
 import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry as staticEntry } from '#/shared/workspace-pane.ts'
@@ -57,7 +57,7 @@ describe('workspace commands open', () => {
       currentBranch: 'feature/query',
     })
     const showRepoBranchWorkspacePaneTab = vi.fn((workspaceId, branch, tab) => {
-      useWorkspacesStore.getState().setWorkspacePaneTab(workspaceId, branch, tab)
+      workspacesStore.getState().setWorkspacePaneTab(workspaceId, branch, tab)
       return true
     })
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
@@ -162,7 +162,7 @@ describe('workspace commands open', () => {
       'feature/worktree',
       'term-222222222222222222222',
     )
-    expect(useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[WORKTREE_KEY]).toBe(
+    expect(workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[WORKTREE_KEY]).toBe(
       'term-222222222222222222222',
     )
     // Cmd+T / File → New Terminal Tab is a generic entry — no insertion
@@ -185,7 +185,7 @@ describe('workspace commands open', () => {
       },
     })
     let visibleSessionIds = ['term-111111111111111111111']
-    useWorkspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, 'term-111111111111111111111')
+    workspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, 'term-111111111111111111111')
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
@@ -270,7 +270,7 @@ describe('workspace commands open', () => {
       },
     })
     let visibleSessionIds = ['term-111111111111111111111']
-    useWorkspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, 'term-111111111111111111111')
+    workspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, 'term-111111111111111111111')
     const closeEvents: string[] = []
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
@@ -560,7 +560,7 @@ describe('workspace commands open', () => {
     })
     const selectTerminal = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn((workspaceId, branch, tab) => {
-      useWorkspacesStore.getState().setWorkspacePaneTab(workspaceId, branch, tab)
+      workspacesStore.getState().setWorkspacePaneTab(workspaceId, branch, tab)
       return true
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
@@ -611,7 +611,7 @@ describe('workspace commands open', () => {
       workspacePaneTabsByBranch: { 'feature/no-worktree': [staticEntry('status'), staticEntry('history')] },
     })
     const showRepoBranchWorkspacePaneTab = vi.fn((workspaceId, branch, tab) => {
-      useWorkspacesStore.getState().setWorkspacePaneTab(workspaceId, branch, tab)
+      workspacesStore.getState().setWorkspacePaneTab(workspaceId, branch, tab)
       return true
     })
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })

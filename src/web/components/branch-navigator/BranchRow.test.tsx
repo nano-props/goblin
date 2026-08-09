@@ -1,52 +1,14 @@
 // @vitest-environment jsdom
-// Partial mock of `#/web/stores/i18n.ts`: delegates to the real
-// module so `i18next.use(initReactI18next).init({…})` still runs,
-// then overrides `useI18nStore` and `useT` for the Chinese-locale
-// row labels this file's assertions check. The simple
-// `stubI18n` helper only covers the `useT → raw key` case; richer
-// overrides write their own `vi.mock(import(...), importOriginal)`
-// and spread `actual` to keep the i18next init side effect live.
-vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
-  const actual = await importOriginal()
-  return {
-    ...actual,
-    useI18nStore: ((selector: (state: { lang: string }) => string) =>
-      selector({ lang: 'zh' })) as typeof actual.useI18nStore,
-    useT: (() => (key: string, params?: Record<string, string | number>) => {
-      switch (key) {
-        case 'branches.dirty':
-          return '有改动'
-        case 'branches.worktree':
-          return '工作树'
-        case 'branches.default':
-          return '默认'
-        case 'branches.gone':
-          return '已失联'
-        case 'terminal.bell-unread-count':
-          return `${params?.count ?? 0} 个未读终端提醒`
-        case 'terminal.output-active':
-          return '终端正在输出'
-        case 'branch-status.changes-count':
-          return `${params?.n ?? 0} 个改动`
-        case 'branch-status.sync.ahead':
-          return `领先 ${params?.n ?? 0}`
-        case 'branch-status.sync.behind':
-          return `落后 ${params?.n ?? 0}`
-        default:
-          return key
-      }
-    }) as unknown as typeof actual.useT,
-  }
-})
-
 import { createRepoBranch, createGitRepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
-import { createRef } from 'react'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { shallowRef } from 'vue'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchRow } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { i18nStore } from '#/web/stores/i18n.ts'
+import { appI18n } from '#/web/stores/i18n-vue.ts'
 
 vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
   BranchActionsMenu: () => null,
@@ -55,17 +17,40 @@ vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
 const responsiveMocks = vi.hoisted(() => ({
   compact: false,
 }))
+const BRANCH_ROW_MESSAGES: Record<string, string> = {
+  'branches.dirty': '有改动',
+  'branches.worktree': '工作树',
+  'branches.default': '默认',
+  'branches.gone': '已失联',
+  'terminal.bell-unread-count': '{count} 个未读终端提醒',
+  'terminal.output-active': '终端正在输出',
+  'branch-status.changes-count': '{n} 个改动',
+  'branch-status.sync.ahead': '领先 {n}',
+  'branch-status.sync.behind': '落后 {n}',
+}
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useIsCompactUi: () => responsiveMocks.compact,
+  useIsCompactUi: () => ({
+    get value() {
+      return responsiveMocks.compact
+    },
+  }),
 }))
+
+beforeEach(() => {
+  i18nStore.setState({ lang: 'zh', dict: BRANCH_ROW_MESSAGES })
+  appI18n.global.setLocaleMessage('zh', BRANCH_ROW_MESSAGES)
+  appI18n.global.locale.value = 'zh'
+})
 
 afterEach(() => {
   responsiveMocks.compact = false
+  i18nStore.setState({ lang: 'en', dict: {} })
+  appI18n.global.locale.value = 'en'
 })
 
 describe('BranchRow', () => {
-  test('shows the generic dirty label for dirty worktrees', () => {
+  test('shows the generic dirty label for dirty worktrees', async () => {
     const repo = branchRowRepo()
     markDirty(repo, 7)
     const branch = createRepoBranch('feature/a', {
@@ -80,7 +65,7 @@ describe('BranchRow', () => {
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
         />
       </ul>,
     )
@@ -90,7 +75,7 @@ describe('BranchRow', () => {
     expect(icon?.querySelector('svg')?.className.baseVal).toContain('text-attention')
   })
 
-  test('keeps status-derived dirty presentation unknown when status is unavailable', () => {
+  test('keeps status-derived dirty presentation unknown when status is unavailable', async () => {
     const repo = branchRowRepo()
     repo.status = undefined
     const branch = createRepoBranch('feature/a', {
@@ -105,7 +90,7 @@ describe('BranchRow', () => {
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
         />
       </ul>,
     )
@@ -137,7 +122,7 @@ describe('BranchRow', () => {
             selected={null}
             onSelectBranch={vi.fn()}
             onOpenBranchStatus={vi.fn()}
-            selectedRef={createRef<HTMLLIElement>()}
+            selectedRef={shallowRef<HTMLLIElement | null>(null)}
           />
         </ul>,
       )
@@ -150,7 +135,7 @@ describe('BranchRow', () => {
     },
   )
 
-  test('keeps the dirty worktree icon when a worktree operation targets another row', () => {
+  test('keeps the dirty worktree icon when a worktree operation targets another row', async () => {
     const repo = branchRowRepo()
     markDirty(repo, 7)
     repo.branchAction = {
@@ -171,7 +156,7 @@ describe('BranchRow', () => {
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
         />
       </ul>,
     )
@@ -179,7 +164,7 @@ describe('BranchRow', () => {
     expect(container.querySelector('[data-testid="branch-summary-icon"][aria-label="有改动"]')).not.toBeNull()
   })
 
-  test('shows terminal bell count badges in the action slot in non-compact mode', () => {
+  test('shows terminal bell count badges in the action slot in non-compact mode', async () => {
     const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a', {
       worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
@@ -193,7 +178,7 @@ describe('BranchRow', () => {
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
           terminalBellCount={3}
         />
       </ul>,
@@ -208,7 +193,7 @@ describe('BranchRow', () => {
     expect(actionArea?.contains(badge ?? null)).toBe(true)
   })
 
-  test('shows terminal output activity in the action slot in non-compact mode', () => {
+  test('shows terminal output activity in the action slot in non-compact mode', async () => {
     const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a', {
       worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
@@ -222,7 +207,7 @@ describe('BranchRow', () => {
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
           terminalOutputActive
         />
       </ul>,
@@ -237,7 +222,7 @@ describe('BranchRow', () => {
     expect(actionArea?.contains(indicator ?? null)).toBe(true)
   })
 
-  test('hides terminal output activity when the branch row is selected in non-compact mode', () => {
+  test('hides terminal output activity when the branch row is selected in non-compact mode', async () => {
     const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a', {
       worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
@@ -251,7 +236,7 @@ describe('BranchRow', () => {
           selected="feature/a"
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
           terminalOutputActive
         />
       </ul>,
@@ -261,7 +246,7 @@ describe('BranchRow', () => {
     expect(container.querySelector('[data-testid="branch-summary-icon"]')).not.toBeNull()
   })
 
-  test('gives terminal bell priority over terminal output activity', () => {
+  test('gives terminal bell priority over terminal output activity', async () => {
     const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a', {
       worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
@@ -275,7 +260,7 @@ describe('BranchRow', () => {
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
           terminalBellCount={2}
           terminalOutputActive
         />
@@ -286,7 +271,7 @@ describe('BranchRow', () => {
     expect(container.querySelector('[data-testid="terminal-output-activity-indicator"]')).toBeNull()
   })
 
-  test('keeps the branch icon when there are no unread terminal bells', () => {
+  test('keeps the branch icon when there are no unread terminal bells', async () => {
     const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a')
 
@@ -298,7 +283,7 @@ describe('BranchRow', () => {
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
         />
       </ul>,
     )
@@ -307,7 +292,7 @@ describe('BranchRow', () => {
     expect(container.querySelector('[aria-label="0 个未读终端提醒"]')).toBeNull()
   })
 
-  test('does not increase branch name font weight when the row is selected', () => {
+  test('does not increase branch name font weight when the row is selected', async () => {
     const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a')
 
@@ -319,7 +304,7 @@ describe('BranchRow', () => {
           selected="feature/a"
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
         />
       </ul>,
     )
@@ -331,7 +316,7 @@ describe('BranchRow', () => {
     expect(branchLabel?.className).not.toContain('font-medium')
   })
 
-  test('keeps the leading terminal bell badge behavior in compact mode', () => {
+  test('keeps the leading terminal bell badge behavior in compact mode', async () => {
     responsiveMocks.compact = true
     const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a')
@@ -344,7 +329,7 @@ describe('BranchRow', () => {
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
           terminalBellCount={3}
         />
       </ul>,
@@ -363,7 +348,7 @@ describe('BranchRow', () => {
     expect(badge!.compareDocumentPosition(branchLabel!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  test('shows terminal output activity on the leading edge in compact mode', () => {
+  test('shows terminal output activity on the leading edge in compact mode', async () => {
     responsiveMocks.compact = true
     const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a')
@@ -376,7 +361,7 @@ describe('BranchRow', () => {
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
           terminalOutputActive
         />
       </ul>,
@@ -394,7 +379,7 @@ describe('BranchRow', () => {
     expect(indicator!.compareDocumentPosition(branchLabel!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  test('lets compact terminal output activity take the leading slot over the dirty worktree icon', () => {
+  test('lets compact terminal output activity take the leading slot over the dirty worktree icon', async () => {
     responsiveMocks.compact = true
     const repo = branchRowRepo()
     markDirty(repo, 3)
@@ -410,7 +395,7 @@ describe('BranchRow', () => {
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
           terminalOutputActive
         />
       </ul>,
@@ -426,7 +411,7 @@ describe('BranchRow', () => {
     expect(summaryTitle).toContain('终端正在输出')
   })
 
-  test('hides terminal output activity when the branch row is selected in compact mode', () => {
+  test('hides terminal output activity when the branch row is selected in compact mode', async () => {
     responsiveMocks.compact = true
     const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a')
@@ -439,7 +424,7 @@ describe('BranchRow', () => {
           selected="feature/a"
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
           terminalOutputActive
         />
       </ul>,
@@ -449,7 +434,7 @@ describe('BranchRow', () => {
     expect(container.querySelector('[data-testid="branch-summary-icon"]')).not.toBeNull()
   })
 
-  test('shows the relative commit time without the last commit author', () => {
+  test('shows the relative commit time without the last commit author', async () => {
     useFakeTimers()
     vi.setSystemTime(new Date('2026-06-05T12:00:00.000Z'))
     const repo = branchRowRepo()
@@ -466,7 +451,7 @@ describe('BranchRow', () => {
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
-          selectedRef={createRef<HTMLLIElement>()}
+          selectedRef={shallowRef<HTMLLIElement | null>(null)}
         />
       </ul>,
     )
@@ -479,7 +464,7 @@ describe('BranchRow', () => {
     expect(summaryTitle).not.toContain('Example Author')
   })
 
-  test('hides the actions wrapper by default and reveals it on row hover in non-compact mode', () => {
+  test('hides the actions wrapper by default and reveals it on row hover in non-compact mode', async () => {
     const { container, shell } = renderRow(false)
     const className = shell?.className ?? ''
     expect(container.querySelector('li')?.className).toContain('group')
@@ -491,7 +476,7 @@ describe('BranchRow', () => {
     expect(className).toContain('transition-opacity')
   })
 
-  test('keeps the actions wrapper visible while the action popover is open in non-compact mode', () => {
+  test('keeps the actions wrapper visible while the action popover is open in non-compact mode', async () => {
     const { shell } = renderRow(false, { actionMenuOpen: true })
     const className = shell?.className ?? ''
     expect(className).not.toContain('opacity-0')
@@ -499,7 +484,7 @@ describe('BranchRow', () => {
     expect(className).not.toContain('group-focus-within:opacity-100')
   })
 
-  test('keeps the actions wrapper fully visible in compact mode', () => {
+  test('keeps the actions wrapper fully visible in compact mode', async () => {
     const { shell } = renderRow(true)
     const className = shell?.className ?? ''
     expect(className).not.toContain('opacity-0')
@@ -507,7 +492,7 @@ describe('BranchRow', () => {
     expect(className).not.toContain('group-focus-within:opacity-100')
   })
 
-  test('keeps the actions wrapper visible while the row reports a busy branch action', () => {
+  test('keeps the actions wrapper visible while the row reports a busy branch action', async () => {
     const { shell } = renderRow(false, { branchActionBusy: true })
     const className = shell?.className ?? ''
     expect(className).not.toContain('opacity-0')
@@ -531,7 +516,7 @@ function renderRow(
         selected={null}
         onSelectBranch={vi.fn()}
         onOpenBranchStatus={vi.fn()}
-        selectedRef={createRef<HTMLLIElement>()}
+        selectedRef={shallowRef<HTMLLIElement | null>(null)}
         actionMenuOpen={options.actionMenuOpen}
         onActionMenuOpenChange={vi.fn()}
         branchActionBusy={options.branchActionBusy}

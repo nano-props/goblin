@@ -9,7 +9,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import {
   observeWorkspacePaneRouteForTest,
@@ -111,7 +111,7 @@ describe('workspace pane tab select action', () => {
     )
     const queuedAction = dispatch(navigation)
 
-    useWorkspacesStore.setState((state) => ({
+    workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
         [REPO_ID]: { ...state.workspaces[REPO_ID]!, workspaceRuntimeId: 'repo-runtime-replaced' },
@@ -221,7 +221,7 @@ function moveTab(navigation: ObservedAppNavigationActionsForTest) {
 
 function storeBackedShowTab() {
   return vi.fn((workspaceId: WorkspaceId, branchName: string, tab: WorkspacePaneStaticTabType) => {
-    useWorkspacesStore.getState().setWorkspacePaneTab(workspaceId, branchName, tab)
+    workspacesStore.getState().setWorkspacePaneTab(workspaceId, branchName, tab)
     return true
   })
 }
@@ -234,15 +234,15 @@ function navigationWith(
   return observedAppNavigationActionsForTest({
     currentWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
     activateWorkspace: (workspaceId) =>
-      useWorkspacesStore.setState({ restoredWorkspaceId: workspaceIdForTest(workspaceId) }),
+      workspacesStore.setState({ restoredWorkspaceId: workspaceIdForTest(workspaceId) }),
     closeWorkspace: async () => ({ ok: true }),
     cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (workspaceId, branch, tab) => {
-      const state = useWorkspacesStore.getState()
+      const state = workspacesStore.getState()
       const canonicalWorkspaceId = workspaceIdForTest(workspaceId)
-      useWorkspacesStore.setState({ restoredWorkspaceId: canonicalWorkspaceId })
+      workspacesStore.setState({ restoredWorkspaceId: canonicalWorkspaceId })
       state.setWorkspacePaneTab(canonicalWorkspaceId, branch, tab)
       return true
     },

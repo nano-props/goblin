@@ -2,7 +2,7 @@
 //
 // All inline 1px separators (vertical seams between toolbar siblings,
 // horizontal rules between popover sections) used to be hand-rolled
-// `<div className="h-px bg-separator">` / `<span className="border-l
+// `<div class="h-px bg-separator">` / `<span class="border-l
 // border-separator">` strings. They drifted in height (h-4 vs h-5) and
 // implementation (background fill vs left/right border) across files —
 // this primitive consolidates them.
@@ -16,11 +16,11 @@
 // Orientation:
 //   • horizontal (default): h-px w-full. Use between stacked groups
 //     inside popovers/menus. Primitive-specific separators remain
-//     Radix-wrapped when they participate in keyboard navigation.
+//     Reka-wrapped when they participate in keyboard navigation.
 //   • vertical: w-px h-<size>. Use as an inline seam between toolbar
 //     siblings. Most callers wrap the rendered element in a `relative`
 //     parent and add `absolute left-0|right-0 top-1/2 -translate-y-1/2`
-//     via `className` to overlay the seam without consuming layout width.
+//     via `class` to overlay the seam without consuming layout width.
 //
 // Size:
 //   • sm (default): vertical = h-4 (16px). Matches the tab-strip /
@@ -36,8 +36,8 @@
 // `[data-orientation="vertical"|"horizontal"]` when orientation matters)
 // rather than asserting on implementation-detail class strings.
 
-import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
+import type { FunctionalComponent, HTMLAttributes } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
 
 const separatorVariants = cva('pointer-events-none shrink-0 bg-separator', {
@@ -63,12 +63,14 @@ const separatorVariants = cva('pointer-events-none shrink-0 bg-separator', {
   },
 })
 
-function Separator({
-  className,
-  orientation = 'horizontal',
-  size = 'sm',
-  ...props
-}: React.ComponentProps<'div'> & VariantProps<typeof separatorVariants>) {
+type SeparatorVariantProps = VariantProps<typeof separatorVariants>
+
+interface SeparatorProps extends HTMLAttributes {
+  orientation?: SeparatorVariantProps['orientation']
+  size?: SeparatorVariantProps['size']
+}
+
+const Separator: FunctionalComponent<SeparatorProps> = (props, { attrs }) => {
   // `aria-hidden` is intentional: separators here are decorative chrome
   // (the surrounding labels carry the semantics). Skipping `role="separator"`
   // / `aria-orientation` keeps the ARIA story consistent — both would be
@@ -78,18 +80,23 @@ function Separator({
   // the data attributes stay in sync with the applied CVA classes even
   // when a caller passes the prop as `null` (the destructure default
   // already covers `undefined`; CVA's `VariantProps` type permits both).
-  const resolvedOrientation = orientation ?? 'horizontal'
-  const resolvedSize = size ?? 'sm'
+  const resolvedOrientation = props.orientation ?? 'horizontal'
+  const resolvedSize = props.size ?? 'sm'
+  const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
   return (
     <div
+      {...elementAttrs}
       aria-hidden="true"
       data-slot="separator"
       data-orientation={resolvedOrientation}
       data-size={resolvedSize}
-      className={cn(separatorVariants({ orientation: resolvedOrientation, size: resolvedSize, className }))}
-      {...props}
+      class={cn(separatorVariants({ orientation: resolvedOrientation, size: resolvedSize }), classValue)}
     />
   )
 }
 
+Separator.props = ['orientation', 'size']
+Separator.inheritAttrs = false
+
 export { Separator, separatorVariants }
+export type { SeparatorProps }

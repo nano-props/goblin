@@ -1,22 +1,20 @@
-// Data-binding host for the workspace picker. The picker itself owns
-// toolbar/sidebar presentation; this host only supplies workspace summaries,
-// labels, and open/switch actions.
-import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { useShallow } from 'zustand/react/shallow'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useT } from '#/web/stores/i18n.ts'
+// Data-binding host for the workspace picker. Presentation stays in the
+// canonical workspace-picker component modules.
+
+import { computed, defineComponent } from 'vue'
+import { toast } from 'vue-sonner'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
 import type { WorkspacePickerItem, WorkspacePickerSurface } from '#/web/components/workspace-picker/types.ts'
 import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
-import { workspacePickerStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
-import { useMemo } from 'react'
-import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
-import { toast } from 'sonner'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 interface WorkspacePickerHostProps {
   currentWorkspaceId: WorkspaceId | null
@@ -26,103 +24,98 @@ interface WorkspacePickerHostProps {
   surface?: WorkspacePickerSurface
 }
 
-export function WorkspacePickerHost({
-  currentWorkspaceId,
-  onOpenWorkspacePathDialog,
-  onOpenRemote,
-  onClone,
-  surface = 'toolbar',
-}: WorkspacePickerHostProps) {
-  const t = useT()
-  const { shortcutsDisabled } = useShortcutSettings()
-  // Build the summary array inside the selector but compare with our
-  // explicit equality fn so re-derivations with identical contents
-  // don't trigger a re-render. Zustand v5's primary `useWorkspacesStore`
-  // hook drops the second-arg equality fn — `useStoreWithEqualityFn`
-  // from `zustand/traditional` is the v5 escape hatch for cases like
-  // this where shallow on Object.is misses the structurally-equal
-  // case.
-  const summaries = useStoreWithEqualityFn(
-    useWorkspacesStore,
-    (s) =>
-      s.workspaceOrder
-        .map<WorkspacePickerItem | null>((id) => {
-          const workspace = s.workspaces[id]
-          if (!workspace) return null
-          const git = workspace.capability.kind === 'git'
-          return {
-            id: workspace.id,
-            name: workspaceNameFromLocator(workspace.id),
-            gitCapability:
-              workspace.capability.kind === 'git'
+export const WorkspacePickerHost = defineComponent(
+  (props: WorkspacePickerHostProps) => {
+    const t = useT()
+    const navigation = useAppNavigation()
+    const shortcutSettings = useShortcutSettings()
+    const summaries = useStoreSelector(
+      workspacesStore,
+      (state) =>
+        state.workspaceOrder
+          .map<WorkspacePickerItem | null>((id) => {
+            const workspace = state.workspaces[id]
+            if (!workspace) return null
+            const gitAvailable = workspace.capability.kind === 'git'
+            return {
+              id: workspace.id,
+              name: workspaceNameFromLocator(workspace.id),
+              gitCapability: gitAvailable
                 ? 'available'
                 : workspace.capability.kind === 'filesystem'
                   ? 'unavailable'
                   : 'unknown',
-            git: git
-              ? {
-                  remoteDetails: undefined,
-                }
-              : null,
-            lifecycle: workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null,
-          }
-        })
-        .filter((x): x is WorkspacePickerItem => x !== null),
-    workspacePickerItemsEqual,
-  )
-  const workspaceIds = useMemo(() => summaries.map((workspace) => workspace.id), [summaries])
-  const terminalBellCounts = useWorkspaceTerminalBellCounts(workspaceIds)
-  const summariesWithTerminalBells = useMemo(
-    () =>
-      summaries.map((workspace) => ({
-        ...workspace,
-        terminalBellCount: terminalBellCounts[workspace.id] ?? 0,
+              git: gitAvailable ? { remoteDetails: undefined } : null,
+              lifecycle: workspace.admission.kind === 'remote' ? workspace.admission.lifecycle : null,
+            }
+          })
+          .filter((workspace): workspace is WorkspacePickerItem => workspace !== null),
+      workspacePickerItemsEqual,
+    )
+    const workspaceIds = computed(() => summaries.value.map((workspace) => workspace.id))
+    const terminalBellCounts = useWorkspaceTerminalBellCounts(workspaceIds)
+    const summariesWithTerminalBells = computed(() =>
+      summaries.value.map<WorkspacePickerItem>((workspace) => ({
+        id: workspace.id,
+        name: workspace.name,
+        gitCapability: workspace.gitCapability,
+        git: workspace.git,
+        lifecycle: workspace.lifecycle,
+        terminalBellCount: terminalBellCounts.value[workspace.id] ?? 0,
       })),
-    [summaries, terminalBellCounts],
-  )
-  const currentWorkspacePickerId = currentWorkspaceId
-  const navigation = useAppNavigation()
-  const { openWorkspaceMembership } = useWorkspacesStore(useShallow(workspacePickerStoreActionsFromStore))
+    )
+    const { openWorkspaceMembership } = workspacesStore.getState()
 
-  async function handleOpenLocal() {
-    await openWorkspaceFromDialog({
-      openWorkspaceMembership,
-      activateWorkspace: navigation.activateWorkspace,
-      openWorkspacePathDialog: onOpenWorkspacePathDialog,
-      t,
-    })
-  }
+    async function openLocalWorkspace(): Promise<void> {
+      await openWorkspaceFromDialog({
+        openWorkspaceMembership,
+        activateWorkspace: navigation.activateWorkspace,
+        openWorkspacePathDialog: props.onOpenWorkspacePathDialog,
+        t,
+      })
+    }
 
-  async function handleClose(workspaceId: WorkspaceId) {
-    const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
-    if (!workspace) return
-    const result = await navigation.closeWorkspace(workspace.id)
-    if (!result.ok) toast.error(t(result.message))
-  }
+    async function closeWorkspace(workspaceId: WorkspaceId): Promise<void> {
+      const workspace = workspacesStore.getState().workspaces[workspaceId]
+      if (!workspace) return
+      const result = await navigation.closeWorkspace(workspace.id)
+      if (!result.ok) {
+        const errorMessageKey = result.message
+        toast.error(t(errorMessageKey))
+      }
+    }
 
-  return (
-    <WorkspacePicker
-      workspaces={summariesWithTerminalBells}
-      currentWorkspaceId={currentWorkspacePickerId}
-      labels={{
-        workspaces: t('workspace-picker.workspaces'),
-        closeWithName: (name) => t('workspace-picker.close-named', { name }),
-        open: t('app-chrome.open'),
-        placeholder: t('workspace-picker.placeholder'),
-        openLocal: t('workspace-picker.open-local'),
-        openLocalShortcut: shortcutsDisabled ? null : '⌘O',
-        openRemote: t('workspace-picker.open-remote'),
-        openRemoteShortcut: shortcutsDisabled ? null : '⌘⇧R',
-        clone: t('workspace-picker.clone'),
-        cloneShortcut: shortcutsDisabled ? null : '⌘⇧O',
-        unavailable: t('workspace-unavailable.title'),
-      }}
-      onActivate={navigation.activateWorkspace}
-      onClose={(workspaceId) => void handleClose(workspaceId)}
-      onOpenLocal={handleOpenLocal}
-      onOpenRemote={onOpenRemote}
-      onClone={onClone}
-      surface={surface}
-    />
-  )
-}
+    return () => {
+      const shortcutsDisabled = shortcutSettings.value.shortcutsDisabled
+      return (
+        <WorkspacePicker
+          workspaces={summariesWithTerminalBells.value}
+          currentWorkspaceId={props.currentWorkspaceId}
+          labels={{
+            workspaces: t('workspace-picker.workspaces'),
+            closeWithName: (name) => t('workspace-picker.close-named', { name }),
+            open: t('app-chrome.open'),
+            placeholder: t('workspace-picker.placeholder'),
+            openLocal: t('workspace-picker.open-local'),
+            openLocalShortcut: shortcutsDisabled ? null : '⌘O',
+            openRemote: t('workspace-picker.open-remote'),
+            openRemoteShortcut: shortcutsDisabled ? null : '⌘⇧R',
+            clone: t('workspace-picker.clone'),
+            cloneShortcut: shortcutsDisabled ? null : '⌘⇧O',
+            unavailable: t('workspace-unavailable.title'),
+          }}
+          onActivate={navigation.activateWorkspace}
+          onClose={(workspaceId) => void closeWorkspace(workspaceId)}
+          onOpenLocal={() => void openLocalWorkspace()}
+          onOpenRemote={props.onOpenRemote}
+          onClone={props.onClone}
+          surface={props.surface ?? 'toolbar'}
+        />
+      )
+    }
+  },
+  {
+    name: 'WorkspacePickerHost',
+    props: ['currentWorkspaceId', 'onOpenWorkspacePathDialog', 'onOpenRemote', 'onClone', 'surface'],
+  },
+)

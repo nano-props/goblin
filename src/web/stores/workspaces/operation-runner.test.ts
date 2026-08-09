@@ -1,10 +1,10 @@
 import { seedRepoShellForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { CancelledError } from '@tanstack/react-query'
+import { CancelledError } from '@tanstack/query-core'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/workspaces/operation-runner.ts'
 import { repoOperation, repoOperationBusy } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { requireGitWorkspaceForTest } from '#/web/stores/workspaces/git-workspace-client-state.test-utils.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace/operation-runner')
@@ -31,8 +31,8 @@ describe('runLatestOperation', () => {
     const starts: string[] = []
     let releaseActive!: () => void
     const active = runLatestOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
@@ -46,8 +46,8 @@ describe('runLatestOperation', () => {
         }),
     })
     const replaced = runLatestOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
@@ -60,8 +60,8 @@ describe('runLatestOperation', () => {
       },
     })
     const latest = runLatestOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
@@ -76,8 +76,8 @@ describe('runLatestOperation', () => {
 
     expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('queued')
     expect(
-      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations
-        .branchAction.phase,
+      requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction
+        .phase,
     ).toBe('queued')
     releaseActive()
 
@@ -87,8 +87,8 @@ describe('runLatestOperation', () => {
     expect(starts).toEqual(['active', 'latest'])
     expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('idle')
     expect(
-      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations
-        .branchAction.phase,
+      requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction
+        .phase,
     ).toBe('idle')
   })
 })
@@ -97,8 +97,8 @@ describe('runExclusiveOperation', () => {
   test('marks and settles all targets together', async () => {
     let release!: () => void
     const work = runExclusiveOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
@@ -119,8 +119,7 @@ describe('runExclusiveOperation', () => {
     expect(repoOperation(REPO_ID, 'fetch').target).toBeNull()
     expect(repoOperationBusy(REPO_ID, 'branchAction')).toBe(true)
     expect(
-      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations
-        .branchAction,
+      requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction,
     ).toMatchObject({
       phase: 'running',
       reason: 'branch:pull',
@@ -134,8 +133,7 @@ describe('runExclusiveOperation', () => {
     expect(repoOperation(REPO_ID, 'fetch').phase).toBe('idle')
     expect(repoOperation(REPO_ID, 'branchAction').target).toBeNull()
     expect(
-      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations
-        .branchAction,
+      requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction,
     ).toMatchObject({
       phase: 'idle',
       target: null,
@@ -145,8 +143,8 @@ describe('runExclusiveOperation', () => {
   test('returns busyResult without scheduling when blocked', async () => {
     let release!: () => void
     const first = runExclusiveOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
@@ -160,8 +158,8 @@ describe('runExclusiveOperation', () => {
     })
     let secondRan = false
     const second = await runExclusiveOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
@@ -182,8 +180,8 @@ describe('runExclusiveOperation', () => {
 
   test('records operation view errors when current work fails', async () => {
     const result = await runExclusiveOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
@@ -202,8 +200,8 @@ describe('runExclusiveOperation', () => {
   test('treats any busy target as blocked before scheduling', async () => {
     let release!: () => void
     const first = runExclusiveOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
@@ -217,8 +215,8 @@ describe('runExclusiveOperation', () => {
     let ran = false
 
     const result = await runExclusiveOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'network',
@@ -254,8 +252,8 @@ describe('runLatestOperation active-task cancellation', () => {
       release = () => resolve()
     })
     const first = runLatestOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'write',
@@ -277,8 +275,8 @@ describe('runLatestOperation active-task cancellation', () => {
 
     let secondStarted = false
     const second = runLatestOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'write',
@@ -314,8 +312,8 @@ describe('runLatestOperation active-task cancellation', () => {
     // its own promise immediately, simulating a real SSH call
     // that detects `signal.aborted` and bails.
     const first = runLatestOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'write',
@@ -331,8 +329,8 @@ describe('runLatestOperation active-task cancellation', () => {
 
     let secondStarted = false
     const second = runLatestOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'write',
@@ -365,8 +363,8 @@ describe('runLatestOperation active-task cancellation', () => {
     const reads: string[] = []
     let releaseRead!: () => void
     const read = runLatestOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'read',
@@ -386,8 +384,8 @@ describe('runLatestOperation active-task cancellation', () => {
     // queuing, not by aborting — the read concurrency is 3, so
     // both can run in parallel; and the replaceKeys differ.
     const read2 = runLatestOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'read',
@@ -416,8 +414,8 @@ describe('runLatestOperation active-task cancellation', () => {
     // does NOT leak to the caller. The NEW run returns its
     // own result normally.
     const old = runLatestOperation<string>({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'write',
@@ -437,8 +435,8 @@ describe('runLatestOperation active-task cancellation', () => {
     await Promise.resolve()
 
     const fresh = runLatestOperation<string>({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'write',
@@ -460,8 +458,8 @@ describe('runLatestOperation active-task cancellation', () => {
     const onError = vi.fn()
     const onStale = vi.fn()
     const readModel = runLatestOperation<string>({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'read',
@@ -481,8 +479,8 @@ describe('runLatestOperation active-task cancellation', () => {
     await Promise.resolve()
 
     await runLatestOperation({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'read',
@@ -497,8 +495,7 @@ describe('runLatestOperation active-task cancellation', () => {
     expect(onError).not.toHaveBeenCalled()
     expect(onStale).toHaveBeenCalledTimes(1)
     expect(
-      requireGitWorkspaceForTest(useWorkspacesStore.getState().workspaces[REPO_ID]).capability.git.operations
-        .branchAction,
+      requireGitWorkspaceForTest(workspacesStore.getState().workspaces[REPO_ID]).capability.git.operations.branchAction,
     ).toMatchObject({
       phase: 'idle',
     })
@@ -513,8 +510,8 @@ describe('runLatestOperation active-task cancellation', () => {
       return err
     }
     const first = runLatestOperation<string>({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'write',
@@ -531,8 +528,8 @@ describe('runLatestOperation active-task cancellation', () => {
     await Promise.resolve()
 
     const second = runLatestOperation<string>({
-      set: useWorkspacesStore.setState,
-      get: useWorkspacesStore.getState,
+      set: workspacesStore.setState,
+      get: workspacesStore.getState,
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-test',
       lane: 'write',

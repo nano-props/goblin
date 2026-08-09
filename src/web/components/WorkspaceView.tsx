@@ -1,53 +1,54 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { computed, defineComponent, onScopeDispose, watch } from 'vue'
+import type { FunctionalComponent, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { useShallow } from 'zustand/react/shallow'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { gitWorkspaceCanExecute, isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
-import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx'
-import type { WorkspacePaneRouteContext } from '#/web/components/workspace-pane/workspace-pane-types.ts'
+import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import type { WorkspaceRouteView } from '#/web/App.tsx'
+import { WorkspaceLayoutPane } from '#/web/components/Layout.tsx'
 import {
   BranchNavigatorSkeleton,
   EmptyWorkspacePaneSkeleton,
   WorkspaceLayoutSkeleton,
   WorkspacePaneSkeleton,
 } from '#/web/components/Skeleton.tsx'
-import { WorkspaceLayoutPane } from '#/web/components/Layout.tsx'
-import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
-import { useRestoreWorkspaceTabsOnView } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
 import { UnavailableWorkspaceView } from '#/web/components/UnavailableWorkspaceView.tsx'
 import { WorkspaceProjectionFailureView } from '#/web/components/WorkspaceProjectionFailureView.tsx'
-import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
-import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
-import { useUiTransitionStore } from '#/web/stores/ui-transition.ts'
-import { WorkspaceLayoutSidebar } from '#/web/components/workspace-layout/WorkspaceLayoutSidebar.tsx'
-import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
-import { WorkspaceLayoutShell } from '#/web/components/workspace-layout/WorkspaceLayoutShell.tsx'
-import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
 import { CreateWorktreePagePane } from '#/web/components/workspace-pages/CreateWorktreePagePane.tsx'
-import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
-import type { WorkspaceRouteView } from '#/web/App.tsx'
-import { useT } from '#/web/stores/i18n.ts'
-import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
+import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
+import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx'
+import { provideWorkspacePaneTabStripScrollMemory } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
+import type { WorkspacePaneRouteContext } from '#/web/components/workspace-pane/workspace-pane-types.ts'
+import { WorkspaceLayoutShell } from '#/web/components/workspace-layout/WorkspaceLayoutShell.tsx'
+import { WorkspaceLayoutSidebar } from '#/web/components/workspace-layout/WorkspaceLayoutSidebar.tsx'
+import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
+import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
+import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
+import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
+import { useRestoreWorkspaceTabsOnView } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
 import type { WorkspaceProjectionPromotionViewState } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
+import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
+import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { invalidateRepoMetadataQueries, invalidateRepoWorktreeStatusQueries } from '#/web/repo-query-runtime.ts'
-import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { uiTransitionStore } from '#/web/stores/ui-transition.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { gitWorkspaceCanExecute, isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
 
 interface WorkspaceProjectionRestoreController {
   state: WorkspaceProjectionPromotionViewState
   retry: () => void
 }
 
-function EmptyWorkspacePane({ trafficLightOffset }: { trafficLightOffset: boolean }) {
-  return (
-    <section data-testid="empty-workspace-pane" className="flex min-h-0 flex-1 flex-col bg-background">
-      <WorkspaceChrome trafficLightOffset={trafficLightOffset} />
-      <div className="min-h-0 flex-1" />
-    </section>
-  )
-}
+const EmptyWorkspacePane: FunctionalComponent<{ trafficLightOffset: boolean }> = (props) => (
+  <section data-testid="empty-workspace-pane" class="flex min-h-0 flex-1 flex-col bg-background">
+    <WorkspaceChrome trafficLightOffset={props.trafficLightOffset} />
+    <div class="min-h-0 flex-1" />
+  </section>
+)
 
-interface Props {
+EmptyWorkspacePane.props = ['trafficLightOffset']
+
+interface WorkspaceViewProps {
   workspaceId: WorkspaceId
   routeView?: WorkspaceRouteView | null
   onOpenSettings?: () => void
@@ -64,330 +65,384 @@ interface Props {
   ) => void
 }
 
-export function WorkspaceView(props: Props) {
-  return (
-    <WorkspacePaneTabStripScrollMemoryProvider>
-      <WorkspaceViewContent {...props} />
-    </WorkspacePaneTabStripScrollMemoryProvider>
-  )
-}
+export const WorkspaceView = defineComponent(
+  (props: WorkspaceViewProps) => {
+    provideWorkspacePaneTabStripScrollMemory()
+    return () => <WorkspaceViewContent {...props} />
+  },
+  {
+    name: 'WorkspaceView',
+    props: [
+      'workspaceId',
+      'routeView',
+      'onOpenSettings',
+      'onOpenWorkspaceNavigator',
+      'onOpenWorkspaceRootPane',
+      'onOpenWorkspaceDashboard',
+      'onOpenRepoBranch',
+      'onOpenRepoNewWorktree',
+      'onCancelRepoNewWorktree',
+      'onReplaceRepoBranch',
+    ],
+  },
+)
 
-function WorkspaceViewContent({
-  workspaceId,
-  routeView = null,
-  onOpenSettings,
-  onOpenWorkspaceNavigator,
-  onOpenWorkspaceRootPane,
-  onOpenWorkspaceDashboard,
-  onOpenRepoBranch,
-  onOpenRepoNewWorktree,
-  onCancelRepoNewWorktree,
-  onReplaceRepoBranch,
-}: Props) {
-  const uiMode = useResponsiveUiMode()
-  const compact = uiMode === 'compact'
-  const view = useWorkspacesStore(
-    useShallow((s) => ({
-      workspaceMembershipReady: s.workspaceMembershipReady,
-      zenMode: s.zenMode,
-      workspacePaneSize: s.workspacePaneSize,
-    })),
-  )
-  const setWorkspacePaneSize = useWorkspacesStore((s) => s.setWorkspacePaneSize)
-  const workspace = useWorkspacesStore((s) => s.workspaces[workspaceId])
-  const previousWorkspaceRoute = useRef({ workspaceId, terminal: workspaceRouteViewIsTerminal(routeView) })
-  useEffect(() => {
-    const previous = previousWorkspaceRoute.current
-    const terminal = workspaceRouteViewIsTerminal(routeView)
-    previousWorkspaceRoute.current = { workspaceId, terminal }
-    if (previous.workspaceId !== workspaceId || !previous.terminal || terminal) return
-    if (!workspace || !gitWorkspaceCanExecute(workspace)) return
-    invalidateRepoMetadataQueries(workspace.id, workspace.workspaceRuntimeId)
-    invalidateRepoWorktreeStatusQueries(workspace.id, workspace.workspaceRuntimeId)
-  }, [routeView, workspace, workspaceId])
-  const git = workspace?.capability.kind === 'git' ? workspace.capability.git : null
-  const gitAvailable = git !== null
-  const gitUnavailable = workspace?.capability.kind === 'filesystem'
-  const gitCapabilitySettled = gitAvailable || gitUnavailable
-
-  const currentBranchName = routeView?.kind === 'branch' ? routeView.branchName : null
-  const routeWorkspacePageActive =
-    routeView?.kind === 'workspace-root' ||
-    routeView?.kind === 'worktree' ||
-    routeView?.kind === 'dashboard' ||
-    routeView?.kind === 'newWorktree'
-  const workspacePaneActive = currentBranchName !== null || routeWorkspacePageActive
-  const singlePane = currentBranchName || routeWorkspacePageActive ? 'workspace' : 'navigator'
-  const compactWorkspaceCurrentBranchName = useRetainedValueDuringExit({
-    value: currentBranchName,
-    active: compact && singlePane === 'workspace',
-    retainMs: WORKSPACE_PANE_TRANSITION_MS,
-    resetKey: workspaceId,
-  })
-
-  // Publish "compact-workspace is mid-transition" to a global store
-  // so the keyboard handler can suppress branch-action shortcuts for
-  // the duration. Without this, the user sees branch X in the
-  // workspace but pressing 'P' (pull) acts on the new route branch Y.
-  // The transition is short (WORKSPACE_PANE_TRANSITION_MS
-  // = 240 ms) and the suppression is imperceptible.
-  const setCompactWorkspaceTransitioning = useUiTransitionStore((s) => s.setCompactWorkspaceTransitioning)
-  const compactWorkspaceTransitioning =
-    compact && compactWorkspaceCurrentBranchName !== null && compactWorkspaceCurrentBranchName !== currentBranchName
-  const workspaceCurrentBranchName = compact ? compactWorkspaceCurrentBranchName : currentBranchName
-  const workspacePaneRouteContext: WorkspacePaneRouteContext =
-    routeView?.kind === 'branch' && routeView.branchName === workspaceCurrentBranchName
-      ? { kind: 'routed', route: routeView.workspacePaneRoute }
-      : { kind: 'inactive' }
-  useEffect(() => {
-    if (!compactWorkspaceTransitioning) {
-      setCompactWorkspaceTransitioning(false)
-      return
-    }
-    setCompactWorkspaceTransitioning(true)
-    const timeout = window.setTimeout(() => {
-      setCompactWorkspaceTransitioning(false)
-    }, WORKSPACE_PANE_TRANSITION_MS)
-    return () => window.clearTimeout(timeout)
-  }, [compactWorkspaceTransitioning, setCompactWorkspaceTransitioning])
-
-  if (!view.workspaceMembershipReady) {
-    return (
-      <WorkspaceLayoutSkeleton
-        singlePane={compact}
-        singlePaneView={singlePane}
-        workspacePaneState={currentBranchName ? 'content' : 'empty'}
-      />
+const WorkspaceViewContent = defineComponent(
+  (props: WorkspaceViewProps) => {
+    const uiMode = useResponsiveUiMode()
+    const compact = computed(() => uiMode.value === 'compact')
+    const view = useStoreSelector(
+      workspacesStore,
+      (state) => ({
+        workspaceMembershipReady: state.workspaceMembershipReady,
+        zenMode: state.zenMode,
+        workspacePaneSize: state.workspacePaneSize,
+      }),
+      (left, right) =>
+        left.workspaceMembershipReady === right.workspaceMembershipReady &&
+        left.zenMode === right.zenMode &&
+        left.workspacePaneSize === right.workspacePaneSize,
     )
-  }
-  if (!workspace) return <RoutedWorkspaceNotFound workspaceId={workspaceId} />
-
-  const zenModeCollapsed = !compact && view.zenMode && workspacePaneActive
-  const workspaceTrafficLightOffset = zenModeCollapsed
-  const sidebarSelectBranch = routeView
-    ? (branchName: string) => onOpenRepoBranch?.(workspace.id, branchName)
-    : undefined
-  const sidebarCreateWorktree = routeView ? () => onOpenRepoNewWorktree?.(workspace.id) : undefined
-  const sidebarOpenDashboard = routeView ? () => onOpenWorkspaceDashboard?.(workspace.id) : undefined
-  const dashboardSelected = routeView?.kind === 'dashboard'
-  const newWorktreeSelected = routeView?.kind === 'newWorktree'
-  const renderSidebarPane = (
-    branchContent?: ReactNode,
-    chromeRegion: 'drag' | 'none' = zenModeCollapsed ? 'none' : 'drag',
-  ) => (
-    <WorkspaceLayoutPane>
-      <WorkspaceLayoutSidebar
-        workspaceId={workspace.id}
-        git={git}
-        compact={compact}
-        branchContent={branchContent ?? (!gitCapabilitySettled ? <BranchNavigatorSkeleton /> : undefined)}
-        chromeRegion={chromeRegion}
-        onOpenSettings={onOpenSettings}
-        onSelectBranch={sidebarSelectBranch}
-        onCreateWorktree={sidebarCreateWorktree}
-        onOpenDashboard={sidebarOpenDashboard}
-        dashboardSelected={dashboardSelected}
-        newWorktreeSelected={newWorktreeSelected}
-        currentBranchName={currentBranchName}
-        workspaceRootSelected={gitUnavailable && routeView?.kind === 'workspace-root'}
-        onSelectWorkspaceRoot={gitUnavailable ? () => onOpenWorkspaceRootPane?.(workspace.id) : undefined}
-      />
-    </WorkspaceLayoutPane>
-  )
-
-  if (isWorkspaceUnavailable(workspace)) {
-    return (
-      <WorkspaceLayoutShell
-        workspaceId={workspaceId}
-        compact={compact}
-        zenMode={view.zenMode}
-        workspacePaneActive={workspacePaneActive}
-        workspacePaneSize={view.workspacePaneSize}
-        onWorkspacePaneSizeChange={setWorkspacePaneSize}
-        sidebarPane={renderSidebarPane(compact ? <UnavailableWorkspaceView workspace={workspace} /> : undefined)}
-        zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
-        workspacePane={
-          <WorkspaceLayoutPane>
-            <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
-            <UnavailableWorkspaceView workspace={workspace} />
-          </WorkspaceLayoutPane>
-        }
-        singlePaneActivePane={compact ? 'navigator' : singlePane}
-      />
+    const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
+    const workspace = computed(() => workspaces.value[props.workspaceId])
+    const setWorkspacePaneSize = workspacesStore.getState().setWorkspacePaneSize
+    const setCompactWorkspaceTransitioning = uiTransitionStore.getState().setCompactWorkspaceTransitioning
+    const currentBranchName = computed(() => (props.routeView?.kind === 'branch' ? props.routeView.branchName : null))
+    const routeWorkspacePageActive = computed(
+      () =>
+        props.routeView?.kind === 'workspace-root' ||
+        props.routeView?.kind === 'worktree' ||
+        props.routeView?.kind === 'dashboard' ||
+        props.routeView?.kind === 'newWorktree',
     )
-  }
+    const workspacePaneActive = computed(() => currentBranchName.value !== null || routeWorkspacePageActive.value)
+    const singlePane = computed<'navigator' | 'workspace'>(() =>
+      currentBranchName.value || routeWorkspacePageActive.value ? 'workspace' : 'navigator',
+    )
+    const compactWorkspaceCurrentBranchName = useRetainedValueDuringExit({
+      value: currentBranchName,
+      active: () => compact.value && singlePane.value === 'workspace',
+      retainMs: WORKSPACE_PANE_TRANSITION_MS,
+      resetKey: () => props.workspaceId,
+    })
+    const compactWorkspaceTransitioning = computed(
+      () =>
+        compact.value &&
+        compactWorkspaceCurrentBranchName.value !== null &&
+        compactWorkspaceCurrentBranchName.value !== currentBranchName.value,
+    )
+    const workspaceCurrentBranchName = computed(() =>
+      compact.value ? compactWorkspaceCurrentBranchName.value : currentBranchName.value,
+    )
+    const workspacePaneRouteContext = computed<WorkspacePaneRouteContext>(() =>
+      props.routeView?.kind === 'branch' && props.routeView.branchName === workspaceCurrentBranchName.value
+        ? { kind: 'routed', route: props.routeView.workspacePaneRoute }
+        : { kind: 'inactive' },
+    )
 
-  function renderWorkspacePaneContent(): ReactNode {
-    if (!routeView) {
-      return (
-        <WorkspacePane
-          workspaceId={workspaceId}
-          currentBranchName={workspaceCurrentBranchName}
-          workspacePaneRouteContext={workspacePaneRouteContext}
-          shortcutsEnabled={!compact || singlePane === 'workspace'}
-          toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-        />
-      )
+    let previousWorkspaceRoute = {
+      workspaceId: props.workspaceId,
+      terminal: workspaceRouteViewIsTerminal(props.routeView ?? null),
     }
+    // Leaving a terminal route makes Git metadata visible again. Invalidate
+    // once at that route edge so the next projection is fresh.
+    watch(
+      [() => props.workspaceId, () => props.routeView ?? null, workspace],
+      ([workspaceId, routeView, currentWorkspace]) => {
+        const previous = previousWorkspaceRoute
+        const terminal = workspaceRouteViewIsTerminal(routeView)
+        previousWorkspaceRoute = { workspaceId, terminal }
+        if (previous.workspaceId !== workspaceId || !previous.terminal || terminal) return
+        if (!currentWorkspace || !gitWorkspaceCanExecute(currentWorkspace)) return
+        invalidateRepoMetadataQueries(currentWorkspace.id, currentWorkspace.workspaceRuntimeId)
+        invalidateRepoWorktreeStatusQueries(currentWorkspace.id, currentWorkspace.workspaceRuntimeId)
+      },
+    )
 
-    switch (routeView.kind) {
-      case 'dashboard':
+    // The global shortcut gate must share the exact lifetime of the compact
+    // exit transition, including cancellation when another route wins.
+    watch(
+      compactWorkspaceTransitioning,
+      (transitioning, _previous, onCleanup) => {
+        setCompactWorkspaceTransitioning(transitioning)
+        if (!transitioning) return
+        const timeout = window.setTimeout(() => setCompactWorkspaceTransitioning(false), WORKSPACE_PANE_TRANSITION_MS)
+        onCleanup(() => window.clearTimeout(timeout))
+      },
+      { immediate: true },
+    )
+    onScopeDispose(() => setCompactWorkspaceTransitioning(false))
+
+    return () => {
+      const currentView = view.value
+      const currentWorkspace = workspace.value
+      const currentRouteView = props.routeView ?? null
+      const isCompact = compact.value
+      const activeSinglePane = singlePane.value
+      const routeBranchName = currentBranchName.value
+
+      if (!currentView.workspaceMembershipReady) {
         return (
-          <WorkspaceDashboardPane
-            workspaceId={workspace.id}
-            compact={compact}
-            trafficLightOffset={workspaceTrafficLightOffset}
-            onBack={() => onOpenWorkspaceNavigator?.(workspace.id)}
-            onSelectBranch={(branchName) => onOpenRepoBranch?.(workspace.id, branchName)}
+          <WorkspaceLayoutSkeleton
+            singlePane={isCompact}
+            singlePaneView={activeSinglePane}
+            workspacePaneState={routeBranchName ? 'content' : 'empty'}
           />
         )
-      case 'workspace-root':
-        return (
-          <WorkspacePane
-            workspaceId={workspaceId}
-            currentBranchName={null}
-            workspacePaneRouteContext={{ kind: 'workspace-root', route: routeView.workspacePaneRoute }}
-            shortcutsEnabled={!compact || singlePane === 'workspace'}
-            toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-            onBackToBranchNavigator={() => onOpenWorkspaceNavigator?.(workspace.id)}
-          />
-        )
-      case 'worktree':
-        return (
-          <WorkspacePane
-            workspaceId={workspaceId}
-            currentBranchName={null}
-            workspacePaneRouteContext={{
-              kind: 'git-worktree',
-              worktreePath: routeView.worktreePath,
-              route: routeView.workspacePaneRoute,
-            }}
-            shortcutsEnabled={!compact || singlePane === 'workspace'}
-            toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-            onBackToBranchNavigator={() => onOpenWorkspaceNavigator?.(workspace.id)}
-          />
-        )
-      case 'newWorktree':
-        return (
-          <CreateWorktreePagePane
-            repoId={workspace.id}
-            compact={compact}
-            trafficLightOffset={workspaceTrafficLightOffset}
-            onCancel={() => {
-              if (onCancelRepoNewWorktree) onCancelRepoNewWorktree(workspace.id)
-              else onOpenWorkspaceNavigator?.(workspace.id)
-            }}
-            onCreated={(branchName, navigationGeneration) =>
-              onReplaceRepoBranch?.(workspace.id, branchName, navigationGeneration)
+      }
+      if (!currentWorkspace) return <RoutedWorkspaceNotFound workspaceId={props.workspaceId} />
+
+      const git = currentWorkspace.capability.kind === 'git' ? currentWorkspace.capability.git : null
+      const gitAvailable = git !== null
+      const gitUnavailable = currentWorkspace.capability.kind === 'filesystem'
+      const gitCapabilitySettled = gitAvailable || gitUnavailable
+      const zenModeCollapsed = !isCompact && currentView.zenMode && workspacePaneActive.value
+      const workspaceTrafficLightOffset = zenModeCollapsed
+      const sidebarSelectBranch = currentRouteView
+        ? (branchName: string) => props.onOpenRepoBranch?.(currentWorkspace.id, branchName)
+        : undefined
+      const sidebarCreateWorktree = currentRouteView
+        ? () => props.onOpenRepoNewWorktree?.(currentWorkspace.id)
+        : undefined
+      const sidebarOpenDashboard = currentRouteView
+        ? () => props.onOpenWorkspaceDashboard?.(currentWorkspace.id)
+        : undefined
+
+      const renderSidebarPane = (
+        branchContent?: VNodeChild,
+        chromeRegion: 'drag' | 'none' = zenModeCollapsed ? 'none' : 'drag',
+      ): VNodeChild => (
+        <WorkspaceLayoutPane>
+          <WorkspaceLayoutSidebar
+            workspaceId={currentWorkspace.id}
+            git={git}
+            compact={isCompact}
+            branchContent={branchContent ?? (!gitCapabilitySettled ? <BranchNavigatorSkeleton /> : undefined)}
+            chromeRegion={chromeRegion}
+            onOpenSettings={props.onOpenSettings}
+            onSelectBranch={sidebarSelectBranch}
+            onCreateWorktree={sidebarCreateWorktree}
+            onOpenDashboard={sidebarOpenDashboard}
+            dashboardSelected={currentRouteView?.kind === 'dashboard'}
+            newWorktreeSelected={currentRouteView?.kind === 'newWorktree'}
+            currentBranchName={routeBranchName}
+            workspaceRootSelected={gitUnavailable && currentRouteView?.kind === 'workspace-root'}
+            onSelectWorkspaceRoot={
+              gitUnavailable ? () => props.onOpenWorkspaceRootPane?.(currentWorkspace.id) : undefined
             }
           />
-        )
-      case 'empty':
-        return <EmptyWorkspacePane trafficLightOffset={workspaceTrafficLightOffset} />
-      case 'branch':
+        </WorkspaceLayoutPane>
+      )
+
+      if (isWorkspaceUnavailable(currentWorkspace)) {
         return (
-          <WorkspacePane
-            workspaceId={workspaceId}
-            currentBranchName={workspaceCurrentBranchName}
-            workspacePaneRouteContext={workspacePaneRouteContext}
-            shortcutsEnabled={!compact || singlePane === 'workspace'}
-            toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-            onBackToBranchNavigator={() => onOpenWorkspaceNavigator?.(workspace.id)}
+          <WorkspaceLayoutShell
+            workspaceId={props.workspaceId}
+            compact={isCompact}
+            zenMode={currentView.zenMode}
+            workspacePaneActive={workspacePaneActive.value}
+            workspacePaneSize={currentView.workspacePaneSize}
+            onWorkspacePaneSizeChange={setWorkspacePaneSize}
+            sidebarPane={renderSidebarPane(
+              isCompact ? <UnavailableWorkspaceView workspace={currentWorkspace} /> : undefined,
+            )}
+            zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
+            workspacePane={
+              <WorkspaceLayoutPane>
+                <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
+                <UnavailableWorkspaceView workspace={currentWorkspace} />
+              </WorkspaceLayoutPane>
+            }
+            singlePaneActivePane={isCompact ? 'navigator' : activeSinglePane}
           />
         )
-      default: {
-        const exhaustive: never = routeView
-        return exhaustive
       }
-    }
-  }
 
-  function renderWorkspace(projectionRestore: WorkspaceProjectionRestoreController | null): ReactNode {
-    if (workspace.session.projectionState === 'stub' && !projectionRestore) {
-      throw new Error('A filesystem workspace cannot own a Git projection stub')
-    }
-    if (workspace.session.projectionState === 'stub' && projectionRestore?.state.phase === 'failed') {
-      const failure = (
-        <WorkspaceProjectionFailureView
-          workspace={workspace}
-          message={projectionRestore.state.message}
-          onRetry={projectionRestore.retry}
-        />
-      )
-      return (
-        <WorkspaceLayoutShell
-          workspaceId={workspaceId}
-          compact={compact}
-          zenMode={view.zenMode}
-          workspacePaneActive={workspacePaneActive}
-          workspacePaneSize={view.workspacePaneSize}
-          onWorkspacePaneSizeChange={setWorkspacePaneSize}
-          sidebarPane={renderSidebarPane(compact ? failure : undefined)}
-          zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
-          workspacePane={
-            <WorkspaceLayoutPane>
-              <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
-              {failure}
-            </WorkspaceLayoutPane>
-          }
-          singlePaneActivePane={compact ? 'navigator' : singlePane}
-        />
-      )
-    }
+      const renderWorkspacePaneContent = (): VNodeChild => {
+        if (!currentRouteView) {
+          return (
+            <WorkspacePane
+              workspaceId={props.workspaceId}
+              currentBranchName={workspaceCurrentBranchName.value}
+              workspacePaneRouteContext={workspacePaneRouteContext.value}
+              shortcutsEnabled={!isCompact || activeSinglePane === 'workspace'}
+              toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+            />
+          )
+        }
 
-    if (workspace.session.projectionState === 'stub') {
-      return (
-        <WorkspaceLayoutShell
-          workspaceId={workspaceId}
-          compact={compact}
-          zenMode={view.zenMode}
-          workspacePaneActive={workspacePaneActive}
-          workspacePaneSize={view.workspacePaneSize}
-          onWorkspacePaneSizeChange={setWorkspacePaneSize}
-          sidebarPane={renderSidebarPane(compact && currentBranchName ? undefined : <BranchNavigatorSkeleton />)}
-          zenRevealSidebarPane={renderSidebarPane(
-            compact && currentBranchName ? undefined : <BranchNavigatorSkeleton />,
-            'none',
-          )}
-          workspacePane={
-            <WorkspaceLayoutPane>
-              {currentBranchName ? (
-                <WorkspacePaneSkeleton toolbarTrafficLightOffset={workspaceTrafficLightOffset} />
-              ) : (
-                <>
+        switch (currentRouteView.kind) {
+          case 'dashboard':
+            return (
+              <WorkspaceDashboardPane
+                workspaceId={currentWorkspace.id}
+                compact={isCompact}
+                trafficLightOffset={workspaceTrafficLightOffset}
+                onBack={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
+                onSelectBranch={(branchName) => props.onOpenRepoBranch?.(currentWorkspace.id, branchName)}
+              />
+            )
+          case 'workspace-root':
+            return (
+              <WorkspacePane
+                workspaceId={props.workspaceId}
+                currentBranchName={null}
+                workspacePaneRouteContext={{
+                  kind: 'workspace-root',
+                  route: currentRouteView.workspacePaneRoute,
+                }}
+                shortcutsEnabled={!isCompact || activeSinglePane === 'workspace'}
+                toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+                onBackToBranchNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
+              />
+            )
+          case 'worktree':
+            return (
+              <WorkspacePane
+                workspaceId={props.workspaceId}
+                currentBranchName={null}
+                workspacePaneRouteContext={{
+                  kind: 'git-worktree',
+                  worktreePath: currentRouteView.worktreePath,
+                  route: currentRouteView.workspacePaneRoute,
+                }}
+                shortcutsEnabled={!isCompact || activeSinglePane === 'workspace'}
+                toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+                onBackToBranchNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
+              />
+            )
+          case 'newWorktree':
+            return (
+              <CreateWorktreePagePane
+                repoId={currentWorkspace.id}
+                compact={isCompact}
+                trafficLightOffset={workspaceTrafficLightOffset}
+                onCancel={() => {
+                  if (props.onCancelRepoNewWorktree) props.onCancelRepoNewWorktree(currentWorkspace.id)
+                  else props.onOpenWorkspaceNavigator?.(currentWorkspace.id)
+                }}
+                onCreated={(branchName, navigationGeneration) =>
+                  props.onReplaceRepoBranch?.(currentWorkspace.id, branchName, navigationGeneration)
+                }
+              />
+            )
+          case 'empty':
+            return <EmptyWorkspacePane trafficLightOffset={workspaceTrafficLightOffset} />
+          case 'branch':
+            return (
+              <WorkspacePane
+                workspaceId={props.workspaceId}
+                currentBranchName={workspaceCurrentBranchName.value}
+                workspacePaneRouteContext={workspacePaneRouteContext.value}
+                shortcutsEnabled={!isCompact || activeSinglePane === 'workspace'}
+                toolbarTrafficLightOffset={workspaceTrafficLightOffset}
+                onBackToBranchNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
+              />
+            )
+        }
+      }
+
+      const renderWorkspace = (projectionRestore: WorkspaceProjectionRestoreController | null): VNodeChild => {
+        if (currentWorkspace.session.projectionState === 'stub' && !projectionRestore) {
+          throw new Error('A filesystem workspace cannot own a Git projection stub')
+        }
+        if (currentWorkspace.session.projectionState === 'stub' && projectionRestore?.state.phase === 'failed') {
+          const failure = (
+            <WorkspaceProjectionFailureView
+              workspace={currentWorkspace}
+              message={projectionRestore.state.message}
+              onRetry={projectionRestore.retry}
+            />
+          )
+          return (
+            <WorkspaceLayoutShell
+              workspaceId={props.workspaceId}
+              compact={isCompact}
+              zenMode={currentView.zenMode}
+              workspacePaneActive={workspacePaneActive.value}
+              workspacePaneSize={currentView.workspacePaneSize}
+              onWorkspacePaneSizeChange={setWorkspacePaneSize}
+              sidebarPane={renderSidebarPane(isCompact ? failure : undefined)}
+              zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
+              workspacePane={
+                <WorkspaceLayoutPane>
                   <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
-                  <EmptyWorkspacePaneSkeleton />
-                </>
-              )}
-            </WorkspaceLayoutPane>
-          }
-          singlePaneActivePane={currentBranchName ? 'workspace' : 'navigator'}
-        />
+                  {failure}
+                </WorkspaceLayoutPane>
+              }
+              singlePaneActivePane={isCompact ? 'navigator' : activeSinglePane}
+            />
+          )
+        }
+
+        if (currentWorkspace.session.projectionState === 'stub') {
+          const branchSkeleton = isCompact && routeBranchName ? undefined : <BranchNavigatorSkeleton />
+          return (
+            <WorkspaceLayoutShell
+              workspaceId={props.workspaceId}
+              compact={isCompact}
+              zenMode={currentView.zenMode}
+              workspacePaneActive={workspacePaneActive.value}
+              workspacePaneSize={currentView.workspacePaneSize}
+              onWorkspacePaneSizeChange={setWorkspacePaneSize}
+              sidebarPane={renderSidebarPane(branchSkeleton)}
+              zenRevealSidebarPane={renderSidebarPane(branchSkeleton, 'none')}
+              workspacePane={
+                <WorkspaceLayoutPane>
+                  {routeBranchName ? (
+                    <WorkspacePaneSkeleton toolbarTrafficLightOffset={workspaceTrafficLightOffset} />
+                  ) : (
+                    <>
+                      <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
+                      <EmptyWorkspacePaneSkeleton />
+                    </>
+                  )}
+                </WorkspaceLayoutPane>
+              }
+              singlePaneActivePane={routeBranchName ? 'workspace' : 'navigator'}
+            />
+          )
+        }
+
+        return (
+          <WorkspaceLayoutShell
+            workspaceId={props.workspaceId}
+            compact={isCompact}
+            zenMode={currentView.zenMode}
+            workspacePaneActive={workspacePaneActive.value}
+            workspacePaneSize={currentView.workspacePaneSize}
+            onWorkspacePaneSizeChange={setWorkspacePaneSize}
+            sidebarPane={renderSidebarPane()}
+            zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
+            workspacePane={<WorkspaceLayoutPane>{renderWorkspacePaneContent()}</WorkspaceLayoutPane>}
+            singlePaneActivePane={activeSinglePane}
+          />
+        )
+      }
+
+      return git ? (
+        <GitWorkspaceEffects workspaceId={props.workspaceId} renderWorkspace={renderWorkspace} />
+      ) : (
+        renderWorkspace(null)
       )
     }
-
-    return (
-      <WorkspaceLayoutShell
-        workspaceId={workspaceId}
-        compact={compact}
-        zenMode={view.zenMode}
-        workspacePaneActive={workspacePaneActive}
-        workspacePaneSize={view.workspacePaneSize}
-        onWorkspacePaneSizeChange={setWorkspacePaneSize}
-        sidebarPane={renderSidebarPane()}
-        zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
-        workspacePane={<WorkspaceLayoutPane>{renderWorkspacePaneContent()}</WorkspaceLayoutPane>}
-        singlePaneActivePane={singlePane}
-      />
-    )
-  }
-
-  return git ? (
-    <GitWorkspaceEffects workspaceId={workspaceId}>{renderWorkspace}</GitWorkspaceEffects>
-  ) : (
-    renderWorkspace(null)
-  )
-}
+  },
+  {
+    name: 'WorkspaceViewContent',
+    props: [
+      'workspaceId',
+      'routeView',
+      'onOpenSettings',
+      'onOpenWorkspaceNavigator',
+      'onOpenWorkspaceRootPane',
+      'onOpenWorkspaceDashboard',
+      'onOpenRepoBranch',
+      'onOpenRepoNewWorktree',
+      'onCancelRepoNewWorktree',
+      'onReplaceRepoBranch',
+    ],
+  },
+)
 
 function workspaceRouteViewIsTerminal(routeView: WorkspaceRouteView | null): boolean {
   return (
@@ -396,32 +451,35 @@ function workspaceRouteViewIsTerminal(routeView: WorkspaceRouteView | null): boo
   )
 }
 
-function GitWorkspaceEffects({
-  workspaceId,
-  children,
-}: {
+interface GitWorkspaceEffectsProps {
   workspaceId: WorkspaceId
-  children: (projectionRestore: WorkspaceProjectionRestoreController) => ReactNode
-}) {
-  useRepoToasts(workspaceId)
-  const projectionRestore = useRestoreWorkspaceTabsOnView({ workspaceId })
-  return children(projectionRestore)
+  renderWorkspace: (projectionRestore: WorkspaceProjectionRestoreController) => VNodeChild
 }
 
-function RoutedWorkspaceNotFound({ workspaceId }: { workspaceId: WorkspaceId }) {
-  const t = useT()
-  const displayLocation = formatWorkspaceDisplayLocation(workspaceId)
-  // An explicit URL remains navigation authority even when its target was
-  // removed. Render the missing fact until a user command chooses a new route;
-  // effects must not invent fallback navigation from a stale projection.
-  return (
-    <section className="flex min-h-0 flex-1 flex-col bg-background">
-      <div className="flex flex-1 items-center justify-center p-6 text-center">
-        <div className="flex max-w-sm flex-col gap-2">
-          <h1 className="text-sm font-medium text-foreground">{t('workspace-route.not-found-title')}</h1>
-          <p className="break-all text-sm text-muted-foreground">{displayLocation}</p>
+const GitWorkspaceEffects = defineComponent(
+  (props: GitWorkspaceEffectsProps) => {
+    useRepoToasts(() => props.workspaceId)
+    const projectionRestore = useRestoreWorkspaceTabsOnView({ workspaceId: () => props.workspaceId })
+    return () => props.renderWorkspace({ state: projectionRestore.state.value, retry: projectionRestore.retry })
+  },
+  { name: 'GitWorkspaceEffects', props: ['workspaceId', 'renderWorkspace'] },
+)
+
+const RoutedWorkspaceNotFound = defineComponent(
+  (props: { workspaceId: WorkspaceId }) => {
+    const t = useT()
+    return () => (
+      // An explicit URL remains navigation authority even when its target was
+      // removed. Render the missing fact until a user chooses another route.
+      <section class="flex min-h-0 flex-1 flex-col bg-background">
+        <div class="flex flex-1 items-center justify-center p-6 text-center">
+          <div class="flex max-w-sm flex-col gap-2">
+            <h1 class="text-sm font-medium text-foreground">{t('workspace-route.not-found-title')}</h1>
+            <p class="break-all text-sm text-muted-foreground">{formatWorkspaceDisplayLocation(props.workspaceId)}</p>
+          </div>
         </div>
-      </div>
-    </section>
-  )
-}
+      </section>
+    )
+  },
+  { name: 'RoutedWorkspaceNotFound', props: ['workspaceId'] },
+)

@@ -1,23 +1,28 @@
-import { Check, ChevronDown, Plus, X } from 'lucide-react'
-import { useRef, useState, type ComponentPropsWithoutRef, type KeyboardEvent, type MouseEvent, type Ref } from 'react'
-import { Button } from '#/web/components/ui/button.tsx'
-import { cn } from '#/web/lib/cn.ts'
+import { Check, ChevronDown, Plus, X } from '@lucide/vue'
+import { PopoverTrigger } from 'reka-ui'
+import { defineComponent, ref } from 'vue'
+import type { ButtonHTMLAttributes, FunctionalComponent, HTMLAttributes } from 'vue'
+import { Button, buttonVariants } from '#/web/components/ui/button.tsx'
+import { Popover, PopoverContent } from '#/web/components/ui/popover.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Separator } from '#/web/components/ui/separator.tsx'
-import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
-import { DelegatedTooltipLayer } from '#/web/components/DelegatedTooltipLayer.tsx'
-import { ToolbarTabList } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
-import { ToolbarClosableTab, type ToolbarTabClose } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
+import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
+import type { ToolbarTabClose } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
 import { toolbarTabChromeClassName, toolbarTabIconClassName } from '#/web/components/tab-strip/tab-variants.ts'
 import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
 import {
   isPendingWorkspacePaneTabItem,
   isRuntimeWorkspacePaneTabItem,
-  type WorkspacePaneRuntimeTabItem,
-  type WorkspacePaneTabItem,
+} from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
+import type {
+  WorkspacePaneRuntimeTabItem,
+  WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { WorkspacePaneTabTitle } from '#/web/components/workspace-pane/WorkspacePaneTabTitle.tsx'
+import { cn } from '#/web/lib/cn.ts'
+import { toButtonVNodeRef } from '#/web/components/ui/refs.ts'
+import type { ElementRef } from '#/web/components/ui/refs.ts'
 import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 
 export type WorkspacePaneT = (key: string, params?: Record<string, string | number>) => string
@@ -36,164 +41,161 @@ interface WorkspacePaneTabSwitcherPopoverProps {
   createAction: WorkspacePaneTabCreateAction | null
   tabInteractionBlocked: boolean
   onSelect: (identity: string) => void
-  onClose: (event: MouseEvent, identity: string) => void
+  onClose: (identity: string) => void
   t: WorkspacePaneT
 }
 
-export function WorkspacePaneTabSwitcherPopover({
-  items,
-  activeTabIdentity,
-  label,
-  createAction,
-  tabInteractionBlocked,
-  onSelect,
-  onClose,
-  t,
-}: WorkspacePaneTabSwitcherPopoverProps) {
-  const [open, setOpen] = useState(false)
-  const contentRef = useRef<HTMLDivElement>(null)
+export const WorkspacePaneTabSwitcherPopover = defineComponent(
+  (props: WorkspacePaneTabSwitcherPopoverProps) => {
+    const open = ref(false)
+    const selectView = (identity: string) => {
+      if (props.tabInteractionBlocked) return
+      open.value = false
+      props.onSelect(identity)
+    }
 
-  const selectView = (identity: string) => {
-    if (tabInteractionBlocked) return
-    setOpen(false)
-    onSelect(identity)
-  }
+    const selectNew = () => {
+      if (!props.createAction || props.createAction.busy) return
+      open.value = false
+      props.createAction.onCreate()
+    }
 
-  const selectNew = () => {
-    if (!createAction || createAction.busy) return
-    setOpen(false)
-    createAction.onCreate()
-  }
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={label} title={label}>
-          <ChevronDown size={14} />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        side="bottom"
-        align="start"
-        className="flex w-max min-w-48 max-w-72 flex-col overflow-hidden p-0"
-        aria-label={label}
-        ref={contentRef}
-        tabIndex={-1}
-        onOpenAutoFocus={(event) => {
-          event.preventDefault()
-          contentRef.current?.focus({ preventScroll: true })
-        }}
-        onCloseAutoFocus={(event) => {
-          // A terminal may win the focus race before Radix finishes closing.
-          // Preserve that completed handoff instead of restoring the trigger.
-          if (terminalHasKeyboardFocus()) event.preventDefault()
-        }}
-      >
-        <ScrollArea className="max-h-64" scrollbarMode="compact">
-          <div className="space-y-0.5 p-1" role="list">
-            {items.map((item) => {
-              const selected = item.identity === activeTabIdentity
-              const pending = isPendingWorkspacePaneTabItem(item)
-              return (
-                <div key={item.identity} className="group relative flex items-center" role="listitem">
-                  <button
-                    type="button"
-                    className={cn(
-                      'flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm py-1 pl-2 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
-                      'pr-8',
-                      selected &&
-                        'bg-selected text-selected-foreground hover:bg-selected hover:text-selected-foreground',
-                    )}
-                    onClick={() => selectView(item.identity)}
-                    disabled={tabInteractionBlocked}
-                    aria-label={item.tooltip}
-                    aria-current={selected ? 'true' : undefined}
-                  >
-                    <span className="flex size-3.5 shrink-0 items-center justify-center">
-                      {selected ? <Check size={13} aria-hidden /> : <WorkspacePaneTabIcon item={item} active={false} />}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{item.label || item.tooltip}</span>
-                    {isRuntimeWorkspacePaneTabItem(item) && item.attention && (
-                      <>
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-notification" aria-hidden="true" />
-                        <span className="sr-only">{runtimeAttentionLabel(item, t)}</span>
-                      </>
-                    )}
-                  </button>
-                  {!pending && item.closable !== false && (
-                    <Button
+    return () => (
+      <Popover open={open.value} onOpenChange={(nextOpen) => (open.value = nextOpen)}>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="icon" class="h-7 w-7 shrink-0" aria-label={props.label} title={props.label}>
+            <ChevronDown size={14} />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="bottom"
+          align="start"
+          class="flex w-max min-w-48 max-w-72 flex-col overflow-hidden p-0"
+          aria-label={props.label}
+          tabindex={-1}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+            if (event.target instanceof HTMLElement) event.target.focus({ preventScroll: true })
+          }}
+          onCloseAutoFocus={(event) => {
+            // A terminal may win the focus race before Reka finishes closing.
+            // Preserve that completed handoff instead of restoring the trigger.
+            if (terminalHasKeyboardFocus()) event.preventDefault()
+          }}
+        >
+          <ScrollArea class="max-h-64" scrollbarMode="compact">
+            <div class="space-y-0.5 p-1" role="list">
+              {props.items.map((item) => {
+                const selected = item.identity === props.activeTabIdentity
+                const pending = isPendingWorkspacePaneTabItem(item)
+                return (
+                  <div key={item.identity} class="group relative flex items-center" role="listitem">
+                    <button
                       type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => onClose(event, item.identity)}
-                      disabled={tabInteractionBlocked}
-                      title={item.closeLabel}
-                      aria-label={item.closeLabel}
+                      class={cn(
+                        'flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-sm py-1 pl-2 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
+                        'pr-8',
+                        selected &&
+                          'bg-selected text-selected-foreground hover:bg-selected hover:text-selected-foreground',
+                      )}
+                      onClick={() => selectView(item.identity)}
+                      disabled={props.tabInteractionBlocked}
+                      aria-label={item.tooltip}
+                      aria-current={selected ? 'true' : undefined}
                     >
-                      <X size={13} />
-                    </Button>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </ScrollArea>
-        {createAction && (
-          <div className="border-t border-separator p-1">
-            <button
-              type="button"
-              className={cn(
-                'flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100',
-                createAction.busy
-                  ? 'cursor-not-allowed opacity-70'
-                  : 'cursor-pointer hover:bg-accent hover:text-accent-foreground',
-              )}
-              onClick={selectNew}
-              disabled={createAction.busy}
-              aria-busy={createAction.busy ? 'true' : undefined}
-            >
-              <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
-                <Plus size={14} />
-              </span>
-              <span className="min-w-0 flex-1 truncate">{createAction.label}</span>
-            </button>
-          </div>
-        )}
-      </PopoverContent>
-    </Popover>
-  )
-}
+                      <span class="flex size-3.5 shrink-0 items-center justify-center">
+                        {selected ? (
+                          <Check size={13} aria-hidden="true" />
+                        ) : (
+                          <WorkspacePaneTabIcon item={item} active={false} />
+                        )}
+                      </span>
+                      <span class="min-w-0 flex-1 truncate">{item.label || item.tooltip}</span>
+                      {isRuntimeWorkspacePaneTabItem(item) && item.attention ? (
+                        <>
+                          <span class="h-2 w-2 shrink-0 rounded-full bg-notification" aria-hidden="true" />
+                          <span class="sr-only">{runtimeAttentionLabel(item, props.t)}</span>
+                        </>
+                      ) : null}
+                    </button>
+                    {!pending && item.closable !== false ? (
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        class="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
+                        onPointerdown={(event) => event.stopPropagation()}
+                        onClick={() => props.onClose(item.identity)}
+                        disabled={props.tabInteractionBlocked}
+                        title={item.closeLabel}
+                        aria-label={item.closeLabel}
+                      >
+                        <X size={13} />
+                      </Button>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          </ScrollArea>
+          {props.createAction ? (
+            <div class="border-t border-separator p-1">
+              <button
+                type="button"
+                class={cn(
+                  'flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100',
+                  props.createAction.busy
+                    ? 'cursor-not-allowed opacity-70'
+                    : 'cursor-pointer hover:bg-accent hover:text-accent-foreground',
+                )}
+                onClick={selectNew}
+                disabled={props.createAction.busy}
+                aria-busy={props.createAction.busy ? 'true' : undefined}
+              >
+                <span class="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
+                  <Plus size={14} />
+                </span>
+                <span class="min-w-0 flex-1 truncate">{props.createAction.label}</span>
+              </button>
+            </div>
+          ) : null}
+        </PopoverContent>
+      </Popover>
+    )
+  },
+  {
+    name: 'WorkspacePaneTabSwitcherPopover',
+    props: ['items', 'activeTabIdentity', 'label', 'createAction', 'tabInteractionBlocked', 'onSelect', 'onClose', 't'],
+  },
+)
 
-export function WorkspacePaneNewButton({
-  id,
-  action,
-  ref,
-}: {
+interface WorkspacePaneNewButtonProps {
   id?: string
   action: WorkspacePaneTabCreateAction
-  ref?: Ref<HTMLButtonElement>
-}) {
-  return (
-    <Button
-      ref={ref}
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="h-7 w-7 shrink-0"
-      id={id}
-      onClick={action.onCreate}
-      disabled={action.busy}
-      aria-busy={action.busy ? 'true' : undefined}
-      aria-label={action.label}
-      title={action.label}
-      data-workspace-pane-new-button=""
-    >
-      <Plus size={14} />
-    </Button>
-  )
+  buttonRef?: ElementRef<HTMLButtonElement>
 }
+
+export const WorkspacePaneNewButton: FunctionalComponent<WorkspacePaneNewButtonProps> = (props) => (
+  <button
+    ref={toButtonVNodeRef(props.buttonRef)}
+    type="button"
+    class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'h-7 w-7 shrink-0')}
+    data-slot="button"
+    data-variant="ghost"
+    data-size="icon"
+    id={props.id}
+    onClick={props.action.onCreate}
+    disabled={props.action.busy}
+    aria-busy={props.action.busy ? 'true' : undefined}
+    aria-label={props.action.label}
+    title={props.action.label}
+    data-workspace-pane-new-button=""
+  >
+    <Plus size={14} />
+  </button>
+)
+
+WorkspacePaneNewButton.props = ['id', 'action', 'buttonRef']
 
 export interface WorkspacePaneTabProps {
   item: WorkspacePaneTabItem
@@ -205,8 +207,8 @@ export interface WorkspacePaneTabProps {
   tabId: string
   focusRegistry: FocusRegistry<string, HTMLButtonElement>
   onSelect: (identity: string) => void
-  onClose: (event: MouseEvent, identity: string) => void
-  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>, identity: string) => void
+  onClose: (identity: string) => void
+  onKeyDown: (event: KeyboardEvent, identity: string) => void
   t: WorkspacePaneT
   interactionDisabled: boolean
   compact?: boolean
@@ -216,9 +218,9 @@ export interface WorkspacePaneTabProps {
 
 interface WorkspacePaneTabChromeProps extends Omit<WorkspacePaneTabProps, 'focusRegistry'> {
   isDragging?: boolean
-  buttonRef: ((node: HTMLButtonElement | null) => void) | undefined
-  containerProps?: ComponentPropsWithoutRef<'div'>
-  buttonProps?: ComponentPropsWithoutRef<'button'>
+  buttonRef?: ElementRef<HTMLButtonElement>
+  containerProps?: HTMLAttributes
+  buttonProps?: ButtonHTMLAttributes
 }
 
 function workspacePaneTabCloseProps(
@@ -226,7 +228,7 @@ function workspacePaneTabCloseProps(
   compact: boolean,
   isActive: boolean,
   interactionDisabled: boolean,
-  onClose: (event: MouseEvent, identity: string) => void,
+  onClose: (identity: string) => void,
 ): ToolbarTabClose | undefined {
   if (compact) return undefined
   if (isPendingWorkspacePaneTabItem(item) || item.closable === false) return { kind: 'placeholder' }
@@ -235,168 +237,219 @@ function workspacePaneTabCloseProps(
     label: item.closeLabel,
     visible: isActive,
     disabled: interactionDisabled,
-    onClose: (event) => onClose(event, item.identity),
+    onClose: (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      onClose(item.identity)
+    },
   }
 }
 
-function WorkspacePaneTabChrome({
-  item,
-  isActive,
-  isSelected,
-  isFocusable,
-  index,
-  total,
-  isDragging = false,
-  tabId,
-  buttonRef,
-  containerProps,
-  buttonProps,
-  onSelect,
-  onClose,
-  onKeyDown,
-  t,
-  interactionDisabled,
-  compact = false,
-  showSeparator = false,
-  onHoverChange,
-}: WorkspacePaneTabChromeProps) {
-  const attentionLabel = isRuntimeWorkspacePaneTabItem(item) && item.attention ? runtimeAttentionLabel(item, t) : null
-  const accessibleLabel = item.label || item.tooltip
+const WorkspacePaneTabChrome: FunctionalComponent<WorkspacePaneTabChromeProps> = (props) => {
+  const attentionLabel =
+    isRuntimeWorkspacePaneTabItem(props.item) && props.item.attention
+      ? runtimeAttentionLabel(props.item, props.t)
+      : null
+  const accessibleLabel = props.item.label || props.item.tooltip
   const ariaLabel = attentionLabel ? `${accessibleLabel} — ${attentionLabel}` : accessibleLabel
-  const closeProps = workspacePaneTabCloseProps(item, compact, isActive, interactionDisabled, onClose)
+  const close = workspacePaneTabCloseProps(
+    props.item,
+    props.compact ?? false,
+    props.isActive,
+    props.interactionDisabled,
+    props.onClose,
+  )
   const collectionAria =
-    index !== undefined && total !== undefined ? { 'aria-posinset': index + 1, 'aria-setsize': total } : {}
+    props.index !== undefined && props.total !== undefined
+      ? { 'aria-posinset': props.index + 1, 'aria-setsize': props.total }
+      : {}
+
   return (
     <ToolbarClosableTab
       containerProps={{
-        ...containerProps,
-        'data-workspace-pane-tab-tooltip-id': item.identity,
+        ...props.containerProps,
+        'data-workspace-pane-tab-tooltip-id': props.item.identity,
         'data-workspace-pane-tab-scroll-target': '',
-        'data-workspace-pane-pending-tab': isPendingWorkspacePaneTabItem(item) ? item.type : undefined,
-        onPointerEnter: (event) => {
-          containerProps?.onPointerEnter?.(event)
-          onHoverChange?.(item.identity)
+        'data-workspace-pane-pending-tab': isPendingWorkspacePaneTabItem(props.item) ? props.item.type : undefined,
+        onPointerenter: (event) => {
+          props.containerProps?.onPointerenter?.(event)
+          props.onHoverChange?.(props.item.identity)
         },
-        onPointerLeave: (event) => {
-          containerProps?.onPointerLeave?.(event)
-          onHoverChange?.(null)
+        onPointerleave: (event) => {
+          props.containerProps?.onPointerleave?.(event)
+          props.onHoverChange?.(null)
         },
       }}
-      containerClassName={toolbarTabChromeClassName({
+      containerClass={toolbarTabChromeClassName({
         variant: 'workspace-pane',
-        active: isActive,
-        dragging: isDragging,
-        compact,
+        active: props.isActive,
+        dragging: props.isDragging ?? false,
+        compact: props.compact ?? false,
       })}
       overlay={
-        showSeparator ? (
-          <Separator orientation="vertical" className="absolute right-0 top-1/2 -translate-y-1/2" />
+        props.showSeparator ? (
+          <Separator orientation="vertical" class="absolute right-0 top-1/2 -translate-y-1/2" />
         ) : null
       }
-      buttonRef={buttonRef}
+      buttonRef={props.buttonRef}
       buttonProps={{
-        ...buttonProps,
+        ...props.buttonProps,
         role: 'tab',
-        id: tabId,
-        'aria-selected': isSelected,
+        id: props.tabId,
+        'aria-selected': props.isSelected,
         'aria-label': ariaLabel,
-        'aria-controls': item.panelId,
+        'aria-controls': props.item.panelId,
+        'aria-keyshortcuts': close?.kind === 'action' ? 'Delete' : undefined,
         ...collectionAria,
-        tabIndex: isFocusable ? 0 : -1,
-        disabled: interactionDisabled,
-        'aria-disabled': interactionDisabled ? true : undefined,
-        onClick: () => onSelect(item.identity),
-        onKeyDown: (event) => onKeyDown(event, item.identity),
+        tabIndex: props.isFocusable ? 0 : -1,
+        disabled: props.interactionDisabled,
+        'aria-disabled': props.interactionDisabled ? true : undefined,
+        onClick: () => props.onSelect(props.item.identity),
+        onKeydown: (event) => props.onKeyDown(event, props.item.identity),
       }}
-      close={closeProps}
+      close={close}
     >
-      <WorkspacePaneTabIcon item={item} active={isActive} compact={compact} />
-      <WorkspacePaneTabTitle item={item} />
-      {isRuntimeWorkspacePaneTabItem(item) && item.attention && (
+      <WorkspacePaneTabIcon item={props.item} active={props.isActive} compact={props.compact} />
+      <WorkspacePaneTabTitle item={props.item} />
+      {isRuntimeWorkspacePaneTabItem(props.item) && props.item.attention ? (
         <>
-          <span className="relative flex h-2 w-2 shrink-0">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-notification opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-notification" />
+          <span class="relative flex h-2 w-2 shrink-0">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-notification opacity-75" />
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-notification" />
           </span>
-          <span className="sr-only">{attentionLabel}</span>
+          <span class="sr-only">{attentionLabel}</span>
         </>
-      )}
+      ) : null}
     </ToolbarClosableTab>
   )
 }
 
-export function WorkspacePaneTab({ item, focusRegistry, ...props }: WorkspacePaneTabProps) {
-  return <WorkspacePaneTabChrome item={item} {...props} buttonRef={focusRegistry.setRef(item.identity)} />
+WorkspacePaneTabChrome.props = [
+  'item',
+  'isActive',
+  'isSelected',
+  'isFocusable',
+  'index',
+  'total',
+  'isDragging',
+  'tabId',
+  'buttonRef',
+  'containerProps',
+  'buttonProps',
+  'onSelect',
+  'onClose',
+  'onKeyDown',
+  't',
+  'interactionDisabled',
+  'compact',
+  'showSeparator',
+  'onHoverChange',
+]
+
+export const WorkspacePaneTab: FunctionalComponent<WorkspacePaneTabProps> = (props) => (
+  <WorkspacePaneTabChrome {...props} buttonRef={props.focusRegistry.setRef(props.item.identity)} />
+)
+
+WorkspacePaneTab.props = [
+  'item',
+  'isActive',
+  'isSelected',
+  'isFocusable',
+  'index',
+  'total',
+  'tabId',
+  'focusRegistry',
+  'onSelect',
+  'onClose',
+  'onKeyDown',
+  't',
+  'interactionDisabled',
+  'compact',
+  'showSeparator',
+  'onHoverChange',
+]
+
+interface SortableWorkspacePaneTabProps extends WorkspacePaneTabProps {
+  sortableIdentity: string
+  sortableIndex: number
 }
 
-export function SortableWorkspacePaneTab({
-  sortableIdentity,
-  item,
-  focusRegistry,
-  onKeyDown,
-  ...props
-}: WorkspacePaneTabProps & { sortableIdentity: string }) {
-  const sortable = useSortableTab(sortableIdentity, {
-    disabled: props.interactionDisabled,
-    onButtonRef: focusRegistry.setRef(item.identity),
-  })
+export const SortableWorkspacePaneTab = defineComponent(
+  (props: SortableWorkspacePaneTabProps) => {
+    const sortable = useSortableTab(
+      () => props.sortableIdentity,
+      () => props.sortableIndex,
+      {
+        disabled: () => props.interactionDisabled,
+        onButtonRef: (node) => props.focusRegistry.setRef(props.item.identity)(node),
+      },
+    )
 
-  return (
-    <div ref={sortable.setContainerRef} style={sortable.style} className="touch-none select-none">
-      <WorkspacePaneTabChrome
-        item={item}
-        {...props}
-        isDragging={sortable.isDragging}
-        buttonRef={sortable.setButtonRef}
-        containerProps={sortable.sortableListeners}
-        buttonProps={sortable.attributes}
-        onKeyDown={(event) => {
-          sortable.sortableOnKeyDown?.(event)
-          if (event.defaultPrevented || sortable.isDragging) return
-          onKeyDown(event, item.identity)
-        }}
-      />
-    </div>
-  )
-}
+    return () => (
+      <div ref={sortable.containerRef} class="touch-none select-none">
+        <WorkspacePaneTabChrome
+          item={props.item}
+          isActive={props.isActive}
+          isSelected={props.isSelected}
+          isFocusable={props.isFocusable}
+          index={props.index}
+          total={props.total}
+          tabId={props.tabId}
+          onSelect={props.onSelect}
+          onClose={props.onClose}
+          onKeyDown={(event, identity) => {
+            if (sortable.isDragging.value) return
+            props.onKeyDown(event, identity)
+          }}
+          t={props.t}
+          interactionDisabled={props.interactionDisabled}
+          compact={props.compact}
+          showSeparator={props.showSeparator}
+          onHoverChange={props.onHoverChange}
+          isDragging={sortable.isDragging.value}
+          buttonRef={sortable.setButtonRef}
+        />
+      </div>
+    )
+  },
+  {
+    name: 'SortableWorkspacePaneTab',
+    props: [
+      'sortableIdentity',
+      'sortableIndex',
+      'item',
+      'isActive',
+      'isSelected',
+      'isFocusable',
+      'index',
+      'total',
+      'tabId',
+      'focusRegistry',
+      'onSelect',
+      'onClose',
+      'onKeyDown',
+      't',
+      'interactionDisabled',
+      'compact',
+      'showSeparator',
+      'onHoverChange',
+    ],
+  },
+)
 
-interface WorkspacePaneTabTooltipLayerProps extends ComponentPropsWithoutRef<'div'> {
-  items: WorkspacePaneTabItem[]
-}
-
-export function WorkspacePaneTabTooltipLayer({ items, children, ...props }: WorkspacePaneTabTooltipLayerProps) {
-  return (
-    <DelegatedTooltipLayer
-      items={items}
-      selector="[data-workspace-pane-tab-tooltip-id]"
-      attributeName="data-workspace-pane-tab-tooltip-id"
-      getItemId={(item) => item.identity}
-      renderTooltip={(item) => <div className="truncate text-xs font-semibold text-foreground">{item.tooltip}</div>}
-      placement="bottom-start"
-      delayMs={500}
-      tooltipClassName="px-3 py-2"
-      asChild
-    >
-      <ToolbarTabList aria-orientation={props.role === 'tablist' ? 'horizontal' : undefined} {...props}>
-        {children}
-      </ToolbarTabList>
-    </DelegatedTooltipLayer>
-  )
-}
-
-function WorkspacePaneTabIcon({
-  item,
-  active,
-  compact = false,
-}: {
+interface WorkspacePaneTabIconProps {
   item: WorkspacePaneTabItem
   active: boolean
   compact?: boolean
-}) {
-  const className = toolbarTabIconClassName(active, compact)
-  const Icon = item.icon
-  return <Icon size={13} className={className} />
 }
+
+const WorkspacePaneTabIcon: FunctionalComponent<WorkspacePaneTabIconProps> = (props) => {
+  const iconClass = toolbarTabIconClassName(props.active, props.compact ?? false)
+  const Icon = props.item.icon
+  return <Icon size={13} class={iconClass} />
+}
+
+WorkspacePaneTabIcon.props = ['item', 'active', 'compact']
 
 function runtimeAttentionLabel(item: WorkspacePaneRuntimeTabItem, t: WorkspacePaneT): string {
   const attentionLabelKey = item.attentionLabelKey

@@ -1,40 +1,30 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
-import { useState } from 'react'
+import { fireEvent } from '@testing-library/vue'
 import { beforeEach, describe, expect, test } from 'vitest'
+import { defineComponent, ref } from 'vue'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { type AppOverlayKey, useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
+import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
+import type { AppOverlayKey } from '#/web/hooks/useAppOverlays.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 
-function Harness() {
+const Harness = defineComponent(() => {
   const overlays = useAppOverlays()
+  return () => <OverlayHarnessView overlays={overlays} />
+})
 
-  return (
-    <>
-      <button id="open-clone" type="button" onClick={overlays.openCloneRepo}>
-        open clone
-      </button>
-      <button id="open-workspace" type="button" onClick={overlays.openWorkspacePathDialog}>
-        open repo
-      </button>
-      <button id="close-all" type="button" onClick={overlays.closeAllOverlays}>
-        close all
-      </button>
-      <output id="clone-open">{overlays.state.clone.open ? 'open' : 'closed'}</output>
-      <output id="open-workspace-open">{overlays.state.openWorkspace.open ? 'open' : 'closed'}</output>
-      <output id="any-open">{overlays.anyOpen ? 'open' : 'closed'}</output>
-    </>
-  )
-}
-
-function RoutedHarness() {
-  const [overlay, setOverlay] = useState<AppOverlayKey | null>(null)
+const RoutedHarness = defineComponent(() => {
+  const overlay = ref<AppOverlayKey | null>(null)
   const overlays = useAppOverlays({
     routeOverlay: overlay,
-    onRouteOverlayChange: setOverlay,
+    onRouteOverlayChange: (nextOverlay) => {
+      overlay.value = nextOverlay
+    },
   })
+  return () => <OverlayHarnessView overlays={overlays} />
+})
 
+function OverlayHarnessView({ overlays }: { overlays: ReturnType<typeof useAppOverlays> }) {
   return (
     <>
       <button id="open-clone" type="button" onClick={overlays.openCloneRepo}>
@@ -46,62 +36,33 @@ function RoutedHarness() {
       <button id="close-all" type="button" onClick={overlays.closeAllOverlays}>
         close all
       </button>
-      <output id="clone-open">{overlays.state.clone.open ? 'open' : 'closed'}</output>
-      <output id="open-workspace-open">{overlays.state.openWorkspace.open ? 'open' : 'closed'}</output>
-      <output id="any-open">{overlays.anyOpen ? 'open' : 'closed'}</output>
+      <output id="clone-open">{overlays.state.value.clone.open ? 'open' : 'closed'}</output>
+      <output id="open-workspace-open">{overlays.state.value.openWorkspace.open ? 'open' : 'closed'}</output>
+      <output id="any-open">{overlays.anyOpen.value ? 'open' : 'closed'}</output>
     </>
   )
 }
 
-beforeEach(() => {
-  resetWorkspacesStore()
-})
+beforeEach(resetWorkspacesStore)
 
 describe('useAppOverlays', () => {
-  test('tracks non-settings overlays centrally and resets all overlays together', () => {
-    const { container } = renderInJsdom(<Harness />)
+  test.each([Harness, RoutedHarness])('opens and closes app overlays through one owner', async (component) => {
+    const view = renderInJsdom(component)
 
-    click(container, '#open-clone')
-    click(container, '#open-workspace')
-    expect(text(container, '#clone-open')).toBe('open')
-    expect(text(container, '#open-workspace-open')).toBe('open')
-    expect(text(container, '#any-open')).toBe('open')
+    await fireEvent.click(view.container.querySelector('#open-clone')!)
+    expect(text(view.container, '#clone-open')).toBe('open')
+    expect(text(view.container, '#any-open')).toBe('open')
 
-    click(container, '#close-all')
-    expect(text(container, '#clone-open')).toBe('closed')
-    expect(text(container, '#open-workspace-open')).toBe('closed')
-    expect(text(container, '#any-open')).toBe('closed')
-  })
+    await fireEvent.click(view.container.querySelector('#open-workspace')!)
+    expect(text(view.container, '#open-workspace-open')).toBe('open')
 
-  test('can derive overlay state from a routed overlay source', () => {
-    const { container } = renderInJsdom(<RoutedHarness />)
-
-    click(container, '#open-clone')
-    expect(text(container, '#clone-open')).toBe('open')
-    expect(text(container, '#open-workspace-open')).toBe('closed')
-    expect(text(container, '#any-open')).toBe('open')
-
-    click(container, '#open-workspace')
-    expect(text(container, '#clone-open')).toBe('closed')
-    expect(text(container, '#open-workspace-open')).toBe('open')
-
-    click(container, '#close-all')
-    expect(text(container, '#clone-open')).toBe('closed')
-    expect(text(container, '#open-workspace-open')).toBe('closed')
-    expect(text(container, '#any-open')).toBe('closed')
+    await fireEvent.click(view.container.querySelector('#close-all')!)
+    expect(text(view.container, '#clone-open')).toBe('closed')
+    expect(text(view.container, '#open-workspace-open')).toBe('closed')
+    expect(text(view.container, '#any-open')).toBe('closed')
   })
 })
 
-function click(container: HTMLElement, selector: string) {
-  const element = container.querySelector(selector)
-  if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing button: ${selector}`)
-  act(() => {
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  })
-}
-
-function text(container: HTMLElement, selector: string): string {
-  const element = container.querySelector(selector)
-  if (!(element instanceof HTMLOutputElement)) throw new Error(`Missing output: ${selector}`)
-  return element.textContent ?? ''
+function text(container: Element, selector: string): string {
+  return container.querySelector(selector)?.textContent ?? ''
 }

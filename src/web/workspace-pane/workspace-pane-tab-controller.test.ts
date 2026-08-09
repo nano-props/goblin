@@ -32,7 +32,7 @@ import type {
   WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -57,7 +57,7 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('commits an exact target route without feature observation', async () => {
-    const setWorkspacePaneTab = vi.spyOn(useWorkspacesStore.getState(), 'setWorkspacePaneTab')
+    const setWorkspacePaneTab = vi.spyOn(workspacesStore.getState(), 'setWorkspacePaneTab')
     await expect(
       commitWorkspacePaneExactTargetRoute(workspacePaneTarget(), SOURCE_ROUTE, TARGET_ROUTE, committingNavigation()),
     ).resolves.toBe(true)
@@ -105,7 +105,7 @@ describe('workspace pane tab controller transactions', () => {
 
   test('presents a workspace-scoped tab through the workspace route', async () => {
     const commitFilesystemWorkspacePaneRoute = vi.fn(async (target, route, options) => {
-      useWorkspacesStore
+      workspacesStore
         .getState()
         .setWorkspacePaneTabForTarget(
           target.routeTarget,
@@ -144,9 +144,9 @@ describe('workspace pane tab controller transactions', () => {
       kind: 'workspace-root',
       workspaceId: WORKSPACE_ID,
     })
-    expect(
-      useWorkspacesStore.getState().workspaces[WORKSPACE_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey],
-    ).toBe('files')
+    expect(workspacesStore.getState().workspaces[WORKSPACE_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
+      'files',
+    )
   })
 
   test('does not settle terminal focus twice when direct navigation abandons', async () => {
@@ -284,9 +284,9 @@ describe('workspace pane tab controller transactions', () => {
       workspaceId: WORKSPACE_ID,
       worktreePath: '/worktree-a',
     })
-    expect(
-      useWorkspacesStore.getState().workspaces[WORKSPACE_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey],
-    ).toBe('terminal')
+    expect(workspacesStore.getState().workspaces[WORKSPACE_ID]?.ui.preferredWorkspacePaneTabByTarget[targetKey]).toBe(
+      'terminal',
+    )
   })
 
   test('rejects exact target completion after its runtime is replaced', async () => {
@@ -303,7 +303,7 @@ describe('workspace pane tab controller transactions', () => {
       TARGET_ROUTE,
       navigation,
     )
-    useWorkspacesStore.setState((state) => ({
+    workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
         [WORKSPACE_ID]: { ...state.workspaces[WORKSPACE_ID]!, workspaceRuntimeId: 'repo-runtime-2' },
@@ -391,7 +391,7 @@ describe('workspace pane tab controller transactions', () => {
       TARGET_ROUTE,
       navigation,
     )
-    const repo = useWorkspacesStore.getState().workspaces[WORKSPACE_ID]!
+    const repo = workspacesStore.getState().workspaces[WORKSPACE_ID]!
     seedRepoQueryDataForTest(repo, {
       branches: [
         createRepoBranch('feature/a', { worktree: { path: '/worktree-b', isPrimary: false, isLocked: false } }),
@@ -404,13 +404,13 @@ describe('workspace pane tab controller transactions', () => {
     await expect(completion).resolves.toBe(false)
   })
 
-  test('invalidates a worktree target when Git capability is removed from the same runtime', () => {
-    const repo = useWorkspacesStore.getState().workspaces[WORKSPACE_ID]!
+  test('invalidates a worktree target when Git capability is removed from the same runtime', async () => {
+    const repo = workspacesStore.getState().workspaces[WORKSPACE_ID]!
     if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
     const gitProbe = repo.capability.probe
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: {
-        ...useWorkspacesStore.getState().workspaces,
+        ...workspacesStore.getState().workspaces,
         [WORKSPACE_ID]: {
           ...repo,
           capability: {

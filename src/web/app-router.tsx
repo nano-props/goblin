@@ -1,142 +1,175 @@
-import {
-  RouterProvider,
-  createBrowserHistory,
-  createRootRoute,
-  createRoute,
-  createRouter,
-  Navigate,
-  redirect,
-  useMatch,
-} from '@tanstack/react-router'
+import { computed, defineComponent, watch } from 'vue'
+import { createRouter, createWebHistory, RouterView, useRoute, useRouter } from 'vue-router'
+import type { RouteLocationNormalized, RouteRecordRaw } from 'vue-router'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { App, type ParsedWorkspacePaneRoute, type WorkspaceRouteView } from '#/web/App.tsx'
-import { Layout } from '#/web/Layout.tsx'
-import { WorkspaceSessionRestoreGate } from '#/web/components/WorkspaceSessionRestore.tsx'
 import { isSettingsPage } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
+import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { App } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute, WorkspaceRouteView } from '#/web/App.tsx'
+import { Layout } from '#/web/Layout.tsx'
+import { useAppRouteNavigation } from '#/web/app-route-navigation.ts'
+import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import {
   branchNameFromSlug,
   workspaceIdFromSlug,
   workspaceSlugFromId,
   worktreePathFromSlug,
 } from '#/web/workspace-route-slugs.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { RuntimeCoherentWorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { useAppRouteActions, type AppRouteNavigation } from '#/web/app-route-navigation.ts'
-import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
-import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 
-const rootRoute = createRootRoute()
-
-const layoutRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  id: 'layout',
-  component: Layout,
-})
-
-const indexRoute = createRoute({
-  getParentRoute: () => layoutRoute,
-  path: '/',
-  component: IndexRoute,
-})
-
-const workspaceRoute = createRoute({
-  getParentRoute: () => layoutRoute,
-  path: '/workspace/$workspaceSlug',
-  component: WorkspaceRoute,
-})
-
-const workspaceDashboardRoute = createRoute({
-  getParentRoute: () => workspaceRoute,
-  path: 'dashboard',
-})
-
-const workspaceRootRoute = createRoute({
-  getParentRoute: () => workspaceRoute,
-  path: 'root',
-})
-
-const workspaceRootTabRoute = createRoute({
-  getParentRoute: () => workspaceRootRoute,
-  path: 'tab/$tabKey',
-})
-
-const workspaceRootTerminalRoute = createRoute({
-  getParentRoute: () => workspaceRootRoute,
-  path: 'terminal/$terminalSessionId',
-})
-
-const gitBranchRoute = createRoute({
-  getParentRoute: () => workspaceRoute,
-  path: 'branch/$branchSlug',
-})
-
-const gitBranchIndexRoute = createRoute({
-  getParentRoute: () => gitBranchRoute,
-  path: '/',
-})
-
-const gitBranchTabRoute = createRoute({
-  getParentRoute: () => gitBranchRoute,
-  path: 'tab/$tabKey',
-})
-
-const gitBranchTerminalRoute = createRoute({
-  getParentRoute: () => gitBranchRoute,
-  path: 'terminal/$terminalSessionId',
-})
-
-const gitWorktreeNewRoute = createRoute({
-  getParentRoute: () => workspaceRoute,
-  path: 'worktree/new',
-})
-
-const gitWorktreeRoute = createRoute({
-  getParentRoute: () => workspaceRoute,
-  path: 'worktree/$worktreeSlug',
-})
-
-const gitWorktreeTerminalRoute = createRoute({
-  getParentRoute: () => gitWorktreeRoute,
-  path: 'terminal/$terminalSessionId',
-})
-
-const gitWorktreeTabRoute = createRoute({
-  getParentRoute: () => gitWorktreeRoute,
-  path: 'tab/$tabKey',
-})
-
-const settingsIndexRoute = createRoute({
-  getParentRoute: () => layoutRoute,
-  path: '/settings',
-  beforeLoad: () => {
-    throw redirect({ to: '/settings/general' })
+const AppRouteView = defineComponent(
+  () => {
+    const route = useRoute()
+    useAppRouteAdmission(route)
+    const callbacks = appRouterCallbacks(useAppRouteNavigation())
+    return () => (
+      <App
+        routeSettingsPage={route.name === 'settings' ? settingsPageFromRoute(route) : null}
+        routeWorkspaceView={workspaceRouteViewFromRoute(route)}
+        {...callbacks}
+      />
+    )
   },
-})
+  { name: 'AppRouteView' },
+)
 
-const settingsRoute = createRoute({
-  getParentRoute: () => layoutRoute,
-  path: '/settings/$page',
-  component: SettingsRoute,
-  beforeLoad: ({ params }) => {
-    if (!isSettingsPage(params.page)) {
-      throw redirect({ to: '/settings/general' })
-    }
+const appRouteChildren: RouteRecordRaw[] = [
+  { path: '', name: 'home', component: AppRouteView },
+  { path: 'settings', redirect: '/settings/general' },
+  {
+    path: 'settings/:page',
+    name: 'settings',
+    component: AppRouteView,
+    beforeEnter: (to: RouteLocationNormalized) =>
+      isSettingsPage(routeStringParam(to.params.page)) ? true : '/settings/general',
   },
-})
+  { path: 'workspace/:workspaceSlug', name: 'workspace', component: AppRouteView },
+  { path: 'workspace/:workspaceSlug/dashboard', name: 'workspace-dashboard', component: AppRouteView },
+  { path: 'workspace/:workspaceSlug/root', name: 'workspace-root', component: AppRouteView },
+  { path: 'workspace/:workspaceSlug/root/tab/:tabKey', name: 'workspace-root-tab', component: AppRouteView },
+  {
+    path: 'workspace/:workspaceSlug/root/terminal/:terminalSessionId',
+    name: 'workspace-root-terminal',
+    component: AppRouteView,
+  },
+  { path: 'workspace/:workspaceSlug/branch/:branchSlug', name: 'workspace-branch', component: AppRouteView },
+  {
+    path: 'workspace/:workspaceSlug/branch/:branchSlug/tab/:tabKey',
+    name: 'workspace-branch-tab',
+    component: AppRouteView,
+  },
+  {
+    path: 'workspace/:workspaceSlug/branch/:branchSlug/terminal/:terminalSessionId',
+    name: 'workspace-branch-terminal',
+    component: AppRouteView,
+  },
+  { path: 'workspace/:workspaceSlug/worktree/new', name: 'workspace-new-worktree', component: AppRouteView },
+  {
+    path: 'workspace/:workspaceSlug/worktree/:worktreeSlug',
+    name: 'workspace-worktree',
+    component: AppRouteView,
+  },
+  {
+    path: 'workspace/:workspaceSlug/worktree/:worktreeSlug/tab/:tabKey',
+    name: 'workspace-worktree-tab',
+    component: AppRouteView,
+  },
+  {
+    path: 'workspace/:workspaceSlug/worktree/:worktreeSlug/terminal/:terminalSessionId',
+    name: 'workspace-worktree-terminal',
+    component: AppRouteView,
+  },
+]
 
-function IndexRoute() {
-  const firstWorkspaceSlug = useWorkspacesStore(initialWorkspaceRouteSlugFromStore)
-  const navigation = useWorkspaceRouteNavigation()
-  if (firstWorkspaceSlug) {
-    return <Navigate to="/workspace/$workspaceSlug/dashboard" params={{ workspaceSlug: firstWorkspaceSlug }} replace />
-  }
-  return (
-    <WorkspaceSessionRestoreGate>
-      <App routeSettingsPage={null} {...navigation} />
-    </WorkspaceSessionRestoreGate>
+const routes: RouteRecordRaw[] = [{ path: '/', component: Layout, children: appRouteChildren }]
+
+function useAppRouteAdmission(route: RouteLocationNormalized): void {
+  const router = useRouter()
+  const workspaceState = useStoreSelector(
+    workspacesStore,
+    (state) => ({
+      restoredWorkspaceId: state.restoredWorkspaceId,
+      workspaceOrder: state.workspaceOrder,
+      workspaces: state.workspaces,
+      workspaceMembershipReady: state.workspaceMembershipReady,
+    }),
+    (left, right) =>
+      left.restoredWorkspaceId === right.restoredWorkspaceId &&
+      left.workspaceOrder === right.workspaceOrder &&
+      left.workspaces === right.workspaces &&
+      left.workspaceMembershipReady === right.workspaceMembershipReady,
   )
+  const admittedPath = computed(() => {
+    if (route.name === 'home') {
+      const workspaceSlug = initialWorkspaceRouteSlugFromStore(workspaceState.value)
+      return workspaceSlug ? `/workspace/${workspaceSlug}/dashboard` : null
+    }
+
+    const workspaceSlug = routeStringParam(route.params.workspaceSlug)
+    if (!workspaceSlug || !routeRequiresGitCapability(route)) return null
+    const workspaceId = workspaceIdFromSlug(workspaceSlug)
+    const workspace = workspaceId ? workspaceState.value.workspaces[workspaceId] : null
+    return workspace?.capability.kind === 'filesystem' ? `/workspace/${workspaceSlug}/dashboard` : null
+  })
+
+  watch(
+    admittedPath,
+    (path) => {
+      if (path && path !== route.path) void router.replace(path)
+    },
+    { immediate: true },
+  )
+}
+
+function routeRequiresGitCapability(route: RouteLocationNormalized): boolean {
+  const name = typeof route.name === 'string' ? route.name : ''
+  return (
+    name === 'workspace-new-worktree' || name.startsWith('workspace-branch') || name.startsWith('workspace-worktree')
+  )
+}
+
+function routeStringParam(value: string | string[]): string | null {
+  return typeof value === 'string' ? value : null
+}
+
+function settingsPageFromRoute(route: RouteLocationNormalized): SettingsPage {
+  const page = routeStringParam(route.params.page)
+  return isSettingsPage(page) ? page : 'general'
+}
+
+export const appRouter = createRouter({
+  history: createWebHistory(),
+  routes,
+})
+
+export const AppRouterProvider = defineComponent(() => () => <RouterView />, { name: 'AppRouterProvider' })
+
+function workspaceRouteViewFromRoute(route: RouteLocationNormalized): WorkspaceRouteView | null {
+  const workspaceSlug = route.params.workspaceSlug
+  if (typeof workspaceSlug !== 'string') return null
+  const routeName = typeof route.name === 'string' ? route.name : ''
+
+  return workspaceRouteViewFromSlugChildRoute(workspaceSlug, {
+    dashboard: routeName === 'workspace-dashboard',
+    workspace: routeName.startsWith('workspace-root'),
+    workspaceTabKey: routeName === 'workspace-root-tab' ? routeStringParam(route.params.tabKey) : null,
+    workspaceTerminalSessionId:
+      routeName === 'workspace-root-terminal' ? routeStringParam(route.params.terminalSessionId) : null,
+    branchSlug: routeName.startsWith('workspace-branch') ? routeStringParam(route.params.branchSlug) : null,
+    tabKey: routeName === 'workspace-branch-tab' ? routeStringParam(route.params.tabKey) : null,
+    terminalSessionId:
+      routeName === 'workspace-branch-terminal' ? routeStringParam(route.params.terminalSessionId) : null,
+    worktreeSlug: routeName.startsWith('workspace-worktree') ? routeStringParam(route.params.worktreeSlug) : null,
+    worktreeTerminalSessionId:
+      routeName === 'workspace-worktree-terminal' ? routeStringParam(route.params.terminalSessionId) : null,
+    worktreeTabKey: routeName === 'workspace-worktree-tab' ? routeStringParam(route.params.tabKey) : null,
+    newWorktree: routeName === 'workspace-new-worktree',
+  })
 }
 
 export function initialWorkspaceRouteSlugFromStore(state: InitialWorkspaceRouteState): string | null {
@@ -154,83 +187,31 @@ interface InitialWorkspaceRouteState extends RuntimeCoherentWorkspaceState {
   workspaceMembershipReady: boolean
 }
 
-function WorkspaceRoute() {
-  const { workspaceSlug } = workspaceRoute.useParams()
-  const dashboardMatch = useMatch({ from: workspaceDashboardRoute.id, shouldThrow: false })
-  const workspaceMatch = useMatch({ from: workspaceRootRoute.id, shouldThrow: false })
-  const workspaceTabMatch = useMatch({ from: workspaceRootTabRoute.id, shouldThrow: false })
-  const workspaceTerminalMatch = useMatch({ from: workspaceRootTerminalRoute.id, shouldThrow: false })
-  const branchMatch = useMatch({ from: gitBranchRoute.id, shouldThrow: false })
-  const branchTabMatch = useMatch({ from: gitBranchTabRoute.id, shouldThrow: false })
-  const branchTerminalMatch = useMatch({ from: gitBranchTerminalRoute.id, shouldThrow: false })
-  const newWorktreeMatch = useMatch({ from: gitWorktreeNewRoute.id, shouldThrow: false })
-  const worktreeMatch = useMatch({ from: gitWorktreeRoute.id, shouldThrow: false })
-  const worktreeTerminalMatch = useMatch({ from: gitWorktreeTerminalRoute.id, shouldThrow: false })
-  const worktreeTabMatch = useMatch({ from: gitWorktreeTabRoute.id, shouldThrow: false })
-  const navigation = useWorkspaceRouteNavigation()
-  const workspaceId = workspaceIdFromSlug(workspaceSlug)
-  const gitUnavailable = useWorkspacesStore((state) => {
-    const workspace = workspaceId ? state.workspaces[workspaceId] : null
-    return workspace?.capability.kind === 'filesystem'
-  })
-  if (gitUnavailable && (branchMatch || worktreeMatch || newWorktreeMatch)) {
-    return <Navigate to="/workspace/$workspaceSlug/dashboard" params={{ workspaceSlug }} replace />
-  }
-  const routeWorkspaceView = workspaceRouteViewFromSlugChildRoute(workspaceSlug, {
-    dashboard: !!dashboardMatch,
-    workspace: !!workspaceMatch,
-    workspaceTabKey: workspaceTabMatch?.params.tabKey ?? null,
-    workspaceTerminalSessionId: workspaceTerminalMatch?.params.terminalSessionId ?? null,
-    branchSlug: branchMatch?.params.branchSlug ?? null,
-    tabKey: branchTabMatch?.params.tabKey ?? null,
-    terminalSessionId: branchTerminalMatch?.params.terminalSessionId ?? null,
-    worktreeSlug: worktreeMatch?.params.worktreeSlug ?? null,
-    worktreeTerminalSessionId: worktreeTerminalMatch?.params.terminalSessionId ?? null,
-    worktreeTabKey: worktreeTabMatch?.params.tabKey ?? null,
-    newWorktree: !!newWorktreeMatch,
-  })
-  return (
-    <WorkspaceSessionRestoreGate>
-      <App routeWorkspaceView={routeWorkspaceView} {...navigation} />
-    </WorkspaceSessionRestoreGate>
-  )
-}
-
 export function workspaceRouteViewFromSlugChildRoute(
   workspaceSlug: string,
-  childRoute: {
-    dashboard: boolean
-    workspace?: boolean
-    workspaceTabKey?: string | null
-    workspaceTerminalSessionId?: string | null
-    branchSlug: string | null
-    tabKey?: string | null
-    terminalSessionId?: string | null
-    worktreeSlug?: string | null
-    worktreeTerminalSessionId?: string | null
-    worktreeTabKey?: string | null
-    newWorktree: boolean
-  },
+  childRoute: WorkspaceChildRoute,
 ): WorkspaceRouteView | null {
   const workspaceId = workspaceIdFromSlug(workspaceSlug)
   return workspaceId ? workspaceRouteViewFromChildRoute(workspaceId, childRoute) : null
 }
 
+interface WorkspaceChildRoute {
+  dashboard: boolean
+  workspace?: boolean
+  workspaceTabKey?: string | null
+  workspaceTerminalSessionId?: string | null
+  branchSlug: string | null
+  tabKey?: string | null
+  terminalSessionId?: string | null
+  worktreeSlug?: string | null
+  worktreeTerminalSessionId?: string | null
+  worktreeTabKey?: string | null
+  newWorktree: boolean
+}
+
 export function workspaceRouteViewFromChildRoute(
   workspaceId: WorkspaceId,
-  childRoute: {
-    dashboard: boolean
-    workspace?: boolean
-    workspaceTabKey?: string | null
-    workspaceTerminalSessionId?: string | null
-    branchSlug: string | null
-    tabKey?: string | null
-    terminalSessionId?: string | null
-    worktreeSlug?: string | null
-    worktreeTerminalSessionId?: string | null
-    worktreeTabKey?: string | null
-    newWorktree: boolean
-  },
+  childRoute: WorkspaceChildRoute,
 ): WorkspaceRouteView {
   if (childRoute.worktreeSlug) {
     const worktreePath = worktreePathFromSlug(childRoute.worktreeSlug)
@@ -277,15 +258,10 @@ function workspacePaneRouteFromParams(
   return { kind: 'invalid-static', tabKey }
 }
 
-function useWorkspaceRouteNavigation() {
-  const routeActions = useAppRouteActions()
-  return appRouterCallbacks(routeActions)
-}
-
 export function appRouterCallbacks(routeActions: AppRouteNavigation) {
   return {
     onRouteSettingsPageChange: (page: SettingsPage | null) => {
-      if (page) routeActions.openSettings(page)
+      applyAppSettingsRouteChange(routeActions, page)
     },
     onOpenWorkspaceNavigator: (workspaceId: WorkspaceId) => routeActions.openWorkspaceNavigator(workspaceId),
     onOpenWorkspaceRootPane: (workspaceId: WorkspaceId) => routeActions.openWorkspaceRootPane(workspaceId),
@@ -294,8 +270,6 @@ export function appRouterCallbacks(routeActions: AppRouteNavigation) {
       openWorkspacePaneRoute(routeActions, workspaceId, branchName),
     onOpenRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.openRepoNewWorktree(workspaceId),
     onCancelRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.cancelRepoNewWorktree(workspaceId),
-    // The successful create command already owns this target. Its Query
-    // projection converges asynchronously and must not re-admit the route.
     onReplaceRepoBranch: (
       workspaceId: WorkspaceId,
       branchName: string,
@@ -315,39 +289,4 @@ export function applyAppSettingsRouteChange(
 interface AppSettingsRouteActions {
   openSettings: AppRouteNavigation['openSettings']
   closeSettings: AppRouteNavigation['closeSettings']
-}
-
-function SettingsRoute() {
-  const { page } = settingsRoute.useParams()
-  const routeActions = useAppRouteActions()
-  return (
-    <App
-      routeSettingsPage={page as SettingsPage}
-      onRouteSettingsPageChange={(nextPage) => applyAppSettingsRouteChange(routeActions, nextPage)}
-    />
-  )
-}
-
-const appRouteTree = rootRoute.addChildren([
-  layoutRoute.addChildren([
-    indexRoute,
-    workspaceRoute.addChildren([
-      workspaceDashboardRoute,
-      workspaceRootRoute.addChildren([workspaceRootTabRoute, workspaceRootTerminalRoute]),
-      gitBranchRoute.addChildren([gitBranchIndexRoute, gitBranchTabRoute, gitBranchTerminalRoute]),
-      gitWorktreeRoute.addChildren([gitWorktreeTerminalRoute, gitWorktreeTabRoute]),
-      gitWorktreeNewRoute,
-    ]),
-    settingsIndexRoute,
-    settingsRoute,
-  ]),
-])
-
-const appRouter = createRouter({
-  routeTree: appRouteTree,
-  history: createBrowserHistory(),
-})
-
-export function AppRouterProvider() {
-  return <RouterProvider router={appRouter} />
 }

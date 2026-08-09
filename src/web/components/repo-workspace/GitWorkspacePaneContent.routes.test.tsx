@@ -8,21 +8,23 @@ import {
   flushAsyncWork,
   getTestGitWorkspacePanePresentation,
   gitWorkspacePaneProjection,
+  navigationWith,
   preferenceBackedWorkspacePaneTabModel,
   repoClientMocks,
   responsiveMocks,
   staticEntry,
 } from '#/web/test-utils/git-workspace-pane-content.tsx'
 import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
-import { screen } from '@testing-library/react'
+import { screen } from '@testing-library/vue'
 import { describe, expect, test, vi } from 'vitest'
-import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
+import { BranchActionSurfaceProvider } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
-import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { TerminalSessionReadScope } from '#/web/components/terminal/terminal-session-context.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 describe('GitWorkspacePaneContent routes', () => {
-  test('offers a compact return to the branch list when the last routed branch no longer exists', () => {
+  test('offers a compact return to the branch list when the last routed branch no longer exists', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [],
@@ -38,14 +40,14 @@ describe('GitWorkspacePaneContent routes', () => {
 
     const renderMissingBranch = () =>
       renderInJsdom(
-        <TerminalSessionReadContext value={emptyTerminalReadContext}>
+        <TerminalSessionReadScope value={emptyTerminalReadContext}>
           <GitWorkspacePaneContentHarness
             repo={presentationRepo}
             detail={detail}
             workspacePaneId="workspace"
             onBackToBranchNavigator={onBackToBranchNavigator}
           />
-        </TerminalSessionReadContext>,
+        </TerminalSessionReadScope>,
       )
 
     const desktop = renderMissingBranch()
@@ -61,7 +63,7 @@ describe('GitWorkspacePaneContent routes', () => {
     expect(onBackToBranchNavigator).toHaveBeenCalledOnce()
   })
 
-  test('renders an empty pane on an explicit bare branch route without a saved preference', () => {
+  test('renders an empty pane on an explicit bare branch route without a saved preference', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
@@ -76,23 +78,23 @@ describe('GitWorkspacePaneContent routes', () => {
     const detail = getTestGitWorkspacePanePresentation(presentationRepo)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
+        <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
           <GitWorkspacePaneContentHarness
             repo={presentationRepo}
             detail={detail}
             workspacePaneId="workspace"
             workspacePaneRouteMode="bare-branch"
           />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+        </BranchActionSurfaceProvider>
+      </TerminalSessionReadScope>,
     )
 
     expect(container.querySelector('#workspace-status-panel')).toBeNull()
     expect(container.textContent).toContain('workspace-pane-tabs.empty')
   })
 
-  test('shows the workspace empty state when the status tab is closed', () => {
+  test('shows the workspace empty state when the status tab is closed', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
@@ -112,20 +114,20 @@ describe('GitWorkspacePaneContent routes', () => {
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
         <GitWorkspacePaneContentHarness
           repo={gitWorkspacePaneProjection(repo)}
           detail={detail}
           workspacePaneId="workspace"
         />
-      </TerminalSessionReadContext>,
+      </TerminalSessionReadScope>,
     )
 
     expect(container.querySelector('#workspace-status-panel')).toBeNull()
     expect(container.textContent).toContain('workspace-pane-tabs.empty')
   })
 
-  test('falls back to status when a worktree-scoped preference is unrenderable on a branch without a worktree', () => {
+  test('falls back to status when a worktree-scoped preference is unrenderable on a branch without a worktree', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/no-worktree')],
@@ -136,16 +138,18 @@ describe('GitWorkspacePaneContent routes', () => {
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <GitWorkspacePaneContent
-            repo={gitWorkspacePaneProjection(repo)}
-            detail={detail}
-            workspacePaneId="workspace"
-            workspacePaneTabModel={preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/no-worktree')}
-          />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+      <AppNavigationProvider value={navigationWith({})}>
+        <TerminalSessionReadScope value={emptyTerminalReadContext}>
+          <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
+            <GitWorkspacePaneContent
+              repo={gitWorkspacePaneProjection(repo)}
+              detail={detail}
+              workspacePaneId="workspace"
+              workspacePaneTabModel={preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/no-worktree')}
+            />
+          </BranchActionSurfaceProvider>
+        </TerminalSessionReadScope>
+      </AppNavigationProvider>,
     )
 
     // The user's preferred tab (terminal) is unrenderable without a
@@ -156,7 +160,7 @@ describe('GitWorkspacePaneContent routes', () => {
     expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
   })
 
-  test('does not apply a stale preference to an explicit bare branch route', () => {
+  test('does not apply a stale preference to an explicit bare branch route', async () => {
     const worktreePath = '/tmp/hook-terminal-empty-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -169,20 +173,20 @@ describe('GitWorkspacePaneContent routes', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/hook-terminal-empty': [staticEntry('status')] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
+        <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
           <GitWorkspacePaneContentHarness
             repo={gitWorkspacePaneProjection(repo)}
             detail={detail}
             workspacePaneId="workspace"
             workspacePaneRouteMode="bare-branch"
           />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+        </BranchActionSurfaceProvider>
+      </TerminalSessionReadScope>,
     )
 
     expect(container.querySelector('#workspace-status-panel')).toBeNull()
@@ -190,7 +194,7 @@ describe('GitWorkspacePaneContent routes', () => {
     expect(container.textContent).toContain('workspace-pane-tabs.empty')
   })
 
-  test('falls back to status when terminal is preferred but sync confirms no terminal tabs', () => {
+  test('falls back to status when terminal is preferred but sync confirms no terminal tabs', async () => {
     const worktreePath = '/tmp/terminal-empty-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -203,20 +207,22 @@ describe('GitWorkspacePaneContent routes', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
+    terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <GitWorkspacePaneContent
-            repo={gitWorkspacePaneProjection(repo)}
-            detail={detail}
-            workspacePaneId="workspace"
-            workspacePaneTabModel={preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/terminal-empty')}
-          />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+      <AppNavigationProvider value={navigationWith({})}>
+        <TerminalSessionReadScope value={emptyTerminalReadContext}>
+          <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
+            <GitWorkspacePaneContent
+              repo={gitWorkspacePaneProjection(repo)}
+              detail={detail}
+              workspacePaneId="workspace"
+              workspacePaneTabModel={preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/terminal-empty')}
+            />
+          </BranchActionSurfaceProvider>
+        </TerminalSessionReadScope>
+      </AppNavigationProvider>,
     )
 
     // Sync is ready, the worktree has no terminal sessions, and the user
@@ -244,16 +250,18 @@ describe('GitWorkspacePaneContent routes', () => {
     const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/b')
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <GitWorkspacePaneContent
-            repo={presentationRepo}
-            detail={detail}
-            workspacePaneId="workspace"
-            workspacePaneTabModel={workspacePaneTabModel}
-          />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+      <AppNavigationProvider value={navigationWith({})}>
+        <TerminalSessionReadScope value={emptyTerminalReadContext}>
+          <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
+            <GitWorkspacePaneContent
+              repo={presentationRepo}
+              detail={detail}
+              workspacePaneId="workspace"
+              workspacePaneTabModel={workspacePaneTabModel}
+            />
+          </BranchActionSurfaceProvider>
+        </TerminalSessionReadScope>
+      </AppNavigationProvider>,
     )
     await flushAsyncWork()
 

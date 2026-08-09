@@ -1,4 +1,5 @@
-import { useEffect, useMemo } from 'react'
+import { computed, toValue, watch } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
@@ -10,10 +11,11 @@ import {
   useTerminalFilesystemTargetCreatePending,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspacePaneRuntimeTabStateInput } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { WorkspacePaneRuntimeProjectionState } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
 export type WorkspacePaneRuntimeTabTargetSelectionByType = Partial<Record<WorkspacePaneRuntimeTabType, string | null>>
 export type WorkspacePaneRuntimeTabTargetKeyByType = Partial<Record<WorkspacePaneRuntimeTabType, string | null>>
@@ -41,10 +43,12 @@ export interface WorkspacePaneRuntimeTabProjectionProvider {
   type: WorkspacePaneRuntimeTabType
   targetKey: (input: WorkspacePaneRuntimeTabTargetInput) => string | null
   readProjection: (input: WorkspacePaneRuntimeTabTargetInput) => WorkspacePaneRuntimeTabProviderProjection
-  useProjection: (input: WorkspacePaneRuntimeTabTargetInput) => WorkspacePaneRuntimeTabProviderProjection
+  useProjection: (
+    input: MaybeRefOrGetter<WorkspacePaneRuntimeTabTargetInput>,
+  ) => ComputedRef<WorkspacePaneRuntimeTabProviderProjection>
   useSyncSelection: (
-    input: WorkspacePaneRuntimeTabSelectionSyncInput,
-    selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType,
+    input: MaybeRefOrGetter<WorkspacePaneRuntimeTabSelectionSyncInput>,
+    selectedSessionIdByRuntimeType: MaybeRefOrGetter<WorkspacePaneRuntimeTabTargetSelectionByType>,
   ) => void
 }
 
@@ -99,20 +103,20 @@ export function readWorkspacePaneRuntimeTabProviderProjections(
 }
 
 export function useWorkspacePaneRuntimeTabProviderProjections(
-  input: WorkspacePaneRuntimeTabTargetInput,
-): WorkspacePaneRuntimeTabProviderProjection[] {
+  input: MaybeRefOrGetter<WorkspacePaneRuntimeTabTargetInput>,
+): ComputedRef<WorkspacePaneRuntimeTabProviderProjection[]> {
   // Hook calls stay explicit so adding a runtime type requires a deliberate
   // compile-time update without making hook order depend on a dynamic loop.
   const terminal = workspacePaneRuntimeTabProjectionProvider('terminal').useProjection(input)
-  return useMemo(() => [terminal], [terminal])
+  return computed(() => [terminal.value])
 }
 
 export function useSyncWorkspacePaneRuntimeTabProviderSelection(
-  input: {
+  input: MaybeRefOrGetter<{
     activeSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType
     runtimeTabTargetKeyByType: WorkspacePaneRuntimeTabTargetKeyByType
-  },
-  selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType,
+  }>,
+  selectedSessionIdByRuntimeType: MaybeRefOrGetter<WorkspacePaneRuntimeTabTargetSelectionByType>,
 ): void {
   workspacePaneRuntimeTabProjectionProvider('terminal').useSyncSelection(input, selectedSessionIdByRuntimeType)
 }
@@ -152,75 +156,77 @@ function readTerminalRuntimeTabProviderProjection(
 
 function readTerminalSelectedSessionId(terminalFilesystemTargetKey: string): string | null {
   return (
-    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey] ??
-    null
+    workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey] ?? null
   )
 }
 
 function useTerminalRuntimeTabProviderProjection(
-  input: WorkspacePaneRuntimeTabTargetInput,
-): WorkspacePaneRuntimeTabProviderProjection {
-  const { workspaceId, workspaceRuntimeId } = input
-  const targetKey = terminalRuntimeTabTargetKey(input)
+  input: MaybeRefOrGetter<WorkspacePaneRuntimeTabTargetInput>,
+): ComputedRef<WorkspacePaneRuntimeTabProviderProjection> {
+  const currentInput = computed(() => toValue(input))
+  const targetKey = computed(() => terminalRuntimeTabTargetKey(currentInput.value))
   const terminalSessionSummaries = useTerminalSessionSummaries(targetKey)
   const terminalCreatePending = useTerminalFilesystemTargetCreatePending(targetKey)
-  const terminalProjectionHydration = useTerminalWorkspaceProjectionHydrationEntry(workspaceId)
-  const selectedTerminalSessionId = useWorkspacesStore((s) =>
-    targetKey ? s.selectedTerminalSessionIdByTerminalFilesystemTarget[targetKey] : undefined,
+  const terminalProjectionHydration = useTerminalWorkspaceProjectionHydrationEntry(() => currentInput.value.workspaceId)
+  const selectedTerminalSessionIdByTarget = useStoreSelector(
+    workspacesStore,
+    (state) => state.selectedTerminalSessionIdByTerminalFilesystemTarget,
   )
 
-  return useMemo(() => {
-    const selectedSessionId = targetKey ? (selectedTerminalSessionId ?? null) : null
+  return computed(() => {
+    const { workspaceRuntimeId } = currentInput.value
+    const currentTargetKey = targetKey.value
+    const selectedSessionId = currentTargetKey
+      ? (selectedTerminalSessionIdByTarget.value[currentTargetKey] ?? null)
+      : null
     const currentHydration =
-      terminalProjectionHydration.workspaceRuntimeId === workspaceRuntimeId ? terminalProjectionHydration : null
+      terminalProjectionHydration.value.workspaceRuntimeId === workspaceRuntimeId
+        ? terminalProjectionHydration.value
+        : null
     return {
-      type: 'terminal',
-      targetKey,
-      views: targetKey ? terminalSessionSummaries : [],
+      type: 'terminal' as const,
+      targetKey: currentTargetKey,
+      views: currentTargetKey ? terminalSessionSummaries.value : [],
       selectedSessionId,
       state: {
-        createPending: terminalCreatePending,
+        createPending: terminalCreatePending.value,
         projectionPhase: currentHydration?.phase ?? 'pending',
         projectionErrorMessage: currentHydration?.errorMessage,
         selectedSessionId,
       },
     }
-  }, [
-    workspaceRuntimeId,
-    selectedTerminalSessionId,
-    targetKey,
-    terminalCreatePending,
-    terminalProjectionHydration,
-    terminalSessionSummaries,
-  ])
+  })
 }
 
 function useSyncTerminalRuntimeTabSelection(
-  input: {
+  input: MaybeRefOrGetter<{
     activeSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType
     runtimeTabTargetKeyByType: WorkspacePaneRuntimeTabTargetKeyByType
-  },
-  selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType,
+  }>,
+  selectedSessionIdByRuntimeType: MaybeRefOrGetter<WorkspacePaneRuntimeTabTargetSelectionByType>,
 ): void {
-  const setSelectedTerminal = useWorkspacesStore((s) => s.setSelectedTerminal)
-  const activeTerminalSessionId = input.activeSessionIdByRuntimeType.terminal ?? null
-  const selectedTerminalSessionId = selectedSessionIdByRuntimeType.terminal ?? undefined
-  const terminalFilesystemTargetKey = input.runtimeTabTargetKeyByType.terminal ?? null
-
-  useEffect(() => {
-    if (!terminalFilesystemTargetKey || !activeTerminalSessionId) return
-    if (activeTerminalSessionId === selectedTerminalSessionId) return
-    setSelectedTerminal(terminalFilesystemTargetKey, activeTerminalSessionId)
-  }, [activeTerminalSessionId, selectedTerminalSessionId, setSelectedTerminal, terminalFilesystemTargetKey])
+  const setSelectedTerminal = workspacesStore.getState().setSelectedTerminal
+  // The active tab and terminal store are separate authorities; synchronize
+  // only the accepted active runtime selection at this boundary.
+  watch(
+    [() => toValue(input), () => toValue(selectedSessionIdByRuntimeType)],
+    ([current, selected]) => {
+      const activeTerminalSessionId = current.activeSessionIdByRuntimeType.terminal ?? null
+      const selectedTerminalSessionId = selected.terminal ?? undefined
+      const terminalFilesystemTargetKey = current.runtimeTabTargetKeyByType.terminal ?? null
+      if (!terminalFilesystemTargetKey || !activeTerminalSessionId) return
+      if (activeTerminalSessionId === selectedTerminalSessionId) return
+      setSelectedTerminal(terminalFilesystemTargetKey, activeTerminalSessionId)
+    },
+    { immediate: true },
+  )
 }
 
 function readTerminalRuntimeProjectionState(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): WorkspacePaneRuntimeProjectionState {
-  const terminalProjectionHydration = useTerminalProjectionHydrationStore
-    .getState()
-    .hydrationByWorkspace.get(workspaceId)
+  const terminalProjectionHydration = terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(workspaceId)
   const currentTerminalProjectionHydration =
     terminalProjectionHydration?.workspaceRuntimeId === workspaceRuntimeId ? terminalProjectionHydration : null
   return {

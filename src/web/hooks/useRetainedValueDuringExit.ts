@@ -1,61 +1,54 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-
-// Timer-based variant of `useLastNonNull`: retains `value` for
-// `retainMs` after `active` flips to false, then drops it. Used by
-// the compact-workspace pane transition which has a fixed exit
-// duration. For the timer-free "retain forever while null" variant,
-// see `useLastNonNull` (used by the branch-action dialog close
-// animation, where Radix AlertDialog drives the unmount itself).
+import { computed, shallowRef, toValue, watch } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 
 interface UseRetainedValueDuringExitOptions<T> {
-  value: T | null
-  active: boolean
+  value: MaybeRefOrGetter<T | null>
+  active: MaybeRefOrGetter<boolean>
   retainMs: number
-  resetKey?: unknown
+  resetKey?: MaybeRefOrGetter<unknown>
 }
 
+/** Retains the last active value until a fixed exit transition completes. */
 export function useRetainedValueDuringExit<T>({
   value,
   active,
   retainMs,
   resetKey,
-}: UseRetainedValueDuringExitOptions<T>): T | null {
-  const retainedValueRef = useRef<T | null>(active ? value : null)
-  const resetKeyRef = useRef(resetKey)
-  const commitVersionRef = useRef(0)
-  const [, forceRender] = useState(0)
-  const resetKeyChangedSinceCommit = !Object.is(resetKeyRef.current, resetKey)
+}: UseRetainedValueDuringExitOptions<T>): ComputedRef<T | null> {
+  const retainedValue = shallowRef<T | null>(null)
+  let committedResetKey = toValue(resetKey)
 
-  // Record only committed active values. Exiting renders can synchronously read
-  // the previous committed value without writing mutable state during render.
-  useLayoutEffect(() => {
-    if (!Object.is(resetKeyRef.current, resetKey)) {
-      resetKeyRef.current = resetKey
-      retainedValueRef.current = active ? value : null
-      commitVersionRef.current += 1
-      return
-    }
+  // The exit timer belongs only to the active/reset-key lifecycle. While the
+  // view is inactive, value changes are unrelated projection updates and must
+  // not restart that fixed window.
+  watch(
+    () => {
+      const nextActive = toValue(active)
+      const nextResetKey = toValue(resetKey)
+      return nextActive
+        ? { active: true as const, resetKey: nextResetKey, value: toValue(value) }
+        : { active: false as const, resetKey: nextResetKey }
+    },
+    (projection, _previous, onCleanup) => {
+      if (!Object.is(committedResetKey, projection.resetKey)) {
+        committedResetKey = projection.resetKey
+        retainedValue.value = projection.active ? projection.value : null
+        return
+      }
 
-    if (active) {
-      retainedValueRef.current = value
-      commitVersionRef.current += 1
-    }
-  }, [active, resetKey, value])
+      if (projection.active) {
+        retainedValue.value = projection.value
+        return
+      }
+      if (retainedValue.value === null) return
 
-  useEffect(() => {
-    if (active || retainedValueRef.current === null) return
+      const timeout = window.setTimeout(() => {
+        retainedValue.value = null
+      }, retainMs)
+      onCleanup(() => window.clearTimeout(timeout))
+    },
+    { immediate: true },
+  )
 
-    const exitVersion = commitVersionRef.current
-    const timeout = window.setTimeout(() => {
-      if (commitVersionRef.current !== exitVersion) return
-      if (!Object.is(resetKeyRef.current, resetKey)) return
-      retainedValueRef.current = null
-      forceRender((version) => version + 1)
-    }, retainMs)
-
-    return () => window.clearTimeout(timeout)
-  }, [active, resetKey, retainMs])
-
-  if (resetKeyChangedSinceCommit) return active ? value : null
-  return active ? value : retainedValueRef.current
+  return computed(() => (toValue(active) ? toValue(value) : retainedValue.value))
 }

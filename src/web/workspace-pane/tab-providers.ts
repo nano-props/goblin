@@ -1,4 +1,4 @@
-import { Diff, FolderTree, GitBranch, History, Terminal, type LucideIcon } from 'lucide-react'
+import { Diff, FolderTree, GitBranch, History, Terminal, type LucideIcon } from '@lucide/vue'
 import type {
   WorkspacePaneRuntimeTabType,
   WorkspacePaneStaticTabType,

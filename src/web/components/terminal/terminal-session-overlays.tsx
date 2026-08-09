@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react'
+import { defineComponent, ref } from 'vue'
+import type { FunctionalComponent } from 'vue'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import type { TerminalSnapshot } from '#/web/components/terminal/types.ts'
@@ -32,28 +33,33 @@ interface EmptyTerminalCtaProps {
 // a second create while the first one is in flight. The registry's
 // pending-create queue would dedupe the second call by filesystem-target
 // key, but a visible loading state is still the right user signal.
-export function EmptyTerminalCta({ onCreate, emptyLabel, newTerminalLabel }: EmptyTerminalCtaProps) {
-  const [creating, setCreating] = useState(false)
-  const handleClick = useCallback(async () => {
-    if (creating) return
-    setCreating(true)
-    try {
-      await onCreate()
-    } finally {
-      setCreating(false)
+export const EmptyTerminalCta = defineComponent(
+  (props: EmptyTerminalCtaProps) => {
+    const creating = ref(false)
+
+    async function create(): Promise<void> {
+      if (creating.value) return
+      creating.value = true
+      try {
+        await props.onCreate()
+      } finally {
+        creating.value = false
+      }
     }
-  }, [creating, onCreate])
-  return (
-    <div className="goblin-terminal-session__empty-cta" role="region" aria-label={emptyLabel}>
-      <div className="goblin-terminal-session__empty-message">
-        <span className="goblin-terminal-session__empty-title">{emptyLabel}</span>
+
+    return () => (
+      <div class="goblin-terminal-session__empty-cta" role="region" aria-label={props.emptyLabel}>
+        <div class="goblin-terminal-session__empty-message">
+          <span class="goblin-terminal-session__empty-title">{props.emptyLabel}</span>
+        </div>
+        <Button type="button" size="sm" variant="secondary" onClick={() => void create()} disabled={creating.value}>
+          {creating.value ? `${props.newTerminalLabel}…` : props.newTerminalLabel}
+        </Button>
       </div>
-      <Button type="button" size="sm" variant="secondary" onClick={handleClick} disabled={creating}>
-        {creating ? `${newTerminalLabel}…` : newTerminalLabel}
-      </Button>
-    </div>
-  )
-}
+    )
+  },
+  { name: 'EmptyTerminalCta', props: ['onCreate', 'emptyLabel', 'newTerminalLabel'] },
+)
 
 interface StatusOverlayProps {
   label: string
@@ -65,65 +71,68 @@ const STATUS_DOT_CLASS = cn('goblin-terminal-session__status-dot', 'animate-puls
 // Transient status chip rendered while a terminal is opening or
 // restarting. Its parent owns the aria-live visibility contract; this
 // component keeps the live-region node stable while its label changes.
-export function StatusOverlay({ label }: StatusOverlayProps) {
+export const StatusOverlay: FunctionalComponent<StatusOverlayProps> = (props) => {
   return (
-    <div className="goblin-terminal-session__status-overlay" role="status" aria-live="polite" aria-busy="true">
-      <span className={STATUS_DOT_CLASS} />
-      <span>{label}</span>
+    <div class="goblin-terminal-session__status-overlay" role="status" aria-live="polite" aria-busy="true">
+      <span class={STATUS_DOT_CLASS} />
+      <span>{props.label}</span>
     </div>
   )
 }
+StatusOverlay.props = ['label']
 
-export function AttachmentOverlay({ badge, snapshot, takeover }: AttachmentOverlayProps) {
+export const AttachmentOverlay: FunctionalComponent<AttachmentOverlayProps> = (props) => {
   return (
-    <div className="goblin-terminal-session__viewer-overlay">
-      <div className="goblin-terminal-session__viewer-content">
-        <div className="goblin-terminal-session__viewer-badge">{badge}</div>
-        <div className="goblin-terminal-session__viewer-meta">
-          <span className="goblin-terminal-session__viewer-process">{snapshot.processName}</span>
-          {snapshot.canonicalTitle && (
-            <span className="goblin-terminal-session__viewer-title">{snapshot.canonicalTitle}</span>
-          )}
+    <div class="goblin-terminal-session__viewer-overlay">
+      <div class="goblin-terminal-session__viewer-content">
+        <div class="goblin-terminal-session__viewer-badge">{props.badge}</div>
+        <div class="goblin-terminal-session__viewer-meta">
+          <span class="goblin-terminal-session__viewer-process">{props.snapshot.processName}</span>
+          {props.snapshot.canonicalTitle ? (
+            <span class="goblin-terminal-session__viewer-title">{props.snapshot.canonicalTitle}</span>
+          ) : null}
         </div>
-        {takeover && (
+        {props.takeover ? (
           <Button
             type="button"
             size="sm"
             variant="secondary"
-            onClick={() => takeover.terminalSessionId && takeover.run(takeover.terminalSessionId)}
-            disabled={!takeover.terminalSessionId || takeover.pending}
-            aria-busy={takeover.pending || undefined}
+            onClick={() => {
+              if (props.takeover?.terminalSessionId) props.takeover.run(props.takeover.terminalSessionId)
+            }}
+            disabled={!props.takeover.terminalSessionId || props.takeover.pending}
+            aria-busy={props.takeover.pending || undefined}
           >
-            {takeover.pending ? takeover.pendingLabel : takeover.label}
+            {props.takeover.pending ? props.takeover.pendingLabel : props.takeover.label}
           </Button>
-        )}
+        ) : null}
       </div>
     </div>
   )
 }
+AttachmentOverlay.props = ['badge', 'snapshot', 'takeover']
 
-export function PresentationFailureOverlay({
-  label,
-  retryLabel,
-  onRetry,
-}: {
+interface PresentationFailureOverlayProps {
   label: string
   retryLabel?: string
   onRetry?: () => void
-}) {
+}
+
+export const PresentationFailureOverlay: FunctionalComponent<PresentationFailureOverlayProps> = (props) => {
   return (
     <div
-      className="goblin-terminal-session__status-overlay goblin-terminal-session__status-overlay--error"
+      class="goblin-terminal-session__status-overlay goblin-terminal-session__status-overlay--error"
       role="alert"
       aria-live="polite"
       aria-atomic="true"
     >
-      <span>{label}</span>
-      {retryLabel && onRetry && (
-        <Button type="button" size="sm" variant="ghost" onClick={onRetry}>
-          {retryLabel}
+      <span>{props.label}</span>
+      {props.retryLabel && props.onRetry ? (
+        <Button type="button" size="sm" variant="ghost" onClick={props.onRetry}>
+          {props.retryLabel}
         </Button>
-      )}
+      ) : null}
     </div>
   )
 }
+PresentationFailureOverlay.props = ['label', 'retryLabel', 'onRetry']

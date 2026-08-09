@@ -50,7 +50,7 @@ describe('workspace pane runtime tab close context', () => {
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', terminalBase)
   })
 
-  test('rejects confirmed close when terminal capability is unavailable', () => {
+  test('rejects confirmed close when terminal capability is unavailable', async () => {
     const context = readWorkspacePaneRuntimeTabCloseContext()
 
     expect(terminalRuntimeTabCloseContext(context)).toBeUndefined()

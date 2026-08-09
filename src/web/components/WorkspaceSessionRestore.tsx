@@ -1,5 +1,6 @@
-import { createContext, useContext, type ReactNode } from 'react'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, RefreshCw } from '@lucide/vue'
+import { defineComponent, inject, provide } from 'vue'
+import type { InjectionKey, PropType } from 'vue'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -7,50 +8,77 @@ import type {
   AuthenticatedAppBootstrapResult,
   AuthenticatedAppBootstrapState,
 } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
-import { useT } from '#/web/stores/i18n.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 
-export const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
-  state: { status: 'restoring-workspace' },
-  retry: () => {},
-})
+const authenticatedWorkspaceRestoreKey: InjectionKey<AuthenticatedAppBootstrapResult> = Symbol(
+  'authenticated-workspace-restore',
+)
 
-export function WorkspaceSessionRestoreGate({ children }: { children: ReactNode }) {
-  const bootstrap = useContext(AuthenticatedWorkspaceRestoreContext)
-  const bootstrapState = bootstrap.state
-  if (bootstrapState.status === 'restoring-workspace') return <WorkspaceSessionRestorePlaceholder />
-  if (bootstrapState.status === 'failed') {
-    return <WorkspaceSessionRestoreError state={bootstrapState} retry={bootstrap.retry} />
-  }
-  return <>{children}</>
+export const AuthenticatedWorkspaceRestoreProvider = defineComponent(
+  (props: { value: AuthenticatedAppBootstrapResult }, { slots }) => {
+    provide(authenticatedWorkspaceRestoreKey, props.value)
+    return () => slots.default?.()
+  },
+  {
+    name: 'AuthenticatedWorkspaceRestoreProvider',
+    props: {
+      value: { type: Object as PropType<AuthenticatedAppBootstrapResult>, required: true },
+    },
+  },
+)
+
+function useAuthenticatedWorkspaceRestore(): AuthenticatedAppBootstrapResult {
+  const bootstrap = inject(authenticatedWorkspaceRestoreKey, null)
+  if (!bootstrap) throw new Error('AuthenticatedWorkspaceRestoreProvider is required')
+  return bootstrap
 }
 
-export function WorkspaceSessionRestorePlaceholder() {
-  return <CenteredLoadingStatus label="Restoring workspace" />
-}
+export const WorkspaceSessionRestoreGate = defineComponent(
+  (_props, { slots }) => {
+    const bootstrap = useAuthenticatedWorkspaceRestore()
+    return () => {
+      const state = bootstrap.state.value
+      if (state.status === 'restoring-workspace') return <WorkspaceSessionRestorePlaceholder />
+      if (state.status === 'failed') return <WorkspaceSessionRestoreError state={state} retry={bootstrap.retry} />
+      return slots.default?.()
+    }
+  },
+  { name: 'WorkspaceSessionRestoreGate' },
+)
 
-export function WorkspaceSessionRestoreError({
-  state,
-  retry,
-}: {
-  state: Extract<AuthenticatedAppBootstrapState, { status: 'failed' }>
-  retry: () => void
-}) {
-  const t = useT()
-  return (
-    <div className="flex h-full items-center justify-center p-8">
-      <EmptyState
-        icon={<AlertTriangle size={18} />}
-        title={t('workspace-restore.failed')}
-        body={
-          <div className="space-y-3">
-            <div className="break-words">{state.message}</div>
-            <Button type="button" variant="outline" onClick={retry}>
-              <RefreshCw />
-              {t('error.try-again')}
-            </Button>
-          </div>
-        }
-      />
-    </div>
-  )
-}
+export const WorkspaceSessionRestorePlaceholder = defineComponent(
+  () => () => <CenteredLoadingStatus label="Restoring workspace" />,
+  { name: 'WorkspaceSessionRestorePlaceholder' },
+)
+
+type FailedBootstrapState = Extract<AuthenticatedAppBootstrapState, { status: 'failed' }>
+
+export const WorkspaceSessionRestoreError = defineComponent(
+  (props: { state: FailedBootstrapState; retry: () => void }) => {
+    const t = useT()
+    return () => (
+      <div class="flex h-full items-center justify-center p-8">
+        <EmptyState
+          icon={<AlertTriangle size={18} />}
+          title={t('workspace-restore.failed')}
+          body={
+            <div class="space-y-3">
+              <div class="break-words">{props.state.message}</div>
+              <Button type="button" variant="outline" onClick={props.retry}>
+                <RefreshCw />
+                {t('error.try-again')}
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    )
+  },
+  {
+    name: 'WorkspaceSessionRestoreError',
+    props: {
+      state: { type: Object as PropType<FailedBootstrapState>, required: true },
+      retry: { type: Function as PropType<() => void>, required: true },
+    },
+  },
+)

@@ -133,7 +133,7 @@ describe('workspace runtime task scheduling', () => {
     expect(activeAborted).toBe(true)
   })
 
-  test('dispose clears operation busy state without recreating runtime on read or settle', () => {
+  test('dispose clears operation busy state without recreating runtime on read or settle', async () => {
     markRepoOperationTargets(REPO_ID, 1, [{ key: 'fetch', reason: 'fetch' }], 'running')
 
     expect(repoOperationBusy(REPO_ID, 'fetch')).toBe(true)
@@ -145,7 +145,7 @@ describe('workspace runtime task scheduling', () => {
     expect(repoOperation(REPO_ID, 'fetch').phase).toBe('idle')
   })
 
-  test('local guard helpers name the scheduler-only admission sets', () => {
+  test('local guard helpers name the scheduler-only admission sets', async () => {
     expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(false)
     expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toEqual({
       fetchBusy: false,

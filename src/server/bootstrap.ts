@@ -2,7 +2,7 @@ import type { Socket } from 'node:net'
 import { serve, type ServerType } from '@hono/node-server'
 import { WebSocketServer } from 'ws'
 import { APP_REALTIME_WS_MESSAGE_LIMIT_BYTES } from '#/shared/app-realtime-validators.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import { disconnectAllInvalidationSockets } from '#/server/modules/invalidation-broker.ts'
 import { disconnectAllClientIntentSockets } from '#/server/modules/client-intent-broker.ts'
 import { createServerRuntime } from '#/server/runtime.ts'
@@ -126,7 +126,7 @@ export async function bootstrapServer(options: BootstrapServerOptions): Promise<
       void shutdownAndExit()
     })
   }
-  serverLogger.info({ hostname, port }, 'listening')
+  serverNodeLog.info({ hostname, port }, 'listening')
   return {
     hostname,
     port,

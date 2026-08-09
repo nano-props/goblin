@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import { createElement } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import type { WorkspacePickerItem } from '#/web/components/workspace-picker/types.ts'
@@ -9,12 +8,13 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspacePickerHost } from '#/web/components/WorkspacePickerHost.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
-vi.mock('#/web/stores/i18n.ts', () => ({ useT: () => (key: string) => key }))
-vi.mock('#/web/runtime-settings-shortcuts.ts', () => ({ useShortcutSettings: () => ({ shortcutsDisabled: false }) }))
+vi.mock('#/web/runtime-settings-shortcuts.ts', () => ({
+  useShortcutSettings: () => ({ value: { shortcutsDisabled: false } }),
+}))
 vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
-  useWorkspaceTerminalBellCounts: () => ({}),
+  useWorkspaceTerminalBellCounts: () => ({ value: {} }),
 }))
 vi.mock('#/web/app-navigation.tsx', () => ({
   useAppNavigation: () => ({
@@ -26,18 +26,18 @@ vi.mock('#/web/app-navigation.tsx', () => ({
 beforeEach(resetWorkspacesStore)
 
 describe('WorkspacePickerHost', () => {
-  test('binds a remote workspace directory name into the picker from its canonical id', () => {
+  test('binds a remote workspace directory name into the picker from its canonical id', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example/home/developer/Documents')
     const workspace = emptyWorkspace(workspaceId, 'workspace-runtime-picker')
-    useWorkspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
+    workspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
 
     const { container } = renderInJsdom(
-      createElement(WorkspacePickerHost, {
-        currentWorkspaceId: workspaceId,
-        onOpenWorkspacePathDialog: vi.fn(),
-        onOpenRemote: vi.fn(),
-        onClone: vi.fn(),
-      }),
+      <WorkspacePickerHost
+        currentWorkspaceId={workspaceId}
+        onOpenWorkspacePathDialog={vi.fn()}
+        onOpenRemote={vi.fn()}
+        onClone={vi.fn()}
+      />,
     )
 
     expect(container.textContent).toContain('Documents')
@@ -46,7 +46,7 @@ describe('WorkspacePickerHost', () => {
 })
 
 describe('workspacePickerItemsEqual', () => {
-  test('treats Git capability changes as unequal', () => {
+  test('treats Git capability changes as unequal', async () => {
     const item: WorkspacePickerItem = {
       id: workspaceIdForTest('goblin+file:///tmp/workspace'),
       name: 'workspace',
@@ -58,7 +58,7 @@ describe('workspacePickerItemsEqual', () => {
     expect(workspacePickerItemsEqual([item], [{ ...item, gitCapability: 'available' }])).toBe(false)
   })
 
-  test('treats remote lifecycle target changes as unequal even when repo id stays the same', () => {
+  test('treats remote lifecycle target changes as unequal even when repo id stays the same', async () => {
     const left: WorkspacePickerItem[] = [
       {
         id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
@@ -103,7 +103,7 @@ describe('workspacePickerItemsEqual', () => {
     expect(workspacePickerItemsEqual(left, right)).toBe(false)
   })
 
-  test('treats failed lifecycle target locator changes as unequal', () => {
+  test('treats failed lifecycle target locator changes as unequal', async () => {
     const target = {
       id: workspaceIdForTest('goblin+ssh://example/srv/repo'),
       alias: 'example',
@@ -148,7 +148,7 @@ describe('workspacePickerItemsEqual', () => {
     expect(workspacePickerItemsEqual(left, right)).toBe(false)
   })
 
-  test('treats terminal bell count changes as unequal', () => {
+  test('treats terminal bell count changes as unequal', async () => {
     const left: WorkspacePickerItem[] = [
       {
         id: workspaceIdForTest('goblin+file:///tmp/repo'),

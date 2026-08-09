@@ -1,124 +1,129 @@
-import { Loader2, MoreHorizontal } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { Loader2, MoreHorizontal } from '@lucide/vue'
+import { PopoverTrigger } from 'reka-ui'
+import { defineComponent, ref } from 'vue'
+import type { PropType, VNodeChild } from 'vue'
 import { Button } from '#/web/components/ui/button.tsx'
-import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
+import { Popover, PopoverContent } from '#/web/components/ui/popover.tsx'
 import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import { cn } from '#/web/lib/cn.ts'
-
-interface ActionPopoverProps {
-  readonly label: string
-  readonly open?: boolean
-  readonly onOpenChange?: (open: boolean) => void
-  readonly busy?: boolean
-  readonly triggerClassName?: string
-  readonly contentClassName?: string
-  readonly children: ReactNode | ((state: ActionPopoverState) => ReactNode)
-}
 
 interface ActionPopoverState {
   readonly close: () => void
 }
 
-export function ActionPopover({
-  label,
-  open,
-  onOpenChange,
-  busy = false,
-  triggerClassName,
-  contentClassName,
-  children,
-}: ActionPopoverProps) {
-  const [internalOpen, setInternalOpen] = useState(false)
-  const effectiveOpen = open ?? internalOpen
+export const ActionPopover = defineComponent(
+  (
+    props: {
+      label: string
+      open?: boolean
+      onOpenChange?: (open: boolean) => void
+      busy?: boolean
+      triggerClass?: string
+      contentClass?: string
+    },
+    { slots },
+  ) => {
+    const internalOpen = ref(false)
 
-  function setOpen(next: boolean) {
-    if (open === undefined) setInternalOpen(next)
-    onOpenChange?.(next)
-  }
+    function setOpen(next: boolean): void {
+      if (props.open === undefined) internalOpen.value = next
+      props.onOpenChange?.(next)
+    }
 
-  function close() {
-    setOpen(false)
-  }
+    const state: ActionPopoverState = { close: () => setOpen(false) }
 
-  return (
-    <Popover open={effectiveOpen} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          data-action-popover-trigger=""
-          variant="ghost"
-          size="sm"
-          title={label}
-          aria-label={label}
-          aria-busy={busy || undefined}
-          onPointerDown={stopPropagation}
+    return () => (
+      <Popover open={props.open ?? internalOpen.value} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            data-action-popover-trigger=""
+            variant="ghost"
+            size="sm"
+            title={props.label}
+            aria-label={props.label}
+            aria-busy={props.busy || undefined}
+            onPointerdown={stopPropagation}
+            onClick={stopPropagation}
+            onDblclick={stopPropagation}
+            class={props.triggerClass}
+          >
+            {props.busy ? <Loader2 class="size-4 animate-spin" /> : <MoreHorizontal class="size-4" />}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="end"
+          class={cn('w-max min-w-48 max-w-72 overflow-hidden p-0', props.contentClass)}
+          onOpenAutoFocus={(event: Event) => event.preventDefault()}
+          onPointerdown={stopPropagation}
           onClick={stopPropagation}
-          onDoubleClick={stopPropagation}
-          className={triggerClassName}
         >
-          {busy ? <Loader2 className="size-4 animate-spin" /> : <MoreHorizontal className="size-4" />}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className={cn('w-max min-w-48 max-w-72 overflow-hidden p-0', contentClassName)}
-        onOpenAutoFocus={(event) => {
-          event.preventDefault()
-        }}
-        onPointerDown={stopPropagation}
-        onClick={stopPropagation}
+          {slots.default?.(state)}
+        </PopoverContent>
+      </Popover>
+    )
+  },
+  {
+    name: 'ActionPopover',
+    props: {
+      label: { type: String, required: true },
+      open: { type: Boolean, default: undefined },
+      onOpenChange: Function as PropType<(open: boolean) => void>,
+      busy: Boolean,
+      triggerClass: String,
+      contentClass: String,
+    },
+  },
+)
+
+export const ActionPopoverItem = defineComponent(
+  (props: {
+    label: string
+    title?: string
+    icon?: VNodeChild
+    shortcut?: string
+    disabled?: boolean
+    busy?: boolean
+    destructive?: boolean
+    onSelect: () => void
+  }) =>
+    () => (
+      <button
+        type="button"
+        disabled={props.disabled}
+        title={props.title}
+        onClick={props.onSelect}
+        class={cn(
+          'flex h-8 w-full cursor-pointer items-center gap-2 rounded-sm py-1 pl-2 pr-2 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50',
+          'focus:bg-accent focus:text-accent-foreground',
+          props.destructive &&
+            'text-danger hover:bg-danger-surface hover:text-danger focus:bg-danger-surface focus:text-danger',
+          props.shortcut && 'whitespace-nowrap',
+        )}
       >
-        {typeof children === 'function' ? children({ close }) : children}
-      </PopoverContent>
-    </Popover>
-  )
-}
+        {props.icon || props.busy ? (
+          <span class="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
+            {props.busy ? <Loader2 size={16} class="animate-spin" /> : props.icon}
+          </span>
+        ) : null}
+        <span class="min-w-0 flex-1 truncate">{props.label}</span>
+        {props.shortcut ? <InlineShortcut shortcut={props.shortcut} /> : null}
+      </button>
+    ),
+  {
+    name: 'ActionPopoverItem',
+    props: {
+      label: { type: String, required: true },
+      title: String,
+      icon: null,
+      shortcut: String,
+      disabled: Boolean,
+      busy: Boolean,
+      destructive: Boolean,
+      onSelect: { type: Function as PropType<() => void>, required: true },
+    },
+  },
+)
 
-interface ActionPopoverItemProps {
-  readonly label: string
-  readonly title?: string
-  readonly icon?: ReactNode
-  readonly shortcut?: string
-  readonly disabled?: boolean
-  readonly busy?: boolean
-  readonly destructive?: boolean
-  readonly onSelect: () => void
-}
-
-export function ActionPopoverItem({
-  label,
-  title,
-  icon,
-  shortcut,
-  disabled = false,
-  busy = false,
-  destructive = false,
-  onSelect,
-}: ActionPopoverItemProps) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      title={title}
-      onClick={onSelect}
-      className={cn(
-        'flex h-8 w-full cursor-pointer items-center gap-2 rounded-sm py-1 pl-2 pr-2 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50',
-        'focus:bg-accent focus:text-accent-foreground',
-        destructive &&
-          'text-danger hover:bg-danger-surface hover:text-danger focus:bg-danger-surface focus:text-danger',
-        shortcut && 'whitespace-nowrap',
-      )}
-    >
-      {icon || busy ? (
-        <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
-          {busy ? <Loader2 size={16} className="animate-spin" /> : icon}
-        </span>
-      ) : null}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {shortcut ? <InlineShortcut shortcut={shortcut} /> : null}
-    </button>
-  )
-}
-
-function stopPropagation(event: { stopPropagation: () => void }) {
+function stopPropagation(event: Event): void {
   event.stopPropagation()
 }

@@ -25,7 +25,7 @@ pointer is currently over a floating element.
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Transient surface             | A temporary parent surface whose visibility is controlled by hover, focus, pointer proximity, or another ambient interaction. |
 | Anchor-bound floating surface | A menu, popover, picker, or similar surface whose position and semantics depend on an anchor inside the transient parent.     |
-| Boundary                      | A React-tree scope that lets descendants report open floating surfaces even when their content portals elsewhere in the DOM.  |
+| Boundary                      | A Vue-tree scope that lets descendants report open floating surfaces even when their content portals elsewhere in the DOM.    |
 | Pinned                        | The transient parent suppresses ambient auto-close because at least one descendant floating surface is open.                  |
 
 ## Interaction Contract
@@ -51,7 +51,7 @@ surface was previously open.
 ### `FloatingSurfaceBoundary`
 
 `FloatingSurfaceBoundary` is the UI-layer primitive that tracks open floating
-surfaces launched by descendants in the React tree.
+surfaces launched by descendants in the Vue tree.
 
 Responsibilities:
 
@@ -135,7 +135,7 @@ repo picker, branch action menu, file action menu, or future sidebar control.
 - Do not move every row or picker popover into centralized app overlay state.
 - Do not make transient parents know about specific child controls.
 - Do not fix anchor stability by eagerly closing child menus on parent leave.
-- Do not replace custom transient parents with a Radix primitive solely to get
+- Do not replace custom transient parents with a Reka primitive solely to get
   hover behavior; custom parents may own sizing, animation retention, inert
   state, title-bar behavior, and resize interaction.
 

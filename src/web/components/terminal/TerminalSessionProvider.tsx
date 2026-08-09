@@ -1,74 +1,51 @@
-import { useEffect, useMemo, type ReactNode } from 'react'
-
+import { defineComponent, onMounted, onScopeDispose, watch } from 'vue'
 import '#/web/components/terminal/terminal-session.css'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
+  provideTerminalSessionContext,
+  provideTerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
+import { preloadTerminalFont } from '#/web/components/terminal/terminal-font.ts'
 import { useTerminalSessionProjection } from '#/web/components/terminal/use-terminal-session-projection.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { useTerminalRuntimeMembershipIndex } from '#/web/components/terminal/terminal-runtime-membership-index.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
-interface TerminalSessionProviderProps {
-  children: ReactNode
-}
+export const TerminalSessionProvider = defineComponent(
+  (_props, { slots }) => {
+    const runtimeMembershipIndex = useTerminalRuntimeMembershipIndex()
+    const selectedSessionIds = useStoreSelector(
+      workspacesStore,
+      (state) => state.selectedTerminalSessionIdByTerminalFilesystemTarget,
+    )
+    const projection = useTerminalSessionProjection()
 
-export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
-  const runtimeMembershipIndex = useTerminalRuntimeMembershipIndex()
-  const selectedTerminalSessionIdByTerminalFilesystemTarget = useWorkspacesStore(
-    (s) => s.selectedTerminalSessionIdByTerminalFilesystemTarget,
-  )
-
-  // T1.1: prewarm the terminal font at app startup. The provider lives at
-  // the router root above the per-route App, so this fires once per app
-  // run (no `key` prop on the provider). preloadTerminalFont is
-  // idempotent — `document.fonts.check` short-circuits on the second
-  // call when openPhase's own preload fires. Failure is swallowed
-  // inside the function; we don't surface it.
-  useEffect(() => {
-    void preloadTerminalFont()
-  }, [])
-
-  const projection = useTerminalSessionProjection()
-
-  // Projection state sync
-  useEffect(() => {
-    projection.setRuntimeMembershipIndex(runtimeMembershipIndex)
-    projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalFilesystemTarget)
-  }, [projection, runtimeMembershipIndex, selectedTerminalSessionIdByTerminalFilesystemTarget])
-
-  // The provider owns event subscriptions, not the client-level projection.
-  // Remounting re-registers listeners without replacing projection state.
-  useEffect(() => {
-    const offOutput = terminalClient.onOutput((event) => {
-      projection.handleOutput(event)
-    })
-    const offBell = terminalClient.onBell((event) => {
-      projection.handleServerBell(event)
-    })
-    const offTitle = terminalClient.onTitle((event) => {
-      projection.handleServerTitle(event)
-    })
-    const offExit = terminalClient.onExit((event) => {
-      projection.handleExit(event)
-    })
-    const offIdentity = terminalClient.onIdentity((event) => {
-      projection.handleIdentity(event)
-    })
-    const offLifecycle = terminalClient.onLifecycle((event) => {
-      projection.handleLifecycle(event)
-    })
-    // Per-session close broadcast. Sibling windows drop matching local
-    // entries immediately. A window that owns an in-flight command close
-    // keeps its projection visible until that close command settles.
-    const offSessionClosed = terminalClient.onSessionClosed((event) => {
-      projection.handleSessionClosed(event)
+    onMounted(() => {
+      void preloadTerminalFont()
     })
 
+    // The client projection is an external owner. Keep its membership and
+    // preferred-selection inputs synchronized with their authoritative store.
+    watch(
+      [runtimeMembershipIndex, selectedSessionIds],
+      ([membershipIndex, preferredSessionIds]) => {
+        projection.setRuntimeMembershipIndex(membershipIndex)
+        projection.setPreferredSelectedTerminalSessionIds(preferredSessionIds)
+      },
+      { immediate: true },
+    )
+
+    const unsubscribers = [
+      terminalClient.onOutput((event) => projection.handleOutput(event)),
+      terminalClient.onBell((event) => projection.handleServerBell(event)),
+      terminalClient.onTitle((event) => projection.handleServerTitle(event)),
+      terminalClient.onExit((event) => projection.handleExit(event)),
+      terminalClient.onIdentity((event) => projection.handleIdentity(event)),
+      terminalClient.onLifecycle((event) => projection.handleLifecycle(event)),
+      terminalClient.onSessionClosed((event) => projection.handleSessionClosed(event)),
+    ]
     const disposeCommandBridge = setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: projection.terminalFilesystemTargetSnapshot,
       createTerminal: projection.createTerminal,
@@ -77,21 +54,12 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       focusTerminal: projection.focusTerminal,
       closeTerminalByDescriptor: projection.closeTerminalByDescriptor,
     })
-
-    return () => {
-      offOutput()
-      offBell()
-      offTitle()
-      offExit()
-      offIdentity()
-      offLifecycle()
-      offSessionClosed()
+    onScopeDispose(() => {
+      for (const unsubscribe of unsubscribers) unsubscribe()
       disposeCommandBridge()
-    }
-  }, [projection])
+    })
 
-  const commandValue = useMemo<TerminalSessionContextValue>(
-    () => ({
+    const commandValue: TerminalSessionContextValue = {
       createTerminal: projection.createTerminal,
       createTerminalWithAdmission: projection.createTerminalWithAdmission,
       selectTerminal: projection.selectTerminal,
@@ -116,24 +84,19 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       submitText: projection.submitText,
       takeover: projection.takeover,
       retryPresentation: projection.retryPresentation,
-    }),
-    [projection],
-  )
-  const readValue = useMemo<TerminalSessionReadContextValue>(
-    () => ({
+    }
+    const readValue: TerminalSessionReadContextValue = {
       terminalFilesystemTargetSnapshot: projection.terminalFilesystemTargetSnapshot,
       subscribeTerminalFilesystemTarget: projection.subscribeTerminalFilesystemTarget,
       workspaceBellCount: projection.workspaceBellCount,
       subscribeWorkspaceBellCount: projection.subscribeWorkspaceBellCount,
       snapshot: projection.snapshot,
       subscribeSnapshot: projection.subscribeSnapshot,
-    }),
-    [projection],
-  )
+    }
+    provideTerminalSessionContext(commandValue)
+    provideTerminalSessionReadContext(readValue)
 
-  return (
-    <TerminalSessionContext value={commandValue}>
-      <TerminalSessionReadContext value={readValue}>{children}</TerminalSessionReadContext>
-    </TerminalSessionContext>
-  )
-}
+    return () => slots.default?.()
+  },
+  { name: 'TerminalSessionProvider' },
+)

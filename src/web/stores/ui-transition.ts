@@ -14,14 +14,14 @@
 // duration. A 240 ms suppression is imperceptible to the user but
 // prevents the visual/keyboard mismatch.
 
-import { create } from 'zustand'
+import { createStore } from 'zustand/vanilla'
 
 interface UiTransitionState {
   isCompactWorkspaceTransitioning: boolean
   setCompactWorkspaceTransitioning: (value: boolean) => void
 }
 
-export const useUiTransitionStore = create<UiTransitionState>()((set) => ({
+export const uiTransitionStore = createStore<UiTransitionState>()((set) => ({
   isCompactWorkspaceTransitioning: false,
   setCompactWorkspaceTransitioning: (value) => set({ isCompactWorkspaceTransitioning: value }),
 }))

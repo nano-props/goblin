@@ -1,35 +1,62 @@
-import { StrictMode } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { AuthProvider } from '#/web/auth/AuthProvider.tsx'
-import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
-import { ResponsiveUiProvider } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { AppRouterProvider } from '#/web/app-router.tsx'
+import { createApp, defineComponent, shallowRef } from 'vue'
+import type { FunctionalComponent } from 'vue'
+import { VueQueryPlugin } from '@tanstack/vue-query'
+import { VueQueryDevtools } from '@tanstack/vue-query-devtools'
+import { AppRouterProvider, appRouter } from '#/web/app-router.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
+import { AuthProvider } from '#/web/auth/AuthProvider.tsx'
+import { ResponsiveUiProvider } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { bootstrapLog } from '#/web/logger.ts'
-import { reactRootOptions } from '#/web/react-root-options.ts'
-import { useI18nStore } from '#/web/stores/i18n.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { i18nStore } from '#/web/stores/i18n.ts'
+import { appI18n, startI18nProjection } from '#/web/stores/i18n-vue.ts'
+import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { createWebBootstrapOwner, startWebBootstrap } from '#/web/web-bootstrap.ts'
+import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
+import { vueAppErrorHandler } from '#/web/vue-app-error-handler.ts'
 
 const INITIAL_PUBLIC_BOOTSTRAP_TIMEOUT_MS = 15_000
 
-const rootEl = document.getElementById('root')
-if (!rootEl) throw new Error('root element missing')
+type BootstrapPhase = { kind: 'loading' } | { kind: 'error'; retry: () => void } | { kind: 'ready' }
+
+const rootElement = document.getElementById('root')
+if (!rootElement) throw new Error('root element missing')
 
 interface MainHotData {
-  root?: Root
   nextBootstrapGeneration?: number
 }
 
 const hotData: MainHotData = import.meta.hot?.data ?? {}
-const root = hotData.root ?? createRoot(rootEl, reactRootOptions())
 const bootstrapOwner = createWebBootstrapOwner(hotData.nextBootstrapGeneration ?? 1)
+const phase = shallowRef<BootstrapPhase>({ kind: 'loading' })
+const Root = defineComponent(
+  () => () => {
+    if (phase.value.kind === 'loading') return <BootLoading />
+    if (phase.value.kind === 'error') return <BootError onRetry={phase.value.retry} />
+    return (
+      <>
+        <ResponsiveUiProvider>
+          <AuthProvider>
+            <AppRouterProvider />
+          </AuthProvider>
+        </ResponsiveUiProvider>
+        {import.meta.env.DEV ? <VueQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" /> : null}
+      </>
+    )
+  },
+  { name: 'Root' },
+)
+const app = createApp(Root)
+const errorHandler = vueAppErrorHandler()
+if (errorHandler) app.config.errorHandler = errorHandler
+app.use(appRouter)
+app.use(VueQueryPlugin, { queryClient: appQueryClient })
+app.use(appI18n)
+const stopI18nProjection = startI18nProjection()
+app.mount(rootElement)
+
 import.meta.hot?.dispose((data: MainHotData) => {
-  data.root = root
   data.nextBootstrapGeneration = bootstrapOwner.generation + 1
-  bootstrapOwner.dispose()
+  disposeWebApp()
 })
 
 startWebBootstrap({
@@ -37,51 +64,51 @@ startWebBootstrap({
   timeoutMs: INITIAL_PUBLIC_BOOTSTRAP_TIMEOUT_MS,
   hydrate: async (signal) => {
     await Promise.all([
-      useI18nStore.getState().hydrate({ subscribe: false, signal }),
-      useHostInfoStore.getState().hydrate({ signal }),
+      i18nStore.getState().hydrate({ subscribe: false, signal }),
+      hostInfoStore.getState().hydrate({ signal }),
     ])
   },
-  renderLoading: () => root.render(<BootLoading />),
-  renderError: (retry) => root.render(<BootError onRetry={retry} />),
-  renderApp: () =>
-    root.render(
-      <StrictMode>
-        <AppRoot />
-      </StrictMode>,
-    ),
-  logFailure: (err) => bootstrapLog.warn('initial public bootstrap failed', { err }),
+  renderLoading: () => {
+    phase.value = { kind: 'loading' }
+  },
+  renderError: (retry) => {
+    phase.value = { kind: 'error', retry }
+  },
+  renderApp: () => {
+    phase.value = { kind: 'ready' }
+  },
+  logFailure: (error) => bootstrapLog.warn('initial public bootstrap failed', { error }),
 })
-
-function AppRoot() {
-  return (
-    <QueryClientProvider client={appQueryClient}>
-      <ResponsiveUiProvider>
-        <AuthProvider>
-          <AppRouterProvider />
-        </AuthProvider>
-      </ResponsiveUiProvider>
-      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />}
-    </QueryClientProvider>
-  )
-}
 
 function BootLoading() {
   return <CenteredLoadingStatus label="Loading" />
 }
 
-function BootError({ onRetry }: { onRetry: () => void }) {
+const BootError: FunctionalComponent<{ onRetry: () => void }> = ({ onRetry }) => {
   return (
-    <div className="flex h-full items-center justify-center bg-background p-4 text-foreground">
-      <div className="flex max-w-sm flex-col items-center gap-3 text-center">
-        <div className="text-sm font-medium">Unable to load application resources.</div>
+    <div class="flex h-full items-center justify-center bg-background p-4 text-foreground">
+      <div class="flex max-w-sm flex-col items-center gap-3 text-center">
+        <div class="text-sm font-medium">Unable to load application resources.</div>
         <button
           type="button"
           onClick={onRetry}
-          className="rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent"
+          class="rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent"
         >
           Retry
         </button>
       </div>
     </div>
   )
+}
+BootError.props = ['onRetry']
+BootError.inheritAttrs = false
+
+let disposed = false
+
+export function disposeWebApp(): void {
+  if (disposed) return
+  disposed = true
+  bootstrapOwner.dispose()
+  stopI18nProjection()
+  app.unmount()
 }

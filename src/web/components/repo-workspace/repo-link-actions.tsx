@@ -1,42 +1,53 @@
-import { useMemo, type ComponentProps } from 'react'
+import { defineComponent, onScopeDispose } from 'vue'
+import type { HTMLAttributes, PropType } from 'vue'
 import { throttle } from 'es-toolkit'
 import { openRepoUrl } from '#/web/repo-client.ts'
-import { StatusLink, type Tone } from '#/web/components/workspace-pane/status-ui.tsx'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { StatusLink } from '#/web/components/workspace-pane/status-ui.tsx'
+import type { Tone } from '#/web/components/workspace-pane/status-ui.tsx'
+import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
-type CommitHashLinkProps = Omit<ComponentProps<'button'>, 'type' | 'children' | 'onClick'> & {
-  repoId: WorkspaceId
-  workspaceRuntimeId: string
-  hash: string
-  shortHash?: string
-  tone?: Tone
-}
+export const CommitHashLink = defineComponent(
+  (
+    props: {
+      repoId: string
+      workspaceRuntimeId: string
+      hash: string
+      shortHash?: string
+      tone?: Tone
+      title?: string
+      class?: HTMLAttributes['class']
+    },
+    { attrs },
+  ) => {
+    const controller = new AbortController()
+    const handleClick = throttle(
+      () => {
+        const repoId = canonicalWorkspaceLocator(props.repoId)
+        if (!repoId) return
+        void openRepoUrl(repoId, props.workspaceRuntimeId, { type: 'commit', hash: props.hash }).catch(() => {})
+      },
+      500,
+      { edges: ['leading'], signal: controller.signal },
+    )
+    onScopeDispose(() => controller.abort('commit-hash-link-unmounted'))
 
-export function CommitHashLink({
-  repoId,
-  workspaceRuntimeId,
-  hash,
-  shortHash,
-  tone,
-  title,
-  className,
-  ...props
-}: CommitHashLinkProps) {
-  const handleClick = useMemo(
-    () =>
-      throttle(
-        () => {
-          void openRepoUrl(repoId, workspaceRuntimeId, { type: 'commit', hash }).catch(() => {})
-        },
-        500,
-        { edges: ['leading'] },
-      ),
-    [repoId, workspaceRuntimeId, hash],
-  )
-
-  return (
-    <StatusLink mono tone={tone} title={title} onClick={handleClick} className={className} {...props}>
-      {shortHash || hash.slice(0, 7)}
-    </StatusLink>
-  )
-}
+    return () => (
+      <StatusLink {...attrs} mono tone={props.tone} title={props.title} onClick={handleClick} class={props.class}>
+        {props.shortHash || props.hash.slice(0, 7)}
+      </StatusLink>
+    )
+  },
+  {
+    name: 'CommitHashLink',
+    inheritAttrs: false,
+    props: {
+      repoId: { type: String, required: true },
+      workspaceRuntimeId: { type: String, required: true },
+      hash: { type: String, required: true },
+      shortHash: String,
+      tone: String as PropType<Tone>,
+      title: String,
+      class: null,
+    },
+  },
+)

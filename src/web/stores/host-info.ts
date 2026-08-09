@@ -18,7 +18,7 @@
 // A missing snapshot is therefore a violated bootstrap invariant, not an
 // alternate web platform or empty home directory.
 
-import { create } from 'zustand'
+import { createStore } from 'zustand/vanilla'
 import { fetchServerJson } from '#/web/lib/server-fetch.ts'
 import { decodeWith } from '#/shared/http-response-schema.ts'
 import { HostInfoSnapshotSchema } from '#/shared/web-bootstrap-response-schema.ts'
@@ -50,7 +50,7 @@ interface HostInfoState {
 
 let hydrateVersion = 0
 
-export const useHostInfoStore = create<HostInfoState>((set) => ({
+export const hostInfoStore = createStore<HostInfoState>((set) => ({
   snapshot: null,
   status: 'pending',
   error: null,
@@ -84,12 +84,12 @@ function requireHostInfoSnapshot(state: Pick<HostInfoState, 'snapshot' | 'status
 
 /** Absolute home-directory path from the bootstrapped server authority. */
 export function homeDirectory(): string {
-  return requireHostInfoSnapshot(useHostInfoStore.getState()).homeDir
+  return requireHostInfoSnapshot(hostInfoStore.getState()).homeDir
 }
 
 /** Platform identifier from the bootstrapped server authority. */
 export function getPlatform(): ClientPlatform {
-  return requireHostInfoSnapshot(useHostInfoStore.getState()).platform
+  return requireHostInfoSnapshot(hostInfoStore.getState()).platform
 }
 
 /** Strict Zustand selector for components that react to the server platform. */

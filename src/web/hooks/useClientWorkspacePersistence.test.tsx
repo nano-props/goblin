@@ -5,7 +5,8 @@ import {
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -15,8 +16,8 @@ import { workspaceLocatorForPath, type WorkspaceId } from '#/shared/workspace-lo
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
-import { useFiletreeInteractionStore } from '#/web/stores/workspaces/filetree-interaction-state.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { filetreeInteractionStore } from '#/web/stores/workspaces/filetree-interaction-state.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const writePresentationMock = vi.fn()
 
@@ -26,12 +27,12 @@ vi.mock('#/web/client-workspace-state.ts', () => ({
 
 beforeEach(() => {
   resetWorkspacesStore()
-  useFiletreeInteractionStore.setState({ interactionByScope: {} })
+  filetreeInteractionStore.setState({ interactionByScope: {} })
   writePresentationMock.mockReset()
 })
 
 describe('useClientWorkspacePersistence', () => {
-  test('persists client-owned workspace state without canonical tabs', () => {
+  test('persists client-owned workspace state without canonical tabs', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       branchSnapshots: [
@@ -39,7 +40,7 @@ describe('useClientWorkspacePersistence', () => {
       ],
       currentBranchName: 'feature/a',
     })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [repo.id]: repo },
       workspaceOrder: [repo.id],
       restoredWorkspaceId: repo.id,
@@ -59,9 +60,9 @@ describe('useClientWorkspacePersistence', () => {
     expect(saved).not.toHaveProperty('workspacePaneTabsByTargetByWorkspace')
   })
 
-  test('persists the routed workspace identity before its store projection is hydrated', () => {
+  test('persists the routed workspace identity before its store projection is hydrated', async () => {
     const routedWorkspaceId = workspaceIdForTest('goblin+file:///tmp/routed-workspace')
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: {},
       workspaceOrder: [],
       restoredWorkspaceId: null,
@@ -76,7 +77,7 @@ describe('useClientWorkspacePersistence', () => {
     )
   })
 
-  test('persists terminal selection, preferred tab, and filetree presentation', () => {
+  test('persists terminal selection, preferred tab, and filetree presentation', async () => {
     const worktreePath = '/tmp/repo-worktree'
     const targetKey = workspacePaneTabsTargetIdentityKey({
       kind: 'git-worktree',
@@ -101,7 +102,7 @@ describe('useClientWorkspacePersistence', () => {
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/worktree': [workspacePaneStaticTabEntry('history')] },
     })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [repo.id]: repo },
       workspaceOrder: [repo.id],
       restoredWorkspaceId: repo.id,
@@ -111,7 +112,7 @@ describe('useClientWorkspacePersistence', () => {
       workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
-    useFiletreeInteractionStore.getState().restoreViewState({
+    filetreeInteractionStore.getState().restoreViewState({
       [`goblin+file:///tmp/repo\0${worktreePath}`]: {
         selectedKeys: ['src/index.ts'],
         expandedKeys: ['src'],
@@ -140,7 +141,7 @@ describe('useClientWorkspacePersistence', () => {
     )
   })
 
-  test('does not persist before workspace restore converges', () => {
+  test('does not persist before workspace restore converges', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       branchSnapshots: [
@@ -148,7 +149,7 @@ describe('useClientWorkspacePersistence', () => {
       ],
       currentBranchName: 'feature/a',
     })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [repo.id]: repo },
       workspaceOrder: [repo.id],
       workspaceMembershipReady: true,
@@ -159,7 +160,7 @@ describe('useClientWorkspacePersistence', () => {
     expect(writePresentationMock).not.toHaveBeenCalled()
   })
 
-  test('debounces high-frequency presentation changes to the latest state', () => {
+  test('debounces high-frequency presentation changes to the latest state', async () => {
     useFakeTimers()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -168,7 +169,7 @@ describe('useClientWorkspacePersistence', () => {
       ],
       currentBranchName: 'feature/a',
     })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [repo.id]: repo },
       workspaceOrder: [repo.id],
       restoredWorkspaceId: repo.id,
@@ -178,19 +179,19 @@ describe('useClientWorkspacePersistence', () => {
     renderInJsdom(<Harness />)
     writePresentationMock.mockClear()
 
-    act(() => {
-      useWorkspacesStore.setState({
+    await flushTestUpdates(() => {
+      workspacesStore.setState({
         selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-111111111111111111111',
         },
       })
-      useWorkspacesStore.setState({
+      workspacesStore.setState({
         selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-222222222222222222222',
         },
       })
     })
-    act(() => {
+    await flushTestUpdates(() => {
       vi.advanceTimersByTime(200)
     })
 
@@ -204,7 +205,7 @@ describe('useClientWorkspacePersistence', () => {
     )
   })
 
-  test('debounces a branch view mode change even when it is the only presentation change', () => {
+  test('debounces a branch view mode change even when it is the only presentation change', async () => {
     useFakeTimers()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -213,7 +214,7 @@ describe('useClientWorkspacePersistence', () => {
       ],
       currentBranchName: 'feature/a',
     })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [repo.id]: repo },
       workspaceOrder: [repo.id],
       restoredWorkspaceId: repo.id,
@@ -223,10 +224,10 @@ describe('useClientWorkspacePersistence', () => {
     renderInJsdom(<Harness />)
     writePresentationMock.mockClear()
 
-    act(() => {
-      useWorkspacesStore.getState().setBranchViewMode(repo.id, 'worktrees')
+    await flushTestUpdates(() => {
+      workspacesStore.getState().setBranchViewMode(repo.id, 'worktrees')
     })
-    act(() => {
+    await flushTestUpdates(() => {
       vi.advanceTimersByTime(200)
     })
 
@@ -236,7 +237,7 @@ describe('useClientWorkspacePersistence', () => {
     )
   })
 
-  test('flushes a pending local presentation synchronously on pagehide', () => {
+  test('flushes a pending local presentation synchronously on pagehide', async () => {
     useFakeTimers()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -245,7 +246,7 @@ describe('useClientWorkspacePersistence', () => {
       ],
       currentBranchName: 'feature/a',
     })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [repo.id]: repo },
       workspaceOrder: [repo.id],
       restoredWorkspaceId: repo.id,
@@ -255,14 +256,14 @@ describe('useClientWorkspacePersistence', () => {
     renderInJsdom(<Harness />)
     writePresentationMock.mockClear()
 
-    act(() => {
-      useWorkspacesStore.setState({
+    await flushTestUpdates(() => {
+      workspacesStore.setState({
         selectedTerminalSessionIdByTerminalFilesystemTarget: {
           'goblin+file:///tmp/repo\0goblin+file:///tmp/a': 'term-333333333333333333333',
         },
       })
     })
-    act(() => {
+    await flushTestUpdates(() => {
       window.dispatchEvent(new Event('pagehide'))
     })
 
@@ -284,7 +285,7 @@ describe('useClientWorkspacePersistence', () => {
       ],
       currentBranchName: 'feature/a',
     })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [repo.id]: repo },
       workspaceOrder: [repo.id],
       restoredWorkspaceId: repo.id,
@@ -307,7 +308,7 @@ describe('useClientWorkspacePersistence', () => {
       ],
       currentBranchName: 'feature/a',
     })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [repo.id]: repo },
       workspaceOrder: [repo.id],
       restoredWorkspaceId: repo.id,
@@ -327,20 +328,23 @@ describe('useClientWorkspacePersistence', () => {
 
     renderInJsdom(<Harness routedWorkspaceId={repo.id} />)
     expect(writePresentationMock).toHaveBeenCalledOnce()
-    await act(async () => {
+    await flushTestUpdates(async () => {
       resolveFirstWrite()
       await Promise.resolve()
     })
 
-    act(() => useWorkspacesStore.setState({ zenMode: true }))
-    act(() => useWorkspacesStore.setState({ zenMode: false }))
+    await flushTestUpdates(() => workspacesStore.setState({ zenMode: true }))
+    await flushTestUpdates(() => workspacesStore.setState({ zenMode: false }))
 
     expect(writePresentationMock).toHaveBeenCalledTimes(3)
     expect(writePresentationMock.mock.calls.map(([state]) => state.zenMode)).toEqual([false, true, false])
   })
 })
 
-function Harness({ routedWorkspaceId = null }: { routedWorkspaceId?: WorkspaceId | null }) {
-  useClientWorkspacePersistence({ routedWorkspaceId })
-  return null
-}
+const Harness = defineComponent(
+  (props: { routedWorkspaceId?: WorkspaceId | null }) => {
+    useClientWorkspacePersistence({ routedWorkspaceId: () => props.routedWorkspaceId ?? null })
+    return () => null
+  },
+  { name: 'ClientWorkspacePersistenceTestHarness', props: ['routedWorkspaceId'] },
+)

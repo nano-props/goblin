@@ -15,7 +15,7 @@ function node(
 }
 
 describe('filetree lazy state', () => {
-  test('tracks loading and loaded prefixes around child reads', () => {
+  test('tracks loading and loaded prefixes around child reads', async () => {
     let state = emptyLazyWorkspaceFilesystemTreeState()
     state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
@@ -37,7 +37,7 @@ describe('filetree lazy state', () => {
     expect(state.result.nodes.map((entry) => entry.id)).toEqual(['src', 'src/index.ts'])
   })
 
-  test('tracks child read failures by prefix and clears them on retry', () => {
+  test('tracks child read failures by prefix and clears them on retry', async () => {
     let state = emptyLazyWorkspaceFilesystemTreeState()
     state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
@@ -54,7 +54,7 @@ describe('filetree lazy state', () => {
     expect(state.errorPrefixes.has('src')).toBe(false)
   })
 
-  test('marks loaded prefixes for reload without dropping the current tree', () => {
+  test('marks loaded prefixes for reload without dropping the current tree', async () => {
     let state = emptyLazyWorkspaceFilesystemTreeState()
     state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
@@ -74,7 +74,7 @@ describe('filetree lazy state', () => {
     expect(state.result.nodes.map((entry) => entry.id)).toEqual(['src', 'src/index.ts'])
   })
 
-  test('replacing children prunes stale descendants', () => {
+  test('replacing children prunes stale descendants', async () => {
     let state = emptyLazyWorkspaceFilesystemTreeState()
     state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
@@ -95,7 +95,7 @@ describe('filetree lazy state', () => {
     expect(state.result.nodes.map((entry) => entry.id)).toEqual(['docs'])
   })
 
-  test('removing a directory prunes its metadata and ignores late child actions', () => {
+  test('removing a directory prunes its metadata and ignores late child actions', async () => {
     let state = emptyLazyWorkspaceFilesystemTreeState()
     state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',
@@ -138,7 +138,7 @@ describe('filetree lazy state', () => {
     expect(state.truncatedPrefixes.size).toBe(0)
   })
 
-  test('replacing a directory with a file prunes its former descendants and metadata', () => {
+  test('replacing a directory with a file prunes its former descendants and metadata', async () => {
     let state = emptyLazyWorkspaceFilesystemTreeState()
     state = lazyWorkspaceFilesystemTreeReducer(state, {
       type: 'childrenLoaded',

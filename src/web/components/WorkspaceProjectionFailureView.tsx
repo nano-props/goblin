@@ -1,49 +1,62 @@
-import { AlertCircle, RefreshCw, X } from 'lucide-react'
-import { toast } from 'sonner'
+import { AlertCircle, RefreshCw, X } from '@lucide/vue'
+import { defineComponent } from 'vue'
+import type { PropType } from 'vue'
+import { toast } from 'vue-sonner'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
-import { useT } from '#/web/stores/i18n.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 
-export function WorkspaceProjectionFailureView({
-  workspace,
-  message,
-  onRetry,
-}: {
+interface WorkspaceProjectionFailureViewProps {
   workspace: WorkspaceState
   message: string
   onRetry: () => void
-}) {
-  const t = useT()
-  const navigation = useAppNavigation()
-
-  async function handleClose() {
-    const result = await navigation.closeWorkspace(workspace.id)
-    if (!result.ok) toast.error(t(result.message))
-  }
-
-  return (
-    <section className="flex min-w-0 flex-1 flex-col">
-      <EmptyState
-        icon={<AlertCircle size={18} />}
-        title={t('lazy-restore.failed')}
-        body={
-          <div className="space-y-3">
-            <div className="break-words">{message}</div>
-            <div className="flex justify-center gap-2">
-              <Button type="button" variant="default" onClick={onRetry}>
-                <RefreshCw />
-                {t('error.try-again')}
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => void handleClose()}>
-                <X />
-                {t('workspace-unavailable.close')}
-              </Button>
-            </div>
-          </div>
-        }
-      />
-    </section>
-  )
 }
+
+export const WorkspaceProjectionFailureView = defineComponent(
+  (props: WorkspaceProjectionFailureViewProps) => {
+    const t = useT()
+    const navigation = useAppNavigation()
+
+    async function handleClose() {
+      const result = await navigation.closeWorkspace(props.workspace.id)
+      if (!result.ok) {
+        const messageKey = result.message
+        toast.error(t(messageKey))
+      }
+    }
+
+    return () => (
+      <section class="flex min-w-0 flex-1 flex-col">
+        <EmptyState
+          icon={<AlertCircle size={18} />}
+          title={t('lazy-restore.failed')}
+          body={
+            <div class="space-y-3">
+              <div class="break-words">{props.message}</div>
+              <div class="flex justify-center gap-2">
+                <Button type="button" variant="default" onClick={props.onRetry}>
+                  <RefreshCw />
+                  {t('error.try-again')}
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => void handleClose()}>
+                  <X />
+                  {t('workspace-unavailable.close')}
+                </Button>
+              </div>
+            </div>
+          }
+        />
+      </section>
+    )
+  },
+  {
+    name: 'WorkspaceProjectionFailureView',
+    props: {
+      workspace: { type: Object as PropType<WorkspaceState>, required: true },
+      message: { type: String, required: true },
+      onRetry: { type: Function as PropType<() => void>, required: true },
+    },
+  },
+)

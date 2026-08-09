@@ -1,5 +1,7 @@
-import { useCallback, useMemo } from 'react'
-import { useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { toValue } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
+import type { QueryClient } from '@tanstack/query-core'
+import { useQueryClient } from '@tanstack/vue-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
 import {
@@ -14,7 +16,6 @@ import {
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  requiredGitWorkspacePaneTabsTarget,
   runtimeWorkspacePaneTarget,
   workspacePaneTabsBranchIdentity,
   workspacePaneTabsTargetWorktreePath,
@@ -24,58 +25,76 @@ import {
 export type WorkspacePaneTabsReorderMutationInput = WorkspacePaneTabsTarget & {
   workspaceRuntimeId: string
   canonicalTabs: readonly WorkspacePaneTabEntry[]
-  onReorderRejected?: () => void
 }
 
 export interface WorkspacePaneTabsReorderMutationResult {
-  reorderTabs: (tabs: readonly WorkspacePaneTabEntry[]) => void
+  reorderTabs: (tabs: readonly WorkspacePaneTabEntry[], onSettled?: () => void) => void
 }
 
 export function useWorkspacePaneTabsReorderMutation(
-  input: WorkspacePaneTabsReorderMutationInput,
+  input: MaybeRefOrGetter<WorkspacePaneTabsReorderMutationInput>,
 ): WorkspacePaneTabsReorderMutationResult {
   const queryClient = useQueryClient()
-  const target = useMemo(() => {
-    const paneTarget = input
-    return runtimeWorkspacePaneTarget(paneTarget, input.workspaceRuntimeId)
-      ? { ...paneTarget, workspaceRuntimeId: input.workspaceRuntimeId }
-      : null
-  }, [input])
-  const canonicalTabsIdentity = useMemo(
-    () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
-    [input.canonicalTabs],
-  )
-
-  const reorderTabs = useCallback(
-    (tabs: readonly WorkspacePaneTabEntry[]) => {
-      if (!target) return
-      const nextIdentity = workspacePaneTabEntryListIdentity(tabs)
-      if (nextIdentity === canonicalTabsIdentity) return
-      const draggedTabs = [...tabs]
-      void runWorkspacePaneTabsReorder(target, draggedTabs, queryClient, input.onReorderRejected)
-    },
-    [canonicalTabsIdentity, input.onReorderRejected, queryClient, target],
-  )
+  const reorderTabs = (tabs: readonly WorkspacePaneTabEntry[], onSettled?: () => void) => {
+    const current = toValue(input)
+    const target = workspacePaneTabsReorderTarget(current)
+    if (!target) {
+      onSettled?.()
+      return
+    }
+    const nextIdentity = workspacePaneTabEntryListIdentity(tabs)
+    if (nextIdentity === workspacePaneTabEntryListIdentity(current.canonicalTabs)) {
+      onSettled?.()
+      return
+    }
+    void runWorkspacePaneTabsReorder(target, [...tabs], queryClient, onSettled)
+  }
 
   return { reorderTabs }
+}
+
+function workspacePaneTabsReorderTarget(
+  input: WorkspacePaneTabsReorderMutationInput,
+): WorkspacePaneTabsReorderTarget | null {
+  if (!runtimeWorkspacePaneTarget(input, input.workspaceRuntimeId)) return null
+  if (input.kind === 'workspace-root') {
+    return { kind: 'workspace-root', workspaceId: input.workspaceId, workspaceRuntimeId: input.workspaceRuntimeId }
+  }
+  if (input.kind === 'git-branch') {
+    return {
+      kind: 'git-branch',
+      workspaceId: input.workspaceId,
+      workspaceRuntimeId: input.workspaceRuntimeId,
+      branchName: input.branchName,
+    }
+  }
+  return {
+    kind: 'git-worktree',
+    workspaceId: input.workspaceId,
+    workspaceRuntimeId: input.workspaceRuntimeId,
+    worktreePath: input.worktreePath,
+  }
 }
 
 async function runWorkspacePaneTabsReorder(
   target: WorkspacePaneTabsReorderTarget,
   draggedTabs: readonly WorkspacePaneTabEntry[],
   queryClient: QueryClient,
-  onReorderRejected: (() => void) | undefined,
+  onSettled: (() => void) | undefined,
 ): Promise<void> {
-  await runWorkspacePaneAction(workspacePaneReorderActionTarget(target), () =>
-    runWorkspacePaneTabsReorderInQueue(target, draggedTabs, queryClient, onReorderRejected),
-  )
+  try {
+    await runWorkspacePaneAction(workspacePaneReorderActionTarget(target), () =>
+      runWorkspacePaneTabsReorderInQueue(target, draggedTabs, queryClient),
+    )
+  } finally {
+    onSettled?.()
+  }
 }
 
 async function runWorkspacePaneTabsReorderInQueue(
   target: WorkspacePaneTabsReorderTarget,
   draggedTabs: readonly WorkspacePaneTabEntry[],
   queryClient: QueryClient,
-  onReorderRejected: (() => void) | undefined,
 ): Promise<void> {
   try {
     const snapshot = await updateWorkspacePaneTabsOnServer({
@@ -91,7 +110,6 @@ async function runWorkspacePaneTabsReorderInQueue(
       worktreePath: workspacePaneTabsTargetWorktreePath(target),
       error: err,
     })
-    onReorderRejected?.()
   }
 }
 

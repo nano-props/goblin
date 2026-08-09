@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -11,8 +11,8 @@ beforeEach(() => {
 })
 
 describe('workspace navigation history', () => {
-  test('records back and forward stacks per repo', () => {
-    const store = useWorkspacesStore.getState()
+  test('records back and forward stacks per repo', async () => {
+    const store = workspacesStore.getState()
     store.recordWorkspaceNavigation(entry('dashboard'))
     store.recordWorkspaceNavigation(entry('branch', 'feature/a'))
     store.recordWorkspaceNavigation(entry('branch', 'feature/b'))
@@ -32,22 +32,22 @@ describe('workspace navigation history', () => {
     expect(history().forwardStack).toEqual([])
   })
 
-  test('drops the forward stack after a new selection', () => {
-    const store = useWorkspacesStore.getState()
+  test('drops the forward stack after a new selection', async () => {
+    const store = workspacesStore.getState()
     store.recordWorkspaceNavigation(entry('dashboard'))
     store.recordWorkspaceNavigation(entry('branch', 'feature/a'))
     store.recordWorkspaceNavigation(entry('branch', 'feature/b'))
     traverse('back')
 
-    useWorkspacesStore.getState().recordWorkspaceNavigation(entry('newWorktree'))
+    workspacesStore.getState().recordWorkspaceNavigation(entry('newWorktree'))
 
     expect(history().current).toEqual(entry('newWorktree'))
     expect(history().backStack).toEqual([entry('dashboard'), entry('branch', 'feature/a')])
     expect(history().forwardStack).toEqual([])
   })
 
-  test('rejects a stale traversal lease after history changes', () => {
-    const store = useWorkspacesStore.getState()
+  test('rejects a stale traversal lease after history changes', async () => {
+    const store = workspacesStore.getState()
     store.recordWorkspaceNavigation(entry('dashboard'))
     store.recordWorkspaceNavigation(entry('branch', 'feature/a'))
     const traversal = store.peekWorkspaceNavigation(REPO_ID, 'back')
@@ -60,8 +60,8 @@ describe('workspace navigation history', () => {
     expect(history().backStack).toEqual([entry('dashboard'), entry('branch', 'feature/a')])
   })
 
-  test('does not duplicate the current entry', () => {
-    const store = useWorkspacesStore.getState()
+  test('does not duplicate the current entry', async () => {
+    const store = workspacesStore.getState()
     store.recordWorkspaceNavigation(entry('branch', 'feature/a'))
     store.recordWorkspaceNavigation(entry('branch', 'feature/a'))
 
@@ -69,8 +69,8 @@ describe('workspace navigation history', () => {
     expect(history().backStack).toEqual([])
   })
 
-  test('records the workspace root as its own navigable route', () => {
-    const store = useWorkspacesStore.getState()
+  test('records the workspace root as its own navigable route', async () => {
+    const store = workspacesStore.getState()
     const workspace = workspaceEntry()
     store.recordWorkspaceNavigation(entry('dashboard'))
     store.recordWorkspaceNavigation(workspace)
@@ -80,8 +80,8 @@ describe('workspace navigation history', () => {
     expect(traverse('forward')).toEqual(workspace)
   })
 
-  test('explicitly replaces the current entry without pushing history', () => {
-    const store = useWorkspacesStore.getState()
+  test('explicitly replaces the current entry without pushing history', async () => {
+    const store = workspacesStore.getState()
     store.recordWorkspaceNavigation(entry('dashboard'))
     store.recordWorkspaceNavigation(entry('branch', 'feature/a'), { replace: true })
 
@@ -90,8 +90,8 @@ describe('workspace navigation history', () => {
     expect(history().forwardStack).toEqual([])
   })
 
-  test('updates branch metadata without adding a back entry', () => {
-    const store = useWorkspacesStore.getState()
+  test('updates branch metadata without adding a back entry', async () => {
+    const store = workspacesStore.getState()
     store.recordWorkspaceNavigation(branchEntry({ tab: 'status', terminalSessionId: null }))
     store.recordWorkspaceNavigation(branchEntry({ tab: 'status', terminalSessionId: 'term-111111111111111111111' }))
 
@@ -99,8 +99,8 @@ describe('workspace navigation history', () => {
     expect(history().backStack).toEqual([])
   })
 
-  test('collapses pending terminal creation into the current terminal entry', () => {
-    const store = useWorkspacesStore.getState()
+  test('collapses pending terminal creation into the current terminal entry', async () => {
+    const store = workspacesStore.getState()
     const status = branchEntry({ tab: 'status', terminalSessionId: null })
     const pendingTerminal = branchEntry({ tab: 'terminal', terminalSessionId: null })
     const createdTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-111111111111111111111' })
@@ -113,8 +113,8 @@ describe('workspace navigation history', () => {
     expect(history().backStack).toEqual([status])
   })
 
-  test('records explicit terminal session switches as navigation', () => {
-    const store = useWorkspacesStore.getState()
+  test('records explicit terminal session switches as navigation', async () => {
+    const store = workspacesStore.getState()
     const firstTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-111111111111111111111' })
     const secondTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-222222222222222222222' })
 
@@ -125,8 +125,8 @@ describe('workspace navigation history', () => {
     expect(history().backStack).toEqual([firstTerminal])
   })
 
-  test('restores the cursor when browser history lands on a back stack entry', () => {
-    const store = useWorkspacesStore.getState()
+  test('restores the cursor when browser history lands on a back stack entry', async () => {
+    const store = workspacesStore.getState()
     const dashboard = entry('dashboard')
     const status = branchEntry({ tab: 'status', terminalSessionId: null })
     const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-111111111111111111111' })
@@ -141,8 +141,8 @@ describe('workspace navigation history', () => {
     expect(history().forwardStack).toEqual([status, terminal])
   })
 
-  test('restores the cursor when browser history lands on a forward stack entry', () => {
-    const store = useWorkspacesStore.getState()
+  test('restores the cursor when browser history lands on a forward stack entry', async () => {
+    const store = workspacesStore.getState()
     const dashboard = entry('dashboard')
     const status = branchEntry({ tab: 'status', terminalSessionId: null })
     const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-111111111111111111111' })
@@ -158,8 +158,8 @@ describe('workspace navigation history', () => {
     expect(history().forwardStack).toEqual([])
   })
 
-  test('restores the cursor when browser back lands on an app forward stack entry', () => {
-    const store = useWorkspacesStore.getState()
+  test('restores the cursor when browser back lands on an app forward stack entry', async () => {
+    const store = workspacesStore.getState()
     const dashboard = entry('dashboard')
     const status = branchEntry({ tab: 'status', terminalSessionId: null })
     const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-111111111111111111111' })
@@ -175,8 +175,8 @@ describe('workspace navigation history', () => {
     expect(history().forwardStack).toEqual([])
   })
 
-  test('replaces a restored stale browser entry with its canonical route without losing the cursor move', () => {
-    const store = useWorkspacesStore.getState()
+  test('replaces a restored stale browser entry with its canonical route without losing the cursor move', async () => {
+    const store = workspacesStore.getState()
     const dashboard = entry('dashboard')
     const staleTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'stale-session' })
     const status = branchEntry({ tab: 'status', terminalSessionId: null })
@@ -192,8 +192,8 @@ describe('workspace navigation history', () => {
     expect(history().forwardStack).toEqual([])
   })
 
-  test('dedupes the new current route from the forward stack after replacing a restored stale entry', () => {
-    const store = useWorkspacesStore.getState()
+  test('dedupes the new current route from the forward stack after replacing a restored stale entry', async () => {
+    const store = workspacesStore.getState()
     const dashboard = entry('dashboard')
     const staleTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'stale-session' })
     const status = branchEntry({ tab: 'status', terminalSessionId: null })
@@ -209,8 +209,8 @@ describe('workspace navigation history', () => {
     expect(history().forwardStack).toEqual([])
   })
 
-  test('treats a new-worktree return target as part of the route identity', () => {
-    const store = useWorkspacesStore.getState()
+  test('treats a new-worktree return target as part of the route identity', async () => {
+    const store = workspacesStore.getState()
     store.recordWorkspaceNavigation(newWorktreeEntry('/workspace/repo-slug/branch/feature-a'))
     store.recordWorkspaceNavigation(newWorktreeEntry('/workspace/repo-slug/dashboard'))
 
@@ -220,11 +220,11 @@ describe('workspace navigation history', () => {
 })
 
 function history() {
-  return useWorkspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]!
+  return workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]!
 }
 
 function traverse(direction: 'back' | 'forward'): WorkspaceNavigationHistoryEntry | null {
-  const store = useWorkspacesStore.getState()
+  const store = workspacesStore.getState()
   const traversal = store.peekWorkspaceNavigation(REPO_ID, direction)
   if (!traversal) return null
   return store.commitWorkspaceNavigation(traversal) ? traversal.target : null

@@ -6,21 +6,21 @@
 // the user sees the old).
 
 import { beforeEach, describe, expect, test } from 'vitest'
-import { useUiTransitionStore } from '#/web/stores/ui-transition.ts'
+import { uiTransitionStore } from '#/web/stores/ui-transition.ts'
 
-describe('useUiTransitionStore', () => {
+describe('uiTransitionStore', () => {
   beforeEach(() => {
-    useUiTransitionStore.setState({ isCompactWorkspaceTransitioning: false })
+    uiTransitionStore.setState({ isCompactWorkspaceTransitioning: false })
   })
 
-  test('initial state is not transitioning', () => {
-    expect(useUiTransitionStore.getState().isCompactWorkspaceTransitioning).toBe(false)
+  test('initial state is not transitioning', async () => {
+    expect(uiTransitionStore.getState().isCompactWorkspaceTransitioning).toBe(false)
   })
 
-  test('setCompactWorkspaceTransitioning flips the flag', () => {
-    useUiTransitionStore.getState().setCompactWorkspaceTransitioning(true)
-    expect(useUiTransitionStore.getState().isCompactWorkspaceTransitioning).toBe(true)
-    useUiTransitionStore.getState().setCompactWorkspaceTransitioning(false)
-    expect(useUiTransitionStore.getState().isCompactWorkspaceTransitioning).toBe(false)
+  test('setCompactWorkspaceTransitioning flips the flag', async () => {
+    uiTransitionStore.getState().setCompactWorkspaceTransitioning(true)
+    expect(uiTransitionStore.getState().isCompactWorkspaceTransitioning).toBe(true)
+    uiTransitionStore.getState().setCompactWorkspaceTransitioning(false)
+    expect(uiTransitionStore.getState().isCompactWorkspaceTransitioning).toBe(false)
   })
 })

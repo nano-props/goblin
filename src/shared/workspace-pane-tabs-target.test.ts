@@ -12,12 +12,12 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('restorable workspace pane targets', () => {
-  it('does not duplicate workspace identity or runtime identity in persisted keys', () => {
+  it('does not duplicate workspace identity or runtime identity in persisted keys', async () => {
     expect(restorableWorkspacePaneTargetKey({ kind: 'workspace-root' })).toBe('workspace-root')
     expect(restorableWorkspacePaneTargetKey({ kind: 'git-branch', branch: 'feature/a' })).toBe('git-branch\0feature/a')
   })
 
-  it('stores worktree roots as canonical locators and binds them to native runtime paths', () => {
+  it('stores worktree roots as canonical locators and binds them to native runtime paths', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://server/srv/app')
     const runtime = {
       kind: 'git-worktree' as const,
@@ -35,12 +35,12 @@ describe('restorable workspace pane targets', () => {
     })
   })
 
-  it('rejects legacy keys that duplicate a workspace id or contain raw worktree paths', () => {
+  it('rejects legacy keys that duplicate a workspace id or contain raw worktree paths', async () => {
     expect(parseRestorableWorkspacePaneTargetKey('goblin+file:///repo\0branch\0main')).toBeNull()
     expect(parseRestorableWorkspacePaneTargetKey('git-worktree\0/tmp/worktree')).toBeNull()
   })
 
-  it('uses strict canonical identities for client target keys', () => {
+  it('uses strict canonical identities for client target keys', async () => {
     const key = workspacePaneTabsTargetIdentityKey({
       kind: 'git-worktree',
       workspaceId: workspaceIdForTest('goblin+ssh://server/srv/app'),
@@ -62,7 +62,7 @@ describe('restorable workspace pane targets', () => {
     expect(parseWorkspacePaneTabsTargetIdentityKey('goblin+file:///repo\0branch\0bad\nbranch')).toBeNull()
   })
 
-  it('decodes canonical Windows worktree locators without consulting the browser platform', () => {
+  it('decodes canonical Windows worktree locators without consulting the browser platform', async () => {
     const target = {
       kind: 'git-worktree' as const,
       root: workspaceIdForTest('goblin+file:///C:/repo/worktree'),
@@ -75,7 +75,7 @@ describe('restorable workspace pane targets', () => {
     })
   })
 
-  it('rejects worktree targets from a different transport or SSH profile', () => {
+  it('rejects worktree targets from a different transport or SSH profile', async () => {
     const workspaceRuntimeId = 'repo-runtime-test'
     expect(
       workspacePaneTabsTargetFromRuntime({

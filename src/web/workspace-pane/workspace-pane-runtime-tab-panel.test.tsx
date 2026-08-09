@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 
 import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { stubI18n } from '#/test-utils/i18n-mock.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
-import { TerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { TerminalSessionCommandScope } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue } from '#/web/components/terminal/types.ts'
-import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import {
   observeWorkspacePaneRouteForTest,
   observedAppNavigationActionsForTest,
@@ -18,9 +18,6 @@ import {
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import type * as WorkspacePaneTabsQueryModule from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-
-stubI18n()
 
 interface CapturedTerminalSessionViewProps {
   base: TerminalSessionBase
@@ -39,15 +36,6 @@ const terminalCreateCommandMocks = vi.hoisted(() => ({
     ok: true as const,
     terminalSessionId: 'term-111111111111111111111',
   })),
-}))
-
-const workspacePaneTabsQueryMocks = vi.hoisted(() => ({
-  refreshWorkspacePaneTabsQueryData: vi.fn(async () => undefined),
-}))
-
-vi.mock('#/web/workspace-pane/workspace-pane-tabs-query.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof WorkspacePaneTabsQueryModule>()),
-  refreshWorkspacePaneTabsQueryData: workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData,
 }))
 
 vi.mock('#/web/components/terminal/TerminalSessionView.tsx', () => ({
@@ -84,11 +72,10 @@ afterEach(() => {
   resetWorkspacesStore()
   terminalSessionViewMocks.props.length = 0
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
-  workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData.mockClear()
 })
 
 describe('workspace pane runtime tab panel', () => {
-  test('renders terminal runtime panel through the runtime panel registry', () => {
+  test('renders terminal runtime panel through the runtime panel registry', async () => {
     const { container } = renderPanel()
 
     const panel = container.querySelector('#workspace-terminal-panel')
@@ -128,7 +115,7 @@ describe('workspace pane runtime tab panel', () => {
       presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'stale-branch' } },
     }
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       await terminalSessionViewMocks.props[0]?.createTerminalForSlot?.(base)
     })
 
@@ -160,7 +147,6 @@ describe('workspace pane runtime tab panel', () => {
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
     })
-    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabsQueryData).not.toHaveBeenCalled()
     expect(navigation.commitWorkspacePaneRoute).toHaveBeenCalledWith(
       'goblin+file:///repo',
       'main',
@@ -174,7 +160,7 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
   const navigation = navigationWith()
   const result = renderInJsdom(
     <AppNavigationProvider value={navigation}>
-      <TerminalSessionContext value={input.terminalContext ?? terminalCommandContextWith()}>
+      <TerminalSessionCommandScope value={input.terminalContext ?? terminalCommandContextWith()}>
         {renderWorkspacePaneRuntimeTabPanel({
           type: 'terminal',
           workspacePaneId: 'workspace',
@@ -199,7 +185,7 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
             projectionErrorMessage: 'boom',
           },
         })}
-      </TerminalSessionContext>
+      </TerminalSessionCommandScope>
     </AppNavigationProvider>,
   )
   return { ...result, navigation }

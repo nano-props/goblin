@@ -6,7 +6,7 @@
 // restored from the previous session for `/` startup routing. Route state owns
 // the workspace currently visible on the right. `workspaces[id]` owns the client
 // shell, UI intent, command presentation, and session-local state. Git
-// domain read data such as branches, status, and worktrees is server/React
+// domain read data such as branches, status, and worktrees is server/TanStack
 // Query authoritative and is composed into presentation models at the UI edge.
 //
 // Race-condition defenses
@@ -15,7 +15,7 @@
 //     they observe a different id in `set()` — this guards against
 //     a stale snapshot from before close-and-reopen overwriting fresh
 //     data in the wrong workspace.
-import { create } from 'zustand'
+import { createStore } from 'zustand/vanilla'
 import { createBranchActions } from '#/web/stores/workspaces/branch-actions.ts'
 import { createGitWorkspaceClientActions } from '#/web/stores/workspaces/git-workspace-client-actions.ts'
 import { createWorkspaceSessionActions } from '#/web/stores/workspaces/workspace-session.ts'
@@ -24,7 +24,7 @@ import { createTabOpenerActions } from '#/web/stores/workspaces/tab-opener.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { WorkspacesStore } from '#/web/stores/workspaces/types.ts'
 
-export const useWorkspacesStore = create<WorkspacesStore>()((set, get) => ({
+export const workspacesStore = createStore<WorkspacesStore>()((set, get) => ({
   // Runtime-coherent client projection.
   workspaces: {},
 

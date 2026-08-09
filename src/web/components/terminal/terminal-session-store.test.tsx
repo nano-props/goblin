@@ -1,17 +1,13 @@
 // @vitest-environment jsdom
-// Tests the simplified hooks in `terminal-session-store.ts` after the
-// factory refactor: each hook should derive the right field, return a
-// safe empty value when the key is null, and the latest-ref selector
-// pattern should keep extra re-renders to zero when the selector
-// identity changes but the projected value does not.
-import { useState } from 'react'
+
+import { defineComponent, ref } from 'vue'
+import type { Ref, VNode } from 'vue'
 import { describe, expect, test } from 'vitest'
-import { act } from '@testing-library/react'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   EMPTY_TERMINAL_SNAPSHOT,
-  TerminalSessionReadContext,
+  TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import {
   useTerminalSessionSummaries,
@@ -27,7 +23,6 @@ import {
 import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import type {
   TerminalSessionReadContextValue,
-  TerminalSnapshot,
   TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
 
@@ -57,50 +52,41 @@ function makeReadContext(overrides: Partial<TerminalFilesystemTargetSnapshot> = 
   }
 }
 
-function withRead(value: TerminalSessionReadContextValue, children: React.ReactNode) {
-  return <TerminalSessionReadContext value={value}>{children}</TerminalSessionReadContext>
+function withRead(value: TerminalSessionReadContextValue, child: VNode): VNode {
+  return <TerminalSessionReadScope value={value}>{child}</TerminalSessionReadScope>
 }
 
-describe('simplified worktree hooks read the right field', () => {
-  test('useTerminalFilesystemTargetCount returns snapshot.count', () => {
-    function Probe() {
-      const count = useTerminalFilesystemTargetCount(WORKTREE_KEY)
-      return <span data-testid="v">{count}</span>
-    }
-    const { getByTestId } = renderInJsdom(withRead(makeReadContext({ count: 7 }), <Probe />))
-    expect(getByTestId('v').textContent).toBe('7')
-  })
+function renderValue<T>(
+  context: TerminalSessionReadContextValue,
+  composable: () => Ref<T>,
+  format: (value: T) => string = String,
+): HTMLElement {
+  const Probe = defineComponent(
+    () => {
+      const value = composable()
+      return () => <span data-testid="v">{format(value.value)}</span>
+    },
+    { name: 'TerminalStoreValueProbe' },
+  )
+  const { container } = renderInJsdom(withRead(context, <Probe />))
+  const value = container.querySelector<HTMLElement>('[data-testid="v"]')
+  if (!value) throw new Error('terminal store value probe did not render')
+  return value
+}
 
-  test('useTerminalFilesystemTargetCreatePending returns snapshot.createPending', () => {
-    function Probe() {
-      const v = useTerminalFilesystemTargetCreatePending(WORKTREE_KEY)
-      return <span data-testid="v">{String(v)}</span>
-    }
-    const { getByTestId } = renderInJsdom(withRead(makeReadContext({ createPending: true }), <Probe />))
-    expect(getByTestId('v').textContent).toBe('true')
-  })
+function expectMissingReadProvider(composable: () => unknown): void {
+  const Probe = defineComponent(
+    () => {
+      composable()
+      return () => null
+    },
+    { name: 'MissingTerminalStoreProviderProbe' },
+  )
+  expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
+}
 
-  test('useTerminalFilesystemTargetBellCount returns snapshot.bellCount', () => {
-    function Probe() {
-      const v = useTerminalFilesystemTargetBellCount(WORKTREE_KEY)
-      return <span data-testid="v">{v}</span>
-    }
-    const { getByTestId } = renderInJsdom(withRead(makeReadContext({ bellCount: 5 }), <Probe />))
-    expect(getByTestId('v').textContent).toBe('5')
-  })
-
-  test('useTerminalFilesystemTargetOutputActive derives from outputActiveCount', () => {
-    function Probe() {
-      const v = useTerminalFilesystemTargetOutputActive(WORKTREE_KEY)
-      return <span data-testid="v">{String(v)}</span>
-    }
-    const { rerender, getByTestId } = renderInJsdom(withRead(makeReadContext({ outputActiveCount: 2 }), <Probe />))
-    expect(getByTestId('v').textContent).toBe('true')
-    rerender(withRead(makeReadContext({ outputActiveCount: 0 }), <Probe />))
-    expect(getByTestId('v').textContent).toBe('false')
-  })
-
-  test('useTerminalFilesystemTargetSelectedDescriptor returns snapshot.selectedDescriptor', () => {
+describe('terminal filesystem target projections', () => {
+  test('reads count, pending, bell, output, descriptor, and sessions fields', async () => {
     const descriptor = terminalDescriptorForTest({
       terminalSessionId: SESSION_ID,
       index: 0,
@@ -109,15 +95,6 @@ describe('simplified worktree hooks read the right field', () => {
       branch: 'main',
       worktreePath: '/r',
     })
-    function Probe() {
-      const d = useTerminalFilesystemTargetSelectedDescriptor(WORKTREE_KEY)
-      return <span data-testid="v">{d?.terminalSessionId ?? 'none'}</span>
-    }
-    const { getByTestId } = renderInJsdom(withRead(makeReadContext({ selectedDescriptor: descriptor }), <Probe />))
-    expect(getByTestId('v').textContent).toBe(SESSION_ID)
-  })
-
-  test('useTerminalSessionSummaries returns snapshot.sessions', () => {
     const sessions = [
       {
         type: 'terminal' as const,
@@ -131,170 +108,116 @@ describe('simplified worktree hooks read the right field', () => {
         hasRecentOutput: false,
       },
     ]
-    function Probe() {
-      const v = useTerminalSessionSummaries(WORKTREE_KEY)
-      return <span data-testid="v">{v.length}</span>
-    }
-    const { getByTestId } = renderInJsdom(withRead(makeReadContext({ sessions }), <Probe />))
-    expect(getByTestId('v').textContent).toBe('1')
+    const context = makeReadContext({
+      count: 7,
+      createPending: true,
+      bellCount: 5,
+      outputActiveCount: 2,
+      selectedDescriptor: descriptor,
+      sessions,
+    })
+
+    expect(renderValue(context, () => useTerminalFilesystemTargetCount(WORKTREE_KEY)).textContent).toBe('7')
+    expect(renderValue(context, () => useTerminalFilesystemTargetCreatePending(WORKTREE_KEY)).textContent).toBe('true')
+    expect(renderValue(context, () => useTerminalFilesystemTargetBellCount(WORKTREE_KEY)).textContent).toBe('5')
+    expect(renderValue(context, () => useTerminalFilesystemTargetOutputActive(WORKTREE_KEY)).textContent).toBe('true')
+    expect(
+      renderValue(
+        context,
+        () => useTerminalFilesystemTargetSelectedDescriptor(WORKTREE_KEY),
+        (value) => value?.terminalSessionId ?? 'none',
+      ).textContent,
+    ).toBe(SESSION_ID)
+    expect(
+      renderValue(
+        context,
+        () => useTerminalSessionSummaries(WORKTREE_KEY),
+        (value) => String(value.length),
+      ).textContent,
+    ).toBe('1')
   })
 })
 
-describe('null key returns empty-derived values', () => {
-  test('useTerminalFilesystemTargetCount(null) returns 0', () => {
-    function Probe() {
-      const v = useTerminalFilesystemTargetCount(null)
-      return <span data-testid="v">{v}</span>
-    }
-    const { getByTestId } = renderInJsdom(withRead(makeReadContext(), <Probe />))
-    expect(getByTestId('v').textContent).toBe('0')
+describe('null targets', () => {
+  test('derive safe empty values while retaining the provider boundary', async () => {
+    const context = makeReadContext()
+    expect(renderValue(context, () => useTerminalFilesystemTargetCount(null)).textContent).toBe('0')
+    expect(renderValue(context, () => useTerminalFilesystemTargetCreatePending(null)).textContent).toBe('false')
+    expect(renderValue(context, () => useTerminalFilesystemTargetOutputActive(null)).textContent).toBe('false')
+    expect(renderValue(context, () => useTerminalFilesystemTargetBellCount(null)).textContent).toBe('0')
+    expect(
+      renderValue(
+        context,
+        () => useTerminalSnapshot(null),
+        (value) => value.phase,
+      ).textContent,
+    ).toBe(EMPTY_TERMINAL_SNAPSHOT.phase)
   })
 
-  test('useTerminalFilesystemTargetCreatePending(null) returns false', () => {
-    function Probe() {
-      const v = useTerminalFilesystemTargetCreatePending(null)
-      return <span data-testid="v">{String(v)}</span>
-    }
-    const { getByTestId } = renderInJsdom(withRead(makeReadContext(), <Probe />))
-    expect(getByTestId('v').textContent).toBe('false')
-  })
-
-  test('useTerminalFilesystemTargetOutputActive(null) returns false', () => {
-    function Probe() {
-      const v = useTerminalFilesystemTargetOutputActive(null)
-      return <span data-testid="v">{String(v)}</span>
-    }
-    const { getByTestId } = renderInJsdom(withRead(makeReadContext(), <Probe />))
-    expect(getByTestId('v').textContent).toBe('false')
-  })
-
-  test('useTerminalFilesystemTargetBellCount(null) returns 0', () => {
-    function Probe() {
-      const v = useTerminalFilesystemTargetBellCount(null)
-      return <span data-testid="v">{v}</span>
-    }
-    const { getByTestId } = renderInJsdom(withRead(makeReadContext(), <Probe />))
-    expect(getByTestId('v').textContent).toBe('0')
-  })
-
-  test('useTerminalSnapshot(null) returns the EMPTY snapshot', () => {
-    function Probe() {
-      const v = useTerminalSnapshot(null)
-      return <span data-testid="v">{v.phase}</span>
-    }
-    const { getByTestId } = renderInJsdom(withRead(makeReadContext(), <Probe />))
-    expect(getByTestId('v').textContent).toBe(EMPTY_TERMINAL_SNAPSHOT.phase)
-  })
-
-  test('null worktree key still requires the read provider', () => {
-    function Probe() {
-      useTerminalFilesystemTargetCount(null)
-      return null
-    }
-    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
-  })
-
-  test('null session id still requires the read provider', () => {
-    function Probe() {
-      useTerminalSnapshot(null)
-      return null
-    }
-    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
-  })
-
-  test('empty repo bell count query still requires the read provider', () => {
-    function Probe() {
-      useWorkspaceTerminalBellCounts([])
-      return null
-    }
-    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
-  })
-
-  test('real worktree key still requires the read provider', () => {
-    function Probe() {
-      useTerminalFilesystemTargetCount(WORKTREE_KEY)
-      return null
-    }
-    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
-  })
-
-  test('real session id still requires the read provider', () => {
-    function Probe() {
-      useTerminalSnapshot(SESSION_ID)
-      return null
-    }
-    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
-  })
-
-  test('non-empty repo bell count query still requires the read provider', () => {
-    function Probe() {
-      useWorkspaceTerminalBellCounts([WORKSPACE_ID])
-      return null
-    }
-    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
+  test('still requires the read provider for every target shape', async () => {
+    expectMissingReadProvider(() => useTerminalFilesystemTargetCount(null))
+    expectMissingReadProvider(() => useTerminalSnapshot(null))
+    expectMissingReadProvider(() => useWorkspaceTerminalBellCounts([]))
+    expectMissingReadProvider(() => useTerminalFilesystemTargetCount(WORKTREE_KEY))
+    expectMissingReadProvider(() => useTerminalSnapshot(SESSION_ID))
+    expectMissingReadProvider(() => useWorkspaceTerminalBellCounts([WORKSPACE_ID]))
   })
 })
 
-describe('useTerminalFilesystemTargetField uses the latest selector closure', () => {
-  test('a selector that depends on a captured variable reflects updates to that variable', () => {
-    function Probe({ multiplier }: { multiplier: number }) {
-      // Closure captures `multiplier`; when the prop changes, the new
-      // selector closure must take effect on the very next render.
-      const value = useTerminalFilesystemTargetField(WORKTREE_KEY, (s) => s.count * multiplier)
-      return <span data-testid="v">{value}</span>
-    }
-
-    function Parent() {
-      const [multiplier, setMultiplier] = useState(1)
-      return (
-        <>
-          <button data-testid="bump" onClick={() => setMultiplier(multiplier + 1)} />
-          <Probe multiplier={multiplier} />
-        </>
-      )
-    }
-
+describe('useTerminalFilesystemTargetField selector reactivity', () => {
+  test('tracks reactive values captured by the selector', async () => {
+    const Parent = defineComponent(
+      () => {
+        const multiplier = ref(1)
+        const value = useTerminalFilesystemTargetField(WORKTREE_KEY, (snapshot) => snapshot.count * multiplier.value)
+        return () => (
+          <>
+            <button
+              data-testid="bump"
+              onClick={() => {
+                multiplier.value += 1
+              }}
+            />
+            <span data-testid="v">{value.value}</span>
+          </>
+        )
+      },
+      { name: 'ReactiveTerminalSelectorProbe' },
+    )
     const { getByTestId } = renderInJsdom(withRead(makeReadContext({ count: 3 }), <Parent />))
     expect(getByTestId('v').textContent).toBe('3')
 
-    act(() => {
-      getByTestId('bump').click()
-    })
-    // multiplier is now 2; count * 2 should be 6. If the selectorRef were
-    // stale we would still see 3.
+    await flushTestUpdates(() => getByTestId('bump').click())
     expect(getByTestId('v').textContent).toBe('6')
-
-    act(() => {
-      getByTestId('bump').click()
-    })
+    await flushTestUpdates(() => getByTestId('bump').click())
     expect(getByTestId('v').textContent).toBe('9')
   })
 
-  test('a selector that ignores its captured variable stays consistent across re-renders', () => {
-    function Probe({ tick }: { tick: number }) {
-      // Selector always projects to `s.count` regardless of `tick`. This
-      // mirrors the real `useTerminalFilesystemTargetCount` etc., where the
-      // selector ignores everything except the store snapshot.
-      const value = useTerminalFilesystemTargetField(WORKTREE_KEY, (s) => s.count + (tick - tick))
-      return <span data-testid="v">{value}</span>
-    }
-
-    function Parent() {
-      const [tick, setTick] = useState(0)
-      return (
-        <>
-          <button data-testid="bump" onClick={() => setTick(tick + 1)} />
-          <Probe tick={tick} />
-        </>
-      )
-    }
-
+  test('keeps a stable projection across unrelated rerenders', async () => {
+    const Parent = defineComponent(
+      () => {
+        const tick = ref(0)
+        const value = useTerminalFilesystemTargetField(
+          WORKTREE_KEY,
+          (snapshot) => snapshot.count + tick.value - tick.value,
+        )
+        return () => (
+          <>
+            <button
+              data-testid="bump"
+              onClick={() => {
+                tick.value += 1
+              }}
+            />
+            <span data-testid="v">{value.value}</span>
+          </>
+        )
+      },
+      { name: 'StableTerminalSelectorProbe' },
+    )
     const { getByTestId } = renderInJsdom(withRead(makeReadContext({ count: 9 }), <Parent />))
     expect(getByTestId('v').textContent).toBe('9')
-
-    act(() => {
-      getByTestId('bump').click()
-    })
+    await flushTestUpdates(() => getByTestId('bump').click())
     expect(getByTestId('v').textContent).toBe('9')
   })
 })

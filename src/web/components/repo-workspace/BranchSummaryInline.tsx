@@ -9,8 +9,12 @@
 // need a different name trigger can reuse the visual primitives without
 // re-deriving the branch-state predicates.
 
-import { ArrowDown, ArrowUp, FolderTree, GitBranch } from 'lucide-react'
-import { useI18nStore, useT, type Lang } from '#/web/stores/i18n.ts'
+import { defineComponent } from 'vue'
+import type { FunctionalComponent, HTMLAttributes } from 'vue'
+import { ArrowDown, ArrowUp, FolderTree, GitBranch } from '@lucide/vue'
+import { i18nStore } from '#/web/stores/i18n.ts'
+import type { Lang } from '#/shared/settings.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
@@ -19,6 +23,7 @@ import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { branchWorktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
 export interface BranchSummaryInlineRepo {
   status: WorktreeStatus[] | undefined
@@ -31,23 +36,23 @@ interface BranchSummaryInlineProps {
   leadingTerminalBellCount?: number
   leadingTerminalOutputActive?: boolean
   worktreeIconDirty?: boolean
-  className?: string
+  class?: HTMLAttributes['class']
 }
 
-function Delta({ direction, count, label }: { direction: 'ahead' | 'behind'; count: number; label: string }) {
-  const Icon = direction === 'ahead' ? ArrowUp : ArrowDown
+const Delta: FunctionalComponent<{ direction: 'ahead' | 'behind'; count: number; label: string }> = (props) => {
+  const Icon = props.direction === 'ahead' ? ArrowUp : ArrowDown
   return (
     <span
       role="img"
-      aria-label={label}
-      title={label}
-      className={cn(
+      aria-label={props.label}
+      title={props.label}
+      class={cn(
         'inline-flex items-center gap-0.5 font-mono text-xs',
-        direction === 'ahead' ? 'text-success' : 'text-attention',
+        props.direction === 'ahead' ? 'text-success' : 'text-attention',
       )}
     >
       <Icon size={11} />
-      {count}
+      {props.count}
     </span>
   )
 }
@@ -97,12 +102,7 @@ export function buildBranchSummaryTitle(
 // visual + accessible signal for both.
 // Kept as a 4-wide column so the name column has a stable left margin
 // even when the icon kind changes.
-export function BranchSummaryIcon({
-  hasWorktree,
-  worktreeDirty,
-  selected,
-  ariaLabel,
-}: {
+interface BranchSummaryIconProps {
   hasWorktree: boolean
   worktreeDirty: boolean | undefined
   selected: boolean
@@ -110,24 +110,26 @@ export function BranchSummaryIcon({
   // passing a label keeps the worktree / dirty state announced when the
   // corresponding badge is hidden (see BranchSummaryMeta).
   ariaLabel?: string
-}) {
+}
+
+export const BranchSummaryIcon: FunctionalComponent<BranchSummaryIconProps> = (props) => {
   return (
     <span
       data-testid="branch-summary-icon"
-      aria-label={ariaLabel}
-      role={ariaLabel ? 'img' : undefined}
-      className="flex w-4 shrink-0 items-center justify-center"
+      aria-label={props.ariaLabel}
+      role={props.ariaLabel ? 'img' : undefined}
+      class="flex w-4 shrink-0 items-center justify-center"
     >
-      {hasWorktree ? (
+      {props.hasWorktree ? (
         <FolderTree
           size={14}
-          className={worktreeDirty === true ? 'text-attention' : 'text-brand-text'}
+          class={props.worktreeDirty === true ? 'text-attention' : 'text-brand-text'}
           aria-hidden="true"
         />
       ) : (
         <GitBranch
           size={14}
-          className={selected ? 'text-selected-muted-foreground' : 'text-muted-foreground'}
+          class={props.selected ? 'text-selected-muted-foreground' : 'text-muted-foreground'}
           aria-hidden="true"
         />
       )}
@@ -141,101 +143,124 @@ export function BranchSummaryIcon({
 // leading BranchSummaryIcon glyph — no worktree / dirty badges here.
 // Read-only by design — none of the inner spans are interactive.
 // BranchRow renders it as part of BranchSummaryInline.
-export function BranchSummaryMeta({
-  repo,
-  branch,
-  selected = false,
-}: Pick<BranchSummaryInlineProps, 'repo' | 'branch' | 'selected'>) {
-  const t = useT()
-  const lang = useI18nStore((s) => s.lang)
-  const { commitMeta } = computeBranchSummaryState(branch, repo, lang)
+export const BranchSummaryMeta = defineComponent(
+  (props: Pick<BranchSummaryInlineProps, 'repo' | 'branch' | 'selected'>) => {
+    const t = useT()
+    const lang = useStoreSelector(i18nStore, (state) => state.lang)
 
-  return (
-    <span
-      className={cn(
-        'flex min-w-0 items-center gap-1.5 overflow-hidden text-xs',
-        selected ? 'text-selected-muted-foreground' : 'text-muted-foreground',
-      )}
-    >
-      {branch.isDefault && (
-        <Badge variant="outline" className="text-muted-foreground">
-          {t('branches.default')}
-        </Badge>
-      )}
-      {branch.trackingGone && <Badge variant="attention">{t('branches.gone')}</Badge>}
-      {branch.ahead > 0 && (
-        <Delta direction="ahead" count={branch.ahead} label={t('branch-status.sync.ahead', { n: branch.ahead })} />
-      )}
-      {branch.behind > 0 && (
-        <Delta direction="behind" count={branch.behind} label={t('branch-status.sync.behind', { n: branch.behind })} />
-      )}
-      {commitMeta && (
+    return () => {
+      const selected = props.selected ?? false
+      const { commitMeta } = computeBranchSummaryState(props.branch, props.repo, lang.value)
+      return (
         <span
-          className={cn(
-            'min-w-0 truncate whitespace-nowrap text-[11px] leading-none',
-            selected ? 'text-selected-muted-foreground/90' : 'text-muted-foreground/85',
-          )}
-          title={commitMeta}
-        >
-          {commitMeta}
-        </span>
-      )}
-    </span>
-  )
-}
-
-export function BranchSummaryInline({
-  repo,
-  branch,
-  selected = false,
-  leadingTerminalBellCount = 0,
-  leadingTerminalOutputActive = false,
-  worktreeIconDirty,
-  className,
-}: BranchSummaryInlineProps) {
-  const t = useT()
-  const lang = useI18nStore((s) => s.lang)
-  const state = computeBranchSummaryState(branch, repo, lang)
-  const { hasWorktree, worktreeDirty } = state
-  const iconDirty = worktreeIconDirty ?? worktreeDirty
-  const showLeadingTerminalBell = leadingTerminalBellCount > 0
-  const showLeadingTerminalOutputActive = leadingTerminalOutputActive && !showLeadingTerminalBell
-  const title = buildBranchSummaryTitle(state, branch, t, leadingTerminalBellCount, showLeadingTerminalOutputActive)
-  // When no terminal signal owns the leading slot, surface the worktree
-  // state on the glyph itself. Compact callers may deliberately pass
-  // terminal bell/output state into this same slot; see BranchRow for
-  // that priority decision.
-  const iconAriaLabel = hasWorktree ? (iconDirty ? t('branches.dirty') : t('branches.worktree')) : undefined
-
-  return (
-    <div title={title} className={cn('flex min-w-0 items-center gap-1.5', className)}>
-      {showLeadingTerminalBell ? (
-        <span className="flex w-4 shrink-0 items-center justify-center">
-          <TerminalBellBadge count={leadingTerminalBellCount} />
-        </span>
-      ) : showLeadingTerminalOutputActive ? (
-        <span className="flex w-4 shrink-0 items-center justify-center">
-          <TerminalOutputActivityIndicator />
-        </span>
-      ) : (
-        <BranchSummaryIcon
-          hasWorktree={hasWorktree}
-          worktreeDirty={iconDirty}
-          selected={selected}
-          ariaLabel={iconAriaLabel}
-        />
-      )}
-      <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-        <span
-          className={cn(
-            'shrink-0 truncate text-[13px] font-normal leading-5',
-            selected ? 'text-selected-foreground' : 'text-foreground',
+          class={cn(
+            'flex min-w-0 items-center gap-1.5 overflow-hidden text-xs',
+            selected ? 'text-selected-muted-foreground' : 'text-muted-foreground',
           )}
         >
-          {branch.name}
+          {props.branch.isDefault ? (
+            <Badge variant="outline" class="text-muted-foreground">
+              {t('branches.default')}
+            </Badge>
+          ) : null}
+          {props.branch.trackingGone ? <Badge variant="attention">{t('branches.gone')}</Badge> : null}
+          {props.branch.ahead > 0 ? (
+            <Delta
+              direction="ahead"
+              count={props.branch.ahead}
+              label={t('branch-status.sync.ahead', { n: props.branch.ahead })}
+            />
+          ) : null}
+          {props.branch.behind > 0 ? (
+            <Delta
+              direction="behind"
+              count={props.branch.behind}
+              label={t('branch-status.sync.behind', { n: props.branch.behind })}
+            />
+          ) : null}
+          {commitMeta ? (
+            <span
+              class={cn(
+                'min-w-0 truncate whitespace-nowrap text-[11px] leading-none',
+                selected ? 'text-selected-foreground' : 'text-muted-foreground',
+              )}
+              title={commitMeta}
+            >
+              {commitMeta}
+            </span>
+          ) : null}
         </span>
-        <BranchSummaryMeta repo={repo} branch={branch} selected={selected} />
-      </span>
-    </div>
-  )
-}
+      )
+    }
+  },
+  { name: 'BranchSummaryMeta', props: ['repo', 'branch', 'selected'] },
+)
+
+export const BranchSummaryInline = defineComponent(
+  (props: BranchSummaryInlineProps) => {
+    const t = useT()
+    const lang = useStoreSelector(i18nStore, (state) => state.lang)
+
+    return () => {
+      const selected = props.selected ?? false
+      const leadingTerminalBellCount = props.leadingTerminalBellCount ?? 0
+      const state = computeBranchSummaryState(props.branch, props.repo, lang.value)
+      const { hasWorktree, worktreeDirty } = state
+      const iconDirty = props.worktreeIconDirty ?? worktreeDirty
+      const showLeadingTerminalBell = leadingTerminalBellCount > 0
+      const showLeadingTerminalOutputActive = !!props.leadingTerminalOutputActive && !showLeadingTerminalBell
+      const title = buildBranchSummaryTitle(
+        state,
+        props.branch,
+        t,
+        leadingTerminalBellCount,
+        showLeadingTerminalOutputActive,
+      )
+      const iconAriaLabel = hasWorktree ? (iconDirty ? t('branches.dirty') : t('branches.worktree')) : undefined
+
+      return (
+        <div title={title} class={cn('flex min-w-0 items-center gap-1.5', props.class)}>
+          {showLeadingTerminalBell ? (
+            <span class="flex w-4 shrink-0 items-center justify-center">
+              <TerminalBellBadge count={leadingTerminalBellCount} />
+            </span>
+          ) : showLeadingTerminalOutputActive ? (
+            <span class="flex w-4 shrink-0 items-center justify-center">
+              <TerminalOutputActivityIndicator />
+            </span>
+          ) : (
+            <BranchSummaryIcon
+              hasWorktree={hasWorktree}
+              worktreeDirty={iconDirty}
+              selected={selected}
+              ariaLabel={iconAriaLabel}
+            />
+          )}
+          <span class="flex min-w-0 items-center gap-1.5 overflow-hidden">
+            <span
+              class={cn(
+                'shrink-0 truncate text-[13px] font-normal leading-5',
+                selected ? 'text-selected-foreground' : 'text-foreground',
+              )}
+            >
+              {props.branch.name}
+            </span>
+            <BranchSummaryMeta repo={props.repo} branch={props.branch} selected={selected} />
+          </span>
+        </div>
+      )
+    }
+  },
+  {
+    name: 'BranchSummaryInline',
+    props: [
+      'repo',
+      'branch',
+      'selected',
+      'leadingTerminalBellCount',
+      'leadingTerminalOutputActive',
+      'worktreeIconDirty',
+      'class',
+    ],
+  },
+)

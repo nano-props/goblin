@@ -1,4 +1,4 @@
-import type { StoreApi } from 'zustand'
+import type { StoreApi } from 'zustand/vanilla'
 import type { RepoMutationExecResult } from '#/shared/git-types.ts'
 import type { RemoteWorkspaceConnectionLifecycle, WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type {

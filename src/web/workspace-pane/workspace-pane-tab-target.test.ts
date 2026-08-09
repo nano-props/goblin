@@ -6,7 +6,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
@@ -35,7 +35,7 @@ beforeEach(() => {
 })
 
 describe('workspace pane tab target read model', () => {
-  test('models the workspace root as a workspace target rather than an empty branch', () => {
+  test('models the workspace root as a workspace target rather than an empty branch', async () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
@@ -44,9 +44,7 @@ describe('workspace pane tab target read model', () => {
 
       tabs: [workspacePaneStaticTabEntry('files')],
     })
-    useWorkspacesStore
-      .getState()
-      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
+    workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
 
     const target = workspacePaneTabTargetForWorkspace(REPO_ID)
 
@@ -57,10 +55,10 @@ describe('workspace pane tab target read model', () => {
     })
   })
 
-  test('marks target resolution unavailable when the repo branch read model is unavailable', () => {
+  test('marks target resolution unavailable when the repo branch read model is unavailable', async () => {
     const repo = emptyWorkspace(REPO_ID, 'repo-runtime-workspace-pane-no-query')
     markGitAvailable(repo)
-    useWorkspacesStore.setState((s) => ({
+    workspacesStore.setState((s) => ({
       workspaces: { ...s.workspaces, [REPO_ID]: repo },
       workspaceOrder: [...s.workspaceOrder, REPO_ID],
       restoredWorkspaceId: REPO_ID,
@@ -75,7 +73,7 @@ describe('workspace pane tab target read model', () => {
     expect(workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)).toBeNull()
   })
 
-  test('resolves an interaction target from accepted data after a background snapshot refresh fails', () => {
+  test('resolves an interaction target from accepted data after a background snapshot refresh fails', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -95,10 +93,10 @@ describe('workspace pane tab target read model', () => {
     ).toMatchObject({ kind: 'ready', target: { branchName: 'feature/query', worktreePath: WORKTREE_PATH } })
   })
 
-  test('marks target resolution unavailable while workspace pane tabs projection is not ready', () => {
+  test('marks target resolution unavailable while workspace pane tabs projection is not ready', async () => {
     const repo = emptyWorkspace(REPO_ID, 'repo-runtime-workspace-pane-no-tabs')
     markGitAvailable(repo)
-    useWorkspacesStore.setState((s) => ({
+    workspacesStore.setState((s) => ({
       workspaces: { ...s.workspaces, [REPO_ID]: repo },
       workspaceOrder: [...s.workspaceOrder, REPO_ID],
       restoredWorkspaceId: REPO_ID,
@@ -122,7 +120,7 @@ describe('workspace pane tab target read model', () => {
     ).toBe(true)
   })
 
-  test('resolves branch targets from the React Query snapshot when store branches are stale', () => {
+  test('resolves branch targets from the TanStack Query snapshot when store branches are stale', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -212,7 +210,7 @@ describe('workspace pane tab target read model', () => {
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(true)
   })
 
-  test('resolves a created runtime by worktree while its canonical branch rename is not projected locally', () => {
+  test('resolves a created runtime by worktree while its canonical branch rename is not projected locally', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -246,7 +244,7 @@ describe('workspace pane tab target read model', () => {
     expect(target?.worktreePath).toBe(WORKTREE_PATH)
   })
 
-  test('treats an explicit bare branch route as an empty workspace pane', () => {
+  test('treats an explicit bare branch route as an empty workspace pane', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -266,7 +264,7 @@ describe('workspace pane tab target read model', () => {
     expect(target?.renderedTab).toBeNull()
   })
 
-  test('records tab openers from the React Query snapshot when store branches are stale', () => {
+  test('records tab openers from the TanStack Query snapshot when store branches are stale', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -285,13 +283,13 @@ describe('workspace pane tab target read model', () => {
     )
 
     expect(
-      useWorkspacesStore.getState().tabOpenerIdentityByScope[
+      workspacesStore.getState().tabOpenerIdentityByScope[
         `${tabOpenerScopeKey({ kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/query' })}\0${repo.workspaceRuntimeId}`
       ]?.['workspace-pane:changes'],
     ).toBe('workspace-pane:status')
   })
 
-  test('scopes worktree tab openers by workspace pane target instead of branch name', () => {
+  test('scopes worktree tab openers by workspace pane target instead of branch name', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -332,9 +330,9 @@ describe('workspace pane tab target read model', () => {
     ).toBe('workspace-pane:status')
   })
 
-  test('keeps detached worktree openers isolated from workspace-root and branch targets', () => {
+  test('keeps detached worktree openers isolated from workspace-root and branch targets', async () => {
     const repo = emptyWorkspace(REPO_ID, 'repo-runtime-detached-opener')
-    useWorkspacesStore.setState((state) => ({
+    workspacesStore.setState((state) => ({
       workspaces: { ...state.workspaces, [REPO_ID]: repo },
       workspaceOrder: [...state.workspaceOrder, REPO_ID],
       restoredWorkspaceId: REPO_ID,
@@ -366,9 +364,9 @@ describe('workspace pane tab target read model', () => {
     ).toBeNull()
   })
 
-  test('records against a canonical branch target without requiring a branch read model', () => {
+  test('records against a canonical branch target without requiring a branch read model', async () => {
     const repo = emptyWorkspace(REPO_ID, 'repo-runtime-workspace-pane-no-query')
-    useWorkspacesStore.setState((s) => ({
+    workspacesStore.setState((s) => ({
       workspaces: { ...s.workspaces, [REPO_ID]: repo },
       workspaceOrder: [...s.workspaceOrder, REPO_ID],
       restoredWorkspaceId: REPO_ID,

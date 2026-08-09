@@ -1,71 +1,135 @@
-// Shared jsdom render helpers. Tests import `renderInJsdom` instead of
-// hand-rolling `createRoot` + `container` + `act` boilerplate.
-//
-// Why a helper rather than `@testing-library/react` directly:
-//   - RTL's `render` already wraps the synchronous mount in its own
-//     `act()` boundary. Tests only add an explicit async `act()` around
-//     the later operation that schedules React work, such as advancing
-//     fake timers; wrapping the render again does not cover that work.
-//   - `cleanup` is registered with `afterEach` so callers don't repeat
-//     the import.
-//   - `flushAnimationFrames` and the shared microtask helpers exist because
-//     several tests need to drive microtasks or rAF deterministically;
-//     without these, tests reach for ad-hoc
-//     `for (let i = 0; i < 5; i++) await Promise.resolve()` loops,
-//     which the testing spec forbids.
-//
-// Why `renderInJsdom` does NOT set `globalThis.IS_REACT_ACT_ENVIRONMENT =
-// true` permanently (an earlier revision of this file did):
-//
-//   React 19's `warnIfUpdatesNotWrappedWithActDEV` fires when
-//     `IS_REACT_ACT_ENVIRONMENT` is true AND no `act` is currently on
-//     the call stack. Permanently flipping the global to true, then
-//     letting `render(...)` return, leaves the worker in the "act
-//     environment is on but no act is running" state, which produces
-//     the "An update to <Component> inside a test was not wrapped in
-//     act(...)" warnings on every fire-and-forget Promise chain that
-//     schedules a setState after the initial mount.
-//
-//   RTL itself keeps `IS_REACT_ACT_ENVIRONMENT` set only for the
-//     duration of its own `act()` wrapper (see
-//     `node_modules/@testing-library/react/dist/act-compat.js:39-77`).
-//     Tests that need an `act` boundary — typically those that drive
-//     fake timers, await async updates, or assert on intermediate
-//     state — should import `act` from `@testing-library/react` and
-//     wrap the state-changing operation in `await act(async () => …)`.
-//     Importing `act` from `react` directly does not set the test
-//     environment flag and can emit "The current testing environment is
-//     not configured to support act(...)". `renderInJsdom` does not
-//     assume that need on the caller's behalf.
-
+// Vue Testing Library owns Vue's mount lifecycle; this helper adds the
+// repository cleanup boundary because Vitest globals are disabled.
+import { cleanup, render } from '@testing-library/vue'
+import type { RenderOptions, RenderResult } from '@testing-library/vue'
+import { VueQueryPlugin } from '@tanstack/vue-query'
+import type { QueryClient } from '@tanstack/vue-query'
+import { defineComponent, isVNode, nextTick, shallowRef } from 'vue'
+import type { Component, ComponentOptions, ShallowRef, VNode } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach } from 'vitest'
-import { cleanup, render, renderHook, type RenderOptions, type RenderResult } from '@testing-library/react'
+import { appI18n } from '#/web/stores/i18n-vue.ts'
 
-afterEach(() => {
-  cleanup()
-})
+afterEach(cleanup)
 
-/** Render a hook through RTL while retaining this module's cleanup boundary. */
-export const renderHookInJsdom = renderHook
+type JsxComponent = Exclude<Component, ComponentOptions>
 
-/**
- * Render a React element under jsdom through RTL's synchronous `act`
- * boundary. Replaces hand-rolled `createRoot` + container boilerplate.
- *
- * Returns the standard RTL result plus a `flushAnimationFrames`
- * helper for tests that drive `requestAnimationFrame` directly.
- */
-export function renderInJsdom(
-  element: React.ReactNode,
-  options?: RenderOptions,
-): RenderResult & { flushAnimationFrames: (frames?: number) => Promise<void> } {
-  const result = render(element, options)
-  return {
-    ...result,
-    async flushAnimationFrames(frames = 1): Promise<void> {
-      for (let i = 0; i < frames; i += 1) {
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+export interface JsdomRenderOptions extends Omit<RenderOptions<unknown>, 'wrapper'> {
+  wrapper?: JsxComponent
+}
+
+export interface JsdomRenderResult extends Omit<RenderResult, 'baseElement' | 'container' | 'rerender'> {
+  baseElement: HTMLElement
+  container: HTMLElement
+  flushAnimationFrames(frames?: number): Promise<void>
+  rerender(next: VNode | Record<string, unknown>): Promise<void>
+}
+
+async function flushAnimationFrames(frames = 1): Promise<void> {
+  for (let index = 0; index < frames; index += 1) {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  }
+}
+
+export function renderInJsdom(component: Component | VNode, options: JsdomRenderOptions = {}): JsdomRenderResult {
+  const { wrapper: Wrapper, ...renderOptions } = options
+  const suppliedPlugins = renderOptions.global?.plugins ?? []
+  const router = suppliedPlugins.some(isRouterPlugin) ? null : createTestRouter()
+  const global = {
+    ...renderOptions.global,
+    plugins: [appI18n, ...(router ? [router] : []), ...suppliedPlugins],
+  }
+
+  if (!isVNode(component)) {
+    const mounted = render(component, { ...renderOptions, global })
+    return {
+      ...mounted,
+      baseElement: mounted.baseElement as HTMLElement,
+      container: mounted.container as HTMLElement,
+      flushAnimationFrames,
+      rerender: async (next) => {
+        if (isVNode(next)) throw new Error('component renders accept prop objects when rerendering')
+        await mounted.rerender(next)
+      },
+    }
+  }
+
+  const content = shallowRef(component)
+  const Harness = defineComponent({
+    name: 'VNodeTestHarness',
+    inheritAttrs: false,
+    setup() {
+      return () => {
+        if (!Wrapper) return content.value
+        const TestWrapper = Wrapper
+        return <TestWrapper>{content.value}</TestWrapper>
       }
+    },
+  })
+  const mounted = render(Harness, { ...renderOptions, global })
+  return {
+    ...mounted,
+    baseElement: mounted.baseElement as HTMLElement,
+    container: mounted.container as HTMLElement,
+    flushAnimationFrames,
+    rerender: async (next) => {
+      if (!isVNode(next)) throw new Error('VNode renders must be rerendered with a VNode')
+      if (next === content.value) {
+        throw new Error('VNode renders must be rerendered with a newly created VNode')
+      }
+      content.value = next
+      await nextTick()
+    },
+  }
+}
+
+function isRouterPlugin(pluginWithOptions: unknown): boolean {
+  const plugin = Array.isArray(pluginWithOptions) ? pluginWithOptions[0] : pluginWithOptions
+  return typeof plugin === 'object' && plugin !== null && 'currentRoute' in plugin && 'resolve' in plugin
+}
+
+function createTestRouter() {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      {
+        path: '/:pathMatch(.*)*',
+        component: defineComponent({
+          name: 'TestRouterRoute',
+          inheritAttrs: false,
+          setup: () => () => null,
+        }),
+      },
+    ],
+  })
+}
+
+export function renderComposableInJsdom<T>(
+  composable: () => T,
+  options: JsdomRenderOptions = {},
+): JsdomRenderResult & { result: ShallowRef<T> } {
+  const result = shallowRef<T>() as ShallowRef<T>
+  const Harness = defineComponent({
+    name: 'ComposableTestHarness',
+    inheritAttrs: false,
+    setup() {
+      result.value = composable()
+      return () => null
+    },
+  })
+  return { ...renderInJsdom(<Harness />, options), result }
+}
+
+export async function flushTestUpdates<T>(callback: () => T | Promise<T>): Promise<T> {
+  const result = await callback()
+  await nextTick()
+  return result
+}
+
+export function vueQueryRenderOptions(queryClient: QueryClient): Pick<JsdomRenderOptions, 'global'> {
+  return {
+    global: {
+      plugins: [[VueQueryPlugin, { queryClient }]],
     },
   }
 }

@@ -1,15 +1,16 @@
 // @vitest-environment jsdom
 
-import { act, screen } from '@testing-library/react'
+import { screen } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspaceNavigationControls } from '#/web/components/WorkspaceNavigationControls.tsx'
 import { AppNavigationProvider } from '#/web/app-navigation.tsx'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
@@ -20,7 +21,7 @@ beforeEach(() => {
 })
 
 describe('WorkspaceNavigationControls', () => {
-  test('uses only the zen control as the reveal surface', () => {
+  test('uses only the zen control as the reveal surface', async () => {
     const onZenRevealTriggerEnter = vi.fn()
     const { container } = renderControls({ zenRevealTriggerEnabled: true, onZenRevealTriggerEnter })
 
@@ -29,27 +30,27 @@ describe('WorkspaceNavigationControls', () => {
     expect(controls?.className).toContain('goblin-workspace-navigation-controls')
     expect(zenRevealSurface(container)?.contains(zenButton())).toBe(true)
 
-    act(() => {
+    await flushTestUpdates(() => {
       backButton().dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
     expect(onZenRevealTriggerEnter).not.toHaveBeenCalled()
 
-    act(() => {
-      zenButton().dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    await flushTestUpdates(() => {
+      zenRevealSurface(container)?.dispatchEvent(new MouseEvent('mouseenter'))
     })
 
     expect(onZenRevealTriggerEnter).toHaveBeenCalledTimes(1)
   })
 
-  test('disables history buttons at stack boundaries and enables them when history is present', () => {
+  test('disables history buttons at stack boundaries and enables them when history is present', async () => {
     const { container } = renderControls()
 
     expect(backButton().disabled).toBe(true)
     expect(forwardButton().disabled).toBe(true)
 
-    act(() => {
-      useWorkspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'dashboard' } })
-      useWorkspacesStore
+    await flushTestUpdates(() => {
+      workspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'dashboard' } })
+      workspacesStore
         .getState()
         .recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'newWorktree', returnTo: null } })
     })
@@ -58,8 +59,8 @@ describe('WorkspaceNavigationControls', () => {
     expect(backButton().disabled).toBe(false)
     expect(forwardButton().disabled).toBe(true)
 
-    act(() => {
-      const store = useWorkspacesStore.getState()
+    await flushTestUpdates(() => {
+      const store = workspacesStore.getState()
       const traversal = store.peekWorkspaceNavigation(REPO_ID, 'back')
       if (traversal) store.commitWorkspaceNavigation(traversal)
     })
@@ -74,9 +75,9 @@ describe('WorkspaceNavigationControls', () => {
     const goForward = vi.fn()
     renderControls({ navigation: navigationWith({ goBack, goForward }) })
 
-    act(() => {
-      useWorkspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'dashboard' } })
-      useWorkspacesStore
+    await flushTestUpdates(() => {
+      workspacesStore.getState().recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'dashboard' } })
+      workspacesStore
         .getState()
         .recordWorkspaceNavigation({ workspaceId: REPO_ID, route: { kind: 'newWorktree', returnTo: null } })
     })
@@ -84,8 +85,8 @@ describe('WorkspaceNavigationControls', () => {
     await user.click(backButton())
     expect(goBack).toHaveBeenCalledWith(REPO_ID)
 
-    act(() => {
-      const store = useWorkspacesStore.getState()
+    await flushTestUpdates(() => {
+      const store = workspacesStore.getState()
       const traversal = store.peekWorkspaceNavigation(REPO_ID, 'back')
       if (traversal) store.commitWorkspaceNavigation(traversal)
     })

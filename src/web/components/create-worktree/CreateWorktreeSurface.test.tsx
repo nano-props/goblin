@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
 import { repoPresentationForTest, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
-import { cleanup, render as rtlRender, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
-import { QueryClientProvider } from '@tanstack/react-query'
-import type { ReactElement } from 'react'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
+import type { VNode } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreePageBody } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
@@ -13,15 +13,12 @@ import { appQueryClient } from '#/web/app-query-client.ts'
 import type { RepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
 import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import type * as RepoClientModule from '#/web/repo-client.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo')
 const WORKTREE_PATH = '/tmp/goblin-repo'
 
-vi.mock('#/web/repo-client.ts', async () => {
-  const actual = await vi.importActual<typeof RepoClientModule>('#/web/repo-client.ts')
-  return { ...actual, getRepoRemoteBranches: vi.fn() }
-})
+vi.mock('#/web/repo-client.ts', () => ({ getRepoRemoteBranches: vi.fn() }))
 
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 
@@ -48,12 +45,12 @@ afterEach(() => {
   delete testWindow.__GOBLIN_BOOTSTRAP__
 })
 
-function render(ui: ReactElement) {
-  return rtlRender(<QueryClientProvider client={appQueryClient}>{ui}</QueryClientProvider>)
+function render(ui: VNode) {
+  return renderInJsdom(<VueQueryClientScope client={appQueryClient}>{ui}</VueQueryClientScope>)
 }
 
 describe('CreateWorktreePageBody', () => {
-  test('does not steal focus when the page mounts', () => {
+  test('does not steal focus when the page mounts', async () => {
     render(<CreateWorktreePageBody repo={createRepo()} onCancel={vi.fn()} onCreate={vi.fn()} />)
 
     expect(document.activeElement).toBe(document.body)
@@ -110,7 +107,8 @@ describe('CreateWorktreePageBody', () => {
 
   test('keeps the form in creating state when live branch data gains the submitted worktree', async () => {
     const user = userEvent.setup()
-    const onCancel = vi.fn()
+    const admittedOnCancel = vi.fn()
+    const replacementOnCancel = vi.fn()
     let resolveCreate!: () => void
     const onCreate = vi.fn(
       () =>
@@ -119,7 +117,7 @@ describe('CreateWorktreePageBody', () => {
         }),
     )
 
-    const view = render(<CreateWorktreePageBody repo={createRepo()} onCancel={onCancel} onCreate={onCreate} />)
+    const view = render(<CreateWorktreePageBody repo={createRepo()} onCancel={admittedOnCancel} onCreate={onCreate} />)
 
     await user.type(screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }), 'feature/new')
     await user.click(screen.getByRole('button', { name: /action.create-worktree-confirm/i }))
@@ -128,10 +126,14 @@ describe('CreateWorktreePageBody', () => {
       (screen.getByRole('button', { name: /action.create-worktree-creating-title/i }) as HTMLButtonElement).disabled,
     ).toBe(true)
 
-    view.rerender(
-      <QueryClientProvider client={appQueryClient}>
-        <CreateWorktreePageBody repo={createRepoWithCreatedWorktree()} onCancel={onCancel} onCreate={onCreate} />
-      </QueryClientProvider>,
+    await view.rerender(
+      <VueQueryClientScope client={appQueryClient}>
+        <CreateWorktreePageBody
+          repo={createRepoWithCreatedWorktree()}
+          onCancel={replacementOnCancel}
+          onCreate={onCreate}
+        />
+      </VueQueryClientScope>,
     )
 
     const branchInput = screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i })
@@ -143,8 +145,9 @@ describe('CreateWorktreePageBody', () => {
 
     resolveCreate()
     await waitFor(() => {
-      expect(onCancel).toHaveBeenCalledTimes(1)
+      expect(admittedOnCancel).toHaveBeenCalledTimes(1)
     })
+    expect(replacementOnCancel).not.toHaveBeenCalled()
   })
 
   test('switches to existingBranch mode and submits the selected branch', async () => {
@@ -153,7 +156,7 @@ describe('CreateWorktreePageBody', () => {
 
     render(<CreateWorktreePageBody repo={createRepo()} onCancel={vi.fn()} onCreate={onCreate} />)
 
-    await user.click(screen.getByRole('radio', { name: /action.create-worktree-mode-existing/i }))
+    await user.click(screen.getByRole('button', { name: /action.create-worktree-mode-existing/i }))
     await waitFor(() => {
       expect(
         (screen.getByRole('button', { name: /action.create-worktree-confirm/i }) as HTMLButtonElement).disabled,
@@ -179,7 +182,7 @@ describe('CreateWorktreePageBody', () => {
 
     render(<CreateWorktreePageBody repo={createRemoteRepo()} onCancel={vi.fn()} onCreate={onCreate} />)
 
-    await user.click(screen.getByRole('radio', { name: /action.create-worktree-mode-remote/i }))
+    await user.click(screen.getByRole('button', { name: /action.create-worktree-mode-remote/i }))
     await waitFor(() => {
       expect(getRepoRemoteBranches).toHaveBeenCalledTimes(1)
     })
@@ -221,7 +224,7 @@ describe('CreateWorktreePageBody', () => {
     })
   })
 
-  test('hides the trust prompt row entirely when neither loading nor needed', () => {
+  test('hides the trust prompt row entirely when neither loading nor needed', async () => {
     render(
       <CreateWorktreePageBody
         repo={createRepo()}
@@ -240,7 +243,7 @@ describe('CreateWorktreePageBody', () => {
     expect(screen.queryByText(/action.create-worktree-bootstrap-config-trusted/i)).toBeNull()
   })
 
-  test('shows the trust prompt when bootstrap operations are present', () => {
+  test('shows the trust prompt when bootstrap operations are present', async () => {
     const preview = {
       hasOperations: true,
       configHash: 'config-hash',

@@ -16,20 +16,22 @@ import {
   createRepoBranch,
   repoPresentationFromQueryForTest,
 } from '#/web/test-utils/repo-store.ts'
-import { act, cleanup } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { cleanup } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
 import {
   branchCheckboxKey,
   resetBranchActionDialogsStore,
-  useBranchActionDialogsStore,
+  branchActionDialogsStore,
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
+import type { VNode, VNodeChild } from 'vue'
 
 vi.mock('#/web/hooks/branchActionDispatch.ts', () => ({
   dispatchPush: vi.fn(),
@@ -37,19 +39,9 @@ vi.mock('#/web/hooks/branchActionDispatch.ts', () => ({
   dispatchRemoveWorktree: vi.fn(),
 }))
 
-// Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
-// that delegates to the real module so `i18next.use(initReactI18next).
-// init({…})` still runs (which is what wires the i18next singleton into
-// `react-i18next`'s module-scoped closure, the one `<Trans>` reads
-// from), and only overrides `useT` to return raw keys. See
-// `src/test-utils/i18n-mock.ts` for the rationale and the importOriginal
-// pattern that backs this side effect.
-import { stubI18n } from '#/test-utils/i18n-mock.ts'
-stubI18n()
-
 // Mock ConfirmDialog to record the `title` and `message` props on
 // every render, so the close-animation regression tests can observe
-// the host's prop choices even when Radix has hidden the dialog
+// the host's prop choices even when Reka has hidden the dialog
 // (jsdom has no exit-animation timing, so the dialog content would
 // otherwise vanish as soon as `open` flips to false).
 const titlePropsByDialog: Record<string, { title: string; message: unknown }> = {
@@ -89,7 +81,7 @@ vi.mock('#/web/components/ConfirmDialog.tsx', () => ({
     }
     const slot = slotByLabel[confirmLabel]
     if (slot) titlePropsByDialog[slot] = { title, message }
-    // Mimic the real Radix AlertDialog: only mount the dialog
+    // Mimic the real Reka AlertDialog: only mount the dialog
     // content when `open` is true. The existing integration tests
     // rely on this — they find the Cancel button via
     // `findButtonByText('dialog.cancel')` and the FIRST match in
@@ -98,7 +90,7 @@ vi.mock('#/web/components/ConfirmDialog.tsx', () => ({
     return (
       <div data-testid={`confirm-dialog-${confirmLabel}`} data-open="true">
         <h2>{title}</h2>
-        <div>{message as React.ReactNode}</div>
+        <div>{message as VNodeChild}</div>
         <button type="button" onClick={() => void onConfirm()}>
           {confirmLabel}
         </button>
@@ -134,13 +126,12 @@ afterEach(() => {
   cleanup()
 })
 
-function render(element: React.ReactNode) {
-  const result = renderInJsdom(<QueryClientProvider client={appQueryClient}>{element}</QueryClientProvider>)
+function render(element: VNode) {
+  const result = renderInJsdom(<VueQueryClientScope client={appQueryClient}>{element}</VueQueryClientScope>)
   return {
     ...result,
-    rerender: (next: React.ReactNode) => {
-      result.rerender(<QueryClientProvider client={appQueryClient}>{next}</QueryClientProvider>)
-    },
+    rerender: async (next: VNode) =>
+      await result.rerender(<VueQueryClientScope client={appQueryClient}>{next}</VueQueryClientScope>),
   }
 }
 
@@ -150,7 +141,7 @@ function findButtonByText(text: string): HTMLButtonElement | null {
 }
 
 function setBranchSnapshotForRepo(repoId: string, branches: ReturnType<typeof createRepoBranch>[]): void {
-  const repo = useWorkspacesStore.getState().workspaces[repoId]
+  const repo = workspacesStore.getState().workspaces[repoId]
   if (!repo) throw new Error(`missing test repo: ${repoId}`)
   const readModel = repoPresentationFromQueryForTest(repo)
   seedRepoQueryDataForTest(repo, {
@@ -161,7 +152,7 @@ function setBranchSnapshotForRepo(repoId: string, branches: ReturnType<typeof cr
 }
 
 function removeBranchFromReadModel(repoId: string, branchName: string): void {
-  const repo = useWorkspacesStore.getState().workspaces[repoId]
+  const repo = workspacesStore.getState().workspaces[repoId]
   if (!repo) throw new Error(`missing test repo: ${repoId}`)
   const readModel = repoPresentationFromQueryForTest(repo)
   setBranchSnapshotForRepo(
@@ -171,15 +162,15 @@ function removeBranchFromReadModel(repoId: string, branchName: string): void {
 }
 
 describe('BranchActionDialogHost', () => {
-  test('regression: store state survives a full unmount/remount cycle of the host', () => {
+  test('regression: store state survives a full unmount/remount cycle of the host', async () => {
     const { repo, branch } = setupRepo()
 
     const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
 
     // (a) Caller opens the dialog via the store — this is what
     // `useBranchActions.requestRemoveWorktree` does internally today.
-    act(() => {
-      useBranchActionDialogsStore
+    await flushTestUpdates(() => {
+      branchActionDialogsStore
         .getState()
         .openRemoveWorktreeConfirm({ repoId: repo.id, branchName: branch.name, payload }, { isProtectedBranch: false })
     })
@@ -189,32 +180,32 @@ describe('BranchActionDialogHost', () => {
     expect(document.body.textContent).toContain('action.confirm-remove-worktree-title')
 
     // (b) + (c) Unmount + remount — the popover went away and came back.
-    act(() => {
+    await flushTestUpdates(() => {
       cleanup()
     })
     render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
 
     // (d) Dialog still rendered, store still holds the entry.
     expect(document.body.textContent).toContain('action.confirm-remove-worktree-title')
-    expect(useBranchActionDialogsStore.getState().removeConfirm?.payload).toEqual(payload)
+    expect(branchActionDialogsStore.getState().removeConfirm?.payload).toEqual(payload)
   })
 
-  test('regression: closeStaleDialogs clears any open dialog whose repo does not match the new active workspace', () => {
+  test('regression: closeStaleDialogs clears any open dialog whose repo does not match the new active workspace', async () => {
     // Repo A active, open removeConfirm for A/feature/x.
     const { repo: repoA, branch: branchA } = setupRepo()
     const repoBId = workspaceIdForTest('goblin+file:///tmp/goblin-other-repo')
     // Add repoB to the store alongside repoA via seedRepoWithReadModelForTest +
     // setState merge (seedRepoWithReadModelForTest alone would overwrite `repos`).
     seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
-    act(() => {
-      useWorkspacesStore.setState((state) => ({
+    await flushTestUpdates(() => {
+      workspacesStore.setState((state) => ({
         workspaces: { ...state.workspaces, [REPO_ID]: repoA },
         restoredWorkspaceId: REPO_ID,
       }))
     })
 
-    act(() => {
-      useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openRemoveWorktreeConfirm(
         {
           repoId: repoA.id,
           branchName: branchA.name,
@@ -233,19 +224,19 @@ describe('BranchActionDialogHost', () => {
     // Switch the active workspace to repoB. The host's
     // closeStaleDialogs effect fires, which closes the open dialog
     // because (repoA, feature/host) != (repoB, main).
-    rerender(<BranchActionDialogHost currentWorkspaceId={repoBId} currentBranchName="main" />)
+    await rerender(<BranchActionDialogHost currentWorkspaceId={repoBId} currentBranchName="main" />)
 
-    expect(useBranchActionDialogsStore.getState().removeConfirm).toBeNull()
+    expect(branchActionDialogsStore.getState().removeConfirm).toBeNull()
     expect(document.body.textContent).not.toContain('action.confirm-remove-worktree-title')
   })
 
-  test('regression: closeStaleDialogs clears a dialog whose branch does not match the new current branch', () => {
+  test('regression: closeStaleDialogs clears a dialog whose branch does not match the new current branch', async () => {
     const { repo, branch: branchX } = setupRepo()
     const branchY = createRepoBranch('feature/y', { worktree: { path: '/tmp/y', isPrimary: false, isLocked: false } })
     setBranchSnapshotForRepo(REPO_ID, [branchX, branchY])
 
-    act(() => {
-      useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openRemoveWorktreeConfirm(
         {
           repoId: repo.id,
           branchName: branchX.name,
@@ -262,79 +253,79 @@ describe('BranchActionDialogHost', () => {
 
     // Switch current route branch in the same repo. The dialog is for X
     // and the new active is Y; closeStaleDialogs should close it.
-    rerender(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branchY.name} />)
+    await rerender(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branchY.name} />)
 
-    expect(useBranchActionDialogsStore.getState().removeConfirm).toBeNull()
+    expect(branchActionDialogsStore.getState().removeConfirm).toBeNull()
   })
 
-  test('one dialog open at a time: opening a second dialog closes the first', () => {
+  test('one dialog open at a time: opening a second dialog closes the first', async () => {
     const { repo, branch } = setupRepo()
-    act(() => {
-      useBranchActionDialogsStore.getState().openPushConfirm({
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openPushConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: branch.name,
       })
     })
-    expect(useBranchActionDialogsStore.getState().pushConfirm).not.toBeNull()
-    act(() => {
-      useBranchActionDialogsStore.getState().openDeleteConfirm({
+    expect(branchActionDialogsStore.getState().pushConfirm).not.toBeNull()
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openDeleteConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: branch.name,
       })
     })
-    expect(useBranchActionDialogsStore.getState().pushConfirm).toBeNull()
-    expect(useBranchActionDialogsStore.getState().deleteConfirm).not.toBeNull()
+    expect(branchActionDialogsStore.getState().pushConfirm).toBeNull()
+    expect(branchActionDialogsStore.getState().deleteConfirm).not.toBeNull()
   })
 
-  test("regression: force-promote preserves the user's deleteAlsoUpstream choice", () => {
+  test("regression: force-promote preserves the user's deleteAlsoUpstream choice", async () => {
     const { repo, branch } = setupRepo()
     // Seed: user opens deleteConfirm and toggles deleteAlsoUpstream on.
-    act(() => {
-      useBranchActionDialogsStore.getState().openDeleteConfirm({
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openDeleteConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: branch.name,
       })
-      useBranchActionDialogsStore.getState().setDeleteAlsoUpstream(repo.id, branch.name, true)
+      branchActionDialogsStore.getState().setDeleteAlsoUpstream(repo.id, branch.name, true)
     })
     // Promote: regular confirm fails, opens force variant.
-    act(() => {
-      useBranchActionDialogsStore.getState().openForceDeleteConfirm({
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openForceDeleteConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: branch.name,
       })
     })
-    expect(useBranchActionDialogsStore.getState().forceDeleteConfirm).not.toBeNull()
-    expect(useBranchActionDialogsStore.getState().deleteConfirm).toBeNull()
+    expect(branchActionDialogsStore.getState().forceDeleteConfirm).not.toBeNull()
+    expect(branchActionDialogsStore.getState().deleteConfirm).toBeNull()
     // The user's deleteAlsoUpstream=true should be preserved into
     // the force confirm's checkbox read.
     const checkboxes =
-      useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey(repo.id, branch.name)]
+      branchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey(repo.id, branch.name)]
     expect(checkboxes?.deleteAlsoUpstream).toBe(true)
   })
 
-  test('protected branch seeds removeAlsoDeletes off on first open', () => {
+  test('protected branch seeds removeAlsoDeletes off on first open', async () => {
     const { repo } = setupRepo()
-    act(() => {
-      useBranchActionDialogsStore
+    await flushTestUpdates(() => {
+      branchActionDialogsStore
         .getState()
         .openRemoveWorktreeConfirm(
           { repoId: repo.id, branchName: 'main', payload: { branch: 'main', path: '/tmp/main' } },
           { isProtectedBranch: true },
         )
     })
-    const checkboxes = useBranchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey(repo.id, 'main')]
+    const checkboxes = branchActionDialogsStore.getState().checkboxStateByBranch[branchCheckboxKey(repo.id, 'main')]
     expect(checkboxes?.removeAlsoDeletes).toBe(false)
   })
 
   // NOTE: Regression coverage for the "dialog content stays rendered
   // during the close animation" fix lives in
   // `useBranchActionDialogDisplay.test.tsx` (the display retention
-  // hook that the host calls). A Radix-portal-driven DOM check is
-  // not feasible in jsdom — Radix's `Presence` checks
+  // hook that the host calls). A Reka-portal-driven DOM check is
+  // not feasible in jsdom — Reka's `Presence` checks
   // `getComputedStyle` for an active animation and sends `UNMOUNT`
   // immediately when none is found, so the dialog unmounts before
   // we can inspect content.
@@ -349,8 +340,8 @@ describe('BranchActionDialogHost', () => {
     const repoA = setupRepo().repo
     const repoBId = workspaceIdForTest('goblin+file:///tmp/goblin-other-repo')
     seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
-    act(() => {
-      useWorkspacesStore.setState((state) => ({
+    await flushTestUpdates(() => {
+      workspacesStore.setState((state) => ({
         workspaces: { ...state.workspaces, [REPO_ID]: repoA },
         restoredWorkspaceId: REPO_ID,
       }))
@@ -365,8 +356,8 @@ describe('BranchActionDialogHost', () => {
     // workspace is still on repo A — the popover use case. The
     // effect does not re-fire (its deps didn't change), so the
     // dialog stays open.
-    act(() => {
-      useBranchActionDialogsStore.getState().openDeleteConfirm({
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openDeleteConfirm({
         repoId: repoBId,
         branchName: 'main',
         payload: 'main',
@@ -375,7 +366,7 @@ describe('BranchActionDialogHost', () => {
 
     const confirmButton = findButtonByText('action.confirm-delete-branch-confirm')
     expect(confirmButton).not.toBeNull()
-    act(() => {
+    await flushTestUpdates(() => {
       confirmButton!.click()
     })
 
@@ -396,18 +387,18 @@ describe('BranchActionDialogHost', () => {
   test('integration: clicking Confirm forwards the persisted checkbox state to dispatchDeleteBranch', async () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
-    act(() => {
-      useBranchActionDialogsStore.getState().openDeleteConfirm({
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openDeleteConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: branch.name,
       })
-      useBranchActionDialogsStore.getState().setDeleteAlsoUpstream(repo.id, branch.name, true)
+      branchActionDialogsStore.getState().setDeleteAlsoUpstream(repo.id, branch.name, true)
     })
     render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-delete-branch-confirm')
-    act(() => {
+    await flushTestUpdates(() => {
       confirmButton!.click()
     })
 
@@ -417,8 +408,8 @@ describe('BranchActionDialogHost', () => {
   test('integration: clicking Confirm on a force-promoted dialog dispatches with force: true', async () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
-    act(() => {
-      useBranchActionDialogsStore.getState().openForceDeleteConfirm({
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openForceDeleteConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: branch.name,
@@ -427,7 +418,7 @@ describe('BranchActionDialogHost', () => {
     render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-force-delete-unmerged-confirm')
-    act(() => {
+    await flushTestUpdates(() => {
       confirmButton!.click()
     })
 
@@ -437,8 +428,8 @@ describe('BranchActionDialogHost', () => {
   test('integration: clicking Confirm on the push-protected dialog calls dispatchPush', async () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
-    act(() => {
-      useBranchActionDialogsStore.getState().openPushConfirm({
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openPushConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: branch.name,
@@ -447,7 +438,7 @@ describe('BranchActionDialogHost', () => {
     render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-push-confirm')
-    act(() => {
+    await flushTestUpdates(() => {
       confirmButton!.click()
     })
 
@@ -463,8 +454,8 @@ describe('BranchActionDialogHost', () => {
   test('integration: clicking Confirm on the remove-worktree dialog dispatches dispatchRemoveWorktree', async () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
-    act(() => {
-      useBranchActionDialogsStore
+    await flushTestUpdates(() => {
+      branchActionDialogsStore
         .getState()
         .openRemoveWorktreeConfirm(
           { repoId: repo.id, branchName: branch.name, payload: { branch: branch.name, path: branch.worktree!.path } },
@@ -474,7 +465,7 @@ describe('BranchActionDialogHost', () => {
     render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-remove-worktree-confirm')
-    act(() => {
+    await flushTestUpdates(() => {
       confirmButton!.click()
     })
 
@@ -484,8 +475,8 @@ describe('BranchActionDialogHost', () => {
   test('integration: clicking Confirm on the force-remove-worktree dialog dispatches forceDeleteBranch:true', async () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
-    act(() => {
-      useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: { branch: branch.name, path: branch.worktree!.path },
@@ -494,7 +485,7 @@ describe('BranchActionDialogHost', () => {
     render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-force-delete-branch-confirm')
-    act(() => {
+    await flushTestUpdates(() => {
       confirmButton!.click()
     })
 
@@ -510,8 +501,8 @@ describe('BranchActionDialogHost', () => {
   test('integration: clicking Cancel closes the slot and does NOT call dispatch', async () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
-    act(() => {
-      useBranchActionDialogsStore.getState().openDeleteConfirm({
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openDeleteConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: branch.name,
@@ -520,31 +511,31 @@ describe('BranchActionDialogHost', () => {
     render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
 
     const cancelButton = findButtonByText('dialog.cancel')
-    act(() => {
+    await flushTestUpdates(() => {
       cancelButton!.click()
     })
 
     expect(dispatch.dispatchDeleteBranch).not.toHaveBeenCalled()
-    expect(useBranchActionDialogsStore.getState().deleteConfirm).toBeNull()
+    expect(branchActionDialogsStore.getState().deleteConfirm).toBeNull()
   })
 
   test('integration: remove-worktree dialog forwards deleteBranch and deleteUpstream to dispatchRemoveWorktree', async () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
-    act(() => {
-      useBranchActionDialogsStore
+    await flushTestUpdates(() => {
+      branchActionDialogsStore
         .getState()
         .openRemoveWorktreeConfirm(
           { repoId: repo.id, branchName: branch.name, payload: { branch: branch.name, path: branch.worktree!.path } },
           { isProtectedBranch: false },
         )
-      useBranchActionDialogsStore.getState().setRemoveAlsoDeletes(repo.id, branch.name, true)
-      useBranchActionDialogsStore.getState().setRemoveAlsoUpstream(repo.id, branch.name, true)
+      branchActionDialogsStore.getState().setRemoveAlsoDeletes(repo.id, branch.name, true)
+      branchActionDialogsStore.getState().setRemoveAlsoUpstream(repo.id, branch.name, true)
     })
     render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-remove-worktree-confirm')
-    act(() => {
+    await flushTestUpdates(() => {
       confirmButton!.click()
     })
 
@@ -566,18 +557,18 @@ describe('BranchActionDialogHost', () => {
     // force-promote must NOT reset the checkbox state.
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
-    act(() => {
-      useBranchActionDialogsStore.getState().openDeleteConfirm({
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openDeleteConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: branch.name,
       })
-      useBranchActionDialogsStore.getState().setDeleteAlsoUpstream(repo.id, branch.name, true)
+      branchActionDialogsStore.getState().setDeleteAlsoUpstream(repo.id, branch.name, true)
       // Simulate the IPC returning "needs force" — the handleResult
       // callback in dispatchDeleteBranch would normally call
       // openForceDeleteConfirm. We do it directly here because the
       // dispatch is mocked.
-      useBranchActionDialogsStore.getState().openForceDeleteConfirm({
+      branchActionDialogsStore.getState().openForceDeleteConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: branch.name,
@@ -586,7 +577,7 @@ describe('BranchActionDialogHost', () => {
     render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-force-delete-unmerged-confirm')
-    act(() => {
+    await flushTestUpdates(() => {
       confirmButton!.click()
     })
 
@@ -612,8 +603,8 @@ describe('BranchActionDialogHost', () => {
     // dispatch mock's recorded return.
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
-    act(() => {
-      useBranchActionDialogsStore.getState().openPushConfirm({
+    await flushTestUpdates(() => {
+      branchActionDialogsStore.getState().openPushConfirm({
         repoId: repo.id,
         branchName: branch.name,
         payload: branch.name,
@@ -622,7 +613,7 @@ describe('BranchActionDialogHost', () => {
     render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-push-confirm')
-    act(() => {
+    await flushTestUpdates(() => {
       confirmButton!.click()
     })
 
@@ -639,30 +630,30 @@ describe('BranchActionDialogHost', () => {
   // The title-flip regression. Pre-fix, the four non-push dialogs
   // used an IIFE that short-circuited to `<ConfirmDialog title=""
   // message="" />` whenever `displayContext` was null. When the
-  // backend IPC completes within the Radix close-animation window
+  // backend IPC completes within the Reka close-animation window
   // (~200 ms) and removes the branch from the repo, `displayContext`
   // becomes null while `entry` is still retained. Pre-fix the user
   // saw the title text disappear mid-fade; post-fix the title stays
   // and only the body collapses. Covers all four non-push dialogs.
   //
   // We can't observe the bug through `document.body.textContent`
-  // because Radix's `AlertDialog` unmounts its content as soon as
+  // because Reka's `AlertDialog` unmounts its content as soon as
   // `open` flips to false in jsdom (no exit-animation timing). So
   // we mock `ConfirmDialog` to record the `title` prop on every
   // render, letting us assert what the host passed to the dialog
-  // even when Radix would have hidden it in the browser.
+  // even when Reka would have hidden it in the browser.
   describe('regression: title stays visible when displayContext goes null mid-fade-out', () => {
-    function dropBranchFromRepo(branchName: string): void {
-      act(() => {
+    async function dropBranchFromRepo(branchName: string): Promise<void> {
+      await flushTestUpdates(() => {
         removeBranchFromReadModel(REPO_ID, branchName)
       })
     }
 
-    test('removeConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', () => {
+    test('removeConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', async () => {
       const { repo, branch } = setupRepo()
       const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
-      act(() => {
-        useBranchActionDialogsStore
+      await flushTestUpdates(() => {
+        branchActionDialogsStore
           .getState()
           .openRemoveWorktreeConfirm(
             { repoId: repo.id, branchName: branch.name, payload },
@@ -677,20 +668,20 @@ describe('BranchActionDialogHost', () => {
       // the repo so `displayContext` becomes null. The host's
       // render here is the structural one that would have rendered
       // `title=""` under the pre-fix IIFE.
-      act(() => {
-        useBranchActionDialogsStore.getState().closeDialog('removeConfirm')
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().closeDialog('removeConfirm')
       })
-      dropBranchFromRepo(branch.name)
+      await dropBranchFromRepo(branch.name)
 
       // Post-fix: title is still the static i18n key. Pre-fix it
       // would be `""`.
       expect(titlePropsByDialog.removeConfirm.title).toBe('action.confirm-remove-worktree-title')
     })
 
-    test('deleteConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', () => {
+    test('deleteConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', async () => {
       const { repo, branch } = setupRepo()
-      act(() => {
-        useBranchActionDialogsStore.getState().openDeleteConfirm({
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().openDeleteConfirm({
           repoId: repo.id,
           branchName: branch.name,
           payload: branch.name,
@@ -699,18 +690,18 @@ describe('BranchActionDialogHost', () => {
       render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
       expect(titlePropsByDialog.deleteConfirm.title).toBe('action.confirm-delete-branch-title')
 
-      act(() => {
-        useBranchActionDialogsStore.getState().closeDialog('deleteConfirm')
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().closeDialog('deleteConfirm')
       })
-      dropBranchFromRepo(branch.name)
+      await dropBranchFromRepo(branch.name)
 
       expect(titlePropsByDialog.deleteConfirm.title).toBe('action.confirm-delete-branch-title')
     })
 
-    test('forceDeleteConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', () => {
+    test('forceDeleteConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', async () => {
       const { repo, branch } = setupRepo()
-      act(() => {
-        useBranchActionDialogsStore.getState().openForceDeleteConfirm({
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().openForceDeleteConfirm({
           repoId: repo.id,
           branchName: branch.name,
           payload: branch.name,
@@ -719,19 +710,19 @@ describe('BranchActionDialogHost', () => {
       render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
       expect(titlePropsByDialog.forceDeleteConfirm.title).toBe('action.confirm-force-delete-unmerged-title')
 
-      act(() => {
-        useBranchActionDialogsStore.getState().closeDialog('forceDeleteConfirm')
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().closeDialog('forceDeleteConfirm')
       })
-      dropBranchFromRepo(branch.name)
+      await dropBranchFromRepo(branch.name)
 
       expect(titlePropsByDialog.forceDeleteConfirm.title).toBe('action.confirm-force-delete-unmerged-title')
     })
 
-    test('forceRemoveConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', () => {
+    test('forceRemoveConfirm: title is the static i18n key, not "", when the branch is removed mid-fade', async () => {
       const { repo, branch } = setupRepo()
       const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
-      act(() => {
-        useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
           repoId: repo.id,
           branchName: branch.name,
           payload,
@@ -740,10 +731,10 @@ describe('BranchActionDialogHost', () => {
       render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
       expect(titlePropsByDialog.forceRemoveConfirm.title).toBe('action.confirm-force-delete-branch-title')
 
-      act(() => {
-        useBranchActionDialogsStore.getState().closeDialog('forceRemoveConfirm')
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().closeDialog('forceRemoveConfirm')
       })
-      dropBranchFromRepo(branch.name)
+      await dropBranchFromRepo(branch.name)
 
       expect(titlePropsByDialog.forceRemoveConfirm.title).toBe('action.confirm-force-delete-branch-title')
     })
@@ -759,17 +750,17 @@ describe('BranchActionDialogHost', () => {
   // `useBranchActionDialogDisplay`, so the body stays stable while
   // the dialog fades out.
   describe('regression: body stays visible when the branch is removed mid-fade-out', () => {
-    function dropBranchFromRepo(branchName: string): void {
-      act(() => {
+    async function dropBranchFromRepo(branchName: string): Promise<void> {
+      await flushTestUpdates(() => {
         removeBranchFromReadModel(REPO_ID, branchName)
       })
     }
 
-    test('removeConfirm: body is not collapsed to empty when the worktree branch is removed mid-fade', () => {
+    test('removeConfirm: body is not collapsed to empty when the worktree branch is removed mid-fade', async () => {
       const { repo, branch } = setupRepo()
       const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
-      act(() => {
-        useBranchActionDialogsStore
+      await flushTestUpdates(() => {
+        branchActionDialogsStore
           .getState()
           .openRemoveWorktreeConfirm(
             { repoId: repo.id, branchName: branch.name, payload },
@@ -777,16 +768,16 @@ describe('BranchActionDialogHost', () => {
           )
       })
       render(<BranchActionDialogHost currentWorkspaceId={repo.id} currentBranchName={branch.name} />)
-      // Pre-close: message is the full body (a React element, not
+      // Pre-close: message is the full body (a VNode, not
       // the empty string).
       expect(titlePropsByDialog.removeConfirm.message).toBeTruthy()
       expect(titlePropsByDialog.removeConfirm.message).not.toBe('')
 
       // Close the slot (entry retained), then drop the branch.
-      act(() => {
-        useBranchActionDialogsStore.getState().closeDialog('removeConfirm')
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().closeDialog('removeConfirm')
       })
-      dropBranchFromRepo(branch.name)
+      await dropBranchFromRepo(branch.name)
 
       // Post-fix: message is still a non-empty body. Pre-fix it
       // would be the string `''` (the IIFE fallback).
@@ -794,10 +785,10 @@ describe('BranchActionDialogHost', () => {
       expect(titlePropsByDialog.removeConfirm.message).not.toBe('')
     })
 
-    test('deleteConfirm: body is not collapsed to empty when the branch is removed mid-fade', () => {
+    test('deleteConfirm: body is not collapsed to empty when the branch is removed mid-fade', async () => {
       const { repo, branch } = setupRepo()
-      act(() => {
-        useBranchActionDialogsStore.getState().openDeleteConfirm({
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().openDeleteConfirm({
           repoId: repo.id,
           branchName: branch.name,
           payload: branch.name,
@@ -807,20 +798,20 @@ describe('BranchActionDialogHost', () => {
       expect(titlePropsByDialog.deleteConfirm.message).toBeTruthy()
       expect(titlePropsByDialog.deleteConfirm.message).not.toBe('')
 
-      act(() => {
-        useBranchActionDialogsStore.getState().closeDialog('deleteConfirm')
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().closeDialog('deleteConfirm')
       })
-      dropBranchFromRepo(branch.name)
+      await dropBranchFromRepo(branch.name)
 
       expect(titlePropsByDialog.deleteConfirm.message).toBeTruthy()
       expect(titlePropsByDialog.deleteConfirm.message).not.toBe('')
     })
 
-    test('forceRemoveConfirm: body is not collapsed to empty when the worktree branch is removed mid-fade', () => {
+    test('forceRemoveConfirm: body is not collapsed to empty when the worktree branch is removed mid-fade', async () => {
       const { repo, branch } = setupRepo()
       const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
-      act(() => {
-        useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
           repoId: repo.id,
           branchName: branch.name,
           payload,
@@ -830,10 +821,10 @@ describe('BranchActionDialogHost', () => {
       expect(titlePropsByDialog.forceRemoveConfirm.message).toBeTruthy()
       expect(titlePropsByDialog.forceRemoveConfirm.message).not.toBe('')
 
-      act(() => {
-        useBranchActionDialogsStore.getState().closeDialog('forceRemoveConfirm')
+      await flushTestUpdates(() => {
+        branchActionDialogsStore.getState().closeDialog('forceRemoveConfirm')
       })
-      dropBranchFromRepo(branch.name)
+      await dropBranchFromRepo(branch.name)
 
       expect(titlePropsByDialog.forceRemoveConfirm.message).toBeTruthy()
       expect(titlePropsByDialog.forceRemoveConfirm.message).not.toBe('')

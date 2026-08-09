@@ -1,5 +1,5 @@
 import { createOpaqueId, isOpaqueId } from '#/shared/opaque-id.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import type {
   RemoteWorkspaceConnectionResult,
   RemoteWorkspaceFailureReason,
@@ -103,7 +103,7 @@ const workspaceRuntimeFailedListeners = new Set<(event: WorkspaceRuntimeFailedEv
 const workspaceRuntimeMembershipAcquiredListeners = new Set<(event: WorkspaceRuntimeMembershipAcquiredEvent) => void>()
 const workspaceRuntimeMembershipReleasedListeners = new Set<(event: WorkspaceRuntimeMembershipReleasedEvent) => void>()
 const workspaceRuntimeAdmissionTails = new Map<string, Promise<void>>()
-const workspaceRuntimeLogger = serverLogger.child({ tag: 'workspace-runtime' })
+const workspaceRuntimeLogger = serverNodeLog.child({ tag: 'workspace-runtime' })
 
 function workspaceRuntimeStateByUser(userId: string): Map<WorkspaceId, WorkspaceRuntimeState> {
   let states = workspaceRuntimesByUser.get(userId)

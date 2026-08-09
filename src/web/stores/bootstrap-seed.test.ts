@@ -37,14 +37,14 @@ describe('client bootstrap seeding', () => {
 
   test('i18n store starts empty and waits for the entrypoint hydrate from /api/i18n', async () => {
     installBridge()
-    const { useI18nStore } = await import('#/web/stores/i18n.ts')
+    const { i18nStore } = await import('#/web/stores/i18n.ts')
 
     // The store used to read `initialI18n` from the bootstrap and
     // seed itself synchronously. The server no longer inlines i18n
     // into HTML, so the store always starts with the default
     // English / auto / empty-dict placeholder. The app entrypoint
-    // calls `hydrate()` before mounting the normal React tree.
-    expect(useI18nStore.getState()).toMatchObject({
+    // calls `hydrate()` before mounting the normal Vue tree.
+    expect(i18nStore.getState()).toMatchObject({
       lang: 'en',
       pref: 'auto',
       dict: {},
@@ -78,10 +78,10 @@ describe('client bootstrap seeding', () => {
     const { settingsSnapshotQueryKey } = await import('#/web/settings-query-cache.ts')
     appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ lang: 'auto' }))
 
-    const { useI18nStore } = await import('#/web/stores/i18n.ts')
+    const { i18nStore } = await import('#/web/stores/i18n.ts')
 
-    await expect(useI18nStore.getState().setPref('en')).resolves.toBeUndefined()
-    expect(useI18nStore.getState()).toMatchObject({
+    await expect(i18nStore.getState().setPref('en')).resolves.toBeUndefined()
+    expect(i18nStore.getState()).toMatchObject({
       lang: 'en',
       pref: 'en',
       dict: { hello: 'hello' },
@@ -92,8 +92,8 @@ describe('client bootstrap seeding', () => {
       pref: 'zh',
       dict: Object.freeze({ hello: '你好' }),
     })
-    await expect(useI18nStore.getState().setPref('zh')).resolves.toBeUndefined()
-    expect(useI18nStore.getState()).toMatchObject({
+    await expect(i18nStore.getState().setPref('zh')).resolves.toBeUndefined()
+    expect(i18nStore.getState()).toMatchObject({
       lang: 'zh',
       pref: 'zh',
       dict: { hello: '你好' },

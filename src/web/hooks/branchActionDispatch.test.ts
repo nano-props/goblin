@@ -8,7 +8,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 
@@ -42,7 +42,7 @@ describe('branch action dispatch', () => {
       },
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
-    useWorkspacesStore.setState({ runBranchAction })
+    workspacesStore.setState({ runBranchAction })
 
     await expect(
       dispatchRemoveWorktree({
@@ -82,7 +82,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {},
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
-    useWorkspacesStore.setState({ runBranchAction })
+    workspacesStore.setState({ runBranchAction })
 
     await expect(
       dispatchRemoveWorktree({
@@ -110,7 +110,7 @@ describe('branch action dispatch', () => {
       message: 'cancelled',
       recoveryMessageKeys: ['error.worktree-removed-followup-failed'] as const,
     }
-    useWorkspacesStore.setState({ runBranchAction: vi.fn(async () => result) })
+    workspacesStore.setState({ runBranchAction: vi.fn(async () => result) })
 
     await expect(
       dispatchRemoveWorktree({

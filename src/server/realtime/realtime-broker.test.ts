@@ -26,7 +26,7 @@ describe('realtime broker', () => {
     vi.setSystemTime(TEST_NOW)
   })
 
-  test('fans out typed feature messages without owning the feature domain', () => {
+  test('fans out typed feature messages without owning the feature domain', async () => {
     const broker = new RealtimeBroker<{ type: 'feature.changed'; value: string }>({
       onClientPresenceChanged: vi.fn(),
       onUserSocketsDrained: vi.fn(),
@@ -40,7 +40,7 @@ describe('realtime broker', () => {
     broker.disconnectAll()
   })
 
-  test('uses transport liveness defaults independently from terminal naming', () => {
+  test('uses transport liveness defaults independently from terminal naming', async () => {
     const broker = new RealtimeBroker<{ type: 'noop' }>({
       onClientPresenceChanged: vi.fn(),
       onUserSocketsDrained: vi.fn(),
@@ -57,7 +57,7 @@ describe('realtime broker', () => {
     broker.disconnectAll()
   })
 
-  test('closes an ordering transition when buffered bytes exceed the transport budget', () => {
+  test('closes an ordering transition when buffered bytes exceed the transport budget', async () => {
     const rawSocket = { send: vi.fn(), close: vi.fn() }
     const onRelease = vi.fn()
     const bufferedSocket = new BufferedRealtimeSocket(rawSocket, onRelease)
@@ -71,7 +71,7 @@ describe('realtime broker', () => {
     expect(onRelease).toHaveBeenCalledOnce()
   })
 
-  test('closes an ordering transition when buffered event count exceeds the transport budget', () => {
+  test('closes an ordering transition when buffered event count exceeds the transport budget', async () => {
     const rawSocket = { send: vi.fn(), close: vi.fn() }
     const bufferedSocket = new BufferedRealtimeSocket(rawSocket)
     bufferedSocket.enqueueTransition(() => new Promise(() => {}))
@@ -149,7 +149,7 @@ describe('realtime broker', () => {
     expect(onRelease).toHaveBeenCalledOnce()
   })
 
-  test('uses immediate transport shutdown for a forced buffered-socket close', () => {
+  test('uses immediate transport shutdown for a forced buffered-socket close', async () => {
     const rawSocket = { send: vi.fn(), close: vi.fn(), forceClose: vi.fn() }
     const bufferedSocket = new BufferedRealtimeSocket(rawSocket)
 
@@ -159,7 +159,7 @@ describe('realtime broker', () => {
     expect(rawSocket.close).not.toHaveBeenCalled()
   })
 
-  test('closes the raw transport when an immediate realtime send fails', () => {
+  test('closes the raw transport when an immediate realtime send fails', async () => {
     const rawSocket = {
       send: vi.fn(() => {
         throw new Error('socket unavailable')
@@ -175,7 +175,7 @@ describe('realtime broker', () => {
     expect(onRelease).toHaveBeenCalledOnce()
   })
 
-  test('rejects new sockets at the admission limit without counting duplicate registration', () => {
+  test('rejects new sockets at the admission limit without counting duplicate registration', async () => {
     const broker = new RealtimeBroker<{ type: 'noop' }>({
       onClientPresenceChanged: vi.fn(),
       onUserSocketsDrained: vi.fn(),
@@ -191,7 +191,7 @@ describe('realtime broker', () => {
     broker.disconnectAll()
   })
 
-  test('keeps client presence online until its final socket unregisters', () => {
+  test('keeps client presence online until its final socket unregisters', async () => {
     const onClientPresenceChanged = vi.fn()
     const onUserSocketsDrained = vi.fn()
     const broker = new RealtimeBroker<{ type: 'noop' }>({ onClientPresenceChanged, onUserSocketsDrained })
@@ -219,7 +219,7 @@ describe('realtime broker', () => {
     broker.disconnectAll()
   })
 
-  test('isolates user fanout and unregisters a socket whose send fails', () => {
+  test('isolates user fanout and unregisters a socket whose send fails', async () => {
     const onUserSocketsDrained = vi.fn()
     const broker = new RealtimeBroker<{ type: 'feature.changed'; value: string }>({
       onClientPresenceChanged: vi.fn(),
@@ -244,7 +244,7 @@ describe('realtime broker', () => {
     broker.disconnectAll()
   })
 
-  test('re-registering a socket replaces its previous user and client identity', () => {
+  test('re-registering a socket replaces its previous user and client identity', async () => {
     const onClientPresenceChanged = vi.fn()
     const broker = new RealtimeBroker<{ type: 'noop' }>({
       onClientPresenceChanged,
@@ -265,7 +265,7 @@ describe('realtime broker', () => {
     broker.disconnectAll()
   })
 
-  test('expires a stale socket without taking a healthy socket for the same client offline', () => {
+  test('expires a stale socket without taking a healthy socket for the same client offline', async () => {
     const onClientPresenceChanged = vi.fn()
     const broker = new RealtimeBroker<{ type: 'noop' }>({
       onClientPresenceChanged,
@@ -290,7 +290,7 @@ describe('realtime broker', () => {
     broker.disconnectAll()
   })
 
-  test('disconnectAll gracefully closes transports and clears broker state', () => {
+  test('disconnectAll gracefully closes transports and clears broker state', async () => {
     const broker = new RealtimeBroker<{ type: 'noop' }>({
       onClientPresenceChanged: vi.fn(),
       onUserSocketsDrained: vi.fn(),

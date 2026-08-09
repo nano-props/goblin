@@ -1,47 +1,38 @@
-import type { ComponentPropsWithoutRef, KeyboardEvent } from 'react'
-import type { DraggableAttributes } from '@dnd-kit/core'
-import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { omit } from 'es-toolkit'
+import { useSortable } from '@dnd-kit/vue/sortable'
+import { computed, ref } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter, Ref } from 'vue'
 
 interface UseSortableTabResult {
-  attributes: DraggableAttributes
-  sortableListeners: ComponentPropsWithoutRef<'div'>
-  sortableOnKeyDown: ((event: KeyboardEvent) => void) | undefined
-  setContainerRef: (node: HTMLElement | null) => void
+  containerRef: Ref<HTMLElement | null>
   setButtonRef: (node: HTMLButtonElement | null) => void
-  style: { transform: string | undefined; transition: string | undefined }
-  isDragging: boolean
+  isDragging: ComputedRef<boolean>
 }
 
 export function useSortableTab(
-  id: string,
-  options?: { disabled?: boolean; onButtonRef?: (node: HTMLButtonElement | null) => void },
+  id: MaybeRefOrGetter<string>,
+  index: MaybeRefOrGetter<number>,
+  options?: {
+    disabled?: MaybeRefOrGetter<boolean>
+    onButtonRef?: (node: HTMLButtonElement | null) => void
+  },
 ): UseSortableTabResult {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+  const containerRef = ref<HTMLElement | null>(null)
+  const buttonRef = ref<HTMLButtonElement | null>(null)
+  const sortable = useSortable({
     id,
+    index,
+    group: 'workspace-pane-tabs',
+    element: containerRef,
+    handle: buttonRef,
     disabled: options?.disabled,
   })
-  const sortableOnKeyDown = listeners?.onKeyDown as ((event: KeyboardEvent) => void) | undefined
-  const sortableListeners = omit((listeners ?? {}) as ComponentPropsWithoutRef<'div'>, ['onKeyDown'])
-  const chromeLikeTransform = transform ? { ...transform, y: 0, scaleX: 1, scaleY: 1 } : null
-  const style = {
-    transform: CSS.Transform.toString(chromeLikeTransform) ?? undefined,
-    transition,
-  }
-
-  const setButtonRef = (node: HTMLButtonElement | null) => {
-    setActivatorNodeRef(node)
-    options?.onButtonRef?.(node)
-  }
 
   return {
-    attributes,
-    sortableListeners,
-    sortableOnKeyDown,
-    setContainerRef: setNodeRef as (node: HTMLElement | null) => void,
-    setButtonRef,
-    style,
-    isDragging,
+    containerRef,
+    setButtonRef: (node) => {
+      buttonRef.value = node
+      options?.onButtonRef?.(node)
+    },
+    isDragging: computed(() => sortable.isDragging.value),
   }
 }

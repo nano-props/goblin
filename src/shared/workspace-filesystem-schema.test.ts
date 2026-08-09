@@ -25,7 +25,7 @@ describe('WorkspaceFilesystemPathSchema', () => {
   ]
 
   for (const { input, ok, label } of cases) {
-    test(`validates ${label} as ${ok ? 'ok' : 'rejected'}`, () => {
+    test(`validates ${label} as ${ok ? 'ok' : 'rejected'}`, async () => {
       const result = v.safeParse(WorkspaceFilesystemPathSchema, input)
       if (ok) {
         expect(result.success).toBe(true)
@@ -35,7 +35,7 @@ describe('WorkspaceFilesystemPathSchema', () => {
     })
   }
 
-  test('rejects strings longer than 4096 characters', () => {
+  test('rejects strings longer than 4096 characters', async () => {
     const result = v.safeParse(WorkspaceFilesystemPathSchema, 'a'.repeat(4097))
     expect(result.success).toBe(false)
   })

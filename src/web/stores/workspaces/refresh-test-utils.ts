@@ -7,21 +7,21 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { installGoblinTestBridge, type IpcTestHandler } from '#/web/test-utils/bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
-import type { WorktreeStatus } from '#/web/types.ts'
+import type { WorktreeStatus } from '#/shared/git-types.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-test-repo')
 export const ipcHandlers: Record<string, IpcTestHandler> = {}
-export const refreshStoreAccess = { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState }
+export const refreshStoreAccess = { get: workspacesStore.getState, set: workspacesStore.setState }
 
-type TestRepo = NonNullable<ReturnType<typeof useWorkspacesStore.getState>['workspaces'][string]>
-type TestCreateWorktreeAction = Parameters<ReturnType<typeof useWorkspacesStore.getState>['runBranchAction']>[1]
+type TestRepo = NonNullable<ReturnType<typeof workspacesStore.getState>['workspaces'][string]>
+type TestCreateWorktreeAction = Parameters<ReturnType<typeof workspacesStore.getState>['runBranchAction']>[1]
 
 export function updateRepoForTest(mutator: (repo: TestRepo) => void): void {
-  useWorkspacesStore.setState((state) => {
+  workspacesStore.setState((state) => {
     const repo = state.workspaces[REPO_ID]
     if (!repo) return state
     return { workspaces: { ...state.workspaces, [REPO_ID]: replaceWorkspace(repo, mutator) } }
@@ -29,14 +29,14 @@ export function updateRepoForTest(mutator: (repo: TestRepo) => void): void {
 }
 
 export function repoBranchNames(): string[] {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+  const repo = workspacesStore.getState().workspaces[REPO_ID]
   return repo
     ? (getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches.map((candidate) => candidate.name) ?? [])
     : []
 }
 
 export function repoCurrentBranch(): string | null {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+  const repo = workspacesStore.getState().workspaces[REPO_ID]
   return repo ? (getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.current ?? null) : null
 }
 

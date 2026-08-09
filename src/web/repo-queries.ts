@@ -1,59 +1,93 @@
-import { useQuery } from '@tanstack/react-query'
+import { computed, toValue } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
+import { useQuery } from '@tanstack/vue-query'
 import type { RepoPullRequestScope } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   repoLogQueryOptions,
-  repoOperationsReadModelQueryOptions,
-  repoPullRequestsReadModelQueryOptions,
-  repoSnapshotReadModelQueryOptions,
+  repoOperationsQueryOptions,
+  repoPullRequestsQueryOptions,
+  repoSnapshotQueryOptions,
   repoRemoteBranchesQueryOptions,
-  repoWorktreeStatusReadModelQueryOptions,
+  repoWorktreeStatusQueryOptions,
 } from '#/web/repo-query-options.ts'
 import { projectRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 
-export function useRepoSnapshotReadModel(repoRoot: WorkspaceId | null, workspaceRuntimeId: string, enabled: boolean) {
-  return useQuery(repoSnapshotReadModelQueryOptions(repoRoot, workspaceRuntimeId, enabled))
+export function useRepoSnapshotReadModel(
+  repoRoot: MaybeRefOrGetter<WorkspaceId>,
+  workspaceRuntimeId: MaybeRefOrGetter<string>,
+) {
+  return useQuery(computed(() => repoSnapshotQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId))))
 }
 
 export function useRepoPullRequestsReadModel(
-  repoRoot: WorkspaceId | null,
-  workspaceRuntimeId: string,
-  scope: RepoPullRequestScope,
-  enabled: boolean,
+  repoRoot: MaybeRefOrGetter<WorkspaceId>,
+  workspaceRuntimeId: MaybeRefOrGetter<string>,
+  scope: MaybeRefOrGetter<RepoPullRequestScope>,
 ) {
-  return useQuery(repoPullRequestsReadModelQueryOptions(repoRoot, workspaceRuntimeId, scope, enabled))
+  return useQuery(
+    computed(() => repoPullRequestsQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId), toValue(scope))),
+  )
 }
 
 export function useRepoWorktreeStatusReadModel(
-  repoRoot: WorkspaceId | null,
-  workspaceRuntimeId: string,
-  enabled: boolean,
+  repoRoot: MaybeRefOrGetter<WorkspaceId>,
+  workspaceRuntimeId: MaybeRefOrGetter<string>,
 ) {
-  return useQuery(repoWorktreeStatusReadModelQueryOptions(repoRoot, workspaceRuntimeId, enabled))
+  return useQuery(computed(() => repoWorktreeStatusQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId))))
+}
+
+interface RepoLogOptions {
+  count?: MaybeRefOrGetter<number | undefined>
+  skip?: MaybeRefOrGetter<number | undefined>
+  enabled?: MaybeRefOrGetter<boolean | undefined>
 }
 
 export function useRepoLogQuery(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  branch: string,
-  options: { count?: number; skip?: number; enabled?: boolean } = {},
+  repoRoot: MaybeRefOrGetter<WorkspaceId>,
+  workspaceRuntimeId: MaybeRefOrGetter<string>,
+  branch: MaybeRefOrGetter<string>,
+  options: RepoLogOptions = {},
 ) {
-  return useQuery(repoLogQueryOptions(repoRoot, workspaceRuntimeId, branch, options))
+  return useQuery(
+    computed(() =>
+      repoLogQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId), toValue(branch), {
+        count: toValue(options.count),
+        skip: toValue(options.skip),
+        enabled: toValue(options.enabled),
+      }),
+    ),
+  )
 }
 
 export function useRepoRemoteBranchesQuery(
-  repoRoot: WorkspaceId,
-  workspaceRuntimeId: string,
-  options: { enabled?: boolean } = {},
+  repoRoot: MaybeRefOrGetter<WorkspaceId>,
+  workspaceRuntimeId: MaybeRefOrGetter<string>,
+  options: { enabled?: MaybeRefOrGetter<boolean | undefined> } = {},
 ) {
-  return useQuery(repoRemoteBranchesQueryOptions(repoRoot, workspaceRuntimeId, options))
+  return useQuery(
+    computed(() =>
+      repoRemoteBranchesQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId), {
+        enabled: toValue(options.enabled),
+      }),
+    ),
+  )
 }
 
 export function useRepoOperationsReadModel(
-  repoRoot: WorkspaceId | null,
-  workspaceRuntimeId: string,
-  options: { includeSettled?: boolean; enabled?: boolean } = {},
+  repoRoot: MaybeRefOrGetter<WorkspaceId>,
+  workspaceRuntimeId: MaybeRefOrGetter<string>,
+  options: {
+    includeSettled?: MaybeRefOrGetter<boolean | undefined>
+  } = {},
 ) {
-  const query = useQuery(repoOperationsReadModelQueryOptions(repoRoot, workspaceRuntimeId, options))
-  return { ...query, data: projectRepoOperationsQueryData(query) }
+  const query = useQuery(
+    computed(() =>
+      repoOperationsQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId), {
+        includeSettled: toValue(options.includeSettled),
+      }),
+    ),
+  )
+  const data = computed(() => projectRepoOperationsQueryData({ status: query.status.value, data: query.data.value }))
+  return { ...query, data }
 }

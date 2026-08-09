@@ -3,8 +3,8 @@
 import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import type { WorkspaceRefreshResult, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { reconcileOpenWorkspaceRuntimeMemberships } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { reconcileOpenWorkspaceRuntimeMemberships } from '#/web/stores/workspaces/workspace-runtime-membership-recovery.ts'
 import {
   createBranchSnapshot,
   resetWorkspacesStore,
@@ -70,15 +70,15 @@ describe('workspace runtime recovery Refresh boundary', () => {
 
     let settled = false
     const recovery = reconcileOpenWorkspaceRuntimeMemberships(
-      useWorkspacesStore.setState,
-      useWorkspacesStore.getState,
+      workspacesStore.setState,
+      workspacesStore.getState,
     ).finally(() => {
       settled = true
     })
     await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce())
 
     expect(settled).toBe(false)
-    expect(useWorkspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
+    expect(workspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
       workspaceRuntimeId: NEXT_RUNTIME_ID,
       capability: { kind: 'probing' },
     })
@@ -92,7 +92,7 @@ describe('workspace runtime recovery Refresh boundary', () => {
     expect(refresh).toHaveBeenCalledOnce()
     expect(refresh).toHaveBeenCalledWith({ workspaceId: WORKSPACE_ID, workspaceRuntimeId: NEXT_RUNTIME_ID })
     expect(snapshot).toHaveBeenCalledOnce()
-    expect(useWorkspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
+    expect(workspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
       workspaceRuntimeId: NEXT_RUNTIME_ID,
       capability: { kind: 'git', probe: { status: 'ready' } },
     })
@@ -114,14 +114,14 @@ describe('workspace runtime recovery Refresh boundary', () => {
     })
 
     await expect(
-      reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
     ).resolves.toMatchObject({
       kind: 'settled',
       targets: [],
       changedTargets: [{ workspaceId: WORKSPACE_ID, workspaceRuntimeId: NEXT_RUNTIME_ID }],
     })
     expect(refresh).toHaveBeenCalledOnce()
-    expect(useWorkspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
+    expect(workspacesStore.getState().workspaces[WORKSPACE_ID]).toMatchObject({
       workspaceRuntimeId: NEXT_RUNTIME_ID,
       capability: { kind: 'probing' },
     })

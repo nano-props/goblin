@@ -117,7 +117,7 @@ const RULES: Rule[] = [
       '/src/web/stores/theme.ts': ['getThemeState', 'resolveThemeStateFromSettings'],
     },
     reason:
-      'settings-client is the transport boundary; settings writes must flow through settings-actions so server results update React Query projections',
+      'settings-client is the transport boundary; settings writes must flow through settings-actions so server results update TanStack Query projections',
   },
 ]
 
@@ -152,7 +152,7 @@ const SOURCE_PATTERN_RULES: SourcePatternRule[] = [
         pattern: /\b(?:dataLoads|operations)\.visibleStatus\b/,
       },
     ],
-    reason: 'web repo reads must use independent repo-snapshot and worktree-status React Query models',
+    reason: 'web repo reads must use independent repo-snapshot and worktree-status TanStack Query models',
   },
 ]
 
@@ -398,6 +398,9 @@ export function checkArchitectureSources(
   for (const { relativeFilePath, source } of sources) {
     const imports = importsByFile.get(relativeFilePath)!
     for (const importRef of imports) {
+      if (importRef.importPath === 'vue' && importRef.importedNames?.includes('h')) {
+        violations.push(`${relativeFilePath}: Vue h() is forbidden; render Vue UI with JSX`)
+      }
       for (const rule of rules) {
         if (!violatesRule(relativeFilePath, importRef, rule)) continue
         violations.push(`${relativeFilePath}: disallowed import "${importRef.importPath}" — ${rule.reason}`)

@@ -6,7 +6,7 @@ import {
 } from '#/shared/workspace-layout.ts'
 
 describe('normalizeWorkspaceSessionLayoutState', () => {
-  test('preserves Zen Mode and workspace pane size', () => {
+  test('preserves Zen Mode and workspace pane size', async () => {
     expect(
       normalizeWorkspaceSessionLayoutState({
         zenMode: false,
@@ -18,7 +18,7 @@ describe('normalizeWorkspaceSessionLayoutState', () => {
     })
   })
 
-  test('falls back to defaults for invalid input', () => {
+  test('falls back to defaults for invalid input', async () => {
     expect(
       normalizeWorkspaceSessionLayoutState({
         zenMode: 'bad',

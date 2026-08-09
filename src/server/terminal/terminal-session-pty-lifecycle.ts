@@ -6,7 +6,7 @@ import {
   type TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 import { isShellProcessName } from '#/shared/terminal-process-name.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import {
   appendOutput,
   applyTerminalTitle,
@@ -36,7 +36,7 @@ import {
   type TerminalPtyState,
 } from '#/server/terminal/terminal-pty-state.ts'
 
-const ptyLifecycleLogger = serverLogger.child({ module: 'terminal-session-pty-lifecycle' })
+const ptyLifecycleLogger = serverNodeLog.child({ module: 'terminal-session-pty-lifecycle' })
 
 type TerminalPtySpawnOutcome = { ok: true } | { ok: false; message: string }
 

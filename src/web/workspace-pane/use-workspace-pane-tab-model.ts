@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { computed, toValue } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type {
   CurrentGitWorkspacePanePresentation,
   GitWorkspacePaneProjection,
@@ -39,13 +40,12 @@ export interface WorkspacePaneModelWorkspace {
 export type WorkspacePaneRuntimeContext = Pick<WorkspacePaneModelWorkspace, 'workspaceRuntimeId' | 'ui'>
 
 export function useGitWorkspacePaneTabModel(
-  gitWorkspace: Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'ui'>,
-  detail: CurrentGitWorkspacePanePresentation,
-  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
-) {
+  gitWorkspace: MaybeRefOrGetter<Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'ui'>>,
+  detail: MaybeRefOrGetter<CurrentGitWorkspacePanePresentation>,
+  workspacePaneRoute: MaybeRefOrGetter<ParsedWorkspacePaneRoute | null | undefined>,
+): ComputedRef<WorkspacePaneTabModel> {
   const input = useGitWorkspacePaneTabModelInput(gitWorkspace, detail, workspacePaneRoute)
-  const model = useMemo(() => createWorkspacePaneTabModel(input), [input])
-  return model
+  return computed(() => createWorkspacePaneTabModel(input.value))
 }
 
 /**
@@ -54,210 +54,179 @@ export function useGitWorkspacePaneTabModel(
  * projection.
  */
 export function useGitWorkspacePaneTabModelInput(
-  gitWorkspace: Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'ui'>,
-  detail: CurrentGitWorkspacePanePresentation,
-  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
-): WorkspacePaneTabModelInput {
-  const { branch } = detail
-  const branchName = branch?.name ?? null
-  const worktreePath = branch?.worktree?.path ?? null
+  gitWorkspace: MaybeRefOrGetter<Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'ui'>>,
+  detail: MaybeRefOrGetter<CurrentGitWorkspacePanePresentation>,
+  workspacePaneRoute: MaybeRefOrGetter<ParsedWorkspacePaneRoute | null | undefined>,
+): ComputedRef<WorkspacePaneTabModelInput> {
+  const workspace = computed(() => toValue(gitWorkspace))
+  const branchName = computed(() => toValue(detail).branch?.name ?? null)
+  const worktreePath = computed(() => toValue(detail).branch?.worktree?.path ?? null)
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
-    workspaceId: gitWorkspace.id,
-    workspaceRuntimeId: gitWorkspace.workspaceRuntimeId,
-    filesystemTarget: worktreePath
-      ? gitWorktreeFilesystemExecutionTarget(gitWorkspace.id, gitWorkspace.workspaceRuntimeId, worktreePath)
-      : null,
+    workspaceId: () => workspace.value.id,
+    workspaceRuntimeId: () => workspace.value.workspaceRuntimeId,
+    filesystemTarget: () =>
+      worktreePath.value
+        ? gitWorktreeFilesystemExecutionTarget(
+            workspace.value.id,
+            workspace.value.workspaceRuntimeId,
+            worktreePath.value,
+          )
+        : null,
   })
-  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(gitWorkspace.id, gitWorkspace.workspaceRuntimeId)
-  const requestedSessionIdByRuntimeType = useMemo(
-    () => (workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined),
-    [workspacePaneRoute],
+  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(
+    () => workspace.value.id,
+    () => workspace.value.workspaceRuntimeId,
   )
 
-  const workspacePaneTabEntries = useMemo(
-    () =>
-      workspacePaneTabsForTargetFromQueryData(
-        workspacePaneTabsQuery.data ?? { revision: 0, entries: [] },
-        branchName
-          ? requiredGitWorkspacePaneTabsTarget(gitWorkspace.id, branchName, worktreePath)
-          : { kind: 'inactive', workspaceId: gitWorkspace.id, branchName: null, worktreePath: null },
-      ),
-    [workspacePaneTabsQuery.data, gitWorkspace.id, branchName, worktreePath],
-  )
-
-  const preferredTab = useMemo(() => {
-    if (workspacePaneRoute?.kind === 'static') return workspacePaneRoute.tab
-    if (workspacePaneRoute?.kind === 'terminal') return 'terminal'
-    if (workspacePaneRoute?.kind === 'invalid-static') return null
-    if (workspacePaneRoute === null) return null
-    return (
-      preferredWorkspacePaneTabForTarget(
-        gitWorkspace.ui,
-        branchName ? requiredGitWorkspacePaneTabsTarget(gitWorkspace.id, branchName, worktreePath) : null,
-      ) ??
-      workspacePaneTabEntries[0]?.type ??
-      null
+  return computed(() => {
+    const currentWorkspace = workspace.value
+    const currentBranchName = branchName.value
+    const currentWorktreePath = worktreePath.value
+    const route = toValue(workspacePaneRoute)
+    const target = currentBranchName
+      ? requiredGitWorkspacePaneTabsTarget(currentWorkspace.id, currentBranchName, currentWorktreePath)
+      : null
+    const tabEntries = workspacePaneTabsForTargetFromQueryData(
+      workspacePaneTabsQuery.data.value ?? { revision: 0, entries: [] },
+      target ?? {
+        kind: 'inactive',
+        workspaceId: currentWorkspace.id,
+        branchName: null,
+        worktreePath: null,
+      },
     )
-  }, [gitWorkspace.ui, gitWorkspace.id, branchName, worktreePath, workspacePaneRoute, workspacePaneTabEntries])
-
-  const input = useMemo<WorkspacePaneTabModelInput>(
-    () => ({
-      workspaceId: gitWorkspace.id,
-      workspaceRuntimeId: gitWorkspace.workspaceRuntimeId,
-      routeTarget: branchName
-        ? { kind: 'git-branch', workspaceId: gitWorkspace.id, branchName }
-        : { kind: 'inactive', workspaceId: gitWorkspace.id },
-      paneTarget: branchName
-        ? requiredGitWorkspacePaneTabsTarget(gitWorkspace.id, branchName, worktreePath)
-        : { kind: 'inactive', workspaceId: gitWorkspace.id },
-      worktreeHead: branchName && worktreePath ? { kind: 'branch', branchName } : undefined,
+    const preferredTab =
+      route?.kind === 'static'
+        ? route.tab
+        : route?.kind === 'terminal'
+          ? 'terminal'
+          : route?.kind === 'invalid-static' || route === null
+            ? null
+            : (preferredWorkspacePaneTabForTarget(currentWorkspace.ui, target) ?? tabEntries[0]?.type ?? null)
+    return {
+      workspaceId: currentWorkspace.id,
+      workspaceRuntimeId: currentWorkspace.workspaceRuntimeId,
+      routeTarget: currentBranchName
+        ? { kind: 'git-branch', workspaceId: currentWorkspace.id, branchName: currentBranchName }
+        : { kind: 'inactive', workspaceId: currentWorkspace.id },
+      paneTarget: target ?? { kind: 'inactive', workspaceId: currentWorkspace.id },
+      worktreeHead:
+        currentBranchName && currentWorktreePath
+          ? { kind: 'branch' as const, branchName: currentBranchName }
+          : undefined,
       preferredTab,
-      allowPreferredTabFallback: workspacePaneRoute === undefined,
-      tabEntries: workspacePaneTabEntries,
-      tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(workspacePaneTabsQuery.status),
-      runtimeTabViews: runtimeProjection.runtimeTabViews,
-      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
-      requestedSessionIdByRuntimeType,
-    }),
-    [
-      gitWorkspace.id,
-      gitWorkspace.workspaceRuntimeId,
-      branchName,
-      worktreePath,
-      preferredTab,
-      workspacePaneTabsQuery.status,
-      workspacePaneTabEntries,
-      runtimeProjection.runtimeTabViews,
-      runtimeProjection.runtimeTabStateByType,
-      requestedSessionIdByRuntimeType,
-      workspacePaneRoute,
-    ],
-  )
-
-  return input
+      allowPreferredTabFallback: route === undefined,
+      tabEntries,
+      tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(workspacePaneTabsQuery.status.value),
+      runtimeTabViews: runtimeProjection.value.runtimeTabViews,
+      runtimeTabStateByType: runtimeProjection.value.runtimeTabStateByType,
+      requestedSessionIdByRuntimeType: route?.kind === 'terminal' ? { terminal: route.terminalSessionId } : undefined,
+    }
+  })
 }
 
 export function useWorkspaceRootTabModel(
-  workspace: WorkspacePaneModelWorkspace,
-  workspacePaneRoute: ParsedWorkspacePaneRoute | null,
-): WorkspacePaneTabModel {
+  workspace: MaybeRefOrGetter<WorkspacePaneModelWorkspace>,
+  workspacePaneRoute: MaybeRefOrGetter<ParsedWorkspacePaneRoute | null>,
+): ComputedRef<WorkspacePaneTabModel> {
+  const currentWorkspace = computed(() => toValue(workspace))
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
-    workspaceId: workspace.id,
-    workspaceRuntimeId: workspace.workspaceRuntimeId,
-    filesystemTarget: workspaceRootFilesystemExecutionTarget(workspace.id, workspace.workspaceRuntimeId),
+    workspaceId: () => currentWorkspace.value.id,
+    workspaceRuntimeId: () => currentWorkspace.value.workspaceRuntimeId,
+    filesystemTarget: () =>
+      workspaceRootFilesystemExecutionTarget(currentWorkspace.value.id, currentWorkspace.value.workspaceRuntimeId),
   })
-  const tabsQuery = useWorkspacePaneTabsQuery(workspace.id, workspace.workspaceRuntimeId)
-  const target = useMemo(() => ({ kind: 'workspace-root' as const, workspaceId: workspace.id }), [workspace.id])
-  const tabEntries = useMemo(
-    () => workspacePaneTabsForTargetFromQueryData(tabsQuery.data ?? { revision: 0, entries: [] }, target),
-    [tabsQuery.data, target],
+  const tabsQuery = useWorkspacePaneTabsQuery(
+    () => currentWorkspace.value.id,
+    () => currentWorkspace.value.workspaceRuntimeId,
   )
-  const requestedTab =
-    workspacePaneRoute?.kind === 'terminal'
-      ? 'terminal'
-      : workspacePaneRoute?.kind === 'static'
-        ? workspacePaneRoute.tab
+  return computed(() => {
+    const current = currentWorkspace.value
+    const route = toValue(workspacePaneRoute)
+    const target = { kind: 'workspace-root' as const, workspaceId: current.id }
+    const tabEntries = workspacePaneTabsForTargetFromQueryData(
+      tabsQuery.data.value ?? { revision: 0, entries: [] },
+      target,
+    )
+    const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
+    const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
+    const preferredTab = route
+      ? requestedTab
+      : tabEntries.length > 0
+        ? (preferredWorkspacePaneTabForTarget(current.ui, target) ?? tabEntries[0]!.type)
         : null
-  const requestedSessionId = workspacePaneRoute?.kind === 'terminal' ? workspacePaneRoute.terminalSessionId : null
-  const preferredTab = workspacePaneRoute
-    ? requestedTab
-    : tabEntries.length > 0
-      ? (preferredWorkspacePaneTabForTarget(workspace.ui, target) ?? tabEntries[0]!.type)
-      : null
-  const input = useMemo<WorkspacePaneTabModelInput>(
-    () => ({
-      workspaceId: workspace.id,
-      workspaceRuntimeId: workspace.workspaceRuntimeId,
+    return createWorkspacePaneTabModel({
+      workspaceId: current.id,
+      workspaceRuntimeId: current.workspaceRuntimeId,
       routeTarget: target,
       paneTarget: target,
       preferredTab,
-      allowPreferredTabFallback: workspacePaneRoute === null,
+      allowPreferredTabFallback: route === null,
       tabEntries,
-      tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(tabsQuery.status),
-      runtimeTabViews: runtimeProjection.runtimeTabViews,
-      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+      tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(tabsQuery.status.value),
+      runtimeTabViews: runtimeProjection.value.runtimeTabViews,
+      runtimeTabStateByType: runtimeProjection.value.runtimeTabStateByType,
       requestedSessionIdByRuntimeType: requestedSessionId ? { terminal: requestedSessionId } : undefined,
-    }),
-    [
-      preferredTab,
-      requestedSessionId,
-      workspace.id,
-      workspace.workspaceRuntimeId,
-      runtimeProjection.runtimeTabStateByType,
-      runtimeProjection.runtimeTabViews,
-      tabEntries,
-      tabsQuery.status,
-      workspacePaneRoute,
-    ],
-  )
-  return useMemo(() => createWorkspacePaneTabModel(input), [input])
+    })
+  })
 }
 
 export function useGitWorktreeWorkspacePaneTabModel(
-  workspaceRuntime: WorkspacePaneRuntimeContext,
-  target: GitWorktreeWorkspacePaneTabsTarget,
-  worktreeHead: GitHead,
-  workspacePaneRoute: ParsedWorkspacePaneRoute | null,
-): WorkspacePaneTabModel {
+  workspaceRuntime: MaybeRefOrGetter<WorkspacePaneRuntimeContext>,
+  target: MaybeRefOrGetter<GitWorktreeWorkspacePaneTabsTarget>,
+  worktreeHead: MaybeRefOrGetter<GitHead>,
+  workspacePaneRoute: MaybeRefOrGetter<ParsedWorkspacePaneRoute | null>,
+): ComputedRef<WorkspacePaneTabModel> {
+  const currentWorkspaceRuntime = computed(() => toValue(workspaceRuntime))
+  const currentTarget = computed(() => toValue(target))
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
-    workspaceId: target.workspaceId,
-    workspaceRuntimeId: workspaceRuntime.workspaceRuntimeId,
-    filesystemTarget: gitWorktreeFilesystemExecutionTarget(
-      target.workspaceId,
-      workspaceRuntime.workspaceRuntimeId,
-      target.worktreePath,
-    ),
+    workspaceId: () => currentTarget.value.workspaceId,
+    workspaceRuntimeId: () => currentWorkspaceRuntime.value.workspaceRuntimeId,
+    filesystemTarget: () =>
+      gitWorktreeFilesystemExecutionTarget(
+        currentTarget.value.workspaceId,
+        currentWorkspaceRuntime.value.workspaceRuntimeId,
+        currentTarget.value.worktreePath,
+      ),
   })
-  const tabsQuery = useWorkspacePaneTabsQuery(target.workspaceId, workspaceRuntime.workspaceRuntimeId)
-  const tabEntries = useMemo(
-    () => workspacePaneTabsForTargetFromQueryData(tabsQuery.data ?? { revision: 0, entries: [] }, target),
-    [tabsQuery.data, target],
+  const tabsQuery = useWorkspacePaneTabsQuery(
+    () => currentTarget.value.workspaceId,
+    () => currentWorkspaceRuntime.value.workspaceRuntimeId,
   )
-  const requestedTab =
-    workspacePaneRoute?.kind === 'terminal'
-      ? 'terminal'
-      : workspacePaneRoute?.kind === 'static'
-        ? workspacePaneRoute.tab
+  return computed(() => {
+    const currentRuntime = currentWorkspaceRuntime.value
+    const current = currentTarget.value
+    const route = toValue(workspacePaneRoute)
+    const tabEntries = workspacePaneTabsForTargetFromQueryData(
+      tabsQuery.data.value ?? { revision: 0, entries: [] },
+      current,
+    )
+    const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
+    const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
+    const preferredTab = route
+      ? requestedTab
+      : tabEntries.length > 0
+        ? (preferredWorkspacePaneTabForTarget(currentRuntime.ui, current) ?? tabEntries[0]!.type)
         : null
-  const requestedSessionId = workspacePaneRoute?.kind === 'terminal' ? workspacePaneRoute.terminalSessionId : null
-  const preferredTab = workspacePaneRoute
-    ? requestedTab
-    : tabEntries.length > 0
-      ? (preferredWorkspacePaneTabForTarget(workspaceRuntime.ui, target) ?? tabEntries[0]!.type)
-      : null
-  const input = useMemo<WorkspacePaneTabModelInput>(
-    () => ({
-      workspaceId: target.workspaceId,
-      workspaceRuntimeId: workspaceRuntime.workspaceRuntimeId,
-      routeTarget: target,
-      paneTarget: target,
-      worktreeHead,
+    return createWorkspacePaneTabModel({
+      workspaceId: current.workspaceId,
+      workspaceRuntimeId: currentRuntime.workspaceRuntimeId,
+      routeTarget: current,
+      paneTarget: current,
+      worktreeHead: toValue(worktreeHead),
       preferredTab,
-      allowPreferredTabFallback: workspacePaneRoute === null,
+      allowPreferredTabFallback: route === null,
       tabEntries,
-      tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(tabsQuery.status),
-      runtimeTabViews: runtimeProjection.runtimeTabViews,
-      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+      tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(tabsQuery.status.value),
+      runtimeTabViews: runtimeProjection.value.runtimeTabViews,
+      runtimeTabStateByType: runtimeProjection.value.runtimeTabStateByType,
       requestedSessionIdByRuntimeType: requestedSessionId ? { terminal: requestedSessionId } : undefined,
-    }),
-    [
-      preferredTab,
-      workspaceRuntime.workspaceRuntimeId,
-      requestedSessionId,
-      runtimeProjection.runtimeTabStateByType,
-      runtimeProjection.runtimeTabViews,
-      tabEntries,
-      tabsQuery.status,
-      target,
-      worktreeHead,
-      workspacePaneRoute,
-    ],
-  )
-  return useMemo(() => createWorkspacePaneTabModel(input), [input])
+    })
+  })
 }
 
 function workspacePaneTabsProjectionPhase(
-  status: ReturnType<typeof useWorkspacePaneTabsQuery>['status'],
+  status: ReturnType<typeof useWorkspacePaneTabsQuery>['status']['value'],
 ): WorkspacePaneTabEntriesProjectionPhase {
   if (status === 'success') return 'ready'
   if (status === 'error') return 'failed'
@@ -270,29 +239,27 @@ function workspacePaneTabsProjectionPhase(
  * this hook only performs the provider write once that boundary allows it.
  */
 export function useSyncWorkspacePaneRuntimeTabSelection(
-  model: Pick<WorkspacePaneTabModel, 'activeTab' | 'runtimeTabTargetKeyByType' | 'runtimeTabStateByType'>,
-  options: { enabled: boolean },
+  model: MaybeRefOrGetter<
+    Pick<WorkspacePaneTabModel, 'activeTab' | 'runtimeTabTargetKeyByType' | 'runtimeTabStateByType'>
+  >,
+  options: { enabled: MaybeRefOrGetter<boolean> },
 ): void {
-  const tabInteractionBlocked = !options.enabled || workspacePaneTabModelBlocksTabInteraction(model)
-  const activeSessionIdByRuntimeType = useMemo(
-    () => ({
+  const currentModel = computed(() => toValue(model))
+  const activeSessionIdByRuntimeType = computed(() => {
+    const current = currentModel.value
+    const tabInteractionBlocked = !toValue(options.enabled) || workspacePaneTabModelBlocksTabInteraction(current)
+    return {
       terminal: tabInteractionBlocked
         ? null
-        : materializedWorkspacePaneRuntimeTabSessionId(model.activeTab, 'terminal'),
-    }),
-    [model.activeTab, tabInteractionBlocked],
-  )
-  const selectedSessionIdByRuntimeType = useMemo(
-    () => ({
-      terminal: model.runtimeTabStateByType.terminal.selectedSessionId,
-    }),
-    [model.runtimeTabStateByType],
-  )
-  useSyncWorkspacePaneRuntimeTabProviderSelection(
-    {
-      activeSessionIdByRuntimeType,
-      runtimeTabTargetKeyByType: model.runtimeTabTargetKeyByType,
-    },
-    selectedSessionIdByRuntimeType,
-  )
+        : materializedWorkspacePaneRuntimeTabSessionId(current.activeTab, 'terminal'),
+    }
+  })
+  const selectedSessionIdByRuntimeType = computed(() => ({
+    terminal: currentModel.value.runtimeTabStateByType.terminal.selectedSessionId,
+  }))
+  const selectionInput = computed(() => ({
+    activeSessionIdByRuntimeType: activeSessionIdByRuntimeType.value,
+    runtimeTabTargetKeyByType: currentModel.value.runtimeTabTargetKeyByType,
+  }))
+  useSyncWorkspacePaneRuntimeTabProviderSelection(selectionInput, selectedSessionIdByRuntimeType)
 }

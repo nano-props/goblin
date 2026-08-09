@@ -1,42 +1,40 @@
-import { useCallback, useEffect, useState } from 'react'
+import { onScopeDispose, readonly, ref } from 'vue'
+import type { Ref } from 'vue'
 
 const ACTION_FEEDBACK_MS = 1500
 
-// Transient "success" affordance for a click-and-confirm button:
-// drive `onSelect`, flip `succeeded` to true on a truthy result, then
-// revert after ~1.5s. The `[succeeded]` effect's cleanup clears the
-// timer on unmount, so we never call setState on an unmounted instance
-// in practice. The action dispatcher surfaces failure toasts itself, so
-// the hook stays quiet on error. `reset` lets parents drop the flash
-// when the underlying value changes (e.g. the row being copied from
-// swaps out).
-export function useActionFeedback() {
-  const [succeeded, setSucceeded] = useState(false)
+export function useActionFeedback(): {
+  succeeded: Readonly<Ref<boolean>>
+  trigger: (onSelect: () => boolean | Promise<boolean> | void | Promise<void>) => void
+  reset: () => void
+} {
+  const succeeded = ref(false)
+  let timeout: number | null = null
 
-  useEffect(() => {
-    if (!succeeded) return
-    const timer = window.setTimeout(() => setSucceeded(false), ACTION_FEEDBACK_MS)
-    return () => window.clearTimeout(timer)
-  }, [succeeded])
+  function reset(): void {
+    if (timeout !== null) window.clearTimeout(timeout)
+    timeout = null
+    succeeded.value = false
+  }
 
-  const trigger = (onSelect: () => boolean | Promise<boolean> | void | Promise<void>) => {
-    // Call onSelect synchronously to match the legacy click contract
-    // (callers expect the action to fire on the same tick as the
-    // click). Sync throws are caught here, async rejections below.
+  function trigger(onSelect: () => boolean | Promise<boolean> | void | Promise<void>): void {
     let result: ReturnType<typeof onSelect>
     try {
       result = onSelect()
     } catch {
       return
     }
+
     void Promise.resolve(result)
-      .then((ok) => {
-        if (ok) setSucceeded(true)
+      .then((accepted) => {
+        if (!accepted) return
+        reset()
+        succeeded.value = true
+        timeout = window.setTimeout(reset, ACTION_FEEDBACK_MS)
       })
       .catch(() => {})
   }
 
-  const reset = useCallback(() => setSucceeded(false), [])
-
-  return { succeeded, trigger, reset }
+  onScopeDispose(reset)
+  return { succeeded: readonly(succeeded), trigger, reset }
 }

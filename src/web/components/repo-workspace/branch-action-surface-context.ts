@@ -1,18 +1,27 @@
-import { createContext, useContext } from 'react'
-import type { BranchActionSurface } from '#/web/hooks/useBranchActionItems.ts'
+import { computed, defineComponent, inject, provide } from 'vue'
+import type { ComputedRef, InjectionKey, PropType } from 'vue'
+import type { BranchActionSurface } from '#/web/hooks/useBranchActionItems.tsx'
 
-// `useBranchActionItems` builds the menu items, shortcut dispatchers,
-// and the in-context patch button for a single branch. They are
-// surfaced here so deeply nested children (e.g. the status tab) can
-// pull a specific slice without prop-drilling the whole surface
-// through every intermediate component. Confirm dialogs no longer
-// live on the surface — they are owned by
-// `useBranchActionDialogsStore` and rendered by the layout-level
-// `BranchActionDialogHost`.
-export const BranchActionSurfaceContext = createContext<BranchActionSurface | null>(null)
+const branchActionSurfaceKey: InjectionKey<ComputedRef<BranchActionSurface>> = Symbol('branch-action-surface')
 
-export function useBranchActionSurface(): BranchActionSurface {
-  const value = useContext(BranchActionSurfaceContext)
+export const BranchActionSurfaceProvider = defineComponent(
+  (props: { value: BranchActionSurface }, { slots }) => {
+    provide(
+      branchActionSurfaceKey,
+      computed(() => props.value),
+    )
+    return () => slots.default?.()
+  },
+  {
+    name: 'BranchActionSurfaceProvider',
+    props: {
+      value: { type: Object as PropType<BranchActionSurface>, required: true },
+    },
+  },
+)
+
+export function useBranchActionSurface(): ComputedRef<BranchActionSurface> {
+  const value = inject(branchActionSurfaceKey, null)
   if (!value) throw new Error('Branch action surface context is unavailable')
   return value
 }

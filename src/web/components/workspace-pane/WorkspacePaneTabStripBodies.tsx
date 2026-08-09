@@ -1,20 +1,22 @@
-import type { RefObject } from 'react'
-import { DndContext, closestCenter } from '@dnd-kit/core'
-import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable'
+import { DragDropProvider } from '@dnd-kit/vue'
+import type { FunctionalComponent, Ref } from 'vue'
 import { ToolbarTabStripBody } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
 import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
-import type { WorkspacePaneTabDnd } from '#/web/components/workspace-pane/workspace-pane-tab-dnd.ts'
 import { isSortableWorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-dnd.ts'
+import type { WorkspacePaneTabDnd } from '#/web/components/workspace-pane/workspace-pane-tab-dnd.ts'
 import type { WorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import {
   SortableWorkspacePaneTab,
   WorkspacePaneNewButton,
   WorkspacePaneTab,
   WorkspacePaneTabSwitcherPopover,
-  WorkspacePaneTabTooltipLayer,
-  type WorkspacePaneT,
-  type WorkspacePaneTabCreateAction,
 } from '#/web/components/workspace-pane/WorkspacePaneTabPresentation.tsx'
+import type {
+  WorkspacePaneT,
+  WorkspacePaneTabCreateAction,
+  WorkspacePaneTabProps,
+} from '#/web/components/workspace-pane/WorkspacePaneTabPresentation.tsx'
+import { WorkspacePaneTabTooltipLayer } from '#/web/components/workspace-pane/WorkspacePaneTabTooltipLayer.tsx'
 import { workspacePaneRuntimeTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 
 // Virtual right-edge for the compact tab's separator computation. The popover
@@ -32,8 +34,8 @@ export interface WorkspacePaneTabBodyContext {
   tabIdForItem: (item: WorkspacePaneTabItem) => string
   onHoverChange: (identity: string | null) => void
   onSelect: (identity: string) => void
-  onClose: (event: React.MouseEvent, identity: string) => void
-  onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, identity: string) => void
+  onClose: (identity: string) => void
+  onKeyDown: (event: KeyboardEvent, identity: string) => void
   t: WorkspacePaneT
   tabInteractionBlocked: boolean
 }
@@ -49,169 +51,146 @@ interface WorkspacePaneCompactTabsBodyProps extends WorkspacePaneTabBodyCommonPr
   createAction: WorkspacePaneTabCreateAction | null
 }
 
-export function WorkspacePaneCompactTabsBody({
-  items,
-  compactItem,
-  workspacePaneId,
-  context,
-  createAction,
-}: WorkspacePaneCompactTabsBodyProps) {
-  const {
-    activeTabIdentity,
-    panelActive,
-    focusableTabIdentity,
-    focusRegistry,
-    hoveredTabIdentity,
-    tabIdForItem,
-    onHoverChange,
-    onSelect,
-    onClose,
-    onKeyDown,
-    t,
-    tabInteractionBlocked,
-  } = context
+export const WorkspacePaneCompactTabsBody: FunctionalComponent<WorkspacePaneCompactTabsBodyProps> = (props) => {
+  const context = props.context
   // Compact tabs intentionally use muted chrome even when selected, so
   // selection should not suppress separators; hover still does.
   const compactActiveVisualIdentity = null
+  const item = props.compactItem
 
   return (
-    <ToolbarTabStripBody className="flex-1">
+    <ToolbarTabStripBody class="flex-1">
       <WorkspacePaneTabTooltipLayer
-        items={items}
+        items={props.items}
         role="tablist"
-        aria-label={t('workspace-pane-tabs.tabs')}
-        className="flex-1"
+        aria-label={context.t('workspace-pane-tabs.tabs')}
+        class="flex-1"
       >
-        {compactItem ? (
+        {item ? (
           <WorkspacePaneTab
-            item={compactItem}
-            isActive={!!panelActive && compactItem.identity === activeTabIdentity}
-            isSelected={compactItem.identity === activeTabIdentity}
-            isFocusable={compactItem.identity === focusableTabIdentity}
+            item={item}
+            isActive={!!context.panelActive && item.identity === context.activeTabIdentity}
+            isSelected={item.identity === context.activeTabIdentity}
+            isFocusable={item.identity === context.focusableTabIdentity}
             tabId={
-              compactItem.kind === 'runtime'
-                ? workspacePaneRuntimeTabProvider(compactItem.runtimeType).buttonId(workspacePaneId, 0)
-                : tabIdForItem(compactItem)
+              item.kind === 'runtime'
+                ? workspacePaneRuntimeTabProvider(item.runtimeType).buttonId(props.workspacePaneId, 0)
+                : context.tabIdForItem(item)
             }
-            focusRegistry={focusRegistry}
-            onSelect={onSelect}
-            onClose={onClose}
-            onKeyDown={onKeyDown}
-            t={t}
-            interactionDisabled={tabInteractionBlocked}
+            focusRegistry={context.focusRegistry}
+            onSelect={context.onSelect}
+            onClose={context.onClose}
+            onKeyDown={context.onKeyDown}
+            t={context.t}
+            interactionDisabled={context.tabInteractionBlocked}
             compact
             showSeparator={shouldShowWorkspacePaneTabSeparator({
-              leftId: compactItem.identity,
+              leftId: item.identity,
               rightId: WORKSPACE_PANE_COMPACT_TRAILING_ACTION_ID,
               activeId: compactActiveVisualIdentity,
-              hoveredId: hoveredTabIdentity,
+              hoveredId: context.hoveredTabIdentity,
             })}
-            onHoverChange={onHoverChange}
+            onHoverChange={context.onHoverChange}
           />
         ) : null}
       </WorkspacePaneTabTooltipLayer>
       <WorkspacePaneTabSwitcherPopover
-        items={items}
-        activeTabIdentity={activeTabIdentity}
-        label={t('workspace-pane-tabs.tabs')}
-        createAction={createAction}
-        tabInteractionBlocked={tabInteractionBlocked}
-        onSelect={onSelect}
-        onClose={onClose}
-        t={t}
+        items={props.items}
+        activeTabIdentity={context.activeTabIdentity}
+        label={context.t('workspace-pane-tabs.tabs')}
+        createAction={props.createAction}
+        tabInteractionBlocked={context.tabInteractionBlocked}
+        onSelect={context.onSelect}
+        onClose={context.onClose}
+        t={context.t}
       />
     </ToolbarTabStripBody>
   )
 }
 
+WorkspacePaneCompactTabsBody.props = ['items', 'compactItem', 'workspacePaneId', 'context', 'createAction']
+
 interface WorkspacePaneScrollableTabsBodyProps extends WorkspacePaneTabBodyCommonProps {
   createAction: WorkspacePaneTabCreateAction | null
-  newButtonRef: RefObject<HTMLButtonElement | null>
+  newButtonRef: Ref<HTMLButtonElement | null>
   workspacePaneId: string
   dnd: WorkspacePaneTabDnd
 }
 
-export function WorkspacePaneScrollableTabsBody({
-  items,
-  context,
-  createAction,
-  newButtonRef,
-  workspacePaneId,
-  dnd,
-}: WorkspacePaneScrollableTabsBodyProps) {
-  const {
-    activeTabIdentity,
-    panelActive,
-    focusableTabIdentity,
-    focusRegistry,
-    hoveredTabIdentity,
-    tabIdForItem,
-    onHoverChange,
-    onSelect,
-    onClose,
-    onKeyDown,
-    t,
-    tabInteractionBlocked,
-  } = context
-  const { sensors, restrictToVisibleTabStrip, sortableIds, handleDragEnd } = dnd
-  const activeVisualIdentity = panelActive ? activeTabIdentity : null
+export const WorkspacePaneScrollableTabsBody: FunctionalComponent<WorkspacePaneScrollableTabsBodyProps> = (props) => {
+  const context = props.context
+  const activeVisualIdentity = context.panelActive ? context.activeTabIdentity : null
+  const sortableIndices = new Map(
+    props.items.filter(isSortableWorkspacePaneTabItem).map((item, index) => [item.identity, index]),
+  )
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      modifiers={[restrictToVisibleTabStrip]}
-      onDragEnd={handleDragEnd}
+    <DragDropProvider
+      modifiers={props.dnd.modifiers}
+      plugins={props.dnd.plugins}
+      sensors={props.dnd.sensors}
+      onDragEnd={props.dnd.handleDragEnd}
     >
       <ToolbarTabStripBody scroll>
-        <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
-          <WorkspacePaneTabTooltipLayer items={items} role="tablist" aria-label={t('workspace-pane-tabs.tabs')}>
-            {items.map((item, index) => {
-              const nextItem = items[index + 1]
-              const rightId = nextItem ? nextItem.identity : WORKSPACE_PANE_NEW_ACTION_ID
-              const commonProps = {
-                item,
-                isActive: !!panelActive && item.identity === activeTabIdentity,
-                isSelected: item.identity === activeTabIdentity,
-                isFocusable: item.identity === focusableTabIdentity,
-                index,
-                total: items.length,
-                tabId: tabIdForItem(item),
-                focusRegistry,
-                showSeparator: shouldShowWorkspacePaneTabSeparator({
-                  leftId: item.identity,
-                  rightId,
-                  activeId: activeVisualIdentity,
-                  hoveredId: hoveredTabIdentity,
-                }),
-                onHoverChange,
-                onSelect,
-                onClose,
-                onKeyDown,
-                t,
-                interactionDisabled: tabInteractionBlocked,
-                compact: false,
-              }
-              if (!isSortableWorkspacePaneTabItem(item)) {
-                return <WorkspacePaneTab key={item.identity} {...commonProps} />
-              }
-              return (
-                <SortableWorkspacePaneTab key={item.identity} {...commonProps} sortableIdentity={item.sortableId} />
-              )
-            })}
-          </WorkspacePaneTabTooltipLayer>
-        </SortableContext>
-        {createAction ? (
+        <WorkspacePaneTabTooltipLayer
+          items={props.items}
+          role="tablist"
+          aria-label={context.t('workspace-pane-tabs.tabs')}
+        >
+          {props.items.map((item, index) => {
+            const nextItem = props.items[index + 1]
+            const rightId = nextItem ? nextItem.identity : WORKSPACE_PANE_NEW_ACTION_ID
+            const commonProps: WorkspacePaneTabProps = {
+              item,
+              isActive: !!context.panelActive && item.identity === context.activeTabIdentity,
+              isSelected: item.identity === context.activeTabIdentity,
+              isFocusable: item.identity === context.focusableTabIdentity,
+              index,
+              total: props.items.length,
+              tabId: context.tabIdForItem(item),
+              focusRegistry: context.focusRegistry,
+              showSeparator: shouldShowWorkspacePaneTabSeparator({
+                leftId: item.identity,
+                rightId,
+                activeId: activeVisualIdentity,
+                hoveredId: context.hoveredTabIdentity,
+              }),
+              onHoverChange: context.onHoverChange,
+              onSelect: context.onSelect,
+              onClose: context.onClose,
+              onKeyDown: context.onKeyDown,
+              t: context.t,
+              interactionDisabled: context.tabInteractionBlocked,
+              compact: false,
+            }
+            if (!isSortableWorkspacePaneTabItem(item)) {
+              return <WorkspacePaneTab key={item.identity} {...commonProps} />
+            }
+            const sortableIndex = sortableIndices.get(item.identity)
+            if (sortableIndex === undefined) return null
+            return (
+              <SortableWorkspacePaneTab
+                key={item.identity}
+                {...commonProps}
+                sortableIdentity={item.sortableId}
+                sortableIndex={sortableIndex}
+              />
+            )
+          })}
+        </WorkspacePaneTabTooltipLayer>
+        {props.createAction ? (
           <WorkspacePaneNewButton
-            ref={newButtonRef}
-            id={items.length === 0 ? `${workspacePaneId}-workspace-pane-tab-empty` : undefined}
-            action={createAction}
+            buttonRef={props.newButtonRef}
+            id={props.items.length === 0 ? `${props.workspacePaneId}-workspace-pane-tab-empty` : undefined}
+            action={props.createAction}
           />
         ) : null}
       </ToolbarTabStripBody>
-    </DndContext>
+    </DragDropProvider>
   )
 }
+
+WorkspacePaneScrollableTabsBody.props = ['items', 'context', 'createAction', 'newButtonRef', 'workspacePaneId', 'dnd']
 
 function shouldShowWorkspacePaneTabSeparator({
   leftId,

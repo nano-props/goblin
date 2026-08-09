@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { createRepoBranch, createGitRepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
-import { createRef } from 'react'
+import { shallowRef } from 'vue'
+import type { ComponentProps } from 'vue-component-type-helpers'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -9,23 +10,17 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 
-// Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
-// that delegates to the real module so `i18next.use(initReactI18next).
-// init({…})` still runs (which is what wires the i18next singleton into
-// `react-i18next`'s module-scoped closure, the one `<Trans>` reads
-// from), and only overrides `useT` to return raw keys. See
-// `src/test-utils/i18n-mock.ts` for the rationale and the importOriginal
-// pattern that backs this side effect.
-import { stubI18n } from '#/test-utils/i18n-mock.ts'
-stubI18n()
-
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useIsCompactUi: () => false,
+  useIsCompactUi: () => ({ value: false }),
 }))
 
 vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
-  useTerminalFilesystemTargetOutputActive: () => terminalStoreMocks.outputActive,
-  useTerminalFilesystemTargetBellCount: () => 0,
+  useTerminalFilesystemTargetOutputActive: () => ({
+    get value() {
+      return terminalStoreMocks.outputActive
+    },
+  }),
+  useTerminalFilesystemTargetBellCount: () => ({ value: 0 }),
 }))
 
 const branchRowPropsSpy = vi.fn()
@@ -46,27 +41,27 @@ beforeEach(() => {
 })
 
 describe('BranchListRow', () => {
-  test('forwards `branchActionBusy=true` when an in-flight branch action targets this branch', () => {
+  test('forwards `branchActionBusy=true` when an in-flight branch action targets this branch', async () => {
     const repo = branchListRowRepo()
     repo.branchAction = { ...repo.branchAction, phase: 'running', target: 'feature/a' }
     renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: true }))
   })
 
-  test('forwards `branchActionBusy=false` when an in-flight branch action targets a different branch', () => {
+  test('forwards `branchActionBusy=false` when an in-flight branch action targets a different branch', async () => {
     const repo = branchListRowRepo()
     repo.branchAction = { ...repo.branchAction, phase: 'running', target: 'feature/other' }
     renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: false }))
   })
 
-  test('forwards `branchActionBusy=false` when the operations state is idle', () => {
+  test('forwards `branchActionBusy=false` when the operations state is idle', async () => {
     const repo = branchListRowRepo()
     renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: false }))
   })
 
-  test('forwards terminal output activity from the worktree terminal snapshot', () => {
+  test('forwards terminal output activity from the worktree terminal snapshot', async () => {
     terminalStoreMocks.outputActive = true
     const repo = branchListRowRepo()
     renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
@@ -77,14 +72,14 @@ describe('BranchListRow', () => {
 function baseProps(
   repo: BranchActionRepo,
   branchName: string,
-): Omit<React.ComponentProps<typeof BranchListRow>, 'terminalBellCount' | 'branchActionBusy'> {
+): Omit<ComponentProps<typeof BranchListRow>, 'terminalBellCount' | 'branchActionBusy'> {
   return {
     repo,
     branch: createRepoBranch(branchName),
     selected: null,
     onSelectBranch: vi.fn(),
     onOpenBranchStatus: vi.fn(),
-    selectedRef: createRef<HTMLLIElement>(),
+    selectedRef: shallowRef<HTMLLIElement | null>(null),
     onActionMenuOpenChange: vi.fn(),
   }
 }

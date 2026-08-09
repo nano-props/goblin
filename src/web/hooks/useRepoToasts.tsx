@@ -1,11 +1,13 @@
-import { useEffect, useRef } from 'react'
+import { computed, defineComponent, toValue, watch } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useT } from '#/web/stores/i18n.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 import type { RepoEvent } from '#/web/stores/workspaces/types.ts'
 import { repoEventActionSuccessLabel } from '#/web/stores/workspaces/action-labels.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import {
   hasWorktreeBootstrapSummaryDetails,
   type WorktreeBootstrapPathSummary,
@@ -39,75 +41,68 @@ const WORKTREE_BOOTSTRAP_PATH_SUMMARY_KEYS: Record<
 const WORKTREE_BOOTSTRAP_MORE_SUFFIX_KEY = 'worktree-bootstrap.summary.more-suffix'
 const WORKTREE_BOOTSTRAP_SETUP_KEY = 'worktree-bootstrap.summary.setup'
 
-export function useRepoToasts(repoId: WorkspaceId) {
+export function useRepoToasts(repoId: MaybeRefOrGetter<WorkspaceId>) {
   const t = useT()
-  const events = useWorkspacesStore((s) => {
-    const workspace = s.workspaces[repoId]
+  const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
+  const events = computed(() => {
+    const workspace = workspaces.value[toValue(repoId)]
     return workspace?.capability.kind === 'git' ? workspace.capability.git.events : null
   })
 
-  // `t` is read through a ref so a language flip doesn't re-fire these
-  // effects (which would already be no-ops after the store clear, but
-  // would still cost a render and obscure the dependency story).
-  // Synced in render body so a toast fired in the same render as the
-  // language switch picks up the new dict — an effect-based sync would
-  // run a tick later and leave the ref one render stale.
-  const tRef = useRef(t)
-  tRef.current = t
-
-  useEffect(() => {
-    if (!events?.length) return
-    for (const event of events) {
-      if (event.kind === 'result') {
-        const result = event.result
-        const hasMessage = !!result.message
-        const actionLabel = repoEventActionSuccessLabel(event.action)
-        const resultMessageKey = result.message || 'error.unknown'
-        const bootstrapSummary = formatTranslatedWorktreeBootstrapSummary(result.worktreeBootstrap, tRef.current)
-        const translatedResultMessage = tRef.current(resultMessageKey)
-        const translatedRecoveryMessages = (result.recoveryMessageKeys ?? []).map((recoveryMessageKey) =>
-          tRef.current(recoveryMessageKey),
-        )
-        const descriptionText = repoResultDescription(
-          result.ok,
-          result.message,
-          translatedResultMessage,
-          translatedRecoveryMessages,
-          bootstrapSummary,
-        )
-        const description =
-          (!result.ok || (hasMessage && (!actionLabel || !!bootstrapSummary))) && descriptionText ? (
-            <ToastDescription>{descriptionText}</ToastDescription>
-          ) : undefined
-        if (result.ok) {
-          toast.success(
-            actionLabel
-              ? tRef.current(actionLabel.labelKey, actionLabel.labelParams)
-              : tRef.current('action.result-ok'),
-            {
-              id: `${repoId}:result:ok:${event.id}`,
-              description,
-            },
+  // Events are an external queue; drain each accepted store batch once.
+  watch(
+    events,
+    (currentEvents) => {
+      if (!currentEvents?.length) return
+      const currentRepoId = toValue(repoId)
+      for (const event of currentEvents) {
+        if (event.kind === 'result') {
+          const result = event.result
+          const hasMessage = !!result.message
+          const actionLabel = repoEventActionSuccessLabel(event.action)
+          const resultMessageKey = result.message || 'error.unknown'
+          const bootstrapSummary = formatTranslatedWorktreeBootstrapSummary(result.worktreeBootstrap, t)
+          const translatedResultMessage = t(resultMessageKey)
+          const translatedRecoveryMessages = (result.recoveryMessageKeys ?? []).map((recoveryMessageKey) =>
+            t(recoveryMessageKey),
           )
+          const descriptionText = repoResultDescription(
+            result.ok,
+            result.message,
+            translatedResultMessage,
+            translatedRecoveryMessages,
+            bootstrapSummary,
+          )
+          const description =
+            (!result.ok || (hasMessage && (!actionLabel || !!bootstrapSummary))) && descriptionText ? (
+              <ToastDescription>{descriptionText}</ToastDescription>
+            ) : undefined
+          if (result.ok) {
+            toast.success(actionLabel ? t(actionLabel.labelKey, actionLabel.labelParams) : t('action.result-ok'), {
+              id: `${currentRepoId}:result:ok:${event.id}`,
+              description,
+            })
+          } else {
+            toast.error(t('action.result-error'), {
+              id: `${currentRepoId}:result:err:${event.id}`,
+              description,
+              duration: 10_000,
+            })
+          }
         } else {
-          toast.error(tRef.current('action.result-error'), {
-            id: `${repoId}:result:err:${event.id}`,
-            description,
+          toast.error(<ToastDescription>{t(event.message)}</ToastDescription>, {
+            id: `${currentRepoId}:error:${event.id}`,
             duration: 10_000,
           })
         }
-      } else {
-        toast.error(<ToastDescription>{tRef.current(event.message)}</ToastDescription>, {
-          id: `${repoId}:error:${event.id}`,
-          duration: 10_000,
-        })
       }
-    }
-    useWorkspacesStore.getState().clearEvents(
-      repoId,
-      events.map((event) => event.id),
-    )
-  }, [events, repoId])
+      workspacesStore.getState().clearEvents(
+        currentRepoId,
+        currentEvents.map((event) => event.id),
+      )
+    },
+    { immediate: true },
+  )
 }
 
 function repoResultDescription(
@@ -123,15 +118,17 @@ function repoResultDescription(
   return [resultMessage, ...translatedRecoveryMessages, bootstrapSummary].filter(Boolean).join('\n')
 }
 
-function ToastDescription({ children }: { children: React.ReactNode }) {
-  return (
-    <ScrollArea className="max-h-32 w-full max-w-full min-w-0" viewportClassName="max-h-32">
-      <pre className="block w-full max-w-full min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] font-mono text-[11px] leading-relaxed">
-        {children}
-      </pre>
-    </ScrollArea>
-  )
-}
+const ToastDescription = defineComponent(
+  (_props, { slots }) =>
+    () => (
+      <ScrollArea class="max-h-32 w-full max-w-full min-w-0" viewportClass="max-h-32">
+        <pre class="block w-full max-w-full min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere] font-mono text-[11px] leading-relaxed">
+          {slots.default?.()}
+        </pre>
+      </ScrollArea>
+    ),
+  { name: 'ToastDescription' },
+)
 
 function formatTranslatedWorktreeBootstrapSummary(
   summary: WorktreeBootstrapSummary | undefined,

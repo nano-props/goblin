@@ -180,7 +180,7 @@ describe('remote ssh command builders', () => {
     expect(gitRootResult.stdout).toBe(admissionResult.stdout)
   })
 
-  test('uses an ssh executable discovered on PATH', () => {
+  test('uses an ssh executable discovered on PATH', async () => {
     const dir = path.join(os.tmpdir(), `goblin-ssh-test-${Date.now()}-${process.pid}`)
     tempDirs.push(dir)
     mkdirSync(dir, { recursive: true })
@@ -195,7 +195,7 @@ describe('remote ssh command builders', () => {
     expect(invocation.command).toBe(executable)
   })
 
-  test('falls back to the bare "ssh" name when no executable is on PATH', () => {
+  test('falls back to the bare "ssh" name when no executable is on PATH', async () => {
     process.env.PATH = path.join(os.tmpdir(), 'definitely-not-on-path-' + process.pid)
     delete process.env.PATHEXT
 
@@ -204,7 +204,7 @@ describe('remote ssh command builders', () => {
     expect(invocation.command).toBe('ssh')
   })
 
-  test('ignores non-executable ssh candidates on PATH', () => {
+  test('ignores non-executable ssh candidates on PATH', async () => {
     const dir = path.join(os.tmpdir(), `goblin-ssh-test-${Date.now()}-${process.pid}`)
     tempDirs.push(dir)
     mkdirSync(dir, { recursive: true })
@@ -223,7 +223,7 @@ describe('remote ssh command builders', () => {
     expect(invocation.command).toBe('ssh')
   })
 
-  test('binds ControlPath to the complete captured SSH connection snapshot', () => {
+  test('binds ControlPath to the complete captured SSH connection snapshot', async () => {
     const withConnection = (effectiveConfig: string): RemoteWorkspaceTarget => {
       const remote = target()
       return { ...remote, sshConnection: buildCanonicalSshConnectionSnapshot(remote, effectiveConfig) }
@@ -241,7 +241,7 @@ describe('remote ssh command builders', () => {
     expect(controlPath(withConnection(changedHostKey))).not.toBe(controlPath(withConnection(base)))
   })
 
-  test('replays the alias as %n while captured HostName fixes %h for commands and terminals', () => {
+  test('replays the alias as %n while captured HostName fixes %h for commands and terminals', async () => {
     const remote = { ...target(), host: 'edge.example.test' }
     const sshConnection = buildCanonicalSshConnectionSnapshot(
       remote,
@@ -260,7 +260,7 @@ describe('remote ssh command builders', () => {
     }
   })
 
-  test('remote terminal startup shell command runs before returning to an interactive shell', () => {
+  test('remote terminal startup shell command runs before returning to an interactive shell', async () => {
     const invocation = buildRemoteTerminalInvocation(target(), '/srv/repo worktree', {
       startupShellCommand: "  bat '/srv/repo worktree/README.md'\r",
     })
@@ -271,7 +271,7 @@ describe('remote ssh command builders', () => {
     expect(invocation.script).toContain('exec "${SHELL:-/bin/sh}" -l')
   })
 
-  test('remote filesystem walk lists direct children without Git filtering', () => {
+  test('remote filesystem walk lists direct children without Git filtering', async () => {
     const invocation = buildRemoteCommandInvocation(target(), {
       type: 'directoryChildren',
       path: '/srv/repo worktree',
@@ -311,7 +311,7 @@ describe('remote ssh command builders', () => {
     expect(result).toMatchObject({ exitCode: 0, stdout: `trash -- ${link}` })
   })
 
-  test('bounds remote directory and Git log result counts after flooring', () => {
+  test('bounds remote directory and Git log result counts after flooring', async () => {
     const directoryScript = (limit?: number) =>
       buildRemoteCommandInvocation(target(), {
         type: 'listDirectories',
@@ -335,7 +335,7 @@ describe('remote ssh command builders', () => {
     expect(logScript(1001)).toContain('--max-count=1000')
   })
 
-  test('remote Git worktree walk decorates direct children with ignore state', () => {
+  test('remote Git worktree walk decorates direct children with ignore state', async () => {
     const invocation = buildRemoteCommandInvocation(target(), {
       type: 'gitDirectoryChildren',
       path: '/srv/repo worktree',
@@ -347,7 +347,7 @@ describe('remote ssh command builders', () => {
     expect(invocation.script).not.toContain('ls-files -co --exclude-standard -z')
   })
 
-  test('remote commandExists checks the command in the remote login shell', () => {
+  test('remote commandExists checks the command in the remote login shell', async () => {
     const invocation = buildRemoteCommandInvocation(target(), {
       type: 'commandExists',
       path: '/srv/repo worktree',
@@ -359,7 +359,7 @@ describe('remote ssh command builders', () => {
     expect(invocation.script).toContain("command -v '\\''bat'\\'' >/dev/null 2>&1")
   })
 
-  test('remote commandExists rejects unsafe command names', () => {
+  test('remote commandExists rejects unsafe command names', async () => {
     const invocation = buildRemoteCommandInvocation(target(), {
       type: 'commandExists',
       path: '/srv/repo',
@@ -369,7 +369,7 @@ describe('remote ssh command builders', () => {
     expect(invocation.script).toBe('exit 1')
   })
 
-  test('remote branch delete push quotes remote and branch arguments', () => {
+  test('remote branch delete push quotes remote and branch arguments', async () => {
     const invocation = buildRemoteCommandInvocation(target(), {
       type: 'gitPushDeleteBranch',
       path: '/srv/repo worktree',

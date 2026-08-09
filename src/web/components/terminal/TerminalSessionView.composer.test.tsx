@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, within } from '@testing-library/react'
+import { fireEvent, within } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
@@ -23,27 +24,27 @@ function composerInput(container: HTMLElement) {
   return textarea
 }
 
-function openComposerInput(container: HTMLElement) {
-  act(() => buttonByLabel(container, 'terminal.composer-open').click())
+async function openComposerInput(container: HTMLElement): Promise<HTMLTextAreaElement> {
+  await flushTestUpdates(() => buttonByLabel(container, 'terminal.composer-open').click())
   return composerInput(container)
 }
 
-function chooseComposerFile(container: HTMLElement, draft: string, file: File) {
-  const textarea = openComposerInput(container)
+async function chooseComposerFile(container: HTMLElement, draft: string, file: File): Promise<HTMLTextAreaElement> {
+  const textarea = await openComposerInput(container)
   const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
   if (!fileInput) throw new Error('expected composer file controls')
-  fireEvent.change(textarea, { target: { value: draft } })
-  fireEvent.change(fileInput, { target: { files: [file] } })
+  await fireEvent.update(textarea, draft)
+  await fireEvent.change(fileInput, { target: { files: [file] } })
   return textarea
 }
 
-function copyContent(container: HTMLElement) {
-  act(() => buttonByLabel(container, 'terminal.composer-open').click())
-  act(() => buttonByLabel(container, 'terminal.composer-show-keys').click())
-  act(() => buttonByLabel(container, 'terminal.composer-more').click())
+async function copyContent(container: HTMLElement): Promise<void> {
+  await flushTestUpdates(() => buttonByLabel(container, 'terminal.composer-open').click())
+  await flushTestUpdates(() => buttonByLabel(container, 'terminal.composer-show-keys').click())
+  await flushTestUpdates(() => buttonByLabel(container, 'terminal.composer-more').click())
   const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
   if (!menu) throw new Error('expected open Composer menu')
-  act(() => within(menu).getByRole('button', { name: 'terminal.composer-copy-content' }).click())
+  await flushTestUpdates(() => within(menu).getByRole('button', { name: 'terminal.composer-copy-content' }).click())
 }
 
 describe('TerminalSessionView composer', () => {
@@ -56,7 +57,7 @@ describe('TerminalSessionView composer', () => {
       const readCopyText = vi.fn(() => 'command\nerror')
       const rendered = await renderTerminalSession({ readCopyText })
 
-      copyContent(rendered.container)
+      await copyContent(rendered.container)
       await vi.waitFor(() => {
         expect(writeText).toHaveBeenCalledWith('command\nerror')
         expect(terminalSessionViewToastForTest().success).toHaveBeenCalledWith('branch-status.copied')
@@ -78,7 +79,7 @@ describe('TerminalSessionView composer', () => {
     try {
       const rendered = await renderTerminalSession({ readCopyText: vi.fn(() => '') })
 
-      copyContent(rendered.container)
+      await copyContent(rendered.container)
 
       expect(writeText).not.toHaveBeenCalled()
       expect(terminalSessionViewToastForTest().error).toHaveBeenCalledWith('terminal.composer-copy-content-empty')
@@ -102,7 +103,7 @@ describe('TerminalSessionView composer', () => {
     try {
       const rendered = await renderTerminalSession({ readCopyText: vi.fn(() => 'output') })
 
-      copyContent(rendered.container)
+      await copyContent(rendered.container)
       await vi.waitFor(() =>
         expect(terminalSessionViewToastForTest().error).toHaveBeenCalledWith('action.result-error', {
           description: 'NotAllowedError: The request is not allowed',
@@ -134,7 +135,7 @@ describe('TerminalSessionView composer', () => {
       const input = composerInput(rendered.container)
       const focus = vi.spyOn(input, 'focus')
 
-      act(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
+      await flushTestUpdates(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
       expect(document.activeElement).toBe(input)
       expect(focus).toHaveBeenLastCalledWith()
       expect(rendered.container.querySelector('.goblin-terminal-session__host')?.parentElement).toBe(
@@ -143,7 +144,7 @@ describe('TerminalSessionView composer', () => {
       expect(rendered.container.querySelector('.goblin-terminal-composer')?.parentElement).toBe(rendered.sessionRoot)
 
       Object.defineProperty(visualViewport, 'height', { configurable: true, value: 500 })
-      act(() => visualViewport.dispatchEvent(new Event('resize')))
+      await flushTestUpdates(() => visualViewport.dispatchEvent(new Event('resize')))
       expect(document.activeElement).toBe(input)
       expect(focus).toHaveBeenCalledOnce()
     } finally {
@@ -163,7 +164,7 @@ describe('TerminalSessionView composer', () => {
       if (!composer) throw new Error('expected a floating composer')
       const input = composerInput(rendered.container)
       const focus = vi.spyOn(input, 'focus')
-      act(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
+      await flushTestUpdates(() => buttonByLabel(rendered.container, 'terminal.composer-open').click())
       expect(focus).toHaveBeenLastCalledWith()
 
       const terminalHost = document.createElement('div')
@@ -172,7 +173,8 @@ describe('TerminalSessionView composer', () => {
       terminalHost.appendChild(terminalInput)
       rendered.sessionRoot.appendChild(terminalHost)
       terminalInput.focus()
-      expect(fireEvent.pointerDown(input, { pointerType: 'touch' })).toBe(true)
+      await fireEvent.pointerDown(input, { pointerType: 'touch' })
+      expect(document.activeElement).toBe(terminalInput)
     } finally {
       await rendered.cleanup()
       if (originalVisualViewport) Object.defineProperty(window, 'visualViewport', originalVisualViewport)
@@ -191,6 +193,8 @@ describe('TerminalSessionView composer', () => {
       rendered.sessionRoot.focus()
       await user.keyboard('{Meta>}f{/Meta}')
       expect(rendered.container.querySelector('.goblin-terminal-session__search')).not.toBeNull()
+      handoffOrder.length = 0
+      clearSearch.mockClear()
       const input = composerInput(rendered.container)
       input.addEventListener('focus', () => handoffOrder.push('composer-focus'))
 
@@ -201,7 +205,7 @@ describe('TerminalSessionView composer', () => {
         bubbles: true,
         cancelable: true,
       })
-      act(() => rendered.sessionRoot.dispatchEvent(shortcut))
+      await flushTestUpdates(() => rendered.sessionRoot.dispatchEvent(shortcut))
 
       expect(shortcut.defaultPrevented).toBe(true)
       expect(handoffOrder).toEqual(['clear-search', 'composer-focus'])
@@ -225,7 +229,7 @@ describe('TerminalSessionView composer', () => {
           bubbles: true,
           cancelable: true,
         })
-        act(() => rendered.sessionRoot.dispatchEvent(unsupported))
+        await flushTestUpdates(() => rendered.sessionRoot.dispatchEvent(unsupported))
         expect(unsupported.defaultPrevented).toBe(false)
       }
       expect(trigger.getAttribute('aria-expanded')).toBe('false')
@@ -250,7 +254,7 @@ describe('TerminalSessionView composer', () => {
         bubbles: true,
         cancelable: true,
       })
-      act(() => rendered.sessionRoot.dispatchEvent(shortcut))
+      await flushTestUpdates(() => rendered.sessionRoot.dispatchEvent(shortcut))
 
       expect(shortcut.defaultPrevented).toBe(true)
       expect(trigger.getAttribute('aria-expanded')).toBe('true')
@@ -263,7 +267,7 @@ describe('TerminalSessionView composer', () => {
         bubbles: true,
         cancelable: true,
       })
-      act(() => rendered.sessionRoot.dispatchEvent(nonMacShortcut))
+      await flushTestUpdates(() => rendered.sessionRoot.dispatchEvent(nonMacShortcut))
       expect(nonMacShortcut.defaultPrevented).toBe(false)
     } finally {
       await rendered.cleanup()
@@ -276,7 +280,7 @@ describe('TerminalSessionView composer', () => {
 
     try {
       const trigger = buttonByLabel(rendered.container, 'terminal.composer-open')
-      act(() => trigger.click())
+      await flushTestUpdates(() => trigger.click())
       rendered.sessionRoot.focus()
       expect(document.activeElement).toBe(rendered.sessionRoot)
 
@@ -287,7 +291,7 @@ describe('TerminalSessionView composer', () => {
         bubbles: true,
         cancelable: true,
       })
-      act(() => rendered.sessionRoot.dispatchEvent(shortcut))
+      await flushTestUpdates(() => rendered.sessionRoot.dispatchEvent(shortcut))
 
       expect(shortcut.defaultPrevented).toBe(true)
       expect(trigger.getAttribute('aria-expanded')).toBe('true')
@@ -326,7 +330,7 @@ describe('TerminalSessionView composer', () => {
         bubbles: true,
         cancelable: true,
       })
-      act(() => rendered.sessionRoot.dispatchEvent(shortcut))
+      await flushTestUpdates(() => rendered.sessionRoot.dispatchEvent(shortcut))
 
       expect(shortcut.defaultPrevented).toBe(false)
       expect(openComposer).not.toHaveBeenCalled()
@@ -379,7 +383,7 @@ describe('TerminalSessionView composer', () => {
         bubbles: true,
         cancelable: true,
       })
-      act(() => rendered.sessionRoot.dispatchEvent(event))
+      await flushTestUpdates(() => rendered.sessionRoot.dispatchEvent(event))
       expect(event.defaultPrevented).toBe(false)
       expect(openComposer).not.toHaveBeenCalled()
     } finally {
@@ -392,9 +396,9 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession({ submitText })
 
     try {
-      const textarea = openComposerInput(rendered.container)
-      fireEvent.change(textarea, { target: { value: 'git status' } })
-      fireEvent.keyDown(textarea, { key: 'Enter' })
+      const textarea = await openComposerInput(rendered.container)
+      await fireEvent.update(textarea, 'git status')
+      await fireEvent.keyDown(textarea, { key: 'Enter' })
 
       expect(submitText).toHaveBeenCalledWith('term-111111111111111111111', 'git status')
       await vi.waitFor(() => expect(textarea.value).toBe(''))
@@ -408,9 +412,9 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession({ submitText })
 
     try {
-      const textarea = openComposerInput(rendered.container)
-      fireEvent.change(textarea, { target: { value: 'keep this command' } })
-      fireEvent.keyDown(textarea, { key: 'Enter' })
+      const textarea = await openComposerInput(rendered.container)
+      await fireEvent.update(textarea, 'keep this command')
+      await fireEvent.keyDown(textarea, { key: 'Enter' })
 
       expect(submitText).toHaveBeenCalledWith('term-111111111111111111111', 'keep this command')
       await vi.waitFor(() => expect(textarea.value).toBe('keep this command'))
@@ -425,23 +429,23 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession()
 
     try {
-      const textarea = openComposerInput(rendered.container)
+      const textarea = await openComposerInput(rendered.container)
       const fileInput = rendered.container.querySelector<HTMLInputElement>('input[type="file"]')
       const moreButton = buttonByLabel(rendered.container, 'terminal.composer-more')
       if (!fileInput) throw new Error('expected composer file controls')
-      fireEvent.change(textarea, { target: { value: 'cat ' } })
+      await fireEvent.update(textarea, 'cat ')
       textarea.setSelectionRange(4, 4)
-      act(() => fireEvent.click(moreButton))
+      await flushTestUpdates(() => fireEvent.click(moreButton))
       const popoverContent = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
       const uploadItem = popoverContent
         ? within(popoverContent).getByRole('button', { name: 'terminal.composer-upload-files' })
         : null
       if (!uploadItem) throw new Error('expected composer upload action')
-      act(() => uploadItem.click())
+      await flushTestUpdates(() => uploadItem.click())
 
       const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
       Object.defineProperty(file, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
-      fireEvent.change(fileInput, { target: { files: [file] } })
+      await fireEvent.change(fileInput, { target: { files: [file] } })
 
       await vi.waitFor(() => expect(textarea.value).toBe("cat '/abs/notes file.txt'"))
       expect(rendered.writeInput).not.toHaveBeenCalled()
@@ -458,13 +462,13 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession()
 
     try {
-      const textarea = chooseComposerFile(rendered.container, '', new File(['content'], 'notes.txt'))
+      const textarea = await chooseComposerFile(rendered.container, '', new File(['content'], 'notes.txt'))
 
       await vi.waitFor(() =>
         expect(rendered.container.querySelector('[aria-label="terminal.file-resolution-progress"]')).not.toBeNull(),
       )
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         savedPaths.resolve(['/tmp/notes.txt'])
         await savedPaths.promise
       })
@@ -489,7 +493,7 @@ describe('TerminalSessionView composer', () => {
     try {
       const file = new File([new Uint8Array([1])], 'archive.bin')
       Object.defineProperty(file, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
-      const textarea = chooseComposerFile(rendered.container, 'cat ', file)
+      const textarea = await chooseComposerFile(rendered.container, 'cat ', file)
 
       await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith('terminal.paste-file-too-large'))
       expect(textarea.value).toBe('cat ')
@@ -508,7 +512,11 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession()
 
     try {
-      const textarea = chooseComposerFile(rendered.container, 'cat existing.txt', new File(['content'], 'notes.txt'))
+      const textarea = await chooseComposerFile(
+        rendered.container,
+        'cat existing.txt',
+        new File(['content'], 'notes.txt'),
+      )
 
       await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith('terminal.paste-file-failed'))
       expect(textarea.value).toBe('cat existing.txt')
@@ -532,9 +540,9 @@ describe('TerminalSessionView composer', () => {
     )
 
     try {
-      const textarea = openComposerInput(rendered.container)
-      fireEvent.change(textarea, { target: { value: 'cat existing.txt' } })
-      act(() => buttonByLabel(rendered.container, 'terminal.composer-more').click())
+      const textarea = await openComposerInput(rendered.container)
+      await fireEvent.update(textarea, 'cat existing.txt')
+      await flushTestUpdates(() => buttonByLabel(rendered.container, 'terminal.composer-more').click())
       const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
       if (!menu) throw new Error('expected open Composer menu')
 
@@ -555,10 +563,10 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession()
 
     try {
-      const textarea = openComposerInput(rendered.container)
+      const textarea = await openComposerInput(rendered.container)
       const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
       Object.defineProperty(file, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
-      fireEvent.change(textarea, { target: { value: 'cat ' } })
+      await fireEvent.update(textarea, 'cat ')
       textarea.setSelectionRange(4, 4)
       if (kind === 'paste') {
         const event = new Event('paste', { bubbles: true, cancelable: true })
@@ -568,7 +576,7 @@ describe('TerminalSessionView composer', () => {
         const terminal = rendered.container.querySelector<HTMLElement>('.goblin-terminal-session')
         if (!terminal) throw new Error('expected terminal session')
         const dataTransfer = dropDataWithFiles([file])
-        fireEvent.dragEnter(terminal, { dataTransfer })
+        await fireEvent.dragEnter(terminal, { dataTransfer })
         const dropOverlay = rendered.container.querySelector('.goblin-terminal-session__drop-overlay')
         expect(dropOverlay).not.toBeNull()
         expect(dropOverlay?.parentElement).toBe(terminal)
@@ -594,7 +602,7 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession()
 
     try {
-      const textarea = openComposerInput(rendered.container)
+      const textarea = await openComposerInput(rendered.container)
       const thumbnail = new File(['thumbnail'], 'thumbnail.png', { type: 'image/png' })
       const clipboardData = clipboardDataWithFiles([thumbnail]) as DataTransfer & {
         getData: (format: string) => string
@@ -618,8 +626,8 @@ describe('TerminalSessionView composer', () => {
     const rendered = await renderTerminalSession()
 
     try {
-      const textarea = openComposerInput(rendered.container)
-      fireEvent.change(textarea, { target: { value: 'preserved draft' } })
+      const textarea = await openComposerInput(rendered.container)
+      await fireEvent.update(textarea, 'preserved draft')
       await user.keyboard('{Meta>}f{/Meta}')
 
       expect(rendered.container.querySelector('.goblin-terminal-session__search')).not.toBeNull()
@@ -627,7 +635,7 @@ describe('TerminalSessionView composer', () => {
       expect(textarea.value).toBe('preserved draft')
 
       const closeSearch = within(rendered.container).getByRole('button', { name: 'terminal.search-close' })
-      act(() => closeSearch.click())
+      await flushTestUpdates(() => closeSearch.click())
 
       expect(rendered.container.querySelector('.goblin-terminal-composer')?.hasAttribute('hidden')).toBe(false)
       expect(textarea.value).toBe('preserved draft')

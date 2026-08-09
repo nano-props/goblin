@@ -1,51 +1,29 @@
-// Body content for the branch-action confirmation dialogs. Three
-// body components serve four of the five dialogs:
-//
-//   - `DeleteBranchConfirmBody` — used by both `deleteConfirm` and
-//     `forceDeleteConfirm` (they share the same structural body;
-//     only the i18n strings differ).
-//   - `RemoveWorktreeConfirmBody` — used by `removeConfirm`.
-//   - `ForceRemoveWorktreeConfirmBody` — used by `forceRemoveConfirm`.
-//
-// The push-protected dialog (`pushConfirm`) has no body component
-// here — its body is a `<Trans>` rendered inline in
-// `BranchActionDialogHost`.
-//
-// Each body takes already-resolved display data as plain props — the
-// host narrows the store view (slot entry + `(repo, branch)` + checkbox
-// state) and passes the narrowed values in, so the bodies never read
-// from any global state and never need non-null assertions.
-
-import { type ReactNode } from 'react'
+import type { FunctionalComponent } from 'vue'
 import { ConfirmCheckbox } from '#/web/components/ConfirmCheckbox.tsx'
 
-function ConfirmValue({ value }: { value: string }) {
-  return (
-    <span className="block break-all font-mono text-foreground" title={value}>
-      {value}
-    </span>
-  )
-}
+const ConfirmValue: FunctionalComponent<{ value: string }> = (props) => (
+  <span class="block break-all font-mono text-foreground" title={props.value}>
+    {props.value}
+  </span>
+)
 
-function IndentedValue({ value }: { value: string }) {
-  return (
-    <span className="block break-all pl-6 font-mono text-foreground" title={value}>
-      {value}
-    </span>
-  )
-}
+ConfirmValue.props = ['value']
 
-function ConfirmStack({ children }: { children: ReactNode }) {
-  return <div className="space-y-3">{children}</div>
-}
+const IndentedValue: FunctionalComponent<{ value: string }> = (props) => (
+  <span class="block break-all pl-6 font-mono text-foreground" title={props.value}>
+    {props.value}
+  </span>
+)
 
-function ConfirmSection({ children }: { children: ReactNode }) {
-  return <div className="space-y-1">{children}</div>
-}
+IndentedValue.props = ['value']
 
-function ConfirmNote({ children }: { children: ReactNode }) {
-  return <span className="block text-muted-foreground">{children}</span>
-}
+const ConfirmStack: FunctionalComponent = (_props, { slots }) => <div class="space-y-3">{slots.default?.()}</div>
+
+const ConfirmSection: FunctionalComponent = (_props, { slots }) => <div class="space-y-1">{slots.default?.()}</div>
+
+const ConfirmNote: FunctionalComponent = (_props, { slots }) => (
+  <span class="block text-muted-foreground">{slots.default?.()}</span>
+)
 
 interface DeleteBranchConfirmBodyProps {
   body: string
@@ -58,34 +36,38 @@ interface DeleteBranchConfirmBodyProps {
   upstreamLabel: string
 }
 
-export function DeleteBranchConfirmBody({
-  body,
-  branchName,
-  note,
-  hasUpstream,
-  deleteAlsoUpstream,
-  tracking,
-  onDeleteAlsoUpstreamChange,
-  upstreamLabel,
-}: DeleteBranchConfirmBodyProps) {
-  return (
-    <ConfirmStack>
+export const DeleteBranchConfirmBody: FunctionalComponent<DeleteBranchConfirmBodyProps> = (props) => (
+  <ConfirmStack>
+    <ConfirmSection>
+      <span>{props.body}</span>
+      <ConfirmValue value={props.branchName} />
+      <ConfirmNote>{props.note}</ConfirmNote>
+    </ConfirmSection>
+    {props.hasUpstream && props.tracking ? (
       <ConfirmSection>
-        <span>{body}</span>
-        <ConfirmValue value={branchName} />
-        <ConfirmNote>{note}</ConfirmNote>
+        <ConfirmCheckbox
+          checked={props.deleteAlsoUpstream}
+          onCheckedChange={props.onDeleteAlsoUpstreamChange}
+          destructive
+        >
+          {props.upstreamLabel}
+        </ConfirmCheckbox>
+        <IndentedValue value={props.tracking} />
       </ConfirmSection>
-      {hasUpstream && tracking && (
-        <ConfirmSection>
-          <ConfirmCheckbox checked={deleteAlsoUpstream} onCheckedChange={onDeleteAlsoUpstreamChange} destructive>
-            {upstreamLabel}
-          </ConfirmCheckbox>
-          <IndentedValue value={tracking} />
-        </ConfirmSection>
-      )}
-    </ConfirmStack>
-  )
-}
+    ) : null}
+  </ConfirmStack>
+)
+
+DeleteBranchConfirmBody.props = [
+  'body',
+  'branchName',
+  'note',
+  'hasUpstream',
+  'deleteAlsoUpstream',
+  'tracking',
+  'onDeleteAlsoUpstreamChange',
+  'upstreamLabel',
+]
 
 interface RemoveWorktreeConfirmBodyProps {
   body: string
@@ -103,58 +85,62 @@ interface RemoveWorktreeConfirmBodyProps {
   deleteUpstreamLabel: string
 }
 
-export function RemoveWorktreeConfirmBody({
-  body,
-  path,
-  branchName,
-  protectedHint,
-  removeAlsoDeletes,
-  removeConfirmProtected,
-  hasUpstream,
-  tracking,
-  removeAlsoUpstream,
-  onRemoveAlsoDeletesChange,
-  onRemoveAlsoUpstreamChange,
-  deleteBranchLabel,
-  deleteUpstreamLabel,
-}: RemoveWorktreeConfirmBodyProps) {
-  return (
-    <ConfirmStack>
+export const RemoveWorktreeConfirmBody: FunctionalComponent<RemoveWorktreeConfirmBodyProps> = (props) => (
+  <ConfirmStack>
+    <ConfirmSection>
+      <span>{props.body}</span>
+      <ConfirmValue value={props.path} />
+    </ConfirmSection>
+    <div class="space-y-2">
       <ConfirmSection>
-        <span>{body}</span>
-        <ConfirmValue value={path} />
+        <ConfirmCheckbox
+          checked={props.removeAlsoDeletes}
+          disabled={props.removeConfirmProtected}
+          describedBy={props.removeConfirmProtected ? 'remove-worktree-protected-hint' : undefined}
+          onCheckedChange={props.onRemoveAlsoDeletesChange}
+          destructive
+          title={props.removeConfirmProtected ? props.protectedHint : undefined}
+        >
+          {props.deleteBranchLabel}
+        </ConfirmCheckbox>
+        <IndentedValue value={props.branchName} />
       </ConfirmSection>
-      <div className="space-y-2">
+      {props.removeConfirmProtected ? (
+        <div id="remove-worktree-protected-hint" class="pl-6 text-xs text-muted-foreground">
+          {props.protectedHint}
+        </div>
+      ) : null}
+      {props.removeAlsoDeletes && props.hasUpstream && !props.removeConfirmProtected && props.tracking ? (
         <ConfirmSection>
           <ConfirmCheckbox
-            checked={removeAlsoDeletes}
-            disabled={removeConfirmProtected}
-            describedBy={removeConfirmProtected ? 'remove-worktree-protected-hint' : undefined}
-            onCheckedChange={onRemoveAlsoDeletesChange}
+            checked={props.removeAlsoUpstream}
+            onCheckedChange={props.onRemoveAlsoUpstreamChange}
             destructive
-            title={removeConfirmProtected ? protectedHint : undefined}
           >
-            {deleteBranchLabel}
+            {props.deleteUpstreamLabel}
           </ConfirmCheckbox>
-          <IndentedValue value={branchName} />
+          <IndentedValue value={props.tracking} />
         </ConfirmSection>
-        {removeConfirmProtected && (
-          <div id="remove-worktree-protected-hint" className="pl-6 text-xs text-muted-foreground">
-            {protectedHint}
-          </div>
-        )}
-        {removeAlsoDeletes && hasUpstream && !removeConfirmProtected && tracking && (
-          <ConfirmSection>
-            <ConfirmCheckbox checked={removeAlsoUpstream} onCheckedChange={onRemoveAlsoUpstreamChange} destructive>
-              {deleteUpstreamLabel}
-            </ConfirmCheckbox>
-            <IndentedValue value={tracking} />
-          </ConfirmSection>
-        )}
-      </div>
-    </ConfirmStack>
-  )
-}
+      ) : null}
+    </div>
+  </ConfirmStack>
+)
+
+RemoveWorktreeConfirmBody.props = [
+  'body',
+  'path',
+  'branchName',
+  'protectedHint',
+  'removeAlsoDeletes',
+  'removeConfirmProtected',
+  'hasUpstream',
+  'tracking',
+  'removeAlsoUpstream',
+  'onRemoveAlsoDeletesChange',
+  'onRemoveAlsoUpstreamChange',
+  'deleteBranchLabel',
+  'deleteUpstreamLabel',
+]
 
 interface ForceRemoveWorktreeConfirmBodyProps {
   removeBody: string
@@ -169,37 +155,41 @@ interface ForceRemoveWorktreeConfirmBodyProps {
   deleteUpstreamLabel: string
 }
 
-export function ForceRemoveWorktreeConfirmBody({
-  removeBody,
-  path,
-  forceDeleteBody,
-  branchName,
-  note,
-  hasUpstream,
-  tracking,
-  removeAlsoUpstream,
-  onRemoveAlsoUpstreamChange,
-  deleteUpstreamLabel,
-}: ForceRemoveWorktreeConfirmBodyProps) {
-  return (
-    <ConfirmStack>
+export const ForceRemoveWorktreeConfirmBody: FunctionalComponent<ForceRemoveWorktreeConfirmBodyProps> = (props) => (
+  <ConfirmStack>
+    <ConfirmSection>
+      <span>{props.removeBody}</span>
+      <ConfirmValue value={props.path} />
+    </ConfirmSection>
+    <ConfirmSection>
+      <span>{props.forceDeleteBody}</span>
+      <ConfirmValue value={props.branchName} />
+      <ConfirmNote>{props.note}</ConfirmNote>
+    </ConfirmSection>
+    {props.hasUpstream && props.tracking ? (
       <ConfirmSection>
-        <span>{removeBody}</span>
-        <ConfirmValue value={path} />
+        <ConfirmCheckbox
+          checked={props.removeAlsoUpstream}
+          onCheckedChange={props.onRemoveAlsoUpstreamChange}
+          destructive
+        >
+          {props.deleteUpstreamLabel}
+        </ConfirmCheckbox>
+        <IndentedValue value={props.tracking} />
       </ConfirmSection>
-      <ConfirmSection>
-        <span>{forceDeleteBody}</span>
-        <ConfirmValue value={branchName} />
-        <ConfirmNote>{note}</ConfirmNote>
-      </ConfirmSection>
-      {hasUpstream && tracking && (
-        <ConfirmSection>
-          <ConfirmCheckbox checked={removeAlsoUpstream} onCheckedChange={onRemoveAlsoUpstreamChange} destructive>
-            {deleteUpstreamLabel}
-          </ConfirmCheckbox>
-          <IndentedValue value={tracking} />
-        </ConfirmSection>
-      )}
-    </ConfirmStack>
-  )
-}
+    ) : null}
+  </ConfirmStack>
+)
+
+ForceRemoveWorktreeConfirmBody.props = [
+  'removeBody',
+  'path',
+  'forceDeleteBody',
+  'branchName',
+  'note',
+  'hasUpstream',
+  'tracking',
+  'removeAlsoUpstream',
+  'onRemoveAlsoUpstreamChange',
+  'deleteUpstreamLabel',
+]

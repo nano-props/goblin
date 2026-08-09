@@ -1,19 +1,20 @@
-import { Loader2 } from 'lucide-react'
+import { Loader2 } from '@lucide/vue'
+import type { FunctionalComponent } from 'vue'
 
 interface CenteredLoadingStatusProps {
   label?: string
-  className?: string
+  class?: string
 }
 
-export function CenteredLoadingStatus({ label = 'Loading', className = '' }: CenteredLoadingStatusProps) {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={`flex h-full items-center justify-center bg-background text-muted-foreground ${className}`}
-    >
-      <Loader2 className="size-5 animate-spin" aria-hidden />
-      <span className="sr-only">{label}</span>
-    </div>
-  )
-}
+export const CenteredLoadingStatus: FunctionalComponent<CenteredLoadingStatusProps> = (props) => (
+  <div
+    role="status"
+    aria-live="polite"
+    class={`flex h-full items-center justify-center bg-background text-muted-foreground ${props.class ?? ''}`}
+  >
+    <Loader2 class="size-5 animate-spin" aria-hidden="true" />
+    <span class="sr-only">{props.label ?? 'Loading'}</span>
+  </div>
+)
+CenteredLoadingStatus.props = ['label', 'class']
+CenteredLoadingStatus.inheritAttrs = false

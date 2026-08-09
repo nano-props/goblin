@@ -6,7 +6,7 @@ import {
   workspacePanePreferenceTargetOptions,
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
@@ -66,7 +66,7 @@ export function seedInitialObservedWorkspacePaneRouteForTest(
     return true
   }
   if (options.autoSeed === false) return false
-  const state = useWorkspacesStore.getState()
+  const state = workspacesStore.getState()
   const repoId = state.restoredWorkspaceId
   const repo = repoId ? state.workspaces[repoId] : null
   if (!repoId || !repo) return false

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import {
   branch,
@@ -30,7 +30,7 @@ describe('workspace refresh capability', () => {
       },
       diagnostics: [],
     })
-    useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    workspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
     const projection = vi.fn(async () => repoSnapshotResponse({ branches: [branch('main')], current: 'main' }))
     ipcHandlers['workspace.refresh'] = () => ({
       kind: 'committed',
@@ -48,7 +48,7 @@ describe('workspace refresh capability', () => {
 
     await runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('git')
+    expect(workspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('git')
     expect(projection).toHaveBeenCalledOnce()
   })
 
@@ -64,7 +64,7 @@ describe('workspace refresh capability', () => {
       },
       diagnostics: [],
     })
-    useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    workspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
     const response = Promise.withResolvers<WorkspaceRefreshResult>()
     const refresh = vi.fn(() => response.promise)
     const projection = vi.fn(async () => repoSnapshotResponse({ branches: [branch('main')], current: 'main' }))
@@ -113,7 +113,7 @@ describe('workspace refresh capability', () => {
 
     await runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
 
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+    const repo = workspacesStore.getState().workspaces[REPO_ID]
     expect(repo?.workspaceRuntimeId).toBe(workspaceRuntimeId)
     expect(repo?.capability.probe).toMatchObject({
       status: 'ready',
@@ -136,7 +136,7 @@ describe('workspace refresh capability', () => {
         diagnostics: [],
       })
     })
-    const before = useWorkspacesStore.getState().workspaces[REPO_ID]!.capability.probe
+    const before = workspacesStore.getState().workspaces[REPO_ID]!.capability.probe
     const fetch = vi.fn()
     const projection = vi.fn()
     ipcHandlers['repo.fetch'] = fetch
@@ -159,7 +159,7 @@ describe('workspace refresh capability', () => {
       message: 'git timed out',
     })
 
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]!.capability.probe).toBe(before)
+    expect(workspacesStore.getState().workspaces[REPO_ID]!.capability.probe).toBe(before)
     expect(fetch).not.toHaveBeenCalled()
     expect(projection).not.toHaveBeenCalled()
   })
@@ -176,7 +176,7 @@ describe('workspace refresh capability', () => {
       },
       diagnostics: [],
     })
-    useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    workspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
     ipcHandlers['workspace.refresh'] = () => {
       throw new Error('workspace transport unavailable')
     }
@@ -185,7 +185,7 @@ describe('workspace refresh capability', () => {
       ok: false,
       message: 'workspace transport unavailable',
     })
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('filesystem')
+    expect(workspacesStore.getState().workspaces[REPO_ID]?.capability.kind).toBe('filesystem')
   })
 
   test('closing a plain Workspace cancels its in-flight capability refresh', async () => {
@@ -200,17 +200,17 @@ describe('workspace refresh capability', () => {
       },
       diagnostics: [],
     })
-    useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    workspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
     const response = Promise.withResolvers<WorkspaceRefreshResult>()
     const refreshRequest = vi.fn(() => response.promise)
     ipcHandlers['workspace.refresh'] = refreshRequest
 
     const refresh = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     await vi.waitFor(() => expect(refreshRequest).toHaveBeenCalledOnce())
-    await expect(useWorkspacesStore.getState().closeWorkspace(REPO_ID)).resolves.toEqual({ ok: true })
+    await expect(workspacesStore.getState().closeWorkspace(REPO_ID)).resolves.toEqual({ ok: true })
 
     await expect(refresh).resolves.toEqual({ ok: false, cancelled: true })
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]).toBeUndefined()
+    expect(workspacesStore.getState().workspaces[REPO_ID]).toBeUndefined()
   })
 
   test('closing a plain Workspace cancels Git work created by a concurrent capability promotion', async () => {
@@ -225,7 +225,7 @@ describe('workspace refresh capability', () => {
       },
       diagnostics: [],
     })
-    useWorkspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
+    workspacesStore.setState({ workspaces: { [REPO_ID]: workspace }, workspaceOrder: [REPO_ID] })
     const removeMembership = Promise.withResolvers<{
       openWorkspaceEntries: []
       workspacePaneTabsByTargetByWorkspace: {}
@@ -248,7 +248,7 @@ describe('workspace refresh capability', () => {
     const projection = vi.fn(() => projectionResponse.promise)
     ipcHandlers['repo.snapshot'] = projection
 
-    const closing = useWorkspacesStore.getState().closeWorkspace(REPO_ID)
+    const closing = workspacesStore.getState().closeWorkspace(REPO_ID)
     await vi.waitFor(() => expect(removeWorkspaceEntry).toHaveBeenCalledOnce())
     const refresh = runWorkspaceRefresh(refreshStoreAccess, REPO_ID, { workspaceRuntimeId })
     await vi.waitFor(() => expect(projection).toHaveBeenCalledOnce())
@@ -256,6 +256,6 @@ describe('workspace refresh capability', () => {
     removeMembership.resolve({ openWorkspaceEntries: [], workspacePaneTabsByTargetByWorkspace: {} })
     await expect(closing).resolves.toEqual({ ok: true })
     await expect(refresh).resolves.toEqual({ ok: true })
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]).toBeUndefined()
+    expect(workspacesStore.getState().workspaces[REPO_ID]).toBeUndefined()
   })
 })

@@ -10,9 +10,11 @@
 // Theme hydration can read the transport snapshot directly; theme writes go
 // through settings-actions.
 
-import { create, type StoreApi } from 'zustand'
+import { createStore } from 'zustand/vanilla'
+import type { StoreApi } from 'zustand/vanilla'
 import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
-import type { ResolvedTheme, SettingsSnapshot, ThemePref, ThemeState } from '#/shared/api-types.ts'
+import type { SettingsSnapshot, ThemeState } from '#/shared/api-types.ts'
+import type { ResolvedTheme, ThemePref } from '#/shared/settings.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import { getThemeState, resolveThemeStateFromSettings } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
@@ -74,7 +76,7 @@ function resolveOsTheme(): ResolvedTheme | null {
 // `src/web/stores/i18n.ts`: paint the HTML attrs first so any
 // CSS-only consumer (e.g. `sonner`) flips in lockstep with the
 // store, then ask Zustand to swap the slice only when it actually
-// changed — that last bit is what keeps React subscribers from
+// changed — that last bit is what keeps view subscribers from
 // re-rendering on no-op writes.
 function commitThemeState(set: ThemeSet, next: ThemeState): void {
   applyHtmlAttrs(next.resolved, next.colorTheme)
@@ -124,7 +126,7 @@ function commitHydratedThemeState(set: ThemeSet, get: ThemeGet, version: number,
   installMediaQueryListener(set, get)
 }
 
-export const useThemeStore = create<ThemeStore>((set, get) => ({
+export const themeStore = createStore<ThemeStore>((set, get) => ({
   // index.html's boot script sets theme attrs before stylesheets
   // load — read it back here so the initial render doesn't disagree
   // with first paint.

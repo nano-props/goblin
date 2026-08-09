@@ -1,98 +1,87 @@
-import { type ReactNode } from 'react'
+import type { FunctionalComponent, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { ZenModeSidebarChrome } from '#/web/components/workspace-layout/ZenModeSidebarChrome.tsx'
 import { CompactWorkspaceLayout, WorkspaceSplitLayout } from '#/web/components/Layout.tsx'
+import { ZenModeSidebarChrome } from '#/web/components/workspace-layout/ZenModeSidebarChrome.tsx'
 import { workspaceLayoutBehavior } from '#/web/lib/workspace-layout.ts'
 
-interface WorkspaceShellBaseProps {
+interface WorkspaceLayoutShellProps {
   workspaceId?: WorkspaceId
   compact: boolean
   zenMode: boolean
   workspacePaneActive: boolean
   workspacePaneSize: number
   onWorkspacePaneSizeChange: (size: number) => void
-  sidebarPane: ReactNode
-  workspacePane: ReactNode
+  sidebarPane: VNodeChild
+  workspacePane: VNodeChild
   singlePaneActivePane?: 'navigator' | 'workspace'
+  zenModeToggleEnabled?: boolean
+  zenRevealSidebarPane?: VNodeChild
 }
 
-type WorkspaceShellProps = WorkspaceShellBaseProps &
-  (
-    | {
-        zenModeToggleEnabled?: true
-        zenRevealSidebarPane: ReactNode
-      }
-    | {
-        zenModeToggleEnabled: false
-        zenRevealSidebarPane?: never
-      }
-  )
-
-export function WorkspaceLayoutShell({
-  workspaceId,
-  compact,
-  zenMode,
-  workspacePaneActive,
-  workspacePaneSize,
-  onWorkspacePaneSizeChange,
-  sidebarPane,
-  zenRevealSidebarPane,
-  workspacePane,
-  singlePaneActivePane = 'navigator',
-  zenModeToggleEnabled = true,
-}: WorkspaceShellProps) {
-  const effectiveZenMode = zenModeToggleEnabled && zenMode
+export const WorkspaceLayoutShell: FunctionalComponent<WorkspaceLayoutShellProps> = (props) => {
+  const zenModeToggleEnabled = props.zenModeToggleEnabled ?? true
+  const effectiveZenMode = zenModeToggleEnabled && props.zenMode
   const behavior = workspaceLayoutBehavior({
-    compact,
+    compact: props.compact,
     zenMode: effectiveZenMode,
-    workspacePaneActive,
+    workspacePaneActive: props.workspacePaneActive,
   })
-  const sidebarPaneSize = 100 - workspacePaneSize
-  const zenRevealEnabled = !compact && behavior.sidebarCollapsed
+  const sidebarPaneSize = 100 - props.workspacePaneSize
+  const zenRevealEnabled = !props.compact && behavior.sidebarCollapsed
+  const activePane = props.singlePaneActivePane ?? 'navigator'
 
-  const renderWorkspaceBody = (
-    workspacePane: ReactNode,
-    navigatorPane: ReactNode = sidebarPane,
-    activePane: 'navigator' | 'workspace' = singlePaneActivePane,
-  ) => {
-    if (compact) {
-      return (
-        <CompactWorkspaceLayout
-          activePane={activePane}
-          sidebarPane={navigatorPane}
-          workspacePane={workspacePane}
-          transitionScopeKey={workspaceId}
-        />
-      )
-    }
-
-    if (behavior.singlePane) return activePane === 'workspace' ? workspacePane : navigatorPane
-
-    return (
+  let workspaceBody: VNodeChild
+  if (props.compact) {
+    workspaceBody = (
+      <CompactWorkspaceLayout
+        activePane={activePane}
+        sidebarPane={props.sidebarPane}
+        workspacePane={props.workspacePane}
+        transitionScopeKey={props.workspaceId}
+      />
+    )
+  } else if (behavior.singlePane) {
+    workspaceBody = activePane === 'workspace' ? props.workspacePane : props.sidebarPane
+  } else {
+    workspaceBody = (
       <WorkspaceSplitLayout
         mode="split"
-        workspacePaneSize={workspacePaneSize}
-        onWorkspacePaneSizeChange={onWorkspacePaneSizeChange}
+        workspacePaneSize={props.workspacePaneSize}
+        onWorkspacePaneSizeChange={props.onWorkspacePaneSizeChange}
         sidebarCollapsed={behavior.sidebarCollapsed}
-        sidebarPane={navigatorPane}
-        workspacePane={workspacePane}
+        sidebarPane={props.sidebarPane}
+        workspacePane={props.workspacePane}
       />
     )
   }
 
   return (
-    <section className="relative flex min-w-0 flex-1 flex-col">
-      {renderWorkspaceBody(workspacePane, sidebarPane)}
-      {!compact && zenModeToggleEnabled ? (
+    <section class="relative flex min-w-0 flex-1 flex-col">
+      {workspaceBody}
+      {!props.compact && zenModeToggleEnabled && props.zenRevealSidebarPane ? (
         <ZenModeSidebarChrome
-          workspaceId={workspaceId}
-          sidebarPane={zenRevealSidebarPane}
+          workspaceId={props.workspaceId}
+          sidebarPane={props.zenRevealSidebarPane}
           zenModeToggleEnabled
           revealEnabled={zenRevealEnabled}
           sidebarSize={sidebarPaneSize}
-          onSidebarSizeChange={(nextSidebarSize) => onWorkspacePaneSizeChange(100 - nextSidebarSize)}
+          onSidebarSizeChange={(nextSidebarSize) => props.onWorkspacePaneSizeChange(100 - nextSidebarSize)}
         />
       ) : null}
     </section>
   )
 }
+
+WorkspaceLayoutShell.props = [
+  'workspaceId',
+  'compact',
+  'zenMode',
+  'workspacePaneActive',
+  'workspacePaneSize',
+  'onWorkspacePaneSizeChange',
+  'sidebarPane',
+  'workspacePane',
+  'singlePaneActivePane',
+  'zenModeToggleEnabled',
+  'zenRevealSidebarPane',
+]

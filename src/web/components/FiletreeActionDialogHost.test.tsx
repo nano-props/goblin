@@ -1,26 +1,22 @@
 // @vitest-environment jsdom
 
-import { act, cleanup } from '@testing-library/react'
+import { cleanup } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { FiletreeActionDialogHost } from '#/web/components/FiletreeActionDialogHost.tsx'
 import {
   resetFiletreeActionDialogsStore,
-  useFiletreeActionDialogsStore,
+  filetreeActionDialogsStore,
 } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import type { VNodeChild } from 'vue'
+import { appI18n } from '#/web/stores/i18n-vue.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 
 const dialogProps = vi.hoisted(() => ({
   latest: { open: false, title: '', message: null as unknown },
-}))
-
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useT: () => (key: string) => {
-    if (key === 'filetree.confirm-trash-body') return 'Move to trash:'
-    return key
-  },
 }))
 
 vi.mock('#/web/components/ConfirmDialog.tsx', () => ({
@@ -31,6 +27,8 @@ vi.mock('#/web/components/ConfirmDialog.tsx', () => ({
 }))
 
 beforeEach(() => {
+  appI18n.global.setLocaleMessage('en', { 'filetree.confirm-trash-body': 'Move to trash:' })
+  appI18n.global.locale.value = 'en'
   resetFiletreeActionDialogsStore()
   dialogProps.latest = { open: false, title: '', message: null }
 })
@@ -42,7 +40,7 @@ afterEach(() => {
 })
 
 describe('FiletreeActionDialogHost', () => {
-  test('retains the file path message while the close animation runs after store state is cleared', () => {
+  test('retains the file path message while the close animation runs after store state is cleared', async () => {
     renderInJsdom(
       <FiletreeActionDialogHost
         currentWorkspaceId={WORKSPACE_ID}
@@ -50,8 +48,8 @@ describe('FiletreeActionDialogHost', () => {
       />,
     )
 
-    act(() => {
-      useFiletreeActionDialogsStore.getState().openTrashFileConfirm({
+    await flushTestUpdates(() => {
+      filetreeActionDialogsStore.getState().openTrashFileConfirm({
         target: {
           kind: 'workspace-root',
           workspaceId: WORKSPACE_ID,
@@ -68,8 +66,8 @@ describe('FiletreeActionDialogHost', () => {
     expect(renderMessageText(dialogProps.latest.message)).toContain('Move to trash:')
     expect(renderMessageText(dialogProps.latest.message)).toContain('src/example.ts')
 
-    act(() => {
-      useFiletreeActionDialogsStore.getState().closeTrashFileConfirm()
+    await flushTestUpdates(() => {
+      filetreeActionDialogsStore.getState().closeTrashFileConfirm()
     })
 
     expect(dialogProps.latest).toMatchObject({
@@ -79,8 +77,8 @@ describe('FiletreeActionDialogHost', () => {
     expect(renderMessageText(dialogProps.latest.message)).toContain('src/example.ts')
   })
 
-  test('closes a confirmation bound to an earlier runtime of the same workspace', () => {
-    useFiletreeActionDialogsStore.getState().openTrashFileConfirm({
+  test('closes a confirmation bound to an earlier runtime of the same workspace', async () => {
+    filetreeActionDialogsStore.getState().openTrashFileConfirm({
       target: {
         kind: 'workspace-root',
         workspaceId: WORKSPACE_ID,
@@ -97,13 +95,13 @@ describe('FiletreeActionDialogHost', () => {
       />,
     )
 
-    expect(useFiletreeActionDialogsStore.getState().trashFileConfirm).toBeNull()
+    expect(filetreeActionDialogsStore.getState().trashFileConfirm).toBeNull()
     expect(dialogProps.latest.open).toBe(false)
   })
 })
 
 function renderMessageText(message: unknown): string {
-  const { container, unmount } = renderInJsdom(<>{message as React.ReactNode}</>)
+  const { container, unmount } = renderInJsdom(<>{message as VNodeChild}</>)
   const text = container.textContent ?? ''
   unmount()
   return text

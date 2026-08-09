@@ -16,7 +16,7 @@ type CommittedProjectedTerminalRuntimeAttachResult = TerminalRuntimeAttachResult
 type ProjectedTerminalRuntimeAttachResult = OptionalIdentityRevision<CommittedProjectedTerminalRuntimeAttachResult>
 
 describe('terminal runtime binding identity', () => {
-  test('compares the runtime session and generation together', () => {
+  test('compares the runtime session and generation together', async () => {
     const binding = { terminalRuntimeSessionId: 'pty-runtime-test', terminalRuntimeGeneration: 2 }
     expect(sameTerminalRuntimeBinding(binding, { ...binding })).toBe(true)
     expect(sameTerminalRuntimeBinding(binding, { ...binding, terminalRuntimeGeneration: 3 })).toBe(false)
@@ -70,7 +70,7 @@ function requireRestartAttempt(runtime: TerminalSessionRuntime) {
 }
 
 describe('TerminalSessionRuntime', () => {
-  test('commits canonical resize data only for the active controller binding', () => {
+  test('commits canonical resize data only for the active controller binding', async () => {
     const runtime = new TerminalSessionRuntime()
     applyAttachResult(runtime, {
       ok: true,
@@ -116,7 +116,7 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.currentCanonicalSize()).toEqual({ cols: 112, rows: 37 })
   })
 
-  test('tracks restart flow and replacing session ids', () => {
+  test('tracks restart flow and replacing session ids', async () => {
     const runtime = new TerminalSessionRuntime()
 
     applyAttachResult(runtime, {
@@ -145,7 +145,7 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.snapshot().attachment).toEqual({ role: 'controller' })
   })
 
-  test('routes replayed output through runtime state', () => {
+  test('routes replayed output through runtime state', async () => {
     const runtime = new TerminalSessionRuntime()
     applyAttachResult(runtime, {
       ok: true,
@@ -206,7 +206,7 @@ describe('TerminalSessionRuntime', () => {
     ])
   })
 
-  test('does not own rendered-output dedupe outside replay', () => {
+  test('does not own rendered-output dedupe outside replay', async () => {
     const runtime = new TerminalSessionRuntime()
     applyAttachResult(runtime, {
       ok: true,
@@ -247,7 +247,7 @@ describe('TerminalSessionRuntime', () => {
     ).toEqual({ changed: false, output: 'next' })
   })
 
-  test('keeps metadata hydration independent from rendered-output checkpoints', () => {
+  test('keeps metadata hydration independent from rendered-output checkpoints', async () => {
     const runtime = new TerminalSessionRuntime()
     applyAttachResult(runtime, {
       ok: true,
@@ -321,7 +321,7 @@ describe('TerminalSessionRuntime', () => {
     ).toEqual({ changed: false, output: 'new-session-output' })
   })
 
-  test('drainReplay discards the replay buffer without surfacing captured events', () => {
+  test('drainReplay discards the replay buffer without surfacing captured events', async () => {
     // The error / cancellation path in `TerminalSession` calls
     // `drainReplay` to clear the preload's replay window when the
     // attach fails partway through. drainReplay must not surface
@@ -358,7 +358,7 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.finishReplay()).toEqual([])
   })
 
-  test('a preload window followed by a post-attach window keeps events newer than the new snapshot seq', () => {
+  test('a preload window followed by a post-attach window keeps events newer than the new snapshot seq', async () => {
     // This is the contract that `TerminalSession.preloadHydratedSnapshot`
     // and `replayActiveView` rely on: the preload's beginReplay starts
     // a window that the post-attach's beginReplay extends with a
@@ -424,7 +424,7 @@ describe('TerminalSessionRuntime', () => {
     expect(events.map((e) => e.data)).toEqual(['preload-new', 'post-attach'])
   })
 
-  test('preserves server-provided title when attaching an existing session', () => {
+  test('preserves server-provided title when attaching an existing session', async () => {
     const runtime = new TerminalSessionRuntime()
 
     applyAttachResult(runtime, {
@@ -451,7 +451,7 @@ describe('TerminalSessionRuntime', () => {
     })
   })
 
-  test('hydrates externally created sessions into open mirror state', () => {
+  test('hydrates externally created sessions into open mirror state', async () => {
     const runtime = new TerminalSessionRuntime()
 
     expect(
@@ -488,7 +488,7 @@ describe('TerminalSessionRuntime', () => {
 })
 
 describe('TerminalSessionRuntime runtime binding generations', () => {
-  test('keeps the retiring binding addressable and rejects its delayed exit during restart', () => {
+  test('keeps the retiring binding addressable and rejects its delayed exit during restart', async () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession({
       terminalRuntimeSessionId: 'pty_runtime_generation_test',
@@ -526,7 +526,7 @@ describe('TerminalSessionRuntime runtime binding generations', () => {
 })
 
 describe('TerminalSessionRuntime restart generation activation', () => {
-  test('activates the replacement after ignoring the retiring generation exit', () => {
+  test('activates the replacement after ignoring the retiring generation exit', async () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession({
       terminalRuntimeSessionId: 'pty_restart_activation_test',
@@ -596,7 +596,7 @@ describe('TerminalSessionRuntime exact start attempts', () => {
       : { ...metadata, frame: 'stream' }
   }
 
-  test('rejects a second restart while the admitted attempt is pending', () => {
+  test('rejects a second restart while the admitted attempt is pending', async () => {
     const runtime = new TerminalSessionRuntime()
     applyAttachResult(runtime, startResult(1))
     const attempt = requireRestartAttempt(runtime)
@@ -614,7 +614,7 @@ describe('TerminalSessionRuntime exact start attempts', () => {
     })
   })
 
-  test('keeps the admitted restart current until it fails', () => {
+  test('keeps the admitted restart current until it fails', async () => {
     const runtime = new TerminalSessionRuntime()
     applyAttachResult(runtime, startResult(1))
     const attempt = requireRestartAttempt(runtime)
@@ -627,7 +627,7 @@ describe('TerminalSessionRuntime exact start attempts', () => {
     })
   })
 
-  test('supersedes a same-binding attach response with an older identity revision', () => {
+  test('supersedes a same-binding attach response with an older identity revision', async () => {
     const runtime = new TerminalSessionRuntime()
     applyAttachResult(runtime, {
       ...startResult(1),
@@ -674,7 +674,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     controller: { clientId: 'client-authoritative', status: 'connected' as const },
   })
 
-  test('stages concurrent reconciliation without erasing the current restart attempt', () => {
+  test('stages concurrent reconciliation without erasing the current restart attempt', async () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession(hydration(1))
     const attempt = requireRestartAttempt(runtime)
@@ -695,7 +695,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     })
   })
 
-  test('falls back to the latest authoritative snapshot when the restart attempt fails', () => {
+  test('falls back to the latest authoritative snapshot when the restart attempt fails', async () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession(hydration(1))
     const attempt = requireRestartAttempt(runtime)
@@ -719,7 +719,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     expect(runtime.phase()).toBe('error')
   })
 
-  test('lets a future authoritative generation supersede an older attach response', () => {
+  test('lets a future authoritative generation supersede an older attach response', async () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession(hydration(1))
     const attempt = requireRestartAttempt(runtime)
@@ -743,7 +743,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     expect(runtime.snapshot().processName).toBe('shell-3')
   })
 
-  test('does not let a same-generation response overwrite a staged authoritative snapshot', () => {
+  test('does not let a same-generation response overwrite a staged authoritative snapshot', async () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession(hydration(1))
     const attempt = requireRestartAttempt(runtime)
@@ -764,7 +764,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     expect(runtime.snapshot().processName).toBe('shell-2')
   })
 
-  test('does not let a partial effect regress or replace an active binding', () => {
+  test('does not let a partial effect regress or replace an active binding', async () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession(hydration(2))
 
@@ -784,7 +784,7 @@ describe('TerminalSessionRuntime authoritative hydration during attempts', () =>
     })
   })
 
-  test('does not use a retiring snapshot as restart failure fallback', () => {
+  test('does not use a retiring snapshot as restart failure fallback', async () => {
     const runtime = new TerminalSessionRuntime()
     runtime.hydrateRepoSession(hydration(1))
     const attempt = requireRestartAttempt(runtime)

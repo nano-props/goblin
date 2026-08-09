@@ -1,11 +1,8 @@
-import * as React from 'react'
-import * as ResizablePrimitive from 'react-resizable-panels'
+import { SplitterGroup, SplitterResizeHandle } from 'reka-ui'
+import type { SplitterGroupProps, SplitterResizeHandleProps } from 'reka-ui'
+import type { FunctionalComponent, HTMLAttributes } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
-type ResizableHandleProps = React.ComponentProps<typeof ResizablePrimitive.Separator>
 
-// Keep the drag hit target and the visible splitter line separate: the
-// target stays transparent, while the 1px line paints the separator. This
-// avoids double-painting semi-transparent border tokens on light themes.
 const resizeHandleClassNames = {
   hitTarget: [
     'group relative z-10 flex shrink-0 items-center justify-center bg-transparent outline-none',
@@ -15,37 +12,49 @@ const resizeHandleClassNames = {
   visibleLine: [
     'pointer-events-none absolute z-20 rounded-full bg-separator/70',
     'transition-[background-color,opacity,width,height] duration-100',
-    'opacity-100 group-data-[separator=hover]:bg-brand group-data-[separator=hover]:opacity-60',
-    'group-focus-visible:bg-brand group-focus-visible:opacity-100 group-data-[separator=active]:bg-brand group-data-[separator=active]:opacity-100',
+    'opacity-100 group-data-[state=hover]:bg-brand group-data-[state=hover]:opacity-60',
+    'group-focus-visible:bg-brand group-focus-visible:opacity-100 group-data-[state=drag]:bg-brand group-data-[state=drag]:opacity-100',
   ].join(' '),
   lineHorizontal:
-    'inset-y-0 left-1/2 w-px -translate-x-1/2 group-data-[separator=hover]:w-0.5 group-focus-visible:w-0.5 group-data-[separator=active]:w-0.5',
+    'inset-y-0 left-1/2 w-px -translate-x-1/2 group-data-[state=hover]:w-0.5 group-focus-visible:w-0.5 group-data-[state=drag]:w-0.5',
 } as const
 
-function ResizablePanelGroup({ className, ...props }: React.ComponentProps<typeof ResizablePrimitive.Group>) {
+type ResizablePanelGroupProps = SplitterGroupProps &
+  HTMLAttributes & {
+    onLayout?: (layout: number[]) => void
+  }
+
+export const ResizablePanelGroup: FunctionalComponent<ResizablePanelGroupProps> = (props, { slots }) => {
+  const { class: classValue, ...groupProps } = props
   return (
-    <ResizablePrimitive.Group data-slot="resizable-panel-group" className={cn('h-full w-full', className)} {...props} />
+    <SplitterGroup {...groupProps} data-slot="resizable-panel-group" class={cn('h-full w-full', classValue)}>
+      {slots.default?.()}
+    </SplitterGroup>
   )
 }
+ResizablePanelGroup.inheritAttrs = false
 
-function ResizablePanel(props: React.ComponentProps<typeof ResizablePrimitive.Panel>) {
-  return <ResizablePrimitive.Panel data-slot="resizable-panel" {...props} />
-}
+type ResizableHandleProps = SplitterResizeHandleProps & HTMLAttributes
 
-function ResizableHandle({ className, ...props }: ResizableHandleProps) {
+export const ResizableHandle: FunctionalComponent<ResizableHandleProps> = (props, { slots }) => {
+  const { class: classValue, ...handleProps } = props
   return (
-    <ResizablePrimitive.Separator
+    <SplitterResizeHandle
+      {...handleProps}
       data-slot="resizable-handle"
-      className={cn(resizeHandleClassNames.hitTarget, resizeHandleClassNames.horizontal, className)}
-      {...props}
+      class={cn(resizeHandleClassNames.hitTarget, resizeHandleClassNames.horizontal, classValue)}
     >
       <ResizeHandleLine />
-    </ResizablePrimitive.Separator>
+      {slots.default?.()}
+    </SplitterResizeHandle>
+  )
+}
+ResizableHandle.inheritAttrs = false
+
+export function ResizeHandleLine() {
+  return (
+    <span aria-hidden="true" class={cn(resizeHandleClassNames.visibleLine, resizeHandleClassNames.lineHorizontal)} />
   )
 }
 
-function ResizeHandleLine() {
-  return <span aria-hidden className={cn(resizeHandleClassNames.visibleLine, resizeHandleClassNames.lineHorizontal)} />
-}
-
-export { ResizableHandle, ResizablePanel, ResizablePanelGroup, ResizeHandleLine, resizeHandleClassNames }
+export { resizeHandleClassNames }

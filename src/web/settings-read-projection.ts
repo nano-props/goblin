@@ -1,3 +1,5 @@
+import { computed } from 'vue'
+import type { ComputedRef } from 'vue'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
@@ -18,9 +20,9 @@ export function currentRuntimeSettingsSnapshot(): RuntimeSettingsSnapshot | unde
   return runtimeSettingsSnapshotOrUndefined(currentSettingsSnapshot())
 }
 
-export function useRuntimeSettingsSnapshot(): RuntimeSettingsSnapshot | undefined {
+export function useRuntimeSettingsSnapshot(): ComputedRef<RuntimeSettingsSnapshot | undefined> {
   const { data } = useSettingsSnapshotQuery()
-  return runtimeSettingsSnapshotOrUndefined(data)
+  return computed(() => runtimeSettingsSnapshotOrUndefined(data.value))
 }
 
 export function readRuntimeShortcutSettings(data: RuntimeSettingsSnapshot | undefined) {
@@ -58,7 +60,7 @@ export function readRuntimeLanSettings(data: RuntimeSettingsSnapshot | undefined
   }
 }
 
-export function useRuntimeRecentWorkspaces() {
+export function useRuntimeRecentWorkspaces(): ComputedRef<SettingsSnapshot['recentWorkspaces']> {
   const { data } = useSettingsSnapshotQuery()
-  return data?.recentWorkspaces ?? []
+  return computed(() => data.value?.recentWorkspaces ?? [])
 }

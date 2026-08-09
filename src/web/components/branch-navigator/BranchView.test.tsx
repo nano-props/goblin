@@ -7,20 +7,21 @@ import {
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
-import { fireEvent, screen } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { fireEvent, screen } from '@testing-library/vue'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { BranchView } from '#/web/components/branch-navigator/BranchView.tsx'
-import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
-import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { TerminalSessionReadScope } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const mocks = vi.hoisted(() => ({
   dispatchShowWorkspacePaneStaticTabAction: vi.fn(),
@@ -76,7 +77,7 @@ beforeEach(() => {
 })
 
 describe('BranchView', () => {
-  test('uses the React Query snapshot for branch rows when available', () => {
+  test('uses the TanStack Query snapshot for branch rows when available', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -92,7 +93,7 @@ describe('BranchView', () => {
     expect(screen.getByText('feature/query')).toBeTruthy()
   })
 
-  test('filters the query branch rows with the workspace branch view preference', () => {
+  test('filters the query branch rows with the workspace branch view preference', async () => {
     const worktreeBranch = createRepoBranch('feature/worktree', {
       worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
     })
@@ -105,7 +106,7 @@ describe('BranchView', () => {
       branches: [createRepoBranch('feature/plain'), worktreeBranch],
       currentBranch: 'feature/worktree',
     })
-    useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+    workspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     renderBranchView()
 
@@ -113,7 +114,7 @@ describe('BranchView', () => {
     expect(screen.queryByText('feature/plain')).toBeNull()
   })
 
-  test('opens a non-current branch status through destination navigation', () => {
+  test('opens a non-current branch status through destination navigation', async () => {
     const destination = createRepoBranch('feature/destination', {
       worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
     })
@@ -128,7 +129,7 @@ describe('BranchView', () => {
     })
 
     renderBranchView()
-    fireEvent.doubleClick(screen.getByText('feature/destination'))
+    await fireEvent.doubleClick(screen.getByText('feature/destination'))
 
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -139,7 +140,7 @@ describe('BranchView', () => {
     )
   })
 
-  test('uses the React Query status read model for branch row dirty state when available', () => {
+  test('uses the TanStack Query status read model for branch row dirty state when available', async () => {
     const branch = createRepoBranch('feature/dirty', {
       worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
     })
@@ -166,7 +167,7 @@ describe('BranchView', () => {
     expect(screen.getByLabelText('branches.dirty')).toBeTruthy()
   })
 
-  test('derives query snapshot worktree state from the query status read model', () => {
+  test('derives query snapshot worktree state from the query status read model', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -268,7 +269,7 @@ describe('BranchView', () => {
 
     expect(await screen.findByText('status.stale-title')).toBeTruthy()
     expect(screen.getByText('main')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'error.try-again' }))
+    await flushTestUpdates(() => screen.getByRole<HTMLElement>('button', { name: 'error.try-again' }).click())
     await vi.waitFor(() => expect(readStatus).toHaveBeenCalledTimes(2))
     await vi.waitFor(() => expect(screen.queryByText('status.stale-title')).toBeNull())
   })
@@ -302,7 +303,7 @@ describe('BranchView', () => {
       expect(readStatus).toHaveBeenCalledOnce()
     })
     expect(await screen.findAllByText('status.stale-title')).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: 'error.try-again' }))
+    await flushTestUpdates(() => screen.getByRole<HTMLElement>('button', { name: 'error.try-again' }).click())
     await vi.waitFor(() => {
       expect(readSnapshot).toHaveBeenCalledTimes(2)
       expect(readStatus).toHaveBeenCalledTimes(2)
@@ -338,12 +339,12 @@ describe('BranchView', () => {
 
 function renderBranchView() {
   return renderInJsdom(
-    <QueryClientProvider client={appQueryClient}>
+    <VueQueryClientScope client={appQueryClient}>
       <AppNavigationProvider value={navigation}>
-        <TerminalSessionReadContext value={terminalReadContext}>
+        <TerminalSessionReadScope value={terminalReadContext}>
           <BranchView repoId={REPO_ID} />
-        </TerminalSessionReadContext>
+        </TerminalSessionReadScope>
       </AppNavigationProvider>
-    </QueryClientProvider>,
+    </VueQueryClientScope>,
   )
 }

@@ -6,13 +6,14 @@ import {
   seedRepoWithReadModelForTest,
   createPullRequest,
 } from '#/web/test-utils/repo-store.ts'
-import { act, screen } from '@testing-library/react'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { screen } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
+  TerminalSessionCommandScope,
+  TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -29,7 +30,11 @@ import {
 
 const responsiveMocks = vi.hoisted(() => ({ compact: false }))
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useIsCompactUi: () => responsiveMocks.compact,
+  useIsCompactUi: () => ({
+    get value() {
+      return responsiveMocks.compact
+    },
+  }),
 }))
 
 beforeEach(() => {
@@ -46,19 +51,19 @@ describe('WorkspacePane status presentation', () => {
     appQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="main"
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     const statusQuery = appQueryClient.getQueryCache().find({
@@ -69,7 +74,7 @@ describe('WorkspacePane status presentation', () => {
       queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId),
       exact: true,
     })
-    act(() => {
+    await flushTestUpdates(() => {
       statusQuery?.setState({
         ...statusQuery.state,
         data: undefined,
@@ -85,28 +90,26 @@ describe('WorkspacePane status presentation', () => {
     expect(screen.getByRole('tab', { name: 'tab.status' })).toBeTruthy()
   })
 
-  test('can render after the repo appears without changing hook order', () => {
+  test('can render after the repo appears without changing hook order', async () => {
     const { container } = render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane workspaceId={REPO_ID} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
-    expect(() => {
-      act(() => {
-        seedRepoWithReadModelForTest({ id: REPO_ID, branches: [] })
-      })
-    }).not.toThrow()
+    await flushTestUpdates(() => {
+      seedRepoWithReadModelForTest({ id: REPO_ID, branches: [] })
+    })
     expect(screen.getByText('branches.empty')).toBeTruthy()
   })
 
-  test('keeps the workspace tab strip mounted and restores scroll position by branch', () => {
+  test('keeps the workspace tab strip mounted and restores scroll position by branch', async () => {
     const branchA = createBranchSnapshot('feature/a', {
       worktree: { path: '/tmp/repo-workspace-container-repo-a', isPrimary: false, isLocked: false },
     })
@@ -124,67 +127,67 @@ describe('WorkspacePane status presentation', () => {
       },
     })
     const { container, rerender } = render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/a"
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
     const viewport = scrollViewport(container)
-    act(() => {
+    await flushTestUpdates(() => {
       viewport.scrollLeft = 120
       viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
     })
 
-    act(() => {
-      rerender(
-        <QueryClientProvider client={appQueryClient}>
+    await flushTestUpdates(async () => {
+      await rerender(
+        <VueQueryClientScope client={appQueryClient}>
           <AppNavigationProvider value={navigation}>
-            <TerminalSessionContext value={terminalCommandContext}>
-              <TerminalSessionReadContext value={terminalReadContext}>
+            <TerminalSessionCommandScope value={terminalCommandContext}>
+              <TerminalSessionReadScope value={terminalReadContext}>
                 <WorkspacePane
                   workspaceId={REPO_ID}
                   currentBranchName="feature/b"
                   workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
                 />
-              </TerminalSessionReadContext>
-            </TerminalSessionContext>
+              </TerminalSessionReadScope>
+            </TerminalSessionCommandScope>
           </AppNavigationProvider>
-        </QueryClientProvider>,
+        </VueQueryClientScope>,
       )
     })
 
     expect(scrollViewport(container)).toBe(viewport)
     expect(viewport.scrollLeft).toBe(0)
 
-    act(() => {
+    await flushTestUpdates(() => {
       viewport.scrollLeft = 40
       viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
     })
 
-    act(() => {
-      rerender(
-        <QueryClientProvider client={appQueryClient}>
+    await flushTestUpdates(async () => {
+      await rerender(
+        <VueQueryClientScope client={appQueryClient}>
           <AppNavigationProvider value={navigation}>
-            <TerminalSessionContext value={terminalCommandContext}>
-              <TerminalSessionReadContext value={terminalReadContext}>
+            <TerminalSessionCommandScope value={terminalCommandContext}>
+              <TerminalSessionReadScope value={terminalReadContext}>
                 <WorkspacePane
                   workspaceId={REPO_ID}
                   currentBranchName="feature/a"
                   workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
                 />
-              </TerminalSessionReadContext>
-            </TerminalSessionContext>
+              </TerminalSessionReadScope>
+            </TerminalSessionCommandScope>
           </AppNavigationProvider>
-        </QueryClientProvider>,
+        </VueQueryClientScope>,
       )
     })
 
@@ -192,7 +195,7 @@ describe('WorkspacePane status presentation', () => {
     expect(viewport.scrollLeft).toBe(120)
   })
 
-  test('uses the React Query status read model for workspace presentation when available', () => {
+  test('uses the TanStack Query status read model for workspace presentation when available', async () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-a'
     const branch = createBranchSnapshot('feature/a', {
       worktree: { path: worktreePath, isPrimary: false, isLocked: false },
@@ -216,19 +219,19 @@ describe('WorkspacePane status presentation', () => {
     })
 
     const { container } = render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/a"
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).not.toBeNull()
@@ -266,19 +269,19 @@ describe('WorkspacePane status presentation', () => {
     })!
 
     render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/stale"
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'changes' } }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     await Promise.all([
@@ -291,7 +294,7 @@ describe('WorkspacePane status presentation', () => {
         exact: true,
       }),
     ])
-    act(() => {
+    await flushTestUpdates(() => {
       snapshotQuery.setState({ ...snapshotQuery.state, status: 'error', error: new Error('snapshot failed') })
       statusQuery.setState({ ...statusQuery.state, status: 'error', error: new Error('status failed') })
     })
@@ -301,7 +304,7 @@ describe('WorkspacePane status presentation', () => {
     expect(screen.getByText(/error.failed-read-repo/)).toBeTruthy()
   })
 
-  test('uses the React Query snapshot for workspace branch presentation when available', () => {
+  test('uses the TanStack Query snapshot for workspace branch presentation when available', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [],
@@ -317,26 +320,26 @@ describe('WorkspacePane status presentation', () => {
     })
 
     const { container } = render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/query"
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(container.textContent).toContain('feature/query')
     expect(container.textContent).not.toContain('branches.empty')
   })
 
-  test('uses the React Query projection for the current branch pull request when available', () => {
+  test('uses the TanStack Query projection for the current branch pull request when available', async () => {
     const branch = createBranchSnapshot('feature/pr')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -356,21 +359,52 @@ describe('WorkspacePane status presentation', () => {
     )
 
     const { container } = render(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <AppNavigationProvider value={navigation}>
-          <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContext}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
                 currentBranchName="feature/pr"
                 workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
               />
-            </TerminalSessionReadContext>
-          </TerminalSessionContext>
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
         </AppNavigationProvider>
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(container.querySelector('[data-pull-request-link=""]')).not.toBeNull()
+  })
+
+  test('does not create a pull-request observer without a branch identity', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [createBranchSnapshot('main')],
+      currentBranchName: null,
+      preferredWorkspacePaneTab: 'status',
+    })
+
+    render(
+      <VueQueryClientScope client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
+              <WorkspacePane
+                workspaceId={REPO_ID}
+                currentBranchName={null}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
+              />
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
+        </AppNavigationProvider>
+      </VueQueryClientScope>,
+    )
+
+    const activePullRequestObservers = appQueryClient
+      .getQueryCache()
+      .getAll()
+      .filter((query) => query.queryKey[3] === 'pull-requests' && query.getObserversCount() > 0)
+    expect(activePullRequestObservers).toHaveLength(0)
   })
 })

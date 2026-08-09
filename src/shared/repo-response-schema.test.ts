@@ -9,7 +9,7 @@ import {
 } from '#/shared/repo-response-schema.ts'
 
 describe('repo response schemas', () => {
-  test('accepts legal empty repository reads', () => {
+  test('accepts legal empty repository reads', async () => {
     expect(v.parse(RepoRemoteBranchesResponseSchema, [])).toEqual([])
     expect(v.parse(RepoLogResponseSchema, [])).toEqual([])
     expect(
@@ -30,7 +30,7 @@ describe('repo response schemas', () => {
     expect(v.parse(RepoPullRequestsResponseSchema, { pullRequests: null })).toEqual({ pullRequests: null })
   })
 
-  test('rejects malformed, forward-incompatible, and full-read-model mutation envelopes', () => {
+  test('rejects malformed, forward-incompatible, and full-read-model mutation envelopes', async () => {
     expect(
       v.parse(RepoMutationExecResultResponseSchema, {
         ok: false,
@@ -66,12 +66,12 @@ describe('repo response schemas', () => {
     ).toBe(false)
   })
 
-  test('rejects a malformed member instead of turning a list into an empty result', () => {
+  test('rejects a malformed member instead of turning a list into an empty result', async () => {
     expect(v.safeParse(RepoRemoteBranchesResponseSchema, ['origin/main', 42]).success).toBe(false)
     expect(v.safeParse(RepoLogResponseSchema, [{ hash: 'abc' }]).success).toBe(false)
   })
 
-  test('rejects legacy and partial repository snapshot shapes', () => {
+  test('rejects legacy and partial repository snapshot shapes', async () => {
     const branch = {
       name: 'main',
       isCurrent: true,
@@ -131,7 +131,7 @@ describe('repo response schemas', () => {
     ).toBe(false)
   })
 
-  test('rejects extra pull-request response fields', () => {
+  test('rejects extra pull-request response fields', async () => {
     expect(v.safeParse(RepoPullRequestsResponseSchema, { pullRequests: [], requested: ['main'] }).success).toBe(false)
   })
 })

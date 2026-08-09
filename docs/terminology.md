@@ -62,7 +62,7 @@ Goblin uses three state classes:
 
 | Class            | Meaning                                                               | Typical names                                                           |
 | ---------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Local            | State that never needs to converge across windows                     | React state, `*Query`, `open`, `pending`                                |
+| Local            | State that never needs to converge across windows                     | Vue state, `*Query`, `open`, `pending`                                  |
 | Runtime-coherent | State that should converge during the current run and is server-owned | `*Projection`, `*Snapshot`, `Runtime*`                                  |
 | Restorable       | State that survives relaunch without live sync                        | `*Cache`, `Restorable*`, `ClientWorkspaceState`, `ServerWorkspaceState` |
 

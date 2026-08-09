@@ -29,13 +29,13 @@ function ctx(overrides: Partial<WorkspacePaneRenderabilityContext> = {}): Worksp
 }
 
 describe('resolveRenderableWorkspacePaneTab', () => {
-  test('preserves a non-terminal preference verbatim', () => {
+  test('preserves a non-terminal preference verbatim', async () => {
     expect(resolveRenderableWorkspacePaneTab('status', ctx())).toBe('status')
     expect(resolveRenderableWorkspacePaneTab('history', ctx())).toBe('history')
     expect(resolveRenderableWorkspacePaneTab('changes', ctx())).toBe('changes')
   })
 
-  test('keeps a changes preference even when the worktree is clean', () => {
+  test('keeps a changes preference even when the worktree is clean', async () => {
     expect(resolveRenderableWorkspacePaneTab('changes', ctx())).toBe('changes')
     expect(
       resolveRenderableWorkspacePaneTab(
@@ -45,7 +45,7 @@ describe('resolveRenderableWorkspacePaneTab', () => {
     ).toBe('changes')
   })
 
-  test('returns null for worktree-scoped preferences when no worktree exists', () => {
+  test('returns null for worktree-scoped preferences when no worktree exists', async () => {
     expect(resolveRenderableWorkspacePaneTab('changes', ctx({ hasWorktree: false }))).toBeNull()
     expect(resolveRenderableWorkspacePaneTab('terminal', ctx({ hasWorktree: false }))).toBeNull()
     expect(
@@ -60,7 +60,7 @@ describe('resolveRenderableWorkspacePaneTab', () => {
     expect(resolveRenderableWorkspacePaneTab('history', ctx({ hasWorktree: false }))).toBe('history')
   })
 
-  test('preserves the terminal preference while sync is unresolved', () => {
+  test('preserves the terminal preference while sync is unresolved', async () => {
     expect(
       resolveRenderableWorkspacePaneTab(
         'terminal',
@@ -69,7 +69,7 @@ describe('resolveRenderableWorkspacePaneTab', () => {
     ).toBe('terminal')
   })
 
-  test('preserves the terminal preference while terminal creation is pending', () => {
+  test('preserves the terminal preference while terminal creation is pending', async () => {
     expect(
       resolveRenderableWorkspacePaneTab(
         'terminal',
@@ -78,7 +78,7 @@ describe('resolveRenderableWorkspacePaneTab', () => {
     ).toBe('terminal')
   })
 
-  test('keeps the terminal preference when the active worktree has at least one session', () => {
+  test('keeps the terminal preference when the active worktree has at least one session', async () => {
     expect(
       resolveRenderableWorkspacePaneTab(
         'terminal',
@@ -93,7 +93,7 @@ describe('resolveRenderableWorkspacePaneTab', () => {
     ).toBe('terminal')
   })
 
-  test('uses runtime availability when it is provided', () => {
+  test('uses runtime availability when it is provided', async () => {
     expect(
       resolveRenderableWorkspacePaneTab(
         'terminal',
@@ -110,7 +110,7 @@ describe('resolveRenderableWorkspacePaneTab', () => {
     ).toBe('terminal')
   })
 
-  test('returns null for terminal after sync confirms the worktree has no terminal sessions', () => {
+  test('returns null for terminal after sync confirms the worktree has no terminal sessions', async () => {
     expect(
       resolveRenderableWorkspacePaneTab(
         'terminal',
@@ -119,7 +119,7 @@ describe('resolveRenderableWorkspacePaneTab', () => {
     ).toBeNull()
   })
 
-  test('does not dismiss terminal when sync settled with non-zero sessions', () => {
+  test('does not dismiss terminal when sync settled with non-zero sessions', async () => {
     expect(
       resolveRenderableWorkspacePaneTab(
         'terminal',
@@ -128,7 +128,7 @@ describe('resolveRenderableWorkspacePaneTab', () => {
     ).toBe('terminal')
   })
 
-  test('is total over the inputs', () => {
+  test('is total over the inputs', async () => {
     const cases: Array<[WorkspacePaneTabType, WorkspacePaneRenderabilityContext, WorkspacePaneTabType | null]> = [
       ['status', ctx(), 'status'],
       [
@@ -172,7 +172,7 @@ describe('resolveRenderableWorkspacePaneTab', () => {
 })
 
 describe('workspacePaneTabScope', () => {
-  test('classifies status/history as branch-level and changes/terminal as worktree-level', () => {
+  test('classifies status/history as branch-level and changes/terminal as worktree-level', async () => {
     expect(workspacePaneTabScope('status')).toBe('branch')
     expect(isBranchLevelWorkspacePaneTab('status')).toBe(true)
     expect(workspacePaneTabScope('history')).toBe('branch')

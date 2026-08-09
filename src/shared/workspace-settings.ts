@@ -37,9 +37,9 @@ export const WORKTREE_BOOTSTRAP_CONFIG_HASH_RE = /^sha256:[a-f0-9]{64}$/
  * that the server is willing to persist as a "most recently chosen
  * external app" per worktree. Mirrors `WORKSPACE_EXTERNAL_APPS` in
  * `src/web/external-workspace-apps.tsx`; the canonical web list lives
- * in the web layer (where React components are wired up) and this
+ * in the web layer (where Vue components are wired up) and this
  * readonly tuple exists so the server can validate persisted ids
- * without pulling in the React side.
+ * without pulling in the Vue side.
  *
  * `as const` preserves the literal union so callers can derive
  * `WorkspaceExternalAppId` below without a parallel enum.

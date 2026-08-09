@@ -5,7 +5,8 @@ import {
   SettingsPersistenceWriteError,
   writeUserSettingsJson,
 } from '#/server/modules/settings-persistence.ts'
-import type { ServerWorkspaceState, UserSettings } from '#/shared/api-types.ts'
+import type { ServerWorkspaceState } from '#/shared/api-types.ts'
+import type { UserSettings } from '#/shared/settings.ts'
 import {
   normalizeWorkspaceSessionEntry,
   workspaceSessionEntryId,

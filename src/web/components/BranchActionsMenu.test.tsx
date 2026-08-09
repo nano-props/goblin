@@ -1,14 +1,10 @@
 // @vitest-environment jsdom
 import { userEvent } from '@testing-library/user-event'
-import { waitFor } from '@testing-library/react'
+import { waitFor } from '@testing-library/vue'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchActionsPopover } from '#/web/components/BranchActionsMenu.tsx'
-import type { BranchActionItem } from '#/web/hooks/useBranchActionItems.ts'
-
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useT: () => (key: string) => key,
-}))
+import type { BranchActionItem } from '#/web/hooks/useBranchActionItems.tsx'
 
 beforeEach(() => {
   const win = window as typeof window & { PointerEvent?: typeof PointerEvent }
@@ -41,10 +37,13 @@ describe('BranchActionsPopover', () => {
     await user.click(trigger)
     await waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('true'))
 
-    const item = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
-      (button) => button.textContent === 'Status',
-    )
-    expect(item).toBeTruthy()
+    let item: HTMLButtonElement | undefined
+    await waitFor(() => {
+      item = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
+        (button) => button.textContent === 'Status',
+      )
+      expect(item).toBeTruthy()
+    })
 
     await user.click(item!)
 
@@ -69,10 +68,13 @@ describe('BranchActionsPopover', () => {
       onOpenChange,
     )
 
-    const item = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
-      (button) => button.textContent === 'Status',
-    )
-    expect(item).toBeTruthy()
+    let item: HTMLButtonElement | undefined
+    await waitFor(() => {
+      item = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
+        (button) => button.textContent === 'Status',
+      )
+      expect(item).toBeTruthy()
+    })
     expect(document.activeElement).not.toBe(item)
 
     await user.click(item!)

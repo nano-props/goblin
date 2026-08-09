@@ -1,4 +1,4 @@
-import type { LangPref } from '#/shared/api-types.ts'
+import type { LangPref } from '#/shared/settings.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 
 export interface MenuRuntimeState {

@@ -3,7 +3,7 @@ import { selectedBranchForBranchSet } from '#/web/stores/workspaces/branch-view-
 import { createRepoBranch } from '#/web/test-utils/repo-store.ts'
 
 describe('selectedBranchForBranchSet', () => {
-  test('preserves no selection instead of selecting the current branch implicitly', () => {
+  test('preserves no selection instead of selecting the current branch implicitly', async () => {
     expect(
       selectedBranchForBranchSet({
         branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
@@ -14,7 +14,7 @@ describe('selectedBranchForBranchSet', () => {
     ).toBeNull()
   })
 
-  test('falls back when an existing selection is no longer visible', () => {
+  test('falls back when an existing selection is no longer visible', async () => {
     expect(
       selectedBranchForBranchSet({
         branches: [createRepoBranch('main'), createRepoBranch('feature/a')],

@@ -20,7 +20,7 @@
 //     single cleanup hook used by the Layout-level host to clear
 //     any dialog that no longer belongs to the current workspace route.
 
-import { create } from 'zustand'
+import { createStore } from 'zustand/vanilla'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface RemoveWorktreeDialogPayload {
@@ -162,7 +162,7 @@ const INITIAL_STATE: BranchActionDialogsState = {
   checkboxStateByBranch: {},
 }
 
-export const useBranchActionDialogsStore = create<BranchActionDialogsStore>()((set) => ({
+export const branchActionDialogsStore = createStore<BranchActionDialogsStore>()((set) => ({
   ...INITIAL_STATE,
 
   openPushConfirm: (entry) =>
@@ -276,5 +276,5 @@ export function resetBranchActionDialogsStore(): void {
   // The previous implementation spread `...INITIAL_STATE` first and
   // `...current` last, which meant every key in INITIAL_STATE was
   // shadowed by `current`'s value — a no-op.
-  useBranchActionDialogsStore.setState(() => ({ ...INITIAL_STATE }))
+  branchActionDialogsStore.setState(() => ({ ...INITIAL_STATE }))
 }

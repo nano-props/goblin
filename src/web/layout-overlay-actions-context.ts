@@ -1,11 +1,19 @@
-import { createContext } from 'react'
+import { inject, provide } from 'vue'
+import type { InjectionKey } from 'vue'
 
-interface LayoutOverlayActionsValue {
+export interface LayoutOverlayActions {
   openWorkspacePathDialog: () => void
   openCloneRepo: () => void
   openRemoteWorkspace: () => void
-  /** Navigate the current repo route to the New Worktree page. */
   openCreateWorktree: () => void
 }
 
-export const LayoutOverlayActions = createContext<LayoutOverlayActionsValue | null>(null)
+const layoutOverlayActionsKey: InjectionKey<LayoutOverlayActions> = Symbol('layout-overlay-actions')
+
+export function provideLayoutOverlayActions(actions: LayoutOverlayActions): void {
+  provide(layoutOverlayActionsKey, actions)
+}
+
+export function useLayoutOverlayActions(): LayoutOverlayActions | null {
+  return inject(layoutOverlayActionsKey, null)
+}

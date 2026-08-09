@@ -18,7 +18,7 @@ function aggregate(nodes: ReadonlyArray<WorkspaceFilesystemNode>): LazyWorkspace
 }
 
 describe('buildFiletreeCollection', () => {
-  test('sorts directories before files and expands recursive rows', () => {
+  test('sorts directories before files and expands recursive rows', async () => {
     const collection = buildFiletreeCollection(
       aggregate([
         fileNode('README.md'),
@@ -53,14 +53,14 @@ describe('buildFiletreeCollection', () => {
     ])
   })
 
-  test('keeps children hidden when their directory is not expanded', () => {
+  test('keeps children hidden when their directory is not expanded', async () => {
     const collection = buildFiletreeCollection(aggregate([dirNode('src'), fileNode('src/index.ts', 'src')]), new Set())
 
     expect(collection.rows.map((row) => row.id)).toEqual(['src'])
     expect(collection.childIdsByParentId.get('src')).toEqual(['src/index.ts'])
   })
 
-  test('guards against cyclic node data', () => {
+  test('guards against cyclic node data', async () => {
     const collection = buildFiletreeCollection(
       aggregate([dirNode('src'), dirNode('src/util', 'src'), { ...dirNode('src'), parentId: 'src/util' }]),
       new Set(['src', 'src/util']),

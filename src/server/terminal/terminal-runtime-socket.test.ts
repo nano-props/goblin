@@ -22,7 +22,7 @@ describe('server terminal runtime sockets and diagnostics', () => {
     expect(host.getDiagnostics().terminal.shuttingDown).toBe(true)
   })
 
-  test('shutdown gracefully closes registered sockets without leaving detached-user timers', () => {
+  test('shutdown gracefully closes registered sockets without leaving detached-user timers', async () => {
     useFakeTimers()
     try {
       const { host, shutdown } = buildRuntime()
@@ -62,7 +62,7 @@ describe('server terminal runtime sockets and diagnostics', () => {
     }
   })
 
-  test('runtime routes a health ping to the registered socket liveness clock', () => {
+  test('runtime routes a health ping to the registered socket liveness clock', async () => {
     // The broker owns a distinct clock for every registered buffered socket.
     // This covers the raw-to-buffered transport lookup in
     // `handleRealtimeMessage`; recording the raw socket would silently miss
@@ -107,7 +107,7 @@ describe('server terminal runtime sockets and diagnostics', () => {
     }
   })
 
-  test('does not route messages from a socket rejected by admission', () => {
+  test('does not route messages from a socket rejected by admission', async () => {
     const { host, shutdown } = buildRuntime()
     const admittedSockets = Array.from({ length: MAX_APP_REALTIME_SOCKETS }, (_, index) => ({
       clientId: `client_admitted_${index}`,
@@ -135,7 +135,7 @@ describe('server terminal runtime sockets and diagnostics', () => {
     }
   })
 
-  test('runtime answers terminal socket health pings with pong', () => {
+  test('runtime answers terminal socket health pings with pong', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
@@ -146,7 +146,7 @@ describe('server terminal runtime sockets and diagnostics', () => {
     shutdown()
   })
 
-  test('runtime health ping refreshes broker presence before the next liveness scan', () => {
+  test('runtime health ping refreshes broker presence before the next liveness scan', async () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {

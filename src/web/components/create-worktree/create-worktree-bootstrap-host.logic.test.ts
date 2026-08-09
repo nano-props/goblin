@@ -11,7 +11,7 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 const CONFIG_HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
 describe('create worktree bootstrap host logic', () => {
-  test('runs untrusted config by default when the server has no matching trust record', () => {
+  test('runs untrusted config by default when the server has no matching trust record', async () => {
     expect(
       resolveWorktreeBootstrapDecision({
         preview: preview(CONFIG_HASH),
@@ -22,7 +22,7 @@ describe('create worktree bootstrap host logic', () => {
     ).toEqual({ kind: 'run', configHash: CONFIG_HASH, configTrusted: false })
   })
 
-  test('uses server trust as the default decision for a matching config hash', () => {
+  test('uses server trust as the default decision for a matching config hash', async () => {
     expect(
       resolveConfigTrusted({
         workspaceSettings: trustedWorkspaceSettings(),
@@ -33,7 +33,7 @@ describe('create worktree bootstrap host logic', () => {
     ).toBe(true)
   })
 
-  test('user trust choice overrides the server default', () => {
+  test('user trust choice overrides the server default', async () => {
     expect(
       resolveWorktreeBootstrapDecision({
         preview: preview(CONFIG_HASH),
@@ -44,7 +44,7 @@ describe('create worktree bootstrap host logic', () => {
     ).toEqual({ kind: 'run', configHash: CONFIG_HASH, configTrusted: false })
   })
 
-  test('skips bootstrap when preview has no runnable config operations', () => {
+  test('skips bootstrap when preview has no runnable config operations', async () => {
     expect(
       resolveWorktreeBootstrapDecision({
         preview: preview(null),
@@ -55,7 +55,7 @@ describe('create worktree bootstrap host logic', () => {
     ).toEqual({ kind: 'skip' })
   })
 
-  test('keeps local choice unchanged for controlled checkbox no-op changes', () => {
+  test('keeps local choice unchanged for controlled checkbox no-op changes', async () => {
     expect(
       resolveNextConfigTrustChoice({
         next: false,
@@ -66,7 +66,7 @@ describe('create worktree bootstrap host logic', () => {
     ).toBe(false)
   })
 
-  test('clears local choice when the next value matches the server default', () => {
+  test('clears local choice when the next value matches the server default', async () => {
     expect(
       resolveNextConfigTrustChoice({
         next: true,
@@ -77,7 +77,7 @@ describe('create worktree bootstrap host logic', () => {
     ).toBeNull()
   })
 
-  test('blocks submit while a runnable config preview is waiting for settings', () => {
+  test('blocks submit while a runnable config preview is waiting for settings', async () => {
     expect(isConfigTrustStateLoading({ preview: preview(CONFIG_HASH), settingsReady: false })).toBe(true)
     expect(isConfigTrustStateLoading({ preview: preview(CONFIG_HASH), settingsReady: true })).toBe(false)
     expect(isConfigTrustStateLoading({ preview: preview(null), settingsReady: false })).toBe(false)

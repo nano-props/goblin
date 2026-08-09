@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { workspaceLayoutBehavior } from '#/web/lib/workspace-layout.ts'
 
 describe('workspaceLayoutBehavior', () => {
-  test('renders split behavior when neither compact nor Zen Mode is active', () => {
+  test('renders split behavior when neither compact nor Zen Mode is active', async () => {
     expect(workspaceLayoutBehavior({ compact: false, zenMode: false })).toMatchObject({
       mode: 'split',
       singlePane: false,
@@ -11,7 +11,7 @@ describe('workspaceLayoutBehavior', () => {
     })
   })
 
-  test('uses the sidebar as the single pane when large-screen Zen Mode has no active workspace pane', () => {
+  test('uses the sidebar as the single pane when large-screen Zen Mode has no active workspace pane', async () => {
     expect(workspaceLayoutBehavior({ compact: false, zenMode: true })).toMatchObject({
       mode: 'single-pane',
       singlePane: true,
@@ -20,7 +20,7 @@ describe('workspaceLayoutBehavior', () => {
     })
   })
 
-  test('collapses the sidebar inside split layout when large-screen Zen Mode has an active workspace pane', () => {
+  test('collapses the sidebar inside split layout when large-screen Zen Mode has an active workspace pane', async () => {
     expect(
       workspaceLayoutBehavior({
         compact: false,
@@ -35,7 +35,7 @@ describe('workspaceLayoutBehavior', () => {
     })
   })
 
-  test('uses single-pane behavior in compact mode even when Zen Mode is off', () => {
+  test('uses single-pane behavior in compact mode even when Zen Mode is off', async () => {
     expect(workspaceLayoutBehavior({ compact: true, zenMode: false })).toMatchObject({
       mode: 'single-pane',
       singlePane: true,
@@ -45,7 +45,7 @@ describe('workspaceLayoutBehavior', () => {
     })
   })
 
-  test('hides the sidebar in compact mode once a workspace pane is active', () => {
+  test('hides the sidebar in compact mode once a workspace pane is active', async () => {
     expect(
       workspaceLayoutBehavior({
         compact: true,

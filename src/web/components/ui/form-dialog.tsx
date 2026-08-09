@@ -1,25 +1,35 @@
-import * as React from 'react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '#/web/components/ui/dialog.tsx'
-interface FormDialogProps extends Omit<React.ComponentProps<typeof DialogContent>, 'children' | 'title'> {
+import { DialogDescription, DialogRoot, DialogTitle } from 'reka-ui'
+import { defineComponent } from 'vue'
+import type { VNodeChild } from 'vue'
+import { DialogContent, DialogHeader, type DialogContentProps } from '#/web/components/ui/dialog.tsx'
+
+type FormDialogProps = Omit<DialogContentProps, 'title'> & {
   open: boolean
-  onOpenChange?: React.ComponentProps<typeof Dialog>['onOpenChange']
-  title: React.ReactNode
-  description?: React.ReactNode
-  children: React.ReactNode
+  onOpenChange?: (open: boolean) => void
+  title: VNodeChild
+  description?: VNodeChild
 }
 
-function FormDialog({ open, onOpenChange, title, description, children, ...props }: FormDialogProps) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent {...props}>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          {description ? <DialogDescription>{description}</DialogDescription> : null}
-        </DialogHeader>
-        {children}
-      </DialogContent>
-    </Dialog>
-  )
-}
+export const FormDialog = defineComponent(
+  (props: FormDialogProps, { attrs, slots }) =>
+    () => (
+      <DialogRoot open={props.open} onUpdate:open={props.onOpenChange}>
+        <DialogContent {...attrs}>
+          <DialogHeader>
+            <DialogTitle class="text-sm leading-tight font-semibold">{props.title}</DialogTitle>
+            {props.description ? (
+              <DialogDescription class="text-sm text-muted-foreground">{props.description}</DialogDescription>
+            ) : null}
+          </DialogHeader>
+          {slots.default?.()}
+        </DialogContent>
+      </DialogRoot>
+    ),
+  {
+    name: 'FormDialog',
+    inheritAttrs: false,
+    props: ['open', 'onOpenChange', 'title', 'description'],
+  },
+)
 
-export { FormDialog }
+export type { FormDialogProps }

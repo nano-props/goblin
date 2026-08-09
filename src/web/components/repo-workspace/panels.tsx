@@ -1,7 +1,8 @@
-import { FolderTree } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { FolderTree } from '@lucide/vue'
+import { defineComponent } from 'vue'
+import type { FunctionalComponent, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { useT } from '#/web/stores/i18n.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
 import { useRepoLogQuery } from '#/web/repo-queries.ts'
@@ -42,7 +43,7 @@ export interface WorkspacePanePanelRenderInput {
 type WorkspacePanePanelProps = Pick<WorkspacePanePanelRenderInput, 'repo' | 'detail' | 'workspacePaneId' | 'panelLabel'>
 
 type GitWorkspacePaneBranch = NonNullable<CurrentGitWorkspacePanePresentation['branch']>
-type WorkspacePaneStaticPanelComponent = (props: WorkspacePanePanelProps) => ReactNode
+type WorkspacePaneStaticPanelComponent = FunctionalComponent<WorkspacePanePanelProps>
 
 const REPO_WORKSPACE_STATIC_PANEL_BY_TYPE: Record<WorkspacePaneStaticTabType, WorkspacePaneStaticPanelComponent> = {
   status: StatusWorkspacePanePanel,
@@ -51,7 +52,7 @@ const REPO_WORKSPACE_STATIC_PANEL_BY_TYPE: Record<WorkspacePaneStaticTabType, Wo
   files: FilesWorkspacePanePanel,
 }
 
-export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
+export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput): VNodeChild {
   if (isWorkspacePaneRuntimeTabType(input.type)) {
     const runtimeState = input.runtimeTabStateByType[input.type]
     const branch = input.detail.branch
@@ -163,92 +164,118 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   )
 }
 
-function FiletreeNoWorktreeView() {
-  const t = useT()
-  return (
-    <EmptyState
-      icon={<FolderTree size={16} />}
-      title={t('filetree.no-worktree-title')}
-      body={t('filetree.no-worktree-body')}
-    />
-  )
-}
+const FiletreeNoWorktreeView = defineComponent(
+  () => {
+    const t = useT()
+    return () => (
+      <EmptyState
+        icon={<FolderTree size={16} />}
+        title={t('filetree.no-worktree-title')}
+        body={t('filetree.no-worktree-body')}
+      />
+    )
+  },
+  { name: 'FiletreeNoWorktreeView' },
+)
 
-function BranchHistoryTab({
-  repoId,
-  workspaceRuntimeId,
-  branchName,
-  workspacePaneId,
-  panelLabel,
-}: {
+interface BranchHistoryTabProps {
   repoId: WorkspaceId
   workspaceRuntimeId: string
   branchName: string
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
-}) {
-  const t = useT()
-  const historyQuery = useRepoLogQuery(repoId, workspaceRuntimeId, branchName, {
-    count: DEFAULT_REPOSITORY_LOG_COUNT,
-  })
-  const entries = historyQuery.data ?? []
-  const errorTitleKey =
-    historyQuery.error instanceof Error ? historyQuery.error.message : DEFAULT_BRANCH_HISTORY_ERROR_KEY
-
-  return (
-    <WorkspacePanePanelFrame id={`${workspacePaneId}-history-panel`} {...panelLabel} busy={historyQuery.isLoading}>
-      {historyQuery.isLoading ? (
-        <HistoryCommitGraphSkeleton rows={8} />
-      ) : historyQuery.isError ? (
-        <EmptyState title={t(errorTitleKey)} />
-      ) : entries.length === 0 ? (
-        <EmptyState title={t('log.empty-for-branch', { branch: branchName })} />
-      ) : (
-        <ScrollPane>
-          <HistoryCommitGraph repoId={repoId} workspaceRuntimeId={workspaceRuntimeId} entries={entries} />
-        </ScrollPane>
-      )}
-    </WorkspacePanePanelFrame>
-  )
 }
 
-function BranchChangesTab({
-  workspacePaneId,
-  panelLabel,
-  branch,
-  currentBranchStatus,
-  statusLoading,
-}: {
+const BranchHistoryTab = defineComponent(
+  (props: BranchHistoryTabProps) => {
+    const t = useT()
+    const historyQuery = useRepoLogQuery(
+      () => props.repoId,
+      () => props.workspaceRuntimeId,
+      () => props.branchName,
+      { count: DEFAULT_REPOSITORY_LOG_COUNT },
+    )
+
+    return () => {
+      const entries = historyQuery.data.value ?? []
+      const queryError = historyQuery.error.value
+      const errorTitleKey = queryError instanceof Error ? queryError.message : DEFAULT_BRANCH_HISTORY_ERROR_KEY
+      return (
+        <WorkspacePanePanelFrame
+          id={`${props.workspacePaneId}-history-panel`}
+          {...props.panelLabel}
+          busy={historyQuery.isLoading.value}
+        >
+          {historyQuery.isLoading.value ? (
+            <HistoryCommitGraphSkeleton rows={8} />
+          ) : historyQuery.isError.value ? (
+            <EmptyState title={t(errorTitleKey)} />
+          ) : entries.length === 0 ? (
+            <EmptyState title={t('log.empty-for-branch', { branch: props.branchName })} />
+          ) : (
+            <ScrollPane>
+              <HistoryCommitGraph
+                repoId={props.repoId}
+                workspaceRuntimeId={props.workspaceRuntimeId}
+                entries={entries}
+              />
+            </ScrollPane>
+          )}
+        </WorkspacePanePanelFrame>
+      )
+    }
+  },
+  {
+    name: 'BranchHistoryTab',
+    props: ['repoId', 'workspaceRuntimeId', 'branchName', 'workspacePaneId', 'panelLabel'],
+  },
+)
+
+interface BranchChangesTabProps {
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
   branch: GitWorkspacePaneBranch
   currentBranchStatus: CurrentGitWorkspacePanePresentation['currentBranchStatus']
   statusLoading: boolean
-}) {
-  const t = useT()
-  const totalEntries = currentBranchStatus?.reduce((n, wt) => n + wt.entries.length, 0)
-
-  return (
-    <WorkspacePanePanelFrame id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
-      {branch.worktree?.path ? (
-        <div className="relative flex min-h-0 flex-1 flex-col">
-          {currentBranchStatus === undefined ? (
-            <EmptyState title={t(statusLoading ? 'dashboard.loading' : 'error.failed-read-repo')} />
-          ) : totalEntries && totalEntries > 0 ? (
-            <ScrollPane>
-              <StatusList status={currentBranchStatus} />
-            </ScrollPane>
-          ) : (
-            <StatusList status={currentBranchStatus} />
-          )}
-        </div>
-      ) : (
-        <EmptyState
-          icon={<FolderTree size={16} />}
-          title={t('status.no-worktree-title')}
-          body={t('status.no-worktree-body')}
-        />
-      )}
-    </WorkspacePanePanelFrame>
-  )
 }
+
+const BranchChangesTab = defineComponent(
+  (props: BranchChangesTabProps) => {
+    const t = useT()
+    return () => {
+      const totalEntries = props.currentBranchStatus?.reduce((count, worktree) => count + worktree.entries.length, 0)
+      const unavailableStatusKey = props.statusLoading ? 'dashboard.loading' : 'error.failed-read-repo'
+      return (
+        <WorkspacePanePanelFrame
+          id={`${props.workspacePaneId}-changes-panel`}
+          {...props.panelLabel}
+          busy={props.statusLoading}
+        >
+          {props.branch.worktree?.path ? (
+            <div class="relative flex min-h-0 flex-1 flex-col">
+              {props.currentBranchStatus === undefined ? (
+                <EmptyState title={t(unavailableStatusKey)} />
+              ) : totalEntries && totalEntries > 0 ? (
+                <ScrollPane>
+                  <StatusList status={props.currentBranchStatus} />
+                </ScrollPane>
+              ) : (
+                <StatusList status={props.currentBranchStatus} />
+              )}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<FolderTree size={16} />}
+              title={t('status.no-worktree-title')}
+              body={t('status.no-worktree-body')}
+            />
+          )}
+        </WorkspacePanePanelFrame>
+      )
+    }
+  },
+  {
+    name: 'BranchChangesTab',
+    props: ['workspacePaneId', 'panelLabel', 'branch', 'currentBranchStatus', 'statusLoading'],
+  },
+)

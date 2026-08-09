@@ -13,7 +13,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace/branch-action-state')
 
 describe('branch action state projection', () => {
-  test('maps active server branch operations onto the branch action operation shape', () => {
+  test('maps active server branch operations onto the branch action operation shape', async () => {
     const operation = serverOperation({ kind: 'push', phase: 'running', branch: 'feature/a' })
 
     expect(isActiveServerBranchAction(operation)).toBe(true)
@@ -25,7 +25,7 @@ describe('branch action state projection', () => {
     })
   })
 
-  test('maps queued operations without a start time', () => {
+  test('maps queued operations without a start time', async () => {
     expect(
       branchActionOperationFromServer(idleOperation(), [
         serverOperation({ kind: 'delete-branch', phase: 'queued', branch: 'feature/a' }),
@@ -37,7 +37,7 @@ describe('branch action state projection', () => {
     })
   })
 
-  test('falls back when the server operation targets another branch', () => {
+  test('falls back when the server operation targets another branch', async () => {
     const fallback = idleOperation()
 
     expect(
@@ -49,7 +49,7 @@ describe('branch action state projection', () => {
     ).toBe(fallback)
   })
 
-  test('projects from a repo-shaped fallback without leaking the fallback read to callers', () => {
+  test('projects from a repo-shaped fallback without leaking the fallback read to callers', async () => {
     const repo = {
       operations: {
         branchAction: {
@@ -77,7 +77,7 @@ describe('branch action state projection', () => {
     })
   })
 
-  test('projects a branch action repo without exposing the local operations wrapper', () => {
+  test('projects a branch action repo without exposing the local operations wrapper', async () => {
     const repo = {
       id: REPO_ID,
       workspaceRuntimeId: 'repo-runtime-1',
@@ -104,7 +104,7 @@ describe('branch action state projection', () => {
     })
   })
 
-  test('ignores inactive and non-branch server operations', () => {
+  test('ignores inactive and non-branch server operations', async () => {
     const fallback = idleOperation()
 
     expect(branchActionOperationFromServer(fallback, [serverOperation({ kind: 'fetch', phase: 'running' })])).toBe(

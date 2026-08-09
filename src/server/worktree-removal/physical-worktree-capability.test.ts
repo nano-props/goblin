@@ -17,7 +17,7 @@ const REMOTE_REPO = workspaceIdForTest('goblin+ssh://prod/srv/repo')
 const REMOTE_PATH = '/srv/worktrees/feature'
 
 describe('physical worktree capability boundaries', () => {
-  test('freezes the exact remote target snapshot used after capture', () => {
+  test('freezes the exact remote target snapshot used after capture', async () => {
     const target = remoteTarget('host-a.test')
     const capability = remoteCapability(target)
     target.host = 'host-b.test'

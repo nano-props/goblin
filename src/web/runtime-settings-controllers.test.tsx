@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 
-import { QueryClientProvider } from '@tanstack/react-query'
-import { act } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
+import { flushTestUpdates, renderComposableInJsdom } from '#/test-utils/render.tsx'
+import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
-import { renderHookInJsdom } from '#/test-utils/render.tsx'
 
 const settingsActionsMocks = vi.hoisted(() => ({
   refreshExternalAppsDetection: vi.fn(async () => {}),
@@ -47,11 +46,11 @@ beforeEach(() => {
 describe('runtime settings controllers', () => {
   test('runs fetch settings writes through settings mutations', async () => {
     const { useFetchSettingsController } = await import('#/web/runtime-settings-fetch.ts')
-    const { result } = renderHookInJsdom(() => useFetchSettingsController(), { wrapper: AppQueryClientProvider })
+    const { result } = renderComposableInJsdom(() => useFetchSettingsController(), { wrapper: AppVueQueryClientScope })
 
-    await act(async () => {
-      await result.current.setFetchInterval(300)
-      await result.current.setTerminalNotificationsEnabled(true)
+    await flushTestUpdates(async () => {
+      await result.value.setFetchInterval(300)
+      await result.value.setTerminalNotificationsEnabled(true)
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('fetch interval update', expect.any(Function))
@@ -65,10 +64,10 @@ describe('runtime settings controllers', () => {
 
   test('runs LAN settings writes through settings mutations', async () => {
     const { useLanSettingsController } = await import('#/web/runtime-settings-lan.ts')
-    const { result } = renderHookInJsdom(() => useLanSettingsController(), { wrapper: AppQueryClientProvider })
+    const { result } = renderComposableInJsdom(() => useLanSettingsController(), { wrapper: AppVueQueryClientScope })
 
-    await act(async () => {
-      await result.current.setLanEnabled(true)
+    await flushTestUpdates(async () => {
+      await result.value.setLanEnabled(true)
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('lanEnabled update', expect.any(Function))
@@ -77,12 +76,14 @@ describe('runtime settings controllers', () => {
 
   test('runs shortcut settings writes through settings mutations', async () => {
     const { useShortcutSettingsController } = await import('#/web/runtime-settings-shortcuts.ts')
-    const { result } = renderHookInJsdom(() => useShortcutSettingsController(), { wrapper: AppQueryClientProvider })
+    const { result } = renderComposableInJsdom(() => useShortcutSettingsController(), {
+      wrapper: AppVueQueryClientScope,
+    })
 
-    const globalShortcutResult = await act(async () => {
-      await result.current.setShortcutsDisabled(true)
-      await result.current.setGlobalShortcutDisabled(true)
-      return await result.current.setGlobalShortcut('CommandOrControl+Shift+K')
+    const globalShortcutResult = await flushTestUpdates(async () => {
+      await result.value.setShortcutsDisabled(true)
+      await result.value.setGlobalShortcutDisabled(true)
+      return await result.value.setGlobalShortcut('CommandOrControl+Shift+K')
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('shortcuts update', expect.any(Function))
@@ -99,10 +100,12 @@ describe('runtime settings controllers', () => {
 
   test('runs external app refresh through settings mutations', async () => {
     const { useExternalAppSettingsController } = await import('#/web/runtime-settings-external-apps.ts')
-    const { result } = renderHookInJsdom(() => useExternalAppSettingsController(), { wrapper: AppQueryClientProvider })
+    const { result } = renderComposableInJsdom(() => useExternalAppSettingsController(), {
+      wrapper: AppVueQueryClientScope,
+    })
 
-    await act(async () => {
-      await result.current.refreshExternalApps()
+    await flushTestUpdates(async () => {
+      await result.value.refreshExternalApps()
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('external app refresh', expect.any(Function))
@@ -113,11 +116,13 @@ describe('runtime settings controllers', () => {
     const { useExternalAppSettingsController } = await import('#/web/runtime-settings-external-apps.ts')
     const refresh = Promise.withResolvers<void>()
     settingsActionsMocks.refreshExternalAppsDetection.mockImplementation(async () => await refresh.promise)
-    const { result } = renderHookInJsdom(() => useExternalAppSettingsController(), { wrapper: AppQueryClientProvider })
+    const { result } = renderComposableInJsdom(() => useExternalAppSettingsController(), {
+      wrapper: AppVueQueryClientScope,
+    })
 
-    const { firstRefresh, secondRefresh } = await act(async () => {
-      const firstRefresh = result.current.refreshExternalApps()
-      const secondRefresh = result.current.refreshExternalApps()
+    const { firstRefresh, secondRefresh } = await flushTestUpdates(async () => {
+      const firstRefresh = result.value.refreshExternalApps()
+      const secondRefresh = result.value.refreshExternalApps()
       await flushMicrotasks()
       return { firstRefresh, secondRefresh }
     })
@@ -126,17 +131,17 @@ describe('runtime settings controllers', () => {
     expect(settingsActionsMocks.refreshExternalAppsDetection).toHaveBeenCalledTimes(1)
 
     refresh.resolve()
-    await act(async () => {
+    await flushTestUpdates(async () => {
       await Promise.all([firstRefresh, secondRefresh])
     })
   })
 
   test('runs GitHub CLI refresh through settings mutations', async () => {
     const { useGitHubSettingsController } = await import('#/web/runtime-settings-github.ts')
-    const { result } = renderHookInJsdom(() => useGitHubSettingsController(), { wrapper: AppQueryClientProvider })
+    const { result } = renderComposableInJsdom(() => useGitHubSettingsController(), { wrapper: AppVueQueryClientScope })
 
-    await act(async () => {
-      await result.current.refreshGitHubCli()
+    await flushTestUpdates(async () => {
+      await result.value.refreshGitHubCli()
     })
 
     expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('GitHub CLI refresh', expect.any(Function))
@@ -147,11 +152,11 @@ describe('runtime settings controllers', () => {
     const { useGitHubSettingsController } = await import('#/web/runtime-settings-github.ts')
     const refresh = Promise.withResolvers<void>()
     settingsActionsMocks.refreshGitHubCliDetection.mockImplementation(async () => await refresh.promise)
-    const { result } = renderHookInJsdom(() => useGitHubSettingsController(), { wrapper: AppQueryClientProvider })
+    const { result } = renderComposableInJsdom(() => useGitHubSettingsController(), { wrapper: AppVueQueryClientScope })
 
-    const { firstRefresh, secondRefresh } = await act(async () => {
-      const firstRefresh = result.current.refreshGitHubCli()
-      const secondRefresh = result.current.refreshGitHubCli()
+    const { firstRefresh, secondRefresh } = await flushTestUpdates(async () => {
+      const firstRefresh = result.value.refreshGitHubCli()
+      const secondRefresh = result.value.refreshGitHubCli()
       await flushMicrotasks()
       return { firstRefresh, secondRefresh }
     })
@@ -160,12 +165,14 @@ describe('runtime settings controllers', () => {
     expect(settingsActionsMocks.refreshGitHubCliDetection).toHaveBeenCalledTimes(1)
 
     refresh.resolve()
-    await act(async () => {
+    await flushTestUpdates(async () => {
       await Promise.all([firstRefresh, secondRefresh])
     })
   })
 })
 
-function AppQueryClientProvider({ children }: { children: ReactNode }) {
-  return <QueryClientProvider client={appQueryClient}>{children}</QueryClientProvider>
-}
+const AppVueQueryClientScope = defineComponent(
+  (_props, { slots }) =>
+    () => <VueQueryClientScope client={appQueryClient}>{slots.default?.()}</VueQueryClientScope>,
+  { name: 'AppVueQueryClientScope' },
+)

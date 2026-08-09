@@ -1,71 +1,81 @@
-import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from 'react'
-import { toast } from 'sonner'
-import { useT } from '#/web/stores/i18n.ts'
+import { defineComponent, ref, watch } from 'vue'
+import type { PropType } from 'vue'
+import { toast } from 'vue-sonner'
+import { useT } from '#/web/stores/i18n-vue.ts'
 import { IconCopyButton } from '#/web/components/IconCopyButton.tsx'
 import { useActionFeedback } from '#/web/hooks/useActionFeedback.ts'
 import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 
-type CopyButtonProps = Omit<
-  ComponentPropsWithoutRef<typeof IconCopyButton>,
-  'busy' | 'label' | 'onClick' | 'succeeded'
-> & {
-  value: string
-  copyLabel: string
-  copiedLabel: string
-}
+export const CopyButton = defineComponent(
+  (props: {
+    value: string
+    copyLabel: string
+    copiedLabel: string
+    class?: string
+    disabled?: boolean
+    side?: 'top' | 'right' | 'bottom' | 'left'
+  }) => {
+    const feedback = useActionFeedback()
+    const copying = ref(false)
+    const t = useT()
+    let requestId = 0
 
-export function CopyButton({ value, copyLabel, copiedLabel, className, disabled, ...props }: CopyButtonProps) {
-  // `copying` guards against double-clicks while the clipboard write is
-  // in flight; `succeeded` is the post-success flash managed by the
-  // shared hook. When `value` changes mid-flight, drop the flash so an
-  // old "Copied!" tooltip can't bleed across rows.
-  const { succeeded, trigger, reset } = useActionFeedback()
-  const [copying, setCopying] = useState(false)
-  const requestIdRef = useRef(0)
-  const valueRef = useRef(value)
-  const t = useT()
+    // A changed value invalidates the previous clipboard request and its
+    // transient success projection; the underlying browser write is not
+    // cancellable once admitted.
+    watch(
+      () => props.value,
+      () => {
+        requestId += 1
+        copying.value = false
+        feedback.reset()
+      },
+    )
 
-  if (valueRef.current !== value) {
-    valueRef.current = value
-    requestIdRef.current += 1
-  }
+    function copy(): void {
+      if (copying.value) return
+      requestId += 1
+      const activeRequestId = requestId
+      const copiedValue = props.value
+      copying.value = true
 
-  useEffect(() => {
-    reset()
-    setCopying(false)
-  }, [value, reset])
-
-  function copy() {
-    if (copying) return
-    const requestId = requestIdRef.current + 1
-    requestIdRef.current = requestId
-    const copiedValue = value
-    setCopying(true)
-    void copyToClipboard(copiedValue)
-      .then(() => {
-        if (requestIdRef.current !== requestId || valueRef.current !== copiedValue) return
-        trigger(() => true)
-      })
-      .catch((err: unknown) => {
-        if (requestIdRef.current !== requestId || valueRef.current !== copiedValue) return
-        toast.error(t('action.result-error'), {
-          description: err instanceof Error ? err.message : String(err),
+      void copyToClipboard(copiedValue)
+        .then(() => {
+          if (requestId !== activeRequestId || props.value !== copiedValue) return
+          feedback.trigger(() => true)
         })
-      })
-      .finally(() => {
-        if (requestIdRef.current === requestId) setCopying(false)
-      })
-  }
+        .catch((error: unknown) => {
+          if (requestId !== activeRequestId || props.value !== copiedValue) return
+          toast.error(t('action.result-error'), {
+            description: error instanceof Error ? error.message : String(error),
+          })
+        })
+        .finally(() => {
+          if (requestId === activeRequestId) copying.value = false
+        })
+    }
 
-  return (
-    <IconCopyButton
-      {...props}
-      className={className}
-      label={succeeded ? copiedLabel : copyLabel}
-      succeeded={succeeded}
-      busy={copying}
-      disabled={disabled || copying}
-      onClick={copy}
-    />
-  )
-}
+    return () => (
+      <IconCopyButton
+        class={props.class}
+        label={feedback.succeeded.value ? props.copiedLabel : props.copyLabel}
+        succeeded={feedback.succeeded.value}
+        busy={copying.value}
+        disabled={props.disabled || copying.value}
+        side={props.side}
+        onClick={copy}
+      />
+    )
+  },
+  {
+    name: 'CopyButton',
+    props: {
+      value: { type: String, required: true },
+      copyLabel: { type: String, required: true },
+      copiedLabel: { type: String, required: true },
+      class: String,
+      disabled: Boolean,
+      side: String as PropType<'top' | 'right' | 'bottom' | 'left'>,
+    },
+  },
+)

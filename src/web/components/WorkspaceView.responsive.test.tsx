@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import '#/web/test-utils/workspace-view.tsx'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import {
   responsiveMocks,
@@ -24,7 +24,7 @@ import {
 } from '#/web/test-utils/workspace-view.tsx'
 
 describe('WorkspaceView responsive layout', () => {
-  test('compact branch activation slides Repo Workspace into the active pane', () => {
+  test('compact branch activation slides Repo Workspace into the active pane', async () => {
     responsiveMocks.mode = 'compact'
     const { container, rerender } = render(<WorkspaceView workspaceId={REPO_ID} />)
 
@@ -34,9 +34,9 @@ describe('WorkspaceView responsive layout', () => {
     expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBeNull()
     expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBe('true')
 
-    act(() => {
+    await flushTestUpdates(async () => {
       branchNavigator(container)?.click()
-      rerender(branchWorkspaceView())
+      await rerender(branchWorkspaceView())
     })
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
@@ -45,11 +45,11 @@ describe('WorkspaceView responsive layout', () => {
     expect(workspacePane(container)).not.toBeNull()
   })
 
-  test('compact mode derives Repo Workspace from an existing current branch', () => {
+  test('compact mode derives Repo Workspace from an existing current branch', async () => {
     responsiveMocks.mode = 'compact'
     const { container } = render(branchWorkspaceView())
 
-    act(() => {})
+    await flushTestUpdates(() => {})
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
     expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBe('true')
@@ -57,7 +57,7 @@ describe('WorkspaceView responsive layout', () => {
     expect(workspacePane(container)).not.toBeNull()
   })
 
-  test('compact back transition keeps the outgoing Repo Workspace content during slide-out', () => {
+  test('compact back transition keeps the outgoing Repo Workspace content during slide-out', async () => {
     useFakeTimers()
     responsiveMocks.mode = 'compact'
     const { container, rerender } = render(branchWorkspaceView())
@@ -65,8 +65,8 @@ describe('WorkspaceView responsive layout', () => {
     expect(workspacePane(container)?.dataset.currentBranchName).toBe('feature/a')
     expect(workspacePane(container)?.dataset.shortcutsEnabled).toBe('true')
 
-    act(() => {
-      rerender(<WorkspaceView workspaceId={REPO_ID} />)
+    await flushTestUpdates(async () => {
+      await rerender(<WorkspaceView workspaceId={REPO_ID} />)
     })
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
@@ -75,14 +75,14 @@ describe('WorkspaceView responsive layout', () => {
     expect(workspacePane(container)?.dataset.workspacePaneRouteKind).toBe('inactive')
     expect(workspacePane(container)?.dataset.shortcutsEnabled).toBe('false')
 
-    act(() => {
+    await flushTestUpdates(() => {
       vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
     })
 
     expect(workspacePane(container)?.dataset.currentBranchName).toBe('')
   })
 
-  test('large-screen missing snapshot data keeps stable shell chrome without a synthetic skeleton', () => {
+  test('large-screen missing snapshot data keeps stable shell chrome without a synthetic skeleton', async () => {
     setReadModelLoading(REPO_ID)
     const { container } = render(<WorkspaceView workspaceId={REPO_ID} />)
 
@@ -94,8 +94,8 @@ describe('WorkspaceView responsive layout', () => {
     expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
   })
 
-  test('large-screen focused initial loading with current branch keeps floating sidebar reveal available', () => {
-    useWorkspacesStore.getState().setZenMode(true)
+  test('large-screen focused initial loading with current branch keeps floating sidebar reveal available', async () => {
+    workspacesStore.getState().setZenMode(true)
     setReadModelLoading(REPO_ID)
 
     const { container } = render(branchWorkspaceView())
@@ -105,7 +105,7 @@ describe('WorkspaceView responsive layout', () => {
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
   })
 
-  test('large-screen unavailable Workspace keeps capability-neutral shell chrome available', () => {
+  test('large-screen unavailable Workspace keeps capability-neutral shell chrome available', async () => {
     setRepoUnavailable(REPO_ID)
     const { container } = render(branchWorkspaceView())
 
@@ -116,8 +116,8 @@ describe('WorkspaceView responsive layout', () => {
     expect(document.body.textContent).toContain('workspace-unavailable.title')
   })
 
-  test('large-screen focused unavailable Workspace keeps floating sidebar reveal available', () => {
-    useWorkspacesStore.getState().setZenMode(true)
+  test('large-screen focused unavailable Workspace keeps floating sidebar reveal available', async () => {
+    workspacesStore.getState().setZenMode(true)
     setRepoUnavailable(REPO_ID)
 
     const { container } = render(branchWorkspaceView())
@@ -127,7 +127,7 @@ describe('WorkspaceView responsive layout', () => {
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
   })
 
-  test('compact missing snapshot data keeps the selected Repo Workspace shell as the single pane', () => {
+  test('compact missing snapshot data keeps the selected Repo Workspace shell as the single pane', async () => {
     responsiveMocks.mode = 'compact'
     setReadModelLoading(REPO_ID)
 
@@ -140,10 +140,10 @@ describe('WorkspaceView responsive layout', () => {
     expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
   })
 
-  test('resizing from split large-screen mode to compact shows Repo Workspace when a branch is selected', () => {
+  test('resizing from split large-screen mode to compact shows Repo Workspace when a branch is selected', async () => {
     const { container, rerender } = render(branchWorkspaceView())
 
-    act(() => {
+    await flushTestUpdates(() => {
       branchNavigator(container)?.click()
     })
 
@@ -151,7 +151,7 @@ describe('WorkspaceView responsive layout', () => {
     expect(workspacePane(container)).not.toBeNull()
 
     responsiveMocks.mode = 'compact'
-    rerender(branchWorkspaceView())
+    await flushTestUpdates(() => rerender(branchWorkspaceView()))
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
     expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBe('true')

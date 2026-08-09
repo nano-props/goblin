@@ -1,44 +1,40 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
-import { useShallow } from 'zustand/react/shallow'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { createAppNavigationActions, type AppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { appNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
-import { useAppRouteNavigation } from '#/web/app-route-navigation.ts'
-export type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { defineComponent, inject, provide, toRef } from 'vue'
+import type { InjectionKey, PropType, Ref } from 'vue'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 
-const AppNavigationContext = createContext<AppNavigationActions | null>(null)
+const appNavigationKey: InjectionKey<Readonly<Ref<AppNavigationActions>>> = Symbol('app-navigation')
 
-export function AppNavigationProvider({
-  value,
-  children,
-}: {
-  value: AppNavigationActions | null
-  children: ReactNode
-}) {
-  return <AppNavigationContext value={value}>{children}</AppNavigationContext>
-}
+export const AppNavigationProvider = defineComponent(
+  (props: { value: AppNavigationActions }, { slots }) => {
+    provide(appNavigationKey, toRef(props, 'value'))
+    return () => slots.default?.()
+  },
+  {
+    name: 'AppNavigationProvider',
+    props: {
+      value: { type: Object as PropType<AppNavigationActions>, required: true },
+    },
+  },
+)
 
 export function useAppNavigation(): AppNavigationActions {
-  const context = useContext(AppNavigationContext)
-  if (context) return context
+  const source = inject(appNavigationKey, null)
+  if (!source) throw new Error('useAppNavigation must be used within <AppNavigationProvider>')
 
-  const workspaceOrder = useWorkspacesStore((s) => s.workspaceOrder)
-  const { closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation } = useWorkspacesStore(
-    useShallow(appNavigationStoreActionsFromStore),
-  )
-  const routeNavigation = useAppRouteNavigation()
-  const fallbackNavigation = useMemo(
-    () =>
-      createAppNavigationActions({
-        currentWorkspaceId: null,
-        workspaceOrder,
-        closeWorkspace,
-        peekWorkspaceNavigation,
-        commitWorkspaceNavigation,
-        routeNavigation,
-      }),
-    [closeWorkspace, peekWorkspaceNavigation, commitWorkspaceNavigation, workspaceOrder, routeNavigation],
-  )
-
-  return fallbackNavigation
+  return {
+    activateWorkspace: (...args) => source.value.activateWorkspace(...args),
+    closeWorkspace: (...args) => source.value.closeWorkspace(...args),
+    cycleWorkspace: (...args) => source.value.cycleWorkspace(...args),
+    selectRepoBranch: (...args) => source.value.selectRepoBranch(...args),
+    showRepoWorktreeTerminalSession: (...args) => source.value.showRepoWorktreeTerminalSession(...args),
+    showWorkspaceRootPaneTab: (...args) => source.value.showWorkspaceRootPaneTab(...args),
+    commitFilesystemWorkspacePaneRoute: (...args) => source.value.commitFilesystemWorkspacePaneRoute(...args),
+    commitWorkspaceRootTerminalSession: (...args) => source.value.commitWorkspaceRootTerminalSession(...args),
+    commitWorkspacePaneRoute: (...args) => source.value.commitWorkspacePaneRoute(...args),
+    currentWorkspacePaneRoute: (...args) => source.value.currentWorkspacePaneRoute(...args),
+    goBack: (...args) => source.value.goBack(...args),
+    goForward: (...args) => source.value.goForward(...args),
+    openSettings: (...args) => source.value.openSettings(...args),
+    openCreateWorktree: (...args) => source.value.openCreateWorktree(...args),
+  }
 }

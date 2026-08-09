@@ -15,7 +15,7 @@ Use this doc for the server-first client model.
 
 ## Repository read models
 
-- React Query is the only runtime cache for server-owned repository reads.
+- TanStack Query is the only runtime cache for server-owned repository reads.
   Repository snapshot, worktree status, and pull requests have independent keys,
   pending states, and failure lifecycles; do not mirror them into Zustand.
 - Accepted query data and the latest refresh outcome are different facts. A

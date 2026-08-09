@@ -2,7 +2,7 @@ import type { ClientWorkspaceState, FiletreeSessionViewState } from '#/shared/ap
 import {
   filetreeInteractionScopeKey,
   parseFiletreeInteractionScopeKey,
-  useFiletreeInteractionStore,
+  filetreeInteractionStore,
   type FiletreeInteractionSnapshot,
 } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import {
@@ -44,7 +44,7 @@ export function persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSessio
 export function restoreFiletreeViewStateFromSession(
   filetreeViewStateByFilesystemTargetByWorkspace: ClientWorkspaceState['filetreeViewStateByFilesystemTargetByWorkspace'],
 ): void {
-  useFiletreeInteractionStore
+  filetreeInteractionStore
     .getState()
     .restoreViewState(interactionByScopeFromSessionViewState(filetreeViewStateByFilesystemTargetByWorkspace))
 }

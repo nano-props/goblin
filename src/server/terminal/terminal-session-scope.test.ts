@@ -5,7 +5,7 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 const workspaceId = canonicalWorkspaceLocator('goblin+file:///tmp/workspace')!
 
 describe('terminal session target execution path', () => {
-  test('derives a workspace-root execution path from its authoritative locator', () => {
+  test('derives a workspace-root execution path from its authoritative locator', async () => {
     expect(
       terminalSessionTargetExecutionPath({
         kind: 'workspace-root',
@@ -15,7 +15,7 @@ describe('terminal session target execution path', () => {
     ).toBe('/tmp/workspace')
   })
 
-  test('derives a Git worktree execution path from its authoritative target root', () => {
+  test('derives a Git worktree execution path from its authoritative target root', async () => {
     const target = {
       kind: 'git-worktree' as const,
       workspaceId,

@@ -7,12 +7,12 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { reconcileOpenWorkspaceRuntimeMemberships } from '#/web/stores/workspaces/workspace-runtime-membership-recovery.ts'
 import {
   closeWorkspaceRuntimeWithCache,
   openWorkspaceRuntimeWithCache,
-  reconcileOpenWorkspaceRuntimeMemberships,
 } from '#/web/stores/workspaces/workspace-session-write-paths.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -56,10 +56,7 @@ describe('workspace runtime membership recovery', () => {
   test('atomically advances a current repo shell to the reconciled server epoch', async () => {
     const previousWorkspaceRuntimeId = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] }).workspaceRuntimeId
 
-    const result = await reconcileOpenWorkspaceRuntimeMemberships(
-      useWorkspacesStore.setState,
-      useWorkspacesStore.getState,
-    )
+    const result = await reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
 
     expect(result).toEqual({
       kind: 'settled',
@@ -72,12 +69,12 @@ describe('workspace runtime membership recovery', () => {
         },
       ],
     })
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ROOT]
+    const repo = workspacesStore.getState().workspaces[REPO_ROOT]
     expect(repo?.workspaceRuntimeId).toBe('repo-runtime-123456789012345678901')
     expect(repo?.capability).toEqual({ kind: 'probing', probe: { status: 'probing' } })
     expect(runWorkspaceRefresh).toHaveBeenCalledOnce()
     expect(runWorkspaceRefresh).toHaveBeenCalledWith(
-      { set: useWorkspacesStore.setState, get: useWorkspacesStore.getState },
+      { set: workspacesStore.setState, get: workspacesStore.getState },
       REPO_ROOT,
       { workspaceRuntimeId: 'repo-runtime-123456789012345678901' },
     )
@@ -99,7 +96,7 @@ describe('workspace runtime membership recovery', () => {
     })
 
     await expect(
-      reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
     ).resolves.toMatchObject({ kind: 'settled', changedTargets: [] })
 
     expect(runWorkspaceRefresh).not.toHaveBeenCalled()
@@ -110,7 +107,7 @@ describe('workspace runtime membership recovery', () => {
     seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
 
     await expect(
-      reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
     ).resolves.toMatchObject({
       kind: 'settled',
       targets: [],
@@ -127,7 +124,7 @@ describe('workspace runtime membership recovery', () => {
     })
     const firstWorkspace = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
     const secondWorkspace = seedRepoWithReadModelForTest({ id: SECOND_REPO_ROOT, branches: [] })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [REPO_ROOT]: firstWorkspace, [SECOND_REPO_ROOT]: secondWorkspace },
       workspaceOrder: [REPO_ROOT, SECOND_REPO_ROOT],
     })
@@ -149,7 +146,7 @@ describe('workspace runtime membership recovery', () => {
     })
 
     await expect(
-      reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
     ).resolves.toMatchObject({
       kind: 'settled',
       targets: [{ workspaceId: REPO_ROOT, workspaceRuntimeId: 'repo-runtime-first-123456789012345' }],
@@ -167,7 +164,7 @@ describe('workspace runtime membership recovery', () => {
     )
     const firstWorkspace = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
     const secondWorkspace = seedRepoWithReadModelForTest({ id: SECOND_REPO_ROOT, branches: [] })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [REPO_ROOT]: firstWorkspace, [SECOND_REPO_ROOT]: secondWorkspace },
       workspaceOrder: [REPO_ROOT, SECOND_REPO_ROOT],
     })
@@ -188,7 +185,7 @@ describe('workspace runtime membership recovery', () => {
       }),
     })
 
-    const recovery = reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
     await vi.waitFor(() => expect(runWorkspaceRefresh).toHaveBeenCalledTimes(2))
 
     firstRefresh.resolve({ ok: true })
@@ -225,10 +222,10 @@ describe('workspace runtime membership recovery', () => {
       'workspace.runtimeList': runtimeList,
     })
 
-    await reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    await reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
 
     expect(runtimeList).toHaveBeenCalledOnce()
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ROOT]
+    const repo = workspacesStore.getState().workspaces[REPO_ROOT]
     expect(repo?.workspaceRuntimeId).toBe(nextWorkspaceRuntimeId)
     expect(repo?.capability.kind).toBe('git')
     expect(repo?.capability.probe.status).toBe('ready')
@@ -247,9 +244,9 @@ describe('workspace runtime membership recovery', () => {
     installGoblinTestBridge({ 'workspace.runtimeReconcile': reconcile })
     seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
 
-    const recovery = reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
     await vi.waitFor(() => expect(reconcile).toHaveBeenCalledOnce())
-    useWorkspacesStore.setState({ workspaces: {}, workspaceOrder: [] })
+    workspacesStore.setState({ workspaces: {}, workspaceOrder: [] })
     firstResponse.resolve({
       runtimes: [
         {
@@ -276,7 +273,7 @@ describe('workspace runtime membership recovery', () => {
     }>()
     const firstWorkspace = seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [] })
     const secondWorkspace = seedRepoWithReadModelForTest({ id: SECOND_REPO_ROOT, branches: [] })
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [REPO_ROOT]: firstWorkspace, [SECOND_REPO_ROOT]: secondWorkspace },
       workspaceOrder: [REPO_ROOT, SECOND_REPO_ROOT],
     })
@@ -295,9 +292,9 @@ describe('workspace runtime membership recovery', () => {
       })
     installGoblinTestBridge({ 'workspace.runtimeReconcile': reconcile })
 
-    const recovery = reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
     await vi.waitFor(() => expect(reconcile).toHaveBeenCalledOnce())
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [REPO_ROOT]: firstWorkspace },
       workspaceOrder: [REPO_ROOT],
     })
@@ -338,7 +335,7 @@ describe('workspace runtime membership recovery', () => {
       'workspace.runtimeOpen': runtimeOpen,
     })
 
-    const recovery = reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
     const open = openWorkspaceRuntimeWithCache(REPO_ROOT)
     await Promise.resolve()
     expect(runtimeOpen).not.toHaveBeenCalled()
@@ -365,7 +362,7 @@ describe('workspace runtime membership recovery', () => {
       'workspace.runtimeClose': runtimeClose,
     })
 
-    const recovery = reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
     const close = closeWorkspaceRuntimeWithCache(REPO_ROOT, repo.workspaceRuntimeId)
     await Promise.resolve()
     expect(runtimeClose).not.toHaveBeenCalled()
@@ -403,7 +400,7 @@ describe('workspace runtime membership recovery', () => {
       const workspaceRuntimeId = await openWorkspaceRuntimeWithCache(REPO_ROOT)
       seedRepoWithReadModelForTest({ id: REPO_ROOT, branches: [], workspaceRuntimeId })
     })()
-    const recovery = reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
 
     await opening
     await recovery
@@ -441,8 +438,8 @@ describe('workspace runtime membership recovery', () => {
       }),
     })
 
-    const opening = useWorkspacesStore.getState().openWorkspaceMembership(REPO_ROOT)
-    const recovery = reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    const opening = workspacesStore.getState().openWorkspaceMembership(REPO_ROOT)
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
 
     await expect(opening).resolves.toMatchObject({ ok: true, workspaceId: REPO_ROOT })
     await expect(recovery).resolves.toMatchObject({ kind: 'settled' })
@@ -480,13 +477,13 @@ describe('workspace runtime membership recovery', () => {
     })
 
     await expect(
-      reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
     ).resolves.toMatchObject({
       kind: 'settled',
       targets: [{ workspaceId: REMOTE_REPO_ROOT, workspaceRuntimeId: nextRemoteRuntimeId }],
     })
 
-    const workspace = useWorkspacesStore.getState().workspaces[REMOTE_REPO_ROOT]
+    const workspace = workspacesStore.getState().workspaces[REMOTE_REPO_ROOT]
     expect(workspace).toMatchObject({
       workspaceRuntimeId: nextRemoteRuntimeId,
       capability: { kind: 'git', probe: readyProbe },
@@ -520,9 +517,9 @@ describe('workspace runtime membership recovery', () => {
       'workspace.runtimeOpen': async () => ({ ok: true, workspaceRuntimeId: 'repo-runtime-abcdefghijklmnopqrstu' }),
     })
 
-    const recovery = reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState)
+    const recovery = reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState)
     await vi.waitFor(() => {
-      expect(useWorkspacesStore.getState().workspaces[REMOTE_REPO_ROOT]?.workspaceRuntimeId).toBe(nextRemoteRuntimeId)
+      expect(workspacesStore.getState().workspaces[REMOTE_REPO_ROOT]?.workspaceRuntimeId).toBe(nextRemoteRuntimeId)
     })
 
     let recoverySettled = false
@@ -571,7 +568,7 @@ describe('workspace runtime membership recovery', () => {
     })
 
     await expect(
-      reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
     ).resolves.toEqual({
       kind: 'settled',
       targets: [],
@@ -605,7 +602,7 @@ describe('workspace runtime membership recovery', () => {
     })
 
     await expect(
-      reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
     ).resolves.toMatchObject({ kind: 'settled', targets: [] })
     expect(remoteLifecycle).not.toHaveBeenCalled()
   })
@@ -632,7 +629,7 @@ describe('workspace runtime membership recovery', () => {
     })
 
     await expect(
-      reconcileOpenWorkspaceRuntimeMemberships(useWorkspacesStore.setState, useWorkspacesStore.getState),
+      reconcileOpenWorkspaceRuntimeMemberships(workspacesStore.setState, workspacesStore.getState),
     ).resolves.toEqual({
       kind: 'settled',
       targets: [{ workspaceId: REMOTE_REPO_ROOT, workspaceRuntimeId: workspace.workspaceRuntimeId }],

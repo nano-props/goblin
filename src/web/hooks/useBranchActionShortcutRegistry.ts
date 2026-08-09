@@ -1,34 +1,33 @@
-import { useEffect, useRef } from 'react'
-import { type BranchActionSurface, visibleBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
+import { toValue, watch } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
+import { type BranchActionSurface, visibleBranchActionItems } from '#/web/hooks/useBranchActionItems.tsx'
 import { setBranchActionShortcutHandler } from '#/web/keyboard/branch-action-shortcuts.ts'
 import type { BranchActionShortcutAction } from '#/shared/shortcut-definitions.ts'
 
 type BranchActionShortcutItems = Pick<BranchActionSurface, 'mainItems' | 'destructiveItems'>
 
 export function useBranchActionShortcutRegistry(
-  actions: BranchActionShortcutItems,
-  enabled = true,
-  additionalHandlers?: Partial<Record<BranchActionShortcutAction, () => void>>,
+  actions: MaybeRefOrGetter<BranchActionShortcutItems>,
+  enabled: MaybeRefOrGetter<boolean> = true,
+  additionalHandlers?: MaybeRefOrGetter<Partial<Record<BranchActionShortcutAction, () => void>> | undefined>,
 ): void {
-  const visibleItems = enabled ? visibleBranchActionItems(actions) : []
-  const visibleItemsRef = useRef(visibleItems)
-  visibleItemsRef.current = visibleItems
-
-  const additionalHandlersRef = useRef(additionalHandlers)
-  additionalHandlersRef.current = additionalHandlers
-
-  useEffect(() => {
-    if (!enabled) return
-    return setBranchActionShortcutHandler((action) => {
-      const item = visibleItemsRef.current.find((candidate) => candidate.id === action)
-      if (item && !item.disabled) {
-        void item.onSelect()
-        return
-      }
-      const additional = additionalHandlersRef.current?.[action]
-      if (additional) {
-        additional()
-      }
-    })
-  }, [enabled])
+  // This watch owns the lifetime of the global shortcut registration. The
+  // callback reads the latest action projections only when a shortcut fires.
+  watch(
+    () => toValue(enabled),
+    (active, _previous, onCleanup) => {
+      if (!active) return
+      onCleanup(
+        setBranchActionShortcutHandler((action) => {
+          const item = visibleBranchActionItems(toValue(actions)).find((candidate) => candidate.id === action)
+          if (item && !item.disabled) {
+            void item.onSelect()
+            return
+          }
+          toValue(additionalHandlers)?.[action]?.()
+        }),
+      )
+    },
+    { immediate: true },
+  )
 }

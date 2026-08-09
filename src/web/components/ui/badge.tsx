@@ -1,6 +1,6 @@
-import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { Slot } from 'radix-ui'
+import { Primitive } from 'reka-ui'
+import type { FunctionalComponent, HTMLAttributes } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
 import { focusRingVisibleInset } from '#/web/components/ui/focus.ts'
 import { STATUS_TONE_CHIP_CLASS } from '#/web/components/ui/status-tones.ts'
@@ -50,23 +50,34 @@ const badgeVariants = cva(
   },
 )
 
-function Badge({
-  className,
-  variant = 'default',
-  size = 'xs',
-  asChild = false,
-  ...props
-}: React.ComponentProps<'span'> & VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot.Root : 'span'
+type BadgeVariantProps = VariantProps<typeof badgeVariants>
 
+interface BadgeProps extends HTMLAttributes {
+  asChild?: boolean
+  variant?: BadgeVariantProps['variant']
+  size?: BadgeVariantProps['size']
+}
+
+const Badge: FunctionalComponent<BadgeProps> = (props, { attrs, slots }) => {
+  const variant = props.variant ?? 'default'
+  const size = props.size ?? 'xs'
+  const { class: classValue, ...badgeAttrs } = attrs as HTMLAttributes
   return (
-    <Comp
+    <Primitive
+      {...badgeAttrs}
+      as="span"
+      asChild={props.asChild}
       data-slot="badge"
       data-variant={variant}
-      className={cn(badgeVariants({ variant, size }), className)}
-      {...props}
-    />
+      class={cn(badgeVariants({ variant, size }), classValue)}
+    >
+      {slots.default?.()}
+    </Primitive>
   )
 }
 
+Badge.props = ['asChild', 'variant', 'size']
+Badge.inheritAttrs = false
+
 export { Badge, badgeVariants }
+export type { BadgeProps }

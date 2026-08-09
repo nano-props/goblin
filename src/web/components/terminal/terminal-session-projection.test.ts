@@ -18,7 +18,7 @@ const RUNTIME_TARGET = runtimeWorkspacePaneTargetForTest({
 })
 
 describe('terminal session projection helpers', () => {
-  test('projects server session summaries into client hydration input', () => {
+  test('projects server session summaries into client hydration input', async () => {
     const projected = projectServerTerminalSession({
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -63,7 +63,7 @@ describe('terminal session projection helpers', () => {
     })
   })
 
-  test('uses null when the server snapshot is missing', () => {
+  test('uses null when the server snapshot is missing', async () => {
     const projected = projectServerTerminalSession({
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -90,7 +90,7 @@ describe('terminal session projection helpers', () => {
     expect(projected?.hydrateInput.controllerStatus).toBe('connected')
   })
 
-  test('rejects server sessions from a different workspace runtime', () => {
+  test('rejects server sessions from a different workspace runtime', async () => {
     const projected = projectServerTerminalSession({
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: 'repo-runtime-current',
@@ -115,7 +115,7 @@ describe('terminal session projection helpers', () => {
     expect(projected).toBeNull()
   })
 
-  test('uses server session presentation metadata', () => {
+  test('uses server session presentation metadata', async () => {
     const projected = projectServerTerminalSession({
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -146,7 +146,7 @@ describe('terminal session projection helpers', () => {
     })
   })
 
-  test('does not replace server presentation from a second client-side authority', () => {
+  test('does not replace server presentation from a second client-side authority', async () => {
     const projected = projectServerTerminalSession({
       workspaceId: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -174,7 +174,7 @@ describe('terminal session projection helpers', () => {
     })
   })
 
-  test('projects attach results into local controller state for the active attachment', () => {
+  test('projects attach results into local controller state for the active attachment', async () => {
     const projected = projectTerminalStartResultForClient(
       {
         ok: true,
@@ -199,7 +199,7 @@ describe('terminal session projection helpers', () => {
     expect(projected.controllerStatus).toBe('connected')
   })
 
-  test('materializes a prepared create projection with the committed canonical branch', () => {
+  test('materializes a prepared create projection with the committed canonical branch', async () => {
     const projected = projectCreateResultForClient(
       {
         target: RUNTIME_TARGET,
@@ -242,7 +242,7 @@ describe('terminal session projection helpers', () => {
     })
   })
 
-  test('uses authoritative create metadata for the projected session', () => {
+  test('uses authoritative create metadata for the projected session', async () => {
     const projected = projectCreateResultForClient(
       {
         target: RUNTIME_TARGET,
@@ -293,7 +293,7 @@ describe('terminal session projection helpers', () => {
     })
   })
 
-  test('projects restored create metadata for the durable terminal session id', () => {
+  test('projects restored create metadata for the durable terminal session id', async () => {
     const projected = projectCreateResultForClient(
       {
         target: RUNTIME_TARGET,

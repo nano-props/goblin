@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, test } from 'vitest'
-import { createTerminalSizingOptions, preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
+import { preloadTerminalFont } from '#/web/components/terminal/terminal-font.ts'
+import { createTerminalSizingOptions } from '#/web/components/terminal/terminal-geometry.ts'
 
 const originalFonts = document.fonts
 
@@ -13,7 +14,7 @@ afterEach(() => {
 })
 
 describe('terminal-geometry', () => {
-  test('builds the shared xterm sizing options', () => {
+  test('builds the shared xterm sizing options', async () => {
     expect(createTerminalSizingOptions()).toEqual({
       allowProposedApi: true,
       fontFamily: "'Goblin Mono', monospace",

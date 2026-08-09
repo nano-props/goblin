@@ -6,7 +6,7 @@ import {
 } from '#/shared/workspace-pane-tabs-validators.ts'
 
 describe('workspace pane tabs update operation schema', () => {
-  test('accepts every supported operation shape', () => {
+  test('accepts every supported operation shape', async () => {
     expect(isWorkspacePaneTabsUpdateOperation({ type: 'open-static', tabType: 'history' })).toBe(true)
     expect(
       isWorkspacePaneTabsUpdateOperation({
@@ -24,7 +24,7 @@ describe('workspace pane tabs update operation schema', () => {
     ).toBe(true)
   })
 
-  test('rejects unsupported tabs and invalid identities', () => {
+  test('rejects unsupported tabs and invalid identities', async () => {
     expect(isWorkspacePaneTabsUpdateOperation({ type: 'open-static', tabType: 'terminal' })).toBe(false)
     expect(
       isWorkspacePaneTabsUpdateOperation({
@@ -40,7 +40,7 @@ describe('workspace pane tabs update operation schema', () => {
 })
 
 describe('workspace pane filesystem execution target schema', () => {
-  test('rejects a Git worktree on another execution transport', () => {
+  test('rejects a Git worktree on another execution transport', async () => {
     expect(
       v.safeParse(WorkspacePaneFilesystemExecutionTargetSchema, {
         kind: 'git-worktree',

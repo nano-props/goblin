@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
-import { act, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/vue'
+import { defineComponent } from 'vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { useAccessTokenStatus } from '#/web/hooks/useAccessTokenStatus.ts'
@@ -31,7 +33,7 @@ describe('useAccessTokenStatus', () => {
       expect(screen.getByRole('button', { name: 'unauthenticated' })).toBeTruthy()
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       screen.getByRole('button', { name: 'unauthenticated' }).click()
     })
 
@@ -41,7 +43,7 @@ describe('useAccessTokenStatus', () => {
       signal: expect.any(AbortSignal),
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       refreshProbe.resolve({ ok: true })
       await refreshProbe.promise
     })
@@ -63,14 +65,14 @@ describe('useAccessTokenStatus', () => {
     renderInJsdom(<Harness />)
 
     expect(screen.getByRole('button', { name: 'checking' })).toBeTruthy()
-    await act(async () => {
+    await flushTestUpdates(async () => {
       await Promise.resolve()
     })
     expect(fetchServerJson).toHaveBeenCalledWith('/api/whoami', expect.any(Function), {
       signal: expect.any(AbortSignal),
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       await vi.advanceTimersByTimeAsync(15_000)
       await Promise.resolve()
     })
@@ -91,7 +93,7 @@ describe('useAccessTokenStatus', () => {
     })
     expect(window.location.search).toBe('?x=1')
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       login.resolve({ ok: true })
       await login.promise
     })
@@ -103,7 +105,7 @@ describe('useAccessTokenStatus', () => {
     window.history.replaceState({}, '', '/?accessToken=bad-token')
 
     renderInJsdom(<Harness />)
-    await act(async () => {
+    await flushTestUpdates(async () => {
       await Promise.resolve()
     })
 
@@ -114,11 +116,14 @@ describe('useAccessTokenStatus', () => {
   })
 })
 
-function Harness() {
-  const auth = useAccessTokenStatus()
-  return (
-    <button type="button" onClick={auth.refresh}>
-      {auth.state}
-    </button>
-  )
-}
+const Harness = defineComponent(
+  () => {
+    const auth = useAccessTokenStatus()
+    return () => (
+      <button type="button" onClick={auth.refresh}>
+        {auth.state}
+      </button>
+    )
+  },
+  { name: 'AccessTokenStatusTestHarness' },
+)

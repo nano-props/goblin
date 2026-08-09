@@ -1,142 +1,178 @@
-import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
+import { defineComponent } from 'vue'
+import type { Component, ComponentOptions, PropType, VNodeChild } from 'vue'
+import { SelectRoot, SelectValue } from 'reka-ui'
+import { SelectContent, SelectItem, SelectTrigger } from '#/web/components/ui/select.tsx'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
-type SettingsCardProps<T extends ElementType = 'div'> = {
-  as?: T
-  className?: string
-} & Omit<ComponentPropsWithoutRef<T>, 'as' | 'className'>
+type SettingsElement = string | Exclude<Component, ComponentOptions>
+type SettingsItemSize = 'sm' | 'md' | 'lg' | 'xl'
+type SettingsSelectValue = string | number
 
-type SettingsListItemProps<T extends ElementType = 'div'> = {
-  as?: T
-  className?: string
-  size?: 'sm' | 'md' | 'lg' | 'xl'
-  separated?: boolean
-} & Omit<ComponentPropsWithoutRef<T>, 'as' | 'className'>
-export function SettingsGroup({
-  label,
-  hint,
-  action,
-  children,
-}: {
-  label: ReactNode
-  hint?: string
-  action?: ReactNode
-  children: ReactNode
-}) {
-  const compact = useIsCompactUi()
-  return (
-    <section className="w-full space-y-1.5">
-      <div className={cn('flex justify-between gap-3 px-3', compact ? 'items-start' : 'items-center')}>
-        <h2 className="text-[11px] font-medium text-muted-foreground">{label}</h2>
-        {action}
-      </div>
-      {hint && <div className="px-3 text-[11px] leading-snug text-muted-foreground/80">{hint}</div>}
-      {children}
-    </section>
-  )
-}
+export const SettingsGroup = defineComponent(
+  (props: { label: VNodeChild; hint?: string; action?: VNodeChild }, { slots }) => {
+    const compact = useIsCompactUi()
+    return () => (
+      <section class="w-full space-y-1.5">
+        <div class={cn('flex justify-between gap-3 px-3', compact.value ? 'items-start' : 'items-center')}>
+          <h2 class="text-[11px] font-medium text-muted-foreground">{props.label}</h2>
+          {props.action}
+        </div>
+        {props.hint ? <div class="px-3 text-[11px] leading-snug text-muted-foreground/80">{props.hint}</div> : null}
+        {slots.default?.()}
+      </section>
+    )
+  },
+  {
+    name: 'SettingsGroup',
+    props: {
+      label: { required: true },
+      hint: String,
+      action: null,
+    },
+  },
+)
 
-export function SettingsCard<T extends ElementType = 'div'>({ as, className, ...props }: SettingsCardProps<T>) {
-  const Comp = (as ?? 'div') as ElementType
-  return (
-    <Comp
-      className={cn(
-        'w-full overflow-hidden rounded-lg border border-border/60 bg-background/85 shadow-[var(--shadow-inset-highlight)]',
-        className,
-      )}
-      {...props}
-    />
-  )
-}
+export const SettingsCard = defineComponent({
+  name: 'SettingsCard',
+  inheritAttrs: false,
+  props: {
+    as: [String, Object, Function] as PropType<SettingsElement>,
+    class: null,
+  },
+  setup(props, { attrs, slots }) {
+    return () => {
+      const Element = props.as ?? 'div'
+      return (
+        <Element
+          {...attrs}
+          class={cn(
+            'w-full overflow-hidden rounded-lg border border-border/60 bg-background/85 shadow-[var(--shadow-inset-highlight)]',
+            props.class,
+          )}
+        >
+          {slots.default?.()}
+        </Element>
+      )
+    }
+  },
+})
 
-export function SettingsList({ children }: { children: ReactNode }) {
-  return <SettingsCard>{children}</SettingsCard>
-}
+export const SettingsList = defineComponent(
+  (_props, { slots }) =>
+    () => <SettingsCard>{slots.default?.()}</SettingsCard>,
+  { name: 'SettingsList' },
+)
 
-export function SettingsListItem<T extends ElementType = 'div'>({
-  as,
-  className,
-  size = 'md',
-  separated = true,
-  ...props
-}: SettingsListItemProps<T>) {
-  const Comp = (as ?? 'div') as ElementType
-  return (
-    <Comp
-      className={cn(
-        'flex min-w-0 items-center justify-between',
-        separated && '[&+&]:border-t [&+&]:border-separator',
-        size === 'sm' && 'min-h-9 gap-3 px-3 py-1.5',
-        size === 'md' && 'min-h-11 gap-4 px-3 py-2',
-        size === 'lg' && 'min-h-12 gap-4 px-4 py-2.5',
-        size === 'xl' && 'min-h-14 gap-3 px-4 py-2.5',
-        className,
-      )}
-      {...props}
-    />
-  )
-}
+export const SettingsListItem = defineComponent({
+  name: 'SettingsListItem',
+  inheritAttrs: false,
+  props: {
+    as: [String, Object, Function] as PropType<SettingsElement>,
+    class: null,
+    size: String as PropType<SettingsItemSize>,
+    separated: { type: Boolean, default: true },
+  },
+  setup(props, { attrs, slots }) {
+    return () => {
+      const Element = props.as ?? 'div'
+      const size = props.size ?? 'md'
+      return (
+        <Element
+          {...attrs}
+          class={cn(
+            'flex min-w-0 items-center justify-between',
+            props.separated && '[&+&]:border-t [&+&]:border-separator',
+            size === 'sm' && 'min-h-9 gap-3 px-3 py-1.5',
+            size === 'md' && 'min-h-11 gap-4 px-3 py-2',
+            size === 'lg' && 'min-h-12 gap-4 px-4 py-2.5',
+            size === 'xl' && 'min-h-14 gap-3 px-4 py-2.5',
+            props.class,
+          )}
+        >
+          {slots.default?.()}
+        </Element>
+      )
+    }
+  },
+})
 
-export function SettingsRow({
-  controlId,
-  label,
-  hint,
-  control,
-}: {
-  controlId: string
-  label: ReactNode
-  hint?: string
-  control: ReactNode
-}) {
-  const compact = useIsCompactUi()
-  return (
-    <SettingsListItem size="lg" className={cn(compact && 'flex-col items-stretch justify-start gap-2')}>
-      <div className="min-w-0 flex-1 overflow-hidden">
-        <label className="block truncate text-sm text-foreground" htmlFor={controlId}>
-          {label}
-        </label>
-        {hint && <div className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{hint}</div>}
-      </div>
-      <div className={cn('min-w-0', compact ? 'w-full' : 'shrink-0')}>{control}</div>
-    </SettingsListItem>
-  )
-}
+export const SettingsRow = defineComponent(
+  (props: { controlId: string; label: VNodeChild; hint?: string; control: VNodeChild }) => {
+    const compact = useIsCompactUi()
+    return () => (
+      <SettingsListItem size="lg" class={cn(compact.value && 'flex-col items-stretch justify-start gap-2')}>
+        <div class="min-w-0 flex-1 overflow-hidden">
+          <label class="block truncate text-sm text-foreground" for={props.controlId}>
+            {props.label}
+          </label>
+          {props.hint ? <div class="mt-0.5 text-[11px] leading-snug text-muted-foreground">{props.hint}</div> : null}
+        </div>
+        <div class={cn('min-w-0', compact.value ? 'w-full' : 'shrink-0')}>{props.control}</div>
+      </SettingsListItem>
+    )
+  },
+  {
+    name: 'SettingsRow',
+    props: {
+      controlId: { type: String, required: true },
+      label: { required: true },
+      hint: String,
+      control: { required: true },
+    },
+  },
+)
 
-interface SettingsSelectProps<T extends string | number> {
-  id: string
-  value: T
-  options: { value: T; label: string; icon?: ReactNode }[]
-  onChange: (value: T) => void
-}
-
-export function SettingsSelect<T extends string | number>({ id, value, options, onChange }: SettingsSelectProps<T>) {
-  const compact = useIsCompactUi()
-  const optionsSignature = options.map((opt) => `${String(opt.value)}:${opt.label}`).join('|')
-  return (
-    <Select
-      key={optionsSignature}
-      value={String(value)}
-      onValueChange={(v) => {
-        const matched = options.find((o) => String(o.value) === v)
-        if (matched) onChange(matched.value)
-      }}
-    >
-      <SelectTrigger
-        id={id}
-        className={cn('h-8 rounded-md bg-control px-2.5 text-xs shadow-none', compact ? 'w-full min-w-0' : 'min-w-36')}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((opt) => (
-          <SelectItem key={String(opt.value)} value={String(opt.value)} textValue={opt.label}>
-            {opt.icon}
-            {opt.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
+export const SettingsSelect = defineComponent(
+  (props: {
+    id: string
+    value: SettingsSelectValue
+    options: Array<{ value: SettingsSelectValue; label: string; icon?: VNodeChild }>
+    onChange: (value: SettingsSelectValue) => void
+  }) => {
+    const compact = useIsCompactUi()
+    return () => {
+      const optionsSignature = props.options.map((option) => `${String(option.value)}:${option.label}`).join('|')
+      return (
+        <SelectRoot
+          key={optionsSignature}
+          modelValue={String(props.value)}
+          onUpdate:modelValue={(value) => {
+            const matched = props.options.find((option) => String(option.value) === value)
+            if (matched) props.onChange(matched.value)
+          }}
+        >
+          <SelectTrigger
+            id={props.id}
+            class={cn(
+              'h-8 rounded-md bg-control px-2.5 text-xs shadow-none',
+              compact.value ? 'w-full min-w-0' : 'min-w-36',
+            )}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {props.options.map((option) => (
+              <SelectItem key={String(option.value)} value={String(option.value)} textValue={option.label}>
+                {option.icon}
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </SelectRoot>
+      )
+    }
+  },
+  {
+    name: 'SettingsSelect',
+    props: {
+      id: { type: String, required: true },
+      value: { type: [String, Number] as PropType<SettingsSelectValue>, required: true },
+      options: {
+        type: Array as PropType<Array<{ value: SettingsSelectValue; label: string; icon?: VNodeChild }>>,
+        required: true,
+      },
+      onChange: { type: Function as PropType<(value: SettingsSelectValue) => void>, required: true },
+    },
+  },
+)

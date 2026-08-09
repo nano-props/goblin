@@ -7,10 +7,10 @@ import {
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen } from '@testing-library/vue'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchFilterAction, CreateWorktreeRowAction } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -26,7 +26,7 @@ beforeEach(() => {
 })
 
 describe('RepoToolbarActions', () => {
-  test('enables the branch filter from the React Query projection branch count', () => {
+  test('enables the branch filter from the TanStack Query projection branch count', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -38,15 +38,15 @@ describe('RepoToolbarActions', () => {
     })
 
     renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <BranchFilterAction repoId={REPO_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(screen.getByLabelText('branches.filter-label').hasAttribute('disabled')).toBe(false)
   })
 
-  test('keeps the branch filter disabled when neither store nor query has branches', () => {
+  test('keeps the branch filter disabled when neither store nor query has branches', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -54,15 +54,15 @@ describe('RepoToolbarActions', () => {
     })
 
     renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <BranchFilterAction repoId={REPO_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(screen.getByLabelText('branches.filter-label').hasAttribute('disabled')).toBe(true)
   })
 
-  test('disables create worktree entry from server branch operation projection', () => {
+  test('disables create worktree entry from server branch operation projection', async () => {
     const repo = seedRepoShellForTest({ id: REPO_ID })
     setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'create-worktree', phase: 'running' })],
@@ -71,9 +71,9 @@ describe('RepoToolbarActions', () => {
     })
 
     renderInJsdom(
-      <QueryClientProvider client={appQueryClient}>
+      <VueQueryClientScope client={appQueryClient}>
         <CreateWorktreeRowAction repoId={REPO_ID} />
-      </QueryClientProvider>,
+      </VueQueryClientScope>,
     )
 
     expect(screen.getByTestId('create-worktree-button').hasAttribute('disabled')).toBe(true)

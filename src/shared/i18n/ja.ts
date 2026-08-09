@@ -487,7 +487,7 @@ export const ja: Record<DictKey, string> = {
   'worktree-bootstrap.summary.setup': 'setup を実行しました: {command}',
   'action.confirm-push-protected-title': '{branch} にプッシュしますか？',
   'action.confirm-push-protected-body':
-    'このまま <branch>{branch}</branch> に直接プッシュしようとしています。通常はプルリクエスト経由が望ましいですが、続行しますか？',
+    'このまま {branch} に直接プッシュしようとしています。通常はプルリクエスト経由が望ましいですが、続行しますか？',
   'action.confirm-push-confirm': 'プッシュを続行',
   'action.confirm-delete-branch-title': 'ブランチを削除しますか？',
   'action.confirm-delete-branch-body': 'ローカルブランチを削除します：',

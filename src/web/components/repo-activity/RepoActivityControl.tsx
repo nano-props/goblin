@@ -1,28 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { Check, Loader2, RefreshCw } from 'lucide-react'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { useI18nStore, useT } from '#/web/stores/i18n.ts'
-import { Tip } from '#/web/components/Tip.tsx'
+import { computed, defineComponent, onScopeDispose, ref, watch } from 'vue'
+import type { PropType } from 'vue'
+import { Check, Loader2, RefreshCw } from '@lucide/vue'
+import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
-import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
-import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
+import { Tip } from '#/web/components/Tip.tsx'
 import type { RepoActivity, RepoActivityProjectionRepo, RepoCompletion } from '#/web/components/repo-activity/model.ts'
 import {
   getRepoActivity,
   getRepoActivityControlView,
   repoOperationsSnapshotHasPrimaryRefresh,
 } from '#/web/components/repo-activity/model.ts'
+import { Button } from '#/web/components/ui/button.tsx'
 import { useVisibleLoadingValue } from '#/web/hooks/useLoadingVisibility.ts'
 import { cn } from '#/web/lib/cn.ts'
-import { Button } from '#/web/components/ui/button.tsx'
-import { repoEventActionSuccessLabel } from '#/web/stores/workspaces/action-labels.ts'
 import { formatRelativeTime } from '#/web/lib/dates.ts'
-import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-queries.ts'
-import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import { i18nStore } from '#/web/stores/i18n.ts'
+import { repoEventActionSuccessLabel } from '#/web/stores/workspaces/action-labels.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
+import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
+import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 
 interface Props {
   repoId: WorkspaceId
@@ -32,218 +34,213 @@ const COMPLETION_VISIBLE_MS = 1500
 
 type RepoActivityControlRepo = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> & RepoActivityProjectionRepo
 
-function useRepoActivityControlPresentation(
-  repo: RepoActivityProjectionRepo,
-  serverOperations?: RepoOperationsSnapshot,
-) {
-  const rawActivity = getRepoActivity(repo, serverOperations)
-  const rawActivityKey = rawActivity
-    ? `${rawActivity.kind}:${rawActivity.labelKey}:${JSON.stringify(rawActivity.labelParams ?? {})}`
-    : null
-  const stableRawActivity = useMemo(() => rawActivity, [rawActivityKey])
-  return useVisibleLoadingValue(stableRawActivity)
-}
-
-function repoActivityControlRepoEqual(
-  a: RepoActivityControlRepo | undefined,
-  b: RepoActivityControlRepo | undefined,
-): boolean {
-  return (
-    a === b ||
-    (!!a && !!b && a.id === b.id && a.workspaceRuntimeId === b.workspaceRuntimeId && a.branchAction === b.branchAction)
-  )
-}
-
-export function RepoActivityControl({ repoId }: Props) {
-  const repo = useStoreWithEqualityFn(
-    useWorkspacesStore,
-    (s): RepoActivityControlRepo | undefined => {
-      const repo = s.workspaces[repoId]
-      return repo?.capability.kind === 'git'
+export const RepoActivityControl = defineComponent(
+  (props: Props) => {
+    const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
+    const repo = computed<RepoActivityControlRepo | undefined>(() => {
+      const workspace = workspaces.value[props.repoId]
+      return workspace?.capability.kind === 'git'
         ? {
-            id: repo.id,
-            workspaceRuntimeId: repo.workspaceRuntimeId,
-            branchAction: repo.capability.git.operations.branchAction,
+            id: workspace.id,
+            workspaceRuntimeId: workspace.workspaceRuntimeId,
+            branchAction: workspace.capability.git.operations.branchAction,
           }
         : undefined
-    },
-    repoActivityControlRepoEqual,
-  )
-  if (!repo) return null
-  return <RepoActivityControlView repo={repo} />
-}
+    })
+    return () => (repo.value ? <RepoActivityControlView repo={repo.value} /> : null)
+  },
+  { name: 'RepoActivityControl', props: ['repoId'] },
+)
 
-function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
-  const operationsReadModel = useRepoOperationsReadModel(repo.id, repo.workspaceRuntimeId)
-  const operationsSnapshot = operationsReadModel.data
-  const visibleActivity = useRepoActivityControlPresentation(repo, operationsSnapshot)
-  const completion = useRepoCompletion(repo.id)
-  const view = getRepoActivityControlView({
-    visibleActivity,
-    completion,
-    primaryRefreshBusy: repoOperationsSnapshotHasPrimaryRefresh(operationsSnapshot),
-  })
+const RepoActivityControlView = defineComponent<{ repo: RepoActivityControlRepo }>({
+  name: 'RepoActivityControlView',
+  inheritAttrs: false,
+  props: ['repo'],
+  setup(props) {
+    const t = useT()
+    const operationsReadModel = useRepoOperationsReadModel(
+      () => props.repo.id,
+      () => props.repo.workspaceRuntimeId,
+    )
+    const rawActivity = computed(() => getRepoActivity(props.repo, operationsReadModel.data.value))
+    const visibleActivity = useVisibleLoadingValue(rawActivity)
+    const completion = useRepoCompletion(() => props.repo.id)
 
-  switch (view.kind) {
-    case 'activity':
-      return <RepoActivityIndicator activity={view.activity} />
-    case 'completion':
-      return <RepoCompletionIndicator completion={view.completion} />
-    case 'refresh-button':
-      return (
-        <RepoRefreshButton
-          repo={repo}
-          primaryRefreshBusy={view.primaryRefreshBusy}
-          lastFetchAt={operationsSnapshot?.lastFetchAt ?? null}
-        />
-      )
-  }
-}
+    return () => {
+      const operationsSnapshot = operationsReadModel.data.value
+      const view = getRepoActivityControlView({
+        visibleActivity: visibleActivity.value,
+        completion: completion.value,
+        primaryRefreshBusy: repoOperationsSnapshotHasPrimaryRefresh(operationsSnapshot),
+      })
 
-function useRepoCompletion(repoId: WorkspaceId): RepoCompletion | null {
-  const events = useWorkspacesStore((s) => {
-    const workspace = s.workspaces[repoId]
+      switch (view.kind) {
+        case 'activity': {
+          const activityLabelKey = view.activity.labelKey
+          const label = t(activityLabelKey, view.activity.labelParams)
+          return <RepoActivityIndicator activity={view.activity} label={label} />
+        }
+        case 'completion': {
+          const completionLabelKey = view.completion.labelKey
+          const label = t(completionLabelKey, view.completion.labelParams)
+          return <RepoCompletionIndicator completion={view.completion} label={label} />
+        }
+        case 'refresh-button':
+          return (
+            <RepoRefreshButton
+              repo={props.repo}
+              primaryRefreshBusy={view.primaryRefreshBusy}
+              lastFetchAt={operationsSnapshot?.lastFetchAt ?? null}
+            />
+          )
+      }
+    }
+  },
+})
+
+function useRepoCompletion(repoId: () => WorkspaceId) {
+  const completion = ref<RepoCompletion | null>(null)
+  const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
+  const events = computed(() => {
+    const workspace = workspaces.value[repoId()]
     return workspace?.capability.kind === 'git' ? workspace.capability.git.events : null
   })
-  const [completion, setCompletion] = useState<RepoCompletion | null>(null)
-  const latestEventIdRef = useRef(0)
+  let currentRepoId: WorkspaceId | null = null
+  let latestEventId = 0
+  let completionTimer: number | null = null
 
-  useEffect(() => {
-    latestEventIdRef.current = 0
-    setCompletion(null)
-  }, [repoId])
+  function clearCompletionTimer(): void {
+    if (completionTimer !== null) window.clearTimeout(completionTimer)
+    completionTimer = null
+  }
 
-  useEffect(() => {
-    if (!events) return
-    const latestSeen = latestEventIdRef.current
-    let nextLatestSeen = latestSeen
-    let nextCompletion: RepoCompletion | null = null
-    for (const event of events) {
-      nextLatestSeen = Math.max(nextLatestSeen, event.id)
-      if (event.id <= latestSeen) continue
-      if (event.kind !== 'result' || !event.result.ok) continue
-      const label = repoEventActionSuccessLabel(event.action)
-      if (label) nextCompletion = { id: event.id, ...label }
-    }
-    latestEventIdRef.current = nextLatestSeen
-    if (nextCompletion) setCompletion(nextCompletion)
-  }, [events])
+  // Completion is an event-stream projection. The watcher advances its cursor
+  // once per authoritative event array and owns the short visibility timer.
+  watch(
+    [repoId, events],
+    ([nextRepoId, nextEvents]) => {
+      if (currentRepoId !== nextRepoId) {
+        currentRepoId = nextRepoId
+        latestEventId = 0
+        completion.value = null
+        clearCompletionTimer()
+      }
+      if (!nextEvents) return
+      let nextLatestEventId = latestEventId
+      let nextCompletion: RepoCompletion | null = null
+      for (const event of nextEvents) {
+        nextLatestEventId = Math.max(nextLatestEventId, event.id)
+        if (event.id <= latestEventId || event.kind !== 'result' || !event.result.ok) continue
+        const label = repoEventActionSuccessLabel(event.action)
+        if (label) nextCompletion = { id: event.id, ...label }
+      }
+      latestEventId = nextLatestEventId
+      if (!nextCompletion) return
+      completion.value = nextCompletion
+      clearCompletionTimer()
+      const completionId = nextCompletion.id
+      completionTimer = window.setTimeout(() => {
+        if (completion.value?.id === completionId) completion.value = null
+        completionTimer = null
+      }, COMPLETION_VISIBLE_MS)
+    },
+    { immediate: true },
+  )
 
-  useEffect(() => {
-    if (!completion) return
-    const timer = window.setTimeout(() => {
-      setCompletion((current) => (current?.id === completion.id ? null : current))
-    }, COMPLETION_VISIBLE_MS)
-    return () => window.clearTimeout(timer)
-  }, [completion])
-
+  onScopeDispose(clearCompletionTimer)
   return completion
 }
 
-function RepoRefreshButton({
-  repo,
-  primaryRefreshBusy,
-  lastFetchAt,
-}: {
-  repo: RepoActivityControlRepo
-  primaryRefreshBusy: boolean
-  lastFetchAt: number | null
-}) {
-  const t = useT()
-  const lang = useI18nStore((s) => s.lang)
-  const label = t('action.refresh')
+const RepoRefreshButton = defineComponent(
+  (props: { repo: RepoActivityControlRepo; primaryRefreshBusy: boolean; lastFetchAt: number | null }) => {
+    const t = useT()
+    const lang = useStoreSelector(i18nStore, (state) => state.lang)
 
-  async function handleSync(): Promise<void> {
-    const workspaceRuntimeId = repo.workspaceRuntimeId
-    const outcome = await runWorkspaceRefresh(
-      { get: useWorkspacesStore.getState, set: useWorkspacesStore.setState },
-      repo.id,
-      { workspaceRuntimeId },
-    )
-    presentWorkspaceRefreshOutcome(outcome, t)
-  }
+    async function refresh(): Promise<void> {
+      const outcome = await runWorkspaceRefresh(
+        { get: workspacesStore.getState, set: workspacesStore.setState },
+        props.repo.id,
+        { workspaceRuntimeId: props.repo.workspaceRuntimeId },
+      )
+      presentWorkspaceRefreshOutcome(outcome, t)
+    }
 
-  const lastSyncedAt = latestRepoSyncTime({ lastFetchAt })
-  const lastSyncedAtIso = lastSyncedAt === null ? null : new Date(lastSyncedAt).toISOString()
-  const lastSyncedLabel = lastSyncedAtIso ? formatRelativeTime(lastSyncedAtIso, lang) : null
+    return () => {
+      const label = t('action.refresh')
+      const lastSyncedAt = latestRepoSyncTime({ lastFetchAt: props.lastFetchAt })
+      const lastSyncedAtIso = lastSyncedAt === null ? null : new Date(lastSyncedAt).toISOString()
+      const lastSyncedLabel = lastSyncedAtIso ? formatRelativeTime(lastSyncedAtIso, lang.value) : null
+      const tooltipLabel = `${t('workspace-picker.tooltip.last-sync-label')} ${
+        lastSyncedLabel ?? t('workspace-picker.tooltip.last-sync-unknown')
+      }`
 
-  // The picker no longer surfaces last-sync info on the tab itself,
-  // so the refresh button tooltip is the primary place users check
-  // how stale the view is. We show "Last synced X ago" when we have
-  // a timestamp, and fall back to the action title before the first
-  // sync has happened. Single-line label so the font matches the
-  // rest of the repo chrome tooltips.
-  const tooltipLabel = lastSyncedLabel
-    ? `${t('workspace-picker.tooltip.last-sync-label')} ${lastSyncedLabel}`
-    : `${t('workspace-picker.tooltip.last-sync-label')} ${t('workspace-picker.tooltip.last-sync-unknown')}`
+      return (
+        <Tip label={tooltipLabel}>
+          <AsyncButton
+            variant="ghost"
+            size="icon-lg"
+            disabled={props.primaryRefreshBusy}
+            loading={props.primaryRefreshBusy}
+            action={refresh}
+            aria-label={label}
+          >
+            {({ busy }: { busy: boolean }) => <RefreshCw class={busy ? 'animate-spin' : ''} />}
+          </AsyncButton>
+        </Tip>
+      )
+    }
+  },
+  {
+    name: 'RepoRefreshButton',
+    props: {
+      repo: { type: Object as PropType<RepoActivityControlRepo>, required: true },
+      primaryRefreshBusy: Boolean,
+      lastFetchAt: { type: Number as PropType<number | null>, default: null },
+    },
+  },
+)
 
+function RepoActivityIndicator({ activity: _activity, label }: { activity: RepoActivity; label: string }) {
   return (
-    <Tip label={tooltipLabel}>
-      <AsyncButton
-        variant="ghost"
-        size="icon-lg"
-        disabled={primaryRefreshBusy}
-        loading={primaryRefreshBusy}
-        onClick={handleSync}
-        aria-label={label}
-      >
-        {({ busy }) => (
-          <>
-            <RefreshCw className={busy ? 'animate-spin' : ''} />
-          </>
-        )}
-      </AsyncButton>
-    </Tip>
-  )
-}
-
-function RepoActivityIndicator({ activity }: { activity: RepoActivity }) {
-  const t = useT()
-  const label = t(activity.labelKey, activity.labelParams)
-
-  return (
-    <div className="flex items-center gap-2">
+    <div class="flex items-center gap-2">
       <Tip label={label}>
-        <span className="inline-flex">
+        <span class="inline-flex">
           <Button
             variant="ghost"
             size="icon-lg"
             disabled
-            aria-busy
+            aria-busy="true"
             aria-label={label}
-            className={cn('bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground')}
+            class={cn('bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground')}
           >
-            <Loader2 className="animate-spin" />
+            <Loader2 class="animate-spin" />
           </Button>
         </span>
       </Tip>
-      <span className="sr-only" role="status">
+      <span class="sr-only" role="status">
         {label}
       </span>
     </div>
   )
 }
 
-function RepoCompletionIndicator({ completion }: { completion: RepoCompletion }) {
-  const t = useT()
-  const label = t(completion.labelKey, completion.labelParams)
-
+function RepoCompletionIndicator({ completion: _completion, label }: { completion: RepoCompletion; label: string }) {
   return (
-    <div className="flex items-center gap-2">
+    <div class="flex items-center gap-2">
       <Tip label={label}>
-        <span className="inline-flex">
+        <span class="inline-flex">
           <Button
             variant="ghost"
             size="icon-lg"
             disabled
             aria-label={label}
-            className="border-success-border bg-success-surface text-success hover:bg-success-surface hover:text-success"
+            class="border-success-border bg-success-surface text-success hover:bg-success-surface hover:text-success"
           >
             <Check />
           </Button>
         </span>
       </Tip>
-      <span className="sr-only" role="status">
+      <span class="sr-only" role="status">
         {label}
       </span>
     </div>

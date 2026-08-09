@@ -1,6 +1,6 @@
 import { DICTS } from '#/shared/i18n/dictionaries.ts'
 import { resolvePreferredLang } from '#/shared/i18n/resolve-lang.ts'
-import type { Lang, LangPref } from '#/shared/api-types.ts'
+import type { Lang, LangPref } from '#/shared/settings.ts'
 import type { I18nSnapshot } from '#/shared/api-types.ts'
 
 function cloneI18nDict(lang: Lang): Record<string, string> {

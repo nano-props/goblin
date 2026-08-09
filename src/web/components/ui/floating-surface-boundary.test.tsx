@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
 import { userEvent } from '@testing-library/user-event'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/vue'
+import { PopoverTrigger } from 'reka-ui'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { FloatingSurfaceBoundary } from '#/web/components/ui/floating-surface-boundary.tsx'
-import { Popover, PopoverContent, PopoverTrigger } from '#/web/components/ui/popover.tsx'
-import { useState } from 'react'
+import { Popover, PopoverContent } from '#/web/components/ui/popover.tsx'
+import { defineComponent, ref } from 'vue'
 
 beforeEach(() => {
   const win = window as typeof window & { PointerEvent?: typeof PointerEvent }
@@ -74,69 +75,78 @@ describe('FloatingSurfaceBoundary', () => {
   })
 })
 
-function UncontrolledPopoverBoundary() {
-  const [pinned, setPinned] = useState(false)
+const UncontrolledPopoverBoundary = defineComponent(
+  () => {
+    const pinned = ref(false)
 
-  return (
-    <FloatingSurfaceBoundary onPinnedChange={setPinned}>
-      <div data-testid="pin-state">{pinned ? 'pinned' : 'unpinned'}</div>
-      <Popover>
-        <PopoverTrigger asChild>
-          <button type="button">Toggle menu</button>
-        </PopoverTrigger>
-        <PopoverContent>
-          <div>Menu content</div>
-        </PopoverContent>
-      </Popover>
-    </FloatingSurfaceBoundary>
-  )
-}
-
-function UnmountOpenPopoverBoundary() {
-  const [mounted, setMounted] = useState(true)
-  const [pinned, setPinned] = useState(false)
-
-  return (
-    <FloatingSurfaceBoundary onPinnedChange={setPinned}>
-      <div data-testid="pin-state">{pinned ? 'pinned' : 'unpinned'}</div>
-      <button type="button" onClick={() => setMounted(false)}>
-        Unmount menu
-      </button>
-      {mounted ? (
-        <Popover open onOpenChange={() => {}}>
+    return () => (
+      <FloatingSurfaceBoundary onPinnedChange={(nextPinned) => (pinned.value = nextPinned)}>
+        <div data-testid="pin-state">{pinned.value ? 'pinned' : 'unpinned'}</div>
+        <Popover>
           <PopoverTrigger asChild>
-            <button type="button">Open menu</button>
+            <button type="button">Toggle menu</button>
+          </PopoverTrigger>
+          <PopoverContent>
+            <div>Menu content</div>
+          </PopoverContent>
+        </Popover>
+      </FloatingSurfaceBoundary>
+    )
+  },
+  { name: 'UncontrolledPopoverBoundary' },
+)
+
+const UnmountOpenPopoverBoundary = defineComponent(
+  () => {
+    const mounted = ref(true)
+    const pinned = ref(false)
+
+    return () => (
+      <FloatingSurfaceBoundary onPinnedChange={(nextPinned) => (pinned.value = nextPinned)}>
+        <div data-testid="pin-state">{pinned.value ? 'pinned' : 'unpinned'}</div>
+        <button type="button" onClick={() => (mounted.value = false)}>
+          Unmount menu
+        </button>
+        {mounted.value ? (
+          <Popover open onOpenChange={() => {}}>
+            <PopoverTrigger asChild>
+              <button type="button">Open menu</button>
+            </PopoverTrigger>
+          </Popover>
+        ) : null}
+      </FloatingSurfaceBoundary>
+    )
+  },
+  { name: 'UnmountOpenPopoverBoundary' },
+)
+
+const MultiplePopoverBoundary = defineComponent(
+  () => {
+    const firstOpen = ref(false)
+    const secondOpen = ref(false)
+    const pinned = ref(false)
+
+    return () => (
+      <FloatingSurfaceBoundary onPinnedChange={(nextPinned) => (pinned.value = nextPinned)}>
+        <div data-testid="pin-state">{pinned.value ? 'pinned' : 'unpinned'}</div>
+        <button type="button" onClick={() => (firstOpen.value = !firstOpen.value)}>
+          {firstOpen.value ? 'Close first menu' : 'Open first menu'}
+        </button>
+        <button type="button" onClick={() => (secondOpen.value = !secondOpen.value)}>
+          {secondOpen.value ? 'Close second menu' : 'Open second menu'}
+        </button>
+        <Popover open={firstOpen.value} onOpenChange={(nextOpen) => (firstOpen.value = nextOpen)}>
+          <PopoverTrigger asChild>
+            <button type="button">First menu trigger</button>
           </PopoverTrigger>
         </Popover>
-      ) : null}
-    </FloatingSurfaceBoundary>
-  )
-}
-
-function MultiplePopoverBoundary() {
-  const [firstOpen, setFirstOpen] = useState(false)
-  const [secondOpen, setSecondOpen] = useState(false)
-  const [pinned, setPinned] = useState(false)
-
-  return (
-    <FloatingSurfaceBoundary onPinnedChange={setPinned}>
-      <div data-testid="pin-state">{pinned ? 'pinned' : 'unpinned'}</div>
-      <button type="button" onClick={() => setFirstOpen((open) => !open)}>
-        {firstOpen ? 'Close first menu' : 'Open first menu'}
-      </button>
-      <button type="button" onClick={() => setSecondOpen((open) => !open)}>
-        {secondOpen ? 'Close second menu' : 'Open second menu'}
-      </button>
-      <Popover open={firstOpen} onOpenChange={setFirstOpen}>
-        <PopoverTrigger asChild>
-          <button type="button">First menu trigger</button>
-        </PopoverTrigger>
-      </Popover>
-      <Popover open={secondOpen} onOpenChange={setSecondOpen}>
-        <PopoverTrigger asChild>
-          <button type="button">Second menu trigger</button>
-        </PopoverTrigger>
-      </Popover>
-    </FloatingSurfaceBoundary>
-  )
-}
+        <Popover open={secondOpen.value} onOpenChange={(nextOpen) => (secondOpen.value = nextOpen)}>
+          <PopoverTrigger asChild>
+            <button type="button">Second menu trigger</button>
+          </PopoverTrigger>
+        </Popover>
+      </FloatingSurfaceBoundary>
+    )
+  },
+  { name: 'MultiplePopoverBoundary' },
+)

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { FilePathText } from '#/web/components/FilePathText.tsx'
 import { ellipsizeLeftPathByWidth } from '#/web/lib/display-path.ts'
 
@@ -61,7 +61,7 @@ describe('FilePathText', () => {
     Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth')
   })
 
-  test('measures actual rendered width instead of estimating by character count', () => {
+  test('measures actual rendered width instead of estimating by character count', async () => {
     vi.spyOn(window, 'getComputedStyle').mockImplementation(
       () =>
         ({
@@ -81,6 +81,7 @@ describe('FilePathText', () => {
 
     const path = 'src/example/WideWide/iiiiiiii.ts'
     const { container } = renderInJsdom(<FilePathText path={path} />)
+    await flushTestUpdates(() => {})
 
     const span = container.querySelector('span')
     expect(span).not.toBeNull()
@@ -91,7 +92,7 @@ describe('FilePathText', () => {
     expect(span?.getAttribute('title')).toBe(path)
   })
 
-  test('recomputes when typography changes without a width change', () => {
+  test('recomputes when typography changes without a width change', async () => {
     vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
       const isTight = (element as HTMLElement).className.includes('tight')
       return {
@@ -110,12 +111,14 @@ describe('FilePathText', () => {
     } as unknown as CanvasRenderingContext2D)
 
     const path = 'src/example/deeply/nested/file.ts'
-    const { container, rerender } = renderInJsdom(<FilePathText path={path} className="wide" />)
+    const { container, rerender } = renderInJsdom(<FilePathText path={path} class="wide" />)
+    await flushTestUpdates(() => {})
 
     const before = container.querySelector('span')?.textContent
     expect(before).toBe('/file.ts')
 
-    rerender(<FilePathText path={path} className="tight" />)
+    await rerender(<FilePathText path={path} class="tight" />)
+    await flushTestUpdates(() => {})
 
     const after = container.querySelector('span')?.textContent
     expect(after).toBe(ellipsizeLeftPathByWidth(path, 112, (text) => text.length * 10))

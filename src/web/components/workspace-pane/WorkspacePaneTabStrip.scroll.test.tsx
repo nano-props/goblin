@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
-import { useState } from 'react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { defineComponent, shallowRef } from 'vue'
 import { describe, expect, test, vi } from 'vitest'
 import {
   TestWorkspacePaneTabStrip,
@@ -15,7 +15,7 @@ import {
 } from '#/web/test-utils/workspace-pane-tab-strip.tsx'
 
 describe('WorkspacePaneTabStrip scroll', () => {
-  test('scrolls the active tab into view when selection changes', () => {
+  test('scrolls the active tab into view when selection changes', async () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -43,7 +43,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
       },
     })
 
-    rerender(
+    await rerender(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
@@ -70,7 +70,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
     })
   })
 
-  test('positions the active tab without animation on initial mount', () => {
+  test('positions the active tab without animation on initial mount', async () => {
     setTabStripScrollGeometry({
       viewport: { left: 0, right: 200 },
       tabs: {
@@ -94,6 +94,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
         onReorder={() => {}}
       />,
     )
+    await flushTestUpdates(() => {})
 
     const scrollIntoView = scrollIntoViewMock()
     const activeTab = workspacePaneTabScrollTarget('workspace-workspace-pane-tab')
@@ -102,7 +103,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
     expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'auto' })
   })
 
-  test('scrolls a left-clipped active tab to the start edge', () => {
+  test('scrolls a left-clipped active tab to the start edge', async () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -128,7 +129,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
       },
     })
 
-    rerender(
+    await rerender(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
@@ -151,7 +152,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
     expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'start', block: 'nearest', behavior: 'smooth' })
   })
 
-  test('scrolls the new terminal button into view before creating a terminal', () => {
+  test('scrolls the new terminal button into view before creating a terminal', async () => {
     const onNew = vi.fn()
     setTabStripScrollGeometry({
       viewport: { left: 0, right: 200 },
@@ -175,12 +176,13 @@ describe('WorkspacePaneTabStrip scroll', () => {
         onReorder={() => {}}
       />,
     )
+    await flushTestUpdates(() => {})
     const scrollIntoView = scrollIntoViewMock()
     scrollIntoView.mockClear()
     const newButton = document.body.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
     expect(newButton).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       newButton?.click()
     })
 
@@ -190,7 +192,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
     expect(onNew).toHaveBeenCalledTimes(1)
   })
 
-  test('does not scroll right when tab data refreshes without changing the active tab', () => {
+  test('does not scroll right when tab data refreshes without changing the active tab', async () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -206,6 +208,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
         onReorder={() => {}}
       />,
     )
+    await flushTestUpdates(() => {})
     const scrollIntoView = scrollIntoViewMock()
     scrollIntoView.mockClear()
     setTabStripScrollGeometry({
@@ -216,7 +219,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
       },
     })
 
-    rerender(
+    await rerender(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
@@ -235,7 +238,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
     expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
-  test('positions an unseen workspace tab target without animation', () => {
+  test('positions an unseen workspace tab target without animation', async () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree-a"
@@ -262,7 +265,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
       },
     })
 
-    rerender(
+    await rerender(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree-b"
         workspacePaneTabTargetKey="/repo\0branch\0feature-b"
@@ -285,7 +288,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
     expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'auto' })
   })
 
-  test('positions a delayed active tab without animation after the target changes', () => {
+  test('positions a delayed active tab without animation after the target changes', async () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree-a"
@@ -302,7 +305,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
     const scrollIntoView = scrollIntoViewMock()
     scrollIntoView.mockClear()
 
-    rerender(
+    await rerender(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree-b"
         workspacePaneTabTargetKey="/repo\0branch\0feature-b"
@@ -327,7 +330,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
       },
     })
 
-    rerender(
+    await rerender(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree-b"
         workspacePaneTabTargetKey="/repo\0branch\0feature-b"
@@ -350,7 +353,62 @@ describe('WorkspacePaneTabStrip scroll', () => {
     expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'auto' })
   })
 
-  test('restores horizontal scroll position for each workspace tab target', () => {
+  test('applies an unseen target baseline before revealing its active tab', async () => {
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalFilesystemTargetKey="/repo\0/repo/worktree-a"
+        workspacePaneTabTargetKey="/repo\0branch\0feature-a"
+        workspacePaneId="workspace"
+        sessions={[session({ terminalSessionId: 'term-aaaaaaaaaaaaaaaaaaaa1', title: 'term-a1', selected: true })]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+    await flushTestUpdates(() => {})
+
+    const viewport = workspacePaneTabViewport()
+    await flushTestUpdates(() => {
+      viewport.scrollLeft = 180
+      viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
+    })
+    setTabStripScrollGeometry({
+      viewport: { left: 0, right: 200 },
+      newButton: { left: 230, right: 258 },
+      tabs: {
+        'workspace-workspace-pane-tab-1': { left: 120, right: 220 },
+      },
+    })
+    const scrollIntoView = scrollIntoViewMock()
+    scrollIntoView.mockClear()
+    scrollIntoView.mockImplementation(() => {
+      viewport.scrollLeft = 96
+    })
+
+    await rerender(
+      <TestWorkspacePaneTabStrip
+        terminalFilesystemTargetKey="/repo\0/repo/worktree-b"
+        workspacePaneTabTargetKey="/repo\0branch\0feature-b"
+        workspacePaneId="workspace"
+        sessions={[
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb1', title: 'term-b1', selected: false }),
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb2', title: 'term-b2', selected: true }),
+        ]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    expect(scrollIntoView).toHaveBeenCalledOnce()
+    expect(viewport.scrollLeft).toBe(96)
+  })
+
+  test('restores horizontal scroll position for each workspace tab target', async () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree-a"
@@ -370,12 +428,12 @@ describe('WorkspacePaneTabStrip scroll', () => {
     )
 
     const viewport = workspacePaneTabViewport()
-    act(() => {
+    await flushTestUpdates(() => {
       viewport.scrollLeft = 180
       viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
     })
 
-    rerender(
+    await rerender(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree-b"
         workspacePaneTabTargetKey="/repo\0branch\0feature-b"
@@ -394,12 +452,12 @@ describe('WorkspacePaneTabStrip scroll', () => {
 
     expect(viewport.scrollLeft).toBe(0)
 
-    act(() => {
+    await flushTestUpdates(() => {
       viewport.scrollLeft = 40
       viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
     })
 
-    rerender(
+    await rerender(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree-a"
         workspacePaneTabTargetKey="/repo\0branch\0feature-a"
@@ -419,7 +477,7 @@ describe('WorkspacePaneTabStrip scroll', () => {
 
     expect(viewport.scrollLeft).toBe(180)
 
-    rerender(
+    await rerender(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree-b"
         workspacePaneTabTargetKey="/repo\0branch\0feature-b"
@@ -439,36 +497,37 @@ describe('WorkspacePaneTabStrip scroll', () => {
     expect(viewport.scrollLeft).toBe(40)
   })
 
-  test('scrolls the right neighbour into view after closing the active tab', () => {
-    function CloseActiveHarness() {
-      const [sessions, setSessions] = useState([
-        session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
-        session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: true }),
-        session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
-      ])
+  test('scrolls the right neighbour into view after closing the active tab', async () => {
+    const CloseActiveHarness = defineComponent(
+      () => {
+        const sessions = shallowRef([
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: true }),
+          session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
+        ])
 
-      return (
-        <TestWorkspacePaneTabStrip
-          terminalFilesystemTargetKey="/repo\0/repo/worktree"
-          workspacePaneId="workspace"
-          sessions={sessions}
-          onNew={() => {}}
-          onSelect={() => {}}
-          onScrollToBottom={() => {}}
-          onClose={(closed) => {
-            setSessions((current) =>
-              current
+        return () => (
+          <TestWorkspacePaneTabStrip
+            terminalFilesystemTargetKey="/repo\0/repo/worktree"
+            workspacePaneId="workspace"
+            sessions={sessions.value}
+            onNew={() => {}}
+            onSelect={() => {}}
+            onScrollToBottom={() => {}}
+            onClose={(closed) => {
+              sessions.value = sessions.value
                 .filter((candidate) => candidate.terminalSessionId !== closed.terminalSessionId)
                 .map((candidate) => ({
                   ...candidate,
                   selected: candidate.terminalSessionId === 'term-333333333333333333333',
-                })),
-            )
-          }}
-          onReorder={() => {}}
-        />
-      )
-    }
+                }))
+            }}
+            onReorder={() => {}}
+          />
+        )
+      },
+      { name: 'CloseActiveHarness' },
+    )
 
     render(<CloseActiveHarness />)
     const scrollIntoView = scrollIntoViewMock()
@@ -480,10 +539,12 @@ describe('WorkspacePaneTabStrip scroll', () => {
         'workspace-workspace-pane-tab-1': { left: 120, right: 220 },
       },
     })
-    const closeButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-2"]')
+    const closeButton = document.body.querySelector<HTMLElement>(
+      '[data-toolbar-tab-close-action][title="close term-2"]',
+    )
     expect(closeButton).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       closeButton?.click()
     })
 
@@ -493,73 +554,79 @@ describe('WorkspacePaneTabStrip scroll', () => {
     expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'smooth' })
   })
 
-  test('focuses the actual active tab after closing the active tab', () => {
-    function CloseActiveSelectsLeftHarness() {
-      const [sessions, setSessions] = useState([
-        session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
-        session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: true }),
-        session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
-      ])
+  test('focuses the actual active tab after closing the active tab', async () => {
+    const CloseActiveSelectsLeftHarness = defineComponent(
+      () => {
+        const sessions = shallowRef([
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: true }),
+          session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
+        ])
 
-      return (
-        <TestWorkspacePaneTabStrip
-          terminalFilesystemTargetKey="/repo\0/repo/worktree"
-          workspacePaneId="workspace"
-          sessions={sessions}
-          onNew={() => {}}
-          onSelect={() => {}}
-          onScrollToBottom={() => {}}
-          onClose={(closed) => {
-            setSessions((current) =>
-              current
+        return () => (
+          <TestWorkspacePaneTabStrip
+            terminalFilesystemTargetKey="/repo\0/repo/worktree"
+            workspacePaneId="workspace"
+            sessions={sessions.value}
+            onNew={() => {}}
+            onSelect={() => {}}
+            onScrollToBottom={() => {}}
+            onClose={(closed) => {
+              sessions.value = sessions.value
                 .filter((candidate) => candidate.terminalSessionId !== closed.terminalSessionId)
                 .map((candidate) => ({
                   ...candidate,
                   selected: candidate.terminalSessionId === 'term-111111111111111111111',
-                })),
-            )
-          }}
-          onReorder={() => {}}
-        />
-      )
-    }
+                }))
+            }}
+            onReorder={() => {}}
+          />
+        )
+      },
+      { name: 'CloseActiveSelectsLeftHarness' },
+    )
 
     render(<CloseActiveSelectsLeftHarness />)
-    const closeButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-2"]')
+    const closeButton = document.body.querySelector<HTMLElement>(
+      '[data-toolbar-tab-close-action][title="close term-2"]',
+    )
     expect(closeButton).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       closeButton?.click()
     })
 
     expect(document.activeElement?.textContent).toContain('term-1')
   })
 
-  test('does not scroll when the active tab stays visible after a non-active terminal session is removed', () => {
-    function CloseInactiveHarness() {
-      const [sessions, setSessions] = useState([
-        session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: true }),
-        session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
-        session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
-      ])
+  test('does not scroll when the active tab stays visible after a non-active terminal session is removed', async () => {
+    const CloseInactiveHarness = defineComponent(
+      () => {
+        const sessions = shallowRef([
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: true }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
+        ])
 
-      return (
-        <TestWorkspacePaneTabStrip
-          terminalFilesystemTargetKey="/repo\0/repo/worktree"
-          workspacePaneId="workspace"
-          sessions={sessions}
-          onNew={() => {}}
-          onSelect={() => {}}
-          onScrollToBottom={() => {}}
-          onClose={(closed) => {
-            setSessions((current) =>
-              current.filter((candidate) => candidate.terminalSessionId !== closed.terminalSessionId),
-            )
-          }}
-          onReorder={() => {}}
-        />
-      )
-    }
+        return () => (
+          <TestWorkspacePaneTabStrip
+            terminalFilesystemTargetKey="/repo\0/repo/worktree"
+            workspacePaneId="workspace"
+            sessions={sessions.value}
+            onNew={() => {}}
+            onSelect={() => {}}
+            onScrollToBottom={() => {}}
+            onClose={(closed) => {
+              sessions.value = sessions.value.filter(
+                (candidate) => candidate.terminalSessionId !== closed.terminalSessionId,
+              )
+            }}
+            onReorder={() => {}}
+          />
+        )
+      },
+      { name: 'CloseInactiveHarness' },
+    )
 
     setTabStripScrollGeometry({
       viewport: { left: 0, right: 200 },
@@ -569,12 +636,15 @@ describe('WorkspacePaneTabStrip scroll', () => {
     })
 
     render(<CloseInactiveHarness />)
+    await flushTestUpdates(() => {})
     const scrollIntoView = scrollIntoViewMock()
     scrollIntoView.mockClear()
-    const closeButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-2"]')
+    const closeButton = document.body.querySelector<HTMLElement>(
+      '[data-toolbar-tab-close-action][title="close term-2"]',
+    )
     expect(closeButton).not.toBeNull()
 
-    act(() => {
+    await flushTestUpdates(() => {
       closeButton?.click()
     })
 

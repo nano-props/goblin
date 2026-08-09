@@ -1,144 +1,117 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
-import type { Key } from 'react-aria-components'
-import { toast } from 'sonner'
+import { computed, defineComponent, shallowRef } from 'vue'
+import type { FunctionalComponent, ShallowRef } from 'vue'
+import { toast } from 'vue-sonner'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
-import {
-  workspacePaneFilesystemExecutionTargetKey,
-  type WorkspacePaneFilesystemExecutionTarget,
-} from '#/shared/workspace-runtime.ts'
 import { workspacePaneStaticTabId } from '#/shared/workspace-pane.ts'
+import { workspacePaneFilesystemExecutionTargetKey } from '#/shared/workspace-runtime.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { FiletreeView } from '#/web/components/workspace-pane/FiletreeView.tsx'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/workspace-pane/file-read-command.ts'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { downloadWorkspaceFile } from '#/web/file-download.ts'
 import { useWorkspaceFilesystemTree } from '#/web/hooks/useWorkspaceFilesystemTree.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
-import { useT } from '#/web/stores/i18n.ts'
-import { useFiletreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import { filetreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
 import {
   emptyFiletreeInteractionSnapshot,
   filetreeInteractionScopeKey,
-  useFiletreeInteractionStore,
+  filetreeInteractionStore,
 } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import { getWorkspaceFileViewer } from '#/web/workspace-filesystem-client.ts'
-import { downloadWorkspaceFile } from '#/web/file-download.ts'
-import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
-  workspacePaneFilesystemRuntimeTarget,
   workspacePaneFilesystemRootPath,
+  workspacePaneFilesystemRuntimeTarget,
   workspacePaneFilesystemTerminalBase,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { showCreatedWorkspacePaneFilesystemTerminal } from '#/web/workspace-pane/workspace-pane-filesystem-terminal.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 
-export function WorkspaceFilesystemTabPanel({
-  routeTarget,
-  target,
-}: {
+interface WorkspaceFilesystemTabPanelProps {
   routeTarget: WorkspacePaneTabsTarget
   target: WorkspacePaneFilesystemTarget
-}) {
-  const workspaceId = target.workspaceId
-  const workspaceRuntimeId = target.workspaceRuntimeId
-  const rootPath = workspacePaneFilesystemRootPath(target)
-  const executionTarget = useMemo(
-    () => workspacePaneFilesystemRuntimeTarget(target),
-    [rootPath, target.kind, workspaceId, workspaceRuntimeId],
-  )
+}
 
+export const WorkspaceFilesystemTabPanel: FunctionalComponent<WorkspaceFilesystemTabPanelProps> = (props) => {
+  const executionTarget = workspacePaneFilesystemRuntimeTarget(props.target)
   return (
     <ExecutionTargetFilesystemTabPanel
       key={workspacePaneFilesystemExecutionTargetKey(executionTarget)}
-      routeTarget={routeTarget}
-      target={target}
+      routeTarget={props.routeTarget}
+      target={props.target}
       executionTarget={executionTarget}
     />
   )
 }
 
-function ExecutionTargetFilesystemTabPanel({
-  routeTarget,
-  target,
-  executionTarget,
-}: {
-  routeTarget: WorkspacePaneTabsTarget
-  target: WorkspacePaneFilesystemTarget
+WorkspaceFilesystemTabPanel.props = ['routeTarget', 'target']
+
+interface ExecutionTargetFilesystemTabPanelProps extends WorkspaceFilesystemTabPanelProps {
   executionTarget: WorkspacePaneFilesystemExecutionTarget
-}) {
-  const workspaceId = target.workspaceId
-  const rootPath = workspacePaneFilesystemRootPath(target)
-  const t = useT()
-  const navigation = useAppNavigation()
-  const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
-  const openTrashFileConfirm = useFiletreeActionDialogsStore((state) => state.openTrashFileConfirm)
-  const interactionScopeKey = useMemo(() => filetreeInteractionScopeKey(workspaceId, rootPath), [rootPath, workspaceId])
-  const selectedKeyList = useFiletreeInteractionStore(
-    (state) =>
-      state.interactionByScope[interactionScopeKey]?.selectedKeys ?? emptyFiletreeInteractionSnapshot().selectedKeys,
-  )
-  const expandedKeyList = useFiletreeInteractionStore(
-    (state) =>
-      state.interactionByScope[interactionScopeKey]?.expandedKeys ?? emptyFiletreeInteractionSnapshot().expandedKeys,
-  )
-  const result = useWorkspaceFilesystemTree({ target: executionTarget, expandedKeys: expandedKeyList })
-  const setSelectedKeys = useFiletreeInteractionStore((state) => state.setSelectedKeys)
-  const setExpandedKey = useFiletreeInteractionStore((state) => state.setExpandedKey)
-  const setTopVisibleRowIndex = useFiletreeInteractionStore((state) => state.setTopVisibleRowIndex)
-  const pruneKeys = useFiletreeInteractionStore((state) => state.pruneKeys)
-  const initialTopVisibleRowIndex = useMemo(
-    () => useFiletreeInteractionStore.getState().interactionByScope[interactionScopeKey]?.topVisibleRowIndex ?? 0,
-    [interactionScopeKey],
-  )
-  const {
-    pendingKeys: pendingOpeningFileKeys,
-    beginPending: beginOpeningFile,
-    endPending: endOpeningFile,
-  } = usePendingKeySet()
-  const openingFileKeyPrefix = useMemo(() => `${interactionScopeKey}\0`, [interactionScopeKey])
-  const openingFileKeys = useMemo(() => {
-    const keys = new Set<string>()
-    for (const key of pendingOpeningFileKeys) {
-      if (key.startsWith(openingFileKeyPrefix)) keys.add(key.slice(openingFileKeyPrefix.length))
+}
+
+const ExecutionTargetFilesystemTabPanel = defineComponent(
+  (props: ExecutionTargetFilesystemTabPanelProps) => {
+    const t = useT()
+    const navigation = useAppNavigation()
+    const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
+    const { openTrashFileConfirm } = filetreeActionDialogsStore.getState()
+    const rootPath = workspacePaneFilesystemRootPath(props.target)
+    const interactionScopeKey = filetreeInteractionScopeKey(props.target.workspaceId, rootPath)
+    const interactionByScope = useStoreSelector(filetreeInteractionStore, (state) => state.interactionByScope)
+    const interactionSnapshot = computed(
+      () => interactionByScope.value[interactionScopeKey] ?? emptyFiletreeInteractionSnapshot(),
+    )
+    const selectedKeys = computed(() => new Set(interactionSnapshot.value.selectedKeys))
+    const expandedKeys = computed(() => new Set(interactionSnapshot.value.expandedKeys))
+    const result = useWorkspaceFilesystemTree({
+      target: props.executionTarget,
+      expandedKeys: () => interactionSnapshot.value.expandedKeys,
+    })
+    const { setSelectedKeys, setExpandedKey, setTopVisibleRowIndex, pruneKeys } = filetreeInteractionStore.getState()
+    const initialTopVisibleRowIndex = interactionSnapshot.value.topVisibleRowIndex
+    const pendingOpeningFileKeys = usePendingKeySet()
+    const openingFileKeyPrefix = `${interactionScopeKey}\0`
+    const openingFileKeys = computed(() => {
+      const keys = new Set<string>()
+      for (const key of pendingOpeningFileKeys.pendingKeys.value) {
+        if (key.startsWith(openingFileKeyPrefix)) keys.add(key.slice(openingFileKeyPrefix.length))
+      }
+      return keys
+    })
+
+    function changeSelectedKeys(keys: Set<string>): void {
+      setSelectedKeys(interactionScopeKey, Array.from(keys))
     }
-    return keys
-  }, [openingFileKeyPrefix, pendingOpeningFileKeys])
-  const selectedKeys = useMemo(() => new Set<Key>(selectedKeyList), [selectedKeyList])
-  const expandedKeys = useMemo(() => new Set(expandedKeyList), [expandedKeyList])
-  const handleSelectedKeysChange = useCallback(
-    (keys: Set<Key>) => {
-      setSelectedKeys(interactionScopeKey, stringKeysFromReactAriaKeys(keys))
-    },
-    [interactionScopeKey, setSelectedKeys],
-  )
-  const handleDirectoryRowToggle = useCallback(
-    (key: string, expanded: boolean) => {
+
+    function toggleDirectory(key: string, expanded: boolean): void {
       setExpandedKey(interactionScopeKey, key, expanded)
       if (!expanded) return
       void result.loadChildren(key).catch((error) => {
-        const errorKey = error instanceof Error ? error.message : 'dashboard.directory.read-failed'
-        toast.error(t(errorKey))
+        const errorMessageKey = error instanceof Error ? error.message : 'dashboard.directory.read-failed'
+        toast.error(t(errorMessageKey))
       })
-    },
-    [interactionScopeKey, result.loadChildren, setExpandedKey, t],
-  )
-  const handlePruneKeys = useCallback(
-    (validKeys: ReadonlySet<string>) => {
+    }
+
+    function pruneInteractionKeys(validKeys: ReadonlySet<string>): void {
       pruneKeys(interactionScopeKey, validKeys, result.loadedPrefixes)
-    },
-    [interactionScopeKey, pruneKeys, result.loadedPrefixes],
-  )
-  const handleTopVisibleRowIndexChange = useCallback(
-    (topVisibleRowIndex: number) => {
+    }
+
+    function updateTopVisibleRowIndex(topVisibleRowIndex: number): void {
       setTopVisibleRowIndex(interactionScopeKey, topVisibleRowIndex)
-    },
-    [interactionScopeKey, setTopVisibleRowIndex],
-  )
-  const openFileInTerminal = useCallback(
-    async (node: WorkspaceFilesystemNode) => {
+    }
+
+    async function openFileInTerminal(node: WorkspaceFilesystemNode): Promise<void> {
       if (node.kind !== 'file') return
       const openingFileKey = `${openingFileKeyPrefix}${node.id}`
-      if (!beginOpeningFile(openingFileKey)) return
+      if (!pendingOpeningFileKeys.beginPending(openingFileKey)) return
       try {
+        const target = props.target
+        const routeTarget = props.routeTarget
+        const executionTarget = props.executionTarget
         const openerIdentity = workspacePaneStaticTabId('files')
         const base = workspacePaneFilesystemTerminalBase(target)
         if (!base) throw new Error('error.workspace-tabs-target-invalid')
@@ -167,90 +140,75 @@ function ExecutionTargetFilesystemTabPanel({
           logMessage: 'filetree open file terminal create failed',
         })
       } finally {
-        endOpeningFile(openingFileKey)
+        pendingOpeningFileKeys.endPending(openingFileKey)
       }
-    },
-    [
-      beginOpeningFile,
-      createTerminalWithAdmission,
-      endOpeningFile,
-      executionTarget,
-      focusTerminal,
-      navigation,
-      openingFileKeyPrefix,
-      routeTarget,
-      t,
-      target,
-    ],
-  )
-  const requestTrashFile = useCallback(
-    (node: WorkspaceFilesystemNode) => {
+    }
+
+    function requestTrashFile(node: WorkspaceFilesystemNode): void {
       if (node.kind !== 'file') return
-      openTrashFileConfirm({ target: executionTarget, path: node.path, name: node.name })
-    },
-    [executionTarget, openTrashFileConfirm],
-  )
+      openTrashFileConfirm({ target: props.executionTarget, path: node.path, name: node.name })
+    }
 
-  return (
-    <FiletreeView
-      tree={result.tree}
-      isInitialLoading={result.isInitialLoading}
-      isReading={result.isReading}
-      loadingKeys={result.loadingKeys}
-      openingFileKeys={openingFileKeys}
-      error={result.error}
-      selectedKeys={selectedKeys}
-      expandedKeys={expandedKeys}
-      onSelectedKeysChange={handleSelectedKeysChange}
-      onDirectoryRowToggle={handleDirectoryRowToggle}
-      onPruneKeys={handlePruneKeys}
-      onRetry={result.refresh}
-      initialTopVisibleRowIndex={initialTopVisibleRowIndex}
-      scrollRestoreKey={interactionScopeKey}
-      scrollRestoreReady={result.expandedDirectoryReadsSettled}
-      onTopVisibleRowIndexChange={handleTopVisibleRowIndexChange}
-      onOpenFile={
-        target.capabilities.terminal.available
-          ? (node) => {
-              void openFileInTerminal(node).catch((error) => {
-                const errorKey = error instanceof Error ? error.message : 'error.terminal-create-failed'
-                toast.error(t(errorKey))
-              })
-            }
-          : undefined
-      }
-      onDownloadFile={(node) => {
-        if (node.kind === 'file') downloadWorkspaceFile(executionTarget, node.path)
-      }}
-      onRequestTrashFile={target.capabilities.files.write ? requestTrashFile : undefined}
-    />
-  )
-}
+    return () => (
+      <FiletreeView
+        tree={result.tree}
+        isInitialLoading={result.isInitialLoading}
+        isReading={result.isReading}
+        loadingKeys={result.loadingKeys}
+        openingFileKeys={openingFileKeys.value}
+        error={result.error}
+        selectedKeys={selectedKeys.value}
+        expandedKeys={expandedKeys.value}
+        onSelectedKeysChange={changeSelectedKeys}
+        onDirectoryRowToggle={toggleDirectory}
+        onPruneKeys={pruneInteractionKeys}
+        onRetry={result.refresh}
+        initialTopVisibleRowIndex={initialTopVisibleRowIndex}
+        scrollRestoreKey={interactionScopeKey}
+        scrollRestoreReady={result.expandedDirectoryReadsSettled}
+        onTopVisibleRowIndexChange={updateTopVisibleRowIndex}
+        onOpenFile={
+          props.target.capabilities.terminal.available
+            ? (node) => {
+                void openFileInTerminal(node).catch((error) => {
+                  const errorMessageKey = error instanceof Error ? error.message : 'error.terminal-create-failed'
+                  toast.error(t(errorMessageKey))
+                })
+              }
+            : undefined
+        }
+        onDownloadFile={(node) => {
+          if (node.kind === 'file') downloadWorkspaceFile(props.executionTarget, node.path)
+        }}
+        onRequestTrashFile={props.target.capabilities.files.write ? requestTrashFile : undefined}
+      />
+    )
+  },
+  {
+    name: 'ExecutionTargetFilesystemTabPanel',
+    props: ['routeTarget', 'target', 'executionTarget'],
+  },
+)
 
-function stringKeysFromReactAriaKeys(keys: ReadonlySet<Key>): string[] {
-  return Array.from(keys).filter((key): key is string => typeof key === 'string')
-}
+function usePendingKeySet(): {
+  pendingKeys: Readonly<ShallowRef<ReadonlySet<string>>>
+  beginPending: (key: string) => boolean
+  endPending: (key: string) => void
+} {
+  const pendingKeys = shallowRef<ReadonlySet<string>>(new Set())
 
-function usePendingKeySet() {
-  const pendingKeysRef = useRef<ReadonlySet<string>>(new Set())
-  const [pendingKeys, setPendingKeys] = useState<ReadonlySet<string>>(() => new Set())
-
-  const beginPending = useCallback((key: string): boolean => {
-    if (pendingKeysRef.current.has(key)) return false
-    const next = new Set(pendingKeysRef.current)
-    next.add(key)
-    pendingKeysRef.current = next
-    setPendingKeys(next)
+  function beginPending(key: string): boolean {
+    if (pendingKeys.value.has(key)) return false
+    pendingKeys.value = new Set(pendingKeys.value).add(key)
     return true
-  }, [])
+  }
 
-  const endPending = useCallback((key: string): void => {
-    if (!pendingKeysRef.current.has(key)) return
-    const next = new Set(pendingKeysRef.current)
+  function endPending(key: string): void {
+    if (!pendingKeys.value.has(key)) return
+    const next = new Set(pendingKeys.value)
     next.delete(key)
-    pendingKeysRef.current = next
-    setPendingKeys(next)
-  }, [])
+    pendingKeys.value = next
+  }
 
   return { pendingKeys, beginPending, endPending }
 }

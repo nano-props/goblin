@@ -1,8 +1,10 @@
-import { createElement } from 'react'
-import { focusManager, QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query'
+import { defineComponent, ref } from 'vue'
+import { focusManager, QueryObserver } from '@tanstack/query-core'
+import { QueryClient } from '@tanstack/vue-query'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { RepoWorktreeStatusSnapshot } from '#/shared/api-types.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { getRepoWorktreeStatusQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import { repoWorktreeStatusQueryOptions } from '#/web/repo-query-options.ts'
 import { useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
@@ -33,14 +35,12 @@ describe('repo worktree status query data', () => {
           releases.push(resolve)
         }),
     )
-    function StatusObservers() {
-      useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', true)
-      useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', true)
-      return null
-    }
+    const StatusObservers = statusObservers()
 
     const first = renderInJsdom(
-      createElement(QueryClientProvider, { client: queryClient }, createElement(StatusObservers)),
+      <VueQueryClientScope client={queryClient}>
+        <StatusObservers />
+      </VueQueryClientScope>,
     )
     await vi.waitFor(() => expect(releases).toHaveLength(1))
     releases[0]!({ workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 })
@@ -50,7 +50,9 @@ describe('repo worktree status query data', () => {
     first.unmount()
 
     const second = renderInJsdom(
-      createElement(QueryClientProvider, { client: queryClient }, createElement(StatusObservers)),
+      <VueQueryClientScope client={queryClient}>
+        <StatusObservers />
+      </VueQueryClientScope>,
     )
     try {
       await vi.waitFor(() => expect(releases).toHaveLength(2))
@@ -78,6 +80,60 @@ describe('repo worktree status query data', () => {
     }
   })
 
+  test('mounts the first visible status owner without retaining an inactive observer', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    setRepoWorktreeStatusQueryData(
+      WORKSPACE_ID,
+      'repo-runtime-1',
+      { workspaceRuntimeId: 'repo-runtime-1', status: [], loadedAt: 1 },
+      queryClient,
+    )
+    repoClientMocks.getRepoWorktreeStatus.mockResolvedValue({
+      workspaceRuntimeId: 'repo-runtime-1',
+      status: [],
+      loadedAt: 2,
+    })
+    const StatusOwner = defineComponent({
+      name: 'RepoWorktreeStatusOwner',
+      inheritAttrs: false,
+      setup() {
+        useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1')
+        return () => null
+      },
+    })
+    const active = ref(false)
+    const ConditionalStatusOwner = defineComponent({
+      name: 'ConditionalRepoWorktreeStatusOwner',
+      inheritAttrs: false,
+      setup() {
+        return () => (active.value ? <StatusOwner /> : null)
+      },
+    })
+
+    const rendered = renderInJsdom(
+      <VueQueryClientScope client={queryClient}>
+        <ConditionalStatusOwner />
+      </VueQueryClientScope>,
+    )
+    try {
+      const queryKey = repoWorktreeStatusQueryOptions(WORKSPACE_ID, 'repo-runtime-1').queryKey
+      expect(queryClient.getQueryCache().find({ queryKey })?.getObserversCount()).toBe(0)
+
+      await flushTestUpdates(() => {
+        active.value = true
+      })
+
+      await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
+      await vi.waitFor(() =>
+        expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-1', queryClient)?.loadedAt).toBe(2),
+      )
+      expect(queryClient.getQueryCache().find({ queryKey })?.getObserversCount()).toBe(1)
+    } finally {
+      rendered.unmount()
+      queryClient.clear()
+    }
+  })
+
   test('shares one status refetch across repeated focus activation without cancelling it', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const signals: Array<AbortSignal | undefined> = []
@@ -92,15 +148,13 @@ describe('repo worktree status query data', () => {
       signals.push(signal)
       return new Promise<RepoWorktreeStatusSnapshot>((resolve) => releases.push(resolve))
     })
-    function StatusObservers() {
-      useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', true)
-      useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1', true)
-      return null
-    }
+    const StatusObservers = statusObservers()
 
     focusManager.setFocused(false)
     const result = renderInJsdom(
-      createElement(QueryClientProvider, { client: queryClient }, createElement(StatusObservers)),
+      <VueQueryClientScope client={queryClient}>
+        <StatusObservers />
+      </VueQueryClientScope>,
     )
     try {
       await vi.waitFor(() => expect(releases).toHaveLength(1))
@@ -311,3 +365,14 @@ describe('repo worktree status query data', () => {
     expect(getRepoWorktreeStatusQueryData(WORKSPACE_ID, 'repo-runtime-current', queryClient)).toBeUndefined()
   })
 })
+
+function statusObservers() {
+  return defineComponent(
+    () => {
+      useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1')
+      useRepoWorktreeStatusReadModel(WORKSPACE_ID, 'repo-runtime-1')
+      return () => null
+    },
+    { name: 'RepoWorktreeStatusObservers' },
+  )
+}

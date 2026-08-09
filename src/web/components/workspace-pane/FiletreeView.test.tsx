@@ -1,35 +1,28 @@
 // @vitest-environment jsdom
-import { useCallback, useState, type ComponentProps } from 'react'
-import { act, type RenderResult } from '@testing-library/react'
+import { defineComponent, shallowRef } from 'vue'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
+import type { JsdomRenderResult } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
-import { renderInJsdom } from '#/test-utils/render.tsx'
-import type { Key } from 'react-aria-components'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { FiletreeView } from '#/web/components/workspace-pane/FiletreeView.tsx'
+import type { FiletreeViewProps } from '#/web/components/workspace-pane/FiletreeView.tsx'
 import type { WorkspaceFilesystemNode, WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
-
-vi.mock('#/web/stores/i18n.ts', () => ({
-  useT: () => (key: string, params?: Record<string, string | number>) => {
-    if (!params) return key
-    let out = key
-    for (const [k, v] of Object.entries(params)) {
-      out = out.replace(`{${k}}`, String(v))
-    }
-    return out
-  },
-}))
 
 let compactUi = false
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useIsCompactUi: () => compactUi,
+  useIsCompactUi: () => ({
+    get value() {
+      return compactUi
+    },
+  }),
 }))
 
 let container: HTMLElement | null = null
-let renderResult: RenderResult | null = null
+let renderResult: JsdomRenderResult | null = null
 
 type FiletreeViewHarnessProps = Omit<
-  ComponentProps<typeof FiletreeView>,
+  FiletreeViewProps,
   | 'selectedKeys'
   | 'expandedKeys'
   | 'isReading'
@@ -62,51 +55,77 @@ function dirNode(id: string, parentId: string | null = null): WorkspaceFilesyste
   return { id, path: id, name, parentId, kind: 'directory', status: 'clean' }
 }
 
-function FiletreeViewHarness({
-  isReading = false,
-  initialTopVisibleRowIndex = 0,
-  scrollRestoreKey = 'test-worktree',
-  scrollRestoreReady = true,
-  onTopVisibleRowIndexChange = () => {},
-  ...props
-}: FiletreeViewHarnessProps) {
-  const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<Key>>(new Set())
-  const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<Key>>(new Set())
-  const pruneKeys = useCallback((validKeys: ReadonlySet<string>) => {
-    setSelectedKeys((current) => filterValidKeys(current, validKeys))
-    setExpandedKeys((current) => filterValidKeys(current, validKeys))
-  }, [])
-  const toggleDirectoryRow = useCallback((key: string, expanded: boolean) => {
-    setExpandedKeys((current) => {
-      const next = new Set(current)
+const FiletreeViewHarness = defineComponent(
+  (props: FiletreeViewHarnessProps) => {
+    const selectedKeys = shallowRef<ReadonlySet<string>>(new Set())
+    const expandedKeys = shallowRef<ReadonlySet<string>>(new Set())
+    const pruneKeys = (validKeys: ReadonlySet<string>) => {
+      selectedKeys.value = filterValidKeys(selectedKeys.value, validKeys)
+      expandedKeys.value = filterValidKeys(expandedKeys.value, validKeys)
+    }
+    const toggleDirectoryRow = (key: string, expanded: boolean) => {
+      const next = new Set(expandedKeys.value)
       if (expanded) next.add(key)
       else next.delete(key)
-      return next
-    })
-  }, [])
+      expandedKeys.value = next
+    }
 
-  return (
-    <FiletreeView
-      {...props}
-      isReading={isReading}
-      selectedKeys={selectedKeys}
-      expandedKeys={expandedKeys}
-      onSelectedKeysChange={setSelectedKeys}
-      onDirectoryRowToggle={toggleDirectoryRow}
-      onPruneKeys={pruneKeys}
-      initialTopVisibleRowIndex={initialTopVisibleRowIndex}
-      scrollRestoreKey={scrollRestoreKey}
-      scrollRestoreReady={scrollRestoreReady}
-      onTopVisibleRowIndexChange={onTopVisibleRowIndexChange}
-    />
-  )
-}
+    return () => (
+      <FiletreeView
+        tree={props.tree}
+        isInitialLoading={props.isInitialLoading}
+        isReading={props.isReading ?? false}
+        loadingKeys={props.loadingKeys}
+        openingFileKeys={props.openingFileKeys}
+        error={props.error}
+        onSelect={props.onSelect}
+        onActivate={props.onActivate}
+        onOpenFile={props.onOpenFile}
+        onDownloadFile={props.onDownloadFile}
+        onRequestTrashFile={props.onRequestTrashFile}
+        selectedKeys={selectedKeys.value}
+        expandedKeys={expandedKeys.value}
+        onSelectedKeysChange={(keys) => {
+          selectedKeys.value = keys
+        }}
+        onDirectoryRowToggle={toggleDirectoryRow}
+        onPruneKeys={pruneKeys}
+        onRetry={props.onRetry}
+        initialTopVisibleRowIndex={props.initialTopVisibleRowIndex ?? 0}
+        scrollRestoreKey={props.scrollRestoreKey ?? 'test-worktree'}
+        scrollRestoreReady={props.scrollRestoreReady ?? true}
+        onTopVisibleRowIndexChange={props.onTopVisibleRowIndexChange ?? (() => {})}
+      />
+    )
+  },
+  {
+    name: 'FiletreeViewHarness',
+    props: [
+      'tree',
+      'isInitialLoading',
+      'isReading',
+      'loadingKeys',
+      'openingFileKeys',
+      'error',
+      'onSelect',
+      'onActivate',
+      'onOpenFile',
+      'onDownloadFile',
+      'onRequestTrashFile',
+      'onRetry',
+      'initialTopVisibleRowIndex',
+      'scrollRestoreKey',
+      'scrollRestoreReady',
+      'onTopVisibleRowIndexChange',
+    ],
+  },
+)
 
-function filterValidKeys(keys: ReadonlySet<Key>, validKeys: ReadonlySet<string>): ReadonlySet<Key> {
+function filterValidKeys(keys: ReadonlySet<string>, validKeys: ReadonlySet<string>): ReadonlySet<string> {
   let changed = false
-  const next = new Set<Key>()
+  const next = new Set<string>()
   for (const key of keys) {
-    if (typeof key === 'string' && validKeys.has(key)) {
+    if (validKeys.has(key)) {
       next.add(key)
     } else {
       changed = true
@@ -120,8 +139,8 @@ function renderView(props: FiletreeViewHarnessProps) {
   container = renderResult.container
 }
 
-function rerenderView(props: FiletreeViewHarnessProps) {
-  renderResult?.rerender(<FiletreeViewHarness {...props} />)
+async function rerenderView(props: FiletreeViewHarnessProps): Promise<void> {
+  await renderResult?.rerender(<FiletreeViewHarness {...props} />)
 }
 
 beforeEach(() => {
@@ -160,7 +179,7 @@ function tree(): HTMLElement {
 }
 
 function scrollViewport(): HTMLDivElement {
-  const element = container?.querySelector<HTMLDivElement>('[data-radix-scroll-area-viewport]')
+  const element = container?.querySelector<HTMLDivElement>('[data-reka-scroll-area-viewport]')
   if (!element) throw new Error('no scroll viewport')
   return element
 }
@@ -179,7 +198,7 @@ function buildTree(): WorkspaceFilesystemTreeResult {
 }
 
 describe('FiletreeView', () => {
-  test('renders the empty state when the tree has no nodes', () => {
+  test('renders the empty state when the tree has no nodes', async () => {
     const tree: WorkspaceFilesystemTreeResult = { nodes: [], truncated: false }
     renderView({ tree, isInitialLoading: false, error: null })
     expect(container?.querySelector('[data-filetree=""]')).not.toBeNull()
@@ -213,7 +232,7 @@ describe('FiletreeView', () => {
     expect(onRetry).toHaveBeenCalledOnce()
   })
 
-  test('keeps retry disabled and reports busy while filesystem reads are pending', () => {
+  test('keeps retry disabled and reports busy while filesystem reads are pending', async () => {
     const onRetry = vi.fn()
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
@@ -227,7 +246,7 @@ describe('FiletreeView', () => {
     expect(container?.querySelector('button')?.hasAttribute('disabled')).toBe(true)
   })
 
-  test('renders a virtualized tree labelled by i18n', () => {
+  test('renders a virtualized tree labelled by i18n', async () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
       isInitialLoading: false,
@@ -236,7 +255,7 @@ describe('FiletreeView', () => {
     expect(tree().getAttribute('aria-label')).toBe('filetree.aria-label')
   })
 
-  test('keeps file action triggers clear of the overlay scrollbar', () => {
+  test('keeps file action triggers clear of the overlay scrollbar', async () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
       isInitialLoading: false,
@@ -247,7 +266,7 @@ describe('FiletreeView', () => {
     expect(row('README.md').firstElementChild?.className).toContain('pr-3')
   })
 
-  test('does not add an extra panel border around the tree body', () => {
+  test('does not add an extra panel border around the tree body', async () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
       isInitialLoading: false,
@@ -256,7 +275,7 @@ describe('FiletreeView', () => {
     expect(tree().className).not.toContain('border-l')
   })
 
-  test('uses the app sans font for explorer file names', () => {
+  test('uses the app sans font for explorer file names', async () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
       isInitialLoading: false,
@@ -266,7 +285,7 @@ describe('FiletreeView', () => {
     expect(tree().className).not.toContain('font-mono')
   })
 
-  test('lists root-level files and directories, directories before files', () => {
+  test('lists root-level files and directories, directories before files', async () => {
     const tree: WorkspaceFilesystemTreeResult = {
       nodes: [
         dirNode('src'),
@@ -382,7 +401,7 @@ describe('FiletreeView', () => {
     expect(onOpenFile).not.toHaveBeenCalled()
   })
 
-  test('keeps the file action menu trigger visible in compact mode', () => {
+  test('keeps the file action menu trigger visible in compact mode', async () => {
     compactUi = true
     const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({ tree, isInitialLoading: false, error: null, onOpenFile: vi.fn() })
@@ -452,7 +471,7 @@ describe('FiletreeView', () => {
     }
     renderView({ tree, isInitialLoading: false, error: null })
 
-    await user.click(row('src').querySelector<HTMLButtonElement>('button[slot="chevron"]')!)
+    await user.click(row('src').querySelector<HTMLButtonElement>('[data-filetree-chevron]')!)
 
     expect(rowNames()).toEqual(['src', 'index.ts'])
     expect(row('src').getAttribute('aria-expanded')).toBe('true')
@@ -485,7 +504,7 @@ describe('FiletreeView', () => {
     expect(onActivate.mock.calls[0]?.[0]?.id).toBe('README.md')
   })
 
-  test('shows the truncated footer when truncated is true', () => {
+  test('shows the truncated footer when truncated is true', async () => {
     const tree: WorkspaceFilesystemTreeResult = {
       nodes: [fileNode('README.md')],
       truncated: true,
@@ -494,7 +513,7 @@ describe('FiletreeView', () => {
     expect(container?.textContent).toMatch(/filetree\.truncated/)
   })
 
-  test('does not render a status dot without an authoritative status projection', () => {
+  test('does not render a status dot without an authoritative status projection', async () => {
     const tree: WorkspaceFilesystemTreeResult = {
       nodes: [fileNode('README.md', null, 'modified')],
       truncated: false,
@@ -505,7 +524,7 @@ describe('FiletreeView', () => {
     expect(container?.querySelector('[aria-label^="filetree.status."]')).toBeNull()
   })
 
-  test('keeps the initial loading state visually quiet and announces aria-busy', () => {
+  test('keeps the initial loading state visually quiet and announces aria-busy', async () => {
     renderView({ tree: null, isInitialLoading: true, error: null })
     expect(container?.querySelectorAll('[role="treeitem"]').length).toBe(0)
     expect(container?.textContent).not.toMatch(/filetree\.loading/)
@@ -513,12 +532,12 @@ describe('FiletreeView', () => {
     expect(container?.querySelector('[data-filetree=""]')?.getAttribute('aria-busy')).toBe('true')
   })
 
-  test('reports the top visible row index instead of the raw scroll offset', () => {
+  test('reports the top visible row index instead of the raw scroll offset', async () => {
     const onTopVisibleRowIndexChange = vi.fn()
     renderView({ tree: buildTree(), isInitialLoading: false, error: null, onTopVisibleRowIndexChange })
     const viewport = scrollViewport()
     viewport.scrollTop = 145
-    act(() => {
+    await flushTestUpdates(() => {
       viewport.dispatchEvent(new Event('scroll', { bubbles: true }))
     })
 
@@ -542,8 +561,8 @@ describe('FiletreeView', () => {
       nodes: [dirNode('src'), fileNode('src/index.ts', 'src'), fileNode('README.md')],
       truncated: false,
     }
-    await act(async () => {
-      rerenderView({ tree: treeB, isInitialLoading: false, error: null })
+    await flushTestUpdates(async () => {
+      await rerenderView({ tree: treeB, isInitialLoading: false, error: null })
     })
 
     expect(rowNames()).toEqual(['src', 'index.ts', 'README.md'])
@@ -568,8 +587,8 @@ describe('FiletreeView', () => {
       nodes: [fileNode('CHANGELOG.md'), dirNode('docs')],
       truncated: false,
     }
-    await act(async () => {
-      rerenderView({ tree: treeB, isInitialLoading: false, error: null })
+    await flushTestUpdates(async () => {
+      await rerenderView({ tree: treeB, isInitialLoading: false, error: null })
     })
 
     expect(rowNames()).toEqual(['docs', 'CHANGELOG.md'])
@@ -578,20 +597,20 @@ describe('FiletreeView', () => {
   })
 })
 
-describe('FiletreeView — React Aria keyboard integration', () => {
+describe('FiletreeView — keyboard integration', () => {
   test('ArrowDown and ArrowUp move focus through visible rows', async () => {
     const user = userEvent.setup()
     renderView({ tree: buildTree(), isInitialLoading: false, error: null })
 
     row('src').focus()
     await user.keyboard('{ArrowDown}')
-    await act(async () => {
+    await flushTestUpdates(async () => {
       await waitForNextMacrotask()
     })
     expect(document.activeElement).toBe(row('README.md'))
 
     await user.keyboard('{ArrowUp}')
-    await act(async () => {
+    await flushTestUpdates(async () => {
       await waitForNextMacrotask()
     })
     expect(document.activeElement).toBe(row('src'))
@@ -622,7 +641,7 @@ describe('FiletreeView — React Aria keyboard integration', () => {
 })
 
 describe('FiletreeView — locale-aware sorting', () => {
-  test('sorts child lists by locale-aware name compare, directories first', () => {
+  test('sorts child lists by locale-aware name compare, directories first', async () => {
     const tree: WorkspaceFilesystemTreeResult = {
       nodes: [fileNode('10.txt'), dirNode('a'), fileNode('2.txt'), dirNode('A'), fileNode('b.txt'), fileNode('a.txt')],
       truncated: false,

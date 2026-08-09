@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
 import { isSafeBranchName } from '#/shared/refnames.ts'
-import type { LangPref, ServerWorkspaceState, ThemePref } from '#/shared/api-types.ts'
+import type { ServerWorkspaceState } from '#/shared/api-types.ts'
+import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import {
   normalizeWorkspaceSessionEntry,
   workspaceSessionEntryId,

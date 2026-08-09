@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { createStore } from 'zustand/vanilla'
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface FiletreeInteractionSnapshot {
@@ -51,7 +51,7 @@ export function emptyFiletreeInteractionSnapshot(): FiletreeInteractionSnapshot 
   return EMPTY_SNAPSHOT
 }
 
-export const useFiletreeInteractionStore = create<FiletreeInteractionStore>()((set) => ({
+export const filetreeInteractionStore = createStore<FiletreeInteractionStore>()((set) => ({
   ...INITIAL_STATE,
   setSelectedKeys: (scopeKey, keys) =>
     set((state) => updateInteractionSnapshot(state, scopeKey, { selectedKeys: normalizeKeys(keys) })),
@@ -196,5 +196,5 @@ function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
 }
 
 export function resetFiletreeInteractionStore(): void {
-  useFiletreeInteractionStore.setState(INITIAL_STATE)
+  filetreeInteractionStore.setState(INITIAL_STATE)
 }

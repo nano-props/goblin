@@ -7,7 +7,7 @@ import {
 } from '#/shared/workspace-settings.ts'
 
 describe('workspace external app target persistence', () => {
-  test('round-trips workspace-root and Git worktree target identities', () => {
+  test('round-trips workspace-root and Git worktree target identities', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://host-a/workspace/example')
     const worktreeTarget = workspaceExternalAppTargetForWorktree(workspaceId, '/workspace/example-feature')
     if (!worktreeTarget) throw new Error('invalid test worktree target')
@@ -18,7 +18,7 @@ describe('workspace external app target persistence', () => {
     )
   })
 
-  test('rejects branches, native paths, and worktrees from another transport', () => {
+  test('rejects branches, native paths, and worktrees from another transport', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://host-a/workspace/example')
 
     expect(parseWorkspaceExternalAppRecentKey(workspaceId, 'git-branch\0main')).toBeNull()

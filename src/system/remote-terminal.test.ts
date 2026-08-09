@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { buildRemoteTerminalInvocation } from '#/system/remote-terminal.ts'
 
 describe('buildRemoteTerminalInvocation', () => {
-  test('builds a safe ssh invocation for an absolute remote worktree path', () => {
+  test('builds a safe ssh invocation for an absolute remote worktree path', async () => {
     const invocation = buildRemoteTerminalInvocation('prod', '/srv/repo-feature')
 
     expect(invocation).not.toBeNull()
@@ -18,7 +18,7 @@ describe('buildRemoteTerminalInvocation', () => {
     expect(invocation?.shellCommand).toContain('/srv/repo-feature')
   })
 
-  test('shell-quotes remote paths that contain single quotes', () => {
+  test('shell-quotes remote paths that contain single quotes', async () => {
     const invocation = buildRemoteTerminalInvocation('prod', "/srv/repo's-feature")
 
     expect(invocation).not.toBeNull()
@@ -27,7 +27,7 @@ describe('buildRemoteTerminalInvocation', () => {
     )
   })
 
-  test('rejects unsafe aliases and remote paths', () => {
+  test('rejects unsafe aliases and remote paths', async () => {
     expect(buildRemoteTerminalInvocation('bad alias', '/srv/repo')).toBeNull()
     expect(buildRemoteTerminalInvocation('prod', 'relative/repo')).toBeNull()
     expect(buildRemoteTerminalInvocation('prod', '/srv/\u0000repo')).toBeNull()

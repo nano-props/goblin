@@ -1,5 +1,5 @@
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { DictKey } from '#/shared/i18n/dictionaries.ts'
+import type { DictKey } from '#/shared/i18n/en.ts'
 
 export type BranchActionShortcutAction = 'pull' | 'push'
 export type ClientNavigationShortcutAction =

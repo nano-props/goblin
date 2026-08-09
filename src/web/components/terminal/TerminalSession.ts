@@ -12,7 +12,7 @@ import type {
 } from '#/shared/terminal-types.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
-import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
+import { preloadTerminalFont } from '#/web/components/terminal/terminal-font.ts'
 import {
   projectTerminalStartResultForClient,
   type TerminalStartResultWithController,
@@ -40,7 +40,7 @@ import {
   createTerminalWriteFailureReporter,
   type TerminalWriteFailureReporter,
 } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
-import { toast } from 'sonner'
+import { toast } from 'vue-sonner'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import type {
   TerminalDescriptor,
@@ -163,7 +163,7 @@ export class TerminalSession {
       request?.onSettled?.()
       return false
     }
-    // A session may exist in the client projection before its React-owned view
+    // A session may exist in the client projection before its component-owned view
     // has reached a stable mount. Keep the presentation-level focus intent
     // pending at that boundary so StrictMode's synthetic mount cleanup cannot
     // settle an intent that the stable mount still needs to fulfil.

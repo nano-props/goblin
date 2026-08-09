@@ -8,9 +8,9 @@ import {
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 
-const terminalRuntimeCoordinatorLogger = serverLogger.child({ module: 'terminal-runtime-coordinator' })
+const terminalRuntimeCoordinatorLogger = serverNodeLog.child({ module: 'terminal-runtime-coordinator' })
 
 interface WorkspaceTabsUserCleanup {
   closeUser: WorkspacePaneTabsCoordinator['closeUser']

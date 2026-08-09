@@ -1,11 +1,7 @@
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
-import type {
-  RuntimeRecentWorkspacesState,
-  RuntimeSettingsSnapshot,
-  UserSettings,
-  SettingsSnapshot,
-} from '#/shared/api-types.ts'
+import type { RuntimeRecentWorkspacesState, RuntimeSettingsSnapshot, SettingsSnapshot } from '#/shared/api-types.ts'
+import type { UserSettings } from '#/shared/settings.ts'
 
 export function buildRuntimeSettingsSnapshot(input: {
   prefs: UserSettings

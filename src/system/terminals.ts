@@ -7,7 +7,7 @@
 // 3. Add the new id to TerminalApp in shared/settings.ts
 // 4. Add i18n keys for the workspace picker
 
-import type { TerminalApp, TerminalAppAvailability } from '#/shared/api-types.ts'
+import type { TerminalApp, TerminalAppAvailability } from '#/shared/settings.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import { isGhosttyInstalled, openInGhostty, openRemoteInGhostty } from '#/system/ghostty.ts'
 import { isAppleTerminalInstalled, openInAppleTerminal, openRemoteInAppleTerminal } from '#/system/apple-terminal.ts'

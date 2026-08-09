@@ -1,10 +1,7 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useResizeObserver } from '@vueuse/core'
+import { defineComponent, onMounted, ref, watch } from 'vue'
 import { ellipsizeLeftPathByWidth } from '#/web/lib/display-path.ts'
 import { cn } from '#/web/lib/cn.ts'
-interface Props {
-  path: string
-  className?: string
-}
 
 let measureCanvas: HTMLCanvasElement | null = null
 
@@ -28,48 +25,43 @@ function createTextWidthMeasurer(element: HTMLElement): (text: string) => number
   }
 }
 
-export function FilePathText({ path, className }: Props) {
-  const ref = useRef<HTMLSpanElement | null>(null)
-  const [displayPath, setDisplayPath] = useState(path)
+export const FilePathText = defineComponent(
+  (props: { path: string; class?: string }) => {
+    const element = ref<HTMLSpanElement | null>(null)
+    const displayPath = ref(props.path)
 
-  const update = useCallback(() => {
-    const element = ref.current
-    if (!element) return
-
-    const availableWidth = element.getBoundingClientRect().width || element.clientWidth
-    const measureText = createTextWidthMeasurer(element)
-    const nextPath = ellipsizeLeftPathByWidth(path, availableWidth, measureText)
-    setDisplayPath((current) => (current === nextPath ? current : nextPath))
-  }, [path])
-
-  useLayoutEffect(() => {
-    update()
-  })
-
-  useLayoutEffect(() => {
-    if (!window.ResizeObserver) {
-      window.addEventListener('resize', update)
-      return () => window.removeEventListener('resize', update)
+    function update(): void {
+      if (!element.value) return
+      const availableWidth = element.value.getBoundingClientRect().width || element.value.clientWidth
+      displayPath.value = ellipsizeLeftPathByWidth(props.path, availableWidth, createTextWidthMeasurer(element.value))
     }
 
-    const element = ref.current
-    if (!element) return
-    const observer = new ResizeObserver(update)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [update])
+    useResizeObserver(element, update)
+    onMounted(update)
+    // Path and typography-class changes do not necessarily resize the
+    // host, so explicitly remeasure after Vue commits either input.
+    watch(
+      [() => props.path, () => props.class],
+      ([path], [previousPath]) => {
+        if (path !== previousPath) displayPath.value = path
+        update()
+      },
+      { flush: 'post' },
+    )
 
-  return (
-    <span
-      ref={ref}
-      className={cn(
-        'block w-full min-w-0 overflow-hidden whitespace-nowrap text-sm text-foreground font-mono',
-        className,
-      )}
-      title={path}
-      aria-label={path}
-    >
-      {displayPath}
-    </span>
-  )
-}
+    return () => (
+      <span
+        ref={element}
+        class={cn(
+          'block w-full min-w-0 overflow-hidden whitespace-nowrap text-sm text-foreground font-mono',
+          props.class,
+        )}
+        title={props.path}
+        aria-label={props.path}
+      >
+        {displayPath.value}
+      </span>
+    )
+  },
+  { name: 'FilePathText', props: { path: { type: String, required: true }, class: String } },
+)

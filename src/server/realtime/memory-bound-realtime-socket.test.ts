@@ -5,7 +5,7 @@ import {
 } from '#/server/realtime/memory-bound-realtime-socket.ts'
 
 describe('MemoryBoundRealtimeSocket', () => {
-  test('sends immediately while the raw sender queue remains within its memory limit', () => {
+  test('sends immediately while the raw sender queue remains within its memory limit', async () => {
     const rawSocket = rawRealtimeSocket(MAX_APP_REALTIME_SEND_BACKLOG_BYTES)
     const socket = new MemoryBoundRealtimeSocket(rawSocket)
 
@@ -15,7 +15,7 @@ describe('MemoryBoundRealtimeSocket', () => {
     expect(rawSocket.terminate).not.toHaveBeenCalled()
   })
 
-  test('admits one atomic message even when it crosses the pending-byte limit', () => {
+  test('admits one atomic message even when it crosses the pending-byte limit', async () => {
     const rawSocket = rawRealtimeSocket(0)
     rawSocket.send.mockImplementation((data) => {
       rawSocket.bufferedAmount = Buffer.byteLength(data)
@@ -29,7 +29,7 @@ describe('MemoryBoundRealtimeSocket', () => {
     expect(rawSocket.terminate).not.toHaveBeenCalled()
   })
 
-  test('terminates without queueing the next send after pending bytes cross the limit', () => {
+  test('terminates without queueing the next send after pending bytes cross the limit', async () => {
     const rawSocket = rawRealtimeSocket(MAX_APP_REALTIME_SEND_BACKLOG_BYTES + 1)
     const socket = new MemoryBoundRealtimeSocket(rawSocket)
 
@@ -39,7 +39,7 @@ describe('MemoryBoundRealtimeSocket', () => {
     expect(rawSocket.terminate).toHaveBeenCalledOnce()
   })
 
-  test('checks accumulated pending bytes again before every send', () => {
+  test('checks accumulated pending bytes again before every send', async () => {
     const rawSocket = rawRealtimeSocket(0)
     rawSocket.send.mockImplementation((data) => {
       rawSocket.bufferedAmount += Buffer.byteLength(data)
@@ -54,7 +54,7 @@ describe('MemoryBoundRealtimeSocket', () => {
     expect(rawSocket.terminate).toHaveBeenCalledOnce()
   })
 
-  test('terminates when the raw send fails', () => {
+  test('terminates when the raw send fails', async () => {
     const rawSocket = rawRealtimeSocket(0)
     rawSocket.send.mockImplementation(() => {
       throw new Error('send failed')
@@ -66,7 +66,7 @@ describe('MemoryBoundRealtimeSocket', () => {
     expect(rawSocket.terminate).toHaveBeenCalledOnce()
   })
 
-  test('keeps ordinary close graceful and force close immediate', () => {
+  test('keeps ordinary close graceful and force close immediate', async () => {
     const gracefulRawSocket = rawRealtimeSocket(0)
     const forcedRawSocket = rawRealtimeSocket(0)
 
@@ -79,7 +79,7 @@ describe('MemoryBoundRealtimeSocket', () => {
     expect(forcedRawSocket.terminate).toHaveBeenCalledOnce()
   })
 
-  test('terminates when graceful close fails', () => {
+  test('terminates when graceful close fails', async () => {
     const rawSocket = rawRealtimeSocket(0)
     rawSocket.close.mockImplementation(() => {
       throw new Error('close failed')

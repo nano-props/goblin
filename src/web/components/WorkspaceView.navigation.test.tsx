@@ -6,12 +6,12 @@ import {
   setWorkspaceProbeForTest,
   createRepoBranch,
 } from '#/web/test-utils/repo-store.ts'
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import '#/web/test-utils/workspace-view.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import * as repoDataQuery from '#/web/repo-query-runtime.ts'
 import {
   restoreWorkspaceTabsMocks,
@@ -26,16 +26,18 @@ import {
 } from '#/web/test-utils/workspace-view.tsx'
 
 describe('WorkspaceView workspace navigation and restore', () => {
-  test('keeps workspace pane scroll memory across a dashboard round trip', () => {
+  test('keeps workspace pane scroll memory across a dashboard round trip', async () => {
     workspacePaneMocks.scrollMemoryProbe = true
     const result = render(branchWorkspaceView())
 
     buttonByTestId(result.container, 'workspace-pane-scroll-memory-write')?.click()
-    act(() => {
-      result.rerender(<WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />)
+    await flushTestUpdates(async () => {
+      await result.rerender(
+        <WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />,
+      )
     })
-    act(() => {
-      result.rerender(branchWorkspaceView())
+    await flushTestUpdates(async () => {
+      await result.rerender(branchWorkspaceView())
     })
 
     expect(result.container.querySelector('[data-testid="workspace-pane-scroll-memory-value"]')?.textContent).toBe(
@@ -43,7 +45,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     )
   })
 
-  test('invalidates the Git projection and worktree status once when leaving a terminal for a static pane', () => {
+  test('invalidates the Git projection and worktree status once when leaving a terminal for a static pane', async () => {
     const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoMetadataQueries')
     const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const terminalRoute = {
@@ -54,8 +56,8 @@ describe('WorkspaceView workspace navigation and restore', () => {
     }
     const result = render(<WorkspaceView workspaceId={REPO_ID} routeView={terminalRoute} />)
 
-    act(() => {
-      result.rerender(
+    await flushTestUpdates(async () => {
+      await result.rerender(
         <WorkspaceView
           workspaceId={REPO_ID}
           routeView={{
@@ -74,7 +76,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(invalidateStatus).toHaveBeenCalledWith(REPO_ID, expect.any(String))
   })
 
-  test('does not invalidate Git reads for terminal-to-terminal or static-to-static navigation', () => {
+  test('does not invalidate Git reads for terminal-to-terminal or static-to-static navigation', async () => {
     const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoMetadataQueries')
     const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const terminalRoute = {
@@ -85,8 +87,8 @@ describe('WorkspaceView workspace navigation and restore', () => {
     }
     const result = render(<WorkspaceView workspaceId={REPO_ID} routeView={terminalRoute} />)
 
-    act(() => {
-      result.rerender(
+    await flushTestUpdates(async () => {
+      await result.rerender(
         <WorkspaceView
           workspaceId={REPO_ID}
           routeView={{
@@ -102,22 +104,56 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(invalidateSnapshot).not.toHaveBeenCalled()
     expect(invalidateStatus).not.toHaveBeenCalled()
 
-    act(() => {
-      result.rerender(<WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />)
+    await flushTestUpdates(async () => {
+      await result.rerender(
+        <WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />,
+      )
     })
 
     expect(invalidateSnapshot).toHaveBeenCalledTimes(1)
     expect(invalidateStatus).toHaveBeenCalledTimes(1)
 
-    act(() => {
-      result.rerender(branchWorkspaceView())
+    await flushTestUpdates(async () => {
+      await result.rerender(branchWorkspaceView())
     })
 
     expect(invalidateSnapshot).toHaveBeenCalledTimes(1)
     expect(invalidateStatus).toHaveBeenCalledTimes(1)
   })
 
-  test('does not transfer terminal-exit invalidations across workspaces', () => {
+  test('projects a static workspace pane route change without remounting the workspace', async () => {
+    const result = render(
+      <WorkspaceView
+        workspaceId={REPO_ID}
+        routeView={{
+          kind: 'branch',
+          workspaceId: REPO_ID,
+          branchName: 'feature/a',
+          workspacePaneRoute: { kind: 'static', tab: 'history' },
+        }}
+      />,
+    )
+
+    expect(workspacePane(result.container)?.dataset.workspacePaneRouteTab).toBe('history')
+
+    await flushTestUpdates(async () => {
+      await result.rerender(
+        <WorkspaceView
+          workspaceId={REPO_ID}
+          routeView={{
+            kind: 'branch',
+            workspaceId: REPO_ID,
+            branchName: 'feature/a',
+            workspacePaneRoute: { kind: 'static', tab: 'files' },
+          }}
+        />,
+      )
+    })
+
+    expect(workspacePane(result.container)?.dataset.workspacePaneRouteTab).toBe('files')
+  })
+
+  test('does not transfer terminal-exit invalidations across workspaces', async () => {
     const otherWorkspaceId = workspaceIdForTest('goblin+file:///tmp/other-workspace')
     seedRepoWithReadModelForTest({
       id: otherWorkspaceId,
@@ -138,8 +174,8 @@ describe('WorkspaceView workspace navigation and restore', () => {
       />,
     )
 
-    act(() => {
-      result.rerender(
+    await flushTestUpdates(async () => {
+      await result.rerender(
         <WorkspaceView
           workspaceId={otherWorkspaceId}
           routeView={{ kind: 'dashboard', workspaceId: otherWorkspaceId }}
@@ -151,7 +187,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(invalidateStatus).not.toHaveBeenCalled()
   })
 
-  test('does not invalidate Git reads when leaving a filesystem terminal', () => {
+  test('does not invalidate Git reads when leaving a filesystem terminal', async () => {
     setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
     const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoMetadataQueries')
     const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
@@ -166,16 +202,18 @@ describe('WorkspaceView workspace navigation and restore', () => {
       />,
     )
 
-    act(() => {
-      result.rerender(<WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />)
+    await flushTestUpdates(async () => {
+      await result.rerender(
+        <WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />,
+      )
     })
 
     expect(invalidateSnapshot).not.toHaveBeenCalled()
     expect(invalidateStatus).not.toHaveBeenCalled()
   })
 
-  test('does not mount an existing repo before its runtime membership is restored', () => {
-    useWorkspacesStore.setState({ workspaceMembershipReady: false })
+  test('does not mount an existing repo before its runtime membership is restored', async () => {
+    workspacesStore.setState({ workspaceMembershipReady: false })
 
     const { container } = render(
       <WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />,
@@ -186,7 +224,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(container.querySelector('[data-testid="workspace-dashboard-page"]')).toBeNull()
   })
 
-  test('renders a non-Git workspace in the shared shell without mounting Git-only actions', () => {
+  test('renders a non-Git workspace in the shared shell without mounting Git-only actions', async () => {
     setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
 
     const { container } = render(
@@ -208,7 +246,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(restoreWorkspaceTabsMocks.useRepoToasts).not.toHaveBeenCalled()
   })
 
-  test('renders the directory Dashboard for a non-Git dashboard route without Git navigation', () => {
+  test('renders the directory Dashboard for a non-Git dashboard route without Git navigation', async () => {
     setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
 
     const { container } = render(
@@ -220,7 +258,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(branchNavigator(container)).toBeNull()
   })
 
-  test('renders the shared directory Dashboard for a remote non-Git workspace', () => {
+  test('renders the shared directory Dashboard for a remote non-Git workspace', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example/srv/workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
@@ -247,7 +285,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(container.querySelector('[data-testid="repo-sync-action"]')).toBeNull()
   })
 
-  test('keeps a routed repo on the restore skeleton until workspace membership is ready', () => {
+  test('keeps a routed repo on the restore skeleton until workspace membership is ready', async () => {
     resetWorkspacesStore()
 
     const { container } = render(
@@ -261,9 +299,9 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(container.textContent).not.toContain('workspace-route.not-found-title')
   })
 
-  test('shows an explicit not-found state after membership restore settles without the routed repo', () => {
+  test('shows an explicit not-found state after membership restore settles without the routed repo', async () => {
     resetWorkspacesStore()
-    useWorkspacesStore.setState({ workspaceMembershipReady: true })
+    workspacesStore.setState({ workspaceMembershipReady: true })
 
     const { container } = render(
       <WorkspaceView workspaceId={REPO_ID} routeView={{ kind: 'dashboard', workspaceId: REPO_ID }} />,
@@ -274,7 +312,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(container.textContent).not.toContain('goblin+file://')
   })
 
-  test('moves a missing routed repo from restore skeleton to not-found when membership settles', () => {
+  test('moves a missing routed repo from restore skeleton to not-found when membership settles', async () => {
     resetWorkspacesStore()
 
     const result = render(
@@ -284,16 +322,16 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(result.container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).not.toBeNull()
     expect(result.container.textContent).not.toContain('workspace-route.not-found-title')
 
-    act(() => {
-      useWorkspacesStore.setState({ workspaceMembershipReady: true })
+    await flushTestUpdates(() => {
+      workspacesStore.setState({ workspaceMembershipReady: true })
     })
 
     expect(result.container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
     expect(result.container.textContent).toContain('workspace-route.not-found-title')
   })
 
-  test('keeps a restore stub on the skeleton without mounting repo data surfaces', () => {
-    useWorkspacesStore.setState((state) => ({
+  test('keeps a restore stub on the skeleton without mounting repo data surfaces', async () => {
+    workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
         [REPO_ID]: {
@@ -308,15 +346,19 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
     expect(branchNavigator(container)).toBeNull()
     expect(workspacePane(container)).toBeNull()
-    expect(restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView).toHaveBeenCalledWith({ workspaceId: REPO_ID })
+    expect(restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView).toHaveBeenCalledWith({
+      workspaceId: expect.any(Function),
+    })
+    const restoreOptions = restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mock.calls.at(-1)?.[0]
+    expect(restoreOptions?.workspaceId()).toBe(REPO_ID)
   })
 
-  test('replaces the stub skeleton with a stable promotion failure view', () => {
+  test('replaces the stub skeleton with a stable promotion failure view', async () => {
     restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockReturnValue({
-      state: { phase: 'failed', message: 'server request failed' },
+      state: { value: { phase: 'failed', message: 'server request failed' } },
       retry: vi.fn(),
     })
-    useWorkspacesStore.setState((state) => ({
+    workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
         [REPO_ID]: {

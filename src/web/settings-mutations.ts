@@ -1,5 +1,4 @@
-import { useRef } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/vue-query'
 import { runSettingsAction } from '#/web/settings-actions.ts'
 
 export function useSettingsMutation<TVariables, TResult>(
@@ -10,17 +9,17 @@ export function useSettingsMutation<TVariables, TResult>(
   // distinct payload semantics; do not use it for user-input writes.
   options?: { singleFlight?: boolean },
 ) {
-  const inFlightRef = useRef<Promise<TResult | null> | null>(null)
+  let inFlight: Promise<TResult | null> | null = null
   return useMutation({
     mutationFn: async (variables: TVariables) => {
       if (!options?.singleFlight) return await runSettingsAction(label, async () => await task(variables))
-      if (inFlightRef.current) return await inFlightRef.current
+      if (inFlight) return await inFlight
       const promise = runSettingsAction(label, async () => await task(variables))
-      inFlightRef.current = promise
+      inFlight = promise
       try {
         return await promise
       } finally {
-        if (inFlightRef.current === promise) inFlightRef.current = null
+        if (inFlight === promise) inFlight = null
       }
     },
   })

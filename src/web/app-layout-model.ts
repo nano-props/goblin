@@ -5,6 +5,7 @@ import { returnToFromHref } from '#/web/app-route-href.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
 import { branchNameFromSlug, workspaceIdFromSlug, worktreePathFromSlug } from '#/web/workspace-route-slugs.ts'
+import type { RouteLocationNormalizedLoaded } from 'vue-router'
 
 export type AuthenticatedAppShellMode = 'settings' | 'workspace-restore' | 'workspace-failed' | 'workspace-ready'
 
@@ -84,6 +85,34 @@ export function workspaceRouteContextFromMatches(
   return { kind: 'empty', workspaceSlug }
 }
 
+export function workspaceRouteContextFromVueRoute(route: RouteLocationNormalizedLoaded): WorkspaceRouteContext | null {
+  const workspaceSlug = routeStringParam(route.params.workspaceSlug)
+  if (!workspaceSlug) return null
+  const routeName = typeof route.name === 'string' ? route.name : ''
+  const branchSlug = routeName.startsWith('workspace-branch') ? routeStringParam(route.params.branchSlug) : null
+  if (branchSlug) {
+    const branchName = branchNameFromSlug(branchSlug)
+    return branchName
+      ? { kind: 'branch', workspaceSlug, branchName, workspacePaneRoute: workspacePaneRouteFromVueRoute(route) }
+      : { kind: 'empty', workspaceSlug }
+  }
+
+  const worktreeSlug = routeName.startsWith('workspace-worktree') ? routeStringParam(route.params.worktreeSlug) : null
+  if (worktreeSlug) {
+    const worktreePath = worktreePathFromSlug(worktreeSlug)
+    return worktreePath
+      ? { kind: 'worktree', workspaceSlug, worktreePath, workspacePaneRoute: workspacePaneRouteFromVueRoute(route) }
+      : { kind: 'empty', workspaceSlug }
+  }
+
+  if (routeName === 'workspace-new-worktree') return { kind: 'newWorktree', workspaceSlug }
+  if (routeName === 'workspace-dashboard') return { kind: 'dashboard', workspaceSlug }
+  if (routeName.startsWith('workspace-root')) {
+    return { kind: 'workspace-root', workspaceSlug, workspacePaneRoute: workspacePaneRouteFromVueRoute(route) }
+  }
+  return { kind: 'empty', workspaceSlug }
+}
+
 export function workspaceNavigationRouteContext(
   routeContext: WorkspaceRouteContext | null,
   routeHref: string | null,
@@ -111,4 +140,16 @@ function workspacePaneRouteFromMatches(
   const tabKey = tabMatch?.params.tabKey
   if (!tabKey) return null
   return isWorkspacePaneStaticTabType(tabKey) ? { kind: 'static', tab: tabKey } : { kind: 'invalid-static', tabKey }
+}
+
+function workspacePaneRouteFromVueRoute(route: RouteLocationNormalizedLoaded): ParsedWorkspacePaneRoute | null {
+  const terminalSessionId = routeStringParam(route.params.terminalSessionId)
+  if (terminalSessionId) return { kind: 'terminal', terminalSessionId }
+  const tabKey = routeStringParam(route.params.tabKey)
+  if (!tabKey) return null
+  return isWorkspacePaneStaticTabType(tabKey) ? { kind: 'static', tab: tabKey } : { kind: 'invalid-static', tabKey }
+}
+
+function routeStringParam(value: string | string[] | undefined): string | null {
+  return typeof value === 'string' ? value : null
 }

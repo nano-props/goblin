@@ -1,4 +1,5 @@
-import type { UserSettings, SettingsSnapshot } from '#/shared/api-types.ts'
+import type { SettingsSnapshot } from '#/shared/api-types.ts'
+import type { UserSettings } from '#/shared/settings.ts'
 import * as v from 'valibot'
 import { postEmbeddedServerJson, requestEmbeddedServerJson } from '#/shared/embedded-server-client.ts'
 import { getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'

@@ -1,107 +1,111 @@
-import { useActionState, useState, type ReactNode } from 'react'
-import { useAuth } from '#/web/auth/AuthProvider.tsx'
-import { useT } from '#/web/stores/i18n.ts'
-import { postServerJson } from '#/web/lib/server-fetch.ts'
-import { OkResponseSchema } from '#/shared/settings-response-schema.ts'
+import { defineComponent, onScopeDispose, ref } from 'vue'
+import type { PropType } from 'vue'
 import { decodeWith } from '#/shared/http-response-schema.ts'
-import { createTimeoutAbortController } from '#/web/lib/abort.ts'
+import { OkResponseSchema } from '#/shared/settings-response-schema.ts'
+import { useAuth } from '#/web/auth/AuthProvider.tsx'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
+import { createTimeoutAbortController } from '#/web/lib/abort.ts'
+import { postServerJson } from '#/web/lib/server-fetch.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 
 const LOGIN_TIMEOUT_MS = 15_000
 
-/**
- * Auth gate for the client. Mounts above the app's normal
- * children; reads the shared auth state from `useAuth()` and
- * either passes through (authenticated) or shows a one-field
- * login form (unauthenticated). Embedded clients have the
- * access token in the bootstrap and never see the form.
- *
- * The form is intentionally minimal — single text input + submit —
- * because the access token is a 25-char base36 string the user is
- * expected to paste from a server log or settings panel. There is
- * no signup, no "forgot token" flow, no rate limit UI; rotate by
- * deleting the access-token file under `app.getPath('userData')`
- * (see `ACCESS_TOKEN_FILE_NAME`) and restarting.
- *
- * Mounted children only exist in the React tree once auth has
- * resolved to `authenticated`, so any side effects (WebSocket
- * subscribers, periodic polls) declared inside this subtree
- * run only after the user has a valid session. This is what
- * keeps the server log quiet on first load.
- *
- * i18n is intentionally not gated here. The client entrypoint
- * hydrates `/api/i18n` before mounting the normal React tree, so
- * this component can stay focused on auth state instead of owning
- * another boot dependency.
- */
-export function TokenGate({ children }: { children: ReactNode }) {
-  const auth = useAuth()
-  if (auth.state === 'checking') return <CheckingPlaceholder />
-  if (auth.state === 'unauthenticated') return <LoginForm onSuccess={auth.refresh} />
-  return <>{children}</>
-}
+export const TokenGate = defineComponent(
+  (_props, { slots }) => {
+    const auth = useAuth()
+    return () => {
+      if (auth.state === 'checking') return <CenteredLoadingStatus label="Checking authentication" />
+      if (auth.state === 'unauthenticated') return <LoginForm onSuccess={auth.refresh} />
+      return slots.default?.()
+    }
+  },
+  { name: 'TokenGate' },
+)
 
-function CheckingPlaceholder() {
-  return <CenteredLoadingStatus label="Checking authentication" />
-}
+const LoginForm = defineComponent(
+  (props: { onSuccess: () => void }) => {
+    const t = useT()
+    const value = ref('')
+    const error = ref<string | null>(null)
+    const submitting = ref(false)
+    let activeTimeout: ReturnType<typeof createTimeoutAbortController> | null = null
 
-function LoginForm({ onSuccess }: { onSuccess: () => void }) {
-  const t = useT()
-  const [value, setValue] = useState('')
-  const [state, loginAction, submitting] = useActionState(
-    async (_previous: { error: string | null }, formData: FormData): Promise<{ error: string | null }> => {
-      const trimmed = String(formData.get('token') ?? '').trim()
-      if (trimmed.length === 0) return { error: t('auth.gate.error-empty') }
+    const submit = async () => {
+      if (submitting.value) return
+      const trimmed = value.value.trim()
+      if (trimmed.length === 0) {
+        error.value = t('auth.gate.error-empty')
+        return
+      }
+      submitting.value = true
+      error.value = null
+      const onSuccess = props.onSuccess
       const timeout = createTimeoutAbortController(LOGIN_TIMEOUT_MS, `login timed out after ${LOGIN_TIMEOUT_MS}ms`)
+      activeTimeout = timeout
       try {
         await postServerJson('/api/login', { token: trimmed }, decodeWith(OkResponseSchema), { signal: timeout.signal })
         onSuccess()
-        return { error: null }
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : t('auth.gate.error-failed') }
+      } catch (caught) {
+        error.value = caught instanceof Error ? caught.message : t('auth.gate.error-failed')
       } finally {
         timeout.dispose()
+        if (activeTimeout === timeout) activeTimeout = null
+        submitting.value = false
       }
-    },
-    { error: null },
-  )
+    }
 
-  const error = submitting ? null : state.error
+    onScopeDispose(() => {
+      activeTimeout?.abort(new Error('login cancelled'))
+      activeTimeout?.dispose()
+      activeTimeout = null
+    })
 
-  return (
-    <div className="flex h-full items-center justify-center bg-background p-4">
-      <form
-        action={loginAction}
-        className="flex w-full max-w-sm flex-col gap-3 rounded-md border border-border bg-card p-6 text-card-foreground shadow-sm"
-      >
-        <h1 className="text-lg font-semibold">{t('auth.gate.title')}</h1>
-        <p className="text-sm text-muted-foreground">{t('auth.gate.description')}</p>
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">{t('auth.gate.token-label')}</span>
-          <input
-            name="token"
-            type="text"
-            inputMode="text"
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            disabled={submitting}
-            className="rounded-md border border-input bg-background px-3 py-2 font-mono text-base"
-            placeholder={t('auth.gate.token-placeholder')}
-          />
-        </label>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+    return () => (
+      <div class="flex h-full items-center justify-center bg-background p-4">
+        <form
+          class="flex w-full max-w-sm flex-col gap-3 rounded-md border border-border bg-card p-6 text-card-foreground shadow-sm"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void submit()
+          }}
         >
-          {submitting ? t('auth.gate.signing-in') : t('auth.gate.sign-in')}
-        </button>
-      </form>
-    </div>
-  )
-}
+          <h1 class="text-lg font-semibold">{t('auth.gate.title')}</h1>
+          <p class="text-sm text-muted-foreground">{t('auth.gate.description')}</p>
+          <label class="flex flex-col gap-1">
+            <span class="text-sm font-medium">{t('auth.gate.token-label')}</span>
+            <input
+              name="token"
+              type="text"
+              inputmode="text"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck={false}
+              value={value.value}
+              onInput={(event) => {
+                if (event.currentTarget instanceof HTMLInputElement) value.value = event.currentTarget.value
+              }}
+              disabled={submitting.value}
+              class="rounded-md border border-input bg-background px-3 py-2 font-mono text-base"
+              placeholder={t('auth.gate.token-placeholder')}
+            />
+          </label>
+          {error.value ? <p class="text-sm text-destructive">{error.value}</p> : null}
+          <button
+            type="submit"
+            disabled={submitting.value}
+            class="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            {submitting.value ? t('auth.gate.signing-in') : t('auth.gate.sign-in')}
+          </button>
+        </form>
+      </div>
+    )
+  },
+  {
+    name: 'LoginForm',
+    props: {
+      onSuccess: { type: Function as PropType<() => void>, required: true },
+    },
+  },
+)

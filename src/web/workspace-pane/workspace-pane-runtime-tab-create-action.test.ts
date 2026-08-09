@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalCreateLeaderAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   commitCreatedTerminalWorkspacePaneRuntimeTab,
   dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
@@ -152,7 +152,7 @@ describe('workspace pane runtime tab create action', () => {
     )
   })
 
-  test('returns no terminal create action without a runtime target', () => {
+  test('returns no terminal create action without a runtime target', async () => {
     const action = workspacePaneRuntimeTabCreateAction('terminal', {
       runtimeTabStateByType: runtimeTabState(),
       showCreatedRuntimeTab: vi.fn(),
@@ -458,7 +458,7 @@ describe('workspace pane runtime tab create action', () => {
 
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
     expect(workspacePaneTabOpener(PANE_TARGET, WORKSPACE_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBeNull()
-    expect(useWorkspacesStore.getState().workspaces[REPO_ROOT]?.workspaceRuntimeId).toBe('repo-runtime-replacement')
+    expect(workspacesStore.getState().workspaces[REPO_ROOT]?.workspaceRuntimeId).toBe('repo-runtime-replacement')
   })
 
   test('rejects a server presentation that does not match the execution target', async () => {
@@ -477,7 +477,7 @@ describe('workspace pane runtime tab create action', () => {
     expect(workspacePaneTabOpener(PANE_TARGET, WORKSPACE_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBeNull()
   })
 
-  test('marks the terminal create action busy only while terminal creation is pending', () => {
+  test('marks the terminal create action busy only while terminal creation is pending', async () => {
     const pendingAction = workspacePaneRuntimeTabCreateAction('terminal', {
       runtimeTabStateByType: runtimeTabState({ createPending: true }),
       showCreatedRuntimeTab: vi.fn(),

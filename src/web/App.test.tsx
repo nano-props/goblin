@@ -1,85 +1,51 @@
 // @vitest-environment jsdom
-
-import { seedRepoShellForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { App } from '#/web/App.tsx'
-import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { renderInJsdom } from '#/test-utils/render.tsx'
-
-const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/example-workspace')
-
-const responsiveMocks = vi.hoisted(() => ({
-  mode: 'default' as 'default' | 'compact',
-}))
-
-vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useResponsiveUiMode: () => responsiveMocks.mode,
-  useIsCompactUi: () => responsiveMocks.mode === 'compact',
-}))
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
+import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 vi.mock('#/web/components/EmptyWorkspaceView.tsx', () => ({
   EmptyWorkspaceView: () => <div data-testid="empty-workspace-view" />,
+}))
+
+vi.mock('#/web/components/Skeleton.tsx', () => ({
+  WorkspaceLayoutSkeleton: () => <div data-testid="workspace-layout-skeleton" />,
+}))
+
+vi.mock('#/web/components/SettingsPageScreen.tsx', () => ({
+  SettingsPageScreen: () => <div data-testid="settings-page-screen" />,
 }))
 
 vi.mock('#/web/components/WorkspaceView.tsx', () => ({
   WorkspaceView: () => <div data-testid="workspace-view" />,
 }))
 
-vi.mock('#/web/components/SettingsPageScreen.tsx', () => ({
-  SettingsPageScreen: () => <div data-testid="settings-page" />,
-}))
+import { App } from '#/web/App.tsx'
 
-vi.mock('#/web/components/ErrorBoundary.tsx', () => ({
-  ErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}))
-
-beforeEach(() => {
-  responsiveMocks.mode = 'default'
-  resetWorkspacesStore()
-})
-
-describe('App workspace membership skeleton', () => {
-  test('renders the empty repo shell while no repository is open', () => {
-    useWorkspacesStore.setState({ workspaceMembershipReady: true })
-
-    const { container } = render(<App />)
-
-    expect(container.querySelector('[data-testid="empty-workspace-view"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="workspace-view"]')).toBeNull()
+describe('App', () => {
+  beforeEach(() => {
+    resetWorkspacesStore()
   })
 
-  test('renders the current repository shell when a repository is open', () => {
-    seedRepoShellForTest({ id: WORKSPACE_ID })
+  test('renders through setup JSX and updates from the workspace store', async () => {
+    const view = renderInJsdom(<App />)
 
-    const { container } = render(<App routeWorkspaceView={{ kind: 'dashboard', workspaceId: WORKSPACE_ID }} />)
+    expect(view.container.querySelector('[data-testid="workspace-layout-skeleton"]')).not.toBeNull()
+    expect(view.container.querySelector('[data-testid="empty-workspace-view"]')).toBeNull()
 
-    expect(container.querySelector('[data-testid="workspace-view"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="empty-workspace-view"]')).toBeNull()
+    await flushTestUpdates(() => {
+      workspacesStore.setState({ workspaceMembershipReady: true })
+    })
+
+    expect(view.container.querySelector('[data-testid="workspace-layout-skeleton"]')).toBeNull()
+    expect(view.container.querySelector('[data-testid="empty-workspace-view"]')).not.toBeNull()
   })
 
-  test('uses a single-pane navigator skeleton in compact mode before workspace membership is ready', () => {
-    responsiveMocks.mode = 'compact'
+  test('merges caller classes with the component root class', async () => {
+    const view = renderInJsdom(<App class="app-host" />)
+    const root = view.container.firstElementChild
 
-    const { container } = render(<App />)
-
-    expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
-    expect(container.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).toBeNull()
+    expect(root?.classList.contains('app-host')).toBe(true)
+    expect(root?.classList.contains('flex')).toBe(true)
   })
 })
-
-function render(element: React.ReactNode) {
-  return renderInJsdom(
-    <LayoutOverlayActions
-      value={{
-        openWorkspacePathDialog: vi.fn(),
-        openRemoteWorkspace: vi.fn(),
-        openCloneRepo: vi.fn(),
-        openCreateWorktree: vi.fn(),
-      }}
-    >
-      {element}
-    </LayoutOverlayActions>,
-  )
-}

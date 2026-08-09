@@ -1,13 +1,9 @@
-import type { Key } from 'react-aria-components'
 import type { FiletreeRow } from '#/web/components/workspace-pane/filetree-collection.ts'
 
 export const FILETREE_ROW_HEIGHT = 24
 
-export function firstStringKey(keys: ReadonlySet<Key>): string | null {
-  for (const key of keys) {
-    if (typeof key === 'string') return key
-  }
-  return null
+export function firstFiletreeKey(keys: ReadonlySet<string>): string | null {
+  return keys.values().next().value ?? null
 }
 
 export function focusFiletreeRowAtIndex(

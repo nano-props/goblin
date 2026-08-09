@@ -49,8 +49,8 @@ export async function resolveRemoteWorkspaceConnection(
   })
 }
 
-export async function getRemoteSshHosts(): Promise<SshConfigHostsResult> {
-  return await fetchServerJson('/api/remote/ssh-hosts', decodeWith(SshConfigHostsResponseSchema))
+export async function getRemoteSshHosts(signal?: AbortSignal): Promise<SshConfigHostsResult> {
+  return await fetchServerJson('/api/remote/ssh-hosts', decodeWith(SshConfigHostsResponseSchema), { signal })
 }
 
 export async function getRemotePathSuggestions(

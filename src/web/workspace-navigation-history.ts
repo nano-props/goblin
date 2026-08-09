@@ -1,19 +1,20 @@
-import { useEffect, useMemo } from 'react'
-import { useRouter } from '@tanstack/react-router'
-import type { HistoryState } from '@tanstack/history'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
+import { computed, toValue, watch } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter } from 'vue'
+import { useRouter } from 'vue-router'
 import { isEqual } from 'es-toolkit'
 import type { AppRouteNavigation, AppRouteNavigationOptions } from '#/web/app-route-navigation.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/workspaces/navigation-history-entry.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { observeAppHistoryNavigation } from '#/web/app-navigation-lifecycle.ts'
+import { takeAppHistoryPresentationAction } from '#/web/app-history-presentation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; workspaceId: WorkspaceId }
@@ -30,32 +31,12 @@ export type WorkspaceNavigationRouteContext =
     }
 
 interface WorkspaceNavigationHistoryOptions {
-  routeContext: WorkspaceNavigationRouteContext | null
-  replaceCurrent?: boolean
-  replaceCurrentRouteContext?: WorkspaceNavigationRouteContext | null
+  routeContext: MaybeRefOrGetter<WorkspaceNavigationRouteContext | null>
+  replaceCurrent?: MaybeRefOrGetter<boolean>
+  replaceCurrentRouteContext?: MaybeRefOrGetter<WorkspaceNavigationRouteContext | null>
 }
 
 type WorkspaceNavigationBrowserHistoryTraversal = 'back' | 'forward'
-type WorkspaceNavigationBrowserHistoryAction =
-  { href: string; type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' } | { href: string; type: 'GO'; index: number }
-
-interface WorkspaceNavigationRouterHistory {
-  state: { location: { href: string; state: HistoryState } }
-  history: {
-    subscribe: (
-      cb: (event: {
-        location: { href: string; state: HistoryState }
-        action: { type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' } | { type: 'GO'; index: number }
-      }) => void,
-    ) => () => void
-  }
-}
-
-// Router history event metadata. It is not part of terminal create/focus
-// logic; it lets the route/history adapter preserve the app history cursor
-// when the browser lands on a URL through Back/Forward instead of an
-// app-initiated PUSH.
-let browserHistoryAction: WorkspaceNavigationBrowserHistoryAction | null = null
 
 export function useWorkspaceNavigationHistory({
   routeContext,
@@ -64,78 +45,75 @@ export function useWorkspaceNavigationHistory({
 }: WorkspaceNavigationHistoryOptions): void {
   const entry = useWorkspaceNavigationHistoryEntry(routeContext)
   const replaceCurrentEntry = useWorkspaceNavigationHistoryEntry(replaceCurrentRouteContext)
-  const router = useRouter({ warn: false }) as WorkspaceNavigationRouterHistory | null
-  const routeHref = router?.state.location.href ?? currentBrowserLocationHref()
-  const recordWorkspaceNavigation = useWorkspacesStore((s) => s.recordWorkspaceNavigation)
+  const router = useRouter()
 
-  useEffect(() => {
-    if (!entry) return
-    const currentHistoryEntry =
-      useWorkspacesStore.getState().navigationHistoryByWorkspace[entry.workspaceId]?.current ?? null
-    const browserHistoryTraversal = workspaceNavigationBrowserHistoryTraversal(routeHref)
-    const browserHistoryReplace = workspaceNavigationBrowserHistoryReplacement(routeHref)
-    const replaceCurrentMatches =
-      replaceCurrent &&
-      !!replaceCurrentEntry &&
-      workspaceNavigationHistoryEntryEqual(currentHistoryEntry, replaceCurrentEntry)
-    if (browserHistoryTraversal && replaceCurrent && replaceCurrentEntry) {
-      if (!replaceCurrentMatches) {
-        recordWorkspaceNavigation(replaceCurrentEntry, { browserHistoryTraversal })
+  // Route settlement is the authoritative point at which a workspace history
+  // projection may be recorded. The watcher is required to follow that
+  // external router/store combination; it does not mirror state locally.
+  watch(
+    [entry, replaceCurrentEntry, () => router.currentRoute.value.fullPath, () => toValue(replaceCurrent)],
+    () => {
+      const nextEntry = entry.value
+      if (!nextEntry) return
+      const routeHref = router.currentRoute.value.fullPath
+      const browserHistoryAction = takeAppHistoryPresentationAction(routeHref)
+      const currentHistoryEntry =
+        workspacesStore.getState().navigationHistoryByWorkspace[nextEntry.workspaceId]?.current ?? null
+      const browserHistoryTraversal = workspaceNavigationBrowserHistoryTraversal(browserHistoryAction)
+      const browserHistoryReplace = browserHistoryAction?.type === 'REPLACE'
+      const replaceCurrentMatches =
+        toValue(replaceCurrent) &&
+        !!replaceCurrentEntry.value &&
+        workspaceNavigationHistoryEntryEqual(currentHistoryEntry, replaceCurrentEntry.value)
+      const recordWorkspaceNavigation = workspacesStore.getState().recordWorkspaceNavigation
+      if (browserHistoryTraversal && toValue(replaceCurrent) && replaceCurrentEntry.value) {
+        if (!replaceCurrentMatches) {
+          recordWorkspaceNavigation(replaceCurrentEntry.value, { browserHistoryTraversal })
+        }
+        const restoredCurrent =
+          workspacesStore.getState().navigationHistoryByWorkspace[nextEntry.workspaceId]?.current ?? null
+        if (workspaceNavigationHistoryEntryEqual(restoredCurrent, replaceCurrentEntry.value)) {
+          recordWorkspaceNavigation(nextEntry, { replace: true })
+        } else if (!workspaceNavigationHistoryEntryEqual(restoredCurrent, nextEntry)) {
+          recordWorkspaceNavigation(nextEntry)
+        }
+        return
       }
-      const restoredCurrent =
-        useWorkspacesStore.getState().navigationHistoryByWorkspace[entry.workspaceId]?.current ?? null
-      if (workspaceNavigationHistoryEntryEqual(restoredCurrent, replaceCurrentEntry)) {
-        recordWorkspaceNavigation(entry, { replace: true })
-      } else if (!workspaceNavigationHistoryEntryEqual(restoredCurrent, entry)) {
-        recordWorkspaceNavigation(entry)
-      }
-      clearBrowserHistoryAction(routeHref)
-      return
-    }
-    recordWorkspaceNavigation(
-      entry,
-      replaceCurrentMatches || browserHistoryReplace
-        ? { replace: true }
-        : browserHistoryTraversal
-          ? { browserHistoryTraversal }
-          : undefined,
-    )
-    clearBrowserHistoryAction(routeHref)
-  }, [entry, recordWorkspaceNavigation, replaceCurrent, replaceCurrentEntry, routeHref])
-}
-
-/** One app subscription owns navigation settlement and browser traversal metadata. */
-export function useAppHistoryPresentationObserver(): void {
-  const router = useRouter({ warn: false }) as WorkspaceNavigationRouterHistory | null
-  useEffect(() => {
-    if (!router) return
-    return router.history.subscribe(({ location, action }) => {
-      observeAppHistoryNavigation({ href: location.href, state: location.state, action })
-      browserHistoryAction =
-        action.type === 'GO'
-          ? { href: location.href, type: 'GO', index: action.index }
-          : { href: location.href, type: action.type }
-    })
-  }, [router])
+      recordWorkspaceNavigation(
+        nextEntry,
+        replaceCurrentMatches || browserHistoryReplace
+          ? { replace: true }
+          : browserHistoryTraversal
+            ? { browserHistoryTraversal }
+            : undefined,
+      )
+    },
+    { immediate: true },
+  )
 }
 
 function useWorkspaceNavigationHistoryEntry(
-  routeContext: WorkspaceNavigationRouteContext | null,
-): WorkspaceNavigationHistoryEntry | null {
-  const snapshot = useStoreWithEqualityFn(
-    useWorkspacesStore,
-    (s) => {
-      if (!routeContext) return null
-      const repo = s.workspaces[routeContext.workspaceId]
-      if (!repo) return null
-      return workspaceNavigationHistoryRouteSnapshotFromContext({
-        routeContext,
-        workspaceId: repo.id,
-      })
-    },
-    workspaceNavigationHistoryRouteSnapshotEqual,
-  )
-  return useMemo(() => workspaceNavigationHistoryEntryFromSnapshot(snapshot), [snapshot])
+  routeContext: MaybeRefOrGetter<WorkspaceNavigationRouteContext | null>,
+): ComputedRef<WorkspaceNavigationHistoryEntry | null> {
+  const storeState = useStoreSelector(workspacesStore, (state) => state)
+  const snapshot = computed(() => {
+    const currentRouteContext = toValue(routeContext)
+    if (!currentRouteContext) return null
+    const repo = storeState.value.workspaces[currentRouteContext.workspaceId]
+    if (!repo) return null
+    return workspaceNavigationHistoryRouteSnapshotFromContext({
+      routeContext: currentRouteContext,
+      workspaceId: repo.id,
+    })
+  })
+  let previousSnapshot: WorkspaceNavigationHistoryRouteSnapshot | null = null
+  let previousEntry: WorkspaceNavigationHistoryEntry | null = null
+  return computed(() => {
+    if (workspaceNavigationHistoryRouteSnapshotEqual(previousSnapshot, snapshot.value)) return previousEntry
+    previousSnapshot = snapshot.value
+    previousEntry = workspaceNavigationHistoryEntryFromSnapshot(snapshot.value)
+    return previousEntry
+  })
 }
 
 type WorkspaceNavigationHistoryRouteSnapshot =
@@ -193,7 +171,7 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
       }
     }
     case 'branch': {
-      const repo = useWorkspacesStore.getState().workspaces[workspaceId]
+      const repo = workspacesStore.getState().workspaces[workspaceId]
       const branchModel =
         repo?.capability.kind === 'git' ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId) : null
       const branch = branchModel?.branches.find((candidate) => candidate.name === routeContext.branchName)
@@ -360,7 +338,7 @@ export function workspaceNavigationHistoryRestoreBlocked(
   workspaceId: WorkspaceId,
   direction: 'back' | 'forward',
 ): boolean {
-  const history = useWorkspacesStore.getState().navigationHistoryByWorkspace[workspaceId]
+  const history = workspacesStore.getState().navigationHistoryByWorkspace[workspaceId]
   const target = direction === 'back' ? history?.backStack.at(-1) : history?.forwardStack.at(-1)
   if (!target) return false
   return (
@@ -385,10 +363,9 @@ function workspaceNavigationBranchEntryTargetsWorkspacePane(entry: WorkspaceNavi
 }
 
 function workspaceNavigationBrowserHistoryTraversal(
-  routeHref: string,
+  action: ReturnType<typeof takeAppHistoryPresentationAction>,
 ): WorkspaceNavigationBrowserHistoryTraversal | null {
-  const action = browserHistoryAction
-  if (!action || action.href !== routeHref) return null
+  if (!action) return null
   if (action.type === 'BACK') return 'back'
   if (action.type === 'FORWARD') return 'forward'
   if (action.type === 'GO') {
@@ -396,18 +373,4 @@ function workspaceNavigationBrowserHistoryTraversal(
     if (action.index > 0) return 'forward'
   }
   return null
-}
-
-function workspaceNavigationBrowserHistoryReplacement(routeHref: string): boolean {
-  const action = browserHistoryAction
-  return !!action && action.href === routeHref && action.type === 'REPLACE'
-}
-
-function clearBrowserHistoryAction(routeHref: string): void {
-  if (browserHistoryAction?.href === routeHref) browserHistoryAction = null
-}
-
-function currentBrowserLocationHref(): string {
-  if (typeof window === 'undefined') return ''
-  return `${window.location.pathname}${window.location.search}${window.location.hash}`
 }

@@ -6,18 +6,16 @@ import type {
   GitHubCliState,
   GlobalShortcutState,
   I18nSnapshot,
-  LangPref,
   LanInfo,
   WorkspaceSettingsState,
   WorkspaceTabsRestoreResult,
   RuntimeRecentWorkspacesState,
   WorkspaceRestoreResult,
-  UserSettings,
   UserSettingsUpdateResponse,
   SettingsSnapshot,
-  ThemePref,
   ThemeState,
 } from '#/shared/api-types.ts'
+import type { LangPref, UserSettings, ThemePref } from '#/shared/settings.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'

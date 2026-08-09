@@ -5,19 +5,21 @@
 // Uses the project's `--font-sans` stack (system UI face, e.g. SF Pro
 // on macOS) at weight 500.
 
+import type { FunctionalComponent, HTMLAttributes } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
 
-interface Props {
+interface Props extends Omit<HTMLAttributes, 'class'> {
   /** Cap height of the wordmark in pixels. Default 13 (fits the window chrome toolbar). */
   size?: number
-  className?: string
+  class?: HTMLAttributes['class']
 }
 
-export function Logo({ size = 13, className }: Props) {
+export const Logo: FunctionalComponent<Props> = ({ class: classValue, size = 13, ...props }) => {
   return (
     <span
+      {...props}
       aria-label="Goblin"
-      className={cn('inline-flex items-baseline align-middle select-none text-foreground', className)}
+      class={cn('inline-flex items-baseline align-middle select-none text-foreground', classValue)}
       style={{
         fontFamily: 'var(--font-sans)',
         fontWeight: 500,
@@ -30,3 +32,4 @@ export function Logo({ size = 13, className }: Props) {
     </span>
   )
 }
+Logo.inheritAttrs = false

@@ -1,72 +1,76 @@
-// shadcn/ui Sonner Toaster. Adjusted from the upstream template:
-// upstream pulls theme from `next-themes`, which doesn't fit because
-// this project owns its own theme store (useThemeStore). We read from
-// there instead so the toast theme tracks html[data-theme].
+import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon } from '@lucide/vue'
+import { Toaster as VueSonner } from 'vue-sonner'
+import type { ToasterProps } from 'vue-sonner'
+import { defineComponent } from 'vue'
+import type { CSSProperties, FunctionalComponent } from 'vue'
+import { themeStore } from '#/web/stores/theme.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
-import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon } from 'lucide-react'
-import { Toaster as Sonner, type ToasterProps } from 'sonner'
-import { useThemeStore } from '#/web/stores/theme.ts'
+const ToastSuccessIcon: FunctionalComponent = () => <CircleCheckIcon class="size-4" />
+const ToastInfoIcon: FunctionalComponent = () => <InfoIcon class="size-4" />
+const ToastWarningIcon: FunctionalComponent = () => <TriangleAlertIcon class="size-4" />
+const ToastErrorIcon: FunctionalComponent = () => <OctagonXIcon class="size-4" />
+const ToastLoadingIcon: FunctionalComponent = () => <Loader2Icon class="size-4 animate-spin" />
 
-const Toaster = ({ toastOptions, className, style, ...props }: ToasterProps) => {
-  const theme = useThemeStore((s) => s.resolved)
-  const classNames = toastOptions?.classNames
+type ToastStyle = CSSProperties & Record<`--${string}`, string>
 
-  return (
-    <Sonner
-      {...props}
-      theme={theme}
-      className={['toaster group', className].filter(Boolean).join(' ')}
-      icons={{
-        success: <CircleCheckIcon className="size-4" />,
-        info: <InfoIcon className="size-4" />,
-        warning: <TriangleAlertIcon className="size-4" />,
-        error: <OctagonXIcon className="size-4" />,
-        loading: <Loader2Icon className="size-4 animate-spin" />,
-      }}
-      // Drive sonner's per-state colours via its CSS-var hooks. Body
-      // stays neutral (popover-coloured); semantic meaning rides on
-      // the icon colour set above.
-      //
-      // NOTE: token names are `--color-popover` / `--color-border`
-      // (Tailwind v4 `@theme` prefixes them with `--color-`). The
-      // upstream shadcn template references `--popover` / `--border`
-      // because it targets Tailwind v3 — copying that as-is would
-      // resolve to `unset` and the toast renders translucent over
-      // the page (the symptom of "semi-transparent toasts").
-      style={
-        {
-          '--normal-bg': 'var(--color-popover)',
-          '--normal-text': 'var(--color-popover-foreground)',
-          '--normal-border': 'var(--color-border)',
-          '--success-bg': 'var(--color-popover)',
-          '--success-text': 'var(--color-success)',
-          '--success-border': 'var(--color-border)',
-          '--error-bg': 'var(--color-popover)',
-          '--error-text': 'var(--color-danger)',
-          '--error-border': 'var(--color-border)',
-          '--warning-bg': 'var(--color-popover)',
-          '--warning-text': 'var(--color-warning)',
-          '--warning-border': 'var(--color-border)',
-          '--info-bg': 'var(--color-popover)',
-          '--info-text': 'var(--color-brand)',
-          '--info-border': 'var(--color-border)',
-          '--border-radius': 'var(--radius)',
-          '--width': 'min(520px, calc(100vw - 2rem))',
-          ...style,
-        } as React.CSSProperties
+export const Toaster = defineComponent<ToasterProps>(
+  (props, { attrs }) => {
+    const theme = useStoreSelector(themeStore, (state) => state.resolved)
+
+    return () => {
+      const classes = props.toastOptions?.classes
+      const style: ToastStyle = {
+        '--normal-bg': 'var(--color-popover)',
+        '--normal-text': 'var(--color-popover-foreground)',
+        '--normal-border': 'var(--color-border)',
+        '--success-bg': 'var(--color-popover)',
+        '--success-text': 'var(--color-success)',
+        '--success-border': 'var(--color-border)',
+        '--error-bg': 'var(--color-popover)',
+        '--error-text': 'var(--color-danger)',
+        '--error-border': 'var(--color-border)',
+        '--warning-bg': 'var(--color-popover)',
+        '--warning-text': 'var(--color-warning)',
+        '--warning-border': 'var(--color-border)',
+        '--info-bg': 'var(--color-popover)',
+        '--info-text': 'var(--color-brand)',
+        '--info-border': 'var(--color-border)',
+        '--border-radius': 'var(--radius)',
+        '--width': 'min(520px, calc(100vw - 2rem))',
+        ...props.style,
       }
-      toastOptions={{
-        ...toastOptions,
-        classNames: {
-          ...classNames,
-          toast: ['max-w-[calc(100vw-2rem)]', classNames?.toast].filter(Boolean).join(' '),
-          content: ['min-w-0 max-w-full overflow-hidden', classNames?.content].filter(Boolean).join(' '),
-          title: ['min-w-0 max-w-full', classNames?.title].filter(Boolean).join(' '),
-          description: ['min-w-0 max-w-full overflow-hidden', classNames?.description].filter(Boolean).join(' '),
-        },
-      }}
-    />
-  )
-}
 
-export { Toaster }
+      return (
+        <VueSonner
+          {...attrs}
+          theme={theme.value}
+          class={['toaster group', props.class].filter(Boolean).join(' ')}
+          icons={{
+            success: ToastSuccessIcon,
+            info: ToastInfoIcon,
+            warning: ToastWarningIcon,
+            error: ToastErrorIcon,
+            loading: ToastLoadingIcon,
+          }}
+          style={style}
+          toastOptions={{
+            ...props.toastOptions,
+            classes: {
+              ...classes,
+              toast: ['max-w-[calc(100vw-2rem)]', classes?.toast].filter(Boolean).join(' '),
+              content: ['min-w-0 max-w-full overflow-hidden', classes?.content].filter(Boolean).join(' '),
+              title: ['min-w-0 max-w-full', classes?.title].filter(Boolean).join(' '),
+              description: ['min-w-0 max-w-full overflow-hidden', classes?.description].filter(Boolean).join(' '),
+            },
+          }}
+        />
+      )
+    }
+  },
+  {
+    name: 'Toaster',
+    inheritAttrs: false,
+    props: ['toastOptions', 'class', 'style'],
+  },
+)

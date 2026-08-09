@@ -14,7 +14,7 @@ import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTermin
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -22,8 +22,8 @@ import {
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import type { AppNavigationActions } from '#/web/app-navigation.tsx'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
@@ -89,7 +89,7 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
         }
   }
   if (options.branchName) {
-    const repo = options.workspaceId ? useWorkspacesStore.getState().workspaces[options.workspaceId] : null
+    const repo = options.workspaceId ? workspacesStore.getState().workspaces[options.workspaceId] : null
     const branch = repo
       ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches.find(
           (candidate) => candidate.name === options.branchName,
@@ -119,7 +119,7 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
       filesystemTarget: null,
     }
   }
-  const repo = options.workspaceId ? useWorkspacesStore.getState().workspaces[options.workspaceId] : null
+  const repo = options.workspaceId ? workspacesStore.getState().workspaces[options.workspaceId] : null
   if (!repo || repo.capability.probe.status !== 'ready') throw new Error('expected ready workspace command fixture')
   return {
     routeTarget: { kind: 'workspace-root', workspaceId: repo.id },
@@ -164,7 +164,7 @@ const hoistedToastMocks = vi.hoisted(() => ({
   error: vi.fn(),
 }))
 
-vi.mock('sonner', () => ({
+vi.mock('vue-sonner', () => ({
   toast: {
     error: hoistedToastMocks.error,
   },
@@ -189,7 +189,7 @@ beforeEach(() => {
   resetWorkspacesStore()
   workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge()
   resetTerminalActionDialogsStore()
-  useTerminalProjectionHydrationStore.setState({
+  terminalProjectionHydrationStore.setState({
     hydrationByWorkspace: new Map(),
     lastSuccessfulRecoveryByWorkspace: new Map(),
   })
@@ -206,7 +206,7 @@ afterEach(() => {
 export const toastMocks = hoistedToastMocks
 
 export function preferredWorkspacePaneTab(branch = 'feature/worktree') {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+  const repo = workspacesStore.getState().workspaces[REPO_ID]
   return repo
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
@@ -226,7 +226,7 @@ export function openTabsFor(branch: string) {
 }
 
 export function tabsFor(branch: string): WorkspacePaneTabEntry[] {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+  const repo = workspacesStore.getState().workspaces[REPO_ID]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
         {
@@ -240,7 +240,7 @@ export function tabsFor(branch: string): WorkspacePaneTabEntry[] {
 }
 
 export function workspaceRuntimeIdForTest(workspaceId = REPO_ID): string {
-  const repo = useWorkspacesStore.getState().workspaces[workspaceId]
+  const repo = workspacesStore.getState().workspaces[workspaceId]
   if (!repo) throw new Error(`expected seeded repo ${workspaceId}`)
   return repo.workspaceRuntimeId
 }
@@ -282,7 +282,7 @@ export function createTerminalWithProjection(resolveSessionId: () => string | Pr
 
 export function recordCreatedTerminalSelection(base: TerminalSessionBase, terminalSessionId: string): void {
   const coordinates = terminalSessionCoordinates(base)
-  useWorkspacesStore
+  workspacesStore
     .getState()
     .setSelectedTerminal(
       formatTerminalFilesystemTargetKey(coordinates.workspaceId, coordinates.executionRootId),
@@ -324,21 +324,21 @@ export function navigationWith(
   return observedAppNavigationActionsForTest({
     currentWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
     activateWorkspace: (workspaceId) =>
-      useWorkspacesStore.setState({ restoredWorkspaceId: workspaceIdForTest(workspaceId) }),
+      workspacesStore.setState({ restoredWorkspaceId: workspaceIdForTest(workspaceId) }),
     closeWorkspace: async () => ({ ok: true }),
     cycleWorkspace: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (workspaceId, branch, tab) => {
-      const state = useWorkspacesStore.getState()
+      const state = workspacesStore.getState()
       const canonicalWorkspaceId = workspaceIdForTest(workspaceId)
-      useWorkspacesStore.setState({ restoredWorkspaceId: canonicalWorkspaceId })
+      workspacesStore.setState({ restoredWorkspaceId: canonicalWorkspaceId })
       state.setWorkspacePaneTab(canonicalWorkspaceId, branch, tab)
       return true
     },
     showRepoBranchTerminalSession: () => true,
     showWorkspaceRootPaneTab: (workspaceId, presentation, options) => {
-      useWorkspacesStore
+      workspacesStore
         .getState()
         .setWorkspacePaneTabForTarget(
           { kind: 'workspace-root', workspaceId: workspaceId },
@@ -351,7 +351,7 @@ export function navigationWith(
       if (target.routeTarget.kind !== 'workspace-root') {
         throw new Error('unexpected detached-worktree route commit in workspace command fixture')
       }
-      useWorkspacesStore
+      workspacesStore
         .getState()
         .setWorkspacePaneTabForTarget(
           target.routeTarget,
@@ -412,7 +412,7 @@ export function emptyWorktreeSnapshot(): TerminalFilesystemTargetSnapshot {
 
 export function worktreeSnapshotForSessions(terminalSessionIds: string[]): TerminalFilesystemTargetSnapshot {
   const selectedKey =
-    useWorkspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[WORKTREE_KEY] ?? null
+    workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[WORKTREE_KEY] ?? null
   const sessions = terminalSessionIds.map((terminalSessionId, index) => ({
     type: 'terminal' as const,
     terminalSessionId: terminalSessionId,

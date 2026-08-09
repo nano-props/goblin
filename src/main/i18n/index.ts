@@ -8,9 +8,10 @@
 
 import { app } from 'electron'
 import { i18nNodeLog } from '#/node/logger.ts'
-import { DICTS, en, type DictKey } from '#/shared/i18n/dictionaries.ts'
+import { DICTS } from '#/shared/i18n/dictionaries.ts'
+import { en, type DictKey } from '#/shared/i18n/en.ts'
 import { resolvePreferredLang } from '#/shared/i18n/resolve-lang.ts'
-import type { Lang, LangPref } from '#/shared/api-types.ts'
+import type { Lang, LangPref } from '#/shared/settings.ts'
 
 let currentLang: Lang = 'en'
 

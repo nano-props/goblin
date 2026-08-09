@@ -58,7 +58,7 @@ function ptyStub(processName = 'zsh') {
 }
 
 describe('spawnTerminalPtyRuntime', () => {
-  test('returns a trimmed process name when node-pty exposes a string', () => {
+  test('returns a trimmed process name when node-pty exposes a string', async () => {
     spawnMock.mockReturnValue({
       process: ' zsh ',
       write: vi.fn(),
@@ -79,7 +79,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(result.runtime.processName()).toBe('zsh')
   })
 
-  test('falls back to terminal when the process getter throws', () => {
+  test('falls back to terminal when the process getter throws', async () => {
     spawnMock.mockReturnValue({
       get process() {
         throw new Error('process unavailable')
@@ -102,7 +102,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(result.runtime.processName()).toBe('terminal')
   })
 
-  test('reads the process getter only once per lookup', () => {
+  test('reads the process getter only once per lookup', async () => {
     let reads = 0
     spawnMock.mockReturnValue({
       get process() {
@@ -128,7 +128,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(reads).toBe(1)
   })
 
-  test('honours an explicit command override without consulting env or passwd', () => {
+  test('honours an explicit command override without consulting env or passwd', async () => {
     vi.mocked(userInfo).mockReturnValue({ shell: '/bin/zsh' } as ReturnType<typeof userInfo>)
     spawnMock.mockReturnValue(ptyStub())
 
@@ -151,7 +151,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(userInfo).not.toHaveBeenCalled()
   })
 
-  test('uses the inherited SHELL on Unix when it is set, with -l for login mode', () => {
+  test('uses the inherited SHELL on Unix when it is set, with -l for login mode', async () => {
     vi.mocked(userInfo).mockReturnValue({ shell: '/bin/zsh' } as ReturnType<typeof userInfo>)
     spawnMock.mockReturnValue(ptyStub())
 
@@ -167,7 +167,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(userInfo).not.toHaveBeenCalled()
   })
 
-  test('runs a startup shell command through the login shell and returns to an interactive shell', () => {
+  test('runs a startup shell command through the login shell and returns to an interactive shell', async () => {
     vi.mocked(userInfo).mockReturnValue({ shell: '/bin/zsh' } as ReturnType<typeof userInfo>)
 
     const resolved = resolveLocalShellWithStartupShellCommand("  bat '/repo/README.md'\r", { SHELL: '/bin/zsh' })
@@ -179,7 +179,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(userInfo).not.toHaveBeenCalled()
   })
 
-  test('startup shell command resolution falls back to normal shell resolution for blank commands', () => {
+  test('startup shell command resolution falls back to normal shell resolution for blank commands', async () => {
     vi.mocked(userInfo).mockReturnValue({ shell: '/bin/zsh' } as ReturnType<typeof userInfo>)
 
     expect(resolveLocalShellWithStartupShellCommand(' \r\n ', { SHELL: '/bin/zsh' })).toEqual({
@@ -188,7 +188,7 @@ describe('spawnTerminalPtyRuntime', () => {
     })
   })
 
-  test('rejects mixing startup shell command with explicit process command', () => {
+  test('rejects mixing startup shell command with explicit process command', async () => {
     const result = spawnTerminalPtyRuntime({
       command: '/bin/zsh',
       startupShellCommand: "bat '/repo/README.md'",
@@ -201,7 +201,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(spawnMock).not.toHaveBeenCalled()
   })
 
-  test('installs data ownership before returning the runtime capability', () => {
+  test('installs data ownership before returning the runtime capability', async () => {
     const term = ptyStub()
     term.onData.mockImplementation((listener: (data: string) => void) => {
       listener('early output')
@@ -215,7 +215,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(terminalEventObserver.onData).toHaveBeenCalledWith('early output', 'zsh')
   })
 
-  test('fails spawn and kills the candidate when data observer installation throws', () => {
+  test('fails spawn and kills the candidate when data observer installation throws', async () => {
     const term = ptyStub()
     term.onData.mockImplementation(() => {
       throw new Error('data observer unavailable')
@@ -230,7 +230,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(term.onExit).not.toHaveBeenCalled()
   })
 
-  test('releases data ownership and kills the candidate when exit observer installation throws', () => {
+  test('releases data ownership and kills the candidate when exit observer installation throws', async () => {
     const dataDisposable = { dispose: vi.fn() }
     const term = ptyStub()
     term.onData.mockReturnValue(dataDisposable)
@@ -247,7 +247,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(term.kill).toHaveBeenCalledOnce()
   })
 
-  test('merges caller env into the spawned PTY environment while keeping terminal TERM', () => {
+  test('merges caller env into the spawned PTY environment while keeping terminal TERM', async () => {
     spawnMock.mockReturnValue(ptyStub())
 
     spawnTerminalPtyRuntime({
@@ -279,7 +279,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(spawnOptions.env).not.toHaveProperty('ELECTRON_NO_ASAR')
   })
 
-  test('falls back to os.userInfo().shell when SHELL is not set (CI / devcontainer)', () => {
+  test('falls back to os.userInfo().shell when SHELL is not set (CI / devcontainer)', async () => {
     vi.mocked(userInfo).mockReturnValue({ shell: '/usr/bin/zsh' } as ReturnType<typeof userInfo>)
 
     const resolved = resolveLocalShell({}, { PATH: '/usr/bin' })
@@ -288,7 +288,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(userInfo).toHaveBeenCalledTimes(1)
   })
 
-  test('treats whitespace-only SHELL as unset and falls through to userInfo', () => {
+  test('treats whitespace-only SHELL as unset and falls through to userInfo', async () => {
     vi.mocked(userInfo).mockReturnValue({ shell: '/usr/bin/zsh' } as ReturnType<typeof userInfo>)
 
     const resolved = resolveLocalShell({}, { SHELL: '   ' })
@@ -296,7 +296,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(resolved).toEqual({ command: '/usr/bin/zsh', args: ['-l'] })
   })
 
-  test('treats whitespace-only userInfo().shell as unset and falls back to /bin/sh', () => {
+  test('treats whitespace-only userInfo().shell as unset and falls back to /bin/sh', async () => {
     vi.mocked(userInfo).mockReturnValue({ shell: '   ' } as ReturnType<typeof userInfo>)
 
     const resolved = resolveLocalShell({}, {})
@@ -304,7 +304,7 @@ describe('spawnTerminalPtyRuntime', () => {
     expect(resolved).toEqual({ command: '/bin/sh', args: ['-l'] })
   })
 
-  test('falls back to /bin/sh when neither env.SHELL nor userInfo().shell is available', () => {
+  test('falls back to /bin/sh when neither env.SHELL nor userInfo().shell is available', async () => {
     vi.mocked(userInfo).mockImplementation(() => {
       throw new Error('userInfo unavailable')
     })

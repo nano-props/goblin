@@ -11,16 +11,7 @@ import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-
-// Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
-// that delegates to the real module so `i18next.use(initReactI18next).
-// init({…})` still runs (which is what wires the i18next singleton into
-// `react-i18next`'s module-scoped closure, the one `<Trans>` reads
-// from), and only overrides `useT` to return raw keys. See
-// `src/test-utils/i18n-mock.ts` for the rationale and the importOriginal
-// pattern that backs this side effect.
-import { stubI18n } from '#/test-utils/i18n-mock.ts'
-stubI18n()
+import { nextTick } from 'vue'
 
 vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
   BranchActionsMenu: () => null,
@@ -33,10 +24,11 @@ vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
 
 afterEach(() => {
   vi.clearAllMocks()
+  Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
 })
 
 describe('BranchList', () => {
-  test('renders one row per branch and forwards click/double-click', () => {
+  test('renders one row per branch and forwards click/double-click', async () => {
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
     const repo = branchListRepo(branches, 'main')
     const onSelect = vi.fn()
@@ -63,7 +55,7 @@ describe('BranchList', () => {
     expect(onOpenStatus).toHaveBeenCalledWith('fix/b')
   })
 
-  test('renders the emptyState slot when branches is empty', () => {
+  test('renders the emptyState slot when branches is empty', async () => {
     const repo = branchListRepo([], '')
     const onSelect = vi.fn()
 
@@ -83,7 +75,7 @@ describe('BranchList', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  test('renders the emptyState slot when repo is null', () => {
+  test('renders the emptyState slot when repo is null', async () => {
     // `branches` is non-empty so the `!repo` branch is the one that
     // short-circuits — passing `branches={[]}` would exercise the
     // empty-list early-return instead.
@@ -102,7 +94,7 @@ describe('BranchList', () => {
     expect(container.querySelector('[data-testid="empty"]')?.textContent).toBe('repo not loaded')
   })
 
-  test('highlights the row whose name matches highlightedBranch', () => {
+  test('highlights the row whose name matches highlightedBranch', async () => {
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
     const repo = branchListRepo(branches, 'main')
 
@@ -121,6 +113,32 @@ describe('BranchList', () => {
     expect(items[2]?.className).toContain('bg-selected')
     expect(items[0]?.className).not.toContain('bg-selected')
     expect(items[1]?.className).not.toContain('bg-selected')
+  })
+
+  test('scrolls the initially highlighted row into view after its ref mounts', async () => {
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+    const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
+    const repo = branchListRepo(branches, 'main')
+    const { container } = renderInJsdom(
+      <BranchList
+        repo={repo}
+        branches={branches}
+        highlightedBranch="fix/b"
+        onSelectBranch={() => {}}
+        onOpenBranchStatus={() => {}}
+        emptyState={null}
+      />,
+    )
+    await nextTick()
+
+    const highlightedRow = container.querySelectorAll('li')[2]
+    expect(scrollIntoView).toHaveBeenCalledOnce()
+    expect(scrollIntoView.mock.contexts[0]).toBe(highlightedRow)
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
   })
 })
 

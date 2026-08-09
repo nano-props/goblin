@@ -2,11 +2,11 @@ import { describe, expect, test } from 'vitest'
 import { isServerInvalidationEvent, settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalidation.ts'
 
 describe('settingsInvalidationScopesForPrefsPatch', () => {
-  test('always includes the settings snapshot scope', () => {
+  test('always includes the settings snapshot scope', async () => {
     expect(settingsInvalidationScopesForPrefsPatch({})).toEqual(['settings-snapshot'])
   })
 
-  test('adds only the derived scopes for changed preference groups', () => {
+  test('adds only the derived scopes for changed preference groups', async () => {
     expect(
       settingsInvalidationScopesForPrefsPatch({
         lang: 'ko',
@@ -17,7 +17,7 @@ describe('settingsInvalidationScopesForPrefsPatch', () => {
 })
 
 describe('workspace runtime invalidation', () => {
-  test('accepts canonical workspace identities and rejects native paths', () => {
+  test('accepts canonical workspace identities and rejects native paths', async () => {
     expect(
       isServerInvalidationEvent({
         type: 'workspace-runtime-invalidated',
@@ -29,7 +29,7 @@ describe('workspace runtime invalidation', () => {
 })
 
 describe('workspace filesystem invalidation', () => {
-  test('accepts runtime-bound filesystem targets and rejects branch or native-path targets', () => {
+  test('accepts runtime-bound filesystem targets and rejects branch or native-path targets', async () => {
     expect(
       isServerInvalidationEvent({
         type: 'workspace-filesystem-invalidated',

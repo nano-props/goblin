@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { WorkspaceRuntimeInvalidationEvent } from '#/shared/workspace-runtime-invalidation.ts'
@@ -25,7 +25,7 @@ vi.mock('#/web/workspace-runtime-invalidation-ingress.ts', () => ({
   },
 }))
 vi.mock('#/web/stores/workspaces/store.ts', () => ({
-  useWorkspacesStore: { getState: mocks.getState, setState: mocks.setState },
+  workspacesStore: { getState: mocks.getState, setState: mocks.setState },
 }))
 vi.mock('#/web/workspace-runtime-query.ts', () => ({ invalidateWorkspaceRuntimes: vi.fn() }))
 vi.mock('#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts', () => ({
@@ -49,7 +49,7 @@ describe('useWorkspaceRuntimeInvalidationRefresh', () => {
     vi.mocked(invalidateWorkspaceRuntimes).mockResolvedValue(snapshot)
     renderInJsdom(<Harness />)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       mocks.listener?.({ type: 'workspace-runtime-invalidated', workspaceId })
       await Promise.resolve()
     })
@@ -67,7 +67,7 @@ describe('useWorkspaceRuntimeInvalidationRefresh', () => {
       .mockResolvedValueOnce(secondSnapshot)
     renderInJsdom(<Harness />)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       mocks.listener?.({ type: 'workspace-runtime-invalidated', workspaceId })
       mocks.listener?.({ type: 'workspace-runtime-invalidated', workspaceId })
       await Promise.resolve()

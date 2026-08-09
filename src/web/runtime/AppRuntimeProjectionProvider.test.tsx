@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 
 import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
-import { act } from '@testing-library/react'
-import { StrictMode } from 'react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
-import type * as WorkspaceSessionWritePaths from '#/web/stores/workspaces/workspace-session-write-paths.ts'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type {
@@ -20,8 +18,8 @@ import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   readWorkspacePaneTabsForTarget,
@@ -48,9 +46,9 @@ vi.mock('#/web/components/terminal/use-terminal-session-projection.ts', () => ({
   useTerminalSessionProjection: () => projectionMocks,
 }))
 
-vi.mock('#/web/stores/workspaces/workspace-session-write-paths.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof WorkspaceSessionWritePaths>()),
-  reconcileOpenWorkspaceRuntimeMemberships: projectionMocks.reconcileOpenWorkspaceRuntimeMemberships,
+vi.mock('#/web/stores/workspaces/workspace-runtime-membership-recovery.ts', () => ({
+  reconcileOpenWorkspaceRuntimeMemberships: (...args: unknown[]) =>
+    projectionMocks.reconcileOpenWorkspaceRuntimeMemberships(...args),
 }))
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-runtime-provider-repo')
@@ -83,7 +81,7 @@ describe('AppRuntimeProjectionProvider', () => {
     projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockReset()
     projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockImplementation(async () => ({
       kind: 'settled' as const,
-      targets: Object.values(useWorkspacesStore.getState().workspaces).map((repo) => ({
+      targets: Object.values(workspacesStore.getState().workspaces).map((repo) => ({
         workspaceId: repo.id,
         workspaceRuntimeId: repo.workspaceRuntimeId,
       })),
@@ -94,7 +92,7 @@ describe('AppRuntimeProjectionProvider', () => {
     listWorkspaceTabsMock.mockReset()
     listWorkspaceTabsMock.mockResolvedValue([])
     resetWorkspacesStore()
-    useTerminalProjectionHydrationStore.setState(useTerminalProjectionHydrationStore.getInitialState())
+    terminalProjectionHydrationStore.setState(terminalProjectionHydrationStore.getInitialState())
     appQueryClient.clear()
     Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
       configurable: true,
@@ -119,27 +117,27 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(null)
     try {
       kickReconnectMock.mockClear()
-      await act(async () => {
+      await flushTestUpdates(async () => {
         Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
         document.dispatchEvent(new Event('visibilitychange'))
       })
       expect(kickReconnectMock).toHaveBeenCalledTimes(1)
 
       kickReconnectMock.mockClear()
-      await act(async () => {
+      await flushTestUpdates(async () => {
         Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
         document.dispatchEvent(new Event('visibilitychange'))
       })
       expect(kickReconnectMock).not.toHaveBeenCalled()
 
       kickReconnectMock.mockClear()
-      await act(async () => {
+      await flushTestUpdates(async () => {
         window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
       })
       expect(kickReconnectMock).toHaveBeenCalledTimes(1)
 
       kickReconnectMock.mockClear()
-      await act(async () => {
+      await flushTestUpdates(async () => {
         window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false }))
       })
       expect(kickReconnectMock).not.toHaveBeenCalled()
@@ -148,22 +146,18 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('hydrates terminal projection under StrictMode effect replay', async () => {
+  test('hydrates terminal projection once on mount', async () => {
     const repo = seedCurrentRepo()
     const coldRecovery = Promise.withResolvers<TerminalSessionsSnapshot>()
     recoverSessionsMock.mockReturnValue(coldRecovery.promise)
-    const result = renderInJsdom(
-      <StrictMode>
-        <RuntimeProbe currentWorkspaceId={REPO_ID} />
-      </StrictMode>,
-    )
+    const result = renderInJsdom(<RuntimeProbe currentWorkspaceId={REPO_ID} />)
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalled())
-      await act(async () => {
+      await flushTestUpdates(async () => {
         coldRecovery.resolve({ revision: 0, sessions: [] })
       })
       await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
+        expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: repo.workspaceRuntimeId,
           phase: 'ready',
         }),
@@ -177,7 +171,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
   test('waits for workspace membership before hydrating terminal server projection', async () => {
     const repo = seedCurrentRepo()
-    useWorkspacesStore.setState({ workspaceMembershipReady: false })
+    workspacesStore.setState({ workspaceMembershipReady: false })
     recoverSessionsMock.mockResolvedValue({
       revision: 1,
       sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
@@ -186,11 +180,11 @@ describe('AppRuntimeProjectionProvider', () => {
     try {
       expect(recoverSessionsMock).not.toHaveBeenCalled()
       expect(
-        useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.workspaceRuntimeId,
+        terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.workspaceRuntimeId,
       ).not.toBe(repo.workspaceRuntimeId)
 
-      await act(async () => {
-        useWorkspacesStore.setState({ workspaceMembershipReady: true })
+      await flushTestUpdates(async () => {
+        workspacesStore.setState({ workspaceMembershipReady: true })
       })
 
       await vi.waitFor(() => {
@@ -202,7 +196,7 @@ describe('AppRuntimeProjectionProvider', () => {
           },
           'client_sharedterminal',
         )
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
+        expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: repo.workspaceRuntimeId,
           phase: 'ready',
         })
@@ -263,7 +257,7 @@ describe('AppRuntimeProjectionProvider', () => {
       recoverSessionsMock.mockClear()
       recoverSessionsMock.mockResolvedValue({ revision: 1, sessions: [] })
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         workspaceTabsChangedHandler?.({
           type: 'workspace-pane-tabs.changed',
           change: 'invalidation',
@@ -287,11 +281,11 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
+        expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
       )
       recoverSessionsMock.mockClear()
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 3 })
         sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 4 })
         await waitForScheduledServerSync()
@@ -310,12 +304,12 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
+        expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
       )
       recoverSessionsMock.mockClear()
       recoverSessionsMock.mockResolvedValueOnce({ revision: 3, sessions: [] })
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 3 })
       })
 
@@ -336,7 +330,7 @@ describe('AppRuntimeProjectionProvider', () => {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
       recoverSessionsMock.mockClear()
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         sessionsChangedHandler?.({
           workspaceId: REPO_ID,
           workspaceRuntimeId: `${repo.workspaceRuntimeId}-old`,
@@ -381,7 +375,7 @@ describe('AppRuntimeProjectionProvider', () => {
         },
       ])
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         recoveredHandler?.('client_sharedterminal')
       })
 
@@ -400,8 +394,8 @@ describe('AppRuntimeProjectionProvider', () => {
       })
 
       recoverSessionsMock.mockClear()
-      useTerminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
-      await act(async () => {
+      terminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
+      await flushTestUpdates(async () => {
         window.dispatchEvent(new Event('focus'))
       })
       await vi.waitFor(() => {
@@ -420,7 +414,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const repo = seedCurrentRepo()
     const nextWorkspaceRuntimeId = 'repo-runtime-123456789012345678901'
     projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockImplementationOnce(async () => {
-      useWorkspacesStore.setState((state) => ({
+      workspacesStore.setState((state) => ({
         workspaces: {
           ...state.workspaces,
           [REPO_ID]: { ...state.workspaces[REPO_ID]!, workspaceRuntimeId: nextWorkspaceRuntimeId },
@@ -443,7 +437,7 @@ describe('AppRuntimeProjectionProvider', () => {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
       recoverSessionsMock.mockClear()
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         recoveredHandler?.('client_sharedterminal')
       })
 
@@ -484,8 +478,8 @@ describe('AppRuntimeProjectionProvider', () => {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
       recoverSessionsMock.mockClear()
 
-      await act(async () => {
-        useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+      await flushTestUpdates(async () => {
+        workspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
       })
 
       expect(recoverSessionsMock).not.toHaveBeenCalled()
@@ -497,19 +491,19 @@ describe('AppRuntimeProjectionProvider', () => {
   test('focus sync only refreshes the current repo session list', async () => {
     const firstRepo = seedCurrentRepo()
     seedSecondRepo()
-    useTerminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
+    terminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
       await vi.waitFor(() =>
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
+        expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: firstRepo.workspaceRuntimeId,
           phase: 'ready',
         }),
       )
       recoverSessionsMock.mockClear()
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         window.dispatchEvent(new Event('focus'))
       })
 
@@ -529,7 +523,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => {
-        expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
+        expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).toMatchObject({
           workspaceRuntimeId: repo.workspaceRuntimeId,
           phase: 'failed',
           errorMessage: 'error.workspace-runtime-stale',
@@ -555,7 +549,7 @@ describe('AppRuntimeProjectionProvider', () => {
     await waitForNextMacrotask()
 
     expect(projectionMocks.reconcileServerSessionsSnapshot).not.toHaveBeenCalled()
-    expect(useTerminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).not.toMatchObject({
+    expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)).not.toMatchObject({
       workspaceRuntimeId: repo.workspaceRuntimeId,
       phase: 'ready',
     })
@@ -574,7 +568,7 @@ describe('AppRuntimeProjectionProvider', () => {
     recoverSessionsMock.mockClear()
     listWorkspaceTabsMock.mockClear()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       recoveredHandler?.('client_sharedterminal')
     })
     await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce())
@@ -614,7 +608,7 @@ function seedCurrentRepo() {
 }
 
 function seedSecondRepo() {
-  const current = useWorkspacesStore.getState()
+  const current = workspacesStore.getState()
   const secondRepo = seedRepoWithReadModelForTest({
     id: workspaceIdForTest('goblin+file:///tmp/goblin-runtime-provider-repo-2'),
     branches: [
@@ -626,7 +620,7 @@ function seedSecondRepo() {
     preferredWorkspacePaneTab: 'terminal',
     workspaceRuntimeId: 'repo-runtime-second',
   })
-  useWorkspacesStore.setState((state) => ({
+  workspacesStore.setState((state) => ({
     ...state,
     workspaces: {
       ...current.workspaces,
@@ -748,7 +742,7 @@ function restartResult(): Extract<TerminalRestartResult, { ok: true }> {
 }
 
 function serverSession(terminalSessionId: string): TestTerminalSessionSummary {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+  const repo = workspacesStore.getState().workspaces[REPO_ID]
   if (!repo) throw new Error('runtime provider test workspace is unavailable')
   const base = terminalSessionBaseForTest({
     repoRoot: REPO_ID,

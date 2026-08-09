@@ -117,12 +117,12 @@ Realtime recovery:
   model for correctness. Page lifecycle notification may be an optimization,
   never the ownership boundary.
 
-## React Query Implication
+## TanStack Query Implication
 
-React Query can own server data for a workspace after the client window has projected
+TanStack Query can own server data for a workspace after the client window has projected
 that workspace, but it must not become an independent workspace-membership authority.
 
-Good candidates for React Query ownership:
+Good candidates for TanStack Query ownership:
 
 - branch-independent repository snapshot reads
 - worktree status reads

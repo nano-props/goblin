@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import vueJsx from '@vitejs/plugin-vue-jsx'
 import tailwind from '@tailwindcss/vite'
 import { execaSync } from 'execa'
 import path from 'node:path'
@@ -24,7 +24,7 @@ function commitHash(): string {
 }
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), tailwind()],
+  plugins: [vueJsx(), tailwind()],
   root: path.resolve(import.meta.dirname, 'src/web'),
   // The app uses browser-history routes such as `/settings/general`.
   // Keep assets rooted at `/` so a refreshed deep link still loads

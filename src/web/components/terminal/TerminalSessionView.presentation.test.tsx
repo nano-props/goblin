@@ -1,15 +1,14 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
-import { StrictMode } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/terminal-snapshot.ts'
 import {
-  TerminalSessionContext,
-  TerminalSessionReadContext,
+  TerminalSessionCommandScope,
+  TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   TerminalFocusRequest,
@@ -35,7 +34,7 @@ const EMPTY_OPENING_SNAPSHOT = {
 } as const
 
 describe('TerminalSessionView presentation and focus', () => {
-  test('retries precommitted focus after the StrictMode view reaches its stable mount', async () => {
+  test('retries precommitted focus when the view mounts', async () => {
     resetTerminalAutoFocusForTest()
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
@@ -121,19 +120,17 @@ describe('TerminalSessionView presentation and focus', () => {
     expect(currentFocusRequest?.isCurrent()).toBe(false)
 
     const { unmount } = renderInJsdom(
-      <StrictMode>
-        <TerminalSessionContext value={context}>
-          <TerminalSessionReadContext value={readContext}>
-            <TerminalSessionView
-              repoRoot="/repo"
-              workspaceRuntimeId={'repo-runtime-test'}
-              branch="feature"
-              worktreePath="/worktree"
-              selectedTerminalSessionId="term-222222222222222222222"
-            />
-          </TerminalSessionReadContext>
-        </TerminalSessionContext>
-      </StrictMode>,
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
+          <TerminalSessionView
+            repoRoot="/repo"
+            workspaceRuntimeId={'repo-runtime-test'}
+            branch="feature"
+            worktreePath="/worktree"
+            selectedTerminalSessionId="term-222222222222222222222"
+          />
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
@@ -198,6 +195,7 @@ describe('TerminalSessionView presentation and focus', () => {
     }
     const attach = vi.fn()
     const detach = vi.fn()
+    const clearSearch = vi.fn()
     const filesystemTargetListeners = new Set<() => void>()
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
@@ -210,7 +208,7 @@ describe('TerminalSessionView presentation and focus', () => {
       restart: vi.fn(),
       findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
       findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      clearSearch: vi.fn(),
+      clearSearch,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
     })
@@ -227,20 +225,22 @@ describe('TerminalSessionView presentation and focus', () => {
     }
 
     const { unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
+      await flushTestUpdates(() => {})
       expect(attach).toHaveBeenCalledTimes(1)
+      expect(clearSearch).not.toHaveBeenCalled()
 
       terminalFilesystemTargetSnapshot = completeFilesystemTargetSnapshot({
         terminalFilesystemTargetKey: '/repo\0/worktree',
@@ -259,12 +259,13 @@ describe('TerminalSessionView presentation and focus', () => {
         count: 1,
         createPending: false,
       })
-      await act(async () => {
+      await flushTestUpdates(async () => {
         for (const listener of filesystemTargetListeners) listener()
       })
 
       expect(attach).toHaveBeenCalledTimes(1)
       expect(detach).not.toHaveBeenCalled()
+      expect(clearSearch).not.toHaveBeenCalled()
     } finally {
       unmount()
     }
@@ -331,16 +332,16 @@ describe('TerminalSessionView presentation and focus', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
@@ -353,7 +354,7 @@ describe('TerminalSessionView presentation and focus', () => {
       )
       expect(button).toBeDefined()
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
 
@@ -377,8 +378,10 @@ describe('TerminalSessionView presentation and focus', () => {
       processName: 'terminal',
       composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
     }
+    const createTerminal = vi.fn(async () => 'term-222222222222222222222')
+    const createTerminalForSlot = vi.fn(async () => 'term-333333333333333333333')
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
-      createTerminal: vi.fn(async () => 'term-222222222222222222222'),
+      createTerminal,
       selectTerminal: vi.fn(),
       scrollToBottom: vi.fn(),
       clearBell: vi.fn(() => false),
@@ -401,24 +404,29 @@ describe('TerminalSessionView presentation and focus', () => {
       subscribeSnapshot: () => () => {},
     }
 
-    const tree = (
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+    const tree = () => (
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
+            createTerminalForSlot={createTerminalForSlot}
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>
     )
 
-    const { container, rerender, unmount } = renderInJsdom(tree)
+    const { container, rerender, unmount } = renderInJsdom(tree())
 
     try {
       expect(container.querySelector('.goblin-terminal-session__empty')).toBeNull()
-      rerender(tree)
+      expect(createTerminal).not.toHaveBeenCalled()
+      expect(createTerminalForSlot).not.toHaveBeenCalled()
+      await rerender(tree())
+      expect(createTerminal).not.toHaveBeenCalled()
+      expect(createTerminalForSlot).not.toHaveBeenCalled()
     } finally {
       unmount()
     }
@@ -480,16 +488,16 @@ describe('TerminalSessionView presentation and focus', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
@@ -503,7 +511,7 @@ describe('TerminalSessionView presentation and focus', () => {
     }
   })
 
-  test('shows terminal projection failure reason while opening without sessions', () => {
+  test('shows terminal projection failure reason while opening without sessions', async () => {
     const terminalFilesystemTargetSnapshot = {
       terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: null,
@@ -536,8 +544,8 @@ describe('TerminalSessionView presentation and focus', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId="repo-runtime-test"
@@ -546,8 +554,8 @@ describe('TerminalSessionView presentation and focus', () => {
             projectionPhase="failed"
             projectionErrorMessage="error.workspace-runtime-stale"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
@@ -616,28 +624,32 @@ describe('TerminalSessionView presentation and focus', () => {
       focusTerminal,
     })
     let activeSnapshot: TerminalSnapshot = openingSnapshot
+    const snapshotListeners = new Set<() => void>()
     const readContext: TerminalSessionReadContextValue = {
       terminalFilesystemTargetSnapshot: () => completeFilesystemTargetSnapshot(terminalFilesystemTargetSnapshot),
       subscribeTerminalFilesystemTarget: () => () => {},
       workspaceBellCount: () => 0,
       subscribeWorkspaceBellCount: () => () => {},
       snapshot: () => activeSnapshot,
-      subscribeSnapshot: () => () => {},
+      subscribeSnapshot: (_terminalSessionId, listener) => {
+        snapshotListeners.add(listener)
+        return () => snapshotListeners.delete(listener)
+      },
     }
     const tree = () => (
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>
     )
 
-    const { container, rerender, unmount } = renderInJsdom(tree())
+    const { container, unmount } = renderInJsdom(tree())
 
     try {
       const root = container.querySelector<HTMLElement>('.goblin-terminal-session')!
@@ -648,9 +660,12 @@ describe('TerminalSessionView presentation and focus', () => {
       focusTerminal.mockClear()
 
       activeSnapshot = openSnapshot
-      rerender(tree())
+      await flushTestUpdates(() => {
+        for (const listener of snapshotListeners) listener()
+      })
 
       expect(container.querySelector('.goblin-terminal-session__search')).not.toBeNull()
+      expect(container.querySelector('.goblin-terminal-session__host--hidden')).toBeNull()
       expect(focusTerminal).not.toHaveBeenCalled()
 
       await user.keyboard('{Escape}')
@@ -707,8 +722,8 @@ describe('TerminalSessionView presentation and focus', () => {
     }
 
     const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
+      <TerminalSessionCommandScope value={context}>
+        <TerminalSessionReadScope value={readContext}>
           <TerminalSessionView
             repoRoot="/repo"
             workspaceRuntimeId={'repo-runtime-test'}
@@ -716,8 +731,8 @@ describe('TerminalSessionView presentation and focus', () => {
             worktreePath="/worktree"
             createTerminalForSlot={createTerminalForSlot}
           />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
+        </TerminalSessionReadScope>
+      </TerminalSessionCommandScope>,
     )
 
     try {
@@ -733,7 +748,7 @@ describe('TerminalSessionView presentation and focus', () => {
       )
       expect(button).toBeDefined()
 
-      await act(async () => {
+      await flushTestUpdates(async () => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
 
@@ -797,7 +812,7 @@ describe('TerminalSessionView presentation and focus', () => {
         (button) => button.textContent === 'error.try-again',
       )
 
-      await act(async () => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+      await flushTestUpdates(async () => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
       expect(retryPresentation).toHaveBeenCalledWith('term-111111111111111111111')
 
       await view.publishSnapshot({
@@ -893,7 +908,7 @@ describe('TerminalSessionView presentation and focus', () => {
     ['indeterminate', 'disconnected', 'indeterminate', 'warning'],
     ['app quitting', 'app-quitting', 'indeterminate', 'silent'],
   ] as const)('maps %s takeover transport failure at the feedback boundary', async (_label, kind, delivery, tone) => {
-    const { toast } = await import('sonner')
+    const { toast } = await import('vue-sonner')
     vi.mocked(toast.error).mockClear()
     vi.mocked(toast.warning).mockClear()
     const takeover = vi.fn().mockRejectedValue(
@@ -918,7 +933,7 @@ describe('TerminalSessionView presentation and focus', () => {
 
     try {
       const button = view.container.querySelector('button')
-      await act(async () => button?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+      await flushTestUpdates(async () => button?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
 
       expect(toast.error).toHaveBeenCalledTimes(tone === 'error' ? 1 : 0)
       expect(toast.warning).toHaveBeenCalledTimes(tone === 'warning' ? 1 : 0)

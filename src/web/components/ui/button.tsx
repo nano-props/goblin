@@ -1,6 +1,6 @@
-import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { Slot } from 'radix-ui'
+import { Primitive } from 'reka-ui'
+import type { ButtonHTMLAttributes, FunctionalComponent } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
 import { dataActiveRing, focusRing } from '#/web/components/ui/focus.ts'
 const buttonVariants = cva(
@@ -60,27 +60,35 @@ const buttonVariants = cva(
   },
 )
 
-function Button({
-  className,
-  variant = 'default',
-  size = 'default',
-  asChild = false,
-  ...props
-}: React.ComponentProps<'button'> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
-  const Comp = asChild ? Slot.Root : 'button'
+type ButtonVariantProps = VariantProps<typeof buttonVariants>
 
+interface ButtonProps extends ButtonHTMLAttributes {
+  asChild?: boolean
+  variant?: ButtonVariantProps['variant']
+  size?: ButtonVariantProps['size']
+}
+
+const Button: FunctionalComponent<ButtonProps> = (props, { attrs, slots }) => {
+  const variant = props.variant ?? 'default'
+  const size = props.size ?? 'default'
+  const { class: classValue, ...buttonAttrs } = attrs as ButtonHTMLAttributes
   return (
-    <Comp
+    <Primitive
+      {...buttonAttrs}
+      as="button"
+      asChild={props.asChild}
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
+      class={cn(buttonVariants({ variant, size }), classValue)}
+    >
+      {slots.default?.()}
+    </Primitive>
   )
 }
 
+Button.props = ['asChild', 'variant', 'size']
+Button.inheritAttrs = false
+
 export { Button, buttonVariants }
+export type { ButtonProps }

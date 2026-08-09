@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 import { Hono } from 'hono'
 import { IpcError } from '#/shared/ipc-error.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 import { errorJson } from '#/server/common/responses.ts'
 
@@ -68,10 +68,10 @@ export function createRouteApp(): Hono {
   app.onError((err, c) => {
     if (err instanceof IpcError) return errorJson(c, err.code, err.message)
     if (err instanceof OperationCancelledError || c.req.raw.signal.aborted) {
-      serverLogger.debug({ path: c.req.path }, 'request cancelled after client disconnect')
+      serverNodeLog.debug({ path: c.req.path }, 'request cancelled after client disconnect')
       return new Response(null, { status: 499 })
     }
-    serverLogger.error({ err }, 'unhandled error')
+    serverNodeLog.error({ err }, 'unhandled error')
     return errorJson(c, 'INTERNAL_SERVER_ERROR', 'Internal server error')
   })
   return app

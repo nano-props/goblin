@@ -19,11 +19,11 @@ const terminalView: WorkspacePaneTabSummary = {
 }
 
 describe('workspace pane tab model', () => {
-  test('keeps pending runtime tab identities stable', () => {
+  test('keeps pending runtime tab identities stable', async () => {
     expect(workspacePanePendingRuntimeTabIdentity('terminal')).toBe('terminal:pending')
   })
 
-  test('derives runtime summary identities from the runtime session id', () => {
+  test('derives runtime summary identities from the runtime session id', async () => {
     expect(workspacePaneRuntimeTabSummarySessionId(terminalView)).toBe('term-111111111111111111111')
     expect(workspacePaneRuntimeTabSummaryIdentity(terminalView)).toBe('terminal:term-111111111111111111111')
   })

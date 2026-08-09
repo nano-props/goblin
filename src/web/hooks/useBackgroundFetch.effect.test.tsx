@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 
 import { seedRepoWithReadModelForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
+import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
-import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
-import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { QueryClientProvider } from '@tanstack/react-query'
+import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
+import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 
 const mocks = vi.hoisted(() => ({
   setBackgroundSyncRepos: vi.fn(async (_targets: unknown, _signal?: AbortSignal) => {}),
@@ -21,11 +21,7 @@ vi.mock('#/web/repo-client.ts', () => ({
 }))
 
 vi.mock('#/web/runtime-settings-fetch.ts', () => ({
-  useFetchSettings: () => ({ fetchIntervalSec: 30 }),
-}))
-
-vi.mock('#/web/lib/server-config.ts', () => ({
-  hasClientServerConfig: () => true,
+  useFetchSettings: () => ({ value: { fetchIntervalSec: 30 } }),
 }))
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace/background-sync')
@@ -42,14 +38,19 @@ describe('useBackgroundFetch request lifecycle', () => {
   })
 
   test('cancels superseded and unmounted registration requests', async () => {
-    const view = renderBackgroundFetchHost(WORKSPACE_ID)
+    const view = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
     await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce())
     const firstSignal = mocks.setBackgroundSyncRepos.mock.calls[0]?.[1]
+    const snapshot = appQueryClient.getQueryData<RepoSnapshotResponse>(
+      repoSnapshotQueryKey(WORKSPACE_ID, 'workspace-runtime-background-sync'),
+    )
+    if (!snapshot) throw new Error('missing seeded repository snapshot')
+    appQueryClient.setQueryData(repoSnapshotQueryKey(WORKSPACE_ID, 'workspace-runtime-next'), snapshot)
 
-    view.rerender(
-      <QueryClientProvider client={appQueryClient}>
-        <BackgroundFetchHost workspaceId={null} />
-      </QueryClientProvider>,
+    await view.rerender(
+      <VueQueryClientScope client={appQueryClient}>
+        <BackgroundFetchHost workspaceId={WORKSPACE_ID} workspaceRuntimeId="workspace-runtime-next" />
+      </VueQueryClientScope>,
     )
     await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledTimes(2))
     const secondSignal = mocks.setBackgroundSyncRepos.mock.calls[1]?.[1]
@@ -58,41 +59,60 @@ describe('useBackgroundFetch request lifecycle', () => {
     expect(secondSignal?.aborted).toBe(false)
     view.unmount()
     expect(secondSignal?.aborted).toBe(true)
+    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenLastCalledWith([]))
   })
 
-  test('does not call the Git registration endpoint for an initial empty or plain Workspace target', async () => {
-    const empty = renderBackgroundFetchHost(null)
-    await Promise.resolve()
-    expect(mocks.setBackgroundSyncRepos).not.toHaveBeenCalled()
-    empty.unmount()
+  test('does not redeclare an unchanged target when its snapshot projection is refreshed', async () => {
+    const view = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
+    await vi.waitFor(() => expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce())
+    const signal = mocks.setBackgroundSyncRepos.mock.calls[0]?.[1]
+    const queryKey = repoSnapshotQueryKey(WORKSPACE_ID, 'workspace-runtime-background-sync')
+    const snapshot = appQueryClient.getQueryData<RepoSnapshotResponse>(queryKey)
+    if (!snapshot) throw new Error('missing seeded repository snapshot')
 
-    const workspace = emptyWorkspace(WORKSPACE_ID, 'workspace-runtime-plain')
-    acceptWorkspaceProbeState(workspace, {
-      status: 'ready',
-      capabilities: {
-        files: { read: true, write: true },
-        terminal: { available: true },
-        git: { status: 'unavailable' },
+    appQueryClient.setQueryData(queryKey, { ...snapshot })
+    await Promise.resolve()
+
+    expect(mocks.setBackgroundSyncRepos).toHaveBeenCalledOnce()
+    expect(signal?.aborted).toBe(false)
+    view.unmount()
+    expect(signal?.aborted).toBe(true)
+  })
+
+  test('does not declare a Git target when the required repo snapshot has no remotes', async () => {
+    const snapshot = appQueryClient.getQueryData<RepoSnapshotResponse>(
+      repoSnapshotQueryKey(WORKSPACE_ID, 'workspace-runtime-background-sync'),
+    )
+    if (!snapshot) throw new Error('missing seeded repository snapshot')
+    appQueryClient.setQueryData(repoSnapshotQueryKey(WORKSPACE_ID, 'workspace-runtime-background-sync'), {
+      snapshot: {
+        ...snapshot.snapshot,
+        remote: { ...snapshot.snapshot.remote, hasRemotes: false },
       },
-      diagnostics: [],
     })
-    useWorkspacesStore.setState({ workspaces: { [WORKSPACE_ID]: workspace } })
-    const plain = renderBackgroundFetchHost(WORKSPACE_ID)
+
+    const view = renderBackgroundFetchHost(WORKSPACE_ID, 'workspace-runtime-background-sync')
     await Promise.resolve()
     expect(mocks.setBackgroundSyncRepos).not.toHaveBeenCalled()
-    plain.unmount()
+    view.unmount()
   })
 })
 
-function BackgroundFetchHost({ workspaceId }: { workspaceId: WorkspaceId | null }) {
-  useBackgroundFetch({ currentWorkspaceId: workspaceId })
-  return null
-}
+const BackgroundFetchHost = defineComponent(
+  (props: { workspaceId: WorkspaceId; workspaceRuntimeId: string }) => {
+    useBackgroundFetch({
+      workspaceId: () => props.workspaceId,
+      workspaceRuntimeId: () => props.workspaceRuntimeId,
+    })
+    return () => null
+  },
+  { name: 'BackgroundFetchTestHost', props: ['workspaceId', 'workspaceRuntimeId'] },
+)
 
-function renderBackgroundFetchHost(workspaceId: WorkspaceId | null) {
+function renderBackgroundFetchHost(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
   return renderInJsdom(
-    <QueryClientProvider client={appQueryClient}>
-      <BackgroundFetchHost workspaceId={workspaceId} />
-    </QueryClientProvider>,
+    <VueQueryClientScope client={appQueryClient}>
+      <BackgroundFetchHost workspaceId={workspaceId} workspaceRuntimeId={workspaceRuntimeId} />
+    </VueQueryClientScope>,
   )
 }

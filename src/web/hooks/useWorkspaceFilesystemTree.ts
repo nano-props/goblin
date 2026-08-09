@@ -4,8 +4,10 @@
 // invalidation, and restored expanded-directory loading. Persisted UI
 // interaction state stays in the filetree interaction store.
 
-import { useCallback, useEffect, useEffectEvent, useMemo, useReducer } from 'react'
-import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { computed, onScopeDispose, reactive, shallowRef, toValue, watch } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+import type { QueryClient } from '@tanstack/query-core'
 import {
   readCurrentWorkspaceFilesystemTree,
   subscribeWorkspaceFilesystemRootReloadStart,
@@ -14,19 +16,20 @@ import {
 import {
   emptyLazyWorkspaceFilesystemTreeState,
   lazyWorkspaceFilesystemTreeReducer,
-  type LazyWorkspaceFilesystemTreeAggregate,
-  type LazyWorkspaceFilesystemTreeState,
+} from '#/web/workspace-filesystem-lazy-state.ts'
+import type {
+  LazyWorkspaceFilesystemTreeAction,
+  LazyWorkspaceFilesystemTreeAggregate,
+  LazyWorkspaceFilesystemTreeState,
 } from '#/web/workspace-filesystem-lazy-state.ts'
 import type { WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
-import {
-  workspacePaneFilesystemExecutionPath,
-  type WorkspacePaneFilesystemExecutionTarget,
-} from '#/shared/workspace-runtime.ts'
+import { workspacePaneFilesystemExecutionPath } from '#/shared/workspace-runtime.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 
 export interface UseWorkspaceFilesystemTreeInput {
   /** Stable for this hook owner's lifetime; execution-target changes replace the owner. */
   readonly target: WorkspacePaneFilesystemExecutionTarget
-  readonly expandedKeys?: readonly string[]
+  readonly expandedKeys?: MaybeRefOrGetter<readonly string[]>
 }
 
 export interface UseWorkspaceFilesystemTreeResult {
@@ -57,121 +60,120 @@ interface CachedWorkspaceFilesystemTreeStateInput {
 }
 
 export function useWorkspaceFilesystemTree(input: UseWorkspaceFilesystemTreeInput): UseWorkspaceFilesystemTreeResult {
-  const inputTarget = input.target
-  const inputTargetRoot = inputTarget.kind === 'workspace-root' ? inputTarget.workspaceId : inputTarget.root
-  const target = useMemo(
-    () => inputTarget,
-    [inputTarget.kind, inputTarget.workspaceId, inputTarget.workspaceRuntimeId, inputTargetRoot],
-  )
+  const target = input.target
   const workspaceId = target.workspaceId
   const workspaceRuntimeId = target.workspaceRuntimeId
   const filesystemRootPath = workspacePaneFilesystemExecutionPath(target)
-  const expandedKeys = input.expandedKeys ?? EMPTY_EXPANDED_KEYS
+  const expandedKeys = () => toValue(input.expandedKeys ?? EMPTY_EXPANDED_KEYS)
   const queryClient = useQueryClient()
-  const enabled = workspaceId.length > 0 && workspaceRuntimeId.length > 0 && filesystemRootPath.length > 0
-  const rootQueryKey = useMemo(() => workspaceFilesystemTreeChildrenQueryKey(target, ''), [target])
-  const [treeState, dispatchTreeState] = useReducer(
-    lazyWorkspaceFilesystemTreeReducer,
-    { queryClient, target, expandedKeys },
-    revalidatingCachedWorkspaceFilesystemTreeState,
+  const enabled = computed(
+    () => workspaceId.length > 0 && workspaceRuntimeId.length > 0 && filesystemRootPath.length > 0,
+  )
+  const treeState = shallowRef(
+    revalidatingCachedWorkspaceFilesystemTreeState({
+      queryClient,
+      target,
+      expandedKeys: expandedKeys(),
+    }),
   )
 
-  const rootQuery = useQuery({
-    queryKey: rootQueryKey,
-    enabled,
-    // The query cache owns this root read across transient panel observer lifetimes.
-    // Runtime identity is part of the key and the server rejects stale runtimes, so
-    // aborting when a tab briefly remounts only creates duplicate replacement reads.
-    queryFn: () => readCurrentWorkspaceFilesystemTree(queryClient, target, {}),
-    retry: false,
-    staleTime: Number.POSITIVE_INFINITY,
-    refetchOnMount: 'always',
-    // Keep TanStack's default reconnect revalidation: it converges this read-only
-    // projection with server authority and never replays a filesystem operation.
-  })
+  function dispatchTreeState(action: LazyWorkspaceFilesystemTreeAction): void {
+    const next = lazyWorkspaceFilesystemTreeReducer(treeState.value, action)
+    if (next !== treeState.value) treeState.value = next
+  }
+
+  const rootQuery = useQuery(
+    computed(() => ({
+      queryKey: workspaceFilesystemTreeChildrenQueryKey(target, ''),
+      enabled: enabled.value,
+      // The query cache owns this root read across transient panel observer lifetimes.
+      queryFn: () => readCurrentWorkspaceFilesystemTree(queryClient, target, {}),
+      retry: false,
+      staleTime: Number.POSITIVE_INFINITY,
+      refetchOnMount: 'always' as const,
+    })),
+  )
   const { data: rootData, error: rootError, isFetching, isPending, refetch } = rootQuery
 
-  useEffect(() => {
-    return subscribeWorkspaceFilesystemRootReloadStart(queryClient, target, () => {
-      dispatchTreeState({ type: 'markForReload' })
-    })
-  }, [queryClient, target])
+  const unsubscribeReload = subscribeWorkspaceFilesystemRootReloadStart(queryClient, target, () => {
+    dispatchTreeState({ type: 'markForReload' })
+  })
+  onScopeDispose(unsubscribeReload)
 
-  useEffect(() => {
-    if (!rootData || isFetching || rootError) return
-    dispatchTreeState({ type: 'childrenLoaded', prefix: '', result: rootData })
-  }, [isFetching, rootData, rootError])
+  watch(
+    [rootData, isFetching, rootError],
+    ([result, fetching, error]) => {
+      if (!result || fetching || error) return
+      dispatchTreeState({ type: 'childrenLoaded', prefix: '', result })
+    },
+    { immediate: true },
+  )
 
-  const readChildren = useCallback(
-    async (prefix: string) => {
-      if (!enabled) return
-      const normalizedPrefix = normalizePrefix(prefix)
-      if (treeState.loadedPrefixes.has(normalizedPrefix)) return
-      if (treeState.loadingPrefixes.has(normalizedPrefix)) return
+  async function readChildren(prefix: string): Promise<void> {
+    if (!enabled.value) return
+    const normalizedPrefix = normalizePrefix(prefix)
+    if (treeState.value.loadedPrefixes.has(normalizedPrefix)) return
+    if (treeState.value.loadingPrefixes.has(normalizedPrefix)) return
 
-      dispatchTreeState({ type: 'childrenLoading', prefix: normalizedPrefix })
-      try {
-        const result = await queryClient.fetchQuery({
-          queryKey: workspaceFilesystemTreeChildrenQueryKey(target, normalizedPrefix),
-          queryFn: ({ signal }) =>
-            readCurrentWorkspaceFilesystemTree(queryClient, target, {
-              prefix: normalizedPrefix || undefined,
-              signal,
-            }),
-          retry: false,
-        })
-        dispatchTreeState({ type: 'childrenLoaded', prefix: normalizedPrefix, result })
-      } catch (err) {
-        dispatchTreeState({ type: 'childrenFailed', prefix: normalizedPrefix })
-        throw err
-      } finally {
-        dispatchTreeState({ type: 'childrenSettled', prefix: normalizedPrefix })
+    dispatchTreeState({ type: 'childrenLoading', prefix: normalizedPrefix })
+    try {
+      const result = await queryClient.fetchQuery({
+        queryKey: workspaceFilesystemTreeChildrenQueryKey(target, normalizedPrefix),
+        queryFn: ({ signal }) =>
+          readCurrentWorkspaceFilesystemTree(queryClient, target, {
+            prefix: normalizedPrefix || undefined,
+            signal,
+          }),
+        retry: false,
+      })
+      dispatchTreeState({ type: 'childrenLoaded', prefix: normalizedPrefix, result })
+    } catch (error) {
+      dispatchTreeState({ type: 'childrenFailed', prefix: normalizedPrefix })
+      throw error
+    } finally {
+      dispatchTreeState({ type: 'childrenSettled', prefix: normalizedPrefix })
+    }
+  }
+
+  const expansionProjection = computed(() =>
+    deriveWorkspaceFilesystemExpansionProjection(
+      expandedKeys(),
+      treeState.value,
+      !isFetching.value && Boolean(rootError.value),
+    ),
+  )
+
+  // Restored expansion state is an external projection. Load only directory
+  // prefixes that became reachable in the current authoritative tree.
+  watch(
+    [rootData, expandedKeys, () => treeState.value.nodesById, () => treeState.value.reloadEpoch],
+    ([result]) => {
+      if (!result) return
+      for (const prefix of expansionProjection.value.restorePrefixes) {
+        void readChildren(prefix).catch(() => {})
       }
     },
-    [enabled, queryClient, treeState.loadedPrefixes, treeState.loadingPrefixes, target],
+    { immediate: true },
   )
 
-  const loadChildren = useCallback(
-    async (prefix: string) => {
-      await readChildren(prefix)
-    },
-    [readChildren],
-  )
-
-  const expansionProjection = useMemo(
-    () => deriveWorkspaceFilesystemExpansionProjection(expandedKeys, treeState, !isFetching && Boolean(rootError)),
-    [expandedKeys, isFetching, rootError, treeState],
-  )
-
-  const restoreExpandedChildren = useEffectEvent(() => {
-    for (const prefix of expansionProjection.restorePrefixes) {
-      void readChildren(prefix).catch(() => {})
-    }
-  })
-
-  useEffect(() => {
-    if (!rootData) return
-    restoreExpandedChildren()
-  }, [expandedKeys, rootData, treeState.nodesById, treeState.reloadEpoch])
-
-  const refresh = useCallback(() => {
-    if (!enabled) return
+  function refresh(): void {
+    if (!enabled.value) return
     void refetch({ cancelRefetch: false })
-  }, [enabled, refetch])
-
-  const error = workspaceFilesystemTreeError(rootError, expansionProjection.visibleErrorPrefixes)
-
-  return {
-    tree: rootData ? treeState.result : null,
-    isInitialLoading: isPending,
-    isReading: isFetching || expansionProjection.visibleLoadingPrefixes.size > 0,
-    error,
-    loadingKeys: expansionProjection.visibleLoadingPrefixes,
-    loadedPrefixes: treeState.loadedPrefixes,
-    expandedDirectoryReadsSettled: expansionProjection.readsSettled,
-    loadChildren,
-    refresh,
   }
+
+  return reactive({
+    tree: computed(() => (rootData.value ? treeState.value.result : null)),
+    isInitialLoading: computed(() => isPending.value),
+    isReading: computed(() => isFetching.value || expansionProjection.value.visibleLoadingPrefixes.size > 0),
+    error: computed(() =>
+      workspaceFilesystemTreeError(rootError.value, expansionProjection.value.visibleErrorPrefixes),
+    ),
+    loadingKeys: computed(() => expansionProjection.value.visibleLoadingPrefixes),
+    loadedPrefixes: computed(() => treeState.value.loadedPrefixes),
+    expandedDirectoryReadsSettled: computed(() => expansionProjection.value.readsSettled),
+    loadChildren: readChildren,
+    refresh,
+  })
 }
 
 function normalizePrefix(prefix: string): string {

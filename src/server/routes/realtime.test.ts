@@ -99,7 +99,7 @@ describe('createRealtimeRoutes — auth middleware', () => {
  * (closing the socket with code 1009 above 1 MiB).
  */
 describe('createRealtimeRoutes — terminal message forwarding', () => {
-  test('host.handleRealtimeMessage is called with the raw payload', () => {
+  test('host.handleRealtimeMessage is called with the raw payload', async () => {
     const handle = vi.fn()
     const host = makeTerminalHost({ handleRealtimeMessage: handle })
     const socket = {} as ServerAppRealtimeSocket

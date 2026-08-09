@@ -20,12 +20,12 @@ import {
   setRepoWorktreeStatusQueryData,
 } from '#/web/repo-query-cache.ts'
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { GitWorkspaceClientState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
-import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
+import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/shared/git-types.ts'
 
 export type RepoPresentationForTest = WorkspaceState & {
   operations: GitWorkspaceClientState['operations']
@@ -102,7 +102,7 @@ export function seedRepoShellForTest(options: {
   if (options.remoteLifecycle !== undefined && repo.admission.kind === 'remote') {
     repo.admission.lifecycle = options.remoteLifecycle
   }
-  useWorkspacesStore.setState({
+  workspacesStore.setState({
     workspaces: { [workspaceId]: repo },
     workspaceOrder: [workspaceId],
     restoredWorkspaceId: workspaceId,
@@ -117,7 +117,7 @@ export function seedRepoShellForTest(options: {
 }
 
 export function setWorkspaceProbeForTest(workspaceId: string, workspaceProbe: WorkspaceProbeState): void {
-  useWorkspacesStore.setState((state) => {
+  workspacesStore.setState((state) => {
     const workspace = state.workspaces[workspaceId]
     if (!workspace) throw new Error(`Missing workspace fixture: ${workspaceId}`)
     const next = { ...workspace }
@@ -170,7 +170,7 @@ export function createPullRequest(number: number, options: Partial<PullRequestIn
 export function resetWorkspacesStore(): void {
   disposeAllRepoOperationSchedulers()
   appQueryClient.clear()
-  useWorkspacesStore.setState({
+  workspacesStore.setState({
     workspaces: {},
     workspaceOrder: [],
     restoredWorkspaceId: null,

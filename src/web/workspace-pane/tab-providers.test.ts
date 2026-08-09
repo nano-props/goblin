@@ -58,29 +58,29 @@ const terminalView: WorkspacePaneTabSummary = {
 }
 
 describe('workspace pane tab providers', () => {
-  test('centralizes static tab scope', () => {
+  test('centralizes static tab scope', async () => {
     expect(statusWorkspacePaneTabProvider.scope).toBe('branch')
     expect(changesWorkspacePaneTabProvider.scope).toBe('worktree')
     expect(historyWorkspacePaneTabProvider.scope).toBe('branch')
     expect(filesWorkspacePaneTabProvider.scope).toBe('worktree')
   })
 
-  test('derives provider scope from the shared workspace pane scope definitions', () => {
+  test('derives provider scope from the shared workspace pane scope definitions', async () => {
     for (const provider of workspacePaneTabProviders) {
       expect(provider.scope).toBe(workspacePaneTabScope(provider.type))
     }
   })
 
-  test('registers one provider per workspace pane tab type', () => {
+  test('registers one provider per workspace pane tab type', async () => {
     expect(workspacePaneTabProviders.map((provider) => provider.type)).toEqual([...WORKSPACE_PANE_TAB_TYPES])
   })
 
-  test('resolves runtime tab providers by type', () => {
+  test('resolves runtime tab providers by type', async () => {
     expect(workspacePaneRuntimeTabProvider('terminal')).toBe(terminalWorkspacePaneTabProvider)
     expect(workspacePaneTabProvider('terminal').kind).toBe('runtime')
   })
 
-  test('derives shared static scope lists from the static scope map', () => {
+  test('derives shared static scope lists from the static scope map', async () => {
     const branchTabs = WORKSPACE_PANE_STATIC_TAB_TYPES.filter((type) => workspacePaneStaticTabScope(type) === 'branch')
     const worktreeTabs = WORKSPACE_PANE_STATIC_TAB_TYPES.filter(
       (type) => workspacePaneStaticTabScope(type) === 'worktree',
@@ -90,7 +90,7 @@ describe('workspace pane tab providers', () => {
     expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toEqual(worktreeTabs)
   })
 
-  test('resolves worktree availability through providers', () => {
+  test('resolves worktree availability through providers', async () => {
     expect(workspacePaneTabProvider('status').canOpen({ hasWorktree: false })).toBe(true)
     expect(workspacePaneTabProvider('history').canOpen({ hasWorktree: false })).toBe(true)
     expect(workspacePaneTabProvider('changes').canOpen({ hasWorktree: false })).toBe(false)
@@ -98,7 +98,7 @@ describe('workspace pane tab providers', () => {
     expect(workspacePaneTabProvider('terminal').canOpen({ hasWorktree: false })).toBe(false)
   })
 
-  test('keeps terminal renderability tied to sync and session truth', () => {
+  test('keeps terminal renderability tied to sync and session truth', async () => {
     expect(
       terminalWorkspacePaneTabProvider.isRenderable(renderability({ projectionPhase: 'pending', sessionCount: 0 })),
     ).toBe(true)
@@ -113,7 +113,7 @@ describe('workspace pane tab providers', () => {
     ).toBe(true)
   })
 
-  test('labels terminal pending state by projection phase', () => {
+  test('labels terminal pending state by projection phase', async () => {
     expect(
       terminalWorkspacePaneTabProvider.pendingLabel({
         t,
@@ -137,7 +137,7 @@ describe('workspace pane tab providers', () => {
     ).toBe('terminal.load-failed')
   })
 
-  test('exposes terminal bell state as runtime tab attention metadata', () => {
+  test('exposes terminal bell state as runtime tab attention metadata', async () => {
     expect(terminalWorkspacePaneTabProvider.attention({ view: terminalView })).toEqual({ attention: false })
     expect(terminalWorkspacePaneTabProvider.attention({ view: { ...terminalView, hasBell: true } })).toEqual({
       attention: true,
@@ -145,7 +145,7 @@ describe('workspace pane tab providers', () => {
     })
   })
 
-  test('builds stable identities, tab entries, and labels', () => {
+  test('builds stable identities, tab entries, and labels', async () => {
     expect(workspacePaneStaticTabProvider('status').identity()).toBe(WORKSPACE_PANE_STATIC_TAB_IDS.status)
     expect(workspacePaneStaticTabProvider('status').buttonId('workspace-pane')).toBe('workspace-pane-status-tab')
     expect(workspacePaneStaticTabProvider('status').panelId('workspace-pane')).toBe('workspace-pane-status-panel')
@@ -184,7 +184,7 @@ describe('workspace pane tab providers', () => {
     ).toBe('Terminal 1 full')
   })
 
-  test('keeps the internal terminal process placeholder out of runtime tab labels', () => {
+  test('keeps the internal terminal process placeholder out of runtime tab labels', async () => {
     const placeholderTerminalView: WorkspacePaneTabSummary = {
       ...terminalView,
       title: 'terminal',

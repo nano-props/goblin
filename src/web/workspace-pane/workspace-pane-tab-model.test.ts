@@ -20,7 +20,7 @@ import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('repo workspace pane tab model', () => {
-  test('projects only tabs supported by a detached worktree surface and selects a valid fallback', () => {
+  test('projects only tabs supported by a detached worktree surface and selects a valid fallback', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -47,7 +47,7 @@ describe('repo workspace pane tab model', () => {
     })
   })
 
-  test('projects exactly the authoritative workspace tabs without resurrecting a closed tab', () => {
+  test('projects exactly the authoritative workspace tabs without resurrecting a closed tab', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
     const model = createWorkspacePaneTabModel({
       workspaceId,
@@ -65,7 +65,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.renderedTab).toBe('files')
   })
 
-  test('keeps distinct terminal identities and selects the workspace-scoped terminal projection', () => {
+  test('keeps distinct terminal identities and selects the workspace-scoped terminal projection', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
     const model = createWorkspacePaneTabModel({
       workspaceId,
@@ -95,7 +95,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.identity).toBe('terminal:term-222222222222222222222')
   })
 
-  test('keeps the canonical selected terminal entry while its live view is not projected', () => {
+  test('keeps the canonical selected terminal entry while its live view is not projected', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
     const terminalSessionId = 'term-111111111111111111111'
     const model = createWorkspacePaneTabModel({
@@ -122,7 +122,7 @@ describe('repo workspace pane tab model', () => {
     )
   })
 
-  test('projects a mixed tab list across static and terminal tabs', () => {
+  test('projects a mixed tab list across static and terminal tabs', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -152,7 +152,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.identity).toBe('workspace-pane:status')
   })
 
-  test('uses the selected terminal from the store as the active terminal tab', () => {
+  test('uses the selected terminal from the store as the active terminal tab', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -179,7 +179,7 @@ describe('repo workspace pane tab model', () => {
     expect(materializedWorkspacePaneRuntimeTabSessionId(model.activeTab, 'terminal')).toBe('term-222222222222222222222')
   })
 
-  test('uses runtime tab state as the selected-session source', () => {
+  test('uses runtime tab state as the selected-session source', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -210,7 +210,7 @@ describe('repo workspace pane tab model', () => {
     expect(materializedWorkspacePaneRuntimeTabSessionId(model.activeTab, 'terminal')).toBe('term-222222222222222222222')
   })
 
-  test('uses a requested runtime session for the active tab without rewriting projection state', () => {
+  test('uses a requested runtime session for the active tab without rewriting projection state', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -232,7 +232,7 @@ describe('repo workspace pane tab model', () => {
     expect(materializedWorkspacePaneRuntimeTabSessionId(model.activeTab, 'terminal')).toBe('term-222222222222222222222')
   })
 
-  test('does not fall back to another terminal when a requested runtime session is missing', () => {
+  test('does not fall back to another terminal when a requested runtime session is missing', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -260,7 +260,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
   })
 
-  test('does not render a runtime host for a verified missing explicit terminal route', () => {
+  test('does not render a runtime host for a verified missing explicit terminal route', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -288,7 +288,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
   })
 
-  test('creates pending runtime tabs from runtime tab state', () => {
+  test('creates pending runtime tabs from runtime tab state', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -314,7 +314,7 @@ describe('repo workspace pane tab model', () => {
     ])
   })
 
-  test('defaults runtime tab state by runtime type when no input state is provided', () => {
+  test('defaults runtime tab state by runtime type when no input state is provided', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -336,7 +336,7 @@ describe('repo workspace pane tab model', () => {
     })
   })
 
-  test('does not materialize runtime-only terminals outside the server tab list', () => {
+  test('does not materialize runtime-only terminals outside the server tab list', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -360,7 +360,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.identity).toBe('terminal:term-222222222222222222222')
   })
 
-  test('falls back when the preferred terminal is runtime-only and not in the server tab list', () => {
+  test('falls back when the preferred terminal is runtime-only and not in the server tab list', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -379,7 +379,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.identity).toBe('workspace-pane:status')
   })
 
-  test('keeps explicit terminal tab entries ahead of the runtime terminal snapshot list', () => {
+  test('keeps explicit terminal tab entries ahead of the runtime terminal snapshot list', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -408,7 +408,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.identity).toBe('terminal:term-222222222222222222222')
   })
 
-  test('keeps terminal selected without a runtime tab while creation is pending', () => {
+  test('keeps terminal selected without a runtime tab while creation is pending', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -437,7 +437,7 @@ describe('repo workspace pane tab model', () => {
     ])
   })
 
-  test('does not add a pending terminal tab during initial terminal sync', () => {
+  test('does not add a pending terminal tab during initial terminal sync', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -463,7 +463,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([['workspace-pane:status', 'static']])
   })
 
-  test('falls back to the first materialized tab when the preferred worktree static tab is not open', () => {
+  test('falls back to the first materialized tab when the preferred worktree static tab is not open', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -491,7 +491,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.identity).toBe('workspace-pane:status')
   })
 
-  test('does not fall back when an explicit static route is not materialized', () => {
+  test('does not fall back when an explicit static route is not materialized', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -512,7 +512,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
   })
 
-  test('falls back to the first materialized tab when a branch preference names a closed tab', () => {
+  test('falls back to the first materialized tab when a branch preference names a closed tab', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -539,7 +539,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.identity).toBe('workspace-pane:status')
   })
 
-  test('returns branch-scope tabs when the selected branch has no worktree', () => {
+  test('returns branch-scope tabs when the selected branch has no worktree', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -558,7 +558,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.identity).toBe('workspace-pane:status')
   })
 
-  test('falls back to the first materialized tab when the last terminal exits a [status, terminal] strip', () => {
+  test('falls back to the first materialized tab when the last terminal exits a [status, terminal] strip', async () => {
     // The user is on a [status, term-111111111111111111111] strip with preferred=terminal.
     // The terminal exits, the runtime snapshot is empty, sync is ready, no
     // pending create. Old behavior: empty pane. New behavior: the model
@@ -587,7 +587,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.identity).toBe('workspace-pane:status')
   })
 
-  test('lands on the remaining terminal when the active terminal is closed among many', () => {
+  test('lands on the remaining terminal when the active terminal is closed among many', async () => {
     // The user has [status, term-111111111111111111111, term-222222222222222222222] with term-111111111111111111111 selected.
     // The user closes term-111111111111111111111 (X click) — term-111111111111111111111 is removed from
     // tabs, term-222222222222222222222 stays selected in the store. The model
@@ -615,7 +615,7 @@ describe('repo workspace pane tab model', () => {
     expect(materializedWorkspacePaneRuntimeTabSessionId(model.activeTab, 'terminal')).toBe('term-222222222222222222222')
   })
 
-  test('keeps the runtime-host view while a terminal create is pending', () => {
+  test('keeps the runtime-host view while a terminal create is pending', async () => {
     // The fallback is for "preferred tab no longer has a backing tab".
     // When the user is actively creating a new terminal, the model keeps
     // the runtime-host view so the new-terminal affordance remains
@@ -645,7 +645,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
   })
 
-  test('keeps runtime-host while create is pending after the last tab was closed', () => {
+  test('keeps runtime-host while create is pending after the last tab was closed', async () => {
     // Creating from an empty strip must preserve the runtime presentation
     // surface. The prepared session can then mount and fit its real xterm
     // before attach; this host is not a create-time geometry provider.
@@ -674,7 +674,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([['terminal:pending', 'pending']])
   })
 
-  test('keeps the runtime-host view while the initial terminal sync is unresolved', () => {
+  test('keeps the runtime-host view while the initial terminal sync is unresolved', async () => {
     // Same as above: the user wants terminal and the worktree has no
     // terminal session yet, but sync is not done. We preserve the
     // runtime-host view rather than falling back to status, because the
@@ -703,7 +703,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
   })
 
-  test('returns no selection when there is no branch at all', () => {
+  test('returns no selection when there is no branch at all', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -725,7 +725,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
   })
 
-  test('keeps bare branch routes on the empty workspace pane', () => {
+  test('keeps bare branch routes on the empty workspace pane', async () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -745,7 +745,7 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
   })
 
-  test('falls back to tabs[0] for server-side exits', () => {
+  test('falls back to tabs[0] for server-side exits', async () => {
     // The last terminal exits externally through the server workspace tab list,
     // so the model uses the generic tabs[0] fallback.
     const model = createModel({

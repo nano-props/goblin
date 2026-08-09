@@ -1,6 +1,7 @@
 // Authenticated bootstrap primes query state from the server transport before
 // feature stores start reading it.
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { onScopeDispose, readonly, ref, toValue } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { ClientWorkspaceState, SettingsSnapshot } from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { bootstrapLog } from '#/web/logger.ts'
@@ -10,9 +11,9 @@ import { restoreRestorableWorkspaceStateFromClientWorkspace } from '#/web/restor
 import { restoreWorkspaceAtBoot } from '#/web/settings-actions.ts'
 import { externalAppsQueryOptions, settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import { useI18nStore } from '#/web/stores/i18n.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useThemeStore } from '#/web/stores/theme.ts'
+import { i18nStore } from '#/web/stores/i18n.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { themeStore } from '#/web/stores/theme.ts'
 import { createTimeoutAbortController, waitForPromiseWithSignal } from '#/web/lib/abort.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
@@ -23,7 +24,7 @@ export type AuthenticatedAppBootstrapState =
   { status: 'restoring-workspace' } | { status: 'ready' } | { status: 'failed'; message: string }
 
 export interface AuthenticatedAppBootstrapResult {
-  state: AuthenticatedAppBootstrapState
+  state: Readonly<Ref<AuthenticatedAppBootstrapState>>
   retry: () => void
 }
 
@@ -40,32 +41,37 @@ interface AuthenticatedWorkspaceRestoreRun {
 type WorkspaceRestoreOutcome = { status: 'completed' } | { status: 'cancelled' } | { status: 'failed'; message: string }
 
 export function useAuthenticatedAppBootstrap(options?: {
-  activeWorkspaceId?: WorkspaceId | null
+  activeWorkspaceId?: MaybeRefOrGetter<WorkspaceId | null | undefined>
 }): AuthenticatedAppBootstrapResult {
-  const activeWorkspaceIdRef = useRef(options?.activeWorkspaceId ?? null)
-  const restoreRunRef = useRef<AuthenticatedWorkspaceRestoreRun | null>(null)
-  const [attempt, setAttempt] = useState(0)
-  const [state, setState] = useState<AuthenticatedAppBootstrapState>(RESTORING_WORKSPACE_BOOTSTRAP_STATE)
+  const state = ref<AuthenticatedAppBootstrapState>(RESTORING_WORKSPACE_BOOTSTRAP_STATE)
+  let restoreRun: AuthenticatedWorkspaceRestoreRun | null = null
+  let disposed = false
 
-  useEffect(() => {
-    if (restoreRunRef.current) return
-    setState(RESTORING_WORKSPACE_BOOTSTRAP_STATE)
-    const run = startAuthenticatedWorkspaceRestoreRun((outcome) => {
-      if (outcome.status === 'completed') {
-        setState(READY_BOOTSTRAP_STATE)
-      } else if (outcome.status === 'failed') {
-        setState({ status: 'failed', message: outcome.message })
-      }
-    }, activeWorkspaceIdRef.current)
-    restoreRunRef.current = run
-    return () => {
-      run.cancel()
-      if (restoreRunRef.current === run) restoreRunRef.current = null
-    }
-  }, [attempt])
+  function start(): void {
+    restoreRun?.cancel()
+    state.value = RESTORING_WORKSPACE_BOOTSTRAP_STATE
+    const run = startAuthenticatedWorkspaceRestoreRun(
+      (outcome) => {
+        if (disposed || restoreRun !== run) return
+        if (outcome.status === 'completed') {
+          state.value = READY_BOOTSTRAP_STATE
+        } else if (outcome.status === 'failed') {
+          state.value = { status: 'failed', message: outcome.message }
+        }
+      },
+      toValue(options?.activeWorkspaceId) ?? null,
+    )
+    restoreRun = run
+  }
 
-  const retry = useCallback(() => setAttempt((value) => value + 1), [])
-  return { state, retry }
+  start()
+  onScopeDispose(() => {
+    disposed = true
+    restoreRun?.cancel()
+    restoreRun = null
+  })
+
+  return { state: readonly(state), retry: start }
 }
 
 function startAuthenticatedWorkspaceRestoreRun(
@@ -111,13 +117,13 @@ async function hydrateNonCriticalAuthenticatedState(
     runOptionalBootstrapTask(
       'theme hydrate',
       async () => {
-        await useThemeStore
+        await themeStore
           .getState()
           .hydrateFromSettingsSnapshot(await waitForPromiseWithSignal(settingsSnapshot, signal))
       },
       signal,
     ),
-    Promise.resolve().then(() => useI18nStore.getState().subscribeInvalidation()),
+    Promise.resolve().then(() => i18nStore.getState().subscribeInvalidation()),
   ])
 }
 
@@ -127,7 +133,7 @@ async function restoreBootSession(
   activeWorkspaceId: WorkspaceId | null,
 ): Promise<WorkspaceRestoreOutcome> {
   try {
-    useWorkspacesStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
+    workspacesStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
     const presentation = await readClientWorkspaceState()
     const snapshot = await waitForPromiseWithSignal(settingsSnapshot, signal)
     if (signal.aborted) throw abortReason(signal)
@@ -148,14 +154,14 @@ async function restoreBootSession(
     )
     applyRestoredClientWorkspace(clientWorkspace)
     await waitForPromiseWithSignal(
-      useWorkspacesStore.getState().hydrateRestoredWorkspaceRuntime(restored.runtime, {
+      workspacesStore.getState().hydrateRestoredWorkspaceRuntime(restored.runtime, {
         signal,
         restoredClientWorkspace: clientWorkspace,
       }),
       signal,
     )
     if (signal.aborted) throw abortReason(signal)
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       sessionPersistenceReady: true,
       sessionRestoreError: null,
     })
@@ -179,7 +185,7 @@ function applyRestoredClientWorkspace(clientWorkspace: ClientWorkspaceState): vo
   const normalizedLayout = normalizeWorkspaceSessionLayoutState(clientWorkspace)
   const restoredWorkspaceState = restoreRestorableWorkspaceStateFromClientWorkspace(clientWorkspace)
   const { applySessionLayoutState, applySessionSelectedTerminalState, applySessionBranchViewModes } =
-    useWorkspacesStore.getState()
+    workspacesStore.getState()
   restoreFiletreeViewStateFromSession(clientWorkspace.filetreeViewStateByFilesystemTargetByWorkspace)
   applySessionLayoutState(normalizedLayout)
   applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalFilesystemTarget)
@@ -187,7 +193,7 @@ function applyRestoredClientWorkspace(clientWorkspace: ClientWorkspaceState): vo
 }
 
 function blockSessionPersistenceAfterRestoreFailure(message: string): void {
-  useWorkspacesStore.setState({
+  workspacesStore.setState({
     workspaceMembershipReady: false,
     sessionPersistenceReady: false,
     sessionRestoreError: message,

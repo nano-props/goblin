@@ -11,7 +11,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 describe('workspace pane layout repository normalization', () => {
-  test('preserves explicit empty targets and removes duplicate and invalid static entries', () => {
+  test('preserves explicit empty targets and removes duplicate and invalid static entries', async () => {
     expect(
       normalizeWorkspacePaneDurableLayout(WORKSPACE_ID, {
         entries: [
@@ -34,7 +34,7 @@ describe('workspace pane layout repository normalization', () => {
     })
   })
 
-  test('compares normalized layouts rather than input ordering and duplicates', () => {
+  test('compares normalized layouts rather than input ordering and duplicates', async () => {
     const entry = {
       target: { kind: 'git-branch' as const, branch: 'main' },
       tabs: [workspacePaneStaticTabEntry('status')],

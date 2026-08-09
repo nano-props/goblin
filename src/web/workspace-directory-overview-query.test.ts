@@ -1,4 +1,4 @@
-import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import { QueryClient, QueryObserver } from '@tanstack/query-core'
 import { describe, expect, test, vi } from 'vitest'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

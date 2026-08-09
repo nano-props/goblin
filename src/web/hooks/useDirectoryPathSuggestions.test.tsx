@@ -4,10 +4,11 @@
 // The hook's contract with the server is:
 //   • fetch only eligible native local prefixes or resolvable SSH prefixes
 //   • dedupe the server's response in-place — duplicates would collide
-//     when used as React keys downstream — and drop non-string entries
+//     when used as vnode keys downstream — and drop non-string entries
 //   • surface request lifecycle so the input can render a loading hint
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { defineComponent } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
@@ -131,7 +132,7 @@ describe('useDirectoryPathSuggestions', () => {
       hasFetched: false,
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       fetch.resolve(['/srv/a'])
       await fetch.promise
     })
@@ -151,19 +152,22 @@ describe('useDirectoryPathSuggestions', () => {
 
     const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
 
-    function Host({ prefix }: { prefix: string }) {
-      const state = useDirectoryPathSuggestions({
-        enabled: true,
-        source: { kind: 'ssh', alias: 'host' },
-        prefix,
-      })
-      snapshots.push(state)
-      return null
-    }
+    const Host = defineComponent(
+      (props: { prefix: string }) => {
+        const state = useDirectoryPathSuggestions({
+          enabled: true,
+          source: { kind: 'ssh', alias: 'host' },
+          prefix: () => props.prefix,
+        })
+        snapshots.push(state)
+        return () => null
+      },
+      { name: 'RemotePathSuggestionsTestHost', props: ['prefix'] },
+    )
 
     const { rerender } = renderInJsdom(<Host prefix="/srv/" />)
 
-    await act(async () => await advanceTimersAndFlush(400))
+    await flushTestUpdates(async () => await advanceTimersAndFlush(400))
 
     expect(snapshots.at(-1)).toEqual({
       suggestions: [],
@@ -171,7 +175,7 @@ describe('useDirectoryPathSuggestions', () => {
       hasFetched: false,
     })
 
-    rerender(<Host prefix="/srv/r" />)
+    await rerender(<Host prefix="/srv/r" />)
 
     expect(snapshots.at(-1)).toEqual({
       suggestions: [],
@@ -179,7 +183,7 @@ describe('useDirectoryPathSuggestions', () => {
       hasFetched: false,
     })
 
-    await act(async () => await advanceTimersAndFlush(400))
+    await flushTestUpdates(async () => await advanceTimersAndFlush(400))
 
     expect(snapshots.at(-1)).toEqual({
       suggestions: [],
@@ -187,7 +191,7 @@ describe('useDirectoryPathSuggestions', () => {
       hasFetched: false,
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       secondFetch.resolve(['/srv/result'])
       await secondFetch.promise
     })
@@ -204,21 +208,28 @@ describe('useDirectoryPathSuggestions', () => {
     mockedLocalFetch.mockResolvedValueOnce(['/srv/alpha']).mockResolvedValueOnce(['/srv/beta'])
     const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
 
-    function Host({ prefix }: { prefix: string }) {
-      const state = useDirectoryPathSuggestions({ enabled: true, source: { kind: 'local' }, prefix })
-      snapshots.push(state)
-      return null
-    }
+    const Host = defineComponent(
+      (props: { prefix: string }) => {
+        const state = useDirectoryPathSuggestions({
+          enabled: true,
+          source: { kind: 'local' },
+          prefix: () => props.prefix,
+        })
+        snapshots.push(state)
+        return () => null
+      },
+      { name: 'LocalPathSuggestionsTestHost', props: ['prefix'] },
+    )
 
     const { rerender } = renderInJsdom(<Host prefix="/srv/a" />)
-    await act(async () => await advanceTimersAndFlush(350))
+    await flushTestUpdates(async () => await advanceTimersAndFlush(350))
     expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/alpha'])
     expect(mockedLocalFetch).toHaveBeenCalledWith('/srv/a', expect.any(AbortSignal))
 
-    rerender(<Host prefix="/srv/b" />)
+    await rerender(<Host prefix="/srv/b" />)
     expect(snapshots.at(-1)).toEqual({ suggestions: [], isLoading: false, hasFetched: false })
 
-    await act(async () => await advanceTimersAndFlush(350))
+    await flushTestUpdates(async () => await advanceTimersAndFlush(350))
     expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/beta'])
   })
 
@@ -229,33 +240,73 @@ describe('useDirectoryPathSuggestions', () => {
     mockedFetch.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
     const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
 
-    function Host({ alias }: { alias: string }) {
-      const state = useDirectoryPathSuggestions({ enabled: true, source: { kind: 'ssh', alias }, prefix: '/srv/' })
-      snapshots.push(state)
-      return null
-    }
+    const Host = defineComponent(
+      (props: { alias: string }) => {
+        const state = useDirectoryPathSuggestions({
+          enabled: true,
+          source: () => ({ kind: 'ssh', alias: props.alias }),
+          prefix: '/srv/',
+        })
+        snapshots.push(state)
+        return () => null
+      },
+      { name: 'AliasedPathSuggestionsTestHost', props: ['alias'] },
+    )
 
     const { rerender } = renderInJsdom(<Host alias="first" />)
-    await act(async () => await advanceTimersAndFlush(350))
+    await flushTestUpdates(async () => await advanceTimersAndFlush(350))
     const firstSignal = mockedFetch.mock.calls[0]?.[1]
     expect(firstSignal?.aborted).toBe(false)
 
-    rerender(<Host alias="second" />)
+    await rerender(<Host alias="second" />)
     expect(firstSignal?.aborted).toBe(true)
     expect(snapshots.at(-1)).toEqual({ suggestions: [], isLoading: false, hasFetched: false })
-    await act(async () => await advanceTimersAndFlush(350))
+    await flushTestUpdates(async () => await advanceTimersAndFlush(350))
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       second.resolve(['/srv/current'])
       await second.promise
     })
     expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/current'])
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       first.resolve(['/srv/stale'])
       await first.promise
     })
     expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/current'])
+  })
+
+  test('keeps one request for raw inputs with the same canonical identity', async () => {
+    useFakeTimers()
+    const request = Promise.withResolvers<string[]>()
+    mockedFetch.mockReturnValue(request.promise)
+    const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
+    const Host = defineComponent(
+      (props: { alias: string; prefix: string }) => {
+        const state = useDirectoryPathSuggestions({
+          enabled: true,
+          source: () => ({ kind: 'ssh', alias: props.alias }),
+          prefix: () => props.prefix,
+        })
+        snapshots.push(state)
+        return () => null
+      },
+      { name: 'CanonicalPathSuggestionsTestHost', props: ['alias', 'prefix'] },
+    )
+    const view = renderInJsdom(<Host alias="prod" prefix="/srv/repo" />)
+    await flushTestUpdates(async () => await advanceTimersAndFlush(350))
+    const signal = mockedFetch.mock.calls[0]?.[1]
+
+    await view.rerender(<Host alias=" prod " prefix=" /srv/repo " />)
+    await flushTestUpdates(async () => await advanceTimersAndFlush(350))
+
+    expect(mockedFetch).toHaveBeenCalledOnce()
+    expect(signal?.aborted).toBe(false)
+    await flushTestUpdates(async () => {
+      request.resolve(['/srv/repo'])
+      await request.promise
+    })
+    expect(snapshots.at(-1)?.suggestions).toEqual(['/srv/repo'])
   })
 
   test('distinguishes a successful empty result from a rejected request', async () => {
@@ -282,34 +333,40 @@ interface RenderInput {
 async function renderHookAndWaitForFetch(input: RenderInput) {
   useFakeTimers()
   let captured = { suggestions: [] as string[], isLoading: false, hasFetched: false }
-  function Host() {
-    captured = useDirectoryPathSuggestions({
-      enabled: input.enabled,
-      source: { kind: 'ssh', alias: input.alias },
-      prefix: input.prefix,
-    })
-    return null
-  }
+  const Host = defineComponent(
+    () => {
+      captured = useDirectoryPathSuggestions({
+        enabled: input.enabled,
+        source: { kind: 'ssh', alias: input.alias },
+        prefix: input.prefix,
+      })
+      return () => null
+    },
+    { name: 'PathSuggestionsResultTestHost' },
+  )
   renderInJsdom(<Host />)
   // The hook debounces by 350ms before firing; advance past that and
   // let the queued microtasks settle so the state update lands.
-  await act(async () => await advanceTimersAndFlush(350))
+  await flushTestUpdates(async () => await advanceTimersAndFlush(350))
   return captured
 }
 
 async function renderHookLifecycle(input: RenderInput) {
   useFakeTimers()
   const snapshots: Array<{ suggestions: string[]; isLoading: boolean; hasFetched: boolean }> = []
-  function Host() {
-    const state = useDirectoryPathSuggestions({
-      enabled: input.enabled,
-      source: { kind: 'ssh', alias: input.alias },
-      prefix: input.prefix,
-    })
-    snapshots.push(state)
-    return null
-  }
+  const Host = defineComponent(
+    () => {
+      const state = useDirectoryPathSuggestions({
+        enabled: input.enabled,
+        source: { kind: 'ssh', alias: input.alias },
+        prefix: input.prefix,
+      })
+      snapshots.push(state)
+      return () => null
+    },
+    { name: 'PathSuggestionsLifecycleTestHost' },
+  )
   renderInJsdom(<Host />)
-  await act(async () => await advanceTimersAndFlush(350))
+  await flushTestUpdates(async () => await advanceTimersAndFlush(350))
   return snapshots
 }

@@ -1,4 +1,5 @@
-import { focusManager, QueryClient } from '@tanstack/react-query'
+import { focusManager } from '@tanstack/query-core'
+import { QueryClient } from '@tanstack/vue-query'
 
 focusManager.setEventListener((setFocused) => {
   if (

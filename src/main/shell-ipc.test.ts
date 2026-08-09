@@ -53,7 +53,7 @@ describe('shell IPC', () => {
     vi.clearAllMocks()
   })
 
-  test('wires shell IPC handlers', () => {
+  test('wires shell IPC handlers', async () => {
     expect(ipcHandlers.has(HOST_OPEN_SETTINGS_WINDOW_CHANNEL)).toBe(true)
     expect(ipcHandlers.has(HOST_OPEN_EXTERNAL_URL_CHANNEL)).toBe(true)
     expect(ipcHandlers.has(HOST_OPEN_DIRECTORY_DIALOG_CHANNEL)).toBe(true)

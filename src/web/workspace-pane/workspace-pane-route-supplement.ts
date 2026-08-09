@@ -2,7 +2,7 @@ import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-file
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneCommittedRuntimeTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
@@ -17,7 +17,7 @@ export function commitWorkspacePaneRouteSupplement(
   target: WorkspacePaneRouteSupplementTarget,
   route: WorkspacePaneRouteTarget,
 ): boolean {
-  const state = useWorkspacesStore.getState()
+  const state = workspacesStore.getState()
   const workspace = state.workspaces[target.workspaceId]
   if (!workspace || workspace.capability.kind !== 'git' || workspace.workspaceRuntimeId !== target.workspaceRuntimeId)
     return false
@@ -43,7 +43,7 @@ export function commitWorkspacePaneCommittedRuntimeRouteSupplement(
   route: WorkspacePaneRouteTarget,
 ): boolean {
   if (!workspacePaneCommittedRuntimeTargetIsCurrent(target)) return false
-  const state = useWorkspacesStore.getState()
+  const state = workspacesStore.getState()
   state.setWorkspacePaneTabForTarget(
     requiredGitWorkspacePaneTabsTarget(target.workspaceId, target.branchName, target.worktreePath),
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',

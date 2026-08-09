@@ -25,7 +25,7 @@ afterEach(() => {
 })
 
 describe('terminal presentation focus', () => {
-  test('focuses an initial terminal route once for its presentation generation', () => {
+  test('focuses an initial terminal route once for its presentation generation', async () => {
     const focusTerminal = acceptedFocus()
 
     fulfillTerminalPresentationFocus('term-initial', focusTerminal)
@@ -39,7 +39,7 @@ describe('terminal presentation focus', () => {
     expect(focusTerminal.mock.calls[0]![1].isCurrent()).toBe(true)
   })
 
-  test('does not recreate a settled focus intent during the same presentation', () => {
+  test('does not recreate a settled focus intent during the same presentation', async () => {
     const firstMount = acceptedFocus()
     const remount = acceptedFocus()
 
@@ -51,7 +51,7 @@ describe('terminal presentation focus', () => {
     expect(remount).not.toHaveBeenCalled()
   })
 
-  test('admits at most one automatic-focus intent for a presentation generation', () => {
+  test('admits at most one automatic-focus intent for a presentation generation', async () => {
     const generation = beginAppNavigation()
     const firstLease = claimTerminalAutoFocus(generation)
 
@@ -60,7 +60,7 @@ describe('terminal presentation focus', () => {
     firstLease?.release()
   })
 
-  test('does not move DOM focus while a mouse-created terminal is pending', () => {
+  test('does not move DOM focus while a mouse-created terminal is pending', async () => {
     const createButton = document.createElement('button')
     document.body.appendChild(createButton)
     createButton.focus()
@@ -76,7 +76,7 @@ describe('terminal presentation focus', () => {
     focusTerminal.mock.calls[0]![1].onSettled()
   })
 
-  test('allows programmatic popover focus restoration before the terminal view mounts', () => {
+  test('allows programmatic popover focus restoration before the terminal view mounts', async () => {
     const createItem = document.createElement('button')
     const popoverTrigger = document.createElement('button')
     document.body.append(createItem, popoverTrigger)
@@ -118,7 +118,7 @@ describe('terminal presentation focus', () => {
     request.onSettled()
   })
 
-  test('retires pending automatic focus when Tab transfers keyboard focus ownership', () => {
+  test('retires pending automatic focus when Tab transfers keyboard focus ownership', async () => {
     const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
@@ -149,7 +149,7 @@ describe('terminal presentation focus', () => {
     request.onSettled()
   })
 
-  test('retries a committed target when its session materializes at the view boundary', () => {
+  test('retries a committed target when its session materializes at the view boundary', async () => {
     const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const beforeMaterialization = rejectedFocus()
@@ -165,7 +165,7 @@ describe('terminal presentation focus', () => {
     request.onSettled()
   })
 
-  test('releases the focus intent when a focus callback throws', () => {
+  test('releases the focus intent when a focus callback throws', async () => {
     const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
 
@@ -180,7 +180,7 @@ describe('terminal presentation focus', () => {
     expect(remount).not.toHaveBeenCalled()
   })
 
-  test('does not duplicate focus when navigation commit already reached the session', () => {
+  test('does not duplicate focus when navigation commit already reached the session', async () => {
     const lease = claimTerminalAutoFocus(beginAppNavigation())
     if (!lease) throw new Error('expected terminal automatic-focus lease')
     const focusTerminal = acceptedFocus()
@@ -194,7 +194,7 @@ describe('terminal presentation focus', () => {
     focusTerminal.mock.calls[0]![1].onSettled()
   })
 
-  test('prevents a superseded presentation from focusing its old terminal', () => {
+  test('prevents a superseded presentation from focusing its old terminal', async () => {
     const firstLease = claimTerminalAutoFocus(beginAppNavigation())
     if (!firstLease) throw new Error('expected first terminal automatic-focus lease')
     const focusFirst = acceptedFocus()
@@ -213,7 +213,7 @@ describe('terminal presentation focus', () => {
     secondRequest.onSettled()
   })
 
-  test('reports terminal keyboard focus only from the active xterm DOM host', () => {
+  test('reports terminal keyboard focus only from the active xterm DOM host', async () => {
     const host = document.createElement('div')
     host.className = 'goblin-managed-terminal-host'
     const textarea = document.createElement('textarea')

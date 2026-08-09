@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resolveRemoteWorkspaceConnection } from '#/web/remote-workspace-client.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -39,7 +39,7 @@ describe('remote lifecycle command client', () => {
     const repo = emptyWorkspace(workspaceId, runtimeId)
     if (repo.admission.kind !== 'remote') throw new Error('expected remote workspace admission')
     repo.admission.lifecycle = { kind: 'failed', reason: 'unreachable' }
-    useWorkspacesStore.setState({ workspaces: { [workspaceId]: repo }, workspaceOrder: [workspaceId] })
+    workspacesStore.setState({ workspaces: { [workspaceId]: repo }, workspaceOrder: [workspaceId] })
   })
 
   test('sends the runtime generation and does not manufacture connecting', async () => {
@@ -50,7 +50,7 @@ describe('remote lifecycle command client', () => {
       }),
     )
 
-    const pending = runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId)
+    const pending = runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId)
     expect(resolveRemoteWorkspaceConnection).toHaveBeenCalledWith(
       { workspaceId, workspaceRuntimeId: runtimeId },
       undefined,
@@ -75,7 +75,7 @@ describe('remote lifecycle command client', () => {
       workspaceProbe: readyProbe,
     })
     await expect(
-      runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
+      runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId),
     ).resolves.toMatchObject({
       kind: 'ready',
       target,
@@ -98,7 +98,7 @@ describe('remote lifecycle command client', () => {
     })
 
     await expect(
-      runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
+      runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId),
     ).resolves.toEqual({
       kind: 'failed',
       workspaceId,
@@ -109,7 +109,7 @@ describe('remote lifecycle command client', () => {
       lifecycle: { kind: 'failed', reason: 'auth-failed', target },
       lifecycleAttemptId: 3,
     })
-    expect(useWorkspacesStore.getState().workspaces[workspaceId]?.capability).toEqual({
+    expect(workspacesStore.getState().workspaces[workspaceId]?.capability).toEqual({
       kind: 'unavailable',
       probe: { status: 'unavailable', reason: 'error.workspace-transport-unavailable' },
     })
@@ -123,7 +123,7 @@ describe('remote lifecycle command client', () => {
     })
 
     await expect(
-      runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
+      runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId),
     ).resolves.toEqual({ kind: 'stale-runtime', workspaceId: workspaceId })
   })
 
@@ -134,8 +134,8 @@ describe('remote lifecycle command client', () => {
         release = resolve
       }),
     )
-    const pending = runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId)
-    useWorkspacesStore.setState((state) => ({
+    const pending = runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId)
+    workspacesStore.setState((state) => ({
       workspaces: {
         ...state.workspaces,
         [workspaceId]: { ...state.workspaces[workspaceId]!, workspaceRuntimeId: 'repo-runtime-test-2' },
@@ -156,7 +156,7 @@ describe('remote lifecycle command client', () => {
   test('does not write lifecycle state for a superseded command', async () => {
     vi.mocked(resolveRemoteWorkspaceConnection).mockResolvedValue({ kind: 'superseded', workspaceId })
     await expect(
-      runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
+      runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId),
     ).resolves.toMatchObject({
       kind: 'superseded',
     })
@@ -168,7 +168,7 @@ describe('remote lifecycle command client', () => {
   test('normalizes command abort without synthesizing local lifecycle state', async () => {
     vi.mocked(resolveRemoteWorkspaceConnection).mockRejectedValue(new DOMException('aborted', 'AbortError'))
     await expect(
-      runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
+      runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId),
     ).resolves.toEqual({
       kind: 'cancelled',
       workspaceId: workspaceId,
@@ -181,7 +181,7 @@ describe('remote lifecycle command client', () => {
   test('normalizes transport failure without synthesizing local lifecycle state', async () => {
     vi.mocked(resolveRemoteWorkspaceConnection).mockRejectedValue(new Error('offline'))
     await expect(
-      runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId),
+      runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId),
     ).resolves.toEqual({
       kind: 'transport-failed',
       workspaceId: workspaceId,
@@ -195,8 +195,8 @@ describe('remote lifecycle command client', () => {
   test('does not report or enrich a command superseded by a newer runtime attempt', async () => {
     const response = Promise.withResolvers<Awaited<ReturnType<typeof resolveRemoteWorkspaceConnection>>>()
     vi.mocked(resolveRemoteWorkspaceConnection).mockReturnValue(response.promise)
-    const pending = runRemoteWorkspaceConnection(useWorkspacesStore.setState, useWorkspacesStore.getState, workspaceId)
-    const workspace = useWorkspacesStore.getState().workspaces[workspaceId]
+    const pending = runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId)
+    const workspace = workspacesStore.getState().workspaces[workspaceId]
     if (workspace?.admission.kind !== 'remote') throw new Error('expected remote workspace admission')
     workspace.admission.lifecycle = { kind: 'failed', reason: 'unreachable', target }
     workspace.admission.lifecycleAttemptId = 4
@@ -217,7 +217,7 @@ describe('remote lifecycle command client', () => {
 })
 
 function remoteAdmission() {
-  const admission = useWorkspacesStore.getState().workspaces[workspaceId]?.admission
+  const admission = workspacesStore.getState().workspaces[workspaceId]?.admission
   if (admission?.kind !== 'remote') throw new Error('expected remote workspace admission')
   return admission
 }

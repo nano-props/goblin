@@ -1,4 +1,4 @@
-// Boot script — applies theme attributes before the React app module runs.
+// Boot script — applies theme attributes before the Vue app module runs.
 // The client entry URL carries them via `?theme=` and `?colorTheme=`.
 //
 // This file lives under `public/` so vite copies it as-is into the

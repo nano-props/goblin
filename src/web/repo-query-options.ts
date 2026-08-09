@@ -1,5 +1,6 @@
-import { queryOptions, skipToken, type Query } from '@tanstack/react-query'
-import type { RepoPullRequestScope } from '#/shared/api-types.ts'
+import type { Query } from '@tanstack/query-core'
+import type { QueryClient } from '@tanstack/query-core'
+import type { RepoPullRequestScope, RepoPullRequestsResponse } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
@@ -32,111 +33,64 @@ function refetchStatusWhenFirstObserverMounts<TQueryFnData, TError, TData, TQuer
 }
 
 export function repoSnapshotQueryOptions(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
-  return queryOptions({
+  return {
     queryKey: repoSnapshotQueryKey(repoRoot, workspaceRuntimeId),
-    queryFn: ({ client }) => fetchQueryOwnedRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, client),
+    queryFn: ({ client }: { client: QueryClient }) =>
+      fetchQueryOwnedRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     staleTime: Number.POSITIVE_INFINITY,
-  })
+  }
 }
 
 export function repoWorktreeStatusQueryOptions(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
-  return queryOptions({
+  return {
     queryKey: repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
-    queryFn: ({ client }) => fetchQueryOwnedRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, client),
+    queryFn: ({ client }: { client: QueryClient }) =>
+      fetchQueryOwnedRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     refetchOnMount: refetchStatusWhenFirstObserverMounts,
-    refetchOnWindowFocus: 'always',
+    refetchOnWindowFocus: 'always' as const,
     staleTime: Number.POSITIVE_INFINITY,
-  })
+  }
 }
 
 export function repoOperationsQueryOptions(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  options: { includeSettled?: boolean; enabled?: boolean } = {},
+  options: { includeSettled?: boolean } = {},
 ) {
   const includeSettled = options.includeSettled === true
-  return queryOptions({
+  return {
     queryKey: repoOperationsQueryKey(repoRoot, workspaceRuntimeId, includeSettled),
-    queryFn: ({ client }) =>
+    queryFn: ({ client }: { client: QueryClient }) =>
       fetchQueryOwnedRepoOperationsReadModel(repoRoot, workspaceRuntimeId, includeSettled, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
-    enabled: options.enabled,
     staleTime: Number.POSITIVE_INFINITY,
-  })
+  }
 }
 
-export function repoSnapshotReadModelQueryOptions(
-  repoRoot: WorkspaceId | null,
-  workspaceRuntimeId: string,
-  enabled: boolean,
-) {
-  const active = enabled && repoRoot !== null
-  return queryOptions({
-    queryKey: repoSnapshotQueryKey(repoRoot, workspaceRuntimeId),
-    queryFn:
-      repoRoot === null
-        ? skipToken
-        : ({ client }) => fetchQueryOwnedRepoSnapshotReadModel(repoRoot, workspaceRuntimeId, client),
-    retry: retryStaleRepoRuntimeRead,
-    retryDelay: 0,
-    staleTime: Number.POSITIVE_INFINITY,
-    enabled: active,
-    subscribed: active,
-  })
-}
-
-export function repoPullRequestsReadModelQueryOptions(
-  repoRoot: WorkspaceId | null,
+export function repoPullRequestsQueryOptions(
+  repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
   scope: RepoPullRequestScope,
-  enabled: boolean,
 ) {
-  const active = enabled && repoRoot !== null
-  return queryOptions({
+  return {
     queryKey: repoPullRequestsQueryKey(repoRoot, workspaceRuntimeId, scope),
-    queryFn:
-      repoRoot === null
-        ? skipToken
-        : ({ client }) => fetchQueryOwnedRepoPullRequestsReadModel(repoRoot, workspaceRuntimeId, scope, client),
+    queryFn: ({ client }: { client: QueryClient }) =>
+      fetchQueryOwnedRepoPullRequestsReadModel(repoRoot, workspaceRuntimeId, scope, client),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
-    staleTime: (query) =>
+    staleTime: (query: { state: { data?: RepoPullRequestsResponse } }) =>
       pullRequestCollectionCacheTtlMs(
         scope.kind === 'branch-detail' ? 'full' : 'summary',
         query.state.data?.pullRequests?.map((entry) => entry.pullRequest) ?? [],
       ),
     refetchOnMount: true,
     refetchOnWindowFocus: true,
-    enabled: active,
-    subscribed: active,
-  })
-}
-
-export function repoWorktreeStatusReadModelQueryOptions(
-  repoRoot: WorkspaceId | null,
-  workspaceRuntimeId: string,
-  enabled: boolean,
-) {
-  const active = enabled && repoRoot !== null
-  return queryOptions({
-    queryKey: repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId),
-    queryFn:
-      repoRoot === null
-        ? skipToken
-        : ({ client }) => fetchQueryOwnedRepoWorktreeStatusReadModel(repoRoot, workspaceRuntimeId, client),
-    retry: retryStaleRepoRuntimeRead,
-    retryDelay: 0,
-    refetchOnMount: refetchStatusWhenFirstObserverMounts,
-    refetchOnWindowFocus: 'always',
-    staleTime: Number.POSITIVE_INFINITY,
-    enabled: active,
-    subscribed: active,
-  })
+  }
 }
 
 export function repoLogQueryOptions(
@@ -147,16 +101,16 @@ export function repoLogQueryOptions(
 ) {
   const count = options.count ?? DEFAULT_REPOSITORY_LOG_COUNT
   const skip = options.skip ?? 0
-  return queryOptions({
+  return {
     queryKey: repoLogQueryKey(repoRoot, workspaceRuntimeId, branch, count, skip),
-    queryFn: ({ client }) =>
+    queryFn: ({ client }: { client: QueryClient }) =>
       fetchQueryOwnedRepoMetadataQuery(repoRoot, workspaceRuntimeId, client, () =>
         getRepoLog(repoRoot, workspaceRuntimeId, branch, { count, skip }),
       ),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     enabled: options.enabled,
-  })
+  }
 }
 
 export function repoRemoteBranchesQueryOptions(
@@ -164,35 +118,14 @@ export function repoRemoteBranchesQueryOptions(
   workspaceRuntimeId: string,
   options: { enabled?: boolean } = {},
 ) {
-  return queryOptions({
+  return {
     queryKey: repoRemoteBranchesQueryKey(repoRoot, workspaceRuntimeId),
-    queryFn: ({ client }) =>
+    queryFn: ({ client }: { client: QueryClient }) =>
       fetchQueryOwnedRepoMetadataQuery(repoRoot, workspaceRuntimeId, client, () =>
         getRepoRemoteBranches(repoRoot, workspaceRuntimeId),
       ),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,
     enabled: options.enabled,
-  })
-}
-
-export function repoOperationsReadModelQueryOptions(
-  repoRoot: WorkspaceId | null,
-  workspaceRuntimeId: string,
-  options: { includeSettled?: boolean; enabled?: boolean } = {},
-) {
-  const includeSettled = options.includeSettled === true
-  const enabled = options.enabled !== false && repoRoot !== null
-  return queryOptions({
-    queryKey: repoOperationsQueryKey(repoRoot, workspaceRuntimeId, includeSettled),
-    queryFn:
-      repoRoot === null
-        ? skipToken
-        : ({ client }) => fetchQueryOwnedRepoOperationsReadModel(repoRoot, workspaceRuntimeId, includeSettled, client),
-    retry: retryStaleRepoRuntimeRead,
-    retryDelay: 0,
-    staleTime: Number.POSITIVE_INFINITY,
-    enabled,
-    subscribed: enabled,
-  })
+  }
 }

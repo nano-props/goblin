@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { WorkspaceZenModeToggle } from '#/web/components/WorkspaceZenModeToggle.tsx'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 beforeEach(() => {
@@ -12,40 +12,40 @@ beforeEach(() => {
 })
 
 describe('WorkspaceZenModeToggle', () => {
-  test('keeps the same button node when zen mode changes', () => {
+  test('keeps the same button node when zen mode changes', async () => {
     const { container } = renderInJsdom(<WorkspaceZenModeToggle />)
 
     const button = zenModeToggle(container)
     expect(button).not.toBeNull()
     expect(button?.getAttribute('aria-pressed')).toBe('false')
 
-    act(() => {
-      useWorkspacesStore.getState().setZenMode(true)
+    await flushTestUpdates(() => {
+      workspacesStore.getState().setZenMode(true)
     })
 
     expect(zenModeToggle(container)).toBe(button)
     expect(zenModeToggle(container)?.getAttribute('aria-pressed')).toBe('true')
   })
 
-  test('toggles zen mode when clicked', () => {
+  test('toggles zen mode when clicked', async () => {
     const { container } = renderInJsdom(<WorkspaceZenModeToggle />)
 
-    expect(useWorkspacesStore.getState().zenMode).toBe(false)
+    expect(workspacesStore.getState().zenMode).toBe(false)
 
-    act(() => {
+    await flushTestUpdates(() => {
       zenModeToggle(container)?.click()
     })
 
-    expect(useWorkspacesStore.getState().zenMode).toBe(true)
+    expect(workspacesStore.getState().zenMode).toBe(true)
     expect(zenModeToggle(container)?.getAttribute('aria-pressed')).toBe('true')
   })
 
-  test('can own the title-bar-chrome interactive surface without changing visual size', () => {
+  test('can own the title-bar-chrome interactive surface without changing visual size', async () => {
     const { container } = renderInJsdom(
       <WorkspaceZenModeToggle
         data-interactive
         data-title-bar-chrome-region="interactive"
-        className="pointer-events-auto"
+        class="pointer-events-auto"
       />,
     )
 

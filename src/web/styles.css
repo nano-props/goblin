@@ -2,8 +2,9 @@
 /* tailwindcss-animate replacement for Tailwind v4. Provides the
  * shadcn/ui motion utilities (animate-in, fade-in-0, zoom-in-95,
  * slide-in-from-*, animate-out + their -out variants) that shadcn
- * components reference for Radix open/close transitions. */
+ * components reference for Reka open/close transitions. */
 @import 'tw-animate-css';
+@import 'vue-sonner/style.css';
 @import './theme/theme.css';
 
 @font-face {

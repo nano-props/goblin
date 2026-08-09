@@ -12,11 +12,11 @@ const SEP = FIELD_SEP
 const NUL = String.fromCharCode(0)
 
 describe('parseBranches', () => {
-  test('returns empty array for empty input', () => {
+  test('returns empty array for empty input', async () => {
     expect(parseBranches('', '')).toEqual([])
   })
 
-  test('strict parsing rejects incomplete and invalid authoritative rows', () => {
+  test('strict parsing rejects incomplete and invalid authoritative rows', async () => {
     expect(() => parseBranches(`main${SEP}abc1234`, 'main')).toThrow('Invalid branch snapshot row')
     expect(() =>
       parseBranches(
@@ -35,7 +35,7 @@ describe('parseBranches', () => {
     ).toThrow('Invalid branch snapshot identity')
   })
 
-  test('parses a single branch with no upstream', () => {
+  test('parses a single branch with no upstream', async () => {
     const line = [
       'main',
       'abc1234000000000000000000000000000000000',
@@ -63,7 +63,7 @@ describe('parseBranches', () => {
     expect(result[0]?.trackingGone).toBeUndefined()
   })
 
-  test('parses ahead/behind from track string', () => {
+  test('parses ahead/behind from track string', async () => {
     const line = [
       'feature',
       'def567800000000000000000000000000000000',
@@ -81,7 +81,7 @@ describe('parseBranches', () => {
     expect(b?.trackingGone).toBe(false)
   })
 
-  test('flags trackingGone when upstream marked [gone]', () => {
+  test('flags trackingGone when upstream marked [gone]', async () => {
     const line = [
       'stale',
       'aaa111100000000000000000000000000000000',
@@ -99,7 +99,7 @@ describe('parseBranches', () => {
     expect(b?.behind).toBe(0)
   })
 
-  test('marks isCurrent only for the matching branch', () => {
+  test('marks isCurrent only for the matching branch', async () => {
     const out = [
       ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a1', '', ''].join(SEP),
       ['dev', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'bbbbbbb', 's', '2026-05-20', 'a1', '', ''].join(SEP),
@@ -109,7 +109,7 @@ describe('parseBranches', () => {
     expect(result.find((b) => b.name === 'dev')?.isCurrent).toBe(true)
   })
 
-  test('attaches worktree info when branch matches', () => {
+  test('attaches worktree info when branch matches', async () => {
     const line = ['feat', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a', '', ''].join(
       SEP,
     )
@@ -119,7 +119,7 @@ describe('parseBranches', () => {
     expect(result[0]?.worktree).not.toHaveProperty('summary')
   })
 
-  test('attaches primary worktree marker when branch matches the main worktree', () => {
+  test('attaches primary worktree marker when branch matches the main worktree', async () => {
     const line = ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a', '', ''].join(
       SEP,
     )
@@ -129,7 +129,7 @@ describe('parseBranches', () => {
     expect(branch?.worktree).not.toHaveProperty('summary')
   })
 
-  test('preserves SEP-free subjects with spaces and unicode', () => {
+  test('preserves SEP-free subjects with spaces and unicode', async () => {
     const subject = 'feat: 添加 i18n 🎉'
     const line = [
       'main',
@@ -147,11 +147,11 @@ describe('parseBranches', () => {
 })
 
 describe('parseLog', () => {
-  test('returns empty for empty input', () => {
+  test('returns empty for empty input', async () => {
     expect(parseLog('')).toEqual([])
   })
 
-  test('parses multiple entries', () => {
+  test('parses multiple entries', async () => {
     const out = [
       ['aaaaaaaa', 'aaaaaaa', 'HEAD -> main, origin/main', 'first', 'Alice', '2026-05-20T10:00:00+08:00'].join(SEP),
       ['bbbbbbbb', 'bbbbbbb', '', 'second', 'Bob', '2026-05-19T10:00:00+08:00'].join(SEP),
@@ -169,7 +169,7 @@ describe('parseLog', () => {
     expect(result[1]?.author).toBe('Bob')
   })
 
-  test('subjects with embedded spaces survive', () => {
+  test('subjects with embedded spaces survive', async () => {
     const out = ['aaaaaaaa', 'aaaaaaa', '', 'feat(scope): hello world', 'a', '2026-05-20T10:00:00Z'].join(SEP)
     expect(parseLog(out)[0]?.message).toBe('feat(scope): hello world')
   })
@@ -186,11 +186,11 @@ describe('parseLog', () => {
 })
 
 describe('parseStatus', () => {
-  test('returns empty for empty input', () => {
+  test('returns empty for empty input', async () => {
     expect(parseStatus('')).toEqual([])
   })
 
-  test('parses simple modified entries', () => {
+  test('parses simple modified entries', async () => {
     const out = ' M src/file.ts\0?? newfile.ts\0'
     const result = parseStatus(out)
     expect(result).toEqual([
@@ -199,13 +199,13 @@ describe('parseStatus', () => {
     ])
   })
 
-  test('handles filenames with spaces (no quoting needed under -z)', () => {
+  test('handles filenames with spaces (no quoting needed under -z)', async () => {
     const out = 'M  file with spaces.txt\0'
     const [e] = parseStatus(out)
     expect(e?.path).toBe('file with spaces.txt')
   })
 
-  test('skips the second record of a rename pair', () => {
+  test('skips the second record of a rename pair', async () => {
     // R<space><space>newpath\0oldpath\0  followed by another entry
     const out = 'R  new/path.ts\0old/path.ts\0 M other.ts\0'
     const result = parseStatus(out)
@@ -231,17 +231,17 @@ describe('parseStatus', () => {
     expect(() => parseStatus(`${status} new/path.ts\0`)).toThrow('Invalid status rename record')
   })
 
-  test('handles unicode and special characters in paths', () => {
+  test('handles unicode and special characters in paths', async () => {
     const out = ' M 中文/файл.txt\0'
     expect(parseStatus(out)[0]?.path).toBe('中文/файл.txt')
   })
 
-  test('rejects records too short to be valid status lines', () => {
+  test('rejects records too short to be valid status lines', async () => {
     const out = 'M\0 M valid.ts\0'
     expect(() => parseStatus(out)).toThrow('Invalid status record')
   })
 
-  test('tolerates trailing NUL with no further data', () => {
+  test('tolerates trailing NUL with no further data', async () => {
     // git status -z always terminates the last record with \0; the
     // split('\0') produces an empty trailing element which the filter
     // must drop.
@@ -249,25 +249,25 @@ describe('parseStatus', () => {
     expect(parseStatus(out)).toEqual([{ x: ' ', y: 'M', path: 'only.ts' }])
   })
 
-  test('rejects an empty record between consecutive NULs', () => {
+  test('rejects an empty record between consecutive NULs', async () => {
     const out = ' M a.ts\0\0 M b.ts\0'
     expect(() => parseStatus(out)).toThrow('Invalid status record')
   })
 })
 
 describe('parseWorktrees', () => {
-  test('rejects empty output because a Git repository always has a primary or bare worktree', () => {
+  test('rejects empty output because a Git repository always has a primary or bare worktree', async () => {
     expect(() => parseWorktrees('')).toThrow('Invalid worktree output')
   })
 
-  test('parses a single non-bare worktree on a branch', () => {
+  test('parses a single non-bare worktree on a branch', async () => {
     const out = ['worktree /repo', 'HEAD abc1234', 'branch refs/heads/main'].join(NUL) + NUL + NUL
     const result = parseWorktrees(out)
     expect(result).toHaveLength(1)
     expect(result[0]).toEqual({ path: '/repo', branch: 'main', isBare: false, isPrimary: true, isLocked: false })
   })
 
-  test('flags locked worktrees (with or without reason)', () => {
+  test('flags locked worktrees (with or without reason)', async () => {
     // `git worktree list --porcelain` emits either a bare `locked` line
     // or `locked <reason>` when the user passed `--reason` to lock.
     const out =
@@ -279,7 +279,7 @@ describe('parseWorktrees', () => {
     expect(parseWorktrees(bare)[0]?.isLocked).toBe(true)
   })
 
-  test('models prunable metadata while excluding it from the usable projection', () => {
+  test('models prunable metadata while excluding it from the usable projection', async () => {
     const out =
       [
         'worktree /repo',
@@ -301,7 +301,7 @@ describe('parseWorktrees', () => {
     expect(parseWorktrees(out).map((worktree) => worktree.path)).toEqual(['/repo', '/repo/live'])
   })
 
-  test('accepts an absolute Windows path in authoritative porcelain output', () => {
+  test('accepts an absolute Windows path in authoritative porcelain output', async () => {
     const out = ['worktree C:/repo', 'HEAD aaaaaaa', 'branch refs/heads/main'].join(NUL) + NUL + NUL
     expect(parseWorktrees(out)).toEqual([
       { path: 'C:/repo', branch: 'main', isBare: false, isPrimary: true, isLocked: false },
@@ -316,7 +316,7 @@ describe('parseWorktrees', () => {
     },
   )
 
-  test('detached HEAD has no branch line — branch left undefined', () => {
+  test('detached HEAD has no branch line — branch left undefined', async () => {
     const out = ['worktree /repo/wt-detached', 'HEAD abc1234', 'detached'].join(NUL) + NUL + NUL
     const [w] = parseWorktrees(out)
     expect(w?.path).toBe('/repo/wt-detached')
@@ -325,7 +325,7 @@ describe('parseWorktrees', () => {
     expect(w?.isPrimary).toBe(true)
   })
 
-  test('flags bare worktrees', () => {
+  test('flags bare worktrees', async () => {
     const out = ['worktree /repo/bare', 'bare'].join(NUL) + NUL + NUL
     const [w] = parseWorktrees(out)
     expect(w?.isBare).toBe(true)
@@ -333,7 +333,7 @@ describe('parseWorktrees', () => {
     expect(w?.branch).toBeUndefined()
   })
 
-  test('parses multiple blocks separated by blank lines', () => {
+  test('parses multiple blocks separated by blank lines', async () => {
     const out =
       [
         'worktree /repo',
@@ -352,7 +352,7 @@ describe('parseWorktrees', () => {
     expect(result.map((w) => w.isPrimary)).toEqual([true, false])
   })
 
-  test('strips refs/heads/ prefix from branch ref', () => {
+  test('strips refs/heads/ prefix from branch ref', async () => {
     const out = ['worktree /repo', 'HEAD aaaaaaa', 'branch refs/heads/feature/nested/name'].join(NUL) + NUL + NUL
     expect(parseWorktrees(out)[0]?.branch).toBe('feature/nested/name')
   })

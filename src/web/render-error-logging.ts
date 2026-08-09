@@ -2,7 +2,7 @@ const loggedObjectRenderErrors = new WeakSet<object>()
 const loggedPrimitiveRenderErrors = new Set<unknown>()
 const MAX_LOGGED_PRIMITIVE_RENDER_ERRORS = 32
 
-export function markReactRenderErrorLogged(error: unknown): boolean {
+export function markRenderErrorLogged(error: unknown): boolean {
   const objectLike = (typeof error === 'object' && error !== null) || typeof error === 'function'
   if (!objectLike) {
     if (loggedPrimitiveRenderErrors.has(error)) return true

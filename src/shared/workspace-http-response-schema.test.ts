@@ -12,7 +12,7 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('workspace HTTP response schemas', () => {
-  test('rejects malformed runtime identities and unknown response fields', () => {
+  test('rejects malformed runtime identities and unknown response fields', async () => {
     expect(() =>
       v.parse(WorkspaceRuntimeOpenIdResponseSchema, {
         ok: true,
@@ -28,7 +28,7 @@ describe('workspace HTTP response schemas', () => {
     ).toThrow()
   })
 
-  test('rejects partial filesystem nodes rather than accepting an incomplete authority', () => {
+  test('rejects partial filesystem nodes rather than accepting an incomplete authority', async () => {
     expect(() =>
       v.parse(WorkspaceFilesystemTreeResponseSchema, {
         nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory' }],
@@ -37,11 +37,11 @@ describe('workspace HTTP response schemas', () => {
     ).toThrow()
   })
 
-  test('requires every path suggestion to be a string', () => {
+  test('requires every path suggestion to be a string', async () => {
     expect(() => v.parse(StringArrayResponseSchema, ['/repo', null])).toThrow()
   })
 
-  test('requires a canonical directory modification timestamp', () => {
+  test('requires a canonical directory modification timestamp', async () => {
     const overview = {
       topLevelFileCount: 2,
       topLevelDirectoryCount: 1,
@@ -53,7 +53,7 @@ describe('workspace HTTP response schemas', () => {
     }
   })
 
-  test('rejects legacy workspace names in runtime response contracts', () => {
+  test('rejects legacy workspace names in runtime response contracts', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example/srv/Documents')
     const readyProbe = {
       status: 'ready' as const,

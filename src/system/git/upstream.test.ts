@@ -14,7 +14,7 @@ describe('decodeGitUpstream', () => {
     })
   })
 
-  test('keeps configured capabilities without exposing a missing tracking ref to ancestry checks', () => {
+  test('keeps configured capabilities without exposing a missing tracking ref to ancestry checks', async () => {
     expect(
       decodeGitUpstream(['refs/remotes/origin/feature/a', 'origin', 'refs/heads/feature/a', ''].join(NUL)),
     ).toEqual({
@@ -24,7 +24,7 @@ describe('decodeGitUpstream', () => {
     })
   })
 
-  test('keeps a local upstream for ancestry without granting remote delete capability', () => {
+  test('keeps a local upstream for ancestry without granting remote delete capability', async () => {
     expect(decodeGitUpstream(['refs/heads/main', '.', 'refs/heads/main', '<'].join(NUL))).toEqual({
       ancestryRef: 'refs/heads/main',
       source: { remote: '.', branch: 'main' },
@@ -38,7 +38,7 @@ describe('decodeGitUpstream', () => {
     ).toBe(remote)
   })
 
-  test('distinguishes no upstream from missing or malformed protocol output', () => {
+  test('distinguishes no upstream from missing or malformed protocol output', async () => {
     expect(decodeGitUpstream(NUL.repeat(3))).toBeNull()
     expect(() => decodeGitUpstream('')).toThrow('Git returned an invalid upstream')
     expect(() => decodeGitUpstream(['refs/remotes/origin/main', 'origin'].join(NUL))).toThrow(

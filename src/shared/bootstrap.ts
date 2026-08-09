@@ -47,7 +47,7 @@ export interface ClientRuntimeSnapshot {
  * native capability set, and the optional QR-code server handoff.
  * Everything else (i18n, settings, host info) lives on dedicated
  * `/api/*` endpoints. The client hydrates i18n before mounting
- * the normal React tree, then the app bootstrap hooks hydrate the
+ * the normal Vue tree, then the app bootstrap composables hydrate the
  * remaining runtime state. The server's HTML is an immutable static
  * file.
  *

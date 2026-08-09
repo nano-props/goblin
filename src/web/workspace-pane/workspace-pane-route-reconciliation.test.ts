@@ -41,7 +41,7 @@ function createWorkspacePaneTabModel(input: RouteModelInput) {
 }
 
 describe('workspace pane route reconciliation', () => {
-  test('keeps a routed terminal session when it is materialized', () => {
+  test('keeps a routed terminal session when it is materialized', async () => {
     const model = terminalModel({ routedSessionId: 'term-111111111111111111111', terminalProjectionPhase: 'ready' })
 
     expect(
@@ -51,7 +51,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('waits for terminal projection before declaring a routed terminal session missing', () => {
+  test('waits for terminal projection before declaring a routed terminal session missing', async () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'pending' })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
@@ -59,7 +59,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('waits for tab entries before validating a routed terminal session', () => {
+  test('waits for tab entries before validating a routed terminal session', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -86,7 +86,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('does not verify a materialized terminal route while terminal projection is pending', () => {
+  test('does not verify a materialized terminal route while terminal projection is pending', async () => {
     const model = terminalModel({ routedSessionId: 'term-111111111111111111111', terminalProjectionPhase: 'pending' })
 
     expect(
@@ -96,7 +96,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('leaves a routed terminal session unverified while terminal projection has failed', () => {
+  test('leaves a routed terminal session unverified while terminal projection has failed', async () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'failed' })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
@@ -104,7 +104,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('leaves a routed terminal session unverified while tab-entry projection has failed', () => {
+  test('leaves a routed terminal session unverified while tab-entry projection has failed', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -131,7 +131,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('waits for terminal creation before declaring a routed terminal session missing', () => {
+  test('waits for terminal creation before declaring a routed terminal session missing', async () => {
     const model = terminalModel({
       routedSessionId: 'missing-session',
       terminalProjectionPhase: 'ready',
@@ -143,7 +143,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('reports a stale terminal route as missing', () => {
+  test('reports a stale terminal route as missing', async () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'ready' })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
@@ -151,7 +151,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('waits for tab entries before validating a routed static tab', () => {
+  test('waits for tab entries before validating a routed static tab', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -170,7 +170,7 @@ describe('workspace pane route reconciliation', () => {
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
   })
 
-  test('leaves a static route unverified while tab-entry projection has failed', () => {
+  test('leaves a static route unverified while tab-entry projection has failed', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -189,7 +189,7 @@ describe('workspace pane route reconciliation', () => {
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
   })
 
-  test('does not verify a materialized static route while tab-entry projection has failed', () => {
+  test('does not verify a materialized static route while tab-entry projection has failed', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -208,19 +208,19 @@ describe('workspace pane route reconciliation', () => {
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
   })
 
-  test('defers history while a route is unverified', () => {
+  test('defers history while a route is unverified', async () => {
     expect(workspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind: 'unverified' })).toEqual({
       kind: 'defer',
     })
   })
 
-  test('defers history for a missing route instead of predicting a replacement navigation', () => {
+  test('defers history for a missing route instead of predicting a replacement navigation', async () => {
     expect(workspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind: 'missing' })).toEqual({
       kind: 'defer',
     })
   })
 
-  test('waits for terminal creation before declaring a routed static tab missing', () => {
+  test('waits for terminal creation before declaring a routed static tab missing', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -239,7 +239,7 @@ describe('workspace pane route reconciliation', () => {
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
   })
 
-  test('reports an unmaterialized static route as missing', () => {
+  test('reports an unmaterialized static route as missing', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -260,7 +260,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('reports an invalid static route as missing', () => {
+  test('reports an invalid static route as missing', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -281,7 +281,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('leaves an invalid static route unverified while tab-entry projection has failed', () => {
+  test('leaves an invalid static route unverified while tab-entry projection has failed', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 
@@ -302,7 +302,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('reports an unmaterialized route as missing when the pane is empty', () => {
+  test('reports an unmaterialized route as missing when the pane is empty', async () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: REPO_ID,
 

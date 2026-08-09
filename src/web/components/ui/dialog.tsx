@@ -1,143 +1,125 @@
-import * as React from 'react'
-import { XIcon } from 'lucide-react'
-import { Dialog as DialogPrimitive } from 'radix-ui'
+import { XIcon } from '@lucide/vue'
+import {
+  DialogClose as RekaDialogClose,
+  DialogContent as RekaDialogContent,
+  DialogOverlay as RekaDialogOverlay,
+  DialogPortal as RekaDialogPortal,
+} from 'reka-ui'
+import { defineComponent } from 'vue'
+import type { FunctionalComponent, HTMLAttributes } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
 import { focusRingInset } from '#/web/components/ui/focus.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import { useT } from '#/web/stores/i18n.ts'
-function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+import { useT } from '#/web/stores/i18n-vue.ts'
+
+type DialogOverlayProps = Omit<InstanceType<typeof RekaDialogOverlay>['$props'], 'class'> & {
+  class?: HTMLAttributes['class']
 }
 
-function DialogTrigger({ ...props }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
-}
-
-function DialogPortal({ ...props }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
-}
-
-function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.Close>) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
-}
-
-function DialogOverlay({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+const DialogOverlay: FunctionalComponent<DialogOverlayProps> = (props, { slots }) => {
+  const { class: classValue, ...overlayProps } = props
   return (
-    <DialogPrimitive.Overlay
+    <RekaDialogOverlay
+      {...overlayProps}
       data-slot="dialog-overlay"
-      className={cn(
+      class={cn(
         'fixed inset-0 z-50 bg-[var(--color-overlay-scrim)] [-webkit-app-region:no-drag] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',
-        className,
+        classValue,
       )}
-      {...props}
-    />
+    >
+      {slots.default?.()}
+    </RekaDialogOverlay>
   )
 }
+DialogOverlay.inheritAttrs = false
 
-function DialogContent({
-  className,
-  children,
-  showCloseButton = true,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+type DialogContentProps = Omit<InstanceType<typeof RekaDialogContent>['$props'], 'class'> & {
+  class?: HTMLAttributes['class']
   showCloseButton?: boolean
-}) {
-  return (
-    <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        data-slot="dialog-content"
-        // Tighter padding (p-4 / gap-3) than upstream shadcn's p-6 / gap-4
-        // — matches the desktop tool's information density. `bg-card` so
-        // the dialog reads as a card on top of the dimmed overlay rather
-        // than the page background showing through.
-        className={cn(
-          'fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-3 rounded-lg border bg-card p-4 text-left shadow-lg [-webkit-app-region:no-drag] duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
-          className,
-        )}
-        {...props}
-      >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            className={cn(
-              "absolute top-3 right-3 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
-              focusRingInset,
+}
+
+export const DialogContent = defineComponent<DialogContentProps>(
+  (props, { attrs, slots }) =>
+    () => {
+      const { class: classValue, ...contentAttrs } = attrs as HTMLAttributes
+      return (
+        <RekaDialogPortal>
+          <DialogOverlay />
+          <RekaDialogContent
+            {...contentAttrs}
+            data-slot="dialog-content"
+            class={cn(
+              'fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-3 rounded-lg border bg-card p-4 text-left shadow-lg [-webkit-app-region:no-drag] duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+              classValue,
             )}
           >
-            <XIcon />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Content>
-    </DialogPortal>
-  )
-}
+            {slots.default?.()}
+            {props.showCloseButton !== false ? (
+              <RekaDialogClose
+                data-slot="dialog-close"
+                class={cn(
+                  "absolute top-3 right-3 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-3.5",
+                  focusRingInset,
+                )}
+              >
+                <XIcon />
+                <span class="sr-only">Close</span>
+              </RekaDialogClose>
+            ) : null}
+          </RekaDialogContent>
+        </RekaDialogPortal>
+      )
+    },
+  {
+    name: 'DialogContent',
+    inheritAttrs: false,
+    props: ['showCloseButton'],
+  },
+)
 
-function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="dialog-header" className={cn('flex flex-col gap-2 text-left', className)} {...props} />
-}
-
-function DialogFooter({
-  className,
-  showCloseButton = false,
-  children,
-  ...props
-}: React.ComponentProps<'div'> & {
-  showCloseButton?: boolean
-}) {
-  const compact = useIsCompactUi()
-  const t = useT()
+export const DialogHeader: FunctionalComponent<HTMLAttributes> = (props, { slots }) => {
+  const { class: classValue, ...elementProps } = props
   return (
-    <div
-      data-slot="dialog-footer"
-      className={cn(compact ? 'flex flex-col-reverse gap-2' : 'flex flex-row justify-end gap-2', className)}
-      {...props}
-    >
-      {children}
-      {showCloseButton && (
-        <DialogPrimitive.Close asChild>
-          <Button variant="outline">{t('dialog.close')}</Button>
-        </DialogPrimitive.Close>
-      )}
+    <div {...elementProps} data-slot="dialog-header" class={cn('flex flex-col gap-2 text-left', classValue)}>
+      {slots.default?.()}
     </div>
   )
 }
+DialogHeader.inheritAttrs = false
 
-function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
-  return (
-    <DialogPrimitive.Title
-      data-slot="dialog-title"
-      // text-sm rather than upstream's text-lg: in a desktop tool the
-      // dialog title is informational, not a marquee — a heading-sized
-      // type would jar against the rest of the inline UI.
-      className={cn('text-sm leading-tight font-semibold', className)}
-      {...props}
-    />
-  )
+type DialogFooterProps = HTMLAttributes & {
+  showCloseButton?: boolean
 }
 
-function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
-  return (
-    <DialogPrimitive.Description
-      data-slot="dialog-description"
-      className={cn('text-sm text-muted-foreground', className)}
-      {...props}
-    />
-  )
-}
+export const DialogFooter = defineComponent<DialogFooterProps>(
+  (props, { attrs, slots }) => {
+    const compact = useIsCompactUi()
+    const t = useT()
 
-export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-  DialogTrigger,
-}
+    return () => {
+      const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
+      return (
+        <div
+          {...elementAttrs}
+          data-slot="dialog-footer"
+          class={cn(compact.value ? 'flex flex-col-reverse gap-2' : 'flex flex-row justify-end gap-2', classValue)}
+        >
+          {slots.default?.()}
+          {props.showCloseButton ? (
+            <RekaDialogClose asChild>
+              <Button variant="outline">{t('dialog.close')}</Button>
+            </RekaDialogClose>
+          ) : null}
+        </div>
+      )
+    }
+  },
+  {
+    name: 'DialogFooter',
+    inheritAttrs: false,
+    props: ['showCloseButton'],
+  },
+)
+
+export type { DialogContentProps, DialogFooterProps }

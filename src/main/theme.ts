@@ -7,8 +7,9 @@
 import { nativeTheme } from 'electron'
 import { getUserSettings } from '#/main/settings-server-client.ts'
 import { themeNodeLog } from '#/node/logger.ts'
-import { DEFAULT_COLOR_THEME } from '#/shared/settings-defaults.ts'
-import type { ResolvedTheme, ThemePref, ThemeState } from '#/shared/api-types.ts'
+import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'
+import type { ThemeState } from '#/shared/api-types.ts'
+import type { ResolvedTheme, ThemePref } from '#/shared/settings.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 
 type Listener = (state: ThemeState) => void

@@ -1,66 +1,80 @@
-import { useEffect } from 'react'
-import { toast } from 'sonner'
-import { ConfirmDialog } from '#/web/components/ConfirmDialog.tsx'
-import { trashWorkspaceFile } from '#/web/workspace-filesystem-client.ts'
-import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
-import { useT } from '#/web/stores/i18n.ts'
-import { useFiletreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
+import { defineComponent, watch } from 'vue'
+import type { FunctionalComponent } from 'vue'
+import { toast } from 'vue-sonner'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { ConfirmDialog } from '#/web/components/ConfirmDialog.tsx'
+import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import { filetreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
+import { trashWorkspaceFile } from '#/web/workspace-filesystem-client.ts'
 
 interface Props {
   readonly currentWorkspaceId: WorkspaceId | null
   readonly currentWorkspaceRuntimeId: string | null
 }
 
-export function FiletreeActionDialogHost({ currentWorkspaceId, currentWorkspaceRuntimeId }: Props) {
-  const t = useT()
-  const trashFileConfirm = useFiletreeActionDialogsStore((s) => s.trashFileConfirm)
-  const closeTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.closeTrashFileConfirm)
-  const closeStaleDialogs = useFiletreeActionDialogsStore((s) => s.closeStaleDialogs)
-  const displayTrashFileConfirm = useLastNonNull(trashFileConfirm)
+export const FiletreeActionDialogHost = defineComponent(
+  (props: Props) => {
+    const t = useT()
+    const trashFileConfirm = useStoreSelector(filetreeActionDialogsStore, (state) => state.trashFileConfirm)
+    const displayTrashFileConfirm = useLastNonNull(trashFileConfirm)
+    const { closeTrashFileConfirm, closeStaleDialogs } = filetreeActionDialogsStore.getState()
 
-  useEffect(() => {
-    closeStaleDialogs(
-      currentWorkspaceId && currentWorkspaceRuntimeId
-        ? { workspaceId: currentWorkspaceId, workspaceRuntimeId: currentWorkspaceRuntimeId }
-        : null,
+    // Dialog authority is scoped to a runtime identity. Route replacement must
+    // close a payload that can no longer be confirmed safely.
+    watch(
+      [() => props.currentWorkspaceId, () => props.currentWorkspaceRuntimeId],
+      ([workspaceId, workspaceRuntimeId]) => {
+        closeStaleDialogs(workspaceId && workspaceRuntimeId ? { workspaceId, workspaceRuntimeId } : null)
+      },
+      { immediate: true },
     )
-  }, [currentWorkspaceId, currentWorkspaceRuntimeId, closeStaleDialogs])
 
-  return (
-    <ConfirmDialog
-      open={trashFileConfirm !== null}
-      title={t('filetree.confirm-trash-title')}
-      message={
-        displayTrashFileConfirm ? (
-          <FiletreeTrashConfirmBody body={t('filetree.confirm-trash-body')} path={displayTrashFileConfirm.path} />
-        ) : (
-          ''
-        )
-      }
-      confirmLabel={t('filetree.confirm-trash-confirm')}
-      destructive
-      onCancel={closeTrashFileConfirm}
-      onConfirm={async () => {
-        if (!trashFileConfirm) return
-        const result = await trashWorkspaceFile(trashFileConfirm.target, trashFileConfirm.path)
-        if (result.ok) {
-          closeTrashFileConfirm()
-          return
+    return () => (
+      <ConfirmDialog
+        open={trashFileConfirm.value !== null}
+        title={t('filetree.confirm-trash-title')}
+        message={
+          displayTrashFileConfirm.value ? (
+            <FiletreeTrashConfirmBody
+              body={t('filetree.confirm-trash-body')}
+              path={displayTrashFileConfirm.value.path}
+            />
+          ) : (
+            ''
+          )
         }
-        toast.error(t(result.message || 'error.failed-trash-file'))
-      }}
-    />
-  )
-}
+        confirmLabel={t('filetree.confirm-trash-confirm')}
+        destructive
+        onCancel={closeTrashFileConfirm}
+        onConfirm={async () => {
+          const payload = trashFileConfirm.value
+          if (!payload) return
+          const result = await trashWorkspaceFile(payload.target, payload.path)
+          if (result.ok) {
+            closeTrashFileConfirm()
+            return
+          }
+          const errorMessageKey = result.message || 'error.failed-trash-file'
+          toast.error(t(errorMessageKey))
+        }}
+      />
+    )
+  },
+  {
+    name: 'FiletreeActionDialogHost',
+    props: ['currentWorkspaceId', 'currentWorkspaceRuntimeId'],
+  },
+)
 
-function FiletreeTrashConfirmBody({ body, path }: { readonly body: string; readonly path: string }) {
-  return (
-    <div className="space-y-1">
-      <span>{body}</span>
-      <span className="block break-all font-mono text-foreground" title={path}>
-        {path}
-      </span>
-    </div>
-  )
-}
+const FiletreeTrashConfirmBody: FunctionalComponent<{ body: string; path: string }> = (props) => (
+  <div class="space-y-1">
+    <span>{props.body}</span>
+    <span class="block break-all font-mono text-foreground" title={props.path}>
+      {props.path}
+    </span>
+  </div>
+)
+
+FiletreeTrashConfirmBody.props = ['body', 'path']

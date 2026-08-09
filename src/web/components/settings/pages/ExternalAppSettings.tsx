@@ -1,19 +1,23 @@
-import { type ComponentType } from 'react'
-import { RotateCw, SquareTerminal } from 'lucide-react'
-import type { EditorApp } from '#/shared/api-types.ts'
+import { RotateCw, SquareTerminal } from '@lucide/vue'
+import { defineComponent } from 'vue'
+import type { FunctionalComponent, PropType, SVGAttributes } from 'vue'
+import type { EditorApp } from '#/shared/settings.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
-import { AppleTerminalIcon, GhosttyIcon, VSCodeIcon } from '#/web/components/ExternalAppIcon/index.tsx'
+import { AppleTerminalIcon } from '#/web/components/ExternalAppIcon/AppleTerminalIcon.tsx'
+import { GhosttyIcon } from '#/web/components/ExternalAppIcon/GhosttyIcon.tsx'
+import { VSCodeIcon } from '#/web/components/ExternalAppIcon/VSCodeIcon.tsx'
 import { SettingsCard, SettingsGroup, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { selectHostPlatform, useHostInfoStore, type ClientPlatform } from '#/web/stores/host-info.ts'
+import { selectHostPlatform, hostInfoStore, type ClientPlatform } from '#/web/stores/host-info.ts'
 import { useExternalAppsQuery } from '#/web/settings-queries.ts'
 import { useExternalAppSettingsController } from '#/web/runtime-settings-external-apps.ts'
-import { useT } from '#/web/stores/i18n.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 import { cn } from '#/web/lib/cn.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
 interface ExternalToolItem {
   id: string
-  Icon: ComponentType<{ className?: string }>
+  Icon: FunctionalComponent<SVGAttributes>
   titleKey: string
   commandKey: string
   detail?: string | null
@@ -89,97 +93,125 @@ const EDITOR_APPS = [
   },
 ] as const satisfies readonly (ExternalToolItem & { id: EditorApp })[]
 
-function DetectionStatusBadge({ available }: { available: boolean }) {
-  const t = useT()
-  return (
-    <Badge variant={available ? 'success' : 'outline'}>
-      {available ? t('settings.apps.status.detected') : t('settings.apps.status.not-detected')}
-    </Badge>
-  )
-}
+const DetectionStatusBadge = defineComponent(
+  (props: { available: boolean }) => {
+    const t = useT()
+    return () => (
+      <Badge variant={props.available ? 'success' : 'outline'}>
+        {props.available ? t('settings.apps.status.detected') : t('settings.apps.status.not-detected')}
+      </Badge>
+    )
+  },
+  { name: 'DetectionStatusBadge', props: { available: Boolean } },
+)
 
-function DetectionRow({ item }: { item: ExternalToolItem & { available: boolean } }) {
-  const t = useT()
-  const Icon = item.Icon
-  return (
-    <SettingsListItem as="li" size="xl">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-        <Icon className="size-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-baseline gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{t(item.titleKey)}</span>
-          <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{t(item.commandKey)}</span>
-        </div>
-        {item.detail ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{item.detail}</p> : null}
-      </div>
-      <DetectionStatusBadge available={item.available} />
-    </SettingsListItem>
-  )
-}
+const DetectionRow = defineComponent(
+  (props: { item: ExternalToolItem & { available: boolean } }) => {
+    const t = useT()
+    return () => {
+      const Icon = props.item.Icon
+      return (
+        <SettingsListItem as="li" size="xl">
+          <span class="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+            <Icon class="size-4" />
+          </span>
+          <div class="min-w-0 flex-1">
+            <div class="flex min-w-0 items-baseline gap-2">
+              <span class="truncate text-sm font-medium text-foreground">{t(props.item.titleKey)}</span>
+              <span class="shrink-0 font-mono text-[11px] text-muted-foreground">{t(props.item.commandKey)}</span>
+            </div>
+            {props.item.detail ? (
+              <p class="mt-0.5 truncate text-xs text-muted-foreground">{props.item.detail}</p>
+            ) : null}
+          </div>
+          <DetectionStatusBadge available={props.item.available} />
+        </SettingsListItem>
+      )
+    }
+  },
+  {
+    name: 'DetectionRow',
+    props: {
+      item: { type: Object as PropType<ExternalToolItem & { available: boolean }>, required: true },
+    },
+  },
+)
 
-function DetectionList({ items }: { items: Array<ExternalToolItem & { available: boolean }> }) {
-  return (
+const DetectionList = defineComponent(
+  (props: { items: Array<ExternalToolItem & { available: boolean }> }) => () => (
     <SettingsCard as="ul">
-      {items.map((item) => (
+      {props.items.map((item) => (
         <DetectionRow key={item.titleKey} item={item} />
       ))}
     </SettingsCard>
-  )
-}
+  ),
+  {
+    name: 'DetectionList',
+    props: {
+      items: { type: Array as PropType<Array<ExternalToolItem & { available: boolean }>>, required: true },
+    },
+  },
+)
 
-export function ExternalAppSettings() {
-  const t = useT()
-  const { data } = useExternalAppsQuery()
-  if (!data) return null
-  const terminalAppAvailability = data.terminal.appAvailability
-  const editorAppAvailability = data.editor.appAvailability
-  const { refreshExternalApps, refreshing } = useExternalAppSettingsController()
-  // Read the platform from the host-info store, not `process.platform`:
-  // the client is sandboxed and does not have `process` at runtime, so
-  // the only reliable source is the public `/api/host` endpoint fetched
-  // during public bootstrap. The store falls back to `'web'`
-  // (which hides every OS-specific terminal entry) until the hydrate
-  // resolves — the settings page is gated behind login anyway.
-  const visibleTerminalIds = PLATFORM_TERMINAL_IDS[useHostInfoStore(selectHostPlatform)]
-  const terminalApps = ALL_TERMINAL_APPS.filter((item) => visibleTerminalIds.has(item.id))
-  return (
-    <>
-      <SettingsGroup
-        label={t('settings.apps.group.terminals')}
-        action={
-          <Button
-            type="button"
-            data-interactive
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground"
-            onClick={() => {
-              if (refreshing) return
-              void refreshExternalApps()
-            }}
-            disabled={refreshing}
+export const ExternalAppSettings = defineComponent(
+  () => {
+    const t = useT()
+    const { data } = useExternalAppsQuery()
+    const { refreshExternalApps, refreshing } = useExternalAppSettingsController()
+    // Read the platform from the host-info store, not `process.platform`:
+    // the client is sandboxed and does not have `process` at runtime, so
+    // the only reliable source is the public `/api/host` endpoint fetched
+    // during public bootstrap. The store falls back to `'web'`
+    // (which hides every OS-specific terminal entry) until the hydrate
+    // resolves — the settings page is gated behind login anyway.
+    const platform = useStoreSelector(hostInfoStore, selectHostPlatform)
+    return () => {
+      const snapshot = data.value
+      if (!snapshot) return null
+      const terminalAppAvailability = snapshot.terminal.appAvailability
+      const editorAppAvailability = snapshot.editor.appAvailability
+      const visibleTerminalIds = PLATFORM_TERMINAL_IDS[platform.value]
+      const terminalApps = ALL_TERMINAL_APPS.filter((item) => visibleTerminalIds.has(item.id))
+      return (
+        <>
+          <SettingsGroup
+            label={t('settings.apps.group.terminals')}
+            action={
+              <Button
+                type="button"
+                data-interactive
+                variant="ghost"
+                size="sm"
+                class="text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  if (refreshing.value) return
+                  void refreshExternalApps()
+                }}
+                disabled={refreshing.value}
+              >
+                <RotateCw class={cn('size-3', refreshing.value && 'animate-spin')} />
+                {t('settings.apps.redetect')}
+              </Button>
+            }
           >
-            <RotateCw className={cn('size-3', refreshing && 'animate-spin')} />
-            {t('settings.apps.redetect')}
-          </Button>
-        }
-      >
-        <DetectionList
-          items={terminalApps.map((item) => ({
-            ...item,
-            available: terminalAppAvailability[item.id as keyof typeof terminalAppAvailability] ?? false,
-          }))}
-        />
-      </SettingsGroup>
-      <SettingsGroup label={t('settings.apps.group.editors')}>
-        <DetectionList
-          items={EDITOR_APPS.map((item) => ({
-            ...item,
-            available: editorAppAvailability[item.id as keyof typeof editorAppAvailability] ?? false,
-          }))}
-        />
-      </SettingsGroup>
-    </>
-  )
-}
+            <DetectionList
+              items={terminalApps.map((item) => ({
+                ...item,
+                available: terminalAppAvailability[item.id as keyof typeof terminalAppAvailability] ?? false,
+              }))}
+            />
+          </SettingsGroup>
+          <SettingsGroup label={t('settings.apps.group.editors')}>
+            <DetectionList
+              items={EDITOR_APPS.map((item) => ({
+                ...item,
+                available: editorAppAvailability[item.id as keyof typeof editorAppAvailability] ?? false,
+              }))}
+            />
+          </SettingsGroup>
+        </>
+      )
+    }
+  },
+  { name: 'ExternalAppSettings' },
+)

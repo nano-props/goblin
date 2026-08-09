@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { act, waitFor } from '@testing-library/react'
+import { waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CloneRepositoryDialog, type CloneRepositoryInput } from '#/web/components/CloneRepositoryDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
+import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -24,10 +25,10 @@ beforeEach(() => {
   }
   // Host info used to live in the bootstrap payload; it now
   // lives on the public `/api/host` endpoint and the client-side
-  // `useHostInfoStore`. Seed the store directly so the dialog's
+  // `hostInfoStore`. Seed the store directly so the dialog's
   // default parent dir (`~/Developer`) resolves correctly without
   // mocking `fetch('/api/host')`.
-  useHostInfoStore.setState({
+  hostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
     status: 'ready',
     error: null,
@@ -51,7 +52,7 @@ afterEach(() => {
 })
 
 describe('CloneRepositoryDialog', () => {
-  test('keeps the inline status row mounted', () => {
+  test('keeps the inline status row mounted', async () => {
     renderInJsdom(
       <CloneRepositoryDialog
         open
@@ -59,11 +60,12 @@ describe('CloneRepositoryDialog', () => {
         onClone={vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))}
       />,
     )
+    await flushTestUpdates(() => {})
 
     expect(document.body.querySelector('[data-slot="dialog-status-row"]')).not.toBeNull()
   })
 
-  test('focuses the clone url input when opened', () => {
+  test('focuses the clone url input when opened', async () => {
     renderInJsdom(
       <CloneRepositoryDialog
         open
@@ -71,6 +73,7 @@ describe('CloneRepositoryDialog', () => {
         onClone={vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))}
       />,
     )
+    await flushTestUpdates(() => {})
 
     expect(document.activeElement).toBe(input('#clone-url'))
   })
@@ -82,9 +85,9 @@ describe('CloneRepositoryDialog', () => {
 
     renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
-    setInputValue('#clone-url', 'https://example.com/repo.git')
-    setInputValue('#clone-directory-name', 'repo')
-    click('button[type="submit"]')
+    await setInputValue('#clone-url', 'https://example.com/repo.git')
+    await setInputValue('#clone-directory-name', 'repo')
+    await click('button[type="submit"]')
 
     expect(onClone).toHaveBeenCalledWith(
       {
@@ -108,9 +111,9 @@ describe('CloneRepositoryDialog', () => {
 
     renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
-    setInputValue('#clone-url', 'https://example.com/repo.git')
-    setInputValue('#clone-directory-name', 'repo')
-    click('button[type="submit"]')
+    await setInputValue('#clone-url', 'https://example.com/repo.git')
+    await setInputValue('#clone-directory-name', 'repo')
+    await click('button[type="submit"]')
 
     await waitFor(() => {
       expect(onClose).not.toHaveBeenCalled()
@@ -127,16 +130,16 @@ describe('CloneRepositoryDialog', () => {
 
     renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
-    setInputValue('#clone-url', 'https://example.com/repo.git')
-    setInputValue('#clone-directory-name', 'repo')
-    click('button[type="submit"]')
+    await setInputValue('#clone-url', 'https://example.com/repo.git')
+    await setInputValue('#clone-directory-name', 'repo')
+    await click('button[type="submit"]')
     const signal = onClone.mock.calls[0]?.[1]
-    clickButtonByText('dialog.cancel')
+    await clickButtonByText('dialog.cancel')
 
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(signal?.aborted).toBe(true)
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       deferred.resolve({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' })
       await deferred.promise
     })
@@ -157,24 +160,25 @@ describe('CloneRepositoryDialog', () => {
     const onClone = vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))
     const { rerender } = renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
-    clickButtonByText('workspace-picker.clone-parent-choose')
-    selection.resolve('/tmp/old-selection')
-    rerender(<CloneRepositoryDialog open={false} onClose={onClose} onClone={onClone} />)
-    rerender(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
-    await act(async () => {
+    await clickButtonByText('workspace-picker.clone-parent-choose')
+    await rerender(<CloneRepositoryDialog open={false} onClose={onClose} onClone={onClone} />)
+    await rerender(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+    await flushTestUpdates(async () => {
+      selection.resolve('/tmp/old-selection')
       await selection.promise
     })
 
     expect(input('#clone-parent-path').value).toBe('~/Developer')
   })
 
-  test('hides native parent picker button when no Electron bridge exists', () => {
+  test('hides native parent picker button when no Electron bridge exists', async () => {
     delete testWindow.goblinNative
     setClientBridgeForTests(null)
     const onClose = vi.fn()
     const onClone = vi.fn(async () => ({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' }))
 
     renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+    await flushTestUpdates(() => {})
 
     expect(queryButtonByText('workspace-picker.clone-parent-choose')).toBeNull()
   })
@@ -205,26 +209,29 @@ function buttonByText(text: string): HTMLButtonElement {
   return element
 }
 
-function setInputValue(selector: string, value: string) {
+async function setInputValue(selector: string, value: string): Promise<void> {
+  await flushTestUpdates(() => {})
   const element = input(selector)
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
   descriptor?.set?.call(element, value)
-  act(() => {
+  await flushTestUpdates(() => {
     element.dispatchEvent(new Event('input', { bubbles: true }))
     element.dispatchEvent(new Event('change', { bubbles: true }))
   })
 }
 
-function click(selector: string) {
+async function click(selector: string): Promise<void> {
+  await flushTestUpdates(() => {})
   const element = button(selector)
-  act(() => {
+  await flushTestUpdates(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
 }
 
-function clickButtonByText(text: string) {
+async function clickButtonByText(text: string): Promise<void> {
+  await flushTestUpdates(() => {})
   const element = buttonByText(text)
-  act(() => {
+  await flushTestUpdates(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
 }

@@ -3,7 +3,7 @@ import * as v from 'valibot'
 import { decodeWith } from '#/shared/http-response-schema.ts'
 
 describe('HTTP response decoding', () => {
-  test('reports the failing response path', () => {
+  test('reports the failing response path', async () => {
     const decode = decodeWith(
       v.strictObject({ runtime: v.strictObject({ workspaces: v.array(v.strictObject({ id: v.string() })) }) }),
     )

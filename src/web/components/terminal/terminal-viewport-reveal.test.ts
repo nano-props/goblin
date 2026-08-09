@@ -272,11 +272,11 @@ test('reveals the bottom-page cursor position while normal scrollback is visible
   reveal.dispose()
 })
 
-test('does not project an invalid alternate-buffer cursor into the viewport', () => {
+test('does not project an invalid alternate-buffer cursor into the viewport', async () => {
   expect(terminalInputRevealRow({ type: 'alternate', baseY: 100, cursorY: 5, viewportY: 50 }, 30)).toBeNull()
 })
 
-test('uses the current viewport row when the cursor is already visible', () => {
+test('uses the current viewport row when the cursor is already visible', async () => {
   expect(terminalInputRevealRow({ type: 'normal', baseY: 100, cursorY: 5, viewportY: 90 }, 30)).toBe(15)
 })
 

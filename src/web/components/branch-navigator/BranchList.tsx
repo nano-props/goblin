@@ -10,11 +10,11 @@
 //   • does NOT wrap in ScrollArea (the pane owns its scroll container)
 //   • owns the per-list `actionMenuOpen` so the "row is no longer rendered
 //     ⇒ close the menu" invariant lives next to the rows that draw it
-//   • uses useLayoutEffect to scroll the highlighted row into view
-//     before paint, so the pane doesn't flash to the top first
+//   • scrolls the highlighted row after Vue has committed the row ref
 //   • the highlight comes from route context through the data wrapper
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { defineComponent, ref, watch } from 'vue'
+import type { PropType, VNodeChild } from 'vue'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
 import type { BranchListRepo } from '#/web/components/branch-navigator/use-branch-list-data.ts'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
@@ -30,59 +30,65 @@ interface Props {
   onSelectBranch: (branch: string) => void
   onOpenBranchStatus: (branch: string) => void
   /** Rendered when `branches` is empty. */
-  emptyState: ReactNode
+  emptyState: VNodeChild
 }
 
-export function BranchList({
-  repo,
-  branches,
-  highlightedBranch,
-  onSelectBranch,
-  onOpenBranchStatus,
-  emptyState,
-}: Props) {
-  const [actionMenuOpen, setActionMenuOpen] = useState<string | null>(null)
-  const selectedRef = useRef<HTMLLIElement | null>(null)
+export const BranchList = defineComponent(
+  (props: Props) => {
+    const actionMenuOpen = ref<string | null>(null)
+    const selectedRef = ref<HTMLLIElement | null>(null)
 
-  // Reset the open action menu when its row is no longer rendered
-  // (filter change, view-mode change, branch removed). Keeps the
-  // action-menu state from outliving its anchor. Pure state update,
-  // not a layout effect.
-  useEffect(() => {
-    if (!actionMenuOpen) return
-    if (!branches.some((branch) => branch.name === actionMenuOpen)) {
-      setActionMenuOpen(null)
+    // The menu owns an anchored overlay, so its state must end with the row.
+    watch(
+      () => props.branches,
+      (branches) => {
+        if (actionMenuOpen.value && !branches.some((branch) => branch.name === actionMenuOpen.value)) {
+          actionMenuOpen.value = null
+        }
+      },
+    )
+
+    // The selected row ref is the DOM-readiness boundary for both initial mount
+    // and route selection changes.
+    watch(
+      [selectedRef, () => props.highlightedBranch],
+      () => selectedRef.value?.scrollIntoView?.({ block: 'nearest' }),
+      { flush: 'post' },
+    )
+
+    return () => {
+      if (props.branches.length === 0 || !props.repo) return <>{props.emptyState}</>
+
+      return (
+        <ul class={BRANCH_ROW_LIST_CLASS}>
+          {props.branches.map((branch) => (
+            <BranchListRow
+              key={branch.name}
+              repo={props.repo!}
+              branch={branch}
+              selected={props.highlightedBranch}
+              onSelectBranch={props.onSelectBranch}
+              onOpenBranchStatus={props.onOpenBranchStatus}
+              selectedRef={selectedRef}
+              actionMenuOpen={actionMenuOpen.value === branch.name}
+              onActionMenuOpenChange={(open) => {
+                actionMenuOpen.value = open ? branch.name : null
+              }}
+            />
+          ))}
+        </ul>
+      )
     }
-  }, [actionMenuOpen, branches])
-
-  // Keep the highlighted row in view as the user navigates with j/k
-  // (pane). useLayoutEffect runs before paint so the pane does not
-  // flash to the top first.
-  useLayoutEffect(() => {
-    const selectedEl = selectedRef.current
-    // jsdom doesn't implement scrollIntoView; the production DOM does.
-    if (selectedEl && typeof selectedEl.scrollIntoView === 'function') {
-      selectedEl.scrollIntoView({ block: 'nearest' })
-    }
-  }, [highlightedBranch])
-
-  if (branches.length === 0 || !repo) return <>{emptyState}</>
-
-  return (
-    <ul className={BRANCH_ROW_LIST_CLASS}>
-      {branches.map((branch) => (
-        <BranchListRow
-          key={branch.name}
-          repo={repo}
-          branch={branch}
-          selected={highlightedBranch}
-          onSelectBranch={onSelectBranch}
-          onOpenBranchStatus={onOpenBranchStatus}
-          selectedRef={selectedRef}
-          actionMenuOpen={actionMenuOpen === branch.name}
-          onActionMenuOpenChange={(open) => setActionMenuOpen(open ? branch.name : null)}
-        />
-      ))}
-    </ul>
-  )
-}
+  },
+  {
+    name: 'BranchList',
+    props: {
+      repo: { type: Object as PropType<BranchListRepo | null>, default: null },
+      branches: { type: Array as PropType<BranchSnapshotInfo[]>, required: true },
+      highlightedBranch: { type: String, default: null },
+      onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
+      onOpenBranchStatus: { type: Function as PropType<(branch: string) => void>, required: true },
+      emptyState: { type: null, required: true },
+    },
+  },
+)

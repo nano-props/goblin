@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type {
   TerminalBellRealtimeEvent,
@@ -26,7 +26,7 @@ import type {
   TerminalSessionReadContextValue,
 } from '#/web/components/terminal/types.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const projection = vi.hoisted(() => ({
   setRuntimeMembershipIndex: vi.fn(),
@@ -127,11 +127,15 @@ vi.mock('#/web/components/terminal/use-terminal-session-projection.ts', () => ({
   useTerminalSessionProjection: () => projection,
 }))
 
-vi.mock('#/web/components/terminal/terminal-runtime-membership-index.ts', () => ({
-  useTerminalRuntimeMembershipIndex: () => runtimeMembershipIndex,
-}))
+vi.mock('#/web/components/terminal/terminal-runtime-membership-index.ts', async () => {
+  // Vitest hoists this factory, so construct the real Vue ref inside it.
+  const { shallowRef } = await import('vue')
+  return {
+    useTerminalRuntimeMembershipIndex: () => shallowRef(runtimeMembershipIndex),
+  }
+})
 
-vi.mock('#/web/components/terminal/terminal-geometry.ts', () => geometryMocks)
+vi.mock('#/web/components/terminal/terminal-font.ts', () => geometryMocks)
 
 vi.mock('#/web/terminal.ts', () => ({
   terminalClient: {
@@ -160,7 +164,7 @@ beforeEach(() => {
 })
 
 describe('TerminalSessionProvider', () => {
-  test('forwards every realtime event to the client-level projection', () => {
+  test('forwards every realtime event to the client-level projection', async () => {
     const output = outputEventFixture()
     const bell: TerminalBellRealtimeEvent = {
       terminalRuntimeSessionId: TERMINAL_RUNTIME_SESSION_ID,
@@ -228,8 +232,8 @@ describe('TerminalSessionProvider', () => {
     expect(projection.setRuntimeMembershipIndex).toHaveBeenLastCalledWith(runtimeMembershipIndex)
     expect(projection.setPreferredSelectedTerminalSessionIds).toHaveBeenLastCalledWith({})
 
-    await act(async () => {
-      useWorkspacesStore.setState({
+    await flushTestUpdates(async () => {
+      workspacesStore.setState({
         selectedTerminalSessionIdByTerminalFilesystemTarget: { target: TERMINAL_SESSION_ID },
       })
     })
@@ -240,13 +244,13 @@ describe('TerminalSessionProvider', () => {
     result.unmount()
   })
 
-  test('prewarms the terminal font on mount', () => {
+  test('prewarms the terminal font on mount', async () => {
     const result = renderProvider()
     expect(geometryMocks.preloadTerminalFont).toHaveBeenCalledTimes(1)
     result.unmount()
   })
 
-  test('publishes projection commands and reads through the provider contexts', () => {
+  test('publishes projection commands and reads through the provider contexts', async () => {
     const captured = renderProviderWithContexts()
 
     expect(captured.command).toStrictEqual({
@@ -294,7 +298,7 @@ describe('TerminalSessionProvider', () => {
     captured.unmount()
   })
 
-  test('unsubscribes realtime events and clears the command bridge on unmount', () => {
+  test('unsubscribes realtime events and clears the command bridge on unmount', async () => {
     const result = renderProvider()
     expect(readTerminalSessionCommandBridge()).not.toBeNull()
 

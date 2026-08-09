@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { QueryClient } from '@tanstack/vue-query'
+import { fireEvent } from '@testing-library/vue'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WebSettings } from '#/web/components/settings/pages/WebSettings.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
@@ -38,9 +40,9 @@ async function renderPage(options: { lanInfo?: LanInfo; lanEnabled?: boolean } =
   queryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ lanEnabled: options.lanEnabled }))
   if (options.lanInfo) queryClient.setQueryData(lanInfoQueryKey(), options.lanInfo)
   return renderInJsdom(
-    <QueryClientProvider client={queryClient}>
+    <VueQueryClientScope client={queryClient}>
       <WebSettings />
-    </QueryClientProvider>,
+    </VueQueryClientScope>,
   )
 }
 
@@ -216,7 +218,7 @@ describe('WebSettings runtime parity', () => {
     expect(electronHtml).toContain('settings.web.token-copy')
     expect(electronContainer.querySelector('#settings-web-url')?.textContent).toBe(window.location.origin)
 
-    act(() => {
+    await flushTestUpdates(() => {
       unmountElectron()
     })
 
@@ -242,10 +244,15 @@ describe('WebSettings runtime parity', () => {
       `[aria-label="settings.web.url-copy: ${window.location.origin}"]`,
     )
     expect(copyUrlButton).not.toBeNull()
-    await act(async () => copyUrlButton?.click())
+    await flushTestUpdates(async () => copyUrlButton?.click())
 
     expect(writeText).toHaveBeenCalledWith(window.location.origin)
     expect(toastMocks.success).toHaveBeenCalledWith('settings.web.url-copied')
+
+    const url = container.querySelector('#settings-web-url')
+    if (!url) throw new Error('missing current browser URL')
+    await fireEvent.copy(url)
+    expect(writeText).toHaveBeenCalledTimes(1)
   })
 
   test('shows server-reported LAN addresses in the web runtime without a native LAN toggle', async () => {
@@ -276,6 +283,6 @@ describe('WebSettings runtime parity', () => {
   })
 })
 
-vi.mock('sonner', () => ({
+vi.mock('vue-sonner', () => ({
   toast: toastMocks,
 }))

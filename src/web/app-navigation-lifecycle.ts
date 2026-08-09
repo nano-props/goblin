@@ -1,10 +1,4 @@
-import type { HistoryState } from '@tanstack/history'
-
-declare module '@tanstack/history' {
-  interface HistoryState {
-    __goblinAppNavigationGeneration?: number
-  }
-}
+import type { HistoryState } from 'vue-router'
 
 export type AppNavigationGeneration = number
 
@@ -115,7 +109,8 @@ export function observeAppHistoryNavigation(input: {
     beginAppNavigation()
     return
   }
-  const generation = input.state?.[APP_NAVIGATION_STATE_KEY]
+  const generationValue = input.state?.[APP_NAVIGATION_STATE_KEY]
+  const generation = typeof generationValue === 'number' ? generationValue : undefined
   const owned = generation === undefined ? null : takeOwnedAppNavigation(generation)
   if (owned) {
     if (owned.targetHref === input.href && appNavigationIsCurrent(owned.generation)) {

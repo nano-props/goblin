@@ -19,7 +19,7 @@ describe('invalidation broker', () => {
     disconnectAllInvalidationSockets()
   })
 
-  test('disconnects every registered invalidation socket during shutdown', () => {
+  test('disconnects every registered invalidation socket during shutdown', async () => {
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
     registerInvalidationSocket(first)
@@ -34,7 +34,7 @@ describe('invalidation broker', () => {
     expect(second.send).not.toHaveBeenCalled()
   })
 
-  test('rejects the (N+1)th subscriber to prevent socket floods', () => {
+  test('rejects the (N+1)th subscriber to prevent socket floods', async () => {
     for (let i = 0; i < MAX_INVALIDATION_SOCKETS; i += 1) {
       registerInvalidationSocket({ send: vi.fn(), close: vi.fn() })
     }
@@ -42,7 +42,7 @@ describe('invalidation broker', () => {
     expect(() => registerInvalidationSocket(overflow)).toThrow(InvalidationSocketLimitError)
   })
 
-  test('frees a slot when a subscriber disconnects', () => {
+  test('frees a slot when a subscriber disconnects', async () => {
     const sockets = Array.from({ length: MAX_INVALIDATION_SOCKETS }, () => ({ send: vi.fn(), close: vi.fn() }))
     for (const s of sockets) registerInvalidationSocket(s)
     unregisterInvalidationSocket(sockets[0]!)
@@ -50,7 +50,7 @@ describe('invalidation broker', () => {
     expect(() => registerInvalidationSocket({ send: vi.fn(), close: vi.fn() })).not.toThrow()
   })
 
-  test('fans user-scoped invalidations only to sockets for that identity', () => {
+  test('fans user-scoped invalidations only to sockets for that identity', async () => {
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
     registerInvalidationSocket(first, 'user_a')
@@ -62,7 +62,7 @@ describe('invalidation broker', () => {
     expect(second.send).not.toHaveBeenCalled()
   })
 
-  test('publishes workspace runtime invalidations with canonical workspace identity', () => {
+  test('publishes workspace runtime invalidations with canonical workspace identity', async () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     registerInvalidationSocket(socket, 'user_a')
     const workspaceId = workspaceIdForTest('goblin+ssh://example/workspace')
@@ -72,7 +72,7 @@ describe('invalidation broker', () => {
     expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: 'workspace-runtime-invalidated', workspaceId }))
   })
 
-  test('publishes filesystem invalidations only to the owning user', () => {
+  test('publishes filesystem invalidations only to the owning user', async () => {
     const owner = { send: vi.fn(), close: vi.fn() }
     const other = { send: vi.fn(), close: vi.fn() }
     registerInvalidationSocket(owner, 'user_a')

@@ -1,4 +1,4 @@
-import type { QueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/query-core'
 import type {
   RepoOperationsSnapshot,
   RepoPullRequestScope,
@@ -180,7 +180,7 @@ export async function refreshRepoSnapshotReadModel(
   options: { signal?: AbortSignal; queryClient?: QueryClient } = {},
 ): Promise<RepoSnapshotResponse> {
   options.signal?.throwIfAborted()
-  const client = options.queryClient ?? appQueryClient
+  const client: QueryClient = options.queryClient ?? appQueryClient
   const queryKey = repoSnapshotQueryKey(repoRoot, workspaceRuntimeId)
   bump(metadataVersions, client, repoRoot, workspaceRuntimeId)
   await client.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })
@@ -201,7 +201,7 @@ export async function ensureRepoSnapshotReadModel(
   options: { signal?: AbortSignal; queryClient?: QueryClient } = {},
 ): Promise<RepoSnapshotResponse> {
   options.signal?.throwIfAborted()
-  const client = options.queryClient ?? appQueryClient
+  const client: QueryClient = options.queryClient ?? appQueryClient
   const sharedRead = client.fetchQuery({
     queryKey: repoSnapshotQueryKey(repoRoot, workspaceRuntimeId),
     staleTime: Number.POSITIVE_INFINITY,
@@ -217,7 +217,7 @@ export function refreshActiveRepoPullRequestQueries(
   workspaceRuntimeId: string,
   options: { queryClient?: QueryClient } = {},
 ): Promise<void> {
-  const client = options.queryClient ?? appQueryClient
+  const client: QueryClient = options.queryClient ?? appQueryClient
   bump(pullRequestVersions, client, repoRoot, workspaceRuntimeId)
   return client.refetchQueries(
     {
@@ -234,7 +234,7 @@ export async function refreshRepoWorktreeStatusReadModel(
   options: { signal?: AbortSignal; queryClient?: QueryClient } = {},
 ): Promise<RepoWorktreeStatusSnapshot> {
   options.signal?.throwIfAborted()
-  const client = options.queryClient ?? appQueryClient
+  const client: QueryClient = options.queryClient ?? appQueryClient
   const queryKey = repoWorktreeStatusQueryKey(repoRoot, workspaceRuntimeId)
   bump(statusVersions, client, repoRoot, workspaceRuntimeId)
   await client.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })

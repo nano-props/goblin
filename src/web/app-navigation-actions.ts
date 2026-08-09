@@ -14,7 +14,7 @@ import {
   type FilesystemWorkspacePaneTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import {
   beginAppNavigation,
@@ -109,7 +109,7 @@ export function createAppNavigationActions({
 }: CreateAppNavigationActionsOptions): AppNavigationActions {
   const traverseWorkspaceNavigation = (workspaceId: WorkspaceId, direction: 'back' | 'forward') => {
     if (workspaceNavigationHistoryRestoreBlocked(workspaceId, direction)) return
-    const canonicalWorkspaceId = useWorkspacesStore.getState().workspaces[workspaceId]?.id
+    const canonicalWorkspaceId = workspacesStore.getState().workspaces[workspaceId]?.id
     if (!canonicalWorkspaceId) return
     const traversal = peekWorkspaceNavigation(canonicalWorkspaceId, direction)
     if (!traversal) return
@@ -227,7 +227,7 @@ function commitFilesystemWorkspacePanePresentation(
   target: FilesystemWorkspacePaneRouteTarget,
   presentation: WorkspaceRootPanePresentation,
 ): boolean {
-  const state = useWorkspacesStore.getState()
+  const state = workspacesStore.getState()
   const workspaceId = target.workspaceId
   if (!state.workspaces[workspaceId]) return false
   if (presentation.kind === 'terminal') {
@@ -290,7 +290,7 @@ function filesystemWorkspacePaneCommitTargetIsCurrent(target: FilesystemWorkspac
 }
 
 function commitFilesystemWorkspacePaneEmptyPresentation(target: FilesystemWorkspacePaneRouteTarget): boolean {
-  const state = useWorkspacesStore.getState()
+  const state = workspacesStore.getState()
   if (!state.workspaces[target.workspaceId]) return false
   state.setWorkspacePaneTabForTarget(target, null)
   return true
@@ -324,7 +324,7 @@ function restoreWorkspacePresentationOrOpenDashboard(
   navigationGeneration: AppNavigationGeneration,
   options: { onBlocked: 'stay' | 'dashboard' },
 ): void {
-  const state = useWorkspacesStore.getState()
+  const state = workspacesStore.getState()
   const workspace = state.workspaces[workspaceId]
   const entry = state.navigationHistoryByWorkspace[workspaceId]?.current ?? null
   // Creating a worktree is a transient workflow, not a resumable workspace presentation.

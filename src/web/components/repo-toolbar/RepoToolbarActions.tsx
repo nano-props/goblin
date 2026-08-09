@@ -1,21 +1,22 @@
-import { useContext } from 'react'
+import { computed, defineComponent } from 'vue'
+import type { FunctionalComponent } from 'vue'
+import { GitBranchPlus } from '@lucide/vue'
+import { formatAccelerator } from '#/shared/accelerator.ts'
+import type { BranchViewMode } from '#/shared/api-types.ts'
+import { CREATE_WORKTREE_SHORTCUT } from '#/shared/shortcut-definitions.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { useShallow } from 'zustand/react/shallow'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { GitBranchPlus } from 'lucide-react'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
-import type { BranchViewMode } from '#/shared/api-types.ts'
-import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
-import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
-import { useT } from '#/web/stores/i18n.ts'
-import { formatAccelerator } from '#/shared/accelerator.ts'
-import { CREATE_WORKTREE_SHORTCUT } from '#/shared/shortcut-definitions.ts'
-import { useRepoOperationsReadModel, useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
+import { useLayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
+import { useRepoOperationsReadModel, useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { branchViewModeForWorkspace, DEFAULT_BRANCH_VIEW_MODE } from '#/web/stores/workspaces/branch-view-mode.ts'
+import type { RepoOperationState } from '#/web/stores/workspaces/operations.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 interface Props {
   repoId: WorkspaceId
@@ -26,106 +27,162 @@ interface CreateWorktreeRowActionProps extends Props {
   onCreateWorktree?: () => void
 }
 
-export function RepoSyncAction({ repoId }: Props) {
-  return <RepoActivityControl repoId={repoId} />
-}
+export const RepoSyncAction: FunctionalComponent<Props> = (props) => <RepoActivityControl repoId={props.repoId} />
+RepoSyncAction.props = ['repoId']
 
-export function BranchFilterAction({ repoId }: Props) {
-  return <WorktreeFilterToggle repoId={repoId} />
-}
+export const BranchFilterAction: FunctionalComponent<Props> = (props) => <WorktreeFilterToggle repoId={props.repoId} />
+BranchFilterAction.props = ['repoId']
 
-function WorktreeFilterToggle({ repoId }: Props) {
-  const setBranchViewMode = useWorkspacesStore((s) => s.setBranchViewMode)
-  const repoView = useWorkspacesStore(
-    useShallow((s) => {
-      const repo = s.workspaces[repoId]
-      return {
-        id: repo?.id ?? '',
-        workspaceRuntimeId: repo?.workspaceRuntimeId ?? '',
-        branchViewMode:
-          repo?.capability.kind === 'git'
-            ? branchViewModeForWorkspace(s.branchViewModeByWorkspace, repo.id)
-            : DEFAULT_BRANCH_VIEW_MODE,
-        exists: repo?.capability.kind === 'git',
-      }
-    }),
-  )
-  const snapshotReadModel = useRepoSnapshotReadModel(repoView.id || null, repoView.workspaceRuntimeId, repoView.exists)
-  return (
-    <BranchViewModeControl
-      value={repoView.branchViewMode}
-      disabled={!snapshotReadModel.data || snapshotReadModel.data.snapshot.branches.length === 0}
-      onChange={(viewMode: BranchViewMode) => setBranchViewMode(repoId, viewMode)}
-    />
-  )
-}
-
-export function CreateWorktreeRowAction({
-  repoId,
-  selected = false,
-  onCreateWorktree: routeCreateWorktree,
-}: CreateWorktreeRowActionProps) {
-  const t = useT()
-  const { disabled, openCreateWorktree } = useCreateWorktreeTrigger(repoId)
-  const label = t('action.create-worktree-title')
-  const shortcutLabel = formatAccelerator(CREATE_WORKTREE_SHORTCUT)
-
-  return (
-    <SidebarRowButton
-      onClick={() => {
-        if (disabled) return
-        if (routeCreateWorktree) routeCreateWorktree()
-        else openCreateWorktree()
-      }}
-      disabled={disabled}
-      selected={selected}
-      aria-label={`${label} (${shortcutLabel})`}
-      data-testid="create-worktree-button"
-      size="dense"
-      className="group"
-      leading={<GitBranchPlus size={16} />}
-      trailing={<InlineShortcut shortcut={shortcutLabel} showOnHover={true} aria-hidden={true} />}
-    >
-      {label}
-    </SidebarRowButton>
-  )
-}
-
-function useCreateWorktreeTrigger(repoId: WorkspaceId) {
-  const overlayActions = useContext(LayoutOverlayActions)
-  const repoShell = useStoreWithEqualityFn(
-    useWorkspacesStore,
-    (s) => {
-      const repo = s.workspaces[repoId]
+const WorktreeFilterToggle = defineComponent(
+  (props: Props) => {
+    const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
+    const branchViewModeByWorkspace = useStoreSelector(workspacesStore, (state) => state.branchViewModeByWorkspace)
+    const repoView = computed<WorktreeFilterRepo | null>(() => {
+      const repo = workspaces.value[props.repoId]
       return repo?.capability.kind === 'git'
         ? {
             id: repo.id,
             workspaceRuntimeId: repo.workspaceRuntimeId,
-            operations: {
-              branchAction: repo.capability.git.operations.branchAction,
-            },
+            branchViewMode: branchViewModeForWorkspace(branchViewModeByWorkspace.value, repo.id),
           }
         : null
-    },
-    (a, b) =>
-      a === b ||
-      (!!a &&
-        !!b &&
-        a.id === b.id &&
-        a.workspaceRuntimeId === b.workspaceRuntimeId &&
-        a.operations.branchAction.phase === b.operations.branchAction.phase &&
-        a.operations.branchAction.reason === b.operations.branchAction.reason &&
-        a.operations.branchAction.target === b.operations.branchAction.target),
-  )
-  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? null, repoShell?.workspaceRuntimeId ?? '', {
-    enabled: !!repoShell,
-  })
-  const branchAction = repoShell
-    ? projectBranchActionOperation(repoShell.operations.branchAction, operationsReadModel.data?.operations)
-    : null
-  const branchActionBusy = branchAction ? branchAction.phase !== 'idle' : true
-  return {
-    disabled: branchActionBusy,
-    openCreateWorktree: () => overlayActions?.openCreateWorktree(),
-  }
+    })
+    return () =>
+      repoView.value ? (
+        <WorktreeFilterReadModel repo={repoView.value} />
+      ) : (
+        <BranchViewModeControl value={DEFAULT_BRANCH_VIEW_MODE} disabled onChange={() => {}} />
+      )
+  },
+  { name: 'WorktreeFilterToggle', props: ['repoId'] },
+)
+
+interface WorktreeFilterRepo {
+  id: WorkspaceId
+  workspaceRuntimeId: string
+  branchViewMode: BranchViewMode
 }
+
+const WorktreeFilterReadModel = defineComponent<{ repo: WorktreeFilterRepo }>({
+  name: 'WorktreeFilterReadModel',
+  inheritAttrs: false,
+  props: ['repo'],
+  setup(props) {
+    const snapshotReadModel = useRepoSnapshotReadModel(
+      () => props.repo.id,
+      () => props.repo.workspaceRuntimeId,
+    )
+
+    function setBranchViewMode(viewMode: BranchViewMode): void {
+      workspacesStore.getState().setBranchViewMode(props.repo.id, viewMode)
+    }
+
+    return () => (
+      <BranchViewModeControl
+        value={props.repo.branchViewMode}
+        disabled={!snapshotReadModel.data.value || snapshotReadModel.data.value.snapshot.branches.length === 0}
+        onChange={setBranchViewMode}
+      />
+    )
+  },
+})
+
+export const CreateWorktreeRowAction = defineComponent(
+  (props: CreateWorktreeRowActionProps) => {
+    const overlayActions = useLayoutOverlayActions()
+    const workspaces = useStoreSelector(workspacesStore, (state) => state.workspaces)
+    const repo = computed<CreateWorktreeActionRepo | null>(() => {
+      const workspace = workspaces.value[props.repoId]
+      return workspace?.capability.kind === 'git'
+        ? {
+            id: workspace.id,
+            workspaceRuntimeId: workspace.workspaceRuntimeId,
+            branchAction: workspace.capability.git.operations.branchAction,
+          }
+        : null
+    })
+
+    function openCreateWorktree(): void {
+      if (props.onCreateWorktree) props.onCreateWorktree()
+      else overlayActions?.openCreateWorktree()
+    }
+
+    return () =>
+      repo.value ? (
+        <CreateWorktreeRowActionReadModel
+          repo={repo.value}
+          selected={props.selected ?? false}
+          onActivate={openCreateWorktree}
+        />
+      ) : (
+        <CreateWorktreeRowActionView disabled selected={props.selected ?? false} onActivate={openCreateWorktree} />
+      )
+  },
+  { name: 'CreateWorktreeRowAction', props: ['repoId', 'selected', 'onCreateWorktree'] },
+)
+
+interface CreateWorktreeActionRepo {
+  id: WorkspaceId
+  workspaceRuntimeId: string
+  branchAction: RepoOperationState
+}
+
+interface CreateWorktreeRowActionViewProps {
+  disabled: boolean
+  selected: boolean
+  onActivate: () => void
+}
+
+const CreateWorktreeRowActionReadModel = defineComponent<{
+  repo: CreateWorktreeActionRepo
+  selected: boolean
+  onActivate: () => void
+}>({
+  name: 'CreateWorktreeRowActionReadModel',
+  inheritAttrs: false,
+  props: ['repo', 'selected', 'onActivate'],
+  setup(props) {
+    const operationsReadModel = useRepoOperationsReadModel(
+      () => props.repo.id,
+      () => props.repo.workspaceRuntimeId,
+    )
+    const branchAction = computed(() => {
+      return projectBranchActionOperation(props.repo.branchAction, operationsReadModel.data.value?.operations)
+    })
+    return () => (
+      <CreateWorktreeRowActionView
+        disabled={branchAction.value.phase !== 'idle'}
+        selected={props.selected}
+        onActivate={props.onActivate}
+      />
+    )
+  },
+})
+
+const CreateWorktreeRowActionView = defineComponent<CreateWorktreeRowActionViewProps>({
+  name: 'CreateWorktreeRowActionView',
+  inheritAttrs: false,
+  props: ['disabled', 'selected', 'onActivate'],
+  setup(props) {
+    const t = useT()
+    const shortcutLabel = formatAccelerator(CREATE_WORKTREE_SHORTCUT)
+    return () => {
+      const label = t('action.create-worktree-title')
+      return (
+        <SidebarRowButton
+          onClick={props.onActivate}
+          disabled={props.disabled}
+          selected={props.selected}
+          aria-label={`${label} (${shortcutLabel})`}
+          data-testid="create-worktree-button"
+          size="dense"
+          class="group"
+          leading={<GitBranchPlus size={16} />}
+          trailing={<InlineShortcut shortcut={shortcutLabel} showOnHover={true} ariaHidden={true} />}
+        >
+          {label}
+        </SidebarRowButton>
+      )
+    }
+  },
+})

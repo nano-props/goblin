@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
-const DEFAULT_REFRESH_COOLDOWN_MS = useTerminalProjectionHydrationStore.getState().refreshCooldownMs
+const DEFAULT_REFRESH_COOLDOWN_MS = terminalProjectionHydrationStore.getState().refreshCooldownMs
 
 describe('terminal projection hydration', () => {
   beforeEach(() => {
-    useTerminalProjectionHydrationStore.setState({
+    terminalProjectionHydrationStore.setState({
       refreshCooldownMs: 100,
       hydrationByWorkspace: new Map(),
       lastSuccessfulRecoveryByWorkspace: new Map(),
@@ -16,16 +16,16 @@ describe('terminal projection hydration', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
-    useTerminalProjectionHydrationStore.setState({
+    terminalProjectionHydrationStore.setState({
       refreshCooldownMs: DEFAULT_REFRESH_COOLDOWN_MS,
       hydrationByWorkspace: new Map(),
       lastSuccessfulRecoveryByWorkspace: new Map(),
     })
   })
 
-  test('measures focus cooldown from the latest successful recovery for the current runtime', () => {
+  test('measures focus cooldown from the latest successful recovery for the current runtime', async () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_000)
-    const state = useTerminalProjectionHydrationStore.getState()
+    const state = terminalProjectionHydrationStore.getState()
     state.markProjectionReady(WORKSPACE_ID, 'workspace-runtime-current')
 
     now.mockReturnValue(1_099)

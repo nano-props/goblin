@@ -65,7 +65,7 @@ describe('terminal IPC', () => {
     vi.spyOn(platform, 'isMacOS').mockReturnValue(true)
   })
 
-  test('wires native terminal notification handlers', () => {
+  test('wires native terminal notification handlers', async () => {
     expect(ipcHandlers.has(TERMINAL_NOTIFY_BELL_CHANNEL)).toBe(true)
     expect(ipcHandlers.has(TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL)).toBe(true)
     expect(ipcHandlers.has(TERMINAL_SET_BADGE_CHANNEL)).toBe(true)

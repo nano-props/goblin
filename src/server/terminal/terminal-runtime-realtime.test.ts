@@ -25,7 +25,7 @@ import { normalizeAppRealtimeSocketServerMessage } from '#/shared/app-realtime-v
 import { BufferedAppRealtimeSocket } from '#/server/realtime/buffered-app-realtime-socket.ts'
 
 describe('terminal realtime handlers', () => {
-  test('orders every externally supported authoritative terminal frame request, including takeover', () => {
+  test('orders every externally supported authoritative terminal frame request, including takeover', async () => {
     expect(requiresRealtimeOrdering('attach')).toBe(true)
     expect(requiresRealtimeOrdering('restart')).toBe(true)
     expect(requiresRealtimeOrdering('takeover')).toBe(true)

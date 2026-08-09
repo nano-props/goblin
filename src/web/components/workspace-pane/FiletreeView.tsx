@@ -1,27 +1,28 @@
-// Read-only file tree view for a filesystem-scoped Workspace Pane target
-// (docs/filetree.md).
+// Read-only file tree view for a filesystem-scoped Workspace Pane target.
 
-import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent, type ReactNode, type UIEvent } from 'react'
-import type { Key } from 'react-aria-components'
-import { useVirtualizer } from '@tanstack/react-virtual'
-import { FolderTree, RefreshCw } from 'lucide-react'
+import { FolderTree, RefreshCw } from '@lucide/vue'
+import { useVirtualizer } from '@tanstack/vue-virtual'
+import { computed, defineComponent, ref, watch } from 'vue'
+import type { FunctionalComponent } from 'vue'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
-import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspace-filesystem-lazy-state.ts'
-import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
+import { Button } from '#/web/components/ui/button.tsx'
 import { focusRingInset } from '#/web/components/ui/focus.ts'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import { Button } from '#/web/components/ui/button.tsx'
-import { buildFiletreeCollection } from '#/web/components/workspace-pane/filetree-collection.ts'
 import { FiletreeTreeRow } from '#/web/components/workspace-pane/FiletreeTreeRow.tsx'
+import { buildFiletreeCollection } from '#/web/components/workspace-pane/filetree-collection.ts'
 import {
   FILETREE_ROW_HEIGHT,
   findTypeaheadRowIndex,
-  firstStringKey,
+  firstFiletreeKey,
   focusFiletreeRowAtIndex,
   topVisibleFiletreeRowIndex,
 } from '#/web/components/workspace-pane/filetree-navigation.ts'
 import { useRestoreTopVisibleRowIndex } from '#/web/hooks/useRestoreTopVisibleRowIndex.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspace-filesystem-lazy-state.ts'
+
+const EMPTY_KEY_SET: ReadonlySet<string> = new Set()
 
 export interface FiletreeViewProps {
   readonly tree: LazyWorkspaceFilesystemTreeAggregate | null
@@ -35,9 +36,9 @@ export interface FiletreeViewProps {
   readonly onOpenFile?: (node: WorkspaceFilesystemNode) => void
   readonly onDownloadFile?: (node: WorkspaceFilesystemNode) => void
   readonly onRequestTrashFile?: (node: WorkspaceFilesystemNode) => void
-  readonly selectedKeys: ReadonlySet<Key>
-  readonly expandedKeys: ReadonlySet<Key>
-  readonly onSelectedKeysChange: (keys: Set<Key>) => void
+  readonly selectedKeys: ReadonlySet<string>
+  readonly expandedKeys: ReadonlySet<string>
+  readonly onSelectedKeysChange: (keys: Set<string>) => void
   readonly onDirectoryRowToggle: (key: string, expanded: boolean) => void
   readonly onPruneKeys: (validKeys: ReadonlySet<string>) => void
   readonly onRetry?: () => void
@@ -55,262 +56,273 @@ const FILE_TREE_I18N_KEYS = {
   stale: 'filetree.stale-title',
 } as const satisfies Record<string, string>
 
-export function FiletreeView({
-  tree,
-  isInitialLoading,
-  isReading,
-  loadingKeys = new Set(),
-  openingFileKeys = new Set(),
-  error,
-  onSelect,
-  onActivate,
-  onOpenFile,
-  onDownloadFile,
-  onRequestTrashFile,
-  selectedKeys,
-  expandedKeys,
-  onSelectedKeysChange,
-  onDirectoryRowToggle,
-  onPruneKeys,
-  onRetry,
-  initialTopVisibleRowIndex,
-  scrollRestoreKey,
-  scrollRestoreReady,
-  onTopVisibleRowIndexChange,
-}: FiletreeViewProps) {
-  const t = useT()
-  const collection = useMemo(() => buildFiletreeCollection(tree, expandedKeys), [expandedKeys, tree])
-  const scrollViewportRef = useRef<HTMLDivElement | null>(null)
-  const rowVirtualizer = useVirtualizer({
-    count: collection.rows.length,
-    getScrollElement: () => scrollViewportRef.current,
-    estimateSize: () => FILETREE_ROW_HEIGHT,
-    overscan: 12,
-    getItemKey: (index) => collection.rows[index]?.id ?? index,
-    initialRect: { width: 800, height: 100_000 },
-  })
-  const virtualRows = rowVirtualizer.getVirtualItems()
-  const renderedRows =
-    virtualRows.length > 0
-      ? virtualRows
-      : collection.rows.map((row, index) => ({ key: row.id, index, start: index * FILETREE_ROW_HEIGHT }))
-  const selectedKey = firstStringKey(selectedKeys)
-  const selectedIndex = selectedKey ? collection.rows.findIndex((row) => row.id === selectedKey) : -1
-  const tabbableIndex = selectedIndex >= 0 ? selectedIndex : 0
+export const FiletreeView = defineComponent(
+  (props: FiletreeViewProps) => {
+    const t = useT()
+    const collection = computed(() => buildFiletreeCollection(props.tree, props.expandedKeys))
+    const scrollViewportRef = ref<HTMLDivElement | null>(null)
+    const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>(
+      computed(() => ({
+        count: collection.value.rows.length,
+        getScrollElement: () => scrollViewportRef.value,
+        estimateSize: () => FILETREE_ROW_HEIGHT,
+        overscan: 12,
+        getItemKey: (index: number) => collection.value.rows[index]?.id ?? index,
+        initialRect: { width: 800, height: 100_000 },
+      })),
+    )
 
-  useEffect(() => {
-    if (!tree) return
-    onPruneKeys(new Set(collection.byId.keys()))
-  }, [collection, onPruneKeys, tree])
+    // Reconcile persisted selection/expansion against the complete current
+    // server projection whenever the tree changes.
+    watch(
+      [() => props.tree, collection],
+      ([tree, currentCollection]) => {
+        if (tree) props.onPruneKeys(new Set(currentCollection.byId.keys()))
+      },
+      { immediate: true },
+    )
 
-  useRestoreTopVisibleRowIndex({
-    restoreKey: scrollRestoreKey,
-    topVisibleRowIndex: initialTopVisibleRowIndex,
-    enabled: tree !== null,
-    ready: scrollRestoreReady,
-    rowCount: collection.rows.length,
-    virtualizer: rowVirtualizer,
-  })
+    useRestoreTopVisibleRowIndex({
+      restoreKey: () => props.scrollRestoreKey,
+      topVisibleRowIndex: () => props.initialTopVisibleRowIndex,
+      enabled: () => props.tree !== null,
+      ready: () => props.scrollRestoreReady,
+      rowCount: () => collection.value.rows.length,
+      scrollElement: scrollViewportRef,
+      virtualizer: () => rowVirtualizer.value,
+    })
 
-  const selectNode = useCallback(
-    (node: WorkspaceFilesystemNode) => {
-      onSelectedKeysChange(new Set<Key>([node.id]))
-      onSelect?.(node)
-    },
-    [onSelect, onSelectedKeysChange],
-  )
+    function selectNode(node: WorkspaceFilesystemNode): void {
+      props.onSelectedKeysChange(new Set([node.id]))
+      props.onSelect?.(node)
+    }
 
-  const handleRowPress = useCallback(
-    (node: WorkspaceFilesystemNode, isExpanded: boolean) => {
+    function pressRow(node: WorkspaceFilesystemNode, isExpanded: boolean): void {
       selectNode(node)
-      if (node.kind !== 'directory') return
-      onDirectoryRowToggle(node.id, !isExpanded)
-    },
-    [onDirectoryRowToggle, selectNode],
-  )
+      if (node.kind === 'directory') props.onDirectoryRowToggle(node.id, !isExpanded)
+    }
 
-  const handleOpenFile = useCallback(
-    (node: WorkspaceFilesystemNode) => {
+    function openFile(node: WorkspaceFilesystemNode): void {
       if (node.kind !== 'file') return
-      onOpenFile?.(node)
-      onActivate?.(node)
-    },
-    [onActivate, onOpenFile],
-  )
+      props.onOpenFile?.(node)
+      props.onActivate?.(node)
+    }
 
-  const handleScroll = useCallback(
-    (event: UIEvent<HTMLDivElement>) => {
-      onTopVisibleRowIndexChange(topVisibleFiletreeRowIndex(event.currentTarget))
-    },
-    [onTopVisibleRowIndexChange],
-  )
+    function handleScroll(event: Event): void {
+      if (event.currentTarget instanceof HTMLElement) {
+        props.onTopVisibleRowIndexChange(topVisibleFiletreeRowIndex(event.currentTarget))
+      }
+    }
 
-  const handleRowKeyDown = useCallback(
-    (node: WorkspaceFilesystemNode, event: KeyboardEvent<HTMLDivElement>) => {
-      const rowIndex = collection.rows.findIndex((row) => row.id === node.id)
+    function handleRowKeydown(node: WorkspaceFilesystemNode, event: KeyboardEvent): void {
+      const rows = collection.value.rows
+      const rowIndex = rows.findIndex((row) => row.id === node.id)
       if (event.key === 'ArrowDown') {
         event.preventDefault()
-        focusFiletreeRowAtIndex(
-          scrollViewportRef.current,
-          rowVirtualizer,
-          Math.min(collection.rows.length - 1, rowIndex + 1),
-        )
+        focusFiletreeRowAtIndex(scrollViewportRef.value, rowVirtualizer.value, Math.min(rows.length - 1, rowIndex + 1))
         return
       }
       if (event.key === 'ArrowUp') {
         event.preventDefault()
-        focusFiletreeRowAtIndex(scrollViewportRef.current, rowVirtualizer, Math.max(0, rowIndex - 1))
+        focusFiletreeRowAtIndex(scrollViewportRef.value, rowVirtualizer.value, Math.max(0, rowIndex - 1))
         return
       }
       if (event.key === 'Home') {
         event.preventDefault()
-        focusFiletreeRowAtIndex(scrollViewportRef.current, rowVirtualizer, 0)
+        focusFiletreeRowAtIndex(scrollViewportRef.value, rowVirtualizer.value, 0)
         return
       }
       if (event.key === 'End') {
         event.preventDefault()
-        focusFiletreeRowAtIndex(scrollViewportRef.current, rowVirtualizer, collection.rows.length - 1)
+        focusFiletreeRowAtIndex(scrollViewportRef.value, rowVirtualizer.value, rows.length - 1)
         return
       }
       if (event.key === 'Enter') {
         event.preventDefault()
-        if (node.kind === 'file') handleOpenFile(node)
+        if (node.kind === 'file') openFile(node)
         return
       }
       if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        const matchIndex = findTypeaheadRowIndex(collection.rows, rowIndex, event.key)
+        const matchIndex = findTypeaheadRowIndex(rows, rowIndex, event.key)
         if (matchIndex >= 0) {
           event.preventDefault()
-          focusFiletreeRowAtIndex(scrollViewportRef.current, rowVirtualizer, matchIndex)
+          focusFiletreeRowAtIndex(scrollViewportRef.value, rowVirtualizer.value, matchIndex)
         }
         return
       }
       if (node.kind !== 'directory') return
       if (event.key === 'ArrowRight') {
         event.preventDefault()
-        if (!expandedKeys.has(node.id)) onDirectoryRowToggle(node.id, true)
+        if (!props.expandedKeys.has(node.id)) props.onDirectoryRowToggle(node.id, true)
       } else if (event.key === 'ArrowLeft') {
         event.preventDefault()
-        if (expandedKeys.has(node.id)) onDirectoryRowToggle(node.id, false)
+        if (props.expandedKeys.has(node.id)) props.onDirectoryRowToggle(node.id, false)
       }
-    },
-    [collection.rows, expandedKeys, handleOpenFile, onDirectoryRowToggle, rowVirtualizer],
-  )
-
-  if (error && !tree) {
-    return (
-      <FiletreeShell loading={isReading}>
-        <EmptyState
-          icon={<FolderTree size={16} />}
-          title={t(FILE_TREE_I18N_KEYS.error)}
-          body={
-            onRetry ? (
-              <Button type="button" variant="default" disabled={isReading} onClick={onRetry}>
-                <RefreshCw className={isReading ? 'animate-spin' : undefined} />
-                {t('error.try-again')}
-              </Button>
-            ) : undefined
-          }
-        />
-      </FiletreeShell>
-    )
-  }
-
-  if (!tree) {
-    if (isInitialLoading) {
-      return <FiletreeShell loading={isInitialLoading} />
     }
-    return (
-      <FiletreeShell loading={isInitialLoading}>
-        <EmptyState icon={<FolderTree size={16} />} title={t(FILE_TREE_I18N_KEYS.empty)} />
-      </FiletreeShell>
-    )
-  }
 
-  if (collection.rows.length === 0) {
-    return (
-      <FiletreeShell loading={isReading}>
-        {error ? <FiletreeStaleNotice isReading={isReading} onRetry={onRetry} /> : null}
-        <EmptyState icon={<FolderTree size={16} />} title={t(FILE_TREE_I18N_KEYS.empty)} />
-      </FiletreeShell>
-    )
-  }
+    return () => {
+      const currentCollection = collection.value
+      const virtualRows = rowVirtualizer.value.getVirtualItems()
+      const renderedRows =
+        virtualRows.length > 0
+          ? virtualRows
+          : currentCollection.rows.map((row, index) => ({
+              key: row.id,
+              index,
+              start: index * FILETREE_ROW_HEIGHT,
+            }))
+      const selectedKey = firstFiletreeKey(props.selectedKeys)
+      const selectedIndex = selectedKey ? currentCollection.rows.findIndex((row) => row.id === selectedKey) : -1
+      const tabbableIndex = selectedIndex >= 0 ? selectedIndex : 0
+      const loadingKeys = props.loadingKeys ?? EMPTY_KEY_SET
+      const openingFileKeys = props.openingFileKeys ?? EMPTY_KEY_SET
 
-  return (
-    <FiletreeShell loading={isReading}>
-      {error ? <FiletreeStaleNotice isReading={isReading} onRetry={onRetry} /> : null}
-      <ScrollArea
-        className="min-h-0 flex-1"
-        scrollbarMode="compact"
-        viewportRef={scrollViewportRef}
-        viewportClassName={focusRingInset}
-        viewportOnScroll={handleScroll}
+      if (props.error && !props.tree) {
+        return (
+          <FiletreeShell loading={props.isReading}>
+            <EmptyState
+              icon={<FolderTree size={16} />}
+              title={t(FILE_TREE_I18N_KEYS.error)}
+              body={
+                props.onRetry ? (
+                  <Button type="button" variant="default" disabled={props.isReading} onClick={props.onRetry}>
+                    <RefreshCw class={props.isReading ? 'animate-spin' : undefined} />
+                    {t('error.try-again')}
+                  </Button>
+                ) : undefined
+              }
+            />
+          </FiletreeShell>
+        )
+      }
+
+      if (!props.tree) {
+        return props.isInitialLoading ? (
+          <FiletreeShell loading />
+        ) : (
+          <FiletreeShell loading={false}>
+            <EmptyState icon={<FolderTree size={16} />} title={t(FILE_TREE_I18N_KEYS.empty)} />
+          </FiletreeShell>
+        )
+      }
+
+      if (currentCollection.rows.length === 0) {
+        return (
+          <FiletreeShell loading={props.isReading}>
+            {props.error ? <FiletreeStaleNotice isReading={props.isReading} onRetry={props.onRetry} /> : null}
+            <EmptyState icon={<FolderTree size={16} />} title={t(FILE_TREE_I18N_KEYS.empty)} />
+          </FiletreeShell>
+        )
+      }
+
+      return (
+        <FiletreeShell loading={props.isReading}>
+          {props.error ? <FiletreeStaleNotice isReading={props.isReading} onRetry={props.onRetry} /> : null}
+          <ScrollArea
+            class="min-h-0 flex-1"
+            scrollbarMode="compact"
+            viewportRef={scrollViewportRef}
+            viewportClass={focusRingInset}
+            viewportOnScroll={handleScroll}
+          >
+            <div
+              role="tree"
+              aria-label={t(FILE_TREE_I18N_KEYS.ariaLabel)}
+              class="relative min-h-full font-sans text-sm"
+              style={{ height: `${rowVirtualizer.value.getTotalSize()}px` }}
+            >
+              {renderedRows.map((virtualRow) => {
+                const row = currentCollection.rows[virtualRow.index]
+                if (!row) return null
+                const childIds = currentCollection.childIdsByParentId.get(row.id) ?? []
+                return (
+                  <FiletreeTreeRow
+                    key={row.id}
+                    row={row}
+                    rowIndex={virtualRow.index}
+                    hasChildItems={
+                      row.node.kind === 'directory' && (row.node.hasChildren === true || childIds.length > 0)
+                    }
+                    isExpanded={props.expandedKeys.has(row.id)}
+                    isSelected={props.selectedKeys.has(row.id)}
+                    isTabbable={virtualRow.index === tabbableIndex}
+                    isLoading={loadingKeys.has(row.id)}
+                    isOpeningFile={openingFileKeys.has(row.id)}
+                    virtualStart={virtualRow.start}
+                    onKeydown={handleRowKeydown}
+                    onRowClick={pressRow}
+                    onToggleDirectory={props.onDirectoryRowToggle}
+                    onSelect={selectNode}
+                    onOpenFile={props.onOpenFile || props.onActivate ? openFile : undefined}
+                    onDownloadFile={props.onDownloadFile}
+                    onRequestTrashFile={props.onRequestTrashFile}
+                  />
+                )
+              })}
+            </div>
+          </ScrollArea>
+          {props.tree.truncated ? (
+            <div class="border-t border-border bg-muted px-4 py-1 text-xs text-muted-foreground">
+              {t(FILE_TREE_I18N_KEYS.truncated)}
+            </div>
+          ) : null}
+        </FiletreeShell>
+      )
+    }
+  },
+  {
+    name: 'FiletreeView',
+    props: [
+      'tree',
+      'isInitialLoading',
+      'isReading',
+      'loadingKeys',
+      'openingFileKeys',
+      'error',
+      'onSelect',
+      'onActivate',
+      'onOpenFile',
+      'onDownloadFile',
+      'onRequestTrashFile',
+      'selectedKeys',
+      'expandedKeys',
+      'onSelectedKeysChange',
+      'onDirectoryRowToggle',
+      'onPruneKeys',
+      'onRetry',
+      'initialTopVisibleRowIndex',
+      'scrollRestoreKey',
+      'scrollRestoreReady',
+      'onTopVisibleRowIndexChange',
+    ],
+  },
+)
+
+const FiletreeStaleNotice = defineComponent(
+  (props: { isReading: boolean; onRetry?: () => void }) => {
+    const t = useT()
+    return () => (
+      <div
+        role="status"
+        class="flex items-center justify-between gap-3 border-b border-warning-border bg-warning-surface px-4 py-2 text-xs text-warning"
       >
-        <div
-          role="tree"
-          aria-label={t(FILE_TREE_I18N_KEYS.ariaLabel)}
-          className="relative min-h-full font-sans text-sm"
-          style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
-        >
-          {renderedRows.map((virtualRow) => {
-            const row = collection.rows[virtualRow.index]
-            if (!row) return null
-            const childIds = collection.childIdsByParentId.get(row.id) ?? []
-            return (
-              <FiletreeTreeRow
-                key={row.id}
-                row={row}
-                rowIndex={virtualRow.index}
-                hasChildItems={row.node.kind === 'directory' && (row.node.hasChildren === true || childIds.length > 0)}
-                isExpanded={expandedKeys.has(row.id)}
-                isSelected={selectedKeys.has(row.id)}
-                isTabbable={virtualRow.index === tabbableIndex}
-                isLoading={loadingKeys.has(row.id)}
-                isOpeningFile={openingFileKeys.has(row.id)}
-                virtualStart={virtualRow.start}
-                onKeyDown={handleRowKeyDown}
-                onRowClick={handleRowPress}
-                onToggleDirectory={onDirectoryRowToggle}
-                onSelect={selectNode}
-                onOpenFile={onOpenFile || onActivate ? handleOpenFile : undefined}
-                onDownloadFile={onDownloadFile}
-                onRequestTrashFile={onRequestTrashFile}
-              />
-            )
-          })}
-        </div>
-      </ScrollArea>
-      {tree.truncated ? (
-        <div className="border-t border-border bg-muted px-4 py-1 text-xs text-muted-foreground">
-          {t(FILE_TREE_I18N_KEYS.truncated)}
-        </div>
-      ) : null}
-    </FiletreeShell>
-  )
-}
+        <span class="font-medium">{t(FILE_TREE_I18N_KEYS.stale)}</span>
+        {props.onRetry ? (
+          <Button type="button" size="sm" variant="ghost" disabled={props.isReading} onClick={props.onRetry}>
+            <RefreshCw class={props.isReading ? 'animate-spin' : undefined} />
+            {t('error.try-again')}
+          </Button>
+        ) : null}
+      </div>
+    )
+  },
+  { name: 'FiletreeStaleNotice', props: ['isReading', 'onRetry'] },
+)
 
-function FiletreeStaleNotice({ isReading, onRetry }: { isReading: boolean; onRetry?: () => void }) {
-  const t = useT()
-  return (
-    <div
-      role="status"
-      className="flex items-center justify-between gap-3 border-b border-warning-border bg-warning-surface px-4 py-2 text-xs text-warning"
-    >
-      <span className="font-medium">{t(FILE_TREE_I18N_KEYS.stale)}</span>
-      {onRetry ? (
-        <Button type="button" size="sm" variant="ghost" disabled={isReading} onClick={onRetry}>
-          <RefreshCw className={isReading ? 'animate-spin' : undefined} />
-          {t('error.try-again')}
-        </Button>
-      ) : null}
-    </div>
-  )
-}
+const FiletreeShell: FunctionalComponent<{ loading: boolean }> = (props, { slots }) => (
+  <div data-filetree="" aria-busy={props.loading || undefined} class="flex min-h-0 flex-1 flex-col">
+    {slots.default?.()}
+  </div>
+)
 
-function FiletreeShell({ loading, children }: { readonly loading: boolean; readonly children?: ReactNode }) {
-  return (
-    <div data-filetree="" aria-busy={loading || undefined} className="flex min-h-0 flex-1 flex-col">
-      {children}
-    </div>
-  )
-}
+FiletreeShell.props = ['loading']

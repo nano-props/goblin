@@ -1,25 +1,29 @@
-import { createContext, useContext, useRef, type ReactNode } from 'react'
+import { defineComponent, inject, provide } from 'vue'
+import type { InjectionKey } from 'vue'
 
 export interface WorkspacePaneTabStripScrollMemory {
   read(key: string): number | undefined
   write(key: string, scrollLeft: number): void
 }
 
-const WorkspacePaneTabStripScrollMemoryContext = createContext<WorkspacePaneTabStripScrollMemory | null>(null)
+const workspacePaneTabStripScrollMemoryKey: InjectionKey<WorkspacePaneTabStripScrollMemory> = Symbol(
+  'workspace-pane-tab-strip-scroll-memory',
+)
 
-export function WorkspacePaneTabStripScrollMemoryProvider({ children }: { children: ReactNode }) {
-  const memoryRef = useRef<WorkspacePaneTabStripScrollMemory | null>(null)
-  if (!memoryRef.current) memoryRef.current = createWorkspacePaneTabStripScrollMemory()
+export const WorkspacePaneTabStripScrollMemoryProvider = defineComponent(
+  (_props, { slots }) => {
+    provideWorkspacePaneTabStripScrollMemory()
+    return () => slots.default?.()
+  },
+  { name: 'WorkspacePaneTabStripScrollMemoryProvider' },
+)
 
-  return (
-    <WorkspacePaneTabStripScrollMemoryContext value={memoryRef.current}>
-      {children}
-    </WorkspacePaneTabStripScrollMemoryContext>
-  )
+export function provideWorkspacePaneTabStripScrollMemory(): void {
+  provide(workspacePaneTabStripScrollMemoryKey, createWorkspacePaneTabStripScrollMemory())
 }
 
 export function useWorkspacePaneTabStripScrollMemoryController(): WorkspacePaneTabStripScrollMemory {
-  const memory = useContext(WorkspacePaneTabStripScrollMemoryContext)
+  const memory = inject(workspacePaneTabStripScrollMemoryKey, null)
   if (!memory) throw new Error('WorkspacePaneTabStripScrollMemoryProvider is required')
   return memory
 }

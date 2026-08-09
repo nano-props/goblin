@@ -1,5 +1,5 @@
 // Actions are the write boundary that commits to the server transport and
-// projects server-returned values into React Query.
+// projects server-returned values into TanStack Query.
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceExternalAppTarget } from '#/shared/workspace-settings.ts'
@@ -37,7 +37,7 @@ import {
   updateRuntimeSettingsSnapshotCache,
 } from '#/web/settings-query-cache.ts'
 
-// Settings actions commit to the embedded server first. React Query is the
+// Settings actions commit to the embedded server first. TanStack Query is the
 // window-local projection of that server result, never an independent source.
 export async function recordRecentWorkspace(workspace: WorkspaceSessionEntry): Promise<void> {
   const result = await addRecentWorkspace(workspace)

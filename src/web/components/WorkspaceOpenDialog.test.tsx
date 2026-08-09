@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-import { act, waitFor } from '@testing-library/react'
+import { waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspaceOpenDialog } from '#/web/components/WorkspaceOpenDialog.tsx'
-import { AppNavigationProvider, type AppNavigationActions } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { useHostInfoStore } from '#/web/stores/host-info.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { hostInfoStore } from '#/web/stores/host-info.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceMembershipActions } from '#/web/stores/workspaces/types.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -19,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
 }))
 
-vi.mock('sonner', () => ({
+vi.mock('vue-sonner', () => ({
   toast: { error: mocks.toastError },
 }))
 
@@ -36,7 +38,7 @@ beforeEach(() => {
   // payload (runtime kind, initial server handoff). The preload
   // only exposes IPC. Host info (homeDir, platform) used to live
   // in the bootstrap; it now lives on the public `/api/host`
-  // endpoint and the client-side `useHostInfoStore` — seed
+  // endpoint and the client-side `hostInfoStore` — seed
   // that store directly so the dialog's tilde resolution and
   // platform branching work without mocking `fetch`.
   Object.defineProperty(window, '__GOBLIN_BOOTSTRAP__', {
@@ -54,7 +56,7 @@ beforeEach(() => {
     configurable: true,
     value: currentNativeBridge(),
   })
-  useHostInfoStore.setState({
+  hostInfoStore.setState({
     snapshot: { homeDir: '/Users/tester', platform: 'darwin', hostname: 'test', pid: 1 },
     status: 'ready',
     error: null,
@@ -75,7 +77,7 @@ describe('WorkspaceOpenDialog', () => {
     }))
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
-    renderAndSubmitWorkspaceOpen(openWorkspaceMembership, activateWorkspace, onOpenChange)
+    await renderAndSubmitWorkspaceOpen(openWorkspaceMembership, activateWorkspace, onOpenChange)
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
     expect(openWorkspaceMembership).toHaveBeenCalledWith('/Users/tester/Developer/repo')
@@ -94,19 +96,19 @@ describe('WorkspaceOpenDialog', () => {
     const openWorkspaceMembership = vi.fn(() => opening.promise)
     const activateWorkspace = vi.fn()
     const onOpenChange = vi.fn()
-    const { navigation, rerender } = renderAndSubmitWorkspaceOpen(
+    const { navigation, rerender } = await renderAndSubmitWorkspaceOpen(
       openWorkspaceMembership,
       activateWorkspace,
       onOpenChange,
     )
     await waitFor(() => expect(openWorkspaceMembership).toHaveBeenCalledWith('/Users/tester/Developer/repo'))
 
-    rerender(
+    await rerender(
       <AppNavigationProvider value={navigation}>
         <WorkspaceOpenDialog open={false} onOpenChange={onOpenChange} />
       </AppNavigationProvider>,
     )
-    await act(async () => {
+    await flushTestUpdates(async () => {
       opening.resolve({
         ok: true,
         workspaceId: workspaceIdForTest('goblin+file:///Users/tester/Developer/repo'),
@@ -128,7 +130,7 @@ describe('WorkspaceOpenDialog', () => {
       throw new Error('workspace activation crashed')
     })
     const onOpenChange = vi.fn()
-    renderAndSubmitWorkspaceOpen(openWorkspaceMembership, activateWorkspace, onOpenChange)
+    await renderAndSubmitWorkspaceOpen(openWorkspaceMembership, activateWorkspace, onOpenChange)
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
 
     expect(openWorkspaceMembership).toHaveBeenCalledOnce()
@@ -146,20 +148,20 @@ function navigationWith(overrides: Partial<Pick<AppNavigationActions, 'activateW
   })
 }
 
-function renderAndSubmitWorkspaceOpen(
+async function renderAndSubmitWorkspaceOpen(
   openWorkspaceMembership: WorkspaceMembershipActions['openWorkspaceMembership'],
   activateWorkspace: AppNavigationActions['activateWorkspace'],
   onOpenChange: (open: boolean) => void,
-) {
-  useWorkspacesStore.setState({ openWorkspaceMembership })
+): Promise<{ navigation: AppNavigationActions; rerender: ReturnType<typeof renderInJsdom>['rerender'] }> {
+  workspacesStore.setState({ openWorkspaceMembership })
   const navigation = navigationWith({ activateWorkspace })
   const { rerender } = renderInJsdom(
     <AppNavigationProvider value={navigation}>
       <WorkspaceOpenDialog open onOpenChange={onOpenChange} />
     </AppNavigationProvider>,
   )
-  setInputValue('#open-workspace-path', '~/Developer/repo')
-  click('button[type="submit"]')
+  await setInputValue('#open-workspace-path', '~/Developer/repo')
+  await click('button[type="submit"]')
   return { navigation, rerender }
 }
 
@@ -175,19 +177,21 @@ function button(selector: string): HTMLButtonElement {
   return element
 }
 
-function setInputValue(selector: string, value: string) {
+async function setInputValue(selector: string, value: string): Promise<void> {
+  await flushTestUpdates(() => {})
   const element = input(selector)
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')
   descriptor?.set?.call(element, value)
-  act(() => {
+  await flushTestUpdates(() => {
     element.dispatchEvent(new Event('input', { bubbles: true }))
     element.dispatchEvent(new Event('change', { bubbles: true }))
   })
 }
 
-function click(selector: string) {
+async function click(selector: string): Promise<void> {
+  await flushTestUpdates(() => {})
   const element = button(selector)
-  act(() => {
+  await flushTestUpdates(() => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
 }

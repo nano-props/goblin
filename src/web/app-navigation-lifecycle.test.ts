@@ -15,7 +15,7 @@ import { runOwnedAppNavigation } from '#/web/app-route-commit.ts'
 beforeEach(() => resetAppNavigationForTest())
 
 describe('app navigation lifecycle', () => {
-  test('captures the current generation only while it has no registered history commit owner', () => {
+  test('captures the current generation only while it has no registered history commit owner', async () => {
     const unownedGeneration = captureUnownedAppNavigationGeneration()
     expect(unownedGeneration).toBe(0)
 
@@ -51,13 +51,13 @@ describe('app navigation lifecycle', () => {
     })
   })
 
-  test('an unknown same-href PUSH supersedes the current navigation', () => {
+  test('an unknown same-href PUSH supersedes the current navigation', async () => {
     const generation = beginAppNavigation()
     observeAppHistoryNavigation({ href: '/same', state: {}, action: { type: 'PUSH' } })
     expect(appNavigationIsCurrent(generation)).toBe(false)
   })
 
-  test('treats a late PUSH from an abandoned registration as the new external presentation', () => {
+  test('treats a late PUSH from an abandoned registration as the new external presentation', async () => {
     const staleGeneration = beginAppNavigation()
     const commitEffect = vi.fn()
     const registration = registerAppNavigation(staleGeneration, '/owned', commitEffect)
@@ -196,7 +196,7 @@ describe('app navigation lifecycle', () => {
     expect(committed).toEqual(['first', 'second'])
   })
 
-  test('a current owned observation commits its effect exactly once', () => {
+  test('a current owned observation commits its effect exactly once', async () => {
     const generation = beginAppNavigation()
     const commitEffect = vi.fn()
     const registration = registerAppNavigation(generation, '/owned', commitEffect)
@@ -231,7 +231,7 @@ describe('app navigation lifecycle', () => {
     expect(secondAbandon).toHaveBeenCalledOnce()
   })
 
-  test('releasing a rejected navigation makes its later history event external', () => {
+  test('releasing a rejected navigation makes its later history event external', async () => {
     const rejectedGeneration = beginAppNavigation()
     const registration = registerAppNavigation(rejectedGeneration, '/rejected')
     if (!registration) throw new Error('missing navigation registration')
@@ -253,7 +253,7 @@ describe('app navigation lifecycle', () => {
     expect(appNavigationIsCurrent(generation)).toBe(false)
   })
 
-  test('GO supersedes at the history callback boundary', () => {
+  test('GO supersedes at the history callback boundary', async () => {
     const generation = beginAppNavigation()
     observeAppHistoryNavigation({ href: '/history', state: {}, action: { type: 'GO', index: -1 } })
     expect(appNavigationIsCurrent(generation)).toBe(false)
@@ -295,7 +295,7 @@ describe('app navigation lifecycle', () => {
     expect(abandonEffect).toHaveBeenCalledOnce()
   })
 
-  test('commits a same-target presentation without waiting for a no-op router event', () => {
+  test('commits a same-target presentation without waiting for a no-op router event', async () => {
     const commitEffect = vi.fn()
     const navigate = vi.fn(async () => {})
 
@@ -312,7 +312,7 @@ describe('app navigation lifecycle', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 
-  test('rejects a stale same-target presentation without committing', () => {
+  test('rejects a stale same-target presentation without committing', async () => {
     const staleGeneration = beginAppNavigation()
     beginAppNavigation()
     const commitEffect = vi.fn()
@@ -329,7 +329,7 @@ describe('app navigation lifecycle', () => {
     expect(commitEffect).not.toHaveBeenCalled()
   })
 
-  test('accepts a same-target commit whose effect starts the next presentation', () => {
+  test('accepts a same-target commit whose effect starts the next presentation', async () => {
     const commitEffect = vi.fn(() => {
       beginAppNavigation()
     })

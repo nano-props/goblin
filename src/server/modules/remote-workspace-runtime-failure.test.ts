@@ -57,7 +57,7 @@ describe('remote runtime failure classification', () => {
       expect(remoteWorkspaceRuntimeFailureReasonFromCommandResult(failedCommand(input))).toBe(expected)
     })
 
-    test('fails the runtime when SSH exits zero without establishing the remote command protocol', () => {
+    test('fails the runtime when SSH exits zero without establishing the remote command protocol', async () => {
       expect(
         remoteWorkspaceRuntimeFailureReasonFromCommandResult(
           failedCommand({

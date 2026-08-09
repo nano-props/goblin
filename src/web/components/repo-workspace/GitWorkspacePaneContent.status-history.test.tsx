@@ -16,21 +16,22 @@ import {
   staticEntry,
 } from '#/web/test-utils/git-workspace-pane-content.tsx'
 import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
-import { act, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/vue'
+import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { describe, expect, test, vi } from 'vitest'
-import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
+import { BranchActionSurfaceProvider } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
-import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { TerminalSessionReadScope } from '#/web/components/terminal/terminal-session-context.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresentation } from '#/web/components/repo-workspace/model.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 describe('GitWorkspacePaneContent status-history', () => {
-  test('renders the changes row with the copy patch action in the status tab when the worktree is dirty', () => {
+  test('renders the changes row with the copy patch action in the status tab when the worktree is dirty', async () => {
     const onCopyPatch = vi.fn()
     const worktreePath = '/tmp/changes-worktree'
     const repo = seedRepoWithReadModelForTest({
@@ -73,24 +74,26 @@ describe('GitWorkspacePaneContent status-history', () => {
     const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/changes')
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext
-          value={branchActionSurfaceWithCopyPatch({
-            label: 'status.copy-patch',
-            title: 'status.copy-patch-title',
-            disabled: false,
-            visible: true,
-            onSelect: onCopyPatch,
-          })}
-        >
-          <GitWorkspacePaneContent
-            repo={presentationRepo}
-            detail={detail}
-            workspacePaneId="workspace"
-            workspacePaneTabModel={workspacePaneTabModel}
-          />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+      <AppNavigationProvider value={navigationWith({})}>
+        <TerminalSessionReadScope value={emptyTerminalReadContext}>
+          <BranchActionSurfaceProvider
+            value={branchActionSurfaceWithCopyPatch({
+              label: 'status.copy-patch',
+              title: 'status.copy-patch-title',
+              disabled: false,
+              visible: true,
+              onSelect: onCopyPatch,
+            })}
+          >
+            <GitWorkspacePaneContent
+              repo={presentationRepo}
+              detail={detail}
+              workspacePaneId="workspace"
+              workspacePaneTabModel={workspacePaneTabModel}
+            />
+          </BranchActionSurfaceProvider>
+        </TerminalSessionReadScope>
+      </AppNavigationProvider>,
     )
 
     expect(container.querySelector('#workspace-status-panel')?.getAttribute('aria-busy')).toBe('true')
@@ -101,7 +104,7 @@ describe('GitWorkspacePaneContent status-history', () => {
     expect(copyButton).not.toBeNull()
     // The button is now icon-only (no visible text), mirroring CopyButton.
     expect(copyButton!.textContent?.trim()).toBe('')
-    act(() => {
+    await flushTestUpdates(() => {
       copyButton!.click()
     })
     expect(onCopyPatch).toHaveBeenCalledTimes(1)
@@ -135,8 +138,8 @@ describe('GitWorkspacePaneContent status-history', () => {
     const onCopyPatch = vi.fn().mockResolvedValue(true)
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
+        <BranchActionSurfaceProvider
           value={branchActionSurfaceWithCopyPatch({
             label: 'status.copy-patch',
             title: 'status.copy-patch-title',
@@ -150,31 +153,31 @@ describe('GitWorkspacePaneContent status-history', () => {
             detail={detail}
             workspacePaneId="workspace"
           />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+        </BranchActionSurfaceProvider>
+      </TerminalSessionReadScope>,
     )
 
     const copyButton = container.querySelector<HTMLButtonElement>('button[aria-label="status.copy-patch-title"]')!
     expect(copyButton).not.toBeNull()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       copyButton.click()
-      await vi.runOnlyPendingTimersAsync()
+      await Promise.resolve()
     })
 
     // After success, the tooltip stays open and the label flips to
-    // status.copy-patch-success. Radix renders the tooltip into a
+    // status.copy-patch-success. Reka renders the tooltip into a
     // portal under document.body, so check the whole document.
     expect(document.body.textContent).toContain('status.copy-patch-success')
 
-    act(() => {
+    await flushTestUpdates(() => {
       vi.advanceTimersByTime(1500)
     })
 
     expect(document.body.textContent).not.toContain('status.copy-patch-success')
   })
 
-  test('does not render the changes row in the status tab when the worktree is clean', () => {
+  test('does not render the changes row in the status tab when the worktree is clean', async () => {
     const worktreePath = '/tmp/clean-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -193,8 +196,8 @@ describe('GitWorkspacePaneContent status-history', () => {
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
+        <BranchActionSurfaceProvider
           value={branchActionSurfaceWithCopyPatch({
             label: 'status.copy-patch',
             title: 'status.copy-patch-title',
@@ -208,8 +211,8 @@ describe('GitWorkspacePaneContent status-history', () => {
             detail={detail}
             workspacePaneId="workspace"
           />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+        </BranchActionSurfaceProvider>
+      </TerminalSessionReadScope>,
     )
 
     expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
@@ -221,7 +224,7 @@ describe('GitWorkspacePaneContent status-history', () => {
   test('opens files from the status row as a new tab and returns to status when it closes', async () => {
     const worktreePath = '/tmp/status-links-worktree'
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
-      useWorkspacesStore.getState().setWorkspacePaneTab(repoId, branch, tab)
+      workspacesStore.getState().setWorkspacePaneTab(repoId, branch, tab)
       return true
     })
     const showRepoBranchEmptyWorkspacePane = vi.fn(() => true)
@@ -250,17 +253,16 @@ describe('GitWorkspacePaneContent status-history', () => {
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchEmptyWorkspacePane })
 
     const { container } = renderInJsdom(
-      <AppNavigationProvider value={navigation}>
-        <TerminalSessionReadContext value={emptyTerminalReadContext}>
-          <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-            <GitWorkspacePaneContentHarness
-              repo={gitWorkspacePaneProjection(repo)}
-              detail={detail}
-              workspacePaneId="workspace"
-            />
-          </BranchActionSurfaceContext>
-        </TerminalSessionReadContext>
-      </AppNavigationProvider>,
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
+        <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
+          <GitWorkspacePaneContentHarness
+            repo={gitWorkspacePaneProjection(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+            navigation={navigation}
+          />
+        </BranchActionSurfaceProvider>
+      </TerminalSessionReadScope>,
     )
 
     const pathButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
@@ -276,11 +278,13 @@ describe('GitWorkspacePaneContent status-history', () => {
       route: { kind: 'static', tab: 'status' },
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       pathButton?.click()
       await Promise.resolve()
     })
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'files')
+    await waitFor(() =>
+      expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'files'),
+    )
     expect(
       workspacePaneTabOpener(
         {
@@ -345,17 +349,16 @@ describe('GitWorkspacePaneContent status-history', () => {
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <AppNavigationProvider value={navigationWith({ showRepoBranchWorkspacePaneTab })}>
-        <TerminalSessionReadContext value={emptyTerminalReadContext}>
-          <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-            <GitWorkspacePaneContentHarness
-              repo={gitWorkspacePaneProjection(repo)}
-              detail={detail}
-              workspacePaneId="workspace"
-            />
-          </BranchActionSurfaceContext>
-        </TerminalSessionReadContext>
-      </AppNavigationProvider>,
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
+        <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
+          <GitWorkspacePaneContentHarness
+            repo={gitWorkspacePaneProjection(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+            navigation={navigationWith({ showRepoBranchWorkspacePaneTab })}
+          />
+        </BranchActionSurfaceProvider>
+      </TerminalSessionReadScope>,
     )
 
     const changesButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
@@ -371,11 +374,13 @@ describe('GitWorkspacePaneContent status-history', () => {
       route: { kind: 'static', tab: 'status' },
     })
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       changesButton?.click()
       await Promise.resolve()
     })
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'changes')
+    await waitFor(() =>
+      expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'changes'),
+    )
   })
 
   test('opens upstream refs and commit hashes from the status rows', async () => {
@@ -411,16 +416,18 @@ describe('GitWorkspacePaneContent status-history', () => {
     const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/open-links')
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <GitWorkspacePaneContent
-            repo={presentationRepo}
-            detail={detail}
-            workspacePaneId="workspace"
-            workspacePaneTabModel={workspacePaneTabModel}
-          />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+      <AppNavigationProvider value={navigationWith({})}>
+        <TerminalSessionReadScope value={emptyTerminalReadContext}>
+          <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
+            <GitWorkspacePaneContent
+              repo={presentationRepo}
+              detail={detail}
+              workspacePaneId="workspace"
+              workspacePaneTabModel={workspacePaneTabModel}
+            />
+          </BranchActionSurfaceProvider>
+        </TerminalSessionReadScope>
+      </AppNavigationProvider>,
     )
 
     const upstreamButton = container.querySelector<HTMLButtonElement>('[data-upstream-link=""]')
@@ -429,7 +436,7 @@ describe('GitWorkspacePaneContent status-history', () => {
     expect(upstreamButton).not.toBeNull()
     expect(commitButton).not.toBeNull()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       upstreamButton?.click()
       await Promise.resolve()
     })
@@ -441,7 +448,7 @@ describe('GitWorkspacePaneContent status-history', () => {
 
     repoClientMocks.openRepoUrl.mockClear()
 
-    await act(async () => {
+    await flushTestUpdates(async () => {
       commitButton?.click()
       await Promise.resolve()
     })
@@ -451,7 +458,7 @@ describe('GitWorkspacePaneContent status-history', () => {
     })
   })
 
-  test('hides the copy patch button on the changes row when copyPatchAction.visible is false', () => {
+  test('hides the copy patch button on the changes row when copyPatchAction.visible is false', async () => {
     const worktreePath = '/tmp/visibility-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -477,8 +484,8 @@ describe('GitWorkspacePaneContent status-history', () => {
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
+        <BranchActionSurfaceProvider
           value={branchActionSurfaceWithCopyPatch({
             label: 'status.copy-patch',
             title: 'status.copy-patch-title',
@@ -492,15 +499,15 @@ describe('GitWorkspacePaneContent status-history', () => {
             detail={detail}
             workspacePaneId="workspace"
           />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+        </BranchActionSurfaceProvider>
+      </TerminalSessionReadScope>,
     )
 
     expect(container.textContent).toContain('branch-status.changes-count')
     expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).toBeNull()
   })
 
-  test('renders the changes panel with status entries and tab labelling', () => {
+  test('renders the changes panel with status entries and tab labelling', async () => {
     const worktreePath = '/tmp/changes-panel-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -531,16 +538,16 @@ describe('GitWorkspacePaneContent status-history', () => {
     const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/changes-panel')
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
+        <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
           <GitWorkspacePaneContent
             repo={presentationRepo}
             detail={detail}
             workspacePaneId="workspace"
             workspacePaneTabModel={workspacePaneTabModel}
           />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+        </BranchActionSurfaceProvider>
+      </TerminalSessionReadScope>,
     )
 
     const panel = container.querySelector('#workspace-changes-panel')
@@ -553,7 +560,7 @@ describe('GitWorkspacePaneContent status-history', () => {
     expect(panel?.querySelector('[aria-label="src/beta.ts"]')).not.toBeNull()
   })
 
-  test('keeps stale changes visible and combines snapshot and status retry into one notice', () => {
+  test('keeps stale changes visible and combines snapshot and status retry into one notice', async () => {
     const worktreePath = '/tmp/stale-changes-panel-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -591,8 +598,8 @@ describe('GitWorkspacePaneContent status-history', () => {
     const onRetrySnapshot = vi.fn()
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
+        <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
           <GitWorkspacePaneContentHarness
             repo={presentationRepo}
             detail={detail}
@@ -607,18 +614,18 @@ describe('GitWorkspacePaneContent status-history', () => {
             ]}
             onRetryStatus={onRetryStatus}
           />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+        </BranchActionSurfaceProvider>
+      </TerminalSessionReadScope>,
     )
 
     expect(screen.getAllByText('status.stale-title')).toHaveLength(1)
     expect(container.querySelector('[aria-label="src/stale.ts"]')).not.toBeNull()
-    act(() => screen.getByRole('button', { name: 'error.try-again' }).click())
+    await flushTestUpdates(() => screen.getByRole('button', { name: 'error.try-again' }).click())
     expect(onRetrySnapshot).toHaveBeenCalledOnce()
     expect(onRetryStatus).toHaveBeenCalledOnce()
   })
 
-  test('renders branch status for a selected branch without a worktree', () => {
+  test('renders branch status for a selected branch without a worktree', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
@@ -637,15 +644,15 @@ describe('GitWorkspacePaneContent status-history', () => {
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
+        <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
           <GitWorkspacePaneContentHarness
             repo={gitWorkspacePaneProjection(repo)}
             detail={detail}
             workspacePaneId="workspace"
           />
-        </BranchActionSurfaceContext>
-      </TerminalSessionReadContext>,
+        </BranchActionSurfaceProvider>
+      </TerminalSessionReadScope>,
     )
 
     expect(container.querySelector('#workspace-status-panel')).not.toBeNull()
@@ -683,13 +690,13 @@ describe('GitWorkspacePaneContent status-history', () => {
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
         <GitWorkspacePaneContentHarness
           repo={gitWorkspacePaneProjection(repo)}
           detail={detail}
           workspacePaneId="workspace"
         />
-      </TerminalSessionReadContext>,
+      </TerminalSessionReadScope>,
     )
     await flushAsyncWork()
     await flushAsyncWork()
@@ -714,7 +721,7 @@ describe('GitWorkspacePaneContent status-history', () => {
     expect(mainRef).not.toBeNull()
     expect(mainRef?.getAttribute('data-history-log-ref-remotes')).toBe('origin')
     const hashButton = rows[0]?.querySelector('[data-history-log-hash=""]') as HTMLButtonElement | null
-    await act(async () => {
+    await flushTestUpdates(async () => {
       hashButton?.click()
     })
     expect(repoClientMocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, repo.workspaceRuntimeId, {
@@ -740,13 +747,13 @@ describe('GitWorkspacePaneContent status-history', () => {
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
         <GitWorkspacePaneContentHarness
           repo={gitWorkspacePaneProjection(repo)}
           detail={detail}
           workspacePaneId="workspace"
         />
-      </TerminalSessionReadContext>,
+      </TerminalSessionReadScope>,
     )
     await flushAsyncWork()
 
@@ -767,13 +774,13 @@ describe('GitWorkspacePaneContent status-history', () => {
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 
     const { container } = renderInJsdom(
-      <TerminalSessionReadContext value={emptyTerminalReadContext}>
+      <TerminalSessionReadScope value={emptyTerminalReadContext}>
         <GitWorkspacePaneContentHarness
           repo={gitWorkspacePaneProjection(repo)}
           detail={detail}
           workspacePaneId="workspace"
         />
-      </TerminalSessionReadContext>,
+      </TerminalSessionReadScope>,
     )
     await flushAsyncWork()
 

@@ -1,9 +1,11 @@
+import { computed } from 'vue'
 import { readRuntimeLanSettings, useRuntimeSettingsSnapshot } from '#/web/settings-read-projection.ts'
 import { setLanEnabled } from '#/web/settings-actions.ts'
 import { useSettingsMutation } from '#/web/settings-mutations.ts'
 
 export function useLanSettings() {
-  return readRuntimeLanSettings(useRuntimeSettingsSnapshot())
+  const snapshot = useRuntimeSettingsSnapshot()
+  return computed(() => readRuntimeLanSettings(snapshot.value))
 }
 
 export function useLanSettingsController() {

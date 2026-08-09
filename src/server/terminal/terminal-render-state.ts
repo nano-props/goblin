@@ -13,7 +13,7 @@ import {
   type TerminalControlSequenceEvent,
   type TerminalControlSequenceScannerState,
 } from '#/server/terminal/terminal-control-sequence-scanner.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 
 // Per-session render state. Recovery hydration is generated from the
 // server-side headless xterm state, so "current screen" semantics stay in
@@ -31,7 +31,7 @@ const HEADLESS_SCROLLBACK_ROWS = 10_000
 // its existing observer boundary instead of accumulating an unbounded chain.
 export const MAX_PENDING_TERMINAL_RENDER_BYTES = 16 * 1024 * 1024
 export const MAX_PENDING_TERMINAL_RENDER_ENTRIES = 16_384
-const terminalRenderStateLogger = serverLogger.child({ module: 'terminal-render-state' })
+const terminalRenderStateLogger = serverNodeLog.child({ module: 'terminal-render-state' })
 
 interface TerminalScreenWriteReservation {
   byteLength: number

@@ -13,7 +13,7 @@ export interface ErrorEnvelope {
 // The map is keyed by `string` (not `IpcErrorCode`) because transport
 // codes like PAYLOAD_TOO_LARGE (413) are not in the shared IPC
 // error enum — they only exist at the HTTP boundary.
-const HTTP_STATUS_BY_IPC_CODE: Record<string, number> = {
+export const HTTP_STATUS_BY_IPC_CODE: Record<string, number> = {
   BAD_REQUEST: 400,
   FORBIDDEN: 401,
   NOT_FOUND: 404,
@@ -40,5 +40,3 @@ export function errorJson(c: Context, code: IpcErrorCode | (string & {}), messag
   // duplicating Hono's status-code union.
   return c.json({ ok: false, code, message } as ErrorEnvelope, httpStatus as never)
 }
-
-export { HTTP_STATUS_BY_IPC_CODE }

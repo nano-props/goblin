@@ -6,7 +6,7 @@ import {
 import { encodeRemoteWorktreeBootstrapRecord } from '#/test-utils/remote-worktree-bootstrap.ts'
 
 describe('remote worktree bootstrap protocol', () => {
-  test('round-trips POSIX paths and setup commands containing newlines', () => {
+  test('round-trips POSIX paths and setup commands containing newlines', async () => {
     const path = 'config/line\nbreak.env'
     const setup = "printf 'line one\\nline two\\n'"
     const output =
@@ -18,7 +18,7 @@ describe('remote worktree bootstrap protocol', () => {
     ])
   })
 
-  test('ignores an unterminated final record while preserving complete records', () => {
+  test('ignores an unterminated final record while preserving complete records', async () => {
     const complete = encodeRemoteWorktreeBootstrapRecord('missing', 'missing.env')
     const truncated = `${REMOTE_WORKTREE_BOOTSTRAP_RECORD_TAGS.copy}\0partial-path`
 
@@ -28,7 +28,7 @@ describe('remote worktree bootstrap protocol', () => {
     expect(decodeRemoteWorktreeBootstrapRecords(truncated)).toEqual([])
   })
 
-  test('preserves a complete record when the next tag is truncated', () => {
+  test('preserves a complete record when the next tag is truncated', async () => {
     const complete = encodeRemoteWorktreeBootstrapRecord('copy', 'complete.env')
 
     expect(decodeRemoteWorktreeBootstrapRecords(`${complete}GOBLIN_BOOT`)).toEqual([

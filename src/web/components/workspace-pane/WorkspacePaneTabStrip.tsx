@@ -1,35 +1,35 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
-import { useT } from '#/web/stores/i18n.ts'
+import { computed, defineComponent, ref } from 'vue'
+import type { ComputedRef } from 'vue'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { ToolbarTabStrip } from '#/web/components/tab-strip/ToolbarTabStrip.tsx'
-import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
-import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import {
-  type WorkspacePaneTabItem,
-  isPendingWorkspacePaneTabItem,
-  isStaticWorkspacePaneTabItem,
-} from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
-import {
-  scrollWorkspacePaneTabTargetIntoView,
-  useDeferredActiveWorkspacePaneTabFocusAfterClose,
-  usePrefersReducedMotion,
-  useWorkspacePaneTabStripAutoScroll,
-  useWorkspacePaneTabStripScrollMemory,
-} from '#/web/components/workspace-pane/workspace-pane-tab-strip-mechanics.ts'
-import { useWorkspacePaneTabStripScrollMemoryController } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
-import {
-  WorkspacePaneNewButton,
-  type WorkspacePaneTabCreateAction,
-} from '#/web/components/workspace-pane/WorkspacePaneTabPresentation.tsx'
+import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
+import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import {
   WorkspacePaneCompactTabsBody,
   WorkspacePaneScrollableTabsBody,
-  type WorkspacePaneTabBodyContext,
 } from '#/web/components/workspace-pane/WorkspacePaneTabStripBodies.tsx'
+import type { WorkspacePaneTabBodyContext } from '#/web/components/workspace-pane/WorkspacePaneTabStripBodies.tsx'
+import { WorkspacePaneNewButton } from '#/web/components/workspace-pane/WorkspacePaneTabPresentation.tsx'
+import type { WorkspacePaneTabCreateAction } from '#/web/components/workspace-pane/WorkspacePaneTabPresentation.tsx'
 import {
   isSortableWorkspacePaneTabItem,
   useWorkspacePaneTabDnd,
 } from '#/web/components/workspace-pane/workspace-pane-tab-dnd.ts'
+import {
+  scrollWorkspacePaneTabTargetIntoView,
+  useDeferredActiveWorkspacePaneTabFocusAfterClose,
+  usePrefersReducedMotion,
+  useWorkspacePaneTabStripScroll,
+} from '#/web/components/workspace-pane/workspace-pane-tab-strip-mechanics.ts'
+import { useWorkspacePaneTabStripScrollMemoryController } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
+import {
+  isPendingWorkspacePaneTabItem,
+  isStaticWorkspacePaneTabItem,
+} from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
+import type { WorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
+import type { WorkspacePaneTabClosePresentationEffects } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
 
 interface WorkspacePaneTabStripProps {
   workspacePaneTabTargetKey: string
@@ -43,7 +43,7 @@ interface WorkspacePaneTabStripProps {
   createAction?: WorkspacePaneTabCreateAction | null
   onSelect: (item: WorkspacePaneTabItem) => void
   onReselect: (item: WorkspacePaneTabItem) => void
-  onClose: (item: WorkspacePaneTabItem) => void
+  onClose: (item: WorkspacePaneTabItem, presentationEffects: WorkspacePaneTabClosePresentationEffects | null) => void
   onReorder: (tabs: WorkspacePaneTabEntry[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
   activateKeyboardNavigationSelection?: boolean
@@ -51,169 +51,149 @@ interface WorkspacePaneTabStripProps {
 
 export const EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY = '__workspace-pane-empty__'
 
-export function WorkspacePaneTabStrip({
-  workspacePaneTabTargetKey,
-  items,
-  workspacePaneId,
-  activeTabIdentity,
-  responsiveCompact,
-  panelActive,
-  focusRegistry: externalFocusRegistry,
-  emptyFocusKey = EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY,
-  createAction = null,
-  onSelect,
-  onReselect,
-  onClose,
-  onReorder,
-  onNavigateOut,
-  activateKeyboardNavigationSelection = false,
-}: WorkspacePaneTabStripProps) {
-  const t = useT()
-  const sortableItems = useMemo(() => items.filter(isSortableWorkspacePaneTabItem), [items])
-  const showCollapsedTabs = !!responsiveCompact
-  const activeItem = activeTabIdentity ? (items.find((item) => item.identity === activeTabIdentity) ?? null) : null
-  const compactPendingItem = showCollapsedTabs ? (items.find(isPendingWorkspacePaneTabItem) ?? null) : null
-  const selectedItem = activeItem ?? compactPendingItem
-  // Compact mode is a structural choice — driven by screen size, not data.
-  // Decoupling it from `selectedItem` means the strip never falls through to
-  // the scrollable layout when there is no active tab; the compact body
-  // handles that case itself (empty tab area + popover switcher).
-  const collapseToSelectedTab = showCollapsedTabs
-  const focusableTabIdentity = selectedItem?.identity ?? items[0]?.identity ?? null
-  const internalFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
-  const focusRegistry = externalFocusRegistry ?? internalFocusRegistry
-  const viewportRef = useRef<HTMLDivElement>(null)
-  const newButtonRef = useRef<HTMLButtonElement>(null)
-  const scrollMemory = useWorkspacePaneTabStripScrollMemoryController()
-  const hasRememberedScrollPosition = scrollMemory.read(workspacePaneTabTargetKey) !== undefined
-  const prefersReducedMotion = usePrefersReducedMotion()
-  const scrollBehavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth'
-  const [hoveredTabIdentity, setHoveredTabIdentity] = useState<string | null>(null)
-  const focusActiveTabAfterClose = useDeferredActiveWorkspacePaneTabFocusAfterClose({
-    activeTabIdentity,
-    items,
-    focusRegistry,
-  })
-  const tabDnd = useWorkspacePaneTabDnd({
-    sortableItems,
-    newButtonRef,
-    disabled: !!createAction?.blocksTabInteraction,
-    onReorder,
-  })
-  const scrollNewButtonIntoView = useCallback(() => {
-    const viewport = viewportRef.current
-    const target = newButtonRef.current
-    if (!viewport || !target) return
-    scrollWorkspacePaneTabTargetIntoView({
-      viewport,
-      target,
-      behavior: scrollBehavior,
+export const WorkspacePaneTabStrip = defineComponent(
+  (props: WorkspacePaneTabStripProps) => {
+    const t = useT()
+    const sortableItems = computed(() => props.items.filter(isSortableWorkspacePaneTabItem))
+    const activeItem = computed(() =>
+      props.activeTabIdentity ? (props.items.find((item) => item.identity === props.activeTabIdentity) ?? null) : null,
+    )
+    const compactPendingItem = computed(() =>
+      props.responsiveCompact ? (props.items.find(isPendingWorkspacePaneTabItem) ?? null) : null,
+    )
+    const selectedItem = computed(() => activeItem.value ?? compactPendingItem.value)
+    const collapseToSelectedTab = computed(() => !!props.responsiveCompact)
+    const focusableTabIdentity = computed(() => selectedItem.value?.identity ?? props.items[0]?.identity ?? null)
+    const internalFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
+    const focusRegistry = props.focusRegistry ?? internalFocusRegistry
+    const viewportRef = ref<HTMLDivElement | null>(null)
+    const newButtonRef = ref<HTMLButtonElement | null>(null)
+    const scrollMemory = useWorkspacePaneTabStripScrollMemoryController()
+    const prefersReducedMotion = usePrefersReducedMotion()
+    const scrollBehavior: ComputedRef<ScrollBehavior> = computed(() => (prefersReducedMotion.value ? 'auto' : 'smooth'))
+    const hoveredTabIdentity = ref<string | null>(null)
+    const focusActiveTabAfterClose = useDeferredActiveWorkspacePaneTabFocusAfterClose({
+      workspacePaneTabTargetKey: () => props.workspacePaneTabTargetKey,
+      activeTabIdentity: () => props.activeTabIdentity,
+      items: () => props.items,
+      focusRegistry,
     })
-  }, [scrollBehavior])
-  const handleNew = useCallback(() => {
-    if (!createAction || createAction.busy) return
-    scrollNewButtonIntoView()
-    createAction.onCreate()
-  }, [createAction, scrollNewButtonIntoView])
-  const renderCreateAction = createAction
-    ? {
-        label: createAction.label,
-        busy: createAction.busy ?? false,
-        blocksTabInteraction: createAction.blocksTabInteraction ?? false,
-        onCreate: handleNew,
+    const tabDnd = useWorkspacePaneTabDnd({
+      sortableItems: () => sortableItems.value,
+      disabled: () => !!props.createAction?.blocksTabInteraction,
+      viewport: () => viewportRef.value,
+      rightBoundary: () => newButtonRef.value,
+      onReorder: (tabs) => props.onReorder(tabs),
+    })
+
+    const scrollNewButtonIntoView = () => {
+      const viewport = viewportRef.value
+      const target = newButtonRef.value
+      if (!viewport || !target) return
+      scrollWorkspacePaneTabTargetIntoView({ viewport, target, behavior: scrollBehavior.value })
+    }
+
+    const handleNew = () => {
+      const createAction = props.createAction
+      if (!createAction || createAction.busy) return
+      scrollNewButtonIntoView()
+      createAction.onCreate()
+    }
+
+    const renderCreateAction = computed<WorkspacePaneTabCreateAction | null>(() =>
+      props.createAction
+        ? {
+            label: props.createAction.label,
+            busy: props.createAction.busy ?? false,
+            blocksTabInteraction: props.createAction.blocksTabInteraction ?? false,
+            onCreate: handleNew,
+          }
+        : null,
+    )
+    const tabInteractionBlocked = computed(() => renderCreateAction.value?.blocksTabInteraction ?? false)
+
+    const handleViewportScroll = useWorkspacePaneTabStripScroll({
+      workspacePaneTabTargetKey: () => props.workspacePaneTabTargetKey,
+      activeTabIdentity: () => props.activeTabIdentity,
+      items: () => props.items,
+      enabled: () => !collapseToSelectedTab.value,
+      viewportRef,
+      newButtonRef,
+      scrollBehavior: () => scrollBehavior.value,
+      getTabElement: focusRegistry.getRef,
+      memory: scrollMemory,
+    })
+
+    const handleSelect = (identity: string) => {
+      const item = props.items.find((candidate) => candidate.identity === identity)
+      if (tabInteractionBlocked.value || !item || isPendingWorkspacePaneTabItem(item)) return
+      if (item.identity === props.activeTabIdentity && props.panelActive) props.onReselect(item)
+      else props.onSelect(item)
+    }
+
+    const handleClose = (identity: string) => {
+      if (tabInteractionBlocked.value) return
+
+      const item = props.items.find((candidate) => candidate.identity === identity)
+      if (!item || isPendingWorkspacePaneTabItem(item)) return
+      const isActive = item.identity === props.activeTabIdentity
+      const tab = focusRegistry.getRef(identity)
+      const focusedElement = document.activeElement
+      const closingTabOwnsFocus = !!tab && !!focusedElement && (tab === focusedElement || tab.contains(focusedElement))
+
+      hoveredTabIdentity.value = null
+      const presentationEffects = isActive || closingTabOwnsFocus ? focusActiveTabAfterClose(identity) : null
+      try {
+        props.onClose(item, presentationEffects)
+      } catch (error) {
+        presentationEffects?.onAbandon()
+        throw error
       }
-    : null
-  const tabInteractionBlocked = renderCreateAction?.blocksTabInteraction ?? false
-  const handleViewportScroll = useWorkspacePaneTabStripScrollMemory({
-    workspacePaneTabTargetKey,
-    enabled: !collapseToSelectedTab,
-    viewportRef,
-    memory: scrollMemory,
-  })
+    }
 
-  useWorkspacePaneTabStripAutoScroll({
-    workspacePaneTabTargetKey,
-    activeTabIdentity,
-    items,
-    enabled: !collapseToSelectedTab,
-    viewportRef,
-    newButtonRef,
-    scrollBehavior,
-    getTabElement: focusRegistry.getRef,
-    hasRememberedScrollPosition,
-  })
-
-  const handleSelect = useCallback(
-    (identity: string) => {
-      const item = items.find((candidate) => candidate.identity === identity)
-      if (tabInteractionBlocked) return
-      if (!item) return
-      if (isPendingWorkspacePaneTabItem(item)) return
-      if (item.identity === activeTabIdentity && panelActive) onReselect(item)
-      else onSelect(item)
-    },
-    [activeTabIdentity, items, onReselect, onSelect, panelActive, tabInteractionBlocked],
-  )
-
-  const handleClose = useCallback(
-    (event: React.MouseEvent, identity: string) => {
-      event.preventDefault()
-      event.stopPropagation()
-      if (tabInteractionBlocked) return
-
-      const item = items.find((candidate) => candidate.identity === identity)
-      if (!item) return
-      if (isPendingWorkspacePaneTabItem(item)) return
-      const isActive = item.identity === activeTabIdentity
-
-      setHoveredTabIdentity(null)
-      if (isActive) focusActiveTabAfterClose(identity)
-      onClose(item)
-    },
-    [activeTabIdentity, focusActiveTabAfterClose, items, onClose, tabInteractionBlocked],
-  )
-
-  const tabIdForItem = useCallback(
-    (item: WorkspacePaneTabItem) => {
+    const tabIdForItem = (item: WorkspacePaneTabItem): string => {
       if (isStaticWorkspacePaneTabItem(item)) {
-        return workspacePaneStaticTabProvider(item.staticTabType).buttonId(workspacePaneId)
+        return workspacePaneStaticTabProvider(item.staticTabType).buttonId(props.workspacePaneId)
       }
-      if (isPendingWorkspacePaneTabItem(item)) return `${workspacePaneId}-${item.type}-pending-tab`
-      const runtimeItems = items.filter(
+      if (isPendingWorkspacePaneTabItem(item)) return `${props.workspacePaneId}-${item.type}-pending-tab`
+      const runtimeItems = props.items.filter(
         (candidate) => candidate.kind === 'runtime' && candidate.runtimeType === item.runtimeType,
       )
       const index = runtimeItems.findIndex((candidate) => candidate.identity === item.identity)
-      return workspacePaneRuntimeTabProvider(item.runtimeType).buttonId(workspacePaneId, Math.max(0, index))
-    },
-    [workspacePaneId, items],
-  )
+      return workspacePaneRuntimeTabProvider(item.runtimeType).buttonId(props.workspacePaneId, Math.max(0, index))
+    }
 
-  const activateKeyboardNavigationTarget = useCallback(
-    (fromIdentity: string, toIdentity: string) => {
-      const to = items.find((item) => item.identity === toIdentity)
-      if (tabInteractionBlocked) return
-      if (!activateKeyboardNavigationSelection || fromIdentity === toIdentity || !to) return
+    const activateKeyboardNavigationTarget = (fromIdentity: string, toIdentity: string) => {
+      const to = props.items.find((item) => item.identity === toIdentity)
+      if (tabInteractionBlocked.value) return
+      if (!props.activateKeyboardNavigationSelection || fromIdentity === toIdentity || !to) return
       if (isPendingWorkspacePaneTabItem(to)) return
-      onSelect(to)
-    },
-    [activateKeyboardNavigationSelection, items, onSelect, tabInteractionBlocked],
-  )
+      props.onSelect(to)
+    }
 
-  const handleTabKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLButtonElement>, tabIdentity: string) => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Home' && e.key !== 'End') return
-      e.preventDefault()
-      if (tabInteractionBlocked) return
-      const keys = items.filter((item) => !isPendingWorkspacePaneTabItem(item)).map((item) => item.identity)
-      const idx = keys.indexOf(tabIdentity)
-      if (idx === -1) return
-      if (collapseToSelectedTab) {
-        if (e.key === 'ArrowLeft') onNavigateOut?.('prev')
-        else if (e.key === 'ArrowRight') onNavigateOut?.('next')
+    const handleTabKeyDown = (event: KeyboardEvent, tabIdentity: string) => {
+      if (event.key === 'Delete') {
+        const item = props.items.find((candidate) => candidate.identity === tabIdentity)
+        if (!item || isPendingWorkspacePaneTabItem(item) || item.closable === false) return
+        event.preventDefault()
+        handleClose(tabIdentity)
+        return
+      }
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') {
+        return
+      }
+      event.preventDefault()
+      if (tabInteractionBlocked.value) return
+      const keys = props.items.filter((item) => !isPendingWorkspacePaneTabItem(item)).map((item) => item.identity)
+      const index = keys.indexOf(tabIdentity)
+      if (index === -1) return
+      if (collapseToSelectedTab.value) {
+        if (event.key === 'ArrowLeft') props.onNavigateOut?.('prev')
+        else if (event.key === 'ArrowRight') props.onNavigateOut?.('next')
         else focusRegistry.focus(tabIdentity)
         return
       }
-      if (e.key === 'Home') {
+      if (event.key === 'Home') {
         const firstKey = keys[0]
         if (firstKey) {
           focusRegistry.focus(firstKey)
@@ -221,7 +201,7 @@ export function WorkspacePaneTabStrip({
         }
         return
       }
-      if (e.key === 'End') {
+      if (event.key === 'End') {
         const lastKey = keys[keys.length - 1]
         if (lastKey) {
           focusRegistry.focus(lastKey)
@@ -229,81 +209,96 @@ export function WorkspacePaneTabStrip({
         }
         return
       }
-      if (e.key === 'ArrowLeft' && idx === 0) {
-        onNavigateOut?.('prev')
-        if (onNavigateOut) return
+      if (event.key === 'ArrowLeft' && index === 0) {
+        props.onNavigateOut?.('prev')
+        if (props.onNavigateOut) return
       }
-      if (e.key === 'ArrowRight' && idx === keys.length - 1) {
-        onNavigateOut?.('next')
-        if (onNavigateOut) return
+      if (event.key === 'ArrowRight' && index === keys.length - 1) {
+        props.onNavigateOut?.('next')
+        if (props.onNavigateOut) return
       }
-      const nextIdx = e.key === 'ArrowLeft' ? (idx - 1 + keys.length) % keys.length : (idx + 1) % keys.length
-      const nextKey = keys[nextIdx]
+      const nextIndex = event.key === 'ArrowLeft' ? (index - 1 + keys.length) % keys.length : (index + 1) % keys.length
+      const nextKey = keys[nextIndex]
       if (nextKey) {
         focusRegistry.focus(nextKey)
         activateKeyboardNavigationTarget(tabIdentity, nextKey)
       }
-    },
-    [
-      activateKeyboardNavigationTarget,
-      collapseToSelectedTab,
-      focusRegistry,
-      items,
-      onNavigateOut,
-      tabInteractionBlocked,
+    }
+
+    return () => {
+      const createAction = renderCreateAction.value
+      if (props.items.length === 0) {
+        if (!createAction) return null
+        return (
+          <WorkspacePaneNewButton
+            buttonRef={focusRegistry.setRef(props.emptyFocusKey ?? EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY)}
+            id={`${props.workspacePaneId}-workspace-pane-tab-empty`}
+            action={createAction}
+          />
+        )
+      }
+
+      const tabBodyContext: WorkspacePaneTabBodyContext = {
+        activeTabIdentity: props.activeTabIdentity,
+        panelActive: props.panelActive,
+        focusableTabIdentity: focusableTabIdentity.value,
+        focusRegistry,
+        hoveredTabIdentity: hoveredTabIdentity.value,
+        tabIdForItem,
+        onHoverChange: (identity) => (hoveredTabIdentity.value = identity),
+        onSelect: handleSelect,
+        onClose: handleClose,
+        onKeyDown: handleTabKeyDown,
+        t,
+        tabInteractionBlocked: tabInteractionBlocked.value,
+      }
+
+      return (
+        <ToolbarTabStrip
+          compact={collapseToSelectedTab.value}
+          compactContent={
+            <WorkspacePaneCompactTabsBody
+              items={props.items}
+              compactItem={selectedItem.value}
+              workspacePaneId={props.workspacePaneId}
+              context={tabBodyContext}
+              createAction={createAction}
+            />
+          }
+          scrollContent={
+            <WorkspacePaneScrollableTabsBody
+              items={props.items}
+              context={tabBodyContext}
+              createAction={createAction}
+              newButtonRef={newButtonRef}
+              workspacePaneId={props.workspacePaneId}
+              dnd={tabDnd}
+            />
+          }
+          viewportRef={viewportRef}
+          viewportOnScroll={handleViewportScroll}
+        />
+      )
+    }
+  },
+  {
+    name: 'WorkspacePaneTabStrip',
+    props: [
+      'workspacePaneTabTargetKey',
+      'items',
+      'workspacePaneId',
+      'responsiveCompact',
+      'activeTabIdentity',
+      'panelActive',
+      'focusRegistry',
+      'emptyFocusKey',
+      'createAction',
+      'onSelect',
+      'onReselect',
+      'onClose',
+      'onReorder',
+      'onNavigateOut',
+      'activateKeyboardNavigationSelection',
     ],
-  )
-
-  const tabBodyContext: WorkspacePaneTabBodyContext = {
-    activeTabIdentity,
-    panelActive,
-    focusableTabIdentity,
-    focusRegistry,
-    hoveredTabIdentity,
-    tabIdForItem,
-    onHoverChange: setHoveredTabIdentity,
-    onSelect: handleSelect,
-    onClose: handleClose,
-    onKeyDown: handleTabKeyDown,
-    t,
-    tabInteractionBlocked,
-  }
-
-  if (items.length === 0) {
-    if (!renderCreateAction) return null
-    return (
-      <WorkspacePaneNewButton
-        ref={focusRegistry.setRef(emptyFocusKey)}
-        id={`${workspacePaneId}-workspace-pane-tab-empty`}
-        action={renderCreateAction}
-      />
-    )
-  }
-
-  return (
-    <ToolbarTabStrip
-      compact={collapseToSelectedTab}
-      compactContent={
-        <WorkspacePaneCompactTabsBody
-          items={items}
-          compactItem={selectedItem}
-          workspacePaneId={workspacePaneId}
-          context={tabBodyContext}
-          createAction={renderCreateAction}
-        />
-      }
-      scrollContent={
-        <WorkspacePaneScrollableTabsBody
-          items={items}
-          context={tabBodyContext}
-          createAction={renderCreateAction}
-          newButtonRef={newButtonRef}
-          workspacePaneId={workspacePaneId}
-          dnd={tabDnd}
-        />
-      }
-      viewportRef={viewportRef}
-      viewportOnScroll={handleViewportScroll}
-    />
-  )
-}
+  },
+)

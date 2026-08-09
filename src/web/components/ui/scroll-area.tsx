@@ -1,87 +1,105 @@
-import type { ComponentProps, Ref, UIEventHandler } from 'react'
-import { ScrollArea as ScrollAreaPrimitive } from 'radix-ui'
+import { ScrollAreaCorner, ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
+import type { ScrollAreaRootProps, ScrollAreaScrollbarProps } from 'reka-ui'
+import type { FunctionalComponent, HTMLAttributes, Ref } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
-type Orientation = 'vertical' | 'horizontal' | 'both'
-// 'compact' omits the 11×11 transparent hit-target applied in the
-// 'default' mode; use it for popovers and short lists where the
-// scrollbar should feel lighter, and 'default' for persistent panes
-// that the user scrolls often.
-type ScrollbarMode = 'default' | 'compact'
 
-interface ScrollAreaProps extends ComponentProps<typeof ScrollAreaPrimitive.Root> {
-  orientation?: Orientation
-  scrollbarMode?: ScrollbarMode
-  className?: string
-  viewportClassName?: string
-  viewportRef?: Ref<HTMLDivElement>
-  viewportOnScroll?: UIEventHandler<HTMLDivElement>
+type Orientation = 'vertical' | 'horizontal' | 'both'
+type ScrollbarMode = 'default' | 'compact'
+type ViewportRef = Ref<HTMLDivElement | null> | ((element: HTMLDivElement | null) => void)
+
+type ScrollAreaProps = Omit<ScrollAreaRootProps, 'class'> &
+  HTMLAttributes & {
+    orientation?: Orientation
+    scrollbarMode?: ScrollbarMode
+    viewportClass?: HTMLAttributes['class']
+    viewportRef?: ViewportRef
+    viewportOnScroll?: (event: Event) => void
+  }
+
+interface ViewportComponentRef {
+  $el?: Element
+  viewportElement?: HTMLElement
 }
 
-export function ScrollArea({
-  className,
-  viewportClassName,
-  viewportRef,
-  viewportOnScroll,
-  children,
-  orientation = 'vertical',
-  scrollbarMode = 'default',
-  type = 'hover',
-  scrollHideDelay = 800,
-  ref,
-  ...props
-}: ScrollAreaProps) {
+function assignViewportRef(target: ViewportRef | undefined, component: unknown): void {
+  if (!target) return
+  const exposed = component as ViewportComponentRef | null
+  const element =
+    exposed?.viewportElement instanceof HTMLDivElement
+      ? exposed.viewportElement
+      : exposed?.$el instanceof HTMLDivElement
+        ? exposed.$el
+        : null
+
+  if (typeof target === 'function') target(element)
+  else target.value = element
+}
+
+export const ScrollArea: FunctionalComponent<ScrollAreaProps> = (props, { slots }) => {
+  const {
+    class: classValue,
+    orientation = 'vertical',
+    scrollbarMode = 'default',
+    scrollHideDelay = 800,
+    type = 'hover',
+    viewportClass,
+    viewportOnScroll,
+    viewportRef,
+    ...rootProps
+  } = props
+  const viewportAttributes: HTMLAttributes = {
+    onScroll: viewportOnScroll,
+    class: cn(
+      'min-h-0 w-full flex-1',
+      orientation !== 'horizontal' && '[&>div]:!block [&>div]:!min-w-0 [&>div]:!w-full',
+      viewportClass,
+    ),
+  }
+
   return (
-    <ScrollAreaPrimitive.Root
-      ref={ref}
+    <ScrollAreaRoot
+      {...rootProps}
       type={type}
       scrollHideDelay={scrollHideDelay}
       data-scrollbar-mode={scrollbarMode}
-      className={cn('relative overflow-hidden flex flex-col', className)}
-      {...props}
+      class={cn('relative flex flex-col overflow-hidden', classValue)}
     >
-      <ScrollAreaPrimitive.Viewport
-        ref={viewportRef}
-        onScroll={viewportOnScroll}
-        className={cn(
-          'flex-1 min-h-0 w-full',
-          orientation !== 'horizontal' && '[&>div]:!block [&>div]:!min-w-0 [&>div]:!w-full',
-          viewportClassName,
-        )}
-      >
-        {children}
-      </ScrollAreaPrimitive.Viewport>
-      {(orientation === 'vertical' || orientation === 'both') && (
+      <ScrollAreaViewport {...viewportAttributes} ref={(component) => assignViewportRef(viewportRef, component)}>
+        {slots.default?.()}
+      </ScrollAreaViewport>
+      {orientation === 'vertical' || orientation === 'both' ? (
         <ScrollBar orientation="vertical" mode={scrollbarMode} />
-      )}
-      {(orientation === 'horizontal' || orientation === 'both') && (
+      ) : null}
+      {orientation === 'horizontal' || orientation === 'both' ? (
         <ScrollBar orientation="horizontal" mode={scrollbarMode} />
-      )}
-      <ScrollAreaPrimitive.Corner className="bg-transparent" />
-    </ScrollAreaPrimitive.Root>
+      ) : null}
+      <ScrollAreaCorner class="bg-transparent" />
+    </ScrollAreaRoot>
   )
 }
+ScrollArea.inheritAttrs = false
 
-interface ScrollBarProps extends ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar> {
-  orientation?: 'vertical' | 'horizontal'
-  mode?: ScrollbarMode
-}
+type ScrollBarProps = Omit<ScrollAreaScrollbarProps, 'class'> &
+  HTMLAttributes & {
+    mode?: ScrollbarMode
+  }
 
-function ScrollBar({ className, orientation = 'vertical', mode = 'default', ref, ...props }: ScrollBarProps) {
+const ScrollBar: FunctionalComponent<ScrollBarProps> = (props, { slots }) => {
+  const { class: classValue, mode = 'default', orientation = 'vertical', ...scrollbarProps } = props
   return (
-    <ScrollAreaPrimitive.Scrollbar
-      ref={ref}
+    <ScrollAreaScrollbar
+      {...scrollbarProps}
       orientation={orientation}
       data-title-bar-chrome-region="no-drag"
-      className={cn(
+      class={cn(
         'flex touch-none select-none p-0.5 opacity-0 transition-opacity duration-200 ease-out data-[state=visible]:opacity-100',
         orientation === 'vertical' && 'h-full w-2 border-l border-l-transparent',
         orientation === 'horizontal' && 'h-2 w-full flex-col border-t border-t-transparent',
-        className,
+        classValue,
       )}
-      {...props}
     >
-      <ScrollAreaPrimitive.Thumb
-        className={cn(
+      <ScrollAreaThumb
+        class={cn(
           'relative flex-1 rounded-full bg-muted-foreground/40 transition-[background-color,width,height] duration-150 ease-out hover:bg-muted-foreground/70 active:bg-muted-foreground/80',
           orientation === 'vertical' && 'mx-auto w-1 hover:w-1.5',
           orientation === 'horizontal' && 'my-auto h-1 hover:h-1.5',
@@ -89,6 +107,10 @@ function ScrollBar({ className, orientation = 'vertical', mode = 'default', ref,
             'before:absolute before:left-1/2 before:top-1/2 before:min-h-11 before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
         )}
       />
-    </ScrollAreaPrimitive.Scrollbar>
+      {slots.default?.()}
+    </ScrollAreaScrollbar>
   )
 }
+ScrollBar.inheritAttrs = false
+
+export type { Orientation as ScrollAreaOrientation, ScrollAreaProps, ScrollbarMode }

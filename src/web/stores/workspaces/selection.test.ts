@@ -7,7 +7,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type {
   WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
@@ -19,7 +19,7 @@ import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import type { BranchSnapshotInfo } from '#/web/types.ts'
+import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -71,7 +71,7 @@ function seedRepo(options: {
 
 function seedRepoShellWithoutBranchReadModel(): void {
   const repo = emptyWorkspace(REPO_ID, 'repo-runtime-selection-no-query')
-  useWorkspacesStore.setState((s) => ({
+  workspacesStore.setState((s) => ({
     workspaces: { ...s.workspaces, [REPO_ID]: repo },
     workspaceOrder: [...s.workspaceOrder, REPO_ID],
     restoredWorkspaceId: REPO_ID,
@@ -79,7 +79,7 @@ function seedRepoShellWithoutBranchReadModel(): void {
 }
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+  const repo = workspacesStore.getState().workspaces[REPO_ID]
   const branchModel = repo ? repoPresentationFromQueryForTest(repo).snapshot : null
   const target =
     repo && branchModel
@@ -91,7 +91,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 }
 
 function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | null {
-  const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
+  const repo = workspacesStore.getState().workspaces[REPO_ID]
   const branchModel = repo ? repoPresentationFromQueryForTest(repo).snapshot : null
   return repo
     ? preferredWorkspacePaneTabForTarget(
@@ -122,44 +122,44 @@ beforeEach(() => {
 })
 
 describe('setBranchViewMode', () => {
-  test('resetWorkspacesStore clears the persisted view mode map', () => {
+  test('resetWorkspacesStore clears the persisted view mode map', async () => {
     seedRepo({ currentBranchName: 'feature/plain' })
-    useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+    workspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     resetWorkspacesStore()
 
-    expect(useWorkspacesStore.getState().branchViewModeByWorkspace).toEqual({})
+    expect(workspacesStore.getState().branchViewModeByWorkspace).toEqual({})
   })
 
-  test('sets branch view mode for the workspace', () => {
+  test('sets branch view mode for the workspace', async () => {
     seedRepo({ currentBranchName: 'feature/plain' })
 
-    useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+    workspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
-    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
+    expect(workspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
   })
 
-  test('keeps the selected branch when it remains visible', () => {
+  test('keeps the selected branch when it remains visible', async () => {
     seedRepo({ currentBranch: 'feature/worktree', currentBranchName: 'feature/worktree' })
 
-    useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+    workspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
+    const repo = workspacesStore.getState().workspaces[REPO_ID]
+    expect(workspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
     expect(repoPresentationFromQueryForTest(repo!).snapshot.current).toBe('feature/worktree')
   })
 
-  test('keeps the selected branch when the new view mode has no visible branches', () => {
+  test('keeps the selected branch when the new view mode has no visible branches', async () => {
     seedRepo({ currentBranchName: 'main', branches: [branch('main')] })
 
-    useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+    workspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
-    const repo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
+    const repo = workspacesStore.getState().workspaces[REPO_ID]
+    expect(workspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
     expect(repoPresentationFromQueryForTest(repo!).snapshot.current).toBe('main')
   })
 
-  test('changes branch view mode without mutating the React Query snapshot', () => {
+  test('changes branch view mode without mutating the TanStack Query snapshot', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [],
@@ -173,17 +173,17 @@ describe('setBranchViewMode', () => {
       currentBranch: 'main',
     })
 
-    useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+    workspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
-    const updatedRepo = useWorkspacesStore.getState().workspaces[REPO_ID]
-    expect(useWorkspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
+    const updatedRepo = workspacesStore.getState().workspaces[REPO_ID]
+    expect(workspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
     expect(repoPresentationFromQueryForTest(updatedRepo!).snapshot.current).toBe('main')
     expect(
       repoPresentationFromQueryForTest(updatedRepo!).snapshot.branches.map((repoBranch) => repoBranch.name),
     ).toEqual(['main', 'feature/plain'])
   })
 
-  test('keeps the hidden repo workspace pane selection on that branch', () => {
+  test('keeps the hidden repo workspace pane selection on that branch', async () => {
     seedRepo({
       currentBranchName: 'feature/plain',
       preferredWorkspacePaneTab: 'terminal',
@@ -193,7 +193,7 @@ describe('setBranchViewMode', () => {
       ],
     })
 
-    useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+    workspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     expect(preferredTabFor('feature/plain')).toBe('terminal')
     expect(preferredTabFor('main')).toBe('status')
@@ -201,30 +201,30 @@ describe('setBranchViewMode', () => {
 })
 
 describe('setWorkspacePaneTab', () => {
-  test('fails when the repo branch snapshot is unavailable', () => {
+  test('fails when the repo branch snapshot is unavailable', async () => {
     seedRepoShellWithoutBranchReadModel()
 
-    expect(() => useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/plain', 'changes')).toThrow(
+    expect(() => workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/plain', 'changes')).toThrow(
       'repository snapshot query data unavailable for workspace',
     )
   })
 
-  test('persists the selected workspace pane tab immediately', () => {
+  test('persists the selected workspace pane tab immediately', async () => {
     seedRepo({ currentBranchName: 'feature/worktree', preferredWorkspacePaneTab: 'status' })
 
-    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/worktree', 'terminal')
+    workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/worktree', 'terminal')
 
     expect(preferredTabFor('feature/worktree')).toBe('terminal')
   })
 
-  test('does not refresh when reselecting the current workspace pane tab', () => {
+  test('does not refresh when reselecting the current workspace pane tab', async () => {
     seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'status' })
-    const before = useWorkspacesStore.getState().workspaces[REPO_ID]
-    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'status')
-    expect(useWorkspacesStore.getState().workspaces[REPO_ID]).toBe(before)
+    const before = workspacesStore.getState().workspaces[REPO_ID]
+    workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'status')
+    expect(workspacesStore.getState().workspaces[REPO_ID]).toBe(before)
   })
 
-  test('uses the React Query snapshot to resolve workspace pane tab targets', () => {
+  test('uses the TanStack Query snapshot to resolve workspace pane tab targets', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [],
@@ -238,16 +238,16 @@ describe('setWorkspacePaneTab', () => {
       currentBranch: 'feature/query',
     })
 
-    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/query', 'changes')
+    workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/query', 'changes')
 
     expect(
-      useWorkspacesStore.getState().workspaces[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[
+      workspacesStore.getState().workspaces[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[
         worktreeTargetKey('/tmp/query-worktree')
       ],
     ).toBe('changes')
   })
 
-  test('restores a session-preferred files tab when its static tab is open', () => {
+  test('restores a session-preferred files tab when its static tab is open', async () => {
     seedRepo({
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'files',
@@ -258,28 +258,28 @@ describe('setWorkspacePaneTab', () => {
     expect(openTabsFor('main')).toEqual(['status', 'files'])
   })
 
-  test('files is a worktree-scoped static tab and lives in the worktree-only bucket', () => {
+  test('files is a worktree-scoped static tab and lives in the worktree-only bucket', async () => {
     expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toContain('files')
   })
 
-  test('keeps selected workspace pane tabs isolated by branch', () => {
+  test('keeps selected workspace pane tabs isolated by branch', async () => {
     seedRepo({ currentBranchName: 'feature/plain' })
 
-    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/plain', 'history')
+    workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/plain', 'history')
 
     expect(preferredTabFor('feature/plain')).toBe('history')
     expect(preferredTabFor('main')).toBe('status')
 
-    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'changes')
+    workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'changes')
 
     expect(preferredTabFor('main')).toBe('changes')
     expect(preferredTabFor('feature/plain')).toBe('history')
   })
 
-  test('persists an intentional empty workspace pane preference', () => {
+  test('persists an intentional empty workspace pane preference', async () => {
     seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'status' })
 
-    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'main', null)
+    workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'main', null)
 
     expect(preferredTabFor('main')).toBeNull()
   })
@@ -287,37 +287,37 @@ describe('setWorkspacePaneTab', () => {
   test('persists the changes tab immediately', async () => {
     seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'status' })
 
-    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'changes')
+    workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'changes')
     await flushAsyncWork()
 
     expect(preferredTabFor('main')).toBe('changes')
   })
 
-  test('keeps workspace pane tab selection as a UI preference write', () => {
+  test('keeps workspace pane tab selection as a UI preference write', async () => {
     seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'terminal' })
 
-    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'status')
+    workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'status')
 
     expect(preferredTabFor('main')).toBe('status')
   })
 
-  test('sets the terminal preference regardless of worktree presence', () => {
+  test('sets the terminal preference regardless of worktree presence', async () => {
     // setWorkspacePaneTab is a pure preference write. Whether `terminal` is
     // *renderable* is decided at read time from the active branch worktree,
     // terminal session count, and opened workspace pane tabs.
     seedRepo({ currentBranchName: 'feature/plain', preferredWorkspacePaneTab: 'status' })
 
-    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/plain', 'terminal')
+    workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/plain', 'terminal')
 
     expect(preferredTabFor('feature/plain')).toBe('terminal')
   })
 
-  test('preserves the terminal preference even when no worktree exists for the active branch', () => {
+  test('preserves the terminal preference even when no worktree exists for the active branch', async () => {
     // Previously the store would re-project to `status` here. With the
     // derived-value pattern the preference is preserved; the UI hook
     // returns `status` for the rendered tab.
     seedRepo({ currentBranchName: 'feature/plain', preferredWorkspacePaneTab: 'terminal' })
-    useWorkspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/plain', 'terminal')
+    workspacesStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/plain', 'terminal')
 
     expect(preferredTabFor('feature/plain')).toBe('terminal')
   })
@@ -328,13 +328,13 @@ function worktreeTargetKey(worktreePath: string): string {
 }
 
 describe('workspace pane layout state', () => {
-  test('applies session pane state atomically with shared normalization rules', () => {
-    useWorkspacesStore.getState().applySessionLayoutState({
+  test('applies session pane state atomically with shared normalization rules', async () => {
+    workspacesStore.getState().applySessionLayoutState({
       zenMode: true,
       workspacePaneSize: 45,
     })
 
-    expect(useWorkspacesStore.getState()).toMatchObject({
+    expect(workspacesStore.getState()).toMatchObject({
       zenMode: true,
       workspacePaneSize: 45,
     })
@@ -342,67 +342,67 @@ describe('workspace pane layout state', () => {
 })
 
 describe('setZenMode', () => {
-  test('enables large-screen Zen Mode', () => {
-    useWorkspacesStore.getState().setZenMode(true)
+  test('enables large-screen Zen Mode', async () => {
+    workspacesStore.getState().setZenMode(true)
 
-    expect(useWorkspacesStore.getState().zenMode).toBe(true)
+    expect(workspacesStore.getState().zenMode).toBe(true)
   })
 
-  test('can disable large-screen Zen Mode again', () => {
-    useWorkspacesStore.getState().setZenMode(true)
-    useWorkspacesStore.getState().setZenMode(false)
+  test('can disable large-screen Zen Mode again', async () => {
+    workspacesStore.getState().setZenMode(true)
+    workspacesStore.getState().setZenMode(false)
 
-    expect(useWorkspacesStore.getState().zenMode).toBe(false)
+    expect(workspacesStore.getState().zenMode).toBe(false)
   })
 
-  test('toggles large-screen Zen Mode', () => {
-    useWorkspacesStore.getState().toggleZenMode()
+  test('toggles large-screen Zen Mode', async () => {
+    workspacesStore.getState().toggleZenMode()
 
-    expect(useWorkspacesStore.getState().zenMode).toBe(true)
+    expect(workspacesStore.getState().zenMode).toBe(true)
   })
 
-  test('preserves large-screen Zen Mode when filtering leaves no selected branch', () => {
+  test('preserves large-screen Zen Mode when filtering leaves no selected branch', async () => {
     seedRepo({ currentBranchName: 'main', branches: [branch('main')] })
-    useWorkspacesStore.getState().setZenMode(true)
+    workspacesStore.getState().setZenMode(true)
 
-    useWorkspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+    workspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
-    expect(useWorkspacesStore.getState().zenMode).toBe(true)
+    expect(workspacesStore.getState().zenMode).toBe(true)
   })
 })
 
 describe('setWorkspacePaneSize', () => {
-  test('stores the workspace pane size', () => {
-    useWorkspacesStore.getState().setWorkspacePaneSize(72.28)
+  test('stores the workspace pane size', async () => {
+    workspacesStore.getState().setWorkspacePaneSize(72.28)
 
-    expect(useWorkspacesStore.getState().workspacePaneSize).toBe(72.3)
+    expect(workspacesStore.getState().workspacePaneSize).toBe(72.3)
   })
 
-  test('normalizes invalid and out-of-range sizes', () => {
-    useWorkspacesStore.getState().setWorkspacePaneSize(200)
+  test('normalizes invalid and out-of-range sizes', async () => {
+    workspacesStore.getState().setWorkspacePaneSize(200)
 
-    expect(useWorkspacesStore.getState().workspacePaneSize).toBe(90)
+    expect(workspacesStore.getState().workspacePaneSize).toBe(90)
   })
 })
 
 describe('resetLayout', () => {
-  test('restores the default pane size but leaves zenMode untouched', () => {
-    useWorkspacesStore.setState({
+  test('restores the default pane size but leaves zenMode untouched', async () => {
+    workspacesStore.setState({
       zenMode: true,
       workspacePaneSize: 70,
     })
 
-    useWorkspacesStore.getState().resetLayout()
+    workspacesStore.getState().resetLayout()
 
-    expect(useWorkspacesStore.getState().zenMode).toBe(true)
-    expect(useWorkspacesStore.getState().workspacePaneSize).toBe(DEFAULT_WORKSPACE_PANE_SIZE)
+    expect(workspacesStore.getState().zenMode).toBe(true)
+    expect(workspacesStore.getState().workspacePaneSize).toBe(DEFAULT_WORKSPACE_PANE_SIZE)
   })
 
-  test('is idempotent when pane sizes are already at defaults', () => {
-    const before = useWorkspacesStore.getState()
+  test('is idempotent when pane sizes are already at defaults', async () => {
+    const before = workspacesStore.getState()
 
-    useWorkspacesStore.getState().resetLayout()
+    workspacesStore.getState().resetLayout()
 
-    expect(useWorkspacesStore.getState()).toBe(before)
+    expect(workspacesStore.getState()).toBe(before)
   })
 })

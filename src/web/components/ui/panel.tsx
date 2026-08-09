@@ -1,49 +1,17 @@
-import type { ComponentPropsWithoutRef, ElementType } from 'react'
+import type { FunctionalComponent, HTMLAttributes } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
 
-type PanelProps<T extends ElementType = 'div'> = {
-  as?: T
-  className?: string
-} & Omit<ComponentPropsWithoutRef<T>, 'as' | 'className'>
-
-function Panel<T extends ElementType = 'div'>({ as, className, ...props }: PanelProps<T>) {
-  const Comp = (as ?? 'div') as ElementType
-  return (
-    <Comp
-      className={cn(
-        'overflow-hidden rounded-xl border border-border/60 bg-background/85 shadow-[var(--shadow-inset-highlight)]',
-        className,
-      )}
-      {...props}
-    />
-  )
-}
-
-function PanelHeader({ className, ...props }: ComponentPropsWithoutRef<'div'>) {
-  return (
-    <div
-      className={cn('flex items-center justify-between border-b border-border/60 px-3 py-2', className)}
-      {...props}
-    />
-  )
-}
-
-function PanelBody({ className, ...props }: ComponentPropsWithoutRef<'div'>) {
-  return <div className={cn('px-3 py-3', className)} {...props} />
-}
-
-function PanelInset({
-  className,
-  tone = 'default',
-  size = 'md',
-  ...props
-}: ComponentPropsWithoutRef<'div'> & {
+type PanelInsetProps = HTMLAttributes & {
   tone?: 'default' | 'muted' | 'dashed'
   size?: 'sm' | 'md' | 'lg'
-}) {
+}
+
+export const PanelInset: FunctionalComponent<PanelInsetProps> = (props, { slots }) => {
+  const { class: classValue, size = 'md', tone = 'default', ...elementProps } = props
   return (
     <div
-      className={cn(
+      {...elementProps}
+      class={cn(
         'rounded-md border',
         tone === 'default' && 'border-border/50 bg-background/60',
         tone === 'muted' && 'border-border/60 bg-muted/20',
@@ -51,11 +19,11 @@ function PanelInset({
         size === 'sm' && 'px-2.5 py-2',
         size === 'md' && 'px-3 py-2',
         size === 'lg' && 'px-4 py-3',
-        className,
+        classValue,
       )}
-      {...props}
-    />
+    >
+      {slots.default?.()}
+    </div>
   )
 }
-
-export { Panel, PanelBody, PanelHeader, PanelInset }
+PanelInset.inheritAttrs = false

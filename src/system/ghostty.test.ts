@@ -41,7 +41,7 @@ afterEach(() => {
 })
 
 describe('isGhosttyInstalled', () => {
-  test('true when either known install path exists, false otherwise', () => {
+  test('true when either known install path exists, false otherwise', async () => {
     existsSyncMock.mockReturnValue(false).mockReturnValueOnce(true)
     expect(isGhosttyInstalled()).toBe(true)
 

@@ -1,7 +1,8 @@
-import { toast } from 'sonner'
+import { defineComponent } from 'vue'
+import { toast } from 'vue-sonner'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
 import { failedDiagnosticsCategory } from '#/web/lib/remote-diagnostics.ts'
-import { useT } from '#/web/stores/i18n.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 import type { RemoteDiagnosticCategory, RemoteDiagnosticsResult } from '#/shared/remote-workspace.ts'
 import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 
@@ -12,47 +13,59 @@ interface Props {
   idleText: string
 }
 
-export function RemoteDiagnosticsPanel({ diagnostics, error, loading, idleText }: Props) {
-  const t = useT()
-  const failedCategory = failedDiagnosticsCategory(diagnostics)
+export const RemoteDiagnosticsPanel = defineComponent(
+  (props: Props) => {
+    const t = useT()
 
-  async function copyText(value: string) {
-    try {
-      await copyToClipboard(value)
-      toast.success(t('branch-status.copied'))
-    } catch (err) {
-      toast.error(t('action.result-error'), {
-        description: err instanceof Error ? err.message : String(err),
-      })
+    async function copyText(value: string): Promise<void> {
+      try {
+        await copyToClipboard(value)
+        toast.success(t('branch-status.copied'))
+      } catch (error) {
+        toast.error(t('action.result-error'), {
+          description: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
-  }
 
-  const statusText = loading
-    ? t('workspace-picker.open-remote-diagnostics-testing')
-    : diagnostics
-      ? diagnostics.ok
-        ? t('workspace-picker.open-remote-diagnostics-ok')
-        : diagnosticCategoryLabel(t, failedCategory ?? diagnostics.category ?? diagnostics.message ?? 'unknown')
-      : error
-        ? error
-        : idleText
-  const copyDetailsValue = diagnostics?.details ?? error ?? null
+    return () => {
+      const failedCategory = failedDiagnosticsCategory(props.diagnostics)
+      const statusText = props.loading
+        ? t('workspace-picker.open-remote-diagnostics-testing')
+        : props.diagnostics
+          ? props.diagnostics.ok
+            ? t('workspace-picker.open-remote-diagnostics-ok')
+            : diagnosticCategoryLabel(
+                t,
+                failedCategory ?? props.diagnostics.category ?? props.diagnostics.message ?? 'unknown',
+              )
+          : (props.error ?? props.idleText)
+      const copyDetailsValue = props.diagnostics?.details ?? props.error ?? null
 
-  return (
-    <div data-slot="remote-diagnostics-status">
-      <DialogStatusRow
-        message={statusText}
-        tone={error || (diagnostics && !diagnostics.ok) ? 'danger' : diagnostics?.ok ? 'success' : 'default'}
-        actionLabel={copyDetailsValue ? t('workspace-picker.open-remote-diagnostics-copy-details') : undefined}
-        onAction={copyDetailsValue ? () => void copyText(copyDetailsValue) : undefined}
-      />
-    </div>
-  )
-}
+      return (
+        <div data-slot="remote-diagnostics-status">
+          <DialogStatusRow
+            message={statusText}
+            tone={
+              props.error || (props.diagnostics && !props.diagnostics.ok)
+                ? 'danger'
+                : props.diagnostics?.ok
+                  ? 'success'
+                  : 'default'
+            }
+            actionLabel={copyDetailsValue ? t('workspace-picker.open-remote-diagnostics-copy-details') : undefined}
+            onAction={copyDetailsValue ? () => void copyText(copyDetailsValue) : undefined}
+          />
+        </div>
+      )
+    }
+  },
+  { name: 'RemoteDiagnosticsPanel', props: ['diagnostics', 'error', 'loading', 'idleText'] },
+)
 
 function diagnosticCategoryLabel(t: (key: string) => string, category: string): string {
   const known = category as RemoteDiagnosticCategory
-  const key = `workspace-picker.open-remote-diagnostics-category-${known}`
-  const translated = t(key)
-  return translated === key ? category : translated
+  const diagnosticKey = `workspace-picker.open-remote-diagnostics-category-${known}`
+  const translated = t(diagnosticKey)
+  return translated === diagnosticKey ? category : translated
 }

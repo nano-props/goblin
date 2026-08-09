@@ -52,7 +52,7 @@ describe('native settings projection sync', () => {
     await flushMicrotasks()
   }
 
-  test('derives native effects from complete authoritative settings snapshots', () => {
+  test('derives native effects from complete authoritative settings snapshots', async () => {
     const previous = defaultSettingsSnapshot()
     const current = defaultSettingsSnapshot({
       lang: 'ja',
@@ -77,7 +77,7 @@ describe('native settings projection sync', () => {
     })
   })
 
-  test('does not emit native work for an unchanged authoritative snapshot', () => {
+  test('does not emit native work for an unchanged authoritative snapshot', async () => {
     const snapshot = defaultSettingsSnapshot()
     expect(nativeProjectionFromSnapshots(snapshot, structuredClone(snapshot))).toBeNull()
   })

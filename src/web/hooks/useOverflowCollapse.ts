@@ -1,42 +1,28 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEventListener, useResizeObserver } from '@vueuse/core'
+import { onMounted, readonly, ref, toValue, watch } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 
-/**
- * Detect when a set of children overflow their container and should collapse
- * into a compact representation. Mirrors the pattern used in both
- * BranchActionControls and WorkspacePaneTabStrip.
- *
- * @param layoutKey A string that changes when the measured content changes
- *                  (e.g. items.map(i => i.id).join('|')).
- * @returns refs to attach to the visible container and the invisible measure
- *          element, plus the current collapsed state.
- */
-export function useOverflowCollapse(layoutKey: string) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const measureRef = useRef<HTMLDivElement | null>(null)
-  const [collapsed, setCollapsed] = useState(false)
+export function useOverflowCollapse(layoutKey: MaybeRefOrGetter<string>): {
+  containerRef: Ref<HTMLDivElement | null>
+  measureRef: Ref<HTMLDivElement | null>
+  collapsed: Readonly<Ref<boolean>>
+} {
+  const containerRef = ref<HTMLDivElement | null>(null)
+  const measureRef = ref<HTMLDivElement | null>(null)
+  const collapsed = ref(false)
 
-  useLayoutEffect(() => {
-    const container = containerRef.current
-    const measure = measureRef.current
-    if (!container || !measure) return
+  function check(): void {
+    if (!containerRef.value || !measureRef.value) return
+    collapsed.value = measureRef.value.scrollWidth > containerRef.value.clientWidth + 1
+  }
 
-    const check = () => {
-      const next = measure.scrollWidth > container.clientWidth + 1
-      setCollapsed((current) => (current === next ? current : next))
-    }
-    check()
+  if (typeof ResizeObserver === 'undefined') useEventListener(window, 'resize', check)
+  else useResizeObserver([containerRef, measureRef], check)
+  onMounted(check)
 
-    const ResizeObserverCtor = globalThis.ResizeObserver
-    if (!ResizeObserverCtor) {
-      window.addEventListener('resize', check)
-      return () => window.removeEventListener('resize', check)
-    }
+  // Content identity can change without changing either measured element's
+  // box, so remeasure once after that projection has rendered.
+  watch(() => toValue(layoutKey), check, { flush: 'post' })
 
-    const observer = new ResizeObserverCtor(check)
-    observer.observe(container)
-    observer.observe(measure)
-    return () => observer.disconnect()
-  }, [layoutKey])
-
-  return { containerRef, measureRef, collapsed }
+  return { containerRef, measureRef, collapsed: readonly(collapsed) }
 }

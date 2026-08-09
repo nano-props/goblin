@@ -1,10 +1,10 @@
-import { useCallback, useLayoutEffect, useRef, useState, type RefObject, type UIEventHandler } from 'react'
-import {
-  isPendingWorkspacePaneTabItem,
-  type WorkspacePaneTabItem,
-} from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
+import { nextTick, onBeforeUpdate, onMounted, onScopeDispose, onUpdated, ref, watch } from 'vue'
+import type { Ref } from 'vue'
 import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
+import { isPendingWorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
+import type { WorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import type { WorkspacePaneTabStripScrollMemory } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
+import type { WorkspacePaneTabClosePresentationEffects } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
 
 const WORKSPACE_PANE_TAB_SCROLL_TARGET_SELECTOR = '[data-workspace-pane-tab-scroll-target]'
 
@@ -61,135 +61,174 @@ function resolveWorkspacePaneTabAutoScroll({
   }
 }
 
-export function usePrefersReducedMotion(): boolean {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() =>
-    typeof window === 'undefined' ? false : window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
-  )
+export function usePrefersReducedMotion(): Readonly<Ref<boolean>> {
+  const prefersReducedMotion = ref(false)
+  let query: MediaQueryList | null = null
 
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setPrefersReducedMotion(query.matches)
+  const update = () => {
+    prefersReducedMotion.value = query?.matches === true
+  }
+
+  onMounted(() => {
+    if (typeof window.matchMedia !== 'function') return
+    query = window.matchMedia('(prefers-reduced-motion: reduce)')
     update()
     query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
+  })
 
+  onScopeDispose(() => query?.removeEventListener('change', update))
   return prefersReducedMotion
 }
 
-export function useWorkspacePaneTabStripAutoScroll({
-  workspacePaneTabTargetKey,
-  activeTabIdentity,
-  items,
-  enabled,
-  viewportRef,
-  newButtonRef,
-  scrollBehavior,
-  getTabElement,
-  hasRememberedScrollPosition,
-}: {
-  workspacePaneTabTargetKey: string
-  activeTabIdentity: string | null
-  items: readonly WorkspacePaneTabItem[]
-  enabled: boolean
-  viewportRef: RefObject<HTMLDivElement | null>
-  newButtonRef: RefObject<HTMLButtonElement | null>
-  scrollBehavior: ScrollBehavior
+export function useWorkspacePaneTabStripScroll(input: {
+  workspacePaneTabTargetKey: () => string
+  activeTabIdentity: () => string | null
+  items: () => readonly WorkspacePaneTabItem[]
+  enabled: () => boolean
+  viewportRef: Ref<HTMLDivElement | null>
+  newButtonRef: Ref<HTMLButtonElement | null>
+  scrollBehavior: () => ScrollBehavior
   getTabElement: (identity: string) => HTMLButtonElement | null
-  hasRememberedScrollPosition: boolean
-}): void {
-  const activeRenderableTabIdentity = activeTabIdentity
-    ? (items.find((item) => item.identity === activeTabIdentity && !isPendingWorkspacePaneTabItem(item))?.identity ??
-      null)
-    : null
-  const lastRenderableTabIdentity =
-    items.filter((item) => !isPendingWorkspacePaneTabItem(item)).at(-1)?.identity ?? null
-  const lastScrolledActiveIdentityRef = useRef<string | null>(null)
-  const lastWorkspacePaneTabTargetKeyRef = useRef<string | null>(null)
-  const awaitingTargetBaselineRef = useRef(false)
-  const targetHadRememberedScrollPositionRef = useRef(false)
+  memory: WorkspacePaneTabStripScrollMemory
+}): (event: Event) => void {
+  let lastScrolledActiveIdentity: string | null = null
+  let awaitingTargetBaseline = false
+  let targetHadRememberedScrollPosition = false
+  let committedTargetKey: string | null = null
+  let committedEnabled = false
+  let projectionVersion = 0
 
-  useLayoutEffect(() => {
-    const previousWorkspacePaneTabTargetKey = lastWorkspacePaneTabTargetKeyRef.current
-    if (previousWorkspacePaneTabTargetKey !== workspacePaneTabTargetKey) {
-      // Latch what existed before entering this target. Strict Mode replays
-      // cleanup and can write the viewport's default zero into memory; that
-      // synthetic write must not turn an unseen target into a restored one.
-      targetHadRememberedScrollPositionRef.current = hasRememberedScrollPosition
+  // The viewport is reused across targets. Capture the old target's position
+  // while its DOM is still mounted, before Vue patches in the next target.
+  onBeforeUpdate(() => {
+    const viewport = input.viewportRef.value
+    const nextTargetKey = input.workspacePaneTabTargetKey()
+    const nextEnabled = input.enabled()
+    if (viewport && committedEnabled && committedTargetKey && (committedTargetKey !== nextTargetKey || !nextEnabled)) {
+      input.memory.write(committedTargetKey, viewport.scrollLeft)
     }
-    lastWorkspacePaneTabTargetKeyRef.current = workspacePaneTabTargetKey
-    const autoScroll = resolveWorkspacePaneTabAutoScroll({
-      activeTabIdentity: enabled ? activeRenderableTabIdentity : null,
-      previousTargetKey: previousWorkspacePaneTabTargetKey,
-      currentTargetKey: workspacePaneTabTargetKey,
-      awaitingTargetBaseline: awaitingTargetBaselineRef.current,
-      lastScrolledActiveIdentity: lastScrolledActiveIdentityRef.current,
-      hasRememberedScrollPosition: targetHadRememberedScrollPositionRef.current,
-    })
-    awaitingTargetBaselineRef.current = autoScroll.nextAwaitingTargetBaseline
+  })
 
-    if (!autoScroll.shouldScroll) {
-      lastScrolledActiveIdentityRef.current = autoScroll.nextScrolledActiveIdentity
+  // After the patch, apply the new target's baseline before revealing its
+  // active tab. Keeping both projections in this layout lifecycle prevents
+  // independent effects from reversing that order.
+  const projectCommittedScrollState = () => {
+    projectionVersion += 1
+    const targetKey = input.workspacePaneTabTargetKey()
+    const enabled = input.enabled()
+    const previousTargetKey = committedTargetKey
+    const targetChanged = previousTargetKey !== targetKey
+    const enabledChanged = committedEnabled !== enabled
+
+    if (!enabled) {
+      awaitingTargetBaseline = true
+      lastScrolledActiveIdentity = null
+      committedTargetKey = targetKey
+      committedEnabled = false
       return
     }
-    const viewport = viewportRef.current
-    const tab = activeRenderableTabIdentity ? getTabElement(activeRenderableTabIdentity) : null
-    if (!viewport || !tab) return
-    lastScrolledActiveIdentityRef.current = autoScroll.nextScrolledActiveIdentity
+
+    const viewport = input.viewportRef.value
+    if (!viewport) return
+    if (targetChanged || (enabledChanged && enabled)) {
+      const rememberedScrollPosition = input.memory.read(targetKey)
+      targetHadRememberedScrollPosition = rememberedScrollPosition !== undefined
+      viewport.scrollLeft = rememberedScrollPosition ?? 0
+    }
+
+    const items = input.items()
+    const activeTabIdentity = input.activeTabIdentity()
+    const activeRenderableTabIdentity = activeTabIdentity
+      ? (items.find((item) => item.identity === activeTabIdentity && !isPendingWorkspacePaneTabItem(item))?.identity ??
+        null)
+      : null
+    const lastRenderableTabIdentity =
+      items.filter((item) => !isPendingWorkspacePaneTabItem(item)).at(-1)?.identity ?? null
+    const autoScroll = resolveWorkspacePaneTabAutoScroll({
+      activeTabIdentity: activeRenderableTabIdentity,
+      previousTargetKey,
+      currentTargetKey: targetKey,
+      awaitingTargetBaseline,
+      lastScrolledActiveIdentity,
+      hasRememberedScrollPosition: targetHadRememberedScrollPosition,
+    })
+    committedTargetKey = targetKey
+    committedEnabled = true
+
+    if (!autoScroll.shouldScroll) {
+      awaitingTargetBaseline = autoScroll.nextAwaitingTargetBaseline
+      lastScrolledActiveIdentity = autoScroll.nextScrolledActiveIdentity
+      return
+    }
+    const tab = activeRenderableTabIdentity ? input.getTabElement(activeRenderableTabIdentity) : null
+    if (!tab) {
+      if (autoScroll.baseline) awaitingTargetBaseline = true
+      return
+    }
+    awaitingTargetBaseline = autoScroll.nextAwaitingTargetBaseline
+    lastScrolledActiveIdentity = autoScroll.nextScrolledActiveIdentity
     const tabScrollTarget = workspacePaneTabScrollTarget(tab)
     const target =
-      activeRenderableTabIdentity === lastRenderableTabIdentity && newButtonRef.current
-        ? newButtonRef.current
+      activeRenderableTabIdentity === lastRenderableTabIdentity && input.newButtonRef.value
+        ? input.newButtonRef.value
         : tabScrollTarget
     scrollWorkspacePaneTabTargetIntoView({
       viewport,
       target,
-      behavior: autoScroll.baseline ? 'auto' : scrollBehavior,
+      behavior: autoScroll.baseline ? 'auto' : input.scrollBehavior(),
     })
-  }, [
-    activeRenderableTabIdentity,
-    enabled,
-    getTabElement,
-    hasRememberedScrollPosition,
-    lastRenderableTabIdentity,
-    newButtonRef,
-    scrollBehavior,
-    workspacePaneTabTargetKey,
-    viewportRef,
-  ])
-}
+  }
 
-export function useWorkspacePaneTabStripScrollMemory({
-  workspacePaneTabTargetKey,
-  enabled,
-  viewportRef,
-  memory,
-}: {
-  workspacePaneTabTargetKey: string
-  enabled: boolean
-  viewportRef: RefObject<HTMLDivElement | null>
-  memory: WorkspacePaneTabStripScrollMemory
-}): UIEventHandler<HTMLDivElement> {
-  // This is ephemeral UI memory, not persisted workspace state. A single
-  // viewport is reused across branch/worktree tab targets, and browsers can
-  // clamp that viewport's scrollLeft when the rendered tab content changes.
-  const handleScroll = useCallback<UIEventHandler<HTMLDivElement>>(
-    (event) => {
-      memory.write(workspacePaneTabTargetKey, event.currentTarget.scrollLeft)
-    },
-    [memory, workspacePaneTabTargetKey],
-  )
+  onMounted(() => {
+    const viewportBeforeProjection = input.viewportRef.value
+    const childMountScrollLeft = viewportBeforeProjection?.scrollLeft
+    projectCommittedScrollState()
+    const viewport = input.viewportRef.value
+    if (
+      !viewport ||
+      !input.enabled() ||
+      childMountScrollLeft === undefined ||
+      viewport.scrollLeft === childMountScrollLeft
+    ) {
+      return
+    }
+    const mountedProjectionVersion = projectionVersion
+    const mountedTargetKey = input.workspacePaneTabTargetKey()
+    const mountedScrollLeft = viewport.scrollLeft
 
-  useLayoutEffect(() => {
-    if (!enabled) return
-    const viewport = viewportRef.current
-    if (!viewport) return
-    viewport.scrollLeft = memory.read(workspacePaneTabTargetKey) ?? 0
-    return () => memory.write(workspacePaneTabTargetKey, viewport.scrollLeft)
-  }, [enabled, memory, workspacePaneTabTargetKey, viewportRef])
+    // ScrollArea can normalize its viewport once more after the parent mount
+    // hook. If it returns to the pre-projection position, reapply the decided
+    // position after that child work. A newer projection or user scroll to a
+    // different position wins instead.
+    void nextTick(() => {
+      if (
+        projectionVersion !== mountedProjectionVersion ||
+        !input.enabled() ||
+        input.workspacePaneTabTargetKey() !== mountedTargetKey
+      ) {
+        return
+      }
+      const mountedViewport = input.viewportRef.value
+      if (mountedViewport?.scrollLeft === childMountScrollLeft) {
+        mountedViewport.scrollLeft = mountedScrollLeft
+      }
+    })
+  })
+  onUpdated(projectCommittedScrollState)
 
-  return handleScroll
+  onScopeDispose(() => {
+    projectionVersion += 1
+    const viewport = input.viewportRef.value
+    if (viewport && input.enabled()) {
+      input.memory.write(input.workspacePaneTabTargetKey(), viewport.scrollLeft)
+    }
+  })
+
+  return (event) => {
+    const viewport = event.currentTarget
+    if (!(viewport instanceof HTMLDivElement)) return
+    input.memory.write(input.workspacePaneTabTargetKey(), viewport.scrollLeft)
+  }
 }
 
 export function scrollWorkspacePaneTabTargetIntoView({
@@ -212,37 +251,75 @@ function workspacePaneTabScrollTarget(tab: HTMLButtonElement): HTMLElement {
   return tab.closest<HTMLElement>(WORKSPACE_PANE_TAB_SCROLL_TARGET_SELECTOR) ?? tab
 }
 
-export function useDeferredActiveWorkspacePaneTabFocusAfterClose({
-  activeTabIdentity,
-  items,
-  focusRegistry,
-}: {
-  activeTabIdentity: string | null
-  items: readonly WorkspacePaneTabItem[]
+export function useDeferredActiveWorkspacePaneTabFocusAfterClose(input: {
+  workspacePaneTabTargetKey: () => string
+  activeTabIdentity: () => string | null
+  items: () => readonly WorkspacePaneTabItem[]
   focusRegistry: FocusRegistry<string, HTMLButtonElement>
-}): (closingIdentity: string) => void {
-  const closingActiveIdentityRef = useRef<string | null>(null)
-  const [focusRequestVersion, setFocusRequestVersion] = useState(0)
+}): (closingIdentity: string) => WorkspacePaneTabClosePresentationEffects {
+  let requestVersion = 0
+  let pendingRequest: PendingWorkspacePaneTabCloseFocusRequest | null = null
 
-  useLayoutEffect(() => {
-    const closingIdentity = closingActiveIdentityRef.current
-    if (!closingIdentity) return
-    if (activeTabIdentity === closingIdentity) return
-    if (!activeTabIdentity) {
-      if (!items.some((item) => item.identity === closingIdentity)) closingActiveIdentityRef.current = null
+  const clearRequest = (request: PendingWorkspacePaneTabCloseFocusRequest) => {
+    if (pendingRequest?.version === request.version) pendingRequest = null
+  }
+
+  const reconcileRequest = () => {
+    const request = pendingRequest
+    if (!request) return
+    const items = input.items()
+    if (request.targetKey !== input.workspacePaneTabTargetKey() || items.length === 0) {
+      clearRequest(request)
       return
     }
+    if (!request.committed) return
+
+    const activeTabIdentity = input.activeTabIdentity()
+    // Runtime removal and close-back navigation are separate authoritative
+    // commits. The first can temporarily leave a non-empty strip without an
+    // active tab; that state does not complete the focus handoff.
+    // The presentation effect admits the handoff, while the rendered items
+    // remain its DOM authority. Do not focus until the closing tab has left.
+    if (items.some((item) => item.identity === request.closingIdentity)) return
+    if (!activeTabIdentity) return
     const activeItem = items.find((item) => item.identity === activeTabIdentity)
-    if (!activeItem || isPendingWorkspacePaneTabItem(activeItem)) {
-      if (!items.some((item) => item.identity === closingIdentity)) closingActiveIdentityRef.current = null
-      return
-    }
-    focusRegistry.focus(activeTabIdentity, { preventScroll: true })
-    closingActiveIdentityRef.current = null
-  }, [activeTabIdentity, focusRegistry, focusRequestVersion, items])
+    if (!activeItem || isPendingWorkspacePaneTabItem(activeItem)) return
+    const activeTab = input.focusRegistry.getRef(activeTabIdentity)
+    if (!activeTab) return
 
-  return useCallback((closingIdentity: string) => {
-    closingActiveIdentityRef.current = closingIdentity
-    setFocusRequestVersion((version) => version + 1)
-  }, [])
+    clearRequest(request)
+    activeTab.focus({ preventScroll: true })
+  }
+
+  onUpdated(reconcileRequest)
+  onScopeDispose(() => {
+    pendingRequest = null
+  })
+
+  return (closingIdentity) => {
+    const request: PendingWorkspacePaneTabCloseFocusRequest = {
+      version: ++requestVersion,
+      targetKey: input.workspacePaneTabTargetKey(),
+      closingIdentity,
+      committed: false,
+    }
+    // One tab strip owns one close-focus handoff. A newer accepted close
+    // supersedes any older request whose completion may still be in flight.
+    pendingRequest = request
+    return {
+      onCommit: () => {
+        if (pendingRequest?.version !== request.version) return
+        request.committed = true
+        reconcileRequest()
+      },
+      onAbandon: () => clearRequest(request),
+    }
+  }
+}
+
+interface PendingWorkspacePaneTabCloseFocusRequest {
+  version: number
+  targetKey: string
+  closingIdentity: string
+  committed: boolean
 }

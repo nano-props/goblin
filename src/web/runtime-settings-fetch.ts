@@ -1,3 +1,4 @@
+import { computed } from 'vue'
 import {
   currentRuntimeSettingsSnapshot,
   readRuntimeFetchSettings,
@@ -11,7 +12,8 @@ export function getRuntimeFetchSettings() {
 }
 
 export function useFetchSettings() {
-  return readRuntimeFetchSettings(useRuntimeSettingsSnapshot())
+  const snapshot = useRuntimeSettingsSnapshot()
+  return computed(() => readRuntimeFetchSettings(snapshot.value))
 }
 
 export function useFetchSettingsController() {

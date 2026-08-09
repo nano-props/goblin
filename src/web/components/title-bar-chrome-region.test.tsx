@@ -10,8 +10,8 @@ import {
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 describe('window chrome regions', () => {
-  test('marks a padded drag region for native window controls', () => {
-    const { container } = renderInJsdom(<TitleBarDragRegion data-testid="chrome" className="bg-card" />)
+  test('marks a padded drag region for native window controls', async () => {
+    const { container } = renderInJsdom(<TitleBarDragRegion data-testid="chrome" class="bg-card" />)
 
     const chrome = container.querySelector<HTMLElement>('[data-testid="chrome"]')
     expect(chrome?.dataset.titleBarChromeRegion).toBe('drag')
@@ -19,7 +19,7 @@ describe('window chrome regions', () => {
     expect(chrome?.className).toContain('bg-card')
   })
 
-  test('marks an unpadded drag region for toolbar remainder space', () => {
+  test('marks an unpadded drag region for toolbar remainder space', async () => {
     const { container } = renderInJsdom(<TitleBarDragRegion reserveWindowControls={false} data-testid="chrome" />)
 
     const chrome = container.querySelector<HTMLElement>('[data-testid="chrome"]')
@@ -28,8 +28,8 @@ describe('window chrome regions', () => {
     expect(chrome?.className).not.toContain('title-bar-chrome')
   })
 
-  test('marks a transparent native drag plate without reserving window controls', () => {
-    const { container } = renderInJsdom(<NativeDragPlate data-testid="plate" className="z-30" />)
+  test('marks a transparent native drag plate without reserving window controls', async () => {
+    const { container } = renderInJsdom(<NativeDragPlate data-testid="plate" class="z-30" />)
 
     const plate = container.querySelector<HTMLElement>('[data-testid="plate"]')
     expect(plate?.dataset.titleBarChromeRegion).toBe('drag')
@@ -42,8 +42,8 @@ describe('window chrome regions', () => {
     expect(plate?.className).not.toContain('title-bar-chrome')
   })
 
-  test('marks an interactive region as no-drag without adding layout chrome', () => {
-    const { container } = renderInJsdom(<TitleBarInteractiveRegion data-testid="interactive" className="flex-1" />)
+  test('marks an interactive region as no-drag without adding layout chrome', async () => {
+    const { container } = renderInJsdom(<TitleBarInteractiveRegion data-testid="interactive" class="flex-1" />)
 
     const interactive = container.querySelector<HTMLElement>('[data-testid="interactive"]')
     expect(interactive?.dataset.titleBarChromeRegion).toBe('interactive')
@@ -53,10 +53,10 @@ describe('window chrome regions', () => {
     expect(interactive?.className).not.toContain('app-drag-region')
   })
 
-  test('can mark a child component root as the interactive region', () => {
+  test('can mark a child component root as the interactive region', async () => {
     const { container } = renderInJsdom(
       <TitleBarInteractiveRegion asChild>
-        <div data-testid="interactive-child" className="h-full" />
+        <div data-testid="interactive-child" class="h-full" />
       </TitleBarInteractiveRegion>,
     )
 
@@ -66,8 +66,8 @@ describe('window chrome regions', () => {
     expect(interactive?.className).toContain('h-full')
   })
 
-  test('marks a passive no-drag carve-out without making it interactive', () => {
-    const { container } = renderInJsdom(<TitleBarNoDragRegion data-testid="no-drag" className="size-8" />)
+  test('marks a passive no-drag carve-out without making it interactive', async () => {
+    const { container } = renderInJsdom(<TitleBarNoDragRegion data-testid="no-drag" class="size-8" />)
 
     const noDrag = container.querySelector<HTMLElement>('[data-testid="no-drag"]')
     expect(noDrag?.dataset.titleBarChromeRegion).toBe('no-drag')
@@ -75,10 +75,10 @@ describe('window chrome regions', () => {
     expect(noDrag?.className).toContain('size-8')
   })
 
-  test('can mark a child component root as a passive no-drag carve-out', () => {
+  test('can mark a child component root as a passive no-drag carve-out', async () => {
     const { container } = renderInJsdom(
       <TitleBarNoDragRegion asChild>
-        <div data-testid="no-drag-child" className="absolute" />
+        <div data-testid="no-drag-child" class="absolute" />
       </TitleBarNoDragRegion>,
     )
 

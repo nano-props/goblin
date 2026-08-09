@@ -2,20 +2,21 @@
 
 import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { QueryClientProvider } from '@tanstack/react-query'
-import type { ReactElement } from 'react'
-import { fireEvent } from '@testing-library/react'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
+import type { VNode } from 'vue'
+import { fireEvent } from '@testing-library/vue'
+import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { WorkspaceLayoutSidebar } from '#/web/components/workspace-layout/WorkspaceLayoutSidebar.tsx'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { useWorkspacesStore } from '#/web/stores/workspaces/store.ts'
+import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { navigation } from '#/web/test-utils/workspace-pane.tsx'
 
 vi.mock('#/web/components/WorkspacePickerHost.tsx', () => ({
-  WorkspacePickerHost: () => (
-    <button type="button" data-testid="workspace-picker-host" className="h-10 w-full shrink-0" />
-  ),
+  WorkspacePickerHost: () => <button type="button" data-testid="workspace-picker-host" class="h-10 w-full shrink-0" />,
 }))
 
 const responsiveMocks = vi.hoisted(() => ({ compact: false }))
@@ -24,7 +25,11 @@ const workspaceCommandMocks = vi.hoisted(() => ({
   terminal: vi.fn(async () => true),
 }))
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
-  useIsCompactUi: () => responsiveMocks.compact,
+  useIsCompactUi: () => ({
+    get value() {
+      return responsiveMocks.compact
+    },
+  }),
 }))
 vi.mock('#/web/commands/workspace-commands.ts', () => ({
   runShowWorkspacePaneTabCommand: workspaceCommandMocks.showTab,
@@ -34,7 +39,7 @@ vi.mock('#/web/commands/workspace-commands.ts', () => ({
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace-shell-sidebar-test')
 
 function repoSnapshot() {
-  const capability = useWorkspacesStore.getState().workspaces[WORKSPACE_ID]?.capability
+  const capability = workspacesStore.getState().workspaces[WORKSPACE_ID]?.capability
   if (capability?.kind !== 'git') throw new Error('Expected Git workspace fixture')
   return capability.git
 }
@@ -58,7 +63,7 @@ afterEach(() => {
 })
 
 describe('WorkspaceLayoutSidebar', () => {
-  test('renders sidebar actions before the branch content without growing action rows', () => {
+  test('renders sidebar actions before the branch content without growing action rows', async () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar
         workspaceId={WORKSPACE_ID}
@@ -90,7 +95,7 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(settings).not.toBeNull()
   })
 
-  test('renders placeholder state when no repo is open', () => {
+  test('renders placeholder state when no repo is open', async () => {
     const { container } = renderSidebar(<WorkspaceLayoutSidebar git={null} compact={false} />)
 
     expect(container.querySelector('[data-testid="workspace-picker-host"]')).not.toBeNull()
@@ -107,7 +112,7 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(settings).not.toBeNull()
   })
 
-  test('keeps the shared dashboard and navigator layout without Git-only controls when Git is unavailable', () => {
+  test('keeps the shared dashboard and navigator layout without Git-only controls when Git is unavailable', async () => {
     const onOpenDashboard = vi.fn()
     const onSelectWorkspaceRoot = vi.fn()
     const { container } = renderSidebar(
@@ -131,12 +136,13 @@ describe('WorkspaceLayoutSidebar', () => {
 
     const workspaceRow = container.querySelector('[data-testid="workspace-root-row"]')
     if (!(workspaceRow instanceof HTMLElement)) throw new Error('missing workspace root row')
-    fireEvent.click(workspaceRow)
+    await fireEvent.click(workspaceRow)
     expect(onSelectWorkspaceRoot).toHaveBeenCalledOnce()
 
     const menuTrigger = workspaceRow.querySelector('button[aria-label="action.menu"]')
     if (!(menuTrigger instanceof HTMLButtonElement)) throw new Error('missing workspace root action menu')
-    fireEvent.click(menuTrigger)
+    await fireEvent.click(menuTrigger)
+    await flushTestUpdates(() => {})
     const statusAction = [...document.querySelectorAll('button')].find((button) => button.textContent === 'tab.status')
     const filesAction = [...document.querySelectorAll('button')].find((button) => button.textContent === 'tab.files')
     const terminalAction = [...document.querySelectorAll('button')].find(
@@ -149,26 +155,27 @@ describe('WorkspaceLayoutSidebar', () => {
     ) {
       throw new Error('missing workspace root actions')
     }
-    fireEvent.click(statusAction)
+    await fireEvent.click(statusAction)
     expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: WORKSPACE_ID, tab: 'status' }),
     )
 
-    fireEvent.click(menuTrigger)
+    await fireEvent.click(menuTrigger)
+    await flushTestUpdates(() => {})
     const reopenedFilesAction = [...document.querySelectorAll('button')].find(
       (button) => button.textContent === 'tab.files',
     )
     if (!(reopenedFilesAction instanceof HTMLButtonElement)) throw new Error('missing reopened Files action')
-    fireEvent.click(reopenedFilesAction)
+    await fireEvent.click(reopenedFilesAction)
     expect(workspaceCommandMocks.showTab).toHaveBeenCalledWith(
       expect.objectContaining({ workspaceId: WORKSPACE_ID, tab: 'files' }),
     )
   })
 
-  test('keeps the remote directory name visible while its capability probe is pending', () => {
+  test('keeps the remote directory name visible while its capability probe is pending', async () => {
     const remoteWorkspaceId = workspaceIdForTest('goblin+ssh://example/home/developer/Documents')
     const workspace = emptyWorkspace(remoteWorkspaceId, 'workspace-runtime-remote')
-    useWorkspacesStore.setState({
+    workspacesStore.setState({
       workspaces: { [remoteWorkspaceId]: workspace },
       workspaceOrder: [remoteWorkspaceId],
     })
@@ -181,7 +188,7 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(container.querySelector('[data-testid="workspace-root-row"]')?.textContent).not.toContain('example:')
   })
 
-  test('keeps the workspace row action menu visible in compact UI', () => {
+  test('keeps the workspace row action menu visible in compact UI', async () => {
     responsiveMocks.compact = true
     const { container } = renderSidebar(<WorkspaceLayoutSidebar workspaceId={WORKSPACE_ID} compact git={null} />)
 
@@ -190,7 +197,7 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(menuTrigger?.parentElement?.className).toContain('pointer-events-auto')
   })
 
-  test('uses the workspace background throughout the sidebar in compact UI', () => {
+  test('uses the workspace background throughout the sidebar in compact UI', async () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar workspaceId={WORKSPACE_ID} compact git={repoSnapshot()} branchContent={<div />} />,
     )
@@ -200,7 +207,7 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(sidebar?.querySelectorAll('.bg-navigation')).toHaveLength(0)
   })
 
-  test('keeps the navigation background in split UI', () => {
+  test('keeps the navigation background in split UI', async () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar
         workspaceId={WORKSPACE_ID}
@@ -213,7 +220,7 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(container.querySelector('aside')?.className).toContain('bg-navigation')
   })
 
-  test('opens create-worktree from the row action', () => {
+  test('opens create-worktree from the row action', async () => {
     const onCreateWorktree = vi.fn()
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar
@@ -228,12 +235,12 @@ describe('WorkspaceLayoutSidebar', () => {
     const createWorktree = container.querySelector('[data-testid="create-worktree-button"]')
     if (!(createWorktree instanceof HTMLButtonElement)) throw new Error('missing create worktree button')
 
-    fireEvent.click(createWorktree)
+    await fireEvent.click(createWorktree)
 
     expect(onCreateWorktree).toHaveBeenCalledTimes(1)
   })
 
-  test('renders zen reveal top chrome as draggable without owning zen-toggle geometry', () => {
+  test('renders zen reveal top chrome as draggable without owning zen-toggle geometry', async () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar
         workspaceId={WORKSPACE_ID}
@@ -249,9 +256,10 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(sidebarTop?.className).not.toContain('relative')
     expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
     expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
+    expect(sidebarTop?.style.height).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
   })
 
-  test('can render the top chrome as neutral when the docked sidebar is collapsed', () => {
+  test('can render the top chrome as neutral when the docked sidebar is collapsed', async () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar
         workspaceId={WORKSPACE_ID}
@@ -266,9 +274,14 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(sidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(sidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
     expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
+    expect(sidebarTop?.style.height).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
   })
 })
 
-function renderSidebar(element: ReactElement) {
-  return renderInJsdom(<QueryClientProvider client={appQueryClient}>{element}</QueryClientProvider>)
+function renderSidebar(element: VNode) {
+  return renderInJsdom(
+    <VueQueryClientScope client={appQueryClient}>
+      <AppNavigationProvider value={navigation}>{element}</AppNavigationProvider>
+    </VueQueryClientScope>,
+  )
 }

@@ -1,7 +1,7 @@
 import { Cron } from 'croner'
 import PQueue from 'p-queue'
 import { fetchRepo } from '#/server/modules/repo-write-paths.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/server/modules/settings-source.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
@@ -99,7 +99,7 @@ let settingsInitializationGeneration = 0
 let runtimeCloseSubscription: (() => void) | null = null
 let runtimeFailureSubscription: (() => void) | null = null
 let membershipReleaseSubscription: (() => void) | null = null
-const backgroundSyncLogger = serverLogger.child({ module: 'background-sync' })
+const backgroundSyncLogger = serverNodeLog.child({ module: 'background-sync' })
 const syncQueue = new PQueue({ concurrency: 1 })
 
 function stopBackgroundSyncJob(): void {

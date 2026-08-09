@@ -6,7 +6,7 @@ import type {
   ServerAppRealtimeSocket,
 } from '#/server/realtime/app-realtime-host.ts'
 import { MemoryBoundRealtimeSocket } from '#/server/realtime/memory-bound-realtime-socket.ts'
-import { serverLogger } from '#/server/logger.ts'
+import { serverNodeLog } from '#/node/logger.ts'
 import {
   isAppRealtimeWorkspacePaneRuntimeAction,
   isAppRealtimeWorkspacePaneTabsAction,
@@ -40,7 +40,7 @@ import type {
 } from '#/shared/workspace-pane-runtime.ts'
 import type { RealtimeRpcHandlers } from '#/server/realtime/realtime-rpc-handlers.ts'
 
-const appRealtimeRuntimeLogger = serverLogger.child({ module: 'app-realtime-runtime' })
+const appRealtimeRuntimeLogger = serverNodeLog.child({ module: 'app-realtime-runtime' })
 
 export interface AppRealtimeRuntimeOptions {
   broker: RealtimeBroker<AppRealtimeMessage>

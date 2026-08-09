@@ -1,168 +1,162 @@
-import * as React from 'react'
-import { AlertDialog as AlertDialogPrimitive } from 'radix-ui'
+import {
+  AlertDialogCancel as RekaAlertDialogCancel,
+  AlertDialogContent as RekaAlertDialogContent,
+  AlertDialogDescription as RekaAlertDialogDescription,
+  AlertDialogOverlay as RekaAlertDialogOverlay,
+  AlertDialogPortal as RekaAlertDialogPortal,
+  AlertDialogTitle as RekaAlertDialogTitle,
+} from 'reka-ui'
+import { defineComponent } from 'vue'
+import type { ButtonHTMLAttributes, FunctionalComponent, HTMLAttributes } from 'vue'
 import { cn } from '#/web/lib/cn.ts'
 import { Button } from '#/web/components/ui/button.tsx'
+import type { ButtonProps } from '#/web/components/ui/button.tsx'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-function AlertDialog({ ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
-  return <AlertDialogPrimitive.Root data-slot="alert-dialog" {...props} />
+
+type AlertDialogOverlayProps = Omit<InstanceType<typeof RekaAlertDialogOverlay>['$props'], 'class'> & {
+  class?: HTMLAttributes['class']
 }
 
-function AlertDialogTrigger({ ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Trigger>) {
-  return <AlertDialogPrimitive.Trigger data-slot="alert-dialog-trigger" {...props} />
-}
-
-function AlertDialogPortal({ ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Portal>) {
-  return <AlertDialogPrimitive.Portal data-slot="alert-dialog-portal" {...props} />
-}
-
-function AlertDialogOverlay({ className, ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Overlay>) {
+const AlertDialogOverlay: FunctionalComponent<AlertDialogOverlayProps> = (props, { slots }) => {
+  const { class: classValue, ...overlayProps } = props
   return (
-    <AlertDialogPrimitive.Overlay
+    <RekaAlertDialogOverlay
+      {...overlayProps}
       data-slot="alert-dialog-overlay"
-      className={cn(
+      class={cn(
         'fixed inset-0 z-50 bg-[var(--color-overlay-scrim)] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',
-        className,
+        classValue,
       )}
-      {...props}
-    />
+    >
+      {slots.default?.()}
+    </RekaAlertDialogOverlay>
   )
 }
+AlertDialogOverlay.inheritAttrs = false
 
-function AlertDialogContent({
-  className,
-  size = 'default',
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
+type AlertDialogContentProps = Omit<InstanceType<typeof RekaAlertDialogContent>['$props'], 'class' | 'size'> & {
+  class?: HTMLAttributes['class']
   size?: 'default' | 'sm'
-}) {
+}
+
+export const AlertDialogContent: FunctionalComponent<AlertDialogContentProps> = (props, { slots }) => {
+  const { class: classValue, size = 'default', ...contentProps } = props
   return (
-    <AlertDialogPortal>
+    <RekaAlertDialogPortal>
       <AlertDialogOverlay />
-      <AlertDialogPrimitive.Content
+      <RekaAlertDialogContent
+        {...contentProps}
         data-slot="alert-dialog-content"
         data-size={size}
-        // Tighter padding (p-4 / gap-3) than upstream — matches our
-        // Dialog calibration so a confirm dialog and a regular dialog
-        // read at the same density. `bg-card` for card-on-overlay.
-        className={cn(
+        class={cn(
           'group/alert-dialog-content fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-3 rounded-lg border bg-card p-4 text-left shadow-lg duration-200 data-[size=sm]:max-w-xs data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[size=default]:sm:max-w-lg',
-          className,
+          classValue,
         )}
-        {...props}
-      />
-    </AlertDialogPortal>
+      >
+        {slots.default?.()}
+      </RekaAlertDialogContent>
+    </RekaAlertDialogPortal>
   )
 }
+AlertDialogContent.inheritAttrs = false
 
-function AlertDialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
+export const AlertDialogHeader: FunctionalComponent<HTMLAttributes> = (props, { slots }) => {
+  const { class: classValue, ...elementProps } = props
   return (
     <div
+      {...elementProps}
       data-slot="alert-dialog-header"
-      className={cn(
+      class={cn(
         'grid grid-rows-[auto_1fr] place-items-start gap-1.5 text-left has-data-[slot=alert-dialog-media]:grid-rows-[auto_auto_1fr] has-data-[slot=alert-dialog-media]:gap-x-6 sm:group-data-[size=default]/alert-dialog-content:place-items-start sm:group-data-[size=default]/alert-dialog-content:text-left sm:group-data-[size=default]/alert-dialog-content:has-data-[slot=alert-dialog-media]:grid-rows-[auto_1fr]',
-        className,
+        classValue,
       )}
-      {...props}
-    />
+    >
+      {slots.default?.()}
+    </div>
   )
 }
+AlertDialogHeader.inheritAttrs = false
 
-function AlertDialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
-  const compact = useIsCompactUi()
-  return (
-    <div
-      data-slot="alert-dialog-footer"
-      className={cn(
-        compact
-          ? 'flex flex-col-reverse gap-2 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2'
-          : 'flex flex-row justify-end gap-2',
-        className,
-      )}
-      {...props}
-    />
-  )
+export const AlertDialogFooter = defineComponent<HTMLAttributes>(
+  (_props, { attrs, slots }) => {
+    const compact = useIsCompactUi()
+    return () => {
+      const { class: classValue, ...elementAttrs } = attrs as HTMLAttributes
+      return (
+        <div
+          {...elementAttrs}
+          data-slot="alert-dialog-footer"
+          class={cn(
+            compact.value
+              ? 'flex flex-col-reverse gap-2 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2'
+              : 'flex flex-row justify-end gap-2',
+            classValue,
+          )}
+        >
+          {slots.default?.()}
+        </div>
+      )
+    }
+  },
+  {
+    name: 'AlertDialogFooter',
+    inheritAttrs: false,
+  },
+)
+
+type AlertDialogTitleProps = Omit<InstanceType<typeof RekaAlertDialogTitle>['$props'], 'class'> & {
+  class?: HTMLAttributes['class']
 }
 
-function AlertDialogTitle({ className, ...props }: React.ComponentProps<typeof AlertDialogPrimitive.Title>) {
+export const AlertDialogTitle: FunctionalComponent<AlertDialogTitleProps> = (props, { slots }) => {
+  const { class: classValue, ...titleProps } = props
   return (
-    <AlertDialogPrimitive.Title
+    <RekaAlertDialogTitle
+      {...titleProps}
       data-slot="alert-dialog-title"
-      // text-sm for the same reason as DialogTitle: a confirm prompt
-      // is informational, not a marquee header.
-      className={cn(
+      class={cn(
         'text-sm leading-tight font-semibold sm:group-data-[size=default]/alert-dialog-content:group-has-data-[slot=alert-dialog-media]/alert-dialog-content:col-start-2',
-        className,
+        classValue,
       )}
-      {...props}
-    />
+    >
+      {slots.default?.()}
+    </RekaAlertDialogTitle>
   )
 }
+AlertDialogTitle.inheritAttrs = false
 
-function AlertDialogDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Description>) {
+type AlertDialogDescriptionProps = Omit<InstanceType<typeof RekaAlertDialogDescription>['$props'], 'class'> & {
+  class?: HTMLAttributes['class']
+}
+
+export const AlertDialogDescription: FunctionalComponent<AlertDialogDescriptionProps> = (props, { slots }) => {
+  const { class: classValue, ...descriptionProps } = props
   return (
-    <AlertDialogPrimitive.Description
+    <RekaAlertDialogDescription
+      {...descriptionProps}
       data-slot="alert-dialog-description"
-      className={cn('text-sm text-muted-foreground', className)}
-      {...props}
-    />
+      class={cn('text-sm text-muted-foreground', classValue)}
+    >
+      {slots.default?.()}
+    </RekaAlertDialogDescription>
   )
 }
+AlertDialogDescription.inheritAttrs = false
 
-function AlertDialogMedia({ className, ...props }: React.ComponentProps<'div'>) {
-  return (
-    <div
-      data-slot="alert-dialog-media"
-      className={cn(
-        "mb-2 inline-flex size-16 items-center justify-center rounded-md bg-muted sm:group-data-[size=default]/alert-dialog-content:row-span-2 *:[svg:not([class*='size-'])]:size-8",
-        className,
-      )}
-      {...props}
-    />
-  )
-}
+type AlertDialogCancelProps = Omit<InstanceType<typeof RekaAlertDialogCancel>['$props'], 'class'> &
+  ButtonHTMLAttributes &
+  Pick<ButtonProps, 'variant' | 'size'>
 
-function AlertDialogAction({
-  className,
-  variant = 'default',
-  size = 'sm',
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Action> &
-  Pick<React.ComponentProps<typeof Button>, 'variant' | 'size'>) {
+export const AlertDialogCancel: FunctionalComponent<AlertDialogCancelProps> = (props, { slots }) => {
+  const { class: classValue, size = 'sm', variant = 'outline', ...cancelProps } = props
   return (
     <Button variant={variant} size={size} asChild>
-      <AlertDialogPrimitive.Action data-slot="alert-dialog-action" className={cn(className)} {...props} />
+      <RekaAlertDialogCancel {...cancelProps} data-slot="alert-dialog-cancel" class={cn(classValue)}>
+        {slots.default?.()}
+      </RekaAlertDialogCancel>
     </Button>
   )
 }
+AlertDialogCancel.inheritAttrs = false
 
-function AlertDialogCancel({
-  className,
-  variant = 'outline',
-  size = 'sm',
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Cancel> &
-  Pick<React.ComponentProps<typeof Button>, 'variant' | 'size'>) {
-  return (
-    <Button variant={variant} size={size} asChild>
-      <AlertDialogPrimitive.Cancel data-slot="alert-dialog-cancel" className={cn(className)} {...props} />
-    </Button>
-  )
-}
-
-export {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogOverlay,
-  AlertDialogPortal,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-}
+export type { AlertDialogCancelProps, AlertDialogContentProps, AlertDialogDescriptionProps, AlertDialogTitleProps }
