@@ -37,48 +37,41 @@ const appHistoryPresentationControllers = new WeakMap<RouterHistory, AppHistoryP
 export function createAppHistoryPresentationHistory(history: RouterHistory): RouterHistory {
   let nextSettlementId = 0
   let consumedSettlementId: number | null = null
-  const presentationByEntryId = new Map<string, AppHistoryPresentation>()
-  const traversalActionByEntryId = new Map<string, AppHistoryPresentationAction>()
-  const legacyEntryIdByPosition = new Map<number, string>()
+  let pendingTraversal: { entryId: string; action: AppHistoryPresentationAction } | null = null
   const legacyEntryIdByState = new WeakMap<object, string>()
 
   const createPresentation = (action: AppHistoryPresentationAction): AppHistoryPresentation => ({
     settlementId: ++nextSettlementId,
     action,
   })
-  const entryIdForState = (state: HistoryState): string => {
-    const storedEntryId = storedAppHistoryEntryId(state)
+  const currentEntryId = (): string => {
+    const storedEntryId = storedAppHistoryEntryId(history.state)
     if (storedEntryId) return storedEntryId
-    const position = state.position
+    const position = history.state.position
     if (typeof position === 'number' && Number.isSafeInteger(position)) {
-      const existingEntryId = legacyEntryIdByPosition.get(position)
-      if (existingEntryId) return existingEntryId
-      const entryId = createOpaqueId('history-entry')
-      legacyEntryIdByPosition.set(position, entryId)
-      return entryId
+      return `history-entry-legacy-${position}`
     }
-    const existingEntryId = legacyEntryIdByState.get(state)
+    const existingEntryId = legacyEntryIdByState.get(history.state)
     if (existingEntryId) return existingEntryId
-    const entryId = createOpaqueId('history-entry')
-    legacyEntryIdByState.set(state, entryId)
+    const entryId = createOpaqueId('history-entry-legacy')
+    legacyEntryIdByState.set(history.state, entryId)
     return entryId
   }
-  const currentEntryId = (): string => entryIdForState(history.state)
   let presentedEntryId = currentEntryId()
+  let currentPresentation = createPresentation({ type: 'REPLACE' })
   const commitPresentation = (entryId: string, action: AppHistoryPresentationAction): AppHistoryPresentation => {
     const presentation = createPresentation(action)
-    presentationByEntryId.set(entryId, presentation)
     presentedEntryId = entryId
+    currentPresentation = presentation
+    pendingTraversal = null
     return presentation
   }
 
-  commitPresentation(presentedEntryId, { type: 'REPLACE' })
-
   const removeTraversalListener = history.listen((_to, _from, information) => {
-    traversalActionByEntryId.set(
-      currentEntryId(),
-      traversalPresentationAction(information as VueHistoryNavigationInformation),
-    )
+    pendingTraversal = {
+      entryId: currentEntryId(),
+      action: traversalPresentationAction(information as VueHistoryNavigationInformation),
+    }
   })
 
   const wrappedHistory: RouterHistory = {
@@ -95,9 +88,8 @@ export function createAppHistoryPresentationHistory(history: RouterHistory): Rou
       commitPresentation(entryId, { type: 'PUSH' })
     },
     replace(to, data) {
-      const entryId = currentEntryId()
+      const entryId = storedAppHistoryEntryId(history.state) ?? createOpaqueId('history-entry')
       history.replace(to, appHistoryStateWithEntryId(data ?? {}, entryId))
-      traversalActionByEntryId.delete(entryId)
       commitPresentation(entryId, { type: 'REPLACE' })
     },
     go(delta, triggerListeners) {
@@ -112,36 +104,29 @@ export function createAppHistoryPresentationHistory(history: RouterHistory): Rou
     destroy() {
       removeTraversalListener()
       appHistoryPresentationControllers.delete(wrappedHistory)
-      presentationByEntryId.clear()
-      traversalActionByEntryId.clear()
+      pendingTraversal = null
       history.destroy()
     },
   }
 
   appHistoryPresentationControllers.set(wrappedHistory, {
     current() {
-      const presentation = presentationByEntryId.get(presentedEntryId)
-      if (!presentation) throw new Error('Vue Router history entry is missing app presentation metadata')
-      return presentation
+      return currentPresentation
     },
     consumeCurrentAction() {
-      const presentation = presentationByEntryId.get(presentedEntryId)
-      if (!presentation) throw new Error('Vue Router history entry is missing app presentation metadata')
-      if (presentation.settlementId === consumedSettlementId) return null
-      consumedSettlementId = presentation.settlementId
-      return presentation.action
+      if (currentPresentation.settlementId === consumedSettlementId) return null
+      consumedSettlementId = currentPresentation.settlementId
+      return currentPresentation.action
     },
     settleCurrent() {
       const entryId = currentEntryId()
-      const traversalAction = traversalActionByEntryId.get(entryId)
-      if (traversalAction) {
-        traversalActionByEntryId.delete(entryId)
-        return commitPresentation(entryId, traversalAction)
+      if (pendingTraversal?.entryId === entryId) {
+        return commitPresentation(entryId, pendingTraversal.action)
       }
-      const presentation = presentationByEntryId.get(entryId)
-      if (!presentation) throw new Error('Vue Router history entry is missing app presentation metadata')
-      presentedEntryId = entryId
-      return presentation
+      if (entryId !== presentedEntryId) {
+        throw new Error('Vue Router history entry changed without a committed app presentation')
+      }
+      return currentPresentation
     },
   })
   return wrappedHistory

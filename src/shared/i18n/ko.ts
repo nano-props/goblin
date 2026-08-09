@@ -193,6 +193,7 @@ export const ko: Record<DictKey, string> = {
   // ---- Empty state -------------------------------------------------------
   'empty.title': '열린 작업 공간이 없습니다',
   'empty.body': '사이드바에서 작업 공간을 선택하거나 폴더를 이 창으로 드래그하세요.',
+  'route.not-found-title': '페이지를 찾을 수 없음',
   'workspace-route.not-found-title': '작업 공간을 찾을 수 없음',
 
   // ---- Drag and drop -----------------------------------------------------

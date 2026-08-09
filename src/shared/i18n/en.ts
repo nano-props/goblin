@@ -202,6 +202,7 @@ export const en = {
   // ---- Empty state --------------------------------------------------------
   'empty.title': 'No workspace open',
   'empty.body': 'Choose a workspace from the sidebar, or drop a folder here.',
+  'route.not-found-title': 'Page not found',
   'workspace-route.not-found-title': 'Workspace not found',
 
   // ---- Drag and drop ------------------------------------------------------

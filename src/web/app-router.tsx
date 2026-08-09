@@ -10,8 +10,10 @@ import { createAppHistoryPresentationHistory } from '#/web/app-history-presentat
 import { App } from '#/web/App.tsx'
 import type { ParsedWorkspacePaneRoute, WorkspaceRouteView } from '#/web/App.tsx'
 import { Layout } from '#/web/Layout.tsx'
+import { EmptyState } from '#/web/components/Layout.tsx'
 import { useAppRouteNavigation } from '#/web/app-route-navigation.ts'
 import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 import {
   branchNameFromSlug,
   workspaceIdFromSlug,
@@ -36,6 +38,14 @@ const AppRouteView = defineComponent({
         {...callbacks}
       />
     )
+  },
+})
+
+const AppNotFoundRouteView = defineComponent({
+  name: 'AppNotFoundRouteView',
+  setup() {
+    const t = useT()
+    return () => <EmptyState title={t('route.not-found-title')} />
   },
 })
 
@@ -85,6 +95,7 @@ const appRouteChildren: RouteRecordRaw[] = [
     name: 'workspace-worktree-terminal',
     component: AppRouteView,
   },
+  { path: ':pathMatch(.*)*', name: 'not-found', component: AppNotFoundRouteView },
 ]
 
 const routes: RouteRecordRaw[] = [{ path: '/', component: Layout, children: appRouteChildren }]

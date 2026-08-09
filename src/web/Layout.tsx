@@ -28,7 +28,6 @@ import {
   workspaceRouteContextFromVueRoute,
 } from '#/web/app-layout-model.ts'
 import {
-  AuthenticatedWorkspaceRestoreProvider,
   WorkspaceSessionRestoreError,
   WorkspaceSessionRestorePlaceholder,
 } from '#/web/components/WorkspaceSessionRestore.tsx'
@@ -69,19 +68,17 @@ const AuthenticatedAppShell = defineComponent({
       const bootstrapState = bootstrap.state.value
       const shellMode = authenticatedAppShellMode(route.path, bootstrapState)
       return (
-        <AuthenticatedWorkspaceRestoreProvider value={bootstrap}>
-          <TerminalSessionProvider>
-            {shellMode === 'settings' ? (
-              <AuthenticatedSettingsShell />
-            ) : shellMode === 'workspace-restore' ? (
-              <WorkspaceSessionRestorePlaceholder />
-            ) : shellMode === 'workspace-failed' && bootstrapState.status === 'failed' ? (
-              <WorkspaceSessionRestoreError state={bootstrapState} retry={bootstrap.retry} />
-            ) : (
-              <AuthenticatedWorkspaceShell />
-            )}
-          </TerminalSessionProvider>
-        </AuthenticatedWorkspaceRestoreProvider>
+        <TerminalSessionProvider>
+          {shellMode === 'settings' ? (
+            <AuthenticatedSettingsShell />
+          ) : shellMode === 'workspace-restore' ? (
+            <WorkspaceSessionRestorePlaceholder />
+          ) : shellMode === 'workspace-failed' && bootstrapState.status === 'failed' ? (
+            <WorkspaceSessionRestoreError state={bootstrapState} retry={bootstrap.retry} />
+          ) : (
+            <AuthenticatedWorkspaceShell />
+          )}
+        </TerminalSessionProvider>
       )
     }
   },

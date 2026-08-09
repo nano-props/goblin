@@ -29,8 +29,7 @@ export function useActionFeedback(): {
 
     void Promise.resolve(result)
       .then((accepted) => {
-        if (!scopeActive || !accepted) return
-        reset()
+        if (!scopeActive || !accepted || succeeded.value) return
         succeeded.value = true
         timeout = window.setTimeout(reset, ACTION_FEEDBACK_MS)
       })

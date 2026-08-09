@@ -22,6 +22,10 @@ export interface JsdomRenderOptions extends Omit<RenderOptions<unknown>, 'wrappe
   wrapper?: JsxComponent
 }
 
+export interface ComponentJsdomRenderOptions extends Omit<JsdomRenderOptions, 'wrapper'> {
+  wrapper?: never
+}
+
 export interface JsdomRenderResult extends Omit<RenderResult, 'baseElement' | 'container' | 'rerender'> {
   baseElement: HTMLElement
   container: HTMLElement
@@ -35,8 +39,16 @@ async function flushAnimationFrames(frames = 1): Promise<void> {
   }
 }
 
-export function renderInJsdom(component: Component | VNode, options: JsdomRenderOptions = {}): JsdomRenderResult {
+export function renderInJsdom(component: VNode, options?: JsdomRenderOptions): JsdomRenderResult
+export function renderInJsdom(component: Component, options?: ComponentJsdomRenderOptions): JsdomRenderResult
+export function renderInJsdom(
+  component: Component | VNode,
+  options: JsdomRenderOptions | ComponentJsdomRenderOptions = {},
+): JsdomRenderResult {
   const { wrapper: Wrapper, ...renderOptions } = options
+  if (!isVNode(component) && Wrapper) {
+    throw new Error('component renders do not accept wrapper; render a VNode when a wrapper is required')
+  }
   const suppliedPlugins = renderOptions.global?.plugins ?? []
   const router = suppliedPlugins.some(isRouterPlugin) ? null : createTestRouter()
   const global = {

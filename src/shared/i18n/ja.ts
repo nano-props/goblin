@@ -202,6 +202,7 @@ export const ja: Record<DictKey, string> = {
   // ---- Empty state -------------------------------------------------------
   'empty.title': 'ワークスペースが開かれていません',
   'empty.body': 'サイドバーからワークスペースを選択するか、フォルダをドラッグしてください。',
+  'route.not-found-title': 'ページが見つかりません',
   'workspace-route.not-found-title': 'ワークスペースが見つかりません',
 
   // ---- Drag and drop -----------------------------------------------------

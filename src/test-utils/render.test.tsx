@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, test, vi } from 'vitest'
+import { defineComponent } from 'vue'
 import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
@@ -23,6 +24,26 @@ describe('renderInJsdom', () => {
     await view.rerender(<span data-testid="target">after</span>)
 
     expect(view.getByTestId('target').textContent).toBe('after')
+  })
+
+  test('rejects wrappers for component renders instead of silently ignoring them', () => {
+    const Component = defineComponent({
+      name: 'ComponentRenderProbe',
+      setup() {
+        return () => <span>probe</span>
+      },
+    })
+    const Wrapper = defineComponent({
+      name: 'ComponentRenderWrapper',
+      setup(_props, { slots }) {
+        return () => <div>{slots.default?.()}</div>
+      },
+    })
+
+    expect(() => {
+      // @ts-expect-error Component renders intentionally exclude the VNode-only wrapper option.
+      renderInJsdom(Component, { wrapper: Wrapper })
+    }).toThrow('component renders do not accept wrapper')
   })
 
   test('flushAnimationFrames awaits the requested number of frames', async () => {

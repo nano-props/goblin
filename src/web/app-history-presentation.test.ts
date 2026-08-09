@@ -27,6 +27,21 @@ beforeEach(() => {
 })
 
 describe('app history presentation', () => {
+  test('starts a fresh presentation without mutating the current history entry', () => {
+    const rawHistory = createMemoryHistory()
+    rawHistory.replace('/restored', { applicationState: 'preserved' })
+    const initialState = rawHistory.state
+
+    const history = createAppHistoryPresentationHistory(rawHistory)
+
+    expect(history.location).toBe('/restored')
+    expect(history.state).toBe(initialState)
+    expect(requireAppHistoryPresentation(history)).toEqual({
+      settlementId: 1,
+      action: { type: 'REPLACE' },
+    })
+  })
+
   test('keeps the final PUSH bound to its committed entry across rapid navigation cancellation', async () => {
     const { history, router } = await createRouterHarness()
     const failedHrefs: string[] = []

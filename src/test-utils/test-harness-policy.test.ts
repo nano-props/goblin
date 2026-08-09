@@ -29,6 +29,7 @@ const TEST_UTILITY_GLOBS = [
 
 const repositoryPolicyLabels = [
   'hand-rolled Vue app',
+  'direct RTL render',
   'direct RTL renderHook',
   'inline WebSocket mock',
   'test-local fetch replacement',
@@ -116,6 +117,8 @@ describe('test harness policy', () => {
 
   test.each([
     ['hand-rolled Vue app', "import { createApp as mount } from 'vue'; mount({})"],
+    ['direct RTL render', "import { render as mount } from '@testing-library/vue'; mount({})"],
+    ['direct RTL render', "import * as rtl from '@testing-library/vue'; rtl.render({})"],
     ['direct RTL renderHook', "import { renderHook as mountHook } from '@testing-library/vue'"],
     ['direct RTL renderHook', "import * as rtl from '@testing-library/vue'; rtl.renderHook(() => null)"],
     ['inline WebSocket mock', 'class FakeWebSocket {}'],
@@ -151,6 +154,7 @@ describe('test harness policy', () => {
 
 function isCanonicalPolicyOwner(file: string, label: (typeof repositoryPolicyLabels)[number]): boolean {
   if (label === 'hand-rolled Vue app') return !isTestFile(file)
+  if (label === 'direct RTL render') return file === CANONICAL_RENDER_FILE
   if (label === 'direct RTL renderHook') return file === CANONICAL_RENDER_FILE
   if (label === 'inline WebSocket mock') return file === CANONICAL_WEBSOCKET_MOCK_FILE
   if (label === 'test-local fetch replacement') return CANONICAL_FETCH_MOCK_FILES.has(file)
@@ -179,6 +183,9 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
 
   traverse(ast, {
     ImportSpecifier(path) {
+      if (importSource(path) === '@testing-library/vue' && importedName(path) === 'render') {
+        violations.add('direct RTL render')
+      }
       if (importSource(path) === '@testing-library/vue' && importedName(path) === 'renderHook') {
         violations.add('direct RTL renderHook')
       }
@@ -201,6 +208,7 @@ function analyzeSource(source: string, file: string): ReadonlySet<PolicyLabel> {
     CallExpression(path) {
       const callee = path.get('callee')
       if (isImportedCreateApp(callee)) violations.add('hand-rolled Vue app')
+      if (isTestingLibraryRender(callee)) violations.add('direct RTL render')
       if (isTestingLibraryRenderHook(callee)) violations.add('direct RTL renderHook')
       if (isVitestViMember(callee, 'useFakeTimers')) {
         violations.add('direct fake-timer configuration')
@@ -252,6 +260,12 @@ function isImportedCreateApp(callee: NodePath): boolean {
 function isTestingLibraryRenderHook(callee: NodePath): boolean {
   if (isImportedIdentifier(callee, '@testing-library/vue', 'renderHook')) return true
   if (!callee.isMemberExpression() || memberPropertyName(callee) !== 'renderHook') return false
+  return isImportedNamespace(callee.get('object'), '@testing-library/vue')
+}
+
+function isTestingLibraryRender(callee: NodePath): boolean {
+  if (isImportedIdentifier(callee, '@testing-library/vue', 'render')) return true
+  if (!callee.isMemberExpression() || memberPropertyName(callee) !== 'render') return false
   return isImportedNamespace(callee.get('object'), '@testing-library/vue')
 }
 

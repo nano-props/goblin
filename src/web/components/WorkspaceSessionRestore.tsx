@@ -1,49 +1,11 @@
 import { AlertTriangle, RefreshCw } from '@lucide/vue'
-import { defineComponent, inject, provide } from 'vue'
-import type { InjectionKey, PropType } from 'vue'
+import { defineComponent } from 'vue'
+import type { PropType } from 'vue'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
-import type {
-  AuthenticatedAppBootstrapResult,
-  AuthenticatedAppBootstrapState,
-} from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-
-const authenticatedWorkspaceRestoreKey: InjectionKey<AuthenticatedAppBootstrapResult> = Symbol(
-  'authenticated-workspace-restore',
-)
-
-export const AuthenticatedWorkspaceRestoreProvider = defineComponent<{ value: AuthenticatedAppBootstrapResult }>({
-  name: 'AuthenticatedWorkspaceRestoreProvider',
-  props: {
-    value: { type: Object as PropType<AuthenticatedAppBootstrapResult>, required: true },
-  },
-
-  setup(props, { slots }) {
-    provide(authenticatedWorkspaceRestoreKey, props.value)
-    return () => slots.default?.()
-  },
-})
-
-function useAuthenticatedWorkspaceRestore(): AuthenticatedAppBootstrapResult {
-  const bootstrap = inject(authenticatedWorkspaceRestoreKey, null)
-  if (!bootstrap) throw new Error('AuthenticatedWorkspaceRestoreProvider is required')
-  return bootstrap
-}
-
-export const WorkspaceSessionRestoreGate = defineComponent({
-  name: 'WorkspaceSessionRestoreGate',
-  setup(_props, { slots }) {
-    const bootstrap = useAuthenticatedWorkspaceRestore()
-    return () => {
-      const state = bootstrap.state.value
-      if (state.status === 'restoring-workspace') return <WorkspaceSessionRestorePlaceholder />
-      if (state.status === 'failed') return <WorkspaceSessionRestoreError state={state} retry={bootstrap.retry} />
-      return slots.default?.()
-    }
-  },
-})
 
 export const WorkspaceSessionRestorePlaceholder = defineComponent({
   name: 'WorkspaceSessionRestorePlaceholder',

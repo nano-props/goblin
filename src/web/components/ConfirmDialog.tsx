@@ -55,9 +55,7 @@ export const ConfirmDialog = defineComponent<{
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={pending} onClick={props.onCancel}>
-                {t('dialog.cancel')}
-              </AlertDialogCancel>
+              <AlertDialogCancel disabled={pending}>{t('dialog.cancel')}</AlertDialogCancel>
               <Button
                 size="sm"
                 variant={props.destructive ? 'destructive' : 'default'}

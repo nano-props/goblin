@@ -1,4 +1,4 @@
-import { QueryClient, QueryObserver } from '@tanstack/vue-query'
+import { QueryClient, QueryObserver } from '@tanstack/query-core'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type * as InvalidationBroker from '#/server/modules/invalidation-broker.ts'
 import { REPO_ID, mocks } from '#/server/test-utils/repo-module.ts'

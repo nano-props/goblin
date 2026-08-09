@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/vue'
-import { defineComponent } from 'vue'
+import { fireEvent, waitFor } from '@testing-library/vue'
+import { defineComponent, onMounted, onUnmounted } from 'vue'
 import type { PropType } from 'vue'
 import { RouterView } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
-const appMocks = vi.hoisted(() => ({ render: vi.fn() }))
+const appMocks = vi.hoisted(() => ({ render: vi.fn(), layoutMounted: vi.fn(), layoutUnmounted: vi.fn() }))
 
 vi.mock('#/web/App.tsx', () => ({
   App: defineComponent({
@@ -40,6 +40,9 @@ vi.mock('#/web/Layout.tsx', () => ({
     name: 'LayoutMock',
     inheritAttrs: false,
     setup() {
+      useAppHistoryPresentationObserver()
+      onMounted(() => appMocks.layoutMounted())
+      onUnmounted(() => appMocks.layoutUnmounted())
       return () => <RouterView />
     },
   }),
@@ -63,7 +66,7 @@ import {
   workspaceRouteContextFromMatches,
 } from '#/web/app-layout-model.ts'
 import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
-import { requireAppHistoryPresentation } from '#/web/app-history-presentation.ts'
+import { requireAppHistoryPresentation, useAppHistoryPresentationObserver } from '#/web/app-history-presentation.ts'
 import {
   beginAppNavigation,
   observeAppHistoryNavigation,
@@ -75,6 +78,7 @@ import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const WORKSPACE_A_ID = workspaceIdForTest('goblin+file:///workspace-a')
 const WORKSPACE_B_ID = workspaceIdForTest('goblin+file:///workspace-b')
@@ -83,14 +87,16 @@ const GIT_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace/repo')
 const ROUTE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///route-workspace')
 const DEEP_LINK_WORKSPACE_ID = workspaceIdForTest('goblin+file:///deep-link-workspace')
 
-beforeEach(() => {
+beforeEach(async () => {
+  navigateBrowser('/')
+  await vi.waitFor(() => expect(appRouter.currentRoute.value.fullPath).toBe('/'))
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  appMocks.render.mockClear()
+  appMocks.layoutMounted.mockClear()
+  appMocks.layoutUnmounted.mockClear()
 })
 
 afterEach(() => {
-  cleanup()
-  navigateBrowser('/')
-  appMocks.render.mockClear()
   vi.restoreAllMocks()
 })
 
@@ -133,6 +139,39 @@ describe('app initial route', () => {
         workspaceMembershipReady: true,
       }),
     ).toBe(workspaceSlugFromId(WORKSPACE_A_ID))
+  })
+})
+
+describe('unmatched app routes', () => {
+  test.each(['/unknown', `/workspace/${workspaceSlugFromId(WORKSPACE_A_ID)}/unknown-child`])(
+    'renders an explicit not-found surface for %s',
+    async (path) => {
+      navigateBrowser(path)
+
+      const view = renderRouter()
+
+      await waitFor(() => expect(appRouter.currentRoute.value.name).toBe('not-found'))
+      expect(view.container.textContent).toContain('route.not-found-title')
+    },
+  )
+
+  test('keeps the root Layout owner mounted while navigating through an unmatched route', async () => {
+    navigateBrowser('/settings/general')
+    renderRouter()
+    await waitFor(() => expect(appRouter.currentRoute.value.name).toBe('settings'))
+    expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
+
+    await appRouter.push('/unknown')
+    await waitFor(() => expect(appRouter.currentRoute.value.name).toBe('not-found'))
+    expect(requireAppHistoryPresentation(appRouter.options.history).action).toEqual({ type: 'PUSH' })
+    expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
+    expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()
+
+    appRouter.back()
+    await waitFor(() => expect(appRouter.currentRoute.value.fullPath).toBe('/settings/general'))
+    expect(requireAppHistoryPresentation(appRouter.options.history).action).toEqual({ type: 'BACK' })
+    expect(appMocks.layoutMounted).toHaveBeenCalledTimes(1)
+    expect(appMocks.layoutUnmounted).not.toHaveBeenCalled()
   })
 })
 
@@ -407,7 +446,7 @@ function navigateBrowser(pathname: string) {
 }
 
 function renderRouter() {
-  return render(AppRouterProvider, { global: { plugins: [appRouter] } })
+  return renderInJsdom(AppRouterProvider, { global: { plugins: [appRouter] } })
 }
 
 describe('workspace route context derivation', () => {
