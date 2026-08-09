@@ -73,7 +73,7 @@ describe('workspace pane tab target read model', () => {
     expect(workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)).toBeNull()
   })
 
-  test('resolves an interaction target from accepted data after a background snapshot refresh fails', async () => {
+  test('resolves an interaction target from accepted data after a background snapshot refresh fails', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -210,7 +210,7 @@ describe('workspace pane tab target read model', () => {
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(true)
   })
 
-  test('resolves a created runtime by worktree while its canonical branch rename is not projected locally', async () => {
+  test('resolves a created runtime by worktree while its canonical branch rename is not projected locally', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -244,7 +244,7 @@ describe('workspace pane tab target read model', () => {
     expect(target?.worktreePath).toBe(WORKTREE_PATH)
   })
 
-  test('treats an explicit bare branch route as an empty workspace pane', async () => {
+  test('treats an explicit bare branch route as an empty workspace pane', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -289,7 +289,7 @@ describe('workspace pane tab target read model', () => {
     ).toBe('workspace-pane:status')
   })
 
-  test('scopes worktree tab openers by workspace pane target instead of branch name', async () => {
+  test('scopes worktree tab openers by workspace pane target instead of branch name', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [

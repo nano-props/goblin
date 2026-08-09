@@ -13,7 +13,7 @@ class FakeParentProcess extends EventEmitter {
 }
 
 describe('bootstrapPtyWorker', () => {
-  test('shuts down every worker-owned PTY when the parent IPC channel disconnects', async () => {
+  test('shuts down every worker-owned PTY when the parent IPC channel disconnects', () => {
     const parent = new FakeParentProcess()
     const runtime = bootstrapPtyWorker(parent)
     const shutdown = vi.spyOn(runtime, 'shutdown')

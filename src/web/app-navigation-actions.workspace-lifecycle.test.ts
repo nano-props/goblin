@@ -23,7 +23,7 @@ import {
 beforeEach(setupAppNavigationActionsTests)
 
 describe('createAppNavigationActions workspace lifecycle', () => {
-  test('cycles repos by navigating from the current repo', async () => {
+  test('cycles repos by navigating from the current repo', () => {
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
@@ -178,7 +178,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     )
   })
 
-  test('cycles repos backward and wraps around', async () => {
+  test('cycles repos backward and wraps around', () => {
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
@@ -329,7 +329,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith(REPO_A_ID, presentationOptions())
   })
 
-  test('restores a saved new-worktree return target when navigating workspace history', async () => {
+  test('restores a saved new-worktree return target when navigating workspace history', () => {
     const navigation = routeNavigation()
     const target = {
       workspaceId: REPO_A_ID,
@@ -357,7 +357,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     )
   })
 
-  test('restores a saved bare branch workspace history entry', async () => {
+  test('restores a saved bare branch workspace history entry', () => {
     const navigation = routeNavigation()
     const target = {
       workspaceId: REPO_A_ID,

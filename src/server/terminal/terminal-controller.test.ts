@@ -21,7 +21,7 @@ function createState(overrides: Partial<TerminalControllerState> = {}): Terminal
 }
 
 describe('terminal client admission', () => {
-  test('publishes membership and controller intent only on commit', async () => {
+  test('publishes membership and controller intent only on commit', () => {
     const state = createState()
     const admission = prepareTerminalClientAdmission(state, 'fresh', 'controller', online, () => true)
 
@@ -30,7 +30,7 @@ describe('terminal client admission', () => {
     expect(state).toEqual({ attachments: new Set(['fresh']), controllerClientId: 'fresh' })
   })
 
-  test('rejects an offline or stale admission without retaining membership', async () => {
+  test('rejects an offline or stale admission without retaining membership', () => {
     const offlineState = createState()
     const offlineAdmission = prepareTerminalClientAdmission(offlineState, 'offline', 'controller', offline, () => true)
     expect(() => offlineAdmission.commit()).toThrow('error.unavailable')
@@ -42,7 +42,7 @@ describe('terminal client admission', () => {
     expect(staleState.attachments).toEqual(new Set())
   })
 
-  test('restores complete previous membership and controller intent on rollback', async () => {
+  test('restores complete previous membership and controller intent on rollback', () => {
     const state = createState({ attachments: new Set(['existing']), controllerClientId: 'existing' })
     const admission = prepareTerminalClientAdmission(state, 'fresh', 'controller', online, () => true)
 
@@ -54,7 +54,7 @@ describe('terminal client admission', () => {
 })
 
 describe('terminal membership and authority', () => {
-  test('first online attachment controls while a sibling remains viewer', async () => {
+  test('first online attachment controls while a sibling remains viewer', () => {
     const state = createState()
     const first = decideTerminalClientAttachment(state, 'a1', online)
     if (first !== 'unavailable') commitTerminalClientAttachment(state, 'a1', first)
@@ -66,7 +66,7 @@ describe('terminal membership and authority', () => {
     expect(state).toEqual({ attachments: new Set(['a1', 'a2']), controllerClientId: 'a1' })
   })
 
-  test('an online attachment claims when prior controller intent is offline', async () => {
+  test('an online attachment claims when prior controller intent is offline', () => {
     const state = createState({ attachments: new Set(['a1']), controllerClientId: 'a1' })
     const decision = decideTerminalClientAttachment(state, 'a2', onlineExcept('a1'))
     if (decision !== 'unavailable') commitTerminalClientAttachment(state, 'a2', decision)
@@ -74,7 +74,7 @@ describe('terminal membership and authority', () => {
     expect(state.controllerClientId).toBe('a2')
   })
 
-  test('explicit takeover atomically admits an online page and claims control', async () => {
+  test('explicit takeover atomically admits an online page and claims control', () => {
     const state = createState({ attachments: new Set(['a1', 'a2']), controllerClientId: 'a1' })
     expect(claimTerminalClientControl(state, 'a2', online)).toBe(true)
     expect(claimTerminalClientControl(state, 'fresh', online)).toBe(true)
@@ -82,20 +82,20 @@ describe('terminal membership and authority', () => {
     expect(state).toEqual({ attachments: new Set(['a1', 'a2', 'fresh']), controllerClientId: 'fresh' })
   })
 
-  test('expiry removes only the page membership and controller intent it owns', async () => {
+  test('expiry removes only the page membership and controller intent it owns', () => {
     const state = createState({ attachments: new Set(['expired', 'current']), controllerClientId: 'expired' })
     expect(expireTerminalClient(state, 'expired')).toBe(true)
     expect(state).toEqual({ attachments: new Set(['current']), controllerClientId: null })
   })
 
-  test('derives effective controller from membership and live presence', async () => {
+  test('derives effective controller from membership and live presence', () => {
     const state = createState({ attachments: new Set(['a1']), controllerClientId: 'a1' })
     expect(effectiveTerminalController(state, online)).toEqual({ clientId: 'a1', status: 'connected' })
     expect(effectiveTerminalController(state, offline)).toBeNull()
     expect(terminalIdentityChanged(state, { clientId: 'a1', status: 'connected' }, offline)).toBe(true)
   })
 
-  test('allows only the effective controller to mutate a binding', async () => {
+  test('allows only the effective controller to mutate a binding', () => {
     const state = createState({ attachments: new Set(['a1', 'a2']), controllerClientId: 'a1' })
     expect(isAuthoritative(state, 'a1', online)).toBe(true)
     expect(explainAuthority(state, 'a2', online)).toBe('not-controller')

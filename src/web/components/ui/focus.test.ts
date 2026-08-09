@@ -6,7 +6,7 @@ import { describe, expect, test } from 'vitest'
 import { focusRingInset, focusRingVisibleInset } from '#/web/components/ui/focus.ts'
 
 describe('focus ring utilities', () => {
-  test('focusRingInset draws the ring inside the border box', async () => {
+  test('focusRingInset draws the ring inside the border box', () => {
     // The ring-inset modifier is what makes the ring clip-proof under
     // ancestor overflow:hidden. Without it, the box-shadow extends past
     // the border and gets sliced by CollapseTransition's height-transition
@@ -16,7 +16,7 @@ describe('focus ring utilities', () => {
     expect(focusRingInset).toContain('focus:ring-ring')
   })
 
-  test('focusRingVisibleInset draws the keyboard-only ring inside the border box', async () => {
+  test('focusRingVisibleInset draws the keyboard-only ring inside the border box', () => {
     expect(focusRingVisibleInset).toContain('focus-visible:ring-inset')
     expect(focusRingVisibleInset).toContain('focus-visible:ring-[3px]')
     expect(focusRingVisibleInset).toContain('focus-visible:ring-ring/50')

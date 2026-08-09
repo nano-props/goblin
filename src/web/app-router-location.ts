@@ -1,5 +1,4 @@
 import type { HistoryState, RouteLocationRaw, Router } from 'vue-router'
-import { markAppHistoryMutation } from '#/web/app-history-presentation.ts'
 
 export function appRouteHref(router: Router, target: RouteLocationRaw): string {
   return router.resolve(target).href
@@ -22,7 +21,6 @@ export async function navigateAppRoute(
     hash: resolved.hash,
     state,
   }
-  markAppHistoryMutation(resolved.fullPath, replace)
   if (replace) await router.replace(location)
   else await router.push(location)
 }

@@ -30,7 +30,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     responsiveMocks.compact = false
   })
 
-  test('shows branch rows and an empty workspace placeholder by default in split mode', async () => {
+  test('shows branch rows and an empty workspace placeholder by default in split mode', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton />)
 
     expect(container.querySelectorAll('li')).toHaveLength(6)
@@ -46,7 +46,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     expect(container.querySelector('[data-testid="repo-toolbar-skeleton-pager"]')).toBeNull()
   })
 
-  test('renders split workspace content when a repo workspace is selected', async () => {
+  test('renders split workspace content when a repo workspace is selected', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton workspacePaneState="content" />)
 
     expect(container.querySelectorAll('li')).toHaveLength(6)
@@ -57,7 +57,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
   })
 
-  test('renders a single Branch Navigator skeleton in single-pane mode', async () => {
+  test('renders a single Branch Navigator skeleton in single-pane mode', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton singlePane />)
 
     expect(container.querySelectorAll('li')).toHaveLength(6)
@@ -65,7 +65,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     expect(container.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
   })
 
-  test('renders a single Repo Workspace skeleton in selected single-pane mode', async () => {
+  test('renders a single Repo Workspace skeleton in selected single-pane mode', () => {
     const { container } = renderInJsdom(
       <WorkspaceLayoutSkeleton singlePane singlePaneView="workspace" workspacePaneState="content" />,
     )
@@ -77,7 +77,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     expect(container.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
   })
 
-  test('sizes branch action placeholders like the icon-only action button', async () => {
+  test('sizes branch action placeholders like the icon-only action button', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton singlePane />)
 
     const action = container.querySelector('[data-testid="branch-navigator-skeleton-action"] > div')
@@ -85,7 +85,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     expect(action?.className).toContain('w-7')
   })
 
-  test('uses the same row metrics as the real Branch Navigator list', async () => {
+  test('uses the same row metrics as the real Branch Navigator list', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton singlePane />)
 
     const row = container.querySelector('li')
@@ -98,7 +98,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     expect(actionSlot?.className).toContain('pr-3')
   })
 
-  test('uses two real-width workspace tab placeholders in default mode', async () => {
+  test('uses two real-width workspace tab placeholders in default mode', () => {
     const { container } = renderInJsdom(
       <WorkspaceLayoutSkeleton singlePane singlePaneView="workspace" workspacePaneState="content" />,
     )
@@ -116,7 +116,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     expect(container.querySelector('[data-testid="workspace-pane-skeleton-switcher"]')).toBeNull()
   })
 
-  test('matches compact workspace toolbar geometry', async () => {
+  test('matches compact workspace toolbar geometry', () => {
     responsiveMocks.compact = true
     const { container } = renderInJsdom(
       <WorkspaceLayoutSkeleton singlePane singlePaneView="workspace" workspacePaneState="content" />,
@@ -132,7 +132,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     expect(container.querySelector('[data-testid="workspace-pane-skeleton-switcher"]')?.className).toContain('w-7')
   })
 
-  test('uses the real Status row geometry for workspace content placeholders', async () => {
+  test('uses the real Status row geometry for workspace content placeholders', () => {
     const { container } = renderInJsdom(
       <WorkspaceLayoutSkeleton singlePane singlePaneView="workspace" workspacePaneState="content" />,
     )

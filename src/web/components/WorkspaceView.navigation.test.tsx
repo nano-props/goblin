@@ -224,7 +224,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(container.querySelector('[data-testid="workspace-dashboard-page"]')).toBeNull()
   })
 
-  test('renders a non-Git workspace in the shared shell without mounting Git-only actions', async () => {
+  test('renders a non-Git workspace in the shared shell without mounting Git-only actions', () => {
     setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
 
     const { container } = render(
@@ -246,7 +246,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(restoreWorkspaceTabsMocks.useRepoToasts).not.toHaveBeenCalled()
   })
 
-  test('renders the directory Dashboard for a non-Git dashboard route without Git navigation', async () => {
+  test('renders the directory Dashboard for a non-Git dashboard route without Git navigation', () => {
     setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
 
     const { container } = render(
@@ -258,7 +258,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(branchNavigator(container)).toBeNull()
   })
 
-  test('renders the shared directory Dashboard for a remote non-Git workspace', async () => {
+  test('renders the shared directory Dashboard for a remote non-Git workspace', () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example/srv/workspace')
     seedRepoWithReadModelForTest({
       id: workspaceId,
@@ -285,7 +285,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(container.querySelector('[data-testid="repo-sync-action"]')).toBeNull()
   })
 
-  test('keeps a routed repo on the restore skeleton until workspace membership is ready', async () => {
+  test('keeps a routed repo on the restore skeleton until workspace membership is ready', () => {
     resetWorkspacesStore()
 
     const { container } = render(

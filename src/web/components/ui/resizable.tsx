@@ -19,7 +19,7 @@ const resizeHandleClassNames = {
     'inset-y-0 left-1/2 w-px -translate-x-1/2 group-data-[state=hover]:w-0.5 group-focus-visible:w-0.5 group-data-[state=drag]:w-0.5',
 } as const
 
-type ResizablePanelGroupProps = SplitterGroupProps &
+type ResizablePanelGroupProps = Omit<SplitterGroupProps, 'keyboardResizeBy'> &
   HTMLAttributes & {
     onLayout?: (layout: number[]) => void
   }
@@ -27,7 +27,12 @@ type ResizablePanelGroupProps = SplitterGroupProps &
 export const ResizablePanelGroup: FunctionalComponent<ResizablePanelGroupProps> = (props, { slots }) => {
   const { class: classValue, ...groupProps } = props
   return (
-    <SplitterGroup {...groupProps} data-slot="resizable-panel-group" class={cn('h-full w-full', classValue)}>
+    <SplitterGroup
+      {...groupProps}
+      keyboardResizeBy={5}
+      data-slot="resizable-panel-group"
+      class={cn('h-full w-full', classValue)}
+    >
       {slots.default?.()}
     </SplitterGroup>
   )
@@ -41,6 +46,7 @@ export const ResizableHandle: FunctionalComponent<ResizableHandleProps> = (props
   return (
     <SplitterResizeHandle
       {...handleProps}
+      aria-orientation="vertical"
       data-slot="resizable-handle"
       class={cn(resizeHandleClassNames.hitTarget, resizeHandleClassNames.horizontal, classValue)}
     >

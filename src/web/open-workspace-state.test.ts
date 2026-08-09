@@ -11,7 +11,7 @@ const REPO_B = workspaceIdForTest('goblin+file:///tmp/repo-b')
 const REPO_C = workspaceIdForTest('goblin+file:///tmp/repo-c')
 
 describe('persistedOpenWorkspaceEntries', () => {
-  test('preserves order, skips missing workspaces, and persists canonical IDs', async () => {
+  test('preserves order, skips missing workspaces, and persists canonical IDs', () => {
     const remoteId = workspaceIdForTest('goblin+ssh://example/srv/repo')
     expect(
       persistedOpenWorkspaceEntries([REPO_A, remoteId, workspaceIdForTest('goblin+file:///tmp/missing')], {
@@ -27,13 +27,13 @@ describe('persistedOpenWorkspaceEntries', () => {
 })
 
 describe('nextRestoredWorkspaceIdAfterWorkspaceClose', () => {
-  test('keeps the active selection when closing an inactive workspace', async () => {
+  test('keeps the active selection when closing an inactive workspace', () => {
     expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A, REPO_B], REPO_A, REPO_B)).toBe(
       'goblin+file:///tmp/repo-a',
     )
   })
 
-  test('slides to the right neighbor, then the left, then null', async () => {
+  test('slides to the right neighbor, then the left, then null', () => {
     expect(nextRestoredWorkspaceIdAfterWorkspaceClose([REPO_A, REPO_B, REPO_C], REPO_B, REPO_B)).toBe(
       'goblin+file:///tmp/repo-c',
     )
@@ -45,7 +45,7 @@ describe('nextRestoredWorkspaceIdAfterWorkspaceClose', () => {
 })
 
 describe('restoredWorkspaceIdAfterWorkspaceHydration', () => {
-  test('preserves a user-selected restored repo over the persisted restored repo', async () => {
+  test('preserves a user-selected restored repo over the persisted restored repo', () => {
     expect(
       restoredWorkspaceIdAfterWorkspaceHydration(
         REPO_A,
@@ -57,7 +57,7 @@ describe('restoredWorkspaceIdAfterWorkspaceHydration', () => {
     ).toBe('goblin+file:///tmp/repo-a')
   })
 
-  test('falls back to the restored preferred repo and then the first open workspace when no preferred repo was restored', async () => {
+  test('falls back to the restored preferred repo and then the first open workspace when no preferred repo was restored', () => {
     expect(
       restoredWorkspaceIdAfterWorkspaceHydration(
         null,
@@ -72,7 +72,7 @@ describe('restoredWorkspaceIdAfterWorkspaceHydration', () => {
     ).toBe('goblin+file:///tmp/repo-a')
   })
 
-  test('does not select the first restored repo while the persisted restored repo is still unavailable', async () => {
+  test('does not select the first restored repo while the persisted restored repo is still unavailable', () => {
     expect(
       restoredWorkspaceIdAfterWorkspaceHydration(
         null,

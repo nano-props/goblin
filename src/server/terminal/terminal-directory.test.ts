@@ -17,7 +17,7 @@ interface Entry {
 }
 
 describe('TerminalDirectory', () => {
-  test('publishes complete membership exactly once with user-wide durable identity uniqueness', async () => {
+  test('publishes complete membership exactly once with user-wide durable identity uniqueness', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const first = entry('pty_first', 'term_durable', 'scope_a')
 
@@ -30,7 +30,7 @@ describe('TerminalDirectory', () => {
     expect(directory.catalogRevision('user_a', 'scope_b')).toBe(0)
   })
 
-  test('orders explicit projection changes and ignores uncommitted mutable metadata', async () => {
+  test('orders explicit projection changes and ignores uncommitted mutable metadata', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const member = entry('pty_first', 'term_first', 'scope_a')
     expect(commit(directory, member)).toBe(true)
@@ -45,7 +45,7 @@ describe('TerminalDirectory', () => {
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(3)
   })
 
-  test('releases a scope clock only after membership is empty', async () => {
+  test('releases a scope clock only after membership is empty', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const member = entry('pty_first', 'term_first', 'scope_a')
     expect(commit(directory, member)).toBe(true)
@@ -58,7 +58,7 @@ describe('TerminalDirectory', () => {
     expect(directory.catalogRevision('user_a', 'scope_a')).toBe(0)
   })
 
-  test('reserves durable identity without catalog visibility until commit', async () => {
+  test('reserves durable identity without catalog visibility until commit', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const reserved = entry('pty_reserved', 'term_reserved', 'scope_a')
     const admission = directory.reserve(reserved)
@@ -75,7 +75,7 @@ describe('TerminalDirectory', () => {
     expect(() => admission?.commit(reserved)).toThrow('terminal directory reservation already settled')
   })
 
-  test('aborts a reservation without a revision or close transition', async () => {
+  test('aborts a reservation without a revision or close transition', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const reserved = entry('pty_reserved', 'term_reserved', 'scope_a')
     const admission = directory.reserve(reserved)
@@ -86,7 +86,7 @@ describe('TerminalDirectory', () => {
     expect(directory.reserve(entry('pty_retry', 'term_reserved', 'scope_a'))).not.toBeNull()
   })
 
-  test('rejects a mismatched entry without consuming the reservation', async () => {
+  test('rejects a mismatched entry without consuming the reservation', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const reserved = entry('pty_reserved', 'term_reserved', 'scope_a')
     const admission = directory.reserve(reserved)
@@ -99,7 +99,7 @@ describe('TerminalDirectory', () => {
     expect(directory.reserve(entry('pty_retry', 'term_reserved', 'scope_a'))).not.toBeNull()
   })
 
-  test('indexes only committed sessions and promotes the next committed session after removal', async () => {
+  test('indexes only committed sessions and promotes the next committed session after removal', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const first = entry('pty_first', 'term_first', 'scope_a')
     const second = entry('pty_second', 'term_second', 'scope_a')
@@ -124,7 +124,7 @@ describe('TerminalDirectory', () => {
     expect(directory.primaryForFilesystemTarget('user_a', 'scope_a', WORKTREE_A)).toBe(prepared)
   })
 
-  test('isolates the primary index by owner, scope, and canonical worktree identity', async () => {
+  test('isolates the primary index by owner, scope, and canonical worktree identity', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const expected = entry('pty_expected', 'term_expected', 'scope_a', WORKTREE_A)
     expect(commit(directory, expected)).toBe(true)
@@ -138,7 +138,7 @@ describe('TerminalDirectory', () => {
     expect(directory.primaryForFilesystemTarget('user_b', 'scope_a', WORKTREE_A)?.id).toBe('pty_other_user')
   })
 
-  test('rejects only a mismatched worktree identity without consuming the reservation', async () => {
+  test('rejects only a mismatched worktree identity without consuming the reservation', () => {
     const directory = new TerminalDirectory<string, Entry>()
     const reserved = entry('pty_reserved', 'term_reserved', 'scope_a', WORKTREE_A)
     const admission = directory.reserve(reserved)

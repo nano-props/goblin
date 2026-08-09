@@ -8,6 +8,10 @@ import { defineComponent, isVNode, nextTick, shallowRef } from 'vue'
 import type { Component, ComponentOptions, ShallowRef, VNode } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach } from 'vitest'
+import {
+  consumeAppHistoryPresentationAction,
+  createAppHistoryPresentationHistory,
+} from '#/web/app-history-presentation.ts'
 import { appI18n } from '#/web/stores/i18n-vue.ts'
 
 afterEach(cleanup)
@@ -89,8 +93,9 @@ function isRouterPlugin(pluginWithOptions: unknown): boolean {
 }
 
 function createTestRouter() {
-  return createRouter({
-    history: createMemoryHistory(),
+  const history = createAppHistoryPresentationHistory(createMemoryHistory())
+  const router = createRouter({
+    history,
     routes: [
       {
         path: '/:pathMatch(.*)*',
@@ -102,6 +107,12 @@ function createTestRouter() {
       },
     ],
   })
+  const removeInitialPresentation = router.afterEach((_to, _from, failure) => {
+    if (failure) return
+    consumeAppHistoryPresentationAction(history)
+    removeInitialPresentation()
+  })
+  return router
 }
 
 export function renderComposableInJsdom<T>(

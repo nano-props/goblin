@@ -15,7 +15,7 @@ const UNAVAILABLE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///unavailable-
 beforeEach(() => appQueryClient.clear())
 
 describe('backgroundSyncTargetsFromStore', () => {
-  test('keeps the visible remotely backed repo registered from accepted snapshot metadata', async () => {
+  test('keeps the visible remotely backed repo registered from accepted snapshot metadata', () => {
     const repo = createRepo({
       id: REMOTE_WORKSPACE_ID,
       remote: { hasRemotes: true, hasGitHubRemote: true },
@@ -26,7 +26,7 @@ describe('backgroundSyncTargetsFromStore', () => {
     ).toEqual([{ workspaceId: REMOTE_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' }])
   })
 
-  test('only registers the current repo and excludes local-only and unavailable repos', async () => {
+  test('only registers the current repo and excludes local-only and unavailable repos', () => {
     const localOnly = createRepo({
       id: LOCAL_WORKSPACE_ID,
       remote: { hasRemotes: false, hasGitHubRemote: false },
@@ -55,7 +55,7 @@ describe('backgroundSyncTargetsFromStore', () => {
     ).toEqual([])
   })
 
-  test('does not register a plain Workspace', async () => {
+  test('does not register a plain Workspace', () => {
     const workspace = emptyWorkspace(LOCAL_WORKSPACE_ID, 'workspace-runtime-test')
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',

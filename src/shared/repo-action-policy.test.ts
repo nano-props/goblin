@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { validateBranchDeletionPolicy, validateRemovableWorktreeState } from '#/shared/repo-action-policy.ts'
 
 describe('validateRemovableWorktreeState', () => {
-  test('accepts a clean unlocked worktree', async () => {
+  test('accepts a clean unlocked worktree', () => {
     expect(
       validateRemovableWorktreeState({
         path: '/tmp/repo-feature',
@@ -14,7 +14,7 @@ describe('validateRemovableWorktreeState', () => {
     ).toBeNull()
   })
 
-  test('rejects locked worktrees', async () => {
+  test('rejects locked worktrees', () => {
     expect(
       validateRemovableWorktreeState({
         path: '/tmp/repo-feature',
@@ -30,7 +30,7 @@ describe('validateRemovableWorktreeState', () => {
     })
   })
 
-  test('rejects dirty or unreadable worktrees', async () => {
+  test('rejects dirty or unreadable worktrees', () => {
     expect(
       validateRemovableWorktreeState({
         path: '/tmp/repo-feature',
@@ -58,21 +58,21 @@ describe('validateRemovableWorktreeState', () => {
 })
 
 describe('validateBranchDeletionPolicy', () => {
-  test('rejects the current branch first', async () => {
+  test('rejects the current branch first', () => {
     expect(validateBranchDeletionPolicy({ branch: 'feature/test', currentBranch: 'feature/test' })).toEqual({
       ok: false,
       message: 'error.cannot-delete-current-branch',
     })
   })
 
-  test('rejects protected branches', async () => {
+  test('rejects protected branches', () => {
     expect(validateBranchDeletionPolicy({ branch: 'main', currentBranch: 'feature/test' })).toEqual({
       ok: false,
       message: 'error.cannot-delete-protected-branch',
     })
   })
 
-  test('rejects branches checked out elsewhere', async () => {
+  test('rejects branches checked out elsewhere', () => {
     expect(
       validateBranchDeletionPolicy({
         branch: 'feature/test',
@@ -85,7 +85,7 @@ describe('validateBranchDeletionPolicy', () => {
     })
   })
 
-  test('maps non-merged branches to the requested error key', async () => {
+  test('maps non-merged branches to the requested error key', () => {
     expect(
       validateBranchDeletionPolicy({
         branch: 'feature/test',
@@ -107,7 +107,7 @@ describe('validateBranchDeletionPolicy', () => {
     })
   })
 
-  test('accepts merged branches or forced deletes', async () => {
+  test('accepts merged branches or forced deletes', () => {
     expect(
       validateBranchDeletionPolicy({
         branch: 'feature/test',

@@ -61,6 +61,7 @@ import {
   workspaceRouteContextFromMatches,
 } from '#/web/app-layout-model.ts'
 import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
+import { requireAppHistoryPresentation } from '#/web/app-history-presentation.ts'
 import {
   beginAppNavigation,
   observeAppHistoryNavigation,
@@ -319,6 +320,7 @@ describe('workspace route capability admission', () => {
       expect(window.location.pathname).toBe(`/workspace/${workspaceSlugFromId(workspaceId)}/dashboard`),
     )
     await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('dashboard'))
+    expect(requireAppHistoryPresentation(appRouter.options.history).action).toEqual({ type: 'REPLACE' })
     expect(appMocks.render).not.toHaveBeenCalledWith('branch')
     expect(appMocks.render).not.toHaveBeenCalledWith('worktree')
     expect(appMocks.render).not.toHaveBeenCalledWith('newWorktree')

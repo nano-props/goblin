@@ -12,25 +12,25 @@ import type { RepoOperationsSnapshot, RepoServerOperationState } from '#/shared/
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace/repo-activity-model')
 
 describe('repo activity model', () => {
-  test('marks the primary refresh control busy from user server fetch operations', async () => {
+  test('marks the primary refresh control busy from user server fetch operations', () => {
     const operations = operationsSnapshot([serverOperation({ kind: 'fetch', phase: 'running', source: 'user' })])
 
     expect(repoOperationsSnapshotHasPrimaryRefresh(operations)).toBe(true)
   })
 
-  test('keeps the primary refresh control idle during background server fetch operations', async () => {
+  test('keeps the primary refresh control idle during background server fetch operations', () => {
     const operations = operationsSnapshot([serverOperation({ kind: 'fetch', phase: 'running', source: 'background' })])
 
     expect(repoOperationsSnapshotHasPrimaryRefresh(operations)).toBe(false)
   })
 
-  test('does not treat non-fetch server operations as primary refresh busy', async () => {
+  test('does not treat non-fetch server operations as primary refresh busy', () => {
     const operations = operationsSnapshot([serverOperation({ kind: 'pull', phase: 'running', source: 'user' })])
 
     expect(repoOperationsSnapshotHasPrimaryRefresh(operations)).toBe(false)
   })
 
-  test('projects branch action activity from server operations', async () => {
+  test('projects branch action activity from server operations', () => {
     resetWorkspacesStore()
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID })
     const operations = operationsSnapshot([serverOperation({ kind: 'push', phase: 'queued', source: 'user' })])

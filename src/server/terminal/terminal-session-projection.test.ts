@@ -33,7 +33,7 @@ function preparedSession() {
 }
 
 describe('terminal session wire projection', () => {
-  test('projects a prepared session without inventing a PTY binding', async () => {
+  test('projects a prepared session without inventing a PTY binding', () => {
     const session = preparedSession()
 
     expect(projectTerminalRuntimeMetadata(session, null)).toEqual({
@@ -60,13 +60,13 @@ describe('terminal session wire projection', () => {
     })
   })
 
-  test('rejects a target and presentation mismatch at the wire boundary', async () => {
+  test('rejects a target and presentation mismatch at the wire boundary', () => {
     expect(() =>
       projectTerminalSessionSummary({ ...preparedSession(), presentation: { kind: 'workspace-root' as const } }, null),
     ).toThrow('terminal session target and presentation disagree')
   })
 
-  test('builds a recovery frame from an accepted snapshot and bound metadata', async () => {
+  test('builds a recovery frame from an accepted snapshot and bound metadata', () => {
     const metadata: TerminalBoundRuntimeMetadata = {
       terminalRuntimeSessionId: 'pty-runtime-session',
       terminalRuntimeGeneration: 2,

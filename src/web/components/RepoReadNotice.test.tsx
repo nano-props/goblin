@@ -51,7 +51,7 @@ describe('RepoReadNotice', () => {
     expect(retryIdleSource).toHaveBeenCalledOnce()
   })
 
-  test('reports a mixed stale and unavailable failure as unavailable', async () => {
+  test('reports a mixed stale and unavailable failure as unavailable', () => {
     renderInJsdom(
       <RepoReadNotice
         failures={[

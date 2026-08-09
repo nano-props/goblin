@@ -22,7 +22,7 @@ describe('SidebarRowButton', () => {
     expect(button.className.split(/\s+/).filter((token) => token === 'caller-marker')).toHaveLength(1)
   })
 
-  test('owns compact and icon row sizes without caller class overrides', async () => {
+  test('owns compact and icon row sizes without caller class overrides', () => {
     const { container } = renderInJsdom(
       <div>
         <SidebarRowButton aria-label="Compact row" size="compact">

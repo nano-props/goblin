@@ -97,7 +97,7 @@ describe('workspace pane runtime tab command actions', () => {
     ).toBe('workspace-pane:files')
   })
 
-  test('preserves a Git worktree target while pane tabs are still pending', async () => {
+  test('preserves a Git worktree target while pane tabs are still pending', () => {
     const branchName = terminalPresentationBranch(terminalBase.presentation)
     if (!branchName) throw new Error('expected Git worktree terminal fixture')
     seedRepoWithReadModelForTest({

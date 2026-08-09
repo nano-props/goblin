@@ -6,13 +6,13 @@ import {
 } from '#/shared/terminal-controller.ts'
 
 describe('shared terminal controller helpers', () => {
-  test('resolves controller, viewer, and unowned attachment roles', async () => {
+  test('resolves controller, viewer, and unowned attachment roles', () => {
     expect(resolveTerminalClientRole(null, 'client_a')).toBe('unowned')
     expect(resolveTerminalClientRole({ clientId: 'client_a', status: 'connected' }, 'client_a')).toBe('controller')
     expect(resolveTerminalClientRole({ clientId: 'client_a', status: 'connected' }, 'client_b')).toBe('viewer')
   })
 
-  test('resolves controller view model with controller status fallback', async () => {
+  test('resolves controller view model with controller status fallback', () => {
     expect(resolveTerminalController(null, 'client_a')).toEqual({
       role: 'unowned',
       controllerStatus: 'none',
@@ -23,7 +23,7 @@ describe('shared terminal controller helpers', () => {
     })
   })
 
-  test('clones controller objects without sharing references', async () => {
+  test('clones controller objects without sharing references', () => {
     const controller = { clientId: 'client_a', status: 'connected' as const }
     expect(cloneTerminalController(null)).toBeNull()
     const cloned = cloneTerminalController(controller)

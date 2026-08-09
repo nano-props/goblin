@@ -19,7 +19,7 @@ describe('filetree-session-state', () => {
     resetFiletreeInteractionStore()
   })
 
-  test('maps file tree interaction state into session view state for open worktrees', async () => {
+  test('maps file tree interaction state into session view state for open worktrees', () => {
     const scopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/tmp/worktree')
     const staleScopeKey = filetreeInteractionScopeKey(WORKSPACE_ID, '/tmp/stale-worktree')
     const closedRepoScopeKey = filetreeInteractionScopeKey(CLOSED_WORKSPACE_ID, '/tmp/worktree')
@@ -83,7 +83,7 @@ describe('filetree-session-state', () => {
     })
   })
 
-  test('persists the workspace-root file tree without a synthetic branch', async () => {
+  test('persists the workspace-root file tree without a synthetic branch', () => {
     const persisted = persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession(
       {
         [filetreeInteractionScopeKey(PLAIN_WORKSPACE_ID, '/tmp/plain-workspace')]: {

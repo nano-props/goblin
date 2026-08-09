@@ -152,7 +152,7 @@ describe('workspace pane runtime tab create action', () => {
     )
   })
 
-  test('returns no terminal create action without a runtime target', async () => {
+  test('returns no terminal create action without a runtime target', () => {
     const action = workspacePaneRuntimeTabCreateAction('terminal', {
       runtimeTabStateByType: runtimeTabState(),
       showCreatedRuntimeTab: vi.fn(),
@@ -477,7 +477,7 @@ describe('workspace pane runtime tab create action', () => {
     expect(workspacePaneTabOpener(PANE_TARGET, WORKSPACE_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBeNull()
   })
 
-  test('marks the terminal create action busy only while terminal creation is pending', async () => {
+  test('marks the terminal create action busy only while terminal creation is pending', () => {
     const pendingAction = workspacePaneRuntimeTabCreateAction('terminal', {
       runtimeTabStateByType: runtimeTabState({ createPending: true }),
       showCreatedRuntimeTab: vi.fn(),

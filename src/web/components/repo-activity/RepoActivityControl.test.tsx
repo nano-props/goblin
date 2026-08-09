@@ -50,7 +50,7 @@ beforeEach(() => {
 })
 
 describe('RepoActivityControl', () => {
-  test('disables the primary refresh button while server projection reports a user fetch', async () => {
+  test('disables the primary refresh button while server projection reports a user fetch', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'fetch', phase: 'running', source: 'user' })],
@@ -64,7 +64,7 @@ describe('RepoActivityControl', () => {
     expect(button(container).getAttribute('aria-busy')).toBe('true')
   })
 
-  test('keeps the primary refresh button idle while server projection reports a background fetch', async () => {
+  test('keeps the primary refresh button idle while server projection reports a background fetch', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     setRepoOperationsQueryData(REPO_ID, repo.workspaceRuntimeId, false, {
       operations: [serverOperation(repo.workspaceRuntimeId, { kind: 'fetch', phase: 'running', source: 'background' })],
@@ -156,7 +156,7 @@ describe('RepoActivityControl', () => {
     })
   })
 
-  test('renders the primary refresh button for local-only repositories without the local-only label', async () => {
+  test('renders the primary refresh button for local-only repositories without the local-only label', () => {
     seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: false } })
 
     const { container } = renderControl()

@@ -41,7 +41,7 @@ describe('terminal-render-state', () => {
   }
 
   describe('appendOutput', () => {
-    test('increments the output sequence for each chunk', async () => {
+    test('increments the output sequence for each chunk', () => {
       const state = createRawOnlyState()
       const first = appendOutput(state, 'hello')
       expect(first.seq).toBe(1)
@@ -53,7 +53,7 @@ describe('terminal-render-state', () => {
       expect(state.sequence).toBe(2)
     })
 
-    test('returns title control events without applying title state', async () => {
+    test('returns title control events without applying title state', () => {
       const state = createRawOnlyState()
       const output = appendOutput(state, '\x1b]0;deferred\x07')
       expect(output.controlEvents).toEqual([{ type: 'title', title: 'deferred' }])
@@ -62,7 +62,7 @@ describe('terminal-render-state', () => {
       expect(state.title).toBe('deferred')
     })
 
-    test('rejects output before mutating sequence state when pending bytes exceed capacity', async () => {
+    test('rejects output before mutating sequence state when pending bytes exceed capacity', () => {
       const state = createState()
 
       expect(() => appendOutput(state, 'x'.repeat(MAX_PENDING_TERMINAL_RENDER_BYTES + 1))).toThrow(
@@ -109,7 +109,7 @@ describe('terminal-render-state', () => {
       expect(state.screen.pendingWriteEntries).toBe(0)
     })
 
-    test('bounds the number of pending write entries', async () => {
+    test('bounds the number of pending write entries', () => {
       const state = createState()
       vi.spyOn(state.screen.terminal, 'write').mockImplementation(() => {})
 
@@ -155,7 +155,7 @@ describe('terminal-render-state', () => {
   })
 
   describe('title extraction', () => {
-    test('captures the last OSC 0 title from a chunk', async () => {
+    test('captures the last OSC 0 title from a chunk', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x1b]0;first title\x07more data')
       expect(state.title).toBe('first title')
@@ -163,13 +163,13 @@ describe('terminal-render-state', () => {
       expect(state.title).toBe('second title')
     })
 
-    test('treats OSC 2 the same as OSC 0', async () => {
+    test('treats OSC 2 the same as OSC 0', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x1b]2;icon title\x07')
       expect(state.title).toBe('icon title')
     })
 
-    test('clears the title when the shell emits an empty OSC string', async () => {
+    test('clears the title when the shell emits an empty OSC string', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x1b]0;a title\x07')
       expect(state.title).toBe('a title')
@@ -177,13 +177,13 @@ describe('terminal-render-state', () => {
       expect(state.title).toBeNull()
     })
 
-    test('leaves the title null when no OSC 0 sequence is present', async () => {
+    test('leaves the title null when no OSC 0 sequence is present', () => {
       const state = createRawOnlyState()
       appendOutput(state, 'plain text output')
       expect(state.title).toBeNull()
     })
 
-    test('reassembles an OSC 0 sequence split across two appendOutput calls', async () => {
+    test('reassembles an OSC 0 sequence split across two appendOutput calls', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x1b]0;~/Developer/goblin — ')
       expect(state.title).toBeNull()
@@ -191,7 +191,7 @@ describe('terminal-render-state', () => {
       expect(state.title).toBe('~/Developer/goblin — npm run dev')
     })
 
-    test('reassembles a split ESC before an OSC 0 sequence', async () => {
+    test('reassembles a split ESC before an OSC 0 sequence', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x1b')
       expect(state.title).toBeNull()
@@ -199,25 +199,25 @@ describe('terminal-render-state', () => {
       expect(state.title).toBe('split-start')
     })
 
-    test('captures an ST-terminated OSC 0 sequence', async () => {
+    test('captures an ST-terminated OSC 0 sequence', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x1b]0;st title\x1b\\')
       expect(state.title).toBe('st title')
     })
 
-    test('captures a C1 OSC title sequence', async () => {
+    test('captures a C1 OSC title sequence', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x9d2;devin running\x9c')
       expect(state.title).toBe('devin running')
     })
 
-    test('captures a C1 OSC title sequence terminated by BEL', async () => {
+    test('captures a C1 OSC title sequence terminated by BEL', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x9d0;devin session\x07')
       expect(state.title).toBe('devin session')
     })
 
-    test('reassembles a C1 OSC title sequence split across appendOutput calls', async () => {
+    test('reassembles a C1 OSC title sequence split across appendOutput calls', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x9d2;devin ')
       expect(state.title).toBeNull()
@@ -225,7 +225,7 @@ describe('terminal-render-state', () => {
       expect(state.title).toBe('devin running')
     })
 
-    test('ends an OSC title at ESC and swallows the second byte of a split 7-bit ST', async () => {
+    test('ends an OSC title at ESC and swallows the second byte of a split 7-bit ST', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x1b]0;split-st\x1b')
       expect(state.title).toBe('split-st')
@@ -233,7 +233,7 @@ describe('terminal-render-state', () => {
       expect(state.title).toBe('split-st')
     })
 
-    test('does not apply an OSC title aborted by CAN or SUB', async () => {
+    test('does not apply an OSC title aborted by CAN or SUB', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x1b]0;stable\x07')
       appendOutputAndApplyTitleEvents(state, '\x1b]0;aborted\x18')
@@ -242,7 +242,7 @@ describe('terminal-render-state', () => {
       expect(state.title).toBe('stable')
     })
 
-    test('clears the title when OSC 0 or OSC 2 ends without a payload separator', async () => {
+    test('clears the title when OSC 0 or OSC 2 ends without a payload separator', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x1b]0;stable\x07')
       appendOutputAndApplyTitleEvents(state, '\x1b]0\x07')
@@ -252,7 +252,7 @@ describe('terminal-render-state', () => {
       expect(state.title).toBeNull()
     })
 
-    test('captures Devin CLI macOS title sequences and ignores OSC 30', async () => {
+    test('captures Devin CLI macOS title sequences and ignores OSC 30', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x1b[22;0t\x1b]0;devin: goblin\x07\x1b]30;devin: goblin\x07')
       expect(state.title).toBe('devin: goblin')
@@ -262,7 +262,7 @@ describe('terminal-render-state', () => {
       expect(state.title).toBe('devin: hello')
     })
 
-    test('ignores unsupported OSC commands without losing a later title', async () => {
+    test('ignores unsupported OSC commands without losing a later title', () => {
       const state = createRawOnlyState()
       appendOutputAndApplyTitleEvents(state, '\x1b]9;ignored\x07\x1b]2;window title\x07')
       expect(state.title).toBe('window title')
@@ -270,7 +270,7 @@ describe('terminal-render-state', () => {
   })
 
   describe('replaySnapshot', () => {
-    test('loads and serializes under Node ESM runtime interop', async () => {
+    test('loads and serializes under Node ESM runtime interop', () => {
       const moduleUrl = pathToFileURL(`${process.cwd()}/src/server/terminal/terminal-render-state.ts`).href
       const result = spawnSync(
         process.execPath,

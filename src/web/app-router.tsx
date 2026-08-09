@@ -6,6 +6,7 @@ import { isSettingsPage } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { createAppHistoryPresentationHistory } from '#/web/app-history-presentation.ts'
 import { App } from '#/web/App.tsx'
 import type { ParsedWorkspacePaneRoute, WorkspaceRouteView } from '#/web/App.tsx'
 import { Layout } from '#/web/Layout.tsx'
@@ -143,7 +144,7 @@ function settingsPageFromRoute(route: RouteLocationNormalized): SettingsPage {
 }
 
 export const appRouter = createRouter({
-  history: createWebHistory(),
+  history: createAppHistoryPresentationHistory(createWebHistory()),
   routes,
 })
 

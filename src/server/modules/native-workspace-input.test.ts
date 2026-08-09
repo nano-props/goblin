@@ -35,7 +35,7 @@ describe('native workspace input', () => {
     (prefix) => expect(planNativeDirectorySuggestions(prefix, 'win32', 'C:\\Users\\example')).toBeNull(),
   )
 
-  test('formats home-relative suggestions without adding a separator', async () => {
+  test('formats home-relative suggestions without adding a separator', () => {
     const plan = planNativeDirectorySuggestions('~/De', 'posix', '/home/example')!
     expect(formatNativeDirectorySuggestion(plan, 'Developer')).toBe('~/Developer')
   })
@@ -48,18 +48,18 @@ describe('native workspace input', () => {
     expect(planNativeDirectorySuggestions(input, platform, home)?.searchRoot).toBe(home)
   })
 
-  test('rejects a completed suggestion that final workspace admission cannot represent', async () => {
+  test('rejects a completed suggestion that final workspace admission cannot represent', () => {
     const plan = planNativeDirectorySuggestions('/tmp/bad', 'posix', '/home/example')!
     expect(formatNativeDirectorySuggestion(plan, 'bad\\name')).toBeNull()
     expect(formatNativeDirectorySuggestion(plan, 'bad\nname')).toBeNull()
   })
 
-  test('uses platform case policy while preserving actual names', async () => {
+  test('uses platform case policy while preserving actual names', () => {
     expect(nativeLeafMatches('Developer', 'dev', 'posix')).toBe(false)
     expect(nativeLeafMatches('Developer', 'dev', 'win32')).toBe(true)
   })
 
-  test('shares tilde expansion with final workspace admission', async () => {
+  test('shares tilde expansion with final workspace admission', () => {
     expect(workspaceLocatorFromNativeCommandInput('~/Developer/repo', 'posix', '/home/example')).toBe(
       'goblin+file:///home/example/Developer/repo',
     )

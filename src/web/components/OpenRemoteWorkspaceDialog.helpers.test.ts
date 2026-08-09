@@ -8,13 +8,13 @@ import {
 } from '#/web/components/OpenRemoteWorkspaceDialog.tsx'
 
 describe('OpenRemoteWorkspaceDialog helpers', () => {
-  test('builds config-only remote inputs', async () => {
+  test('builds config-only remote inputs', () => {
     expect(buildRemoteConnectionInput('prod', '/srv/repo')).toEqual({ alias: 'prod', remotePath: '/srv/repo' })
     expect(buildRemoteConnectionInput('prod', '~/repo')).toEqual({ alias: 'prod', remotePath: '~/repo' })
     expect(buildRemoteConnectionInput('', '/srv/repo')).toBeNull()
   })
 
-  test('allows manual aliases as long as alias and path are valid', async () => {
+  test('allows manual aliases as long as alias and path are valid', () => {
     for (const alias of ['-F', '.', '..', 'bad alias', '服务器']) {
       expect(canSubmitRemoteWorkspace({ alias, remotePath: '/srv/repo', pending: false })).toBe(false)
       expect(buildRemoteConnectionInput(alias, '/srv/repo')).toBeNull()
@@ -28,12 +28,12 @@ describe('OpenRemoteWorkspaceDialog helpers', () => {
     ).toBe(true)
   })
 
-  test('rejects non-absolute remote paths', async () => {
+  test('rejects non-absolute remote paths', () => {
     expect(remotePathError('repo').errorKey).toBe('workspace-picker.open-remote-path-absolute')
     expect(remotePathError('~/repo').errorKey).toBeNull()
   })
 
-  test('uses the passed path stage as the workspace-open admission boundary', async () => {
+  test('uses the passed path stage as the workspace-open admission boundary', () => {
     expect(
       remoteDiagnosticsAllowWorkspaceOpen({
         stages: [
@@ -62,7 +62,7 @@ describe('OpenRemoteWorkspaceDialog helpers', () => {
     ).toBe(false)
   })
 
-  test('keeps raw dialog errors as-is instead of leaking a missing i18n lookup', async () => {
+  test('keeps raw dialog errors as-is instead of leaking a missing i18n lookup', () => {
     const t = (key: string) => key
     expect(formatRemoteDialogError(t, 'Permission denied')).toBe('Permission denied')
     expect(formatRemoteDialogError(t, 'error.ssh-config-changed')).toBe('error.ssh-config-changed')

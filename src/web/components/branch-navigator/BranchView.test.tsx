@@ -167,7 +167,7 @@ describe('BranchView', () => {
     expect(screen.getByLabelText('branches.dirty')).toBeTruthy()
   })
 
-  test('derives query snapshot worktree state from the query status read model', async () => {
+  test('derives query snapshot worktree state from the query status read model', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],

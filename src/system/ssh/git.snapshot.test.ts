@@ -20,11 +20,11 @@ import {
 } from '#/system/ssh/git-test-utils.ts'
 
 describe('remote git snapshot', () => {
-  test('parses a canonical repository common directory', async () => {
+  test('parses a canonical repository common directory', () => {
     expect(parseRemoteRepoCommonDir('/srv/repo/.git\0')).toBe('/srv/repo/.git')
   })
 
-  test('rejects malformed repository common directory output', async () => {
+  test('rejects malformed repository common directory output', () => {
     expect(parseRemoteRepoCommonDir('')).toBeNull()
   })
 
@@ -228,7 +228,7 @@ describe('remote git snapshot', () => {
     expect(run).toHaveBeenCalledTimes(2)
   })
 
-  test('prefers stderr when converting remote exec failures', async () => {
+  test('prefers stderr when converting remote exec failures', () => {
     expect(
       remoteExecResult({
         ok: false,

@@ -18,7 +18,7 @@ describe('type assertion policy', () => {
     },
   )
 
-  test('allows only the complete reviewed expression', async () => {
+  test('allows only the complete reviewed expression', () => {
     const reviewed = 'value as unknown as Target'
     const allowlist = new Map([[file, [reviewed]]])
 
@@ -28,7 +28,7 @@ describe('type assertion policy', () => {
     ])
   })
 
-  test('rejects ts-ignore directives', async () => {
+  test('rejects ts-ignore directives', () => {
     for (const [source, line] of [
       ['// @ts-ignore\ncall()', 1],
       ['/// @ts-ignore\ncall()', 1],
@@ -39,11 +39,11 @@ describe('type assertion policy', () => {
     }
   })
 
-  test('ignores ts-ignore text inside strings', async () => {
+  test('ignores ts-ignore text inside strings', () => {
     expect(findTypeAssertionViolations("const message = '// @ts-ignore'", file, noAllowlist)).toEqual([])
   })
 
-  test('ignores ts-ignore mentions in explanatory comments', async () => {
+  test('ignores ts-ignore mentions in explanatory comments', () => {
     expect(findTypeAssertionViolations('// Do not use @ts-ignore here\ncall()', file, noAllowlist)).toEqual([])
     expect(findTypeAssertionViolations('/* Do not use @ts-ignore here */\ncall()', file, noAllowlist)).toEqual([])
   })

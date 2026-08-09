@@ -21,7 +21,7 @@ const lineageA = 'pty_lineage_a_aaaaaaaa'
 const lineageB = 'pty_lineage_b_aaaaaaaa'
 
 describe('TerminalSessionProjection races', () => {
-  test('does not delete a durable session when the retiring generation exits during restart', async () => {
+  test('does not delete a durable session when the retiring generation exits during restart', () => {
     const localProjection = new TerminalSessionProjection()
     localProjection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     localProjection.reconcileServerSessions(
@@ -49,7 +49,7 @@ describe('TerminalSessionProjection races', () => {
     localProjection.destroy()
   })
 
-  test('does not delete a durable session when its retiring runtime closes during restart', async () => {
+  test('does not delete a durable session when its retiring runtime closes during restart', () => {
     const localProjection = new TerminalSessionProjection()
     localProjection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     localProjection.reconcileServerSessions(
@@ -70,7 +70,7 @@ describe('TerminalSessionProjection races', () => {
     localProjection.destroy()
   })
 
-  test('does not apply or retain a bell from the retiring runtime during restart', async () => {
+  test('does not apply or retain a bell from the retiring runtime during restart', () => {
     const localProjection = new TerminalSessionProjection()
     localProjection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     localProjection.reconcileServerSessions(
@@ -98,7 +98,7 @@ describe('TerminalSessionProjection races', () => {
     localProjection.destroy()
   })
 
-  test('drops a bell that arrives before its runtime binding is known', async () => {
+  test('drops a bell that arrives before its runtime binding is known', () => {
     const localProjection = new TerminalSessionProjection()
     localProjection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     localProjection.handleServerBell({
@@ -124,7 +124,7 @@ describe('TerminalSessionProjection races', () => {
     localProjection.destroy()
   })
 
-  test('does not let a delayed partial create effect regress or replace a newer active binding', async () => {
+  test('does not let a delayed partial create effect regress or replace a newer active binding', () => {
     const projection = new TerminalSessionProjection()
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.reconcileServerSessions(

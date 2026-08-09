@@ -75,7 +75,7 @@ afterEach(() => {
 })
 
 describe('workspace pane runtime tab panel', () => {
-  test('renders terminal runtime panel through the runtime panel registry', async () => {
+  test('renders terminal runtime panel through the runtime panel registry', () => {
     const { container } = renderPanel()
 
     const panel = container.querySelector('#workspace-terminal-panel')

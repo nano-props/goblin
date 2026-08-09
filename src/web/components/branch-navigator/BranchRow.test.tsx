@@ -464,7 +464,7 @@ describe('BranchRow', () => {
     expect(summaryTitle).not.toContain('Example Author')
   })
 
-  test('hides the actions wrapper by default and reveals it on row hover in non-compact mode', async () => {
+  test('hides the actions wrapper by default and reveals it on row hover in non-compact mode', () => {
     const { container, shell } = renderRow(false)
     const className = shell?.className ?? ''
     expect(container.querySelector('li')?.className).toContain('group')
@@ -476,7 +476,7 @@ describe('BranchRow', () => {
     expect(className).toContain('transition-opacity')
   })
 
-  test('keeps the actions wrapper visible while the action popover is open in non-compact mode', async () => {
+  test('keeps the actions wrapper visible while the action popover is open in non-compact mode', () => {
     const { shell } = renderRow(false, { actionMenuOpen: true })
     const className = shell?.className ?? ''
     expect(className).not.toContain('opacity-0')
@@ -484,7 +484,7 @@ describe('BranchRow', () => {
     expect(className).not.toContain('group-focus-within:opacity-100')
   })
 
-  test('keeps the actions wrapper fully visible in compact mode', async () => {
+  test('keeps the actions wrapper fully visible in compact mode', () => {
     const { shell } = renderRow(true)
     const className = shell?.className ?? ''
     expect(className).not.toContain('opacity-0')
@@ -492,7 +492,7 @@ describe('BranchRow', () => {
     expect(className).not.toContain('group-focus-within:opacity-100')
   })
 
-  test('keeps the actions wrapper visible while the row reports a busy branch action', async () => {
+  test('keeps the actions wrapper visible while the row reports a busy branch action', () => {
     const { shell } = renderRow(false, { branchActionBusy: true })
     const className = shell?.className ?? ''
     expect(className).not.toContain('opacity-0')

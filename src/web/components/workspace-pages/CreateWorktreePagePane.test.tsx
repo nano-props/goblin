@@ -191,7 +191,7 @@ describe('CreateWorktreePagePane', () => {
     expect(container.textContent).not.toContain('status.stale-title')
   })
 
-  test('keeps stable page chrome while branch data is loading', async () => {
+  test('keeps stable page chrome while branch data is loading', () => {
     appQueryClient.removeQueries({ queryKey: repoSnapshotQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID) })
 
     const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)

@@ -30,6 +30,30 @@ describe('ScrollArea', () => {
     expect((container.firstElementChild as HTMLElement | null)?.dataset.scrollbarMode).toBe('compact')
   })
 
+  test('animates only scrollbar thickness, never the measured thumb length', () => {
+    const horizontal = renderInJsdom(
+      <ScrollArea orientation="horizontal" type="always">
+        <div class="w-[1000px]">wide content</div>
+      </ScrollArea>,
+    )
+    const vertical = renderInJsdom(
+      <ScrollArea orientation="vertical" type="always">
+        <div class="h-[1000px]">tall content</div>
+      </ScrollArea>,
+    )
+
+    const horizontalThumb = horizontal.container.querySelector(
+      '[data-title-bar-chrome-region="no-drag"]',
+    )?.firstElementChild
+    const verticalThumb = vertical.container.querySelector(
+      '[data-title-bar-chrome-region="no-drag"]',
+    )?.firstElementChild
+    expect(horizontalThumb?.className).toContain('transition-[background-color,height]')
+    expect(horizontalThumb?.className).not.toContain('transition-[background-color,width]')
+    expect(verticalThumb?.className).toContain('transition-[background-color,width]')
+    expect(verticalThumb?.className).not.toContain('transition-[background-color,height]')
+  })
+
   test('applies caller classes exactly once', async () => {
     const { container } = renderInJsdom(<ScrollArea class="caller-marker">content</ScrollArea>)
     const root = container.firstElementChild

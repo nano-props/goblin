@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { createPtyEventChannel } from '#/server/terminal/pty-event-lease.ts'
 
 describe('PTY event lease', () => {
-  test('replays startup events in source order only after activation', async () => {
+  test('replays startup events in source order only after activation', () => {
     const channel = createPtyEventChannel()
     const delivered: string[] = []
     channel.sink.data(ptyData('first', 'process-a'))
@@ -20,7 +20,7 @@ describe('PTY event lease', () => {
     expect(delivered).toEqual(['data:process-a:first', 'data:process-b:second', 'exit:0'])
   })
 
-  test('forwards live events after activation and discards after disposal', async () => {
+  test('forwards live events after activation and discards after disposal', () => {
     const channel = createPtyEventChannel()
     const onData = vi.fn()
     const claim = channel.lease.claim({ onData, onExit: vi.fn() })
@@ -34,7 +34,7 @@ describe('PTY event lease', () => {
     expect(onData).toHaveBeenCalledWith(ptyData('live'))
   })
 
-  test('preserves order when delivery synchronously produces another event', async () => {
+  test('preserves order when delivery synchronously produces another event', () => {
     const channel = createPtyEventChannel()
     const delivered: string[] = []
     channel.sink.data(ptyData('first'))
@@ -52,7 +52,7 @@ describe('PTY event lease', () => {
     expect(delivered).toEqual(['first', 'second', 'third'])
   })
 
-  test('fails closed when an observer throws', async () => {
+  test('fails closed when an observer throws', () => {
     const channel = createPtyEventChannel()
     const exit = vi.fn()
     channel.sink.data(ptyData('first'))
@@ -69,7 +69,7 @@ describe('PTY event lease', () => {
     expect(() => channel.lease.claim({ onData: vi.fn(), onExit: vi.fn() })).toThrow('PTY event lease is unavailable')
   })
 
-  test('treats exit as terminal and ignores later source callbacks', async () => {
+  test('treats exit as terminal and ignores later source callbacks', () => {
     const channel = createPtyEventChannel()
     const delivered: string[] = []
     const claim = channel.lease.claim({
@@ -86,7 +86,7 @@ describe('PTY event lease', () => {
     expect(delivered).toEqual(['data:before', 'exit'])
   })
 
-  test('fails explicitly instead of retaining an unbounded pre-claim stream', async () => {
+  test('fails explicitly instead of retaining an unbounded pre-claim stream', () => {
     const channel = createPtyEventChannel(4)
     channel.sink.data(ptyData('12345'))
 
@@ -95,7 +95,7 @@ describe('PTY event lease', () => {
     )
   })
 
-  test('bounds pre-claim output by its UTF-8 byte size', async () => {
+  test('bounds pre-claim output by its UTF-8 byte size', () => {
     const channel = createPtyEventChannel(2)
     channel.sink.data(ptyData('界'))
 
@@ -104,7 +104,7 @@ describe('PTY event lease', () => {
     )
   })
 
-  test('does not apply the ownership-transfer limit to live output after activation', async () => {
+  test('does not apply the ownership-transfer limit to live output after activation', () => {
     const channel = createPtyEventChannel(4)
     const onData = vi.fn()
     const claim = channel.lease.claim({ onData, onExit: vi.fn() })
@@ -115,7 +115,7 @@ describe('PTY event lease', () => {
     expect(onData).toHaveBeenCalledWith(ptyData('12345'))
   })
 
-  test('bounds the number of pre-claim events independently of their character count', async () => {
+  test('bounds the number of pre-claim events independently of their character count', () => {
     const channel = createPtyEventChannel(1_000, 2)
     channel.sink.data(ptyData('a'))
     channel.sink.data(ptyData('b'))
@@ -126,7 +126,7 @@ describe('PTY event lease', () => {
     )
   })
 
-  test('counts empty pre-claim data events toward the event limit', async () => {
+  test('counts empty pre-claim data events toward the event limit', () => {
     const channel = createPtyEventChannel(1_000, 1)
     channel.sink.data(ptyData(''))
     channel.sink.data(ptyData(''))
@@ -136,7 +136,7 @@ describe('PTY event lease', () => {
     )
   })
 
-  test('allows exactly one owner to claim the event stream', async () => {
+  test('allows exactly one owner to claim the event stream', () => {
     const channel = createPtyEventChannel()
     channel.lease.claim({ onData: vi.fn(), onExit: vi.fn() })
 

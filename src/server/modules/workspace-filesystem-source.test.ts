@@ -153,7 +153,7 @@ describe('workspace-filesystem-source — local direct children', () => {
 })
 
 describe('workspace-filesystem-source — buildChildNodes pure helper', () => {
-  test('sorts directories before files and rejects nested entries', async () => {
+  test('sorts directories before files and rejects nested entries', () => {
     const nodes = buildChildNodes({
       prefix: 'src',
       entries: ['src/z.ts', 'src/a-dir/', 'src/nested/file.ts', 'docs/readme.md'],
@@ -164,7 +164,7 @@ describe('workspace-filesystem-source — buildChildNodes pure helper', () => {
     ])
   })
 
-  test('strips absolute paths and parent traversals', async () => {
+  test('strips absolute paths and parent traversals', () => {
     const nodes = buildChildNodes({
       prefix: '',
       entries: ['../etc/passwd', '/abs/file.ts', 'good.ts', 'dir/'],
@@ -173,7 +173,7 @@ describe('workspace-filesystem-source — buildChildNodes pure helper', () => {
     expect(ids).toEqual(['dir', 'good.ts'])
   })
 
-  test('truncates large direct-child result sets', async () => {
+  test('truncates large direct-child result sets', () => {
     const entries = Array.from({ length: MAX_WORKSPACE_FILESYSTEM_NODES + 16 }, (_, index) => `f${index}.txt`)
     const result = buildLimitedChildNodes({ prefix: '', entries, maxNodes: MAX_WORKSPACE_FILESYSTEM_NODES })
 

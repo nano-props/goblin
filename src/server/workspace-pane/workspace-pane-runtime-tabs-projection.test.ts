@@ -9,7 +9,7 @@ const WORKTREE_ROOT = canonicalWorkspaceLocator('goblin+file:///repo/worktree')!
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 
 describe('workspace pane runtime tabs projection', () => {
-  test('collects native worktree execution paths without reconstructing target identity', async () => {
+  test('collects native worktree execution paths without reconstructing target identity', () => {
     expect(
       workspaceRuntimeTabWorktreePaths({
         entries: [
@@ -46,7 +46,7 @@ describe('workspace pane runtime tabs projection', () => {
     ).toEqual(['/repo/worktree', '/repo/other'])
   })
 
-  test('fast-fails a worktree target from a different transport', async () => {
+  test('fast-fails a worktree target from a different transport', () => {
     expect(() =>
       workspaceRuntimeTabWorktreePaths({
         entries: [

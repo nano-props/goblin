@@ -6,7 +6,7 @@ import { ToolbarTabList, ToolbarTabStrip, ToolbarTabStripBody } from '#/web/comp
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 describe('ToolbarTabStrip', () => {
-  test('renders the compact shell as a flex toolbar item', async () => {
+  test('renders the compact shell as a flex toolbar item', () => {
     const { container } = renderInJsdom(
       <ToolbarTabStrip
         compact
@@ -21,7 +21,7 @@ describe('ToolbarTabStrip', () => {
     expect(container.querySelector('[data-testid="scroll-marker"]')).toBeNull()
   })
 
-  test('renders the scroll shell without taking over blank-space dragging', async () => {
+  test('renders the scroll shell without taking over blank-space dragging', () => {
     const { container } = renderInJsdom(
       <ToolbarTabStrip
         compact={false}
@@ -57,7 +57,7 @@ describe('ToolbarTabStrip', () => {
     expect(container.querySelector('[data-testid="compact-marker"]')).toBeNull()
   })
 
-  test('scopes app-region no-drag to the visible scroll root', async () => {
+  test('scopes app-region no-drag to the visible scroll root', () => {
     const styles = readFileSync('src/web/styles.css', 'utf8')
 
     expect(styles).toContain('.title-bar-scroll-region {')
@@ -68,7 +68,7 @@ describe('ToolbarTabStrip', () => {
 })
 
 describe('ToolbarTabStripBody', () => {
-  test('adds the shared scroll-row width contract only when scroll is enabled', async () => {
+  test('adds the shared scroll-row width contract only when scroll is enabled', () => {
     const { container } = renderInJsdom(
       <div>
         <ToolbarTabStripBody data-testid="compact-body" />

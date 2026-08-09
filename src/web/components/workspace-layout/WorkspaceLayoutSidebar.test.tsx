@@ -63,7 +63,7 @@ afterEach(() => {
 })
 
 describe('WorkspaceLayoutSidebar', () => {
-  test('renders sidebar actions before the branch content without growing action rows', async () => {
+  test('renders sidebar actions before the branch content without growing action rows', () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar
         workspaceId={WORKSPACE_ID}
@@ -95,7 +95,7 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(settings).not.toBeNull()
   })
 
-  test('renders placeholder state when no repo is open', async () => {
+  test('renders placeholder state when no repo is open', () => {
     const { container } = renderSidebar(<WorkspaceLayoutSidebar git={null} compact={false} />)
 
     expect(container.querySelector('[data-testid="workspace-picker-host"]')).not.toBeNull()
@@ -188,7 +188,7 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(container.querySelector('[data-testid="workspace-root-row"]')?.textContent).not.toContain('example:')
   })
 
-  test('keeps the workspace row action menu visible in compact UI', async () => {
+  test('keeps the workspace row action menu visible in compact UI', () => {
     responsiveMocks.compact = true
     const { container } = renderSidebar(<WorkspaceLayoutSidebar workspaceId={WORKSPACE_ID} compact git={null} />)
 
@@ -197,7 +197,7 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(menuTrigger?.parentElement?.className).toContain('pointer-events-auto')
   })
 
-  test('uses the workspace background throughout the sidebar in compact UI', async () => {
+  test('uses the workspace background throughout the sidebar in compact UI', () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar workspaceId={WORKSPACE_ID} compact git={repoSnapshot()} branchContent={<div />} />,
     )
@@ -207,7 +207,7 @@ describe('WorkspaceLayoutSidebar', () => {
     expect(sidebar?.querySelectorAll('.bg-navigation')).toHaveLength(0)
   })
 
-  test('keeps the navigation background in split UI', async () => {
+  test('keeps the navigation background in split UI', () => {
     const { container } = renderSidebar(
       <WorkspaceLayoutSidebar
         workspaceId={WORKSPACE_ID}

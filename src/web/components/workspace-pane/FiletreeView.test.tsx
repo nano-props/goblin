@@ -198,7 +198,7 @@ function buildTree(): WorkspaceFilesystemTreeResult {
 }
 
 describe('FiletreeView', () => {
-  test('renders the empty state when the tree has no nodes', async () => {
+  test('renders the empty state when the tree has no nodes', () => {
     const tree: WorkspaceFilesystemTreeResult = { nodes: [], truncated: false }
     renderView({ tree, isInitialLoading: false, error: null })
     expect(container?.querySelector('[data-filetree=""]')).not.toBeNull()
@@ -232,7 +232,7 @@ describe('FiletreeView', () => {
     expect(onRetry).toHaveBeenCalledOnce()
   })
 
-  test('keeps retry disabled and reports busy while filesystem reads are pending', async () => {
+  test('keeps retry disabled and reports busy while filesystem reads are pending', () => {
     const onRetry = vi.fn()
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
@@ -246,7 +246,7 @@ describe('FiletreeView', () => {
     expect(container?.querySelector('button')?.hasAttribute('disabled')).toBe(true)
   })
 
-  test('renders a virtualized tree labelled by i18n', async () => {
+  test('renders a virtualized tree labelled by i18n', () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
       isInitialLoading: false,
@@ -255,7 +255,7 @@ describe('FiletreeView', () => {
     expect(tree().getAttribute('aria-label')).toBe('filetree.aria-label')
   })
 
-  test('keeps file action triggers clear of the overlay scrollbar', async () => {
+  test('keeps file action triggers clear of the overlay scrollbar', () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
       isInitialLoading: false,
@@ -266,7 +266,7 @@ describe('FiletreeView', () => {
     expect(row('README.md').firstElementChild?.className).toContain('pr-3')
   })
 
-  test('does not add an extra panel border around the tree body', async () => {
+  test('does not add an extra panel border around the tree body', () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
       isInitialLoading: false,
@@ -275,7 +275,7 @@ describe('FiletreeView', () => {
     expect(tree().className).not.toContain('border-l')
   })
 
-  test('uses the app sans font for explorer file names', async () => {
+  test('uses the app sans font for explorer file names', () => {
     renderView({
       tree: { nodes: [fileNode('README.md')], truncated: false },
       isInitialLoading: false,
@@ -285,7 +285,7 @@ describe('FiletreeView', () => {
     expect(tree().className).not.toContain('font-mono')
   })
 
-  test('lists root-level files and directories, directories before files', async () => {
+  test('lists root-level files and directories, directories before files', () => {
     const tree: WorkspaceFilesystemTreeResult = {
       nodes: [
         dirNode('src'),
@@ -401,7 +401,7 @@ describe('FiletreeView', () => {
     expect(onOpenFile).not.toHaveBeenCalled()
   })
 
-  test('keeps the file action menu trigger visible in compact mode', async () => {
+  test('keeps the file action menu trigger visible in compact mode', () => {
     compactUi = true
     const tree: WorkspaceFilesystemTreeResult = { nodes: [fileNode('README.md')], truncated: false }
     renderView({ tree, isInitialLoading: false, error: null, onOpenFile: vi.fn() })
@@ -504,7 +504,7 @@ describe('FiletreeView', () => {
     expect(onActivate.mock.calls[0]?.[0]?.id).toBe('README.md')
   })
 
-  test('shows the truncated footer when truncated is true', async () => {
+  test('shows the truncated footer when truncated is true', () => {
     const tree: WorkspaceFilesystemTreeResult = {
       nodes: [fileNode('README.md')],
       truncated: true,
@@ -513,7 +513,7 @@ describe('FiletreeView', () => {
     expect(container?.textContent).toMatch(/filetree\.truncated/)
   })
 
-  test('does not render a status dot without an authoritative status projection', async () => {
+  test('does not render a status dot without an authoritative status projection', () => {
     const tree: WorkspaceFilesystemTreeResult = {
       nodes: [fileNode('README.md', null, 'modified')],
       truncated: false,
@@ -524,7 +524,7 @@ describe('FiletreeView', () => {
     expect(container?.querySelector('[aria-label^="filetree.status."]')).toBeNull()
   })
 
-  test('keeps the initial loading state visually quiet and announces aria-busy', async () => {
+  test('keeps the initial loading state visually quiet and announces aria-busy', () => {
     renderView({ tree: null, isInitialLoading: true, error: null })
     expect(container?.querySelectorAll('[role="treeitem"]').length).toBe(0)
     expect(container?.textContent).not.toMatch(/filetree\.loading/)
@@ -641,7 +641,7 @@ describe('FiletreeView — keyboard integration', () => {
 })
 
 describe('FiletreeView — locale-aware sorting', () => {
-  test('sorts child lists by locale-aware name compare, directories first', async () => {
+  test('sorts child lists by locale-aware name compare, directories first', () => {
     const tree: WorkspaceFilesystemTreeResult = {
       nodes: [fileNode('10.txt'), dirNode('a'), fileNode('2.txt'), dirNode('A'), fileNode('b.txt'), fileNode('a.txt')],
       truncated: false,

@@ -25,7 +25,7 @@ import {
 } from '#/web/test-utils/terminal-session-projection.ts'
 
 describe('TerminalSessionProjection reconciliation', () => {
-  test('creates missing local sessions and syncs selection', async () => {
+  test('creates missing local sessions and syncs selection', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
 
     projection.reconcileServerSessions(
@@ -43,7 +43,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     })
   })
 
-  test('applies a preferred selection after its session materializes', async () => {
+  test('applies a preferred selection after its session materializes', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.setPreferredSelectedTerminalSessionIds({
       [WORKTREE_KEY]: 'term-111111111111111111111',
@@ -65,7 +65,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     )
   })
 
-  test('removes local sessions absent from the authoritative catalog', async () => {
+  test('removes local sessions absent from the authoritative catalog', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     terminalSessionProjectionAccess(projection).ensureSession(makeDescriptor('term-111111111111111111111', 1))
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
@@ -181,7 +181,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
-  test('ignores a stale session-closed event after the durable terminal rebinds', async () => {
+  test('ignores a stale session-closed event after the durable terminal rebinds', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -196,7 +196,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
-  test('uses the canonical durable session for an exact close', async () => {
+  test('uses the canonical durable session for an exact close', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
@@ -458,7 +458,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
   })
 
-  test('preserves current selection and falls back to controller when current is lost', async () => {
+  test('preserves current selection and falls back to controller when current is lost', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
 
     // First reconcile: term-111111111111111111111 becomes current
@@ -486,7 +486,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     )
   })
 
-  test('closing the active terminal selects the adjacent tab in the server session list', async () => {
+  test('closing the active terminal selects the adjacent tab in the server session list', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
 
     projection.reconcileServerSessions(
@@ -513,7 +513,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     )
   })
 
-  test('invalidates cached filesystem target snapshot when the server session list changes', async () => {
+  test('invalidates cached filesystem target snapshot when the server session list changes', () => {
     projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
     projection.reconcileServerSessions(
       { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },

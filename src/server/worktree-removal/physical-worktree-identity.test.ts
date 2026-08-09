@@ -7,7 +7,7 @@ import {
 import { parseRemotePhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 describe('physical worktree identity', () => {
-  test('resolved local entries reached through different repo roots share a canonical path key', async () => {
+  test('resolved local entries reached through different repo roots share a canonical path key', () => {
     const worktreePath = path.resolve('/worktrees/feature')
     const left: PhysicalWorktreeIdentity = {
       kind: 'local',
@@ -20,7 +20,7 @@ describe('physical worktree identity', () => {
     expect(physicalWorktreeIdentityKey(left)).toBe(physicalWorktreeIdentityKey(right))
   })
 
-  test('resolved remote aliases merge when namespace and canonical path match', async () => {
+  test('resolved remote aliases merge when namespace and canonical path match', () => {
     const left: PhysicalWorktreeIdentity = {
       kind: 'remote',
       executionNamespaceId: '0123456789abcdef0123456789abcdef',
@@ -31,7 +31,7 @@ describe('physical worktree identity', () => {
     expect(physicalWorktreeIdentityKey(left)).toBe(physicalWorktreeIdentityKey(right))
   })
 
-  test('remote protocol parses the non-sensitive namespace and canonical path', async () => {
+  test('remote protocol parses the non-sensitive namespace and canonical path', () => {
     const output = remoteOutput('machine-a')
     expect(parseRemotePhysicalWorktreeIdentity(output)).toEqual({
       kind: 'remote',
@@ -40,14 +40,14 @@ describe('physical worktree identity', () => {
     })
   })
 
-  test('different machine facts cannot collide even if a runtime token is repeated', async () => {
+  test('different machine facts cannot collide even if a runtime token is repeated', () => {
     const left = parseRemotePhysicalWorktreeIdentity(remoteOutput('machine-a'))
     const right = parseRemotePhysicalWorktreeIdentity(remoteOutput('machine-b'))
 
     expect(physicalWorktreeIdentityKey(left)).not.toBe(physicalWorktreeIdentityKey(right))
   })
 
-  test('remote protocol rejects malformed or ambiguous output', async () => {
+  test('remote protocol rejects malformed or ambiguous output', () => {
     expect(() => parseRemotePhysicalWorktreeIdentity('short\0machine-a\0mnt-a\0/srv/worktrees/feature\0')).toThrow(
       'error.invalid-worktree-identity',
     )

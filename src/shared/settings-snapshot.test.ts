@@ -20,14 +20,14 @@ const prefs = {
 }
 
 describe('settings snapshot partitions', () => {
-  test('builds runtime settings without workspace restore state', async () => {
+  test('builds runtime settings without workspace restore state', () => {
     expect(buildRuntimeSettingsSnapshot({ prefs, globalShortcutRegistered: true })).toEqual({
       ...prefs,
       globalShortcutRegistered: true,
     })
   })
 
-  test('builds runtime recent repos separately from settings prefs', async () => {
+  test('builds runtime recent repos separately from settings prefs', () => {
     expect(
       buildRuntimeRecentWorkspacesState({
         recentWorkspaces: [{ id: workspaceIdForTest('goblin+file:///tmp/repo-a') }],
@@ -37,7 +37,7 @@ describe('settings snapshot partitions', () => {
     })
   })
 
-  test('keeps workspace restore state out of the settings snapshot', async () => {
+  test('keeps workspace restore state out of the settings snapshot', () => {
     const snapshot = buildSettingsSnapshot({
       prefs,
       globalShortcutRegistered: false,

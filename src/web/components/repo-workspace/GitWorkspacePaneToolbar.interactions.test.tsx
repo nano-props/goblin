@@ -170,7 +170,7 @@ describe('GitWorkspacePaneToolbar interactions', () => {
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'files')
   })
 
-  test('does not show branch actions in the workspace bar (actions moved to branch rows)', async () => {
+  test('does not show branch actions in the workspace bar (actions moved to branch rows)', () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),

@@ -15,7 +15,7 @@ function componentTags(value: string): string[] {
 }
 
 describe('i18n dictionaries', () => {
-  test('does not contain empty or whitespace-only values', async () => {
+  test('does not contain empty or whitespace-only values', () => {
     for (const [lang, dict] of Object.entries(dicts)) {
       for (const [key, value] of Object.entries(dict)) {
         expect(value.trim(), `${lang}.${key}`).not.toBe('')
@@ -23,7 +23,7 @@ describe('i18n dictionaries', () => {
     }
   })
 
-  test('keeps placeholders and rich-text component tags aligned with English', async () => {
+  test('keeps placeholders and rich-text component tags aligned with English', () => {
     const keys = Object.keys(en) as DictKey[]
     for (const lang of ['zh', 'ko', 'ja'] as const) {
       for (const key of keys) {
@@ -33,7 +33,7 @@ describe('i18n dictionaries', () => {
     }
   })
 
-  test('localizes menu and remote workspace copy for non-English dictionaries', async () => {
+  test('localizes menu and remote workspace copy for non-English dictionaries', () => {
     expect(zh['menu.file.open-remote-workspace']).toBe('打开远程工作区…')
     expect(ko['menu.file.open-remote-workspace']).toBe('원격 작업 공간 열기…')
     expect(ja['menu.file.open-remote-workspace']).toBe('リモートワークスペースを開く…')
@@ -56,7 +56,7 @@ describe('i18n dictionaries', () => {
     expect(ja['workspace-picker.open-remote-path-label']).toBe('リモートパス')
   })
 
-  test('keeps top-level workspace copy independent of Git repository terminology', async () => {
+  test('keeps top-level workspace copy independent of Git repository terminology', () => {
     const workspaceKeys = [
       'workspace-picker.workspaces',
       'workspace-picker.placeholder',

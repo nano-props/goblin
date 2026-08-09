@@ -136,7 +136,7 @@ describe('test harness policy', () => {
     expect(analyzeSource(source, 'fixture.test.tsx')).toContain(label)
   })
 
-  test('detects xterm mocks through Vitest bindings without matching text', async () => {
+  test('detects xterm mocks through Vitest bindings without matching text', () => {
     expect(hasXtermMock("import { vi as testVi } from 'vitest'; testVi.mock('@xterm/xterm', () => ({}))", 'x.ts')).toBe(
       true,
     )

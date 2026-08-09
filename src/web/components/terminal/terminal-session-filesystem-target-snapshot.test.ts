@@ -30,7 +30,7 @@ function makeSession(
 }
 
 describe('terminal session filesystem target snapshot helper', () => {
-  test('builds summaries and populates snapshot cache lazily', async () => {
+  test('builds summaries and populates snapshot cache lazily', () => {
     const descriptor = makeDescriptor('term-111111111111111111111', 1)
     const session = makeSession(descriptor, {
       phase: 'open',

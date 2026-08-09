@@ -13,6 +13,7 @@ const splitterMocks = vi.hoisted(() => ({
   beforeDefaultSize: null as number | null,
   afterDefaultSize: null as number | null,
   beforeMinSize: null as number | null,
+  keyboardResizeBy: null as number | null,
   handleDisabled: false,
   beforeCollapse: vi.fn(),
   beforeResize: vi.fn<(size: number) => void>(),
@@ -29,9 +30,13 @@ vi.mock('reka-ui', () => ({
   SplitterGroup: {
     name: 'MockSplitterGroup',
     inheritAttrs: false,
-    props: ['direction', 'onLayout'],
-    setup(props: { onLayout?: (layout: number[]) => void }, { attrs, slots }: MockComponentContext) {
+    props: ['direction', 'keyboardResizeBy', 'onLayout'],
+    setup(
+      props: { keyboardResizeBy?: number; onLayout?: (layout: number[]) => void },
+      { attrs, slots }: MockComponentContext,
+    ) {
       return () => {
+        splitterMocks.keyboardResizeBy = props.keyboardResizeBy ?? null
         splitterMocks.onLayout = props.onLayout ?? null
         return <div class={attrs.class}>{slots.default?.()}</div>
       }
@@ -98,6 +103,7 @@ beforeEach(() => {
   splitterMocks.beforeDefaultSize = null
   splitterMocks.afterDefaultSize = null
   splitterMocks.beforeMinSize = null
+  splitterMocks.keyboardResizeBy = null
   splitterMocks.handleDisabled = false
   splitterMocks.beforeCollapse.mockClear()
   splitterMocks.beforeResize.mockClear()
@@ -130,6 +136,13 @@ afterEach(() => {
 })
 
 describe('SplitPane', () => {
+  test('preserves the mainline keyboard resize step', () => {
+    const View = defineComponent(() => () => <SplitPane before={<div />} after={<div />} afterSize={62} />)
+    renderInJsdom(View)
+
+    expect(splitterMocks.keyboardResizeBy).toBe(5)
+  })
+
   test('persists user layout changes while expanded', async () => {
     const onAfterSizeChange = vi.fn()
     const View = defineComponent(() => () => (

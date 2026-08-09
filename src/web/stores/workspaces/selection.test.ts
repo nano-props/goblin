@@ -247,7 +247,7 @@ describe('setWorkspacePaneTab', () => {
     ).toBe('changes')
   })
 
-  test('restores a session-preferred files tab when its static tab is open', async () => {
+  test('restores a session-preferred files tab when its static tab is open', () => {
     seedRepo({
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'files',
@@ -258,7 +258,7 @@ describe('setWorkspacePaneTab', () => {
     expect(openTabsFor('main')).toEqual(['status', 'files'])
   })
 
-  test('files is a worktree-scoped static tab and lives in the worktree-only bucket', async () => {
+  test('files is a worktree-scoped static tab and lives in the worktree-only bucket', () => {
     expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toContain('files')
   })
 

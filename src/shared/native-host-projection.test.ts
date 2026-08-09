@@ -7,7 +7,7 @@ import {
 } from '#/shared/native-host-projection.ts'
 
 describe('native host projection helpers', () => {
-  test('picks only settings that affect native projection', async () => {
+  test('picks only settings that affect native projection', () => {
     expect(
       pickNativeSettingsProjectionPatch({
         lang: 'ja',
@@ -20,7 +20,7 @@ describe('native host projection helpers', () => {
     })
   })
 
-  test('returns null when a settings update does not affect native projection', async () => {
+  test('returns null when a settings update does not affect native projection', () => {
     expect(
       pickNativeSettingsProjectionPatch({
         terminalNotificationsEnabled: true,
@@ -28,7 +28,7 @@ describe('native host projection helpers', () => {
     ).toBeNull()
   })
 
-  test('derives the native projection state from full settings', async () => {
+  test('derives the native projection state from full settings', () => {
     expect(
       nativeSettingsProjectionStateFromSettings({
         lang: 'ko',
@@ -51,11 +51,11 @@ describe('native host projection helpers', () => {
     })
   })
 
-  test('rejects an empty native host projection payload', async () => {
+  test('rejects an empty native host projection payload', () => {
     expect(v.safeParse(NativeHostProjectionSchema, {}).success).toBe(false)
   })
 
-  test('rejects unknown native host projection fields', async () => {
+  test('rejects unknown native host projection fields', () => {
     expect(
       v.safeParse(NativeHostProjectionSchema, {
         prefs: {

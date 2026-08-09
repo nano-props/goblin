@@ -164,7 +164,7 @@ beforeEach(() => {
 })
 
 describe('TerminalSessionProvider', () => {
-  test('forwards every realtime event to the client-level projection', async () => {
+  test('forwards every realtime event to the client-level projection', () => {
     const output = outputEventFixture()
     const bell: TerminalBellRealtimeEvent = {
       terminalRuntimeSessionId: TERMINAL_RUNTIME_SESSION_ID,
@@ -244,13 +244,13 @@ describe('TerminalSessionProvider', () => {
     result.unmount()
   })
 
-  test('prewarms the terminal font on mount', async () => {
+  test('prewarms the terminal font on mount', () => {
     const result = renderProvider()
     expect(geometryMocks.preloadTerminalFont).toHaveBeenCalledTimes(1)
     result.unmount()
   })
 
-  test('publishes projection commands and reads through the provider contexts', async () => {
+  test('publishes projection commands and reads through the provider contexts', () => {
     const captured = renderProviderWithContexts()
 
     expect(captured.command).toStrictEqual({
@@ -298,7 +298,7 @@ describe('TerminalSessionProvider', () => {
     captured.unmount()
   })
 
-  test('unsubscribes realtime events and clears the command bridge on unmount', async () => {
+  test('unsubscribes realtime events and clears the command bridge on unmount', () => {
     const result = renderProvider()
     expect(readTerminalSessionCommandBridge()).not.toBeNull()
 

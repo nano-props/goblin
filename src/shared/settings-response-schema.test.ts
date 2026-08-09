@@ -11,7 +11,7 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('settings response schemas', () => {
-  test('accepts current settings response contracts', async () => {
+  test('accepts current settings response contracts', () => {
     const prefs = defaultUserSettings({ globalShortcut: 'Alt+K' })
     expect(v.parse(UserSettingsSchema, prefs)).toEqual(prefs)
     expect(v.parse(SettingsSnapshotSchema, defaultSettingsSnapshot(prefs))).toEqual(defaultSettingsSnapshot(prefs))
@@ -31,7 +31,7 @@ describe('settings response schemas', () => {
     expect(v.safeParse(UserSettingsSchema, input).success).toBe(false)
   })
 
-  test('rejects malformed nested settings snapshot state', async () => {
+  test('rejects malformed nested settings snapshot state', () => {
     const snapshot = defaultSettingsSnapshot()
     const malformedRecent = { ...snapshot, recentWorkspaces: [{ id: 'relative/path' }] }
     expect(v.safeParse(SettingsSnapshotSchema, malformedRecent).success).toBe(false)
@@ -48,7 +48,7 @@ describe('settings response schemas', () => {
     expect(v.safeParse(SettingsSnapshotSchema, malformedWorkspaceSettings).success).toBe(false)
   })
 
-  test('rejects incomplete and extended command responses', async () => {
+  test('rejects incomplete and extended command responses', () => {
     expect(v.safeParse(UserSettingsUpdateResponseSchema, { prefs: defaultUserSettings() }).success).toBe(false)
     expect(
       v.safeParse(UserSettingsUpdateResponseSchema, {
@@ -63,7 +63,7 @@ describe('settings response schemas', () => {
     )
   })
 
-  test('accepts a deferred Git workspace stub without a repo projection', async () => {
+  test('accepts a deferred Git workspace stub without a repo projection', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///deferred-repo')
     const response = {
       status: 'restored',

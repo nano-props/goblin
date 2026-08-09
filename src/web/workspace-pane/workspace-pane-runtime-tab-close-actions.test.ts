@@ -38,7 +38,7 @@ const terminalView: WorkspacePaneTerminalTabSummary = {
 }
 
 describe('workspace pane runtime tab close actions', () => {
-  test('requests close confirmation for terminal tabs running non-shell processes', async () => {
+  test('requests close confirmation for terminal tabs running non-shell processes', () => {
     expect(
       workspacePaneRuntimeTabCloseConfirmRequest({
         type: 'terminal',
@@ -56,7 +56,7 @@ describe('workspace pane runtime tab close actions', () => {
     })
   })
 
-  test('does not request close confirmation for terminal tabs running a shell', async () => {
+  test('does not request close confirmation for terminal tabs running a shell', () => {
     expect(
       workspacePaneRuntimeTabCloseConfirmRequest({
         type: 'terminal',
@@ -88,7 +88,7 @@ describe('workspace pane runtime tab close actions', () => {
     ).toBe('terminal:term-111111111111111111111')
   })
 
-  test('uses the canonical terminal base as the runtime close target', async () => {
+  test('uses the canonical terminal base as the runtime close target', () => {
     expect(terminalBaseForRuntimeTabCloseTarget(closeTarget)).toEqual(terminalBase)
   })
 })

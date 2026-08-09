@@ -7,6 +7,7 @@ import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { PopoverTrigger } from 'reka-ui'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ZenModeSidebarChrome } from '#/web/components/workspace-layout/ZenModeSidebarChrome.tsx'
@@ -105,6 +106,46 @@ describe('ZenModeSidebarChrome', () => {
       hitArea?.dispatchEvent(new MouseEvent('mouseenter'))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
+  })
+
+  test('retains the reveal through the closing animation state', async () => {
+    useFakeTimers()
+    const { container } = renderInJsdom(
+      <ZenModeSidebarChrome
+        workspaceId={WORKSPACE_ID}
+        zenModeToggleEnabled
+        revealEnabled
+        sidebarSize={36}
+        onSidebarSizeChange={() => {}}
+        sidebarPane={mockSidebarPane()}
+      />,
+    )
+
+    await flushTestUpdates(() => {
+      zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseenter'))
+    })
+    expect(zenModeSidebarReveal(container)?.dataset.state).toBe('opening')
+    await advanceTimersAndFlush(16)
+    expect(zenModeSidebarReveal(container)?.dataset.state).toBe('open')
+
+    const reveal = zenModeSidebarReveal(container)
+    await flushTestUpdates(() => {
+      reveal?.dispatchEvent(
+        new MouseEvent('mouseleave', {
+          clientX: 900,
+          clientY: 24,
+          relatedTarget: document.body,
+        }),
+      )
+    })
+
+    expect(reveal?.dataset.open).toBe('false')
+    expect(reveal?.dataset.state).toBe('closing')
+    expect(reveal?.isConnected).toBe(true)
+    await advanceTimersAndFlush(259)
+    expect(reveal?.dataset.state).toBe('closing')
+    await advanceTimersAndFlush(1)
+    expect(reveal?.dataset.state).toBe('closed')
   })
 
   test('uses a top-level drag plate for the revealed sidebar titlebar', async () => {

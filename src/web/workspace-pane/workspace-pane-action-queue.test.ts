@@ -66,7 +66,7 @@ describe('workspace pane action queue', () => {
     expect(workspaceOrder).toEqual(['first', 'second'])
   })
 
-  test('identifies a detached worktree by its filesystem path instead of workspace-root scope', async () => {
+  test('identifies a detached worktree by its filesystem path instead of workspace-root scope', () => {
     expect(
       workspacePaneActionTargetFromCoordinates({
         workspaceId: TARGET.workspaceId,
@@ -102,7 +102,7 @@ describe('workspace pane action queue', () => {
     await first
   })
 
-  test('keys every target kind from only its authoritative identity', async () => {
+  test('keys every target kind from only its authoritative identity', () => {
     expect(
       workspacePaneActionTargetKey({
         kind: 'workspace-root',
@@ -128,7 +128,7 @@ describe('workspace pane action queue', () => {
     ).toBe('goblin+file:///repo\0runtime\0git-worktree\0/repo-worktree')
   })
 
-  test('keeps a detached Git worktree in its worktree queue', async () => {
+  test('keeps a detached Git worktree in its worktree queue', () => {
     const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)
     const root = canonicalWorkspaceLocator('goblin+file:///repo-detached')
     if (!workspaceId || !root) throw new Error('invalid mock filesystem target')

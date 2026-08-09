@@ -15,7 +15,7 @@ function descriptor(terminalSessionId: string): TerminalDescriptor {
 }
 
 describe('terminal session selection helper', () => {
-  test('prefers preferred selection, then current, then controller, then first terminal', async () => {
+  test('prefers preferred selection, then current, then controller, then first terminal', () => {
     const isValid = (_worktreeKey: string, key: string) =>
       ['term-111111111111111111111', 'term-222222222222222222222', 'term-333333333333333333333'].includes(key)
     const sortedDescriptors = [

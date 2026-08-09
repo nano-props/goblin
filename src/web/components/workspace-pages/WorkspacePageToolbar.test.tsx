@@ -6,7 +6,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspacePageToolbar } from '#/web/components/workspace-pages/WorkspacePageToolbar.tsx'
 
 describe('WorkspacePageToolbar', () => {
-  test('renders a selected workspace-style tab outside compact mode', async () => {
+  test('renders a selected workspace-style tab outside compact mode', () => {
     const { container } = renderInJsdom(<WorkspacePageToolbar icon={LayoutDashboard} label="Dashboard" />)
 
     expect(container.querySelector('[role="tablist"]')).not.toBeNull()
@@ -14,7 +14,7 @@ describe('WorkspacePageToolbar', () => {
     expect(container.querySelector('button[aria-label="workspace.back-to-workspace-navigator"]')).toBeNull()
   })
 
-  test('renders compact back-title chrome without a tab strip', async () => {
+  test('renders compact back-title chrome without a tab strip', () => {
     const onBack = vi.fn()
     const { container } = renderInJsdom(
       <WorkspacePageToolbar icon={LayoutDashboard} label="Dashboard" compact onBack={onBack} />,

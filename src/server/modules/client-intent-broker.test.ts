@@ -13,11 +13,11 @@ describe('client intent broker', () => {
     disconnectAllClientIntentSockets()
   })
 
-  test('returns false when no subscriber is attached', async () => {
+  test('returns false when no subscriber is attached', () => {
     expect(publishClientIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' })).toBe(false)
   })
 
-  test('broadcasts the enveloped intent to every subscriber and returns true', async () => {
+  test('broadcasts the enveloped intent to every subscriber and returns true', () => {
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
     registerClientIntentSocket(first)
@@ -34,7 +34,7 @@ describe('client intent broker', () => {
     expect(second.send).toHaveBeenCalledWith(expected)
   })
 
-  test('disconnects every subscriber during shutdown', async () => {
+  test('disconnects every subscriber during shutdown', () => {
     const first = { send: vi.fn(), close: vi.fn() }
     const second = { send: vi.fn(), close: vi.fn() }
     registerClientIntentSocket(first)
@@ -49,7 +49,7 @@ describe('client intent broker', () => {
     expect(second.send).not.toHaveBeenCalled()
   })
 
-  test('rejects the (N+1)th subscriber to prevent socket floods', async () => {
+  test('rejects the (N+1)th subscriber to prevent socket floods', () => {
     for (let i = 0; i < MAX_CLIENT_INTENT_SOCKETS; i += 1) {
       registerClientIntentSocket({ send: vi.fn(), close: vi.fn() })
     }
@@ -57,7 +57,7 @@ describe('client intent broker', () => {
     expect(() => registerClientIntentSocket(overflow)).toThrow(ClientIntentSocketLimitError)
   })
 
-  test('frees a slot when a subscriber disconnects', async () => {
+  test('frees a slot when a subscriber disconnects', () => {
     const sockets = Array.from({ length: MAX_CLIENT_INTENT_SOCKETS }, () => ({
       send: vi.fn(),
       close: vi.fn(),

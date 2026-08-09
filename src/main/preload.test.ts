@@ -112,7 +112,7 @@ function loadPreload(
 }
 
 describe('preload goblinNative bridge', () => {
-  test('exposes only the IPC surface, no bootstrap fields', async () => {
+  test('exposes only the IPC surface, no bootstrap fields', () => {
     // The bootstrap is now empty on first paint in every runtime.
     // The preload no longer seeds `window.__GOBLIN_BOOTSTRAP__`
     // with anything — auth is via the http-only cookie planted by
@@ -219,7 +219,7 @@ describe('preload goblinNative bridge', () => {
     warn.mockRestore()
   })
 
-  test('shares a single goblin:event ipc listener across subscribers', async () => {
+  test('shares a single goblin:event ipc listener across subscribers', () => {
     const { goblinNative, ipcRenderer } = loadPreload()
     const cb1 = vi.fn()
     const cb2 = vi.fn()
@@ -243,7 +243,7 @@ describe('preload goblinNative bridge', () => {
     expect(ipcRenderer.off).toHaveBeenCalledWith(HOST_IPC_EVENT_CHANNEL, listener)
   })
 
-  test('continues delivering goblin:event when one subscriber throws', async () => {
+  test('continues delivering goblin:event when one subscriber throws', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { goblinNative, ipcRenderer } = loadPreload()
     const cb1 = vi.fn(() => {
@@ -264,7 +264,7 @@ describe('preload goblinNative bridge', () => {
     warn.mockRestore()
   })
 
-  test('uses a dedicated effect-intent ipc listener across subscribers', async () => {
+  test('uses a dedicated effect-intent ipc listener across subscribers', () => {
     const { goblinNative, ipcRenderer } = loadPreload()
     const cb1 = vi.fn()
     const cb2 = vi.fn()
@@ -297,7 +297,7 @@ describe('preload goblinNative bridge', () => {
     expect(invocations.map((entry) => entry.channel)).toEqual([ROTATE_ACCESS_TOKEN_CHANNEL])
   })
 
-  test('locks the goblinNative IPC surface to browser-missing capabilities', async () => {
+  test('locks the goblinNative IPC surface to browser-missing capabilities', () => {
     // The client's "Server First" architecture means the server
     // is the single source of truth: any IPC channel that the
     // server *could* expose over `/api/*` belongs on the HTTP
@@ -373,7 +373,7 @@ describe('preload goblinNative bridge', () => {
     }
   })
 
-  test('the channel-extraction helper detects unwired channels (self-check)', async () => {
+  test('the channel-extraction helper detects unwired channels (self-check)', () => {
     // Sanity-check on `extractIpcChannelLiterals`: pretend preload
     // just grew a new IPC call. The helper should surface it as
     // "unwired" so the lockdown test above fails fast. If this

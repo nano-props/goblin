@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 describe('WorkspacePicker', () => {
-  test('uses workspace capability and transport icons', async () => {
+  test('uses workspace capability and transport icons', () => {
     render(
       <WorkspacePicker
         workspaces={[
@@ -36,7 +36,7 @@ describe('WorkspacePicker', () => {
     expect(current?.querySelector('.lucide-folder-git-2')).toBeNull()
   })
 
-  test('keeps the current workspace button as the only workspace chrome inside the current workspace group', async () => {
+  test('keeps the current workspace button as the only workspace chrome inside the current workspace group', () => {
     render(
       <WorkspacePicker
         workspaces={[
@@ -64,7 +64,7 @@ describe('WorkspacePicker', () => {
     expect(document.body.querySelector('button[aria-label="More"]')).toBeNull()
   })
 
-  test('exposes the current workspace button as a selected tab in a horizontal tablist', async () => {
+  test('exposes the current workspace button as a selected tab in a horizontal tablist', () => {
     render(
       <WorkspacePicker
         workspaces={[
@@ -92,7 +92,7 @@ describe('WorkspacePicker', () => {
     expect(activeTab.tabIndex).toBe(0)
   })
 
-  test('renders the sidebar surface as a plain full-width picker button instead of a tab strip', async () => {
+  test('renders the sidebar surface as a plain full-width picker button instead of a tab strip', () => {
     render(
       <WorkspacePicker
         workspaces={[
@@ -249,7 +249,7 @@ describe('WorkspacePicker', () => {
     expect(workspaceCRow?.querySelector('.bg-notification')?.textContent).toBe('1')
   })
 
-  test('renders only the current workspace button when multiple workspaces are open, with the rest in the popover', async () => {
+  test('renders only the current workspace button when multiple workspaces are open, with the rest in the popover', () => {
     vi.stubGlobal('matchMedia', createMatchMedia(false))
 
     render(

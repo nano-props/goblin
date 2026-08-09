@@ -170,7 +170,7 @@ describe('createAppNavigationActions history traversal', () => {
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, historyRestoreOptions())
   })
 
-  test('restores a malformed terminal history entry as the bare branch route', async () => {
+  test('restores a malformed terminal history entry as the bare branch route', () => {
     const navigation = routeNavigation()
     const target = {
       workspaceId: REPO_A_ID,
@@ -231,7 +231,7 @@ describe('createAppNavigationActions history traversal', () => {
     },
   )
 
-  test('does not open create worktree without a current repo', async () => {
+  test('does not open create worktree without a current repo', () => {
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: null,

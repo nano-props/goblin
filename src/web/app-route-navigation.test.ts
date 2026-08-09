@@ -132,7 +132,7 @@ describe('app route navigation helpers', () => {
     expect(abandonEffect).toHaveBeenCalledOnce()
   })
 
-  test('reads the current workspace pane route only for the exact repo branch', async () => {
+  test('reads the current workspace pane route only for the exact repo branch', () => {
     const branchRoot = '/workspace/example/branch/main'
     expect(workspacePaneRouteFromBranchHref(branchRoot, branchRoot)).toBeNull()
     expect(workspacePaneRouteFromBranchHref(`${branchRoot}/tab/files`, branchRoot)).toEqual({
@@ -164,7 +164,7 @@ describe('app route navigation helpers', () => {
     ).rejects.toThrow('navigation failed')
   })
 
-  test('records a route return target when opening a different route', async () => {
+  test('records a route return target when opening a different route', () => {
     expect(
       routeReturnSearch('/workspace/workspace-slug/branch/branch-slug', '/workspace/workspace-slug/worktree/new'),
     ).toEqual({
@@ -172,19 +172,19 @@ describe('app route navigation helpers', () => {
     })
   })
 
-  test('records the workspace route as a return target when opening a new worktree', async () => {
+  test('records the workspace route as a return target when opening a new worktree', () => {
     expect(routeReturnSearch('/workspace/workspace-slug', '/workspace/workspace-slug/worktree/new')).toEqual({
       returnTo: '/workspace/workspace-slug',
     })
   })
 
-  test('does not record the current route as its own return target', async () => {
+  test('does not record the current route as its own return target', () => {
     expect(
       routeReturnSearch('/workspace/workspace-slug/worktree/new', '/workspace/workspace-slug/worktree/new'),
     ).toEqual({})
   })
 
-  test('preserves an existing return target when re-entering the same route', async () => {
+  test('preserves an existing return target when re-entering the same route', () => {
     expect(
       routeReturnSearch(
         '/workspace/workspace-slug/worktree/new?returnTo=%2Fworkspace%2Fworkspace-slug%2Fbranch%2Fbranch-slug',
@@ -193,7 +193,7 @@ describe('app route navigation helpers', () => {
     ).toEqual({ returnTo: '/workspace/workspace-slug/branch/branch-slug' })
   })
 
-  test('preserves an existing return target while navigating inside a route family', async () => {
+  test('preserves an existing return target while navigating inside a route family', () => {
     expect(
       routeReturnSearch(
         '/settings/general?returnTo=%2Fworkspace%2Fworkspace-slug%2Fdashboard',
@@ -205,7 +205,7 @@ describe('app route navigation helpers', () => {
     })
   })
 
-  test('reads a same-origin relative return target from the current href', async () => {
+  test('reads a same-origin relative return target from the current href', () => {
     expect(
       returnToFromHref(
         '/workspace/workspace-slug/worktree/new?returnTo=%2Fworkspace%2Fworkspace-slug%2Fbranch%2Fbranch-slug',
@@ -213,11 +213,11 @@ describe('app route navigation helpers', () => {
     ).toBe('/workspace/workspace-slug/branch/branch-slug')
   })
 
-  test('ignores external return targets', async () => {
+  test('ignores external return targets', () => {
     expect(returnToFromHref('/settings/general?returnTo=https%3A%2F%2Fexample.invalid')).toBeNull()
   })
 
-  test('ignores protocol-relative return targets', async () => {
+  test('ignores protocol-relative return targets', () => {
     expect(returnToFromHref('/settings/general?returnTo=%2F%2Fexample.invalid')).toBeNull()
   })
 })

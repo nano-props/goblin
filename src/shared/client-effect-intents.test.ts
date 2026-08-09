@@ -2,22 +2,22 @@ import { describe, expect, test } from 'vitest'
 import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
 
 describe('isClientEffectIntent', () => {
-  test('accepts tab close without a window-close variant', async () => {
+  test('accepts tab close without a window-close variant', () => {
     expect(isClientEffectIntent({ type: 'workspace-pane-close-tab-requested' })).toBe(true)
     expect(isClientEffectIntent({ type: 'workspace-pane-close-tab-or-window-requested' })).toBe(false)
   })
 
-  test('accepts workspace pane tab intents with a known tab type', async () => {
+  test('accepts workspace pane tab intents with a known tab type', () => {
     expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' })).toBe(true)
     expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested', tab: 'terminal' })).toBe(true)
   })
 
-  test('rejects malformed workspace pane tab intents before command routing', async () => {
+  test('rejects malformed workspace pane tab intents before command routing', () => {
     expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested', tab: 'bad' })).toBe(false)
     expect(isClientEffectIntent({ type: 'show-workspace-pane-tab-requested' })).toBe(false)
   })
 
-  test('validates payload-bearing intent variants', async () => {
+  test('validates payload-bearing intent variants', () => {
     expect(isClientEffectIntent({ type: 'cycle-workspace-requested', direction: 1 })).toBe(true)
     expect(isClientEffectIntent({ type: 'cycle-workspace-requested', direction: 0 })).toBe(false)
     expect(isClientEffectIntent({ type: 'open-settings-requested', page: 'about' })).toBe(true)
@@ -64,7 +64,7 @@ describe('isClientEffectIntent', () => {
     ).toBe(false)
   })
 
-  test('accepts only valid recent repo entries', async () => {
+  test('accepts only valid recent repo entries', () => {
     expect(
       isClientEffectIntent({
         type: 'open-recent-workspace-requested',

@@ -41,7 +41,7 @@ function operation(
 }
 
 describe('repo write operation state policy', () => {
-  test('classifies settled phases and resolves their effective timestamp', async () => {
+  test('classifies settled phases and resolves their effective timestamp', () => {
     expect(isSettledRepoWriteOperation(operation('done', 'done', { queuedAt: 1, settledAt: 3 }))).toBe(true)
     expect(isSettledRepoWriteOperation(operation('running', 'running', { queuedAt: 1, startedAt: 2 }))).toBe(false)
     expect(repoWriteOperationTimestamp(operation('settled', 'done', { queuedAt: 1, startedAt: 2, settledAt: 3 }))).toBe(
@@ -49,7 +49,7 @@ describe('repo write operation state policy', () => {
     )
   })
 
-  test('projects visible operations newest first and returns defensive nested copies', async () => {
+  test('projects visible operations newest first and returns defensive nested copies', () => {
     const older = operation('older', 'running', { queuedAt: 1, startedAt: 2 })
     const newer = operation('newer', 'queued', { queuedAt: 3 })
     const settled = operation('settled', 'done', { queuedAt: 4, settledAt: 5 })
@@ -61,7 +61,7 @@ describe('repo write operation state policy', () => {
     expect(projected[0]?.cancellation).not.toBe(newer.cancellation)
   })
 
-  test('retains repo-scoped operations while filtering another runtime', async () => {
+  test('retains repo-scoped operations while filtering another runtime', () => {
     const repoScoped = { ...operation('repo', 'queued', { queuedAt: 1 }), workspaceRuntimeId: null }
     const otherRuntime = { ...operation('other', 'queued', { queuedAt: 2 }), workspaceRuntimeId: 'runtime-b' }
 
@@ -70,7 +70,7 @@ describe('repo write operation state policy', () => {
     ).toEqual(['repo'])
   })
 
-  test('prefers explicit cancellation and recognizes legacy cancelled results', async () => {
+  test('prefers explicit cancellation and recognizes legacy cancelled results', () => {
     expect(repoWriteOperationFailureReason('failure', 'git-timeout')).toBe('git-timeout')
     expect(repoWriteOperationFailureReason('cancelled', null)).toBe('caller-abort')
     expect(repoWriteOperationFailureReason('failure', null)).toBeNull()

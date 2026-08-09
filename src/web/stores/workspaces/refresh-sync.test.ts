@@ -7,11 +7,11 @@ import { REPO_ID, branch, ipcHandlers, resetRefreshTest, seedRepo } from '#/web/
 beforeEach(resetRefreshTest)
 
 describe('refreshFailureMessage', () => {
-  test('keeps a bare cancellation silent', async () => {
+  test('keeps a bare cancellation silent', () => {
     expect(refreshFailureMessage({ ok: false, message: 'cancelled' })).toBeNull()
   })
 
-  test('surfaces recovery guidance attached to a cancellation', async () => {
+  test('surfaces recovery guidance attached to a cancellation', () => {
     expect(
       refreshFailureMessage({
         ok: false,
@@ -21,7 +21,7 @@ describe('refreshFailureMessage', () => {
     ).toBe('error.workspace-runtime-settlement-failed')
   })
 
-  test('surfaces an ordinary failure', async () => {
+  test('surfaces an ordinary failure', () => {
     expect(refreshFailureMessage({ ok: false, message: 'error.failed-read-repo' })).toBe('error.failed-read-repo')
   })
 })

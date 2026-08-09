@@ -178,7 +178,7 @@ describe('branch action capabilities', () => {
     })
   })
 
-  test('uses canonical worktree state to gate primary worktree removal', async () => {
+  test('uses canonical worktree state to gate primary worktree removal', () => {
     const branch = createRepoBranch('feature/main-worktree', {
       worktree: { path: REPO_WORKTREE_PATH, isPrimary: false, isLocked: false },
     })
@@ -200,7 +200,7 @@ describe('branch action capabilities', () => {
     })
   })
 
-  test('allows removing the current branch when it belongs to a linked worktree', async () => {
+  test('allows removing the current branch when it belongs to a linked worktree', () => {
     const worktreePath = '/tmp/goblin-current-linked-worktree'
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/goblin-current-linked-worktree')
     const branch = createRepoBranch('feature/current-linked', {

@@ -27,7 +27,7 @@ describe('repo read invalidation ingress', () => {
     mocks.dispose.mockReset()
   })
 
-  test('forwards repo read invalidations and returns the shared subscription disposer', async () => {
+  test('forwards repo read invalidations and returns the shared subscription disposer', () => {
     const listener = vi.fn()
     const dispose = subscribeRepoReadInvalidation(listener)
     const event = {
@@ -43,7 +43,7 @@ describe('repo read invalidation ingress', () => {
     expect(dispose).toBe(mocks.dispose)
   })
 
-  test('ignores invalidations owned by other projections', async () => {
+  test('ignores invalidations owned by other projections', () => {
     const listener = vi.fn()
     subscribeRepoReadInvalidation(listener)
 
@@ -52,7 +52,7 @@ describe('repo read invalidation ingress', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
-  test('forwards the shared connection-open signal', async () => {
+  test('forwards the shared connection-open signal', () => {
     const onOpen = vi.fn()
     subscribeRepoReadInvalidation(vi.fn(), onOpen)
 

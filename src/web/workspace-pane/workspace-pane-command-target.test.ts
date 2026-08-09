@@ -35,7 +35,7 @@ beforeEach(() => {
 })
 
 describe('workspace pane command target', () => {
-  test('derives the worktree branch presentation from its single Git head authority', async () => {
+  test('derives the worktree branch presentation from its single Git head authority', () => {
     const target: WorkspacePaneCommandTarget = {
       routeTarget: {
         kind: 'git-worktree',
@@ -49,7 +49,7 @@ describe('workspace pane command target', () => {
     expect(workspacePaneCommandCoordinates(target).branchName).toBe('feature/example')
   })
 
-  test('derives a detached presentation without a parallel nullable branch field', async () => {
+  test('derives a detached presentation without a parallel nullable branch field', () => {
     const target: WorkspacePaneCommandTarget = {
       routeTarget: {
         kind: 'git-worktree',
@@ -63,7 +63,7 @@ describe('workspace pane command target', () => {
     expect(workspacePaneCommandCoordinates(target).branchName).toBeNull()
   })
 
-  test('does not admit a contradictory worktree branch field', async () => {
+  test('does not admit a contradictory worktree branch field', () => {
     const target: WorkspacePaneCommandTarget = {
       routeTarget: {
         kind: 'git-worktree',

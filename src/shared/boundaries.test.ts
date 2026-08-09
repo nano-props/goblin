@@ -15,7 +15,7 @@ describe('architecture boundary rules', () => {
     ).toEqual([expect.stringContaining('/src/web/components/Example.tsx: Vue h() is forbidden')])
   })
 
-  test('rejects namespace re-exports from disallowed modules', async () => {
+  test('rejects namespace re-exports from disallowed modules', () => {
     expect(
       checkArchitectureSources([
         {
@@ -26,7 +26,7 @@ describe('architecture boundary rules', () => {
     ).toEqual([expect.stringContaining('/src/server/desktop.ts: disallowed import "electron"')])
   })
 
-  test('rejects dynamic imports and require calls inside template interpolations', async () => {
+  test('rejects dynamic imports and require calls inside template interpolations', () => {
     expect(
       checkArchitectureSources([
         {
@@ -44,7 +44,7 @@ describe('architecture boundary rules', () => {
     ])
   })
 
-  test('rejects require and dynamic import calls with whitespace before the parenthesis', async () => {
+  test('rejects require and dynamic import calls with whitespace before the parenthesis', () => {
     expect(
       checkArchitectureSources([
         {
@@ -62,7 +62,7 @@ describe('architecture boundary rules', () => {
     ])
   })
 
-  test('rejects disallowed imports when comments appear in import syntax', async () => {
+  test('rejects disallowed imports when comments appear in import syntax', () => {
     expect(
       checkArchitectureSources([
         {
@@ -90,7 +90,7 @@ describe('architecture boundary rules', () => {
     ])
   })
 
-  test('rejects disallowed settings-client symbols when named bindings contain comments', async () => {
+  test('rejects disallowed settings-client symbols when named bindings contain comments', () => {
     expect(
       checkArchitectureSources([
         {
@@ -108,7 +108,7 @@ describe('architecture boundary rules', () => {
     ])
   })
 
-  test('ignores import-like text inside regex literals', async () => {
+  test('ignores import-like text inside regex literals', () => {
     expect(
       checkArchitectureSources([
         {
@@ -127,7 +127,7 @@ describe('architecture boundary rules', () => {
     ).toEqual([])
   })
 
-  test('rejects named re-exports when comments contain braces', async () => {
+  test('rejects named re-exports when comments contain braces', () => {
     expect(
       checkArchitectureSources([
         {
@@ -138,7 +138,7 @@ describe('architecture boundary rules', () => {
     ).toEqual([expect.stringContaining('/src/server/reexport.ts: disallowed import "electron"')])
   })
 
-  test('keeps static import bindings after import expressions and import.meta', async () => {
+  test('keeps static import bindings after import expressions and import.meta', () => {
     expect(
       checkArchitectureSources([
         {
@@ -150,7 +150,7 @@ describe('architecture boundary rules', () => {
     ).toEqual([])
   })
 
-  test('allows only approved settings-client symbols in settings read boundaries', async () => {
+  test('allows only approved settings-client symbols in settings read boundaries', () => {
     expect(
       checkArchitectureSources([
         {
@@ -170,7 +170,7 @@ describe('architecture boundary rules', () => {
     ).toEqual([expect.stringContaining('/src/web/settings-queries.ts: disallowed import "#/web/settings-client.ts"')])
   })
 
-  test('rejects settings-client imports from unapproved web files', async () => {
+  test('rejects settings-client imports from unapproved web files', () => {
     expect(
       checkArchitectureSources([
         {
@@ -185,7 +185,7 @@ describe('architecture boundary rules', () => {
     ])
   })
 
-  test('rejects relative imports that resolve to settings-client', async () => {
+  test('rejects relative imports that resolve to settings-client', () => {
     expect(
       checkArchitectureSources([
         {
@@ -200,7 +200,7 @@ describe('architecture boundary rules', () => {
     ])
   })
 
-  test('keeps in-process PTY composition confined to the approved test runtime', async () => {
+  test('keeps in-process PTY composition confined to the approved test runtime', () => {
     expect(
       checkArchitectureSources([
         {
@@ -226,7 +226,7 @@ describe('architecture boundary rules', () => {
     ])
   })
 
-  test('keeps the concrete worker-backed PTY implementation at the server bootstrap boundary', async () => {
+  test('keeps the concrete worker-backed PTY implementation at the server bootstrap boundary', () => {
     expect(
       checkArchitectureSources([
         {
@@ -243,7 +243,7 @@ describe('architecture boundary rules', () => {
     ])
   })
 
-  test('rejects legacy direct repo read surfaces in web code', async () => {
+  test('rejects legacy direct repo read surfaces in web code', () => {
     expect(
       checkArchitectureSources([
         {
@@ -288,7 +288,7 @@ describe('architecture boundary rules', () => {
     ])
   })
 
-  test('allows independent status composition and domain invalidation names in web code', async () => {
+  test('allows independent status composition and domain invalidation names in web code', () => {
     expect(
       checkArchitectureSources([
         {
@@ -303,7 +303,7 @@ describe('architecture boundary rules', () => {
     ).toEqual([])
   })
 
-  test('rejects transitive Node imports from the browser runtime', async () => {
+  test('rejects transitive Node imports from the browser runtime', () => {
     expect(
       checkArchitectureSources([
         {
@@ -318,7 +318,7 @@ describe('architecture boundary rules', () => {
     ).toEqual([expect.stringContaining('/src/web/main.tsx -> /src/shared/validator.ts -> node:path')])
   })
 
-  test('rejects bare Node builtin imports from the browser runtime', async () => {
+  test('rejects bare Node builtin imports from the browser runtime', () => {
     expect(
       checkArchitectureSources([
         {
@@ -329,7 +329,7 @@ describe('architecture boundary rules', () => {
     ).toEqual([expect.stringContaining('/src/web/main.tsx -> path')])
   })
 
-  test('allows type-only and browser-unreachable Node imports', async () => {
+  test('allows type-only and browser-unreachable Node imports', () => {
     expect(
       checkArchitectureSources([
         {
@@ -345,7 +345,7 @@ describe('architecture boundary rules', () => {
     ).toEqual([])
   })
 
-  test('allows inline type-only imports and re-exports', async () => {
+  test('allows inline type-only imports and re-exports', () => {
     expect(
       checkArchitectureSources([
         {

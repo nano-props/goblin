@@ -6,7 +6,7 @@ import { WorkspaceChrome, WorkspaceToolbar } from '#/web/components/workspace-to
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 
 describe('WorkspaceToolbar', () => {
-  test('owns workspace chrome without inheriting a generic toolbar gap', async () => {
+  test('owns workspace chrome without inheriting a generic toolbar gap', () => {
     const { container } = renderInJsdom(
       <WorkspaceToolbar>
         <div data-testid="body" />
@@ -26,7 +26,7 @@ describe('WorkspaceToolbar', () => {
     expect(container.querySelector('[data-testid="body"]')).not.toBeNull()
   })
 
-  test('keeps compact/non-draggable chrome padded without opting into window dragging', async () => {
+  test('keeps compact/non-draggable chrome padded without opting into window dragging', () => {
     renderInJsdom(
       <WorkspaceToolbar draggable={false}>
         <div />
@@ -40,7 +40,7 @@ describe('WorkspaceToolbar', () => {
     expect(toolbar?.className).not.toContain('title-bar-chrome')
   })
 
-  test('reserves traffic-light chrome through WorkspaceChrome only when requested', async () => {
+  test('reserves traffic-light chrome through WorkspaceChrome only when requested', () => {
     const { container } = renderInJsdom(<WorkspaceChrome trafficLightOffset />)
 
     const toolbar = workspaceToolbar(container)

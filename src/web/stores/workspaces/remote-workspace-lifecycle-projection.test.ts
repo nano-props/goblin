@@ -24,7 +24,7 @@ describe('remote lifecycle projection acceptance', () => {
     workspacesStore.setState({ workspaces: { [repoRoot]: repo }, workspaceOrder: [repoRoot] })
   })
 
-  test('accepts connecting then terminal within one server attempt', async () => {
+  test('accepts connecting then terminal within one server attempt', () => {
     expect(accept({ kind: 'connecting', attemptId: 2 })).toBe(true)
     expect(accept({ kind: 'ready', attemptId: 2, target })).toBe(true)
     expect(remoteAdmission()).toEqual({
@@ -34,7 +34,7 @@ describe('remote lifecycle projection acceptance', () => {
     })
   })
 
-  test('rejects an older command response and same-attempt phase regression', async () => {
+  test('rejects an older command response and same-attempt phase regression', () => {
     expect(accept({ kind: 'connecting', attemptId: 3 })).toBe(true)
     expect(accept({ kind: 'failed', attemptId: 3, reason: 'timeout' })).toBe(true)
     expect(accept({ kind: 'ready', attemptId: 2, target })).toBe(false)

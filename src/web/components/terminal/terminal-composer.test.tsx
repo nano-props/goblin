@@ -1188,7 +1188,7 @@ describe('TerminalComposer', () => {
     expect(document.activeElement).toBe(more)
   })
 
-  test('buttons avoid iOS long-press callout attributes', async () => {
+  test('buttons avoid iOS long-press callout attributes', () => {
     const { container } = render()
     const buttons = container.querySelectorAll('button')
     expect(buttons.length).toBeGreaterThan(1)

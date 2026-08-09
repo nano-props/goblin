@@ -10,7 +10,7 @@ import {
 } from '#/shared/workspace-display-location.ts'
 
 describe('workspace display locations', () => {
-  test('derives the same workspace directory name for local and remote locators', async () => {
+  test('derives the same workspace directory name for local and remote locators', () => {
     expect(workspaceNameFromLocator(workspaceIdForTest('goblin+file:///home/example/Documents'))).toBe('Documents')
     expect(workspaceNameFromLocator(workspaceIdForTest('goblin+ssh://prod/home/example/Documents'))).toBe('Documents')
     expect(workspaceNameFromLocator(workspaceIdForTest('goblin+file:///C:/Users/example/My%20Workspace'))).toBe(
@@ -20,19 +20,19 @@ describe('workspace display locations', () => {
     expect(workspaceNameFromLocator(workspaceIdForTest('goblin+file:///C:/'))).toBe('C:\\')
   })
 
-  test('formats local workspace locations as tildified paths', async () => {
+  test('formats local workspace locations as tildified paths', () => {
     expect(formatLocalWorkspaceLocation('/Users/example/Developer/workspace', '/Users/example')).toBe(
       '~/Developer/workspace',
     )
   })
 
-  test('formats concrete remote target locators with connection identity', async () => {
+  test('formats concrete remote target locators with connection identity', () => {
     expect(formatRemoteWorkspaceTargetLocator({ user: 'git', host: 'example.test', remotePath: '/srv/repo' })).toBe(
       'git@example.test:/srv/repo',
     )
   })
 
-  test('formats workspace locations from the best available remote metadata', async () => {
+  test('formats workspace locations from the best available remote metadata', () => {
     expect(
       formatWorkspaceDisplayLocation(
         workspaceIdForTest('goblin+file:///Users/example/Developer/workspace'),
@@ -76,7 +76,7 @@ describe('workspace display locations', () => {
     ).toBe('~\\My Workspace')
   })
 
-  test('formats recent workspace session entry locators', async () => {
+  test('formats recent workspace session entry locators', () => {
     expect(
       formatWorkspaceSessionEntryLocator(
         { id: workspaceIdForTest('goblin+file:///Users/example/workspace') },
@@ -91,7 +91,7 @@ describe('workspace display locations', () => {
     ).toBe('prod:/srv/workspace')
   })
 
-  test('formats remote worktree locators', async () => {
+  test('formats remote worktree locators', () => {
     expect(formatRemoteWorktreeLocator({ user: 'git', host: 'example.test' }, '/srv/workspace-feature')).toBe(
       'git@example.test:/srv/workspace-feature',
     )

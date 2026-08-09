@@ -49,7 +49,7 @@ beforeEach(() => {
 })
 
 describe('terminal bell state', () => {
-  test('publishes the initial unread count from the source of truth', async () => {
+  test('publishes the initial unread count from the source of truth', () => {
     const onBadgeChange = vi.fn()
 
     createTerminalBellState(vi.fn(), onBadgeChange)
@@ -200,7 +200,7 @@ describe('terminal bell state', () => {
     hasFocus.mockRestore()
   })
 
-  test('supports clearing and removing tracked bell state', async () => {
+  test('supports clearing and removing tracked bell state', () => {
     const controller = createTerminalBellState(vi.fn(), vi.fn())
 
     controller.handleBell(descriptor, { processName: 'zsh', visible: false })

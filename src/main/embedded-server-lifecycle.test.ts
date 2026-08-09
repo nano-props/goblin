@@ -112,7 +112,7 @@ async function reserveTestPort(): Promise<number> {
 }
 
 describe('embedded server port selection', () => {
-  test('parses configured ports and falls back to the default port for invalid values', async () => {
+  test('parses configured ports and falls back to the default port for invalid values', () => {
     expect(parseServerPort('32123')).toBe(32123)
     expect(parseServerPort(undefined)).toBe(DEFAULT_EMBEDDED_SERVER_PORT)
     expect(parseServerPort('0')).toBe(DEFAULT_EMBEDDED_SERVER_PORT)
@@ -160,7 +160,7 @@ describe('embedded server process lifecycle', () => {
     )
   })
 
-  test('resolves packaged server entries from the ordinary Resources runtime', async () => {
+  test('resolves packaged server entries from the ordinary Resources runtime', () => {
     expect(resolveEmbeddedServerRuntimeRoot('/Applications/Goblin.app/Contents/Resources/app.asar', true)).toBe(
       path.join('/Applications/Goblin.app/Contents/Resources', 'dist/server'),
     )

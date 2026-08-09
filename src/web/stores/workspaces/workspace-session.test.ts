@@ -27,7 +27,7 @@ import {
 beforeEach(resetLifecycleTest)
 
 describe('repo lifecycle', () => {
-  test('creates a remote placeholder before its lifecycle resolves', async () => {
+  test('creates a remote placeholder before its lifecycle resolves', () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -46,7 +46,7 @@ describe('repo lifecycle', () => {
     expect(result.workspaces[target.id]).toMatchObject({ id: target.id, admission: { kind: 'remote' } })
   })
 
-  test('accepts a capability change for an unchanged ready remote target', async () => {
+  test('accepts a capability change for an unchanged ready remote target', () => {
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.test',

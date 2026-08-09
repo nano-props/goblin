@@ -31,7 +31,7 @@ const scope = { userId: 'user-a', workspaceId, workspaceRuntimeId: 'runtime-a' }
 const target = { kind: 'git-worktree' as const, workspaceId, workspaceRuntimeId: 'runtime-a', root: worktreeRoot }
 
 describe('workspace pane epoch overlay', () => {
-  test('projects runtime tabs through static gaps without copying static order', async () => {
+  test('projects runtime tabs through static gaps without copying static order', () => {
     const status = workspacePaneStaticTabEntry('status')
     const files = workspacePaneStaticTabEntry('files')
     const history = workspacePaneStaticTabEntry('history')
@@ -56,7 +56,7 @@ describe('workspace pane epoch overlay', () => {
     ])
   })
 
-  test('retains same-epoch placement hints across disappearance and clears them on epoch close', async () => {
+  test('retains same-epoch placement hints across disappearance and clears them on epoch close', () => {
     const overlay = new WorkspacePaneEpochOverlay()
     const status = workspacePaneStaticTabEntry('status')
     const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')
@@ -70,7 +70,7 @@ describe('workspace pane epoch overlay', () => {
     expect(overlay.placementHints({ ...scope, target })).toEqual([])
   })
 
-  test('indexes physical targets and active epochs with epoch-bounded cleanup', async () => {
+  test('indexes physical targets and active epochs with epoch-bounded cleanup', () => {
     const overlay = new WorkspacePaneEpochOverlay()
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree')
@@ -85,7 +85,7 @@ describe('workspace pane epoch overlay', () => {
     expect(overlay.physicalTargets(identity)).toHaveLength(1)
   })
 
-  test('reconciles invalid target metadata, placement, and physical indexes with the validated catalog', async () => {
+  test('reconciles invalid target metadata, placement, and physical indexes with the validated catalog', () => {
     const overlay = new WorkspacePaneEpochOverlay()
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree')
@@ -100,7 +100,7 @@ describe('workspace pane epoch overlay', () => {
     expect(overlay.physicalTargets(identity)).toEqual([])
   })
 
-  test('clears a removed physical identity without deleting target placement', async () => {
+  test('clears a removed physical identity without deleting target placement', () => {
     const overlay = new WorkspacePaneEpochOverlay()
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree')
@@ -122,7 +122,7 @@ describe('workspace pane epoch overlay', () => {
     expect(overlay.placementHints({ ...scope, target })).toHaveLength(1)
   })
 
-  test('does not clear newly rebound ownership at the same physical identity', async () => {
+  test('does not clear newly rebound ownership at the same physical identity', () => {
     const overlay = new WorkspacePaneEpochOverlay()
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
     const first = physicalWorktreeAdmissionLease(
@@ -142,7 +142,7 @@ describe('workspace pane epoch overlay', () => {
     expect(overlay.physicalTargets(rebound)).toEqual([{ ...scope, target }])
   })
 
-  test('rejects duplicate provider types and keys revisions by type', async () => {
+  test('rejects duplicate provider types and keys revisions by type', () => {
     expect(providerRevisionMap([{ type: 'terminal', revision: 2 }])).toEqual(new Map([['terminal', 2]]))
     expect(() =>
       providerRevisionMap([

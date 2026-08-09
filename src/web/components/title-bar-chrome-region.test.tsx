@@ -19,7 +19,7 @@ describe('window chrome regions', () => {
     expect(chrome?.className).toContain('bg-card')
   })
 
-  test('marks an unpadded drag region for toolbar remainder space', async () => {
+  test('marks an unpadded drag region for toolbar remainder space', () => {
     const { container } = renderInJsdom(<TitleBarDragRegion reserveWindowControls={false} data-testid="chrome" />)
 
     const chrome = container.querySelector<HTMLElement>('[data-testid="chrome"]')

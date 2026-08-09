@@ -37,7 +37,8 @@ vi.mock('#/web/hooks/useSettingsWriteErrorToast.ts', () => ({
   useSettingsWriteErrorToast: () => undefined,
 }))
 
-vi.mock('#/web/app-history-presentation.ts', () => ({
+vi.mock('#/web/app-history-presentation.ts', async (importOriginal) => ({
+  ...(await importOriginal()),
   useAppHistoryPresentationObserver: () => undefined,
 }))
 
@@ -205,7 +206,7 @@ describe('CompactWorkspaceLayout', () => {
 })
 
 describe('WorkspaceSplitLayout', () => {
-  test('defaults the split layout to a 30/70 sidebar/workspace ratio', async () => {
+  test('defaults the split layout to a 30/70 sidebar/workspace ratio', () => {
     const { container } = renderInJsdom(
       <WorkspaceSplitLayout sidebarPane={<div>navigator</div>} workspacePane={<div>workspace</div>} />,
     )
@@ -215,12 +216,12 @@ describe('WorkspaceSplitLayout', () => {
 })
 
 describe('authenticatedAppShellMode', () => {
-  test('settings routes render outside the workspace boot gate', async () => {
+  test('settings routes render outside the workspace boot gate', () => {
     expect(authenticatedAppShellMode('/settings/general', restoringWorkspaceState)).toBe('settings')
     expect(authenticatedAppShellMode('/settings/shortcuts', readyState)).toBe('settings')
   })
 
-  test('workspace routes wait for authenticated boot before mounting runtime', async () => {
+  test('workspace routes wait for authenticated boot before mounting runtime', () => {
     expect(authenticatedAppShellMode('/', restoringWorkspaceState)).toBe('workspace-restore')
     expect(authenticatedAppShellMode('/workspace/repo/dashboard', restoringWorkspaceState)).toBe('workspace-restore')
     expect(authenticatedAppShellMode('/workspace/repo/dashboard', readyState)).toBe('workspace-ready')

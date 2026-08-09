@@ -11,7 +11,7 @@ describe('websocket lifecycle', () => {
     wsMock = installWebSocketMock({ autoOpen: false })
   })
 
-  test('cancels pending idle close before a connecting socket opens', async () => {
+  test('cancels pending idle close before a connecting socket opens', () => {
     let shouldKeepOpen = true
     const onOpen = vi.fn()
     const lifecycle = createWebSocketLifecycle({
@@ -36,7 +36,7 @@ describe('websocket lifecycle', () => {
     expect(socket.readyState).toBe(wsMock.OPEN)
   })
 
-  test('forgets closing sockets before ensuring a fresh socket', async () => {
+  test('forgets closing sockets before ensuring a fresh socket', () => {
     const lifecycle = createWebSocketLifecycle({
       resolveConnection: () => ({ url: 'ws://example.test/socket' }),
       createSocket: (connection) => new WebSocket(connection.url),
@@ -56,7 +56,7 @@ describe('websocket lifecycle', () => {
     expect(wsMock.instances).toHaveLength(2)
   })
 
-  test('ignores stale socket messages after a newer socket becomes active', async () => {
+  test('ignores stale socket messages after a newer socket becomes active', () => {
     const onMessage = vi.fn()
     const lifecycle = createWebSocketLifecycle({
       resolveConnection: () => ({ url: 'ws://example.test/socket' }),

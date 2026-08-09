@@ -82,7 +82,7 @@ describe('WorkspaceView responsive layout', () => {
     expect(workspacePane(container)?.dataset.currentBranchName).toBe('')
   })
 
-  test('large-screen missing snapshot data keeps stable shell chrome without a synthetic skeleton', async () => {
+  test('large-screen missing snapshot data keeps stable shell chrome without a synthetic skeleton', () => {
     setReadModelLoading(REPO_ID)
     const { container } = render(<WorkspaceView workspaceId={REPO_ID} />)
 
@@ -105,7 +105,7 @@ describe('WorkspaceView responsive layout', () => {
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
   })
 
-  test('large-screen unavailable Workspace keeps capability-neutral shell chrome available', async () => {
+  test('large-screen unavailable Workspace keeps capability-neutral shell chrome available', () => {
     setRepoUnavailable(REPO_ID)
     const { container } = render(branchWorkspaceView())
 
@@ -127,7 +127,7 @@ describe('WorkspaceView responsive layout', () => {
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
   })
 
-  test('compact missing snapshot data keeps the selected Repo Workspace shell as the single pane', async () => {
+  test('compact missing snapshot data keeps the selected Repo Workspace shell as the single pane', () => {
     responsiveMocks.mode = 'compact'
     setReadModelLoading(REPO_ID)
 

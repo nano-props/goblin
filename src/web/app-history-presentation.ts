@@ -1,10 +1,18 @@
 import { onScopeDispose } from 'vue'
 import { useRouter } from 'vue-router'
-import type { HistoryState } from 'vue-router'
+import type { HistoryState, Router, RouterHistory } from 'vue-router'
+import { createOpaqueId, isOpaqueId } from '#/shared/opaque-id.ts'
 import { observeAppHistoryNavigation } from '#/web/app-navigation-lifecycle.ts'
 
+const APP_HISTORY_ENTRY_ID_STATE_KEY = '__goblinAppHistoryEntryId' as const
+
 export type AppHistoryPresentationAction =
-  { href: string; type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' } | { href: string; type: 'GO'; index: number }
+  { type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' } | { type: 'GO'; index: number }
+
+export interface AppHistoryPresentation {
+  settlementId: number
+  action: AppHistoryPresentationAction
+}
 
 interface VueHistoryNavigationInformation {
   delta: number
@@ -12,65 +20,176 @@ interface VueHistoryNavigationInformation {
   direction: 'back' | 'forward' | ''
 }
 
-let pendingMutation: AppHistoryPresentationAction | null = null
-let pendingTraversal: AppHistoryPresentationAction | null = null
-let presentedAction: AppHistoryPresentationAction | null = null
-
-export function markAppHistoryMutation(href: string, replace: boolean): void {
-  pendingMutation = { href, type: replace ? 'REPLACE' : 'PUSH' }
+interface AppHistoryPresentationController {
+  current(): AppHistoryPresentation
+  consumeCurrentAction(): AppHistoryPresentationAction | null
+  settleCurrent(): AppHistoryPresentation
 }
 
-export function takeAppHistoryPresentationAction(href: string): AppHistoryPresentationAction | null {
-  if (presentedAction?.href !== href) return null
-  const action = presentedAction
-  presentedAction = null
-  return action
+const appHistoryPresentationControllers = new WeakMap<RouterHistory, AppHistoryPresentationController>()
+
+/**
+ * Gives every history entry a stable identity. Vue Router calls push/replace
+ * only after a mutation passes its guards; traversal metadata is keyed to its
+ * target entry and published only after router settlement. In-flight
+ * navigations therefore never share presentation state.
+ */
+export function createAppHistoryPresentationHistory(history: RouterHistory): RouterHistory {
+  let nextSettlementId = 0
+  let consumedSettlementId: number | null = null
+  const presentationByEntryId = new Map<string, AppHistoryPresentation>()
+  const traversalActionByEntryId = new Map<string, AppHistoryPresentationAction>()
+  const legacyEntryIdByPosition = new Map<number, string>()
+  const legacyEntryIdByState = new WeakMap<object, string>()
+
+  const createPresentation = (action: AppHistoryPresentationAction): AppHistoryPresentation => ({
+    settlementId: ++nextSettlementId,
+    action,
+  })
+  const entryIdForState = (state: HistoryState): string => {
+    const storedEntryId = storedAppHistoryEntryId(state)
+    if (storedEntryId) return storedEntryId
+    const position = state.position
+    if (typeof position === 'number' && Number.isSafeInteger(position)) {
+      const existingEntryId = legacyEntryIdByPosition.get(position)
+      if (existingEntryId) return existingEntryId
+      const entryId = createOpaqueId('history-entry')
+      legacyEntryIdByPosition.set(position, entryId)
+      return entryId
+    }
+    const existingEntryId = legacyEntryIdByState.get(state)
+    if (existingEntryId) return existingEntryId
+    const entryId = createOpaqueId('history-entry')
+    legacyEntryIdByState.set(state, entryId)
+    return entryId
+  }
+  const currentEntryId = (): string => entryIdForState(history.state)
+  let presentedEntryId = currentEntryId()
+  const commitPresentation = (entryId: string, action: AppHistoryPresentationAction): AppHistoryPresentation => {
+    const presentation = createPresentation(action)
+    presentationByEntryId.set(entryId, presentation)
+    presentedEntryId = entryId
+    return presentation
+  }
+
+  commitPresentation(presentedEntryId, { type: 'REPLACE' })
+
+  const removeTraversalListener = history.listen((_to, _from, information) => {
+    traversalActionByEntryId.set(
+      currentEntryId(),
+      traversalPresentationAction(information as VueHistoryNavigationInformation),
+    )
+  })
+
+  const wrappedHistory: RouterHistory = {
+    base: history.base,
+    get location() {
+      return history.location
+    },
+    get state() {
+      return history.state
+    },
+    push(to, data) {
+      const entryId = createOpaqueId('history-entry')
+      history.push(to, appHistoryStateWithEntryId(data ?? {}, entryId))
+      commitPresentation(entryId, { type: 'PUSH' })
+    },
+    replace(to, data) {
+      const entryId = currentEntryId()
+      history.replace(to, appHistoryStateWithEntryId(data ?? {}, entryId))
+      traversalActionByEntryId.delete(entryId)
+      commitPresentation(entryId, { type: 'REPLACE' })
+    },
+    go(delta, triggerListeners) {
+      history.go(delta, triggerListeners)
+    },
+    listen(callback) {
+      return history.listen(callback)
+    },
+    createHref(location) {
+      return history.createHref(location)
+    },
+    destroy() {
+      removeTraversalListener()
+      appHistoryPresentationControllers.delete(wrappedHistory)
+      presentationByEntryId.clear()
+      traversalActionByEntryId.clear()
+      history.destroy()
+    },
+  }
+
+  appHistoryPresentationControllers.set(wrappedHistory, {
+    current() {
+      const presentation = presentationByEntryId.get(presentedEntryId)
+      if (!presentation) throw new Error('Vue Router history entry is missing app presentation metadata')
+      return presentation
+    },
+    consumeCurrentAction() {
+      const presentation = presentationByEntryId.get(presentedEntryId)
+      if (!presentation) throw new Error('Vue Router history entry is missing app presentation metadata')
+      if (presentation.settlementId === consumedSettlementId) return null
+      consumedSettlementId = presentation.settlementId
+      return presentation.action
+    },
+    settleCurrent() {
+      const entryId = currentEntryId()
+      const traversalAction = traversalActionByEntryId.get(entryId)
+      if (traversalAction) {
+        traversalActionByEntryId.delete(entryId)
+        return commitPresentation(entryId, traversalAction)
+      }
+      const presentation = presentationByEntryId.get(entryId)
+      if (!presentation) throw new Error('Vue Router history entry is missing app presentation metadata')
+      presentedEntryId = entryId
+      return presentation
+    },
+  })
+  return wrappedHistory
 }
 
-/** One mounted owner connects Vue Router settlement to app navigation ownership. */
+function storedAppHistoryEntryId(state: HistoryState): string | null {
+  const value = state[APP_HISTORY_ENTRY_ID_STATE_KEY]
+  return isOpaqueId(value) ? value : null
+}
+
+/** One mounted owner connects committed Vue Router history entries to app navigation ownership. */
 export function useAppHistoryPresentationObserver(): void {
   const router = useRouter()
-  const removeHistoryListener = router.options.history.listen((to, _from, information) => {
-    pendingTraversal = traversalAction(to, information as VueHistoryNavigationInformation)
-  })
-  const removeAfterEach = router.afterEach((to, _from, failure) => {
-    const href = to.fullPath
-    if (failure) {
-      pendingMutation = null
-      pendingTraversal = null
-      return
-    }
+  onScopeDispose(installAppHistoryPresentationObserver(router))
+}
 
-    const action = actionForSettledHref(href)
-    const state = router.options.history.state as HistoryState
-    observeAppHistoryNavigation({ href, state, action: navigationLifecycleAction(action) })
-    presentedAction = action
-  })
-
-  onScopeDispose(() => {
-    removeAfterEach()
-    removeHistoryListener()
+export function installAppHistoryPresentationObserver(router: Router): () => void {
+  return router.afterEach((to, _from, failure) => {
+    if (failure) return
+    const presentation = settleAppHistoryPresentation(router.options.history)
+    observeAppHistoryNavigation({ href: to.fullPath, state: router.options.history.state, action: presentation.action })
   })
 }
 
-function actionForSettledHref(href: string): AppHistoryPresentationAction {
-  const traversal = pendingTraversal
-  const mutation = pendingMutation
-  pendingTraversal = null
-  pendingMutation = null
-  if (traversal?.href === href) return traversal
-  if (mutation?.href === href) return mutation
-  return { href, type: 'REPLACE' }
+export function requireAppHistoryPresentation(history: RouterHistory): AppHistoryPresentation {
+  const controller = appHistoryPresentationControllers.get(history)
+  if (!controller) throw new Error('Vue Router must use the app history presentation adapter')
+  return controller.current()
 }
 
-function traversalAction(href: string, information: VueHistoryNavigationInformation): AppHistoryPresentationAction {
-  if (Math.abs(information.delta) > 1) return { href, type: 'GO', index: information.delta }
-  if (information.direction === 'forward' || information.delta > 0) return { href, type: 'FORWARD' }
-  return { href, type: 'BACK' }
+export function consumeAppHistoryPresentationAction(history: RouterHistory): AppHistoryPresentationAction | null {
+  const controller = appHistoryPresentationControllers.get(history)
+  if (!controller) throw new Error('Vue Router must use the app history presentation adapter')
+  return controller.consumeCurrentAction()
 }
 
-function navigationLifecycleAction(
-  action: AppHistoryPresentationAction,
-): { type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' } | { type: 'GO'; index: number } {
-  return action.type === 'GO' ? { type: 'GO', index: action.index } : { type: action.type }
+function settleAppHistoryPresentation(history: RouterHistory): AppHistoryPresentation {
+  const controller = appHistoryPresentationControllers.get(history)
+  if (!controller) throw new Error('Vue Router must use the app history presentation adapter')
+  return controller.settleCurrent()
+}
+
+function appHistoryStateWithEntryId(state: HistoryState, entryId: string): HistoryState {
+  return { ...state, [APP_HISTORY_ENTRY_ID_STATE_KEY]: entryId }
+}
+
+function traversalPresentationAction(information: VueHistoryNavigationInformation): AppHistoryPresentationAction {
+  if (Math.abs(information.delta) > 1) return { type: 'GO', index: information.delta }
+  if (information.direction === 'forward' || information.delta > 0) return { type: 'FORWARD' }
+  return { type: 'BACK' }
 }

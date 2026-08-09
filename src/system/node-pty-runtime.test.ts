@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { prepareNodePtyDarwinRuntime, validateNodePtyDarwinRuntime } from '#/system/node-pty-runtime.ts'
 
 describe('prepareNodePtyDarwinRuntime', () => {
-  test('repairs a non-executable helper when the caller owns deployment preparation', async () => {
+  test('repairs a non-executable helper when the caller owns deployment preparation', () => {
     const chmod = vi.fn()
     prepareNodePtyDarwinRuntime({
       packageRoot: '/runtime/node_modules/node-pty',
@@ -14,7 +14,7 @@ describe('prepareNodePtyDarwinRuntime', () => {
     expect(chmod).toHaveBeenCalledWith('/runtime/node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper', 0o755)
   })
 
-  test('fails validation instead of modifying a packaged runtime', async () => {
+  test('fails validation instead of modifying a packaged runtime', () => {
     expect(() =>
       validateNodePtyDarwinRuntime({
         packageRoot: '/runtime/node_modules/node-pty',
@@ -25,7 +25,7 @@ describe('prepareNodePtyDarwinRuntime', () => {
     ).toThrow('node-pty spawn-helper is not executable')
   })
 
-  test('leaves an executable helper unchanged', async () => {
+  test('leaves an executable helper unchanged', () => {
     const chmod = vi.fn()
     prepareNodePtyDarwinRuntime({
       packageRoot: '/runtime/node_modules/node-pty',
@@ -36,7 +36,7 @@ describe('prepareNodePtyDarwinRuntime', () => {
     expect(chmod).not.toHaveBeenCalled()
   })
 
-  test('does nothing off macOS', async () => {
+  test('does nothing off macOS', () => {
     const stat = vi.fn()
     prepareNodePtyDarwinRuntime({
       packageRoot: '/runtime/node_modules/node-pty',
@@ -46,7 +46,7 @@ describe('prepareNodePtyDarwinRuntime', () => {
     expect(stat).not.toHaveBeenCalled()
   })
 
-  test('fails fast when the helper is missing', async () => {
+  test('fails fast when the helper is missing', () => {
     expect(() =>
       validateNodePtyDarwinRuntime({
         packageRoot: '/runtime/node_modules/node-pty',

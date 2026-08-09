@@ -108,7 +108,7 @@ describe('RuntimeProjectionScopeRegistry', () => {
     registry.dispose()
   })
 
-  test('registry disposal releases provider subscriptions and every child scope', async () => {
+  test('registry disposal releases provider subscriptions and every child scope', () => {
     const unsubscribe = vi.fn()
     const registry = createRuntimeProjectionScopeRegistry(() => true)
     const first = registry.scopeFor(TARGET)

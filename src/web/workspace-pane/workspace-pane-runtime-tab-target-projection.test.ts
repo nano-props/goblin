@@ -27,13 +27,13 @@ afterEach(() => {
 })
 
 describe('workspace pane runtime tab target projection', () => {
-  test('registers a projection provider for every runtime tab type', async () => {
+  test('registers a projection provider for every runtime tab type', () => {
     expect(workspacePaneRuntimeTabProjectionProviders().map((provider) => provider.type)).toEqual(
       WORKSPACE_PANE_RUNTIME_TAB_TYPES,
     )
   })
 
-  test('builds terminal runtime projection from explicit runtime inputs', async () => {
+  test('builds terminal runtime projection from explicit runtime inputs', () => {
     const projection = workspacePaneRuntimeTabTargetProjection({
       providers: [
         {
@@ -59,7 +59,7 @@ describe('workspace pane runtime tab target projection', () => {
     })
   })
 
-  test('clears runtime views and selection when no worktree target exists', async () => {
+  test('clears runtime views and selection when no worktree target exists', () => {
     const projection = workspacePaneRuntimeTabTargetProjection({
       providers: [
         {
@@ -147,7 +147,7 @@ describe('workspace pane runtime tab target projection', () => {
     expect(projection.runtimeTabStateByType.terminal.selectedSessionId).toBe('term-222222222222222222222')
   })
 
-  test('formats the current runtime target key', async () => {
+  test('formats the current runtime target key', () => {
     expect(
       workspacePaneRuntimeTabTargetKey({
         workspaceId: REPO_ID,
@@ -171,7 +171,7 @@ describe('workspace pane runtime tab target projection', () => {
     ).toBeNull()
   })
 
-  test('rejects a filesystem target owned by a different runtime', async () => {
+  test('rejects a filesystem target owned by a different runtime', () => {
     expect(
       workspacePaneRuntimeTabTargetKey({
         workspaceId: REPO_ID,

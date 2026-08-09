@@ -58,7 +58,7 @@ describe('TerminalRenderQueue', () => {
 })
 
 describe('rendered output checkpoints', () => {
-  test('selects the latest checkpoint for one runtime binding', async () => {
+  test('selects the latest checkpoint for one runtime binding', () => {
     expect(latestRenderedOutputCheckpoint([], BINDING)).toBeNull()
     expect(
       latestRenderedOutputCheckpoint(
@@ -73,7 +73,7 @@ describe('rendered output checkpoints', () => {
     ).toEqual(checkpoint(5))
   })
 
-  test('compares bindings independently from output sequence', async () => {
+  test('compares bindings independently from output sequence', () => {
     expect(sameRenderedOutputBinding(checkpoint(1), checkpoint(9))).toBe(true)
     expect(
       sameRenderedOutputBinding(checkpoint(1), {
@@ -83,7 +83,7 @@ describe('rendered output checkpoints', () => {
     ).toBe(false)
   })
 
-  test('normalizes an output sequence without changing its binding', async () => {
+  test('normalizes an output sequence without changing its binding', () => {
     expect(normalizeRenderedOutputCheckpoint(checkpoint(4.9))).toEqual(checkpoint(4))
     expect(normalizeRenderedOutputCheckpoint(checkpoint(Number.NaN))).toEqual(checkpoint(0))
     expect(normalizeRenderedOutputCheckpoint(checkpoint(-1))).toEqual(checkpoint(0))

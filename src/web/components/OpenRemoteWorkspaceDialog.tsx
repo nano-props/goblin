@@ -1,4 +1,5 @@
 import { computed, defineComponent, nextTick, ref, watch } from 'vue'
+import { SelectRoot } from 'reka-ui'
 import type { RemoteDiagnosticsResult, RemoteWorkspaceTarget, SshConfigHost } from '#/shared/remote-workspace.ts'
 import { isResolvableRemotePathInput, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { isValidSshProfile } from '#/shared/workspace-locator.ts'
@@ -11,6 +12,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/component
 import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { SelectContent, SelectItem, SelectTrigger } from '#/web/components/ui/select.tsx'
+import { SelectValue } from '#/web/components/ui/SelectValue.tsx'
 import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -22,7 +24,6 @@ import {
 } from '#/web/remote-workspace-client.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { SelectRoot, SelectValue } from 'reka-ui'
 
 interface Props {
   open: boolean

@@ -7,7 +7,7 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('terminal filesystem target key', () => {
-  test('formats and parses Workspace/execution-root identity', async () => {
+  test('formats and parses Workspace/execution-root identity', () => {
     const key = formatTerminalFilesystemTargetKey(
       workspaceIdForTest('goblin+file:///repo'),
       workspaceIdForTest('goblin+file:///repo/worktree'),
@@ -48,7 +48,7 @@ describe('terminal filesystem target key', () => {
     )
   })
 
-  test('rejects malformed keys', async () => {
+  test('rejects malformed keys', () => {
     expect(parseTerminalFilesystemTargetKey('')).toBeNull()
     expect(parseTerminalFilesystemTargetKey('/repo')).toBeNull()
     expect(parseTerminalFilesystemTargetKey('/repo\0')).toBeNull()

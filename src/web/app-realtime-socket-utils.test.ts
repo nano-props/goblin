@@ -4,7 +4,7 @@ import type { AppRealtimeClientMessage } from '#/shared/app-realtime-socket.ts'
 import { encodeAppRealtimeClientMessage } from '#/web/app-realtime-socket-utils.ts'
 
 describe('app realtime socket encoding', () => {
-  test('rejects a request whose complete encoded frame exceeds the transport limit', async () => {
+  test('rejects a request whose complete encoded frame exceeds the transport limit', () => {
     const message = {
       type: 'request',
       requestId: 'req_1234567890abcdef',

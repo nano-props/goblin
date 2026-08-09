@@ -93,6 +93,7 @@ describe('WorkspacePaneTabStrip presentation and interaction', () => {
     expect(activeClose).not.toBeNull()
     expect(activeClose?.dataset.disabled).toBe('true')
     expect(activeClose?.className).toContain('opacity-100')
+    expect(activeClose?.className).toContain('ml-auto')
     expect(inactiveClose).not.toBeNull()
     expect(inactiveClose?.dataset.disabled).toBe('true')
     expect(inactiveClose?.className).toContain('opacity-0')
@@ -108,7 +109,7 @@ describe('WorkspacePaneTabStrip presentation and interaction', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  test('reserves close-action space for a pending terminal tab', async () => {
+  test('reserves close-action space for a pending terminal tab', () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -126,7 +127,9 @@ describe('WorkspacePaneTabStrip presentation and interaction', () => {
     )
 
     const pendingTab = document.body.querySelector('[data-workspace-pane-pending-tab="terminal"]')
-    expect(pendingTab?.querySelector('[data-toolbar-tab-close-placeholder]')).not.toBeNull()
+    const closePlaceholder = pendingTab?.querySelector<HTMLElement>('[data-toolbar-tab-close-placeholder]')
+    expect(closePlaceholder).not.toBeNull()
+    expect(closePlaceholder?.className).toContain('ml-auto')
     expect(pendingTab?.querySelector('button[aria-label^="close "]')).toBeNull()
   })
 
@@ -210,7 +213,7 @@ describe('WorkspacePaneTabStrip presentation and interaction', () => {
     expect(terminalTwo.querySelector(':scope > [data-slot="separator"][data-orientation="vertical"]')).not.toBeNull()
   })
 
-  test('uses the full terminal title and unread state in the tab aria-label', async () => {
+  test('uses the full terminal title and unread state in the tab aria-label', () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -296,7 +299,7 @@ describe('WorkspacePaneTabStrip presentation and interaction', () => {
     expect(document.activeElement).toBe(tab3)
   })
 
-  test('keeps the selected terminal tab semantically selected even when the panel is inactive', async () => {
+  test('keeps the selected terminal tab semantically selected even when the panel is inactive', () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -325,7 +328,7 @@ describe('WorkspacePaneTabStrip presentation and interaction', () => {
     expect(tab2.tabIndex).toBe(-1)
   })
 
-  test('renders the same pending item as a busy tab in expanded mode', async () => {
+  test('renders the same pending item as a busy tab in expanded mode', () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -357,7 +360,7 @@ describe('WorkspacePaneTabStrip presentation and interaction', () => {
     expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
   })
 
-  test('keeps placeholder terminal titles out of materialized tab text', async () => {
+  test('keeps placeholder terminal titles out of materialized tab text', () => {
     const placeholderView: TerminalSessionSummary = {
       ...session({ terminalSessionId: 'term-111111111111111111111', title: 'terminal', selected: true }),
       fullTitle: 'terminal',

@@ -50,10 +50,25 @@ function render(ui: VNode) {
 }
 
 describe('CreateWorktreePageBody', () => {
-  test('does not steal focus when the page mounts', async () => {
+  test('does not steal focus when the page mounts', () => {
     render(<CreateWorktreePageBody repo={createRepo()} onCancel={vi.fn()} onCreate={vi.fn()} />)
 
     expect(document.activeElement).toBe(document.body)
+  })
+
+  test('preserves the styled current-branch badge in the selected base value', () => {
+    const { container } = render(<CreateWorktreePageBody repo={createRepo()} onCancel={vi.fn()} onCreate={vi.fn()} />)
+
+    const value = container.querySelector<HTMLElement>('#cwt-base [data-slot="select-value"]')
+    const parts = value?.querySelectorAll(':scope > span')
+    expect(value).not.toBeNull()
+    expect(parts).toHaveLength(2)
+    expect(parts?.[0]?.textContent).toBe('main')
+    expect(parts?.[0]?.className).toContain('truncate')
+    expect(parts?.[1]?.textContent).toBe('action.create-worktree-base-current')
+    expect(parts?.[1]?.className).toContain('ml-2')
+    expect(parts?.[1]?.className).toContain('text-xs')
+    expect(parts?.[1]?.className).toContain('text-muted-foreground')
   })
 
   test('disables submit until the form is valid', async () => {
@@ -162,6 +177,9 @@ describe('CreateWorktreePageBody', () => {
         (screen.getByRole('button', { name: /action.create-worktree-confirm/i }) as HTMLButtonElement).disabled,
       ).toBe(false)
     })
+    const selectedValue = document.querySelector<HTMLElement>('#cwt-existing-branch [data-slot="select-value"]')
+    expect(selectedValue?.textContent).toBe('main')
+    expect(selectedValue?.querySelector('.text-muted-foreground')).toBeNull()
     const pathInput = screen.getByRole('textbox', { name: /action.create-worktree-path-label/i })
     await user.clear(pathInput)
     await user.type(pathInput, `${WORKTREE_PATH}-main`)
@@ -224,7 +242,7 @@ describe('CreateWorktreePageBody', () => {
     })
   })
 
-  test('hides the trust prompt row entirely when neither loading nor needed', async () => {
+  test('hides the trust prompt row entirely when neither loading nor needed', () => {
     render(
       <CreateWorktreePageBody
         repo={createRepo()}
@@ -243,7 +261,7 @@ describe('CreateWorktreePageBody', () => {
     expect(screen.queryByText(/action.create-worktree-bootstrap-config-trusted/i)).toBeNull()
   })
 
-  test('shows the trust prompt when bootstrap operations are present', async () => {
+  test('shows the trust prompt when bootstrap operations are present', () => {
     const preview = {
       hasOperations: true,
       configHash: 'config-hash',

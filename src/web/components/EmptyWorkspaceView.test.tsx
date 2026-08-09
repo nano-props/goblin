@@ -56,7 +56,7 @@ function renderEmptyWorkspaceView() {
 }
 
 describe('EmptyWorkspaceView', () => {
-  test('disables zen toggle and pins the navigator pane in compact mode', async () => {
+  test('disables zen toggle and pins the navigator pane in compact mode', () => {
     responsiveMocks.mode = 'compact'
     const { container } = renderEmptyWorkspaceView()
 
@@ -67,7 +67,7 @@ describe('EmptyWorkspaceView', () => {
     expect(shell?.dataset.compact).toBe('true')
   })
 
-  test('keeps workspace inactive by default even outside compact mode', async () => {
+  test('keeps workspace inactive by default even outside compact mode', () => {
     responsiveMocks.mode = 'default'
     const { container } = renderEmptyWorkspaceView()
 

@@ -12,7 +12,8 @@ import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/workspaces/navigation-history-entry.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { takeAppHistoryPresentationAction } from '#/web/app-history-presentation.ts'
+import { consumeAppHistoryPresentationAction } from '#/web/app-history-presentation.ts'
+import type { AppHistoryPresentationAction } from '#/web/app-history-presentation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
@@ -55,8 +56,7 @@ export function useWorkspaceNavigationHistory({
     () => {
       const nextEntry = entry.value
       if (!nextEntry) return
-      const routeHref = router.currentRoute.value.fullPath
-      const browserHistoryAction = takeAppHistoryPresentationAction(routeHref)
+      const browserHistoryAction = consumeAppHistoryPresentationAction(router.options.history)
       const currentHistoryEntry =
         workspacesStore.getState().navigationHistoryByWorkspace[nextEntry.workspaceId]?.current ?? null
       const browserHistoryTraversal = workspaceNavigationBrowserHistoryTraversal(browserHistoryAction)
@@ -363,7 +363,7 @@ function workspaceNavigationBranchEntryTargetsWorkspacePane(entry: WorkspaceNavi
 }
 
 function workspaceNavigationBrowserHistoryTraversal(
-  action: ReturnType<typeof takeAppHistoryPresentationAction>,
+  action: AppHistoryPresentationAction | null,
 ): WorkspaceNavigationBrowserHistoryTraversal | null {
   if (!action) return null
   if (action.type === 'BACK') return 'back'

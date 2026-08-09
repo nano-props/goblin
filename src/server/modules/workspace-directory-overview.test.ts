@@ -56,7 +56,7 @@ describe('workspace directory overview', () => {
     })
   })
 
-  it('rejects malformed remote output instead of guessing', async () => {
+  it('rejects malformed remote output instead of guessing', () => {
     expect(parseRemoteDirectoryOverview('2\t3\t1700000000\n')).toEqual({
       topLevelFileCount: 2,
       topLevelDirectoryCount: 3,

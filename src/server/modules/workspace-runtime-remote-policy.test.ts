@@ -26,7 +26,7 @@ const unavailableProbe: WorkspaceSettledProbeState = {
 }
 
 describe('remote workspace runtime policy', () => {
-  test('projects ready and failed connection results into settled lifecycle states', async () => {
+  test('projects ready and failed connection results into settled lifecycle states', () => {
     const ready: RemoteWorkspaceConnectionResult = {
       kind: 'ready',
       gitAvailable: true,
@@ -46,14 +46,14 @@ describe('remote workspace runtime policy', () => {
     })
   })
 
-  test('reads a target only from terminal lifecycle states', async () => {
+  test('reads a target only from terminal lifecycle states', () => {
     expect(remoteWorkspaceLifecycleTarget({ kind: 'idle', attemptId: 0 })).toBeNull()
     expect(remoteWorkspaceLifecycleTarget({ kind: 'connecting', attemptId: 1 })).toBeNull()
     expect(remoteWorkspaceLifecycleTarget({ kind: 'failed', attemptId: 2, reason: 'unknown' })).toBeNull()
     expect(remoteWorkspaceLifecycleTarget({ kind: 'ready', attemptId: 3, target })).toBe(target)
   })
 
-  test('plans initial probe commits only while probing and refresh commits for settled probes', async () => {
+  test('plans initial probe commits only while probing and refresh commits for settled probes', () => {
     const probing: WorkspaceProbeState = { status: 'probing' }
     expect(
       planRemoteWorkspaceProbeTransition(probing, {
@@ -72,7 +72,7 @@ describe('remote workspace runtime policy', () => {
     ).toEqual({ before: unavailableProbe, after: unavailableProbe })
   })
 
-  test('classifies settled and superseded results from authoritative runtime inputs', async () => {
+  test('classifies settled and superseded results from authoritative runtime inputs', () => {
     const lifecycle = { kind: 'ready' as const, attemptId: 4, target }
     expect(settledRemoteWorkspaceLifecycleResult(lifecycle, unavailableProbe)).toEqual({
       kind: 'settled',

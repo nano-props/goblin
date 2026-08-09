@@ -2,7 +2,7 @@
 
 import { GitBranch, GitBranchPlus, RadioTower } from '@lucide/vue'
 import type { LucideIcon } from '@lucide/vue'
-import { SelectRoot, SelectValue } from 'reka-ui'
+import { SelectRoot } from 'reka-ui'
 import { computed, defineComponent, ref } from 'vue'
 import type { FunctionalComponent } from 'vue'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
@@ -23,6 +23,7 @@ import { DirectoryPathSuggestions } from '#/web/components/ui/directory-path-sug
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { SelectContent, SelectItem, SelectTrigger } from '#/web/components/ui/select.tsx'
+import { SelectValue } from '#/web/components/ui/SelectValue.tsx'
 import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.tsx'
 import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -162,6 +163,7 @@ export const CreateWorktreeForm = defineComponent(
       const branchError = isCreating ? '' : currentDerived.branchError
       const existingBranchError = isCreating ? '' : currentDerived.existingBranchError
       const localBranchError = isCreating ? '' : currentDerived.localBranchError
+      const selectedBase = props.repo.snapshot.branches.find((candidate) => candidate.name === base.value)
 
       return (
         <div>
@@ -223,7 +225,18 @@ export const CreateWorktreeForm = defineComponent(
                           aria-invalid={!!baseError}
                           aria-describedby="cwt-base-error"
                         >
-                          <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
+                          {selectedBase ? (
+                            <SelectValue>
+                              <span class="truncate">{selectedBase.name}</span>
+                              {selectedBase.name === props.repo.snapshot.current ? (
+                                <span class="ml-2 text-xs text-muted-foreground">
+                                  {t('action.create-worktree-base-current')}
+                                </span>
+                              ) : null}
+                            </SelectValue>
+                          ) : (
+                            <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
+                          )}
                         </SelectTrigger>
                         <SelectContent>
                           {props.repo.snapshot.branches.map((candidate) => (

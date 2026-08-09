@@ -18,7 +18,7 @@ const target: RemoteWorkspaceTarget = {
 }
 
 describe('remote physical worktree identity command', () => {
-  test('publishes a user-scoped namespace atomically and canonicalizes the worktree', async () => {
+  test('publishes a user-scoped namespace atomically and canonicalizes the worktree', () => {
     const invocation = buildRemoteCommandInvocation(target, {
       type: 'resolvePhysicalWorktreeIdentity',
       path: '/srv/worktrees/feature',
@@ -71,7 +71,7 @@ describe('remote physical worktree identity command', () => {
     expect((await stat(path.join(runtime, 'goblin', 'execution-namespace-id'))).mode & 0o777).toBe(0o600)
   })
 
-  test('resolves the canonical Git common directory without generation facts', async () => {
+  test('resolves the canonical Git common directory without generation facts', () => {
     const invocation = buildRemoteCommandInvocation(target, {
       type: 'resolveRepoCommonDir',
       path: '/srv/worktrees/feature',

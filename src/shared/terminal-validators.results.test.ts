@@ -13,7 +13,7 @@ import { normalizeAppRealtimeSocketServerMessage } from '#/shared/app-realtime-v
 import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
 
 describe('shared terminal validators results', () => {
-  test('normalizes terminal create results with required prepared-session metadata', async () => {
+  test('normalizes terminal create results with required prepared-session metadata', () => {
     const createResult = {
       ok: true,
       action: 'created' as const,
@@ -58,7 +58,7 @@ describe('shared terminal validators results', () => {
     })
   })
 
-  test('rejects terminal presentations without a canonical target-compatible branch', async () => {
+  test('rejects terminal presentations without a canonical target-compatible branch', () => {
     const metadata = {
       ok: true,
       action: 'created',
@@ -101,7 +101,7 @@ describe('shared terminal validators results', () => {
     ).toBeNull()
   })
 
-  test('rejects terminal session snapshots with non-execution or presentation-mismatched targets', async () => {
+  test('rejects terminal session snapshots with non-execution or presentation-mismatched targets', () => {
     const session = {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalRuntimeGeneration: 1,
@@ -191,7 +191,7 @@ describe('shared terminal validators results', () => {
     }
   })
 
-  test('normalizes valid terminal socket server messages', async () => {
+  test('normalizes valid terminal socket server messages', () => {
     expect(
       normalizeAppRealtimeSocketServerMessage({
         type: 'output',
@@ -261,7 +261,7 @@ describe('shared terminal validators results', () => {
     })
   })
 
-  test('normalizes runtime-open command responses', async () => {
+  test('normalizes runtime-open command responses', () => {
     const payload = {
       ok: true,
       runtimeType: 'terminal',
@@ -367,7 +367,7 @@ describe('shared terminal validators results', () => {
     })
   })
 
-  test('normalizes runtime close command responses', async () => {
+  test('normalizes runtime close command responses', () => {
     const paneTabsSnapshot = { revision: 8, entries: [] }
     const effects = [
       {
@@ -449,7 +449,7 @@ describe('shared terminal validators results', () => {
     })
   })
 
-  test('validates terminal socket success response payloads by action', async () => {
+  test('validates terminal socket success response payloads by action', () => {
     const resizeResponse = {
       type: 'response',
       requestId: 'req_resize',
@@ -705,7 +705,7 @@ describe('shared terminal validators results', () => {
     ).toBeNull()
   })
 
-  test('normalizes targeted session-closed realtime messages', async () => {
+  test('normalizes targeted session-closed realtime messages', () => {
     expect(
       normalizeTerminalSocketServerMessage({
         type: 'session-closed',
@@ -737,7 +737,7 @@ describe('shared terminal validators results', () => {
     ).toBeNull()
   })
 
-  test('rejects malformed terminal retirement tab snapshots', async () => {
+  test('rejects malformed terminal retirement tab snapshots', () => {
     const tabsBeforeRetirement = [{ type: 'terminal' }]
     expect(
       normalizeTerminalRealtimeMessage({
@@ -765,7 +765,7 @@ describe('shared terminal validators results', () => {
     ).toBeNull()
   })
 
-  test('rejects projection effects that contradict terminal frame ownership', async () => {
+  test('rejects projection effects that contradict terminal frame ownership', () => {
     const metadata = {
       terminalRuntimeSessionId: 'pty_1234567890abcdef',
       terminalRuntimeGeneration: 1,
@@ -828,7 +828,7 @@ describe('shared terminal validators results', () => {
     }
   })
 
-  test('rejects invalid snapshot sequence checkpoints', async () => {
+  test('rejects invalid snapshot sequence checkpoints', () => {
     const payload = {
       ok: true,
       frame: 'snapshot',
@@ -865,7 +865,7 @@ describe('shared terminal validators results', () => {
     }
   })
 
-  test('normalizes workspace tabs changed realtime messages', async () => {
+  test('normalizes workspace tabs changed realtime messages', () => {
     const messages = [
       {
         type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,

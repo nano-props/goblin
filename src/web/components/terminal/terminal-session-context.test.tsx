@@ -56,7 +56,7 @@ function makeCommandContext(overrides: Partial<TerminalSessionContextValue> = {}
 }
 
 describe('useTerminalSessionContext', () => {
-  test('throws when the provider is missing', async () => {
+  test('throws when the provider is missing', () => {
     expect(() => renderInJsdom(<CommandProbe />)).toThrow('Terminal session context is unavailable')
   })
 
@@ -72,7 +72,7 @@ describe('useTerminalSessionContext', () => {
 })
 
 describe('useTerminalSessionReadContext', () => {
-  test('throws when the provider is missing', async () => {
+  test('throws when the provider is missing', () => {
     expect(() => renderInJsdom(<ReadSnapshot />)).toThrow('Terminal session read context is unavailable')
   })
 

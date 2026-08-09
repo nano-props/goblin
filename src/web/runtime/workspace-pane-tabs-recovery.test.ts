@@ -25,7 +25,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     expect(list).toHaveBeenCalledWith(TARGET)
   })
 
-  test('skips a revision event already represented by the cache', async () => {
+  test('skips a revision event already represented by the cache', () => {
     const list = vi.fn(async () => ({ revision: 4, entries: [] }))
     const recovery = new WorkspacePaneTabsRecovery({
       list,

@@ -29,31 +29,31 @@ function measureVariableWidth(text: string): number {
 }
 
 describe('ellipsizeLeftTextByWidth', () => {
-  test('keeps the longest suffix that fits the measured width', async () => {
+  test('keeps the longest suffix that fits the measured width', () => {
     expect(ellipsizeLeftTextByWidth('WWWWiiii', 38, measureVariableWidth)).toBe('…iiii')
   })
 
-  test('returns empty when even the ellipsis does not fit', async () => {
+  test('returns empty when even the ellipsis does not fit', () => {
     expect(ellipsizeLeftTextByWidth('example', 8, measureVariableWidth)).toBe('')
   })
 })
 
 describe('ellipsizeLeftPathByWidth', () => {
-  test('returns the full path when it already fits', async () => {
+  test('returns the full path when it already fits', () => {
     expect(ellipsizeLeftPathByWidth('src/example/file.ts', 300, measureMonospace)).toBe('src/example/file.ts')
   })
 
-  test('prefers the longest path suffix that fits the available width', async () => {
+  test('prefers the longest path suffix that fits the available width', () => {
     expect(ellipsizeLeftPathByWidth('src/example/deeply/nested/file.ts', 240, measureMonospace)).toBe(
       '…/deeply/nested/file.ts',
     )
   })
 
-  test('falls back to truncating the filename tail when no full segment suffix fits', async () => {
+  test('falls back to truncating the filename tail when no full segment suffix fits', () => {
     expect(ellipsizeLeftPathByWidth('src/example/deeply/nested/file.ts', 70, measureMonospace)).toBe('…ile.ts')
   })
 
-  test('uses actual measured widths rather than character count heuristics', async () => {
+  test('uses actual measured widths rather than character count heuristics', () => {
     expect(ellipsizeLeftPathByWidth('src/example/WideWide/iiiiiiii.ts', 103, measureVariableWidth)).toBe(
       '…/iiiiiiii.ts',
     )

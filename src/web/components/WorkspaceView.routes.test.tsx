@@ -38,7 +38,7 @@ describe('WorkspaceView branch and page routes', () => {
     expect(workspacePane(container)).not.toBeNull()
   })
 
-  test('route branch view does not write current branch into the store before read model is ready', async () => {
+  test('route branch view does not write current branch into the store before read model is ready', () => {
     resetWorkspacesStore()
     seedRepoShellForTest({ id: REPO_ID })
 
@@ -52,7 +52,7 @@ describe('WorkspaceView branch and page routes', () => {
     ).not.toThrow()
   })
 
-  test('route branch view uses the URL branch as the displayed workspace branch', async () => {
+  test('route branch view uses the URL branch as the displayed workspace branch', () => {
     const { container } = render(
       <WorkspaceView
         workspaceId={REPO_ID}
@@ -63,7 +63,7 @@ describe('WorkspaceView branch and page routes', () => {
     expect(workspacePane(container)?.dataset.currentBranchName).toBe('feature/a')
   })
 
-  test('route branch view leaves store selection unchanged when read model is ready', async () => {
+  test('route branch view leaves store selection unchanged when read model is ready', () => {
     render(
       <WorkspaceView
         workspaceId={REPO_ID}
@@ -72,7 +72,7 @@ describe('WorkspaceView branch and page routes', () => {
     )
   })
 
-  test('new worktree page cancel returns to the stored source route', async () => {
+  test('new worktree page cancel returns to the stored source route', () => {
     const onCancelRepoNewWorktree = vi.fn()
     const onOpenWorkspaceDashboard = vi.fn()
     const { container } = render(
@@ -90,7 +90,7 @@ describe('WorkspaceView branch and page routes', () => {
     expect(onOpenWorkspaceDashboard).not.toHaveBeenCalled()
   })
 
-  test('new worktree page cancel falls back to repo root when route cancel is unavailable', async () => {
+  test('new worktree page cancel falls back to repo root when route cancel is unavailable', () => {
     const onOpenWorkspaceNavigator = vi.fn()
     const onOpenWorkspaceDashboard = vi.fn()
     const { container } = render(
@@ -108,7 +108,7 @@ describe('WorkspaceView branch and page routes', () => {
     expect(onOpenWorkspaceDashboard).not.toHaveBeenCalled()
   })
 
-  test('new worktree page creation replaces the form route with the created branch route', async () => {
+  test('new worktree page creation replaces the form route with the created branch route', () => {
     const onCancelRepoNewWorktree = vi.fn()
     const onReplaceRepoBranch = vi.fn()
     const { container } = render(
@@ -126,7 +126,7 @@ describe('WorkspaceView branch and page routes', () => {
     expect(onCancelRepoNewWorktree).not.toHaveBeenCalled()
   })
 
-  test('compact repo root keeps the navigator visible with an empty workspace pane hidden', async () => {
+  test('compact repo root keeps the navigator visible with an empty workspace pane hidden', () => {
     responsiveMocks.mode = 'compact'
 
     const { container } = render(
@@ -153,7 +153,7 @@ describe('WorkspaceView branch and page routes', () => {
     expect(container.querySelector('[data-testid="empty-workspace-pane"]')).toBeNull()
   })
 
-  test('compact dashboard page shows the workspace pane and returns to repo root', async () => {
+  test('compact dashboard page shows the workspace pane and returns to repo root', () => {
     responsiveMocks.mode = 'compact'
     const onOpenWorkspaceNavigator = vi.fn()
 
@@ -174,7 +174,7 @@ describe('WorkspaceView branch and page routes', () => {
     expect(onOpenWorkspaceNavigator).toHaveBeenCalledWith(REPO_ID)
   })
 
-  test('compact new worktree page shows the workspace pane with compact page chrome', async () => {
+  test('compact new worktree page shows the workspace pane with compact page chrome', () => {
     responsiveMocks.mode = 'compact'
 
     const { container } = render(

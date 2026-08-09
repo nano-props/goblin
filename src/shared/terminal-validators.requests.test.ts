@@ -23,7 +23,7 @@ import { normalizeAppRealtimeClientMessage } from '#/shared/app-realtime-validat
 import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
 
 describe('shared terminal validators requests', () => {
-  test('constrains trusted terminal measurements to protocol bounds', async () => {
+  test('constrains trusted terminal measurements to protocol bounds', () => {
     expect(constrainTerminalSize(700, 400)).toEqual({ cols: 500, rows: 300 })
     expect(constrainTerminalSize(0, -10)).toEqual({ cols: 1, rows: 1 })
     expect(constrainTerminalSize(80.9, 24.2)).toEqual({ cols: 80, rows: 24 })
@@ -31,7 +31,7 @@ describe('shared terminal validators requests', () => {
     expect(constrainTerminalSize(80, Number.NaN)).toBeNull()
   })
 
-  test('normalizes terminal sizes within supported bounds', async () => {
+  test('normalizes terminal sizes within supported bounds', () => {
     expect(normalizeTerminalSize(80, 24)).toEqual({ cols: 80, rows: 24 })
     expect(normalizeTerminalSize(80.9, 24.2)).toEqual({ cols: 80, rows: 24 })
     expect(normalizeTerminalSize(0, 24)).toBeNull()
@@ -40,14 +40,14 @@ describe('shared terminal validators requests', () => {
     expect(isValidTerminalSize('120', 40)).toBe(false)
   })
 
-  test('validates terminal write data at the shared protocol boundary', async () => {
+  test('validates terminal write data at the shared protocol boundary', () => {
     expect(isValidTerminalWriteData('echo ok')).toBe(true)
     expect(isValidTerminalWriteData('echo\0bad')).toBe(false)
     expect(isValidTerminalWriteData('x'.repeat(MAX_TERMINAL_WRITE_CHARS))).toBe(true)
     expect(isValidTerminalWriteData('x'.repeat(MAX_TERMINAL_WRITE_CHARS + 1))).toBe(false)
   })
 
-  test('validates attachment ids and bell payloads', async () => {
+  test('validates attachment ids and bell payloads', () => {
     expect(isValidTerminalRuntimeSessionId('pty_1234567890abcdef')).toBe(true)
     expect(isValidTerminalRuntimeSessionId('short')).toBe(false)
     expect(isValidTerminalRuntimeSessionId('bad id')).toBe(false)
@@ -136,7 +136,7 @@ describe('shared terminal validators requests', () => {
     expect(isValidTerminalTestNotificationInput({ title: '', body: 'Notifications are working' })).toBe(false)
   })
 
-  test('measures terminal websocket messages in UTF-8 bytes', async () => {
+  test('measures terminal websocket messages in UTF-8 bytes', () => {
     expect('你'.length).toBe(1)
     expect(terminalUtf8ByteLength('你')).toBe(3)
     expect('😀'.length).toBe(2)
@@ -145,7 +145,7 @@ describe('shared terminal validators requests', () => {
     expect(isTerminalWsMessageWithinLimit('你'.repeat(Math.floor(TERMINAL_WS_MESSAGE_LIMIT_BYTES / 2)))).toBe(false)
   })
 
-  test('normalizes valid terminal client messages', async () => {
+  test('normalizes valid terminal client messages', () => {
     expect(
       normalizeAppRealtimeClientMessage({
         type: 'request',
@@ -192,7 +192,7 @@ describe('shared terminal validators requests', () => {
     ).toBeNull()
   })
 
-  test('rejects NUL bytes in terminal write data', async () => {
+  test('rejects NUL bytes in terminal write data', () => {
     expect(
       normalizeAppRealtimeClientMessage({
         type: 'request',
@@ -207,7 +207,7 @@ describe('shared terminal validators requests', () => {
     ).toBeNull()
   })
 
-  test('normalizes structured terminal write results and rejects legacy booleans', async () => {
+  test('normalizes structured terminal write results and rejects legacy booleans', () => {
     const response = {
       type: 'response' as const,
       requestId: 'request_write_123',
@@ -226,7 +226,7 @@ describe('shared terminal validators requests', () => {
     })
   })
 
-  test('rejects empty terminal ids in workspace tab replacement requests', async () => {
+  test('rejects empty terminal ids in workspace tab replacement requests', () => {
     expect(
       normalizeAppRealtimeClientMessage({
         type: 'request',
@@ -285,7 +285,7 @@ describe('shared terminal validators requests', () => {
     ).toBeNull()
   })
 
-  test('accepts workspace tab operation requests and rejects invalid identities', async () => {
+  test('accepts workspace tab operation requests and rejects invalid identities', () => {
     expect(
       normalizeAppRealtimeClientMessage({
         type: 'request',
@@ -332,7 +332,7 @@ describe('shared terminal validators requests', () => {
     ).toBeNull()
   })
 
-  test('normalizes runtime-open application requests with provider validation', async () => {
+  test('normalizes runtime-open application requests with provider validation', () => {
     const message = {
       type: 'request',
       requestId: 'request_runtime_open',
@@ -382,7 +382,7 @@ describe('shared terminal validators requests', () => {
     ).toBeNull()
   })
 
-  test('normalizes runtime close application requests and rejects invalid session ids', async () => {
+  test('normalizes runtime close application requests and rejects invalid session ids', () => {
     const target = {
       target: {
         kind: 'git-worktree',
@@ -432,7 +432,7 @@ describe('shared terminal validators requests', () => {
     ).toBeNull()
   })
 
-  test('rejects client identity supplied inside terminal action payloads', async () => {
+  test('rejects client identity supplied inside terminal action payloads', () => {
     const terminalRuntimeSessionId = 'pty_request_123456789'
     const requests = [
       {
@@ -466,7 +466,7 @@ describe('shared terminal validators requests', () => {
     }
   })
 
-  test('requires a bound safe-integer generation on PTY mutation requests', async () => {
+  test('requires a bound safe-integer generation on PTY mutation requests', () => {
     const terminalRuntimeSessionId = 'pty_request_123456789'
     const requests = [
       {
@@ -504,7 +504,7 @@ describe('shared terminal validators requests', () => {
     }
   })
 
-  test('rejects client identity and unknown fields on terminal request envelopes', async () => {
+  test('rejects client identity and unknown fields on terminal request envelopes', () => {
     const request = {
       type: 'request',
       requestId: 'request_strict_envelope',
@@ -521,7 +521,7 @@ describe('shared terminal validators requests', () => {
     expect(normalizeTerminalClientMessage({ ...request, legacyField: true })).toBeNull()
   })
 
-  test('rejects legacy and dual workspace identity on scoped terminal requests', async () => {
+  test('rejects legacy and dual workspace identity on scoped terminal requests', () => {
     const message = {
       type: 'request',
       requestId: 'request_recover_sessions',
@@ -542,7 +542,7 @@ describe('shared terminal validators requests', () => {
     expect(normalizeTerminalClientMessage({ ...message, input: { ...legacyInput, repoRoot: workspaceId } })).toBeNull()
   })
 
-  test('rejects legacy and dual workspace identity on terminal realtime events', async () => {
+  test('rejects legacy and dual workspace identity on terminal realtime events', () => {
     const scopedEvents = [
       {
         type: 'bell',
@@ -616,7 +616,7 @@ describe('shared terminal validators requests', () => {
     }
   })
 
-  test('rejects unsupported terminal create realtime requests', async () => {
+  test('rejects unsupported terminal create realtime requests', () => {
     const unsupportedCreateRequest = {
       type: 'request',
       requestId: 'request_123',

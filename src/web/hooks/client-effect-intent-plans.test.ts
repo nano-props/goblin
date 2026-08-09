@@ -75,7 +75,7 @@ const CURRENT_DIRECTORY_REPO = {
 }
 
 describe('client effect intent plans', () => {
-  test('creates a worktree terminal bell plan when the worktree group matches a known worktree', async () => {
+  test('creates a worktree terminal bell plan when the worktree group matches a known worktree', () => {
     resetWorkspacesStore()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -115,7 +115,7 @@ describe('client effect intent plans', () => {
     })
   })
 
-  test('creates a workspace-root terminal bell plan without a Git read model', async () => {
+  test('creates a workspace-root terminal bell plan without a Git read model', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace')
     const plan = createTerminalBellIntentPlan({ id: workspaceId, workspaceRuntimeId: 'workspace-runtime-test' }, null, {
       type: 'terminal-bell-click',
@@ -133,7 +133,7 @@ describe('client effect intent plans', () => {
     })
   })
 
-  test('keeps a Git main-worktree bell on its branch presentation', async () => {
+  test('keeps a Git main-worktree bell on its branch presentation', () => {
     resetWorkspacesStore()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -168,7 +168,7 @@ describe('client effect intent plans', () => {
     })
   })
 
-  test('marks worktree terminal bell intent unavailable when the branch read model is missing', async () => {
+  test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
     const plan = createTerminalBellIntentPlan(
       { id: workspaceIdForTest('goblin+file:///tmp/repo'), workspaceRuntimeId: 'workspace-runtime-test' },
       null,
@@ -190,7 +190,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'unavailable', reason: 'snapshot-unavailable' })
   })
 
-  test('routes a detached worktree bell through its authoritative catalog entry', async () => {
+  test('routes a detached worktree bell through its authoritative catalog entry', () => {
     const worktreePath = '/workspace/detached'
     const plan = createTerminalBellIntentPlan(
       { id: DETACHED_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
@@ -218,7 +218,7 @@ describe('client effect intent plans', () => {
     })
   })
 
-  test('keeps detached presentation authoritative when the current catalog associates the path with a branch', async () => {
+  test('keeps detached presentation authoritative when the current catalog associates the path with a branch', () => {
     const worktreePath = '/workspace/detached'
     const plan = createTerminalBellIntentPlan(
       { id: DETACHED_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
@@ -248,7 +248,7 @@ describe('client effect intent plans', () => {
     expect(plan).toMatchObject({ kind: 'show-detached-worktree-terminal', worktreePath })
   })
 
-  test('rejects bell identities from a stale Workspace runtime', async () => {
+  test('rejects bell identities from a stale Workspace runtime', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace')
     const plan = createTerminalBellIntentPlan(
       { id: workspaceId, workspaceRuntimeId: 'workspace-runtime-current' },
@@ -266,7 +266,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('rejects a branch presentation whose worktree no longer matches the execution target', async () => {
+  test('rejects a branch presentation whose worktree no longer matches the execution target', () => {
     resetWorkspacesStore()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -307,7 +307,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('suppresses recent repo open when overlays block the action', async () => {
+  test('suppresses recent repo open when overlays block the action', () => {
     const plan = createAppLevelIntentPlan(
       {
         type: 'open-recent-workspace-requested',
@@ -319,7 +319,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('suppresses close repo when workspace shortcuts are blocked', async () => {
+  test('suppresses close repo when workspace shortcuts are blocked', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'close-workspace-requested' },
       {
@@ -338,7 +338,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('suppresses workspace tab close shortcut while workspace shortcuts are blocked', async () => {
+  test('suppresses workspace tab close shortcut while workspace shortcuts are blocked', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'workspace-pane-close-tab-requested' },
       {
@@ -357,7 +357,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('suppresses workspace tab close shortcut while overlays block workspace actions', async () => {
+  test('suppresses workspace tab close shortcut while overlays block workspace actions', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'workspace-pane-close-tab-requested' },
       {
@@ -376,7 +376,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('treats workspace tab close as a no-op when no workspace is active', async () => {
+  test('treats workspace tab close as a no-op when no workspace is active', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'workspace-pane-close-tab-requested' },
       {
@@ -395,7 +395,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('does not turn close workspace into close window when no workspace is active', async () => {
+  test('does not turn close workspace into close window when no workspace is active', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'close-workspace-requested' },
       {
@@ -413,7 +413,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('keeps native new-terminal intent active while workspace shortcuts are suppressed', async () => {
+  test('keeps native new-terminal intent active while workspace shortcuts are suppressed', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'terminal-new-tab-requested' },
       {
@@ -436,7 +436,7 @@ describe('client effect intent plans', () => {
     })
   })
 
-  test('rejects native terminal intent when the workspace has no terminal capability', async () => {
+  test('rejects native terminal intent when the workspace has no terminal capability', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'terminal-new-tab-requested' },
       {
@@ -463,7 +463,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('rejects terminal creation before workspace operation admission is ready', async () => {
+  test('rejects terminal creation before workspace operation admission is ready', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'terminal-new-tab-requested' },
       {
@@ -481,7 +481,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('creates a refresh plan from the current workspace runtime id', async () => {
+  test('creates a refresh plan from the current workspace runtime id', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'workspace-refresh-requested' },
       {
@@ -504,7 +504,7 @@ describe('client effect intent plans', () => {
     })
   })
 
-  test('creates a refresh plan for a plain Workspace', async () => {
+  test('creates a refresh plan for a plain Workspace', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'workspace-refresh-requested' },
       {
@@ -526,7 +526,7 @@ describe('client effect intent plans', () => {
     })
   })
 
-  test('creates a zen mode toggle plan for the current workspace', async () => {
+  test('creates a zen mode toggle plan for the current workspace', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'workspace-zen-mode-toggle-requested' },
       {
@@ -545,7 +545,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'toggle-zen-mode' })
   })
 
-  test('suppresses zen mode toggle when workspace shortcuts are blocked', async () => {
+  test('suppresses zen mode toggle when workspace shortcuts are blocked', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'workspace-zen-mode-toggle-requested' },
       {
@@ -564,7 +564,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('suppresses zen mode toggle while the terminal is focused', async () => {
+  test('suppresses zen mode toggle while the terminal is focused', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'workspace-zen-mode-toggle-requested' },
       {
@@ -583,7 +583,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('creates a create-worktree plan for the current workspace', async () => {
+  test('creates a create-worktree plan for the current workspace', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'create-worktree-requested' },
       {
@@ -602,7 +602,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'create-worktree' })
   })
 
-  test('rejects create-worktree intent for a non-Git workspace', async () => {
+  test('rejects create-worktree intent for a non-Git workspace', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'create-worktree-requested' },
       {
@@ -629,7 +629,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('suppresses create-worktree when there is no current repo', async () => {
+  test('suppresses create-worktree when there is no current repo', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'create-worktree-requested' },
       {
@@ -648,7 +648,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('suppresses create-worktree when workspace shortcuts are blocked', async () => {
+  test('suppresses create-worktree when workspace shortcuts are blocked', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'create-worktree-requested' },
       {
@@ -667,7 +667,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'noop' })
   })
 
-  test('external open drain kick plan schedules rerun when a drain is already active', async () => {
+  test('external open drain kick plan schedules rerun when a drain is already active', () => {
     expect(createExternalOpenDrainKickPlan({ disposed: false, draining: true })).toEqual({
       kind: 'schedule-rerun',
     })

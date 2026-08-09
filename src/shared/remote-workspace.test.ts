@@ -14,12 +14,12 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('remote workspace normalization', () => {
-  test('keeps Git probe outcomes out of lifecycle failure reasons', async () => {
+  test('keeps Git probe outcomes out of lifecycle failure reasons', () => {
     expect(isRemoteWorkspaceFailureReason('not-a-repo')).toBe(false)
     expect(isRemoteWorkspaceFailureReason('git-missing')).toBe(false)
   })
 
-  test('maps diagnostic and i18n failures to lifecycle reasons', async () => {
+  test('maps diagnostic and i18n failures to lifecycle reasons', () => {
     for (const reason of REMOTE_WORKSPACE_FAILURE_REASONS) {
       expect(toRemoteWorkspaceFailureReason(reason)).toBe(reason)
     }
@@ -29,7 +29,7 @@ describe('remote workspace normalization', () => {
     expect(toRemoteWorkspaceFailureReason('not-a-repo')).toBe('unknown')
   })
 
-  test('compares persisted workspace identity by canonical ID', async () => {
+  test('compares persisted workspace identity by canonical ID', () => {
     const entry = remoteWorkspaceSessionEntry({
       id: workspaceIdForTest('goblin+ssh://host/repo'),
       alias: 'host',
@@ -46,7 +46,7 @@ describe('remote workspace normalization', () => {
     expect(sameWorkspaceSessionEntry(null, entry)).toBe(false)
   })
 
-  test('rejects legacy, raw-path, and mismatched persisted identities without repairing them', async () => {
+  test('rejects legacy, raw-path, and mismatched persisted identities without repairing them', () => {
     expect(normalizeWorkspaceSessionEntry({ kind: 'local', id: '/repo' })).toBeNull()
     expect(
       normalizeWorkspaceSessionEntry({
@@ -64,7 +64,7 @@ describe('remote workspace normalization', () => {
     ).toBeNull()
   })
 
-  test('accepts bounded cross-platform identities and rejects oversized durable entries', async () => {
+  test('accepts bounded cross-platform identities and rejects oversized durable entries', () => {
     expect(normalizeWorkspaceSessionEntry({ id: 'goblin+file:///repo' })).toEqual({ id: 'goblin+file:///repo' })
     expect(normalizeWorkspaceSessionEntry({ id: 'goblin+file:///C:/repo' })).toEqual({
       id: 'goblin+file:///C:/repo',
@@ -72,7 +72,7 @@ describe('remote workspace normalization', () => {
     expect(normalizeWorkspaceSessionEntry({ id: `goblin+file:///${'a'.repeat(4096)}` })).toBeNull()
   })
 
-  test('derives ref display names from the normalized remote path', async () => {
+  test('derives ref display names from the normalized remote path', () => {
     expect(
       normalizeRemoteWorkspaceRef({
         alias: 'prod',
@@ -87,7 +87,7 @@ describe('remote workspace normalization', () => {
     })
   })
 
-  test('canonicalizes stale target display names', async () => {
+  test('canonicalizes stale target display names', () => {
     expect(
       normalizeRemoteTarget({
         alias: 'prod',
@@ -104,7 +104,7 @@ describe('remote workspace normalization', () => {
     })
   })
 
-  test('constructs a canonical ID-only session entry from a remote reference', async () => {
+  test('constructs a canonical ID-only session entry from a remote reference', () => {
     expect(
       remoteWorkspaceSessionEntry({
         id: workspaceIdForTest('goblin+ssh://prod/'),
@@ -115,7 +115,7 @@ describe('remote workspace normalization', () => {
     ).toEqual({ id: 'goblin+ssh://prod/srv/repo' })
   })
 
-  test('treats display names as canonical target data', async () => {
+  test('treats display names as canonical target data', () => {
     const target = {
       id: workspaceIdForTest('goblin+ssh://prod/srv/repo'),
       alias: 'prod',

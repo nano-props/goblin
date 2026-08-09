@@ -3,25 +3,25 @@ import { MAX_TERMINAL_WRITE_CHARS, TERMINAL_WS_MESSAGE_LIMIT_BYTES } from '#/sha
 import { planTerminalPathWrite, shellEscapePath } from '#/web/clipboard/terminal-path-write.ts'
 
 describe('shellEscapePath', () => {
-  test('quotes simple paths so shell metacharacters cannot expand later', async () => {
+  test('quotes simple paths so shell metacharacters cannot expand later', () => {
     expect(shellEscapePath('/tmp/a-b_1.txt')).toBe("'/tmp/a-b_1.txt'")
     expect(shellEscapePath('/tmp/$HOME/notes')).toBe("'/tmp/$HOME/notes'")
   })
 
-  test('quotes spaces and embedded single quotes', async () => {
+  test('quotes spaces and embedded single quotes', () => {
     expect(shellEscapePath("/tmp/it's here.txt")).toBe("'/tmp/it'\\''s here.txt'")
   })
 })
 
 describe('planTerminalPathWrite', () => {
-  test('returns a write plan for safe paths', async () => {
+  test('returns a write plan for safe paths', () => {
     expect(planTerminalPathWrite(['/tmp/a', '/tmp/with space'])).toEqual({
       kind: 'write',
       data: "'/tmp/a' '/tmp/with space'",
     })
   })
 
-  test('rejects the complete plan when any path contains terminal control characters', async () => {
+  test('rejects the complete plan when any path contains terminal control characters', () => {
     expect(planTerminalPathWrite(['/tmp/ok', '/tmp/bad\u001bname'])).toEqual({ kind: 'unsafe' })
   })
 
@@ -29,21 +29,21 @@ describe('planTerminalPathWrite', () => {
     expect(planTerminalPathWrite(['/tmp/ok', path])).toEqual({ kind: 'invalid' })
   })
 
-  test('returns none for an empty path list', async () => {
+  test('returns none for an empty path list', () => {
     expect(planTerminalPathWrite([])).toEqual({ kind: 'none' })
   })
 
-  test('returns too-long before building an oversized terminal write', async () => {
+  test('returns too-long before building an oversized terminal write', () => {
     const hugePath = `/tmp/${'a'.repeat(MAX_TERMINAL_WRITE_CHARS)}`
     expect(planTerminalPathWrite([hugePath])).toEqual({ kind: 'too-long' })
   })
 
-  test('returns too-long for many short paths that overflow the envelope together', async () => {
+  test('returns too-long for many short paths that overflow the envelope together', () => {
     const paths = Array.from({ length: 100_000 }, (_, index) => `/tmp/file-${index}.txt`)
     expect(planTerminalPathWrite(paths)).toEqual({ kind: 'too-long' })
   })
 
-  test('uses JSON-escaped length so quoted paths cannot overflow the websocket envelope', async () => {
+  test('uses JSON-escaped length so quoted paths cannot overflow the websocket envelope', () => {
     const path = `/tmp/${'"'.repeat(Math.floor(MAX_TERMINAL_WRITE_CHARS / 2))}`
     const escaped = shellEscapePath(path)
     expect(escaped.length).toBeLessThan(MAX_TERMINAL_WRITE_CHARS)
@@ -51,7 +51,7 @@ describe('planTerminalPathWrite', () => {
     expect(planTerminalPathWrite([path])).toEqual({ kind: 'too-long' })
   })
 
-  test('uses UTF-8 byte length for multibyte paths', async () => {
+  test('uses UTF-8 byte length for multibyte paths', () => {
     const path = `/tmp/${'你'.repeat(Math.floor(TERMINAL_WS_MESSAGE_LIMIT_BYTES / 2))}`
     expect(path.length).toBeLessThan(MAX_TERMINAL_WRITE_CHARS)
     expect(planTerminalPathWrite([path])).toEqual({ kind: 'too-long' })

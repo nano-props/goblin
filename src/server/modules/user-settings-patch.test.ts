@@ -16,7 +16,7 @@ const data: UserSettingsData = {
 }
 
 describe('user settings patch policy', () => {
-  test('validates and plans changed preference values without changing workspace state', async () => {
+  test('validates and plans changed preference values without changing workspace state', () => {
     const plan = planUserSettingsPatch(
       data,
       validateUserSettingsPatch({ theme: 'dark', fetchIntervalSec: 42, terminalNotificationsEnabled: true }),
@@ -28,7 +28,7 @@ describe('user settings patch policy', () => {
     expect(plan.next.recentWorkspaces).toBe(data.recentWorkspaces)
   })
 
-  test('preserves the authoritative data object for a no-op patch', async () => {
+  test('preserves the authoritative data object for a no-op patch', () => {
     const plan = planUserSettingsPatch(data, validateUserSettingsPatch({ theme: data.theme }))
 
     expect(plan).toEqual({ next: data, changed: false, fetchIntervalChanged: false })
@@ -42,11 +42,11 @@ describe('user settings patch policy', () => {
     expect(() => validateUserSettingsPatch(patch as Partial<UserSettings>)).toThrow(message)
   })
 
-  test('projects only public user preference fields', async () => {
+  test('projects only public user preference fields', () => {
     expect(userSettingsFromData(data)).toEqual(defaultUserSettings())
   })
 
-  test('preserves the original primitive comparison for negative zero fetch intervals', async () => {
+  test('preserves the original primitive comparison for negative zero fetch intervals', () => {
     const negativeZeroData = { ...data, fetchIntervalSec: -0 }
     const plan = planUserSettingsPatch(negativeZeroData, validateUserSettingsPatch({ fetchIntervalSec: 0 }))
 
@@ -55,14 +55,14 @@ describe('user settings patch policy', () => {
     expect(plan.next).toBe(negativeZeroData)
   })
 
-  test('normalizes a negative-zero fetch interval at the patch boundary', async () => {
+  test('normalizes a negative-zero fetch interval at the patch boundary', () => {
     const validated = validateUserSettingsPatch({ fetchIntervalSec: -0 })
 
     expect(validated.fetchIntervalSec).toBe(0)
     expect(Object.is(validated.fetchIntervalSec, -0)).toBe(false)
   })
 
-  test('normalizes a negative-zero fetch interval at the persistence boundary', async () => {
+  test('normalizes a negative-zero fetch interval at the persistence boundary', () => {
     const decoded = currentSettingsData({ ...data, fetchIntervalSec: -0 })
 
     expect(decoded).not.toBeNull()

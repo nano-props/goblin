@@ -7,7 +7,7 @@ import {
 import { formatWorkspaceLocator, workspaceLocatorForPath } from '#/shared/workspace-locator.ts'
 
 describe('workspace runtime domain', () => {
-  it('keeps a readable directory ready when Git is unavailable', async () => {
+  it('keeps a readable directory ready when Git is unavailable', () => {
     expect(
       capabilitiesFromGitProbe(
         { status: 'inconclusive', diagnostic: 'git executable unavailable' },
@@ -23,7 +23,7 @@ describe('workspace runtime domain', () => {
     })
   })
 
-  it('binds persisted targets to the current runtime without duplicating identity in persistence', async () => {
+  it('binds persisted targets to the current runtime without duplicating identity in persistence', () => {
     const workspaceId = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/workspace' }, 'posix')!
     expect(bindWorkspacePaneTarget({ kind: 'workspace-root' }, workspaceId, 'runtime-current')).toEqual({
       kind: 'workspace-root',
@@ -40,7 +40,7 @@ describe('workspace runtime domain', () => {
     })
   })
 
-  it('includes every filesystem owner identity field in its stable key', async () => {
+  it('includes every filesystem owner identity field in its stable key', () => {
     const workspaceId = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/workspace' }, 'posix')!
     const current = { kind: 'workspace-root', workspaceId, workspaceRuntimeId: 'runtime-current' } as const
     const same = { ...current }

@@ -147,7 +147,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     )
   })
 
-  test('does not render the external app launcher for a branch without a filesystem target', async () => {
+  test('does not render the external app launcher for a branch without a filesystem target', () => {
     const { container } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -214,7 +214,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     expect(c.querySelector('[data-workspace-toolbar-trailing-actions]')).toBeNull()
   })
 
-  test('uses the first visible external app as the split-button primary action without recent state', async () => {
+  test('uses the first visible external app as the split-button primary action without recent state', () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
@@ -422,7 +422,7 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     expect(container.querySelector<HTMLButtonElement>('button[aria-label="worktrees.reveal-title"]')).toBeNull()
   })
 
-  test('hides the external app launcher in compact filesystem toolbars', async () => {
+  test('hides the external app launcher in compact filesystem toolbars', () => {
     toolbarResponsiveMocks.compactUi = true
     const { container: c } = renderToolbar({
       terminalCount: 1,

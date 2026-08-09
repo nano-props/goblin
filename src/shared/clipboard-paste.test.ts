@@ -9,7 +9,7 @@ import {
   PASTE_FILE_MAX_BYTES,
 } from '#/shared/clipboard-paste.ts'
 
-test('locks the terminal blob content and multipart transport limits', async () => {
+test('locks the terminal blob content and multipart transport limits', () => {
   expect(PASTE_FILE_MAX_BYTES).toBe(25 * 1024 * 1024)
   expect(MAX_PASTE_BATCH_BYTES).toBe(32 * 1024 * 1024)
   expect(MAX_PASTE_HTTP_BODY_BYTES).toBe(34 * 1024 * 1024)
@@ -17,7 +17,7 @@ test('locks the terminal blob content and multipart transport limits', async () 
 })
 
 describe('isTerminalPastePathSafe', () => {
-  test('allows ordinary shell metacharacters that shell quoting handles', async () => {
+  test('allows ordinary shell metacharacters that shell quoting handles', () => {
     expect(isTerminalPastePathSafe('/tmp/$HOME/notes')).toBe(true)
     expect(isTerminalPastePathSafe("/tmp/it's here.txt")).toBe(true)
     expect(isTerminalPastePathSafe('/tmp/[draft]*.md')).toBe(true)
@@ -38,48 +38,48 @@ describe('isTerminalPastePathSafe', () => {
 })
 
 describe('looksLikeUriList', () => {
-  test('returns false for an empty string', async () => {
+  test('returns false for an empty string', () => {
     expect(looksLikeUriList('')).toBe(false)
   })
 
-  test('returns false for whitespace only', async () => {
+  test('returns false for whitespace only', () => {
     expect(looksLikeUriList('   \n\n\t')).toBe(false)
   })
 
-  test('returns false for plain prose', async () => {
+  test('returns false for plain prose', () => {
     expect(looksLikeUriList('hello world')).toBe(false)
   })
 
-  test('returns false for Excel-style TSV (multi-line, no file:// prefix)', async () => {
+  test('returns false for Excel-style TSV (multi-line, no file:// prefix)', () => {
     // The defining Excel scenario: a row of header cells and a row of
     // values, tab-separated. None of the lines start with file://.
     const tsv = 'Header1\tHeader2\tHeader3\nValue1\tValue2\tValue3'
     expect(looksLikeUriList(tsv)).toBe(false)
   })
 
-  test('returns true for a single file:// URI', async () => {
+  test('returns true for a single file:// URI', () => {
     expect(looksLikeUriList('file:///home/user/foo.png')).toBe(true)
   })
 
-  test('returns true for multiple file:// URIs (one per line)', async () => {
+  test('returns true for multiple file:// URIs (one per line)', () => {
     const list = ['file:///home/user/foo.png', 'file:///home/user/bar.pdf'].join('\n')
     expect(looksLikeUriList(list)).toBe(true)
   })
 
-  test('returns true when file:// URIs are mixed with RFC 2483 comments', async () => {
+  test('returns true when file:// URIs are mixed with RFC 2483 comments', () => {
     const list = ['# copied from Nautilus', 'file:///home/user/foo.png', '# trailing comment', ''].join('\n')
     expect(looksLikeUriList(list)).toBe(true)
   })
 
-  test('returns true with CRLF line endings (Windows-style)', async () => {
+  test('returns true with CRLF line endings (Windows-style)', () => {
     expect(looksLikeUriList('file:///a\r\nfile:///b\r\n')).toBe(true)
   })
 
-  test('returns true with surrounding whitespace on each line', async () => {
+  test('returns true with surrounding whitespace on each line', () => {
     expect(looksLikeUriList('  file:///a  \n  file:///b  ')).toBe(true)
   })
 
-  test('returns false when at least one significant line is not a file:// URI', async () => {
+  test('returns false when at least one significant line is not a file:// URI', () => {
     // The typical Linux file manager never produces this shape; if a
     // single non-URI line appears, the text is real data, not a URI
     // list. We must NOT classify it as a URI list.
@@ -87,13 +87,13 @@ describe('looksLikeUriList', () => {
     expect(looksLikeUriList(mixed)).toBe(false)
   })
 
-  test('returns false when only comments are present (no actual URIs)', async () => {
+  test('returns false when only comments are present (no actual URIs)', () => {
     expect(looksLikeUriList('# just a comment\n# another one')).toBe(false)
   })
 })
 
 describe('looksLikeAbsolutePathList', () => {
-  test('returns false for empty / single line', async () => {
+  test('returns false for empty / single line', () => {
     expect(looksLikeAbsolutePathList('')).toBe(false)
     // Single-line input is handled by the "single-line + files → files"
     // branch; this predicate is only consulted for multi-line text.
@@ -101,21 +101,21 @@ describe('looksLikeAbsolutePathList', () => {
     expect(looksLikeAbsolutePathList('C:\\Users\\foo\\bar.png')).toBe(false)
   })
 
-  test('returns true for multiple POSIX absolute paths', async () => {
+  test('returns true for multiple POSIX absolute paths', () => {
     expect(looksLikeAbsolutePathList('/home/a\n/home/b')).toBe(true)
     expect(looksLikeAbsolutePathList('/home/a\r\n/home/b\r\n')).toBe(true)
   })
 
-  test('returns true for multiple Windows drive-letter paths', async () => {
+  test('returns true for multiple Windows drive-letter paths', () => {
     expect(looksLikeAbsolutePathList('C:\\a\\b\nC:\\c\\d')).toBe(true)
     expect(looksLikeAbsolutePathList('C:\\a\nD:\\b')).toBe(true)
   })
 
-  test('returns true for Windows UNC paths', async () => {
+  test('returns true for Windows UNC paths', () => {
     expect(looksLikeAbsolutePathList('\\\\server\\share\\a\n\\\\server\\share\\b')).toBe(true)
   })
 
-  test('returns false for non-file URIs (https, sftp, mailto)', async () => {
+  test('returns false for non-file URIs (https, sftp, mailto)', () => {
     // Regression: the predicate previously matched any URI scheme
     // (https://, sftp://, etc.), which would silently drop multi-line
     // URL text from a webpage when paired with an image blob. The
@@ -127,13 +127,13 @@ describe('looksLikeAbsolutePathList', () => {
     expect(looksLikeAbsolutePathList('mailto:a@b.com\nmailto:c@d.com')).toBe(false)
   })
 
-  test('returns false if any non-empty line is not path-like', async () => {
+  test('returns false if any non-empty line is not path-like', () => {
     expect(looksLikeAbsolutePathList('/home/a\nnot a path')).toBe(false)
     expect(looksLikeAbsolutePathList('echo hello\nworld')).toBe(false)
     expect(looksLikeAbsolutePathList('C:\\a\\b\ngreeting\nC:\\c\\d')).toBe(false)
   })
 
-  test('ignores blank lines between paths', async () => {
+  test('ignores blank lines between paths', () => {
     expect(looksLikeAbsolutePathList('/home/a\n\n/home/b')).toBe(true)
     expect(looksLikeAbsolutePathList('/home/a\n   \n/home/b')).toBe(true)
   })

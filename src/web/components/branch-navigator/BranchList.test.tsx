@@ -28,7 +28,7 @@ afterEach(() => {
 })
 
 describe('BranchList', () => {
-  test('renders one row per branch and forwards click/double-click', async () => {
+  test('renders one row per branch and forwards click/double-click', () => {
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
     const repo = branchListRepo(branches, 'main')
     const onSelect = vi.fn()
@@ -55,7 +55,7 @@ describe('BranchList', () => {
     expect(onOpenStatus).toHaveBeenCalledWith('fix/b')
   })
 
-  test('renders the emptyState slot when branches is empty', async () => {
+  test('renders the emptyState slot when branches is empty', () => {
     const repo = branchListRepo([], '')
     const onSelect = vi.fn()
 
@@ -75,7 +75,7 @@ describe('BranchList', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  test('renders the emptyState slot when repo is null', async () => {
+  test('renders the emptyState slot when repo is null', () => {
     // `branches` is non-empty so the `!repo` branch is the one that
     // short-circuits — passing `branches={[]}` would exercise the
     // empty-list early-return instead.
@@ -94,7 +94,7 @@ describe('BranchList', () => {
     expect(container.querySelector('[data-testid="empty"]')?.textContent).toBe('repo not loaded')
   })
 
-  test('highlights the row whose name matches highlightedBranch', async () => {
+  test('highlights the row whose name matches highlightedBranch', () => {
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
     const repo = branchListRepo(branches, 'main')
 

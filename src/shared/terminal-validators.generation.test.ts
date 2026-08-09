@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { normalizeTerminalRealtimeMessage } from '#/shared/terminal-validators.ts'
 
 describe('shared terminal validators generation', () => {
-  test('requires a non-negative safe-integer identity revision on identity events', async () => {
+  test('requires a non-negative safe-integer identity revision on identity events', () => {
     const message = {
       type: 'identity' as const,
       event: {
@@ -25,7 +25,7 @@ describe('shared terminal validators generation', () => {
     }
   })
 
-  test('requires a bound safe-integer generation on PTY realtime events', async () => {
+  test('requires a bound safe-integer generation on PTY realtime events', () => {
     const message = {
       type: 'exit' as const,
       event: {
@@ -76,7 +76,7 @@ describe('shared terminal validators generation', () => {
     }
   })
 
-  test('requires non-negative safe-integer output checkpoints', async () => {
+  test('requires non-negative safe-integer output checkpoints', () => {
     const message = {
       type: 'output' as const,
       event: {

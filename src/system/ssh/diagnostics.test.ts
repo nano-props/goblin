@@ -11,7 +11,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 const okShell: RemoteCommandResult = { ok: true, stdout: 'ok', stderr: '', message: 'ok', timedOut: false }
 
 describe('classifySshFailure', () => {
-  test('classifies connection reset during ssh handshake as handshake failure', async () => {
+  test('classifies connection reset during ssh handshake as handshake failure', () => {
     expect(
       classifySshFailure({
         ok: false,
@@ -24,7 +24,7 @@ describe('classifySshFailure', () => {
     ).toBe('handshake-failed')
   })
 
-  test('keeps shell-failed for generic post-connect ssh errors', async () => {
+  test('keeps shell-failed for generic post-connect ssh errors', () => {
     expect(
       classifySshFailure({
         ok: false,
@@ -36,7 +36,7 @@ describe('classifySshFailure', () => {
     ).toBe('shell-failed')
   })
 
-  test('classifies a missing remote protocol marker as a shell failure', async () => {
+  test('classifies a missing remote protocol marker as a shell failure', () => {
     expect(
       classifySshFailure({
         ok: false,

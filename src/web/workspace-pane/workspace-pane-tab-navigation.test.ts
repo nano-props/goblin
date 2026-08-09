@@ -15,7 +15,7 @@ import {
 } from '#/web/test-utils/workspace-pane-tab-model.ts'
 
 describe('repo workspace pane tab navigation', () => {
-  test('resolves the adjacent tab after close from the shared tab list', async () => {
+  test('resolves the adjacent tab after close from the shared tab list', () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -38,7 +38,7 @@ describe('repo workspace pane tab navigation', () => {
     expect(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'missing:missing')).toBeNull()
   })
 
-  test('prefers the opener tab over the adjacent tab when resolving the next tab after close', async () => {
+  test('prefers the opener tab over the adjacent tab when resolving the next tab after close', () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -63,7 +63,7 @@ describe('repo workspace pane tab navigation', () => {
     ).toBe('workspace-pane:changes')
   })
 
-  test('falls back to the adjacent tab when the opener tab no longer exists', async () => {
+  test('falls back to the adjacent tab when the opener tab no longer exists', () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -88,7 +88,7 @@ describe('repo workspace pane tab navigation', () => {
     ).toBe('workspace-pane:changes')
   })
 
-  test('skips pending terminal tabs when resolving the next tab after close', async () => {
+  test('skips pending terminal tabs when resolving the next tab after close', () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -106,7 +106,7 @@ describe('repo workspace pane tab navigation', () => {
     expect(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, 'workspace-pane:status')).toBeNull()
   })
 
-  test('moves through the shared tab list from the active tab identity', async () => {
+  test('moves through the shared tab list from the active tab identity', () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 
@@ -136,7 +136,7 @@ describe('repo workspace pane tab navigation', () => {
     expect(adjacentWorkspacePaneTab(model.tabs, 'missing:missing', 1)).toBeNull()
   })
 
-  test('keeps the current terminal selection when another terminal remains selected', async () => {
+  test('keeps the current terminal selection when another terminal remains selected', () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
 

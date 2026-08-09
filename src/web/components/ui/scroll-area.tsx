@@ -100,9 +100,9 @@ const ScrollBar: FunctionalComponent<ScrollBarProps> = (props, { slots }) => {
     >
       <ScrollAreaThumb
         class={cn(
-          'relative flex-1 rounded-full bg-muted-foreground/40 transition-[background-color,width,height] duration-150 ease-out hover:bg-muted-foreground/70 active:bg-muted-foreground/80',
-          orientation === 'vertical' && 'mx-auto w-1 hover:w-1.5',
-          orientation === 'horizontal' && 'my-auto h-1 hover:h-1.5',
+          'relative flex-1 rounded-full bg-muted-foreground/40 duration-150 ease-out hover:bg-muted-foreground/70 active:bg-muted-foreground/80',
+          orientation === 'vertical' && 'mx-auto w-1 transition-[background-color,width] hover:w-1.5',
+          orientation === 'horizontal' && 'my-auto h-1 transition-[background-color,height] hover:h-1.5',
           mode === 'default' &&
             'before:absolute before:left-1/2 before:top-1/2 before:min-h-11 before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
         )}

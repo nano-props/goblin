@@ -14,7 +14,7 @@ afterEach(() => {
 })
 
 describe('terminal-geometry', () => {
-  test('builds the shared xterm sizing options', async () => {
+  test('builds the shared xterm sizing options', () => {
     expect(createTerminalSizingOptions()).toEqual({
       allowProposedApi: true,
       fontFamily: "'Goblin Mono', monospace",

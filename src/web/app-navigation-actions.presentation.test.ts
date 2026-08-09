@@ -340,7 +340,7 @@ describe('createAppNavigationActions presentation', () => {
     },
   )
 
-  test('selects branches by resolving the branch workspace pane route', async () => {
+  test('selects branches by resolving the branch workspace pane route', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -371,7 +371,7 @@ describe('createAppNavigationActions presentation', () => {
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
   })
 
-  test('opens the branch root while workspace pane tabs are still loading', async () => {
+  test('opens the branch root while workspace pane tabs are still loading', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -429,7 +429,7 @@ describe('createAppNavigationActions presentation', () => {
     expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
-  test('selects branches by falling back when the preferred workspace pane tab is stale', async () => {
+  test('selects branches by falling back when the preferred workspace pane tab is stale', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -455,7 +455,7 @@ describe('createAppNavigationActions presentation', () => {
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
   })
 
-  test('selects branches with an intentional empty workspace pane route', async () => {
+  test('selects branches with an intentional empty workspace pane route', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [

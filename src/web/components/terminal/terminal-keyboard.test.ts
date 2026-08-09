@@ -46,28 +46,28 @@ function keyEvent(partial: {
 }
 
 describe('SafariShiftKeyResolver', () => {
-  test('returns null on non-Safari browsers', async () => {
+  test('returns null on non-Safari browsers', () => {
     withUserAgent(CHROME_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: ',', code: 'Comma', shiftKey: true }))).toBeNull()
     })
   })
 
-  test('returns null when shiftKey is not pressed', async () => {
+  test('returns null when shiftKey is not pressed', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: ',', code: 'Comma', shiftKey: false }))).toBeNull()
     })
   })
 
-  test('returns null for non-keydown events', async () => {
+  test('returns null for non-keydown events', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ type: 'keyup', key: ',', code: 'Comma', shiftKey: true }))).toBeNull()
     })
   })
 
-  test('returns null when modifier keys are pressed', async () => {
+  test('returns null when modifier keys are pressed', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: ',', code: 'Comma', shiftKey: true, ctrlKey: true }))).toBeNull()
@@ -76,14 +76,14 @@ describe('SafariShiftKeyResolver', () => {
     })
   })
 
-  test('returns null for unknown event.code', async () => {
+  test('returns null for unknown event.code', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: 'a', code: 'KeyA', shiftKey: true }))).toBeNull()
     })
   })
 
-  test('returns null when key is already the correct shifted character', async () => {
+  test('returns null when key is already the correct shifted character', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: '<', code: 'Comma', shiftKey: true }))).toBeNull()
@@ -93,7 +93,7 @@ describe('SafariShiftKeyResolver', () => {
     })
   })
 
-  test('US QWERTY: returns shifted char when key reports unshifted char', async () => {
+  test('US QWERTY: returns shifted char when key reports unshifted char', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: ',', code: 'Comma', shiftKey: true }))).toBe('<')
@@ -107,7 +107,7 @@ describe('SafariShiftKeyResolver', () => {
     })
   })
 
-  test('Chinese layout: returns full-width shifted char when key reports full-width unshifted char', async () => {
+  test('Chinese layout: returns full-width shifted char when key reports full-width unshifted char', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: '，', code: 'Comma', shiftKey: true }))).toBe('《')
@@ -121,7 +121,7 @@ describe('SafariShiftKeyResolver', () => {
     })
   })
 
-  test('returns default shifted char for empty or Unidentified key on single-layout keys', async () => {
+  test('returns default shifted char for empty or Unidentified key on single-layout keys', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: '', code: 'Digit1', shiftKey: true }))).toBe('!')
@@ -129,7 +129,7 @@ describe('SafariShiftKeyResolver', () => {
     })
   })
 
-  test('returns null for empty or Unidentified key on multi-layout keys without remembered layout', async () => {
+  test('returns null for empty or Unidentified key on multi-layout keys without remembered layout', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: '', code: 'Comma', shiftKey: true }))).toBeNull()
@@ -139,7 +139,7 @@ describe('SafariShiftKeyResolver', () => {
     })
   })
 
-  test('reuses remembered layout for empty multi-layout Shift key events', async () => {
+  test('reuses remembered layout for empty multi-layout Shift key events', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: '；', code: 'Semicolon', shiftKey: false }))).toBeNull()
@@ -149,7 +149,7 @@ describe('SafariShiftKeyResolver', () => {
     })
   })
 
-  test('can learn layout from already-correct shifted key and reuse it later', async () => {
+  test('can learn layout from already-correct shifted key and reuse it later', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: '《', code: 'Comma', shiftKey: true }))).toBeNull()
@@ -157,7 +157,7 @@ describe('SafariShiftKeyResolver', () => {
     })
   })
 
-  test('reset clears remembered layouts', async () => {
+  test('reset clears remembered layouts', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: '；', code: 'Semicolon', shiftKey: false }))).toBeNull()
@@ -166,7 +166,7 @@ describe('SafariShiftKeyResolver', () => {
     })
   })
 
-  test('returns null for unmatched key on a known code', async () => {
+  test('returns null for unmatched key on a known code', () => {
     withUserAgent(SAFARI_UA, () => {
       const resolver = new SafariShiftKeyResolver()
       expect(resolver.inputForEvent(keyEvent({ key: 'x', code: 'Comma', shiftKey: true }))).toBeNull()
@@ -175,7 +175,7 @@ describe('SafariShiftKeyResolver', () => {
 })
 
 describe('terminalInputForMacOptionArrow', () => {
-  test('returns escape sequence for Option+Arrow on Mac', async () => {
+  test('returns escape sequence for Option+Arrow on Mac', () => {
     expect(
       terminalInputForMacOptionArrow(
         { type: 'keydown', key: 'ArrowLeft', altKey: true, ctrlKey: false, metaKey: false, shiftKey: false },
@@ -184,7 +184,7 @@ describe('terminalInputForMacOptionArrow', () => {
     ).toBe('\x1bb')
   })
 
-  test('returns null when not on Mac', async () => {
+  test('returns null when not on Mac', () => {
     expect(
       terminalInputForMacOptionArrow(
         { type: 'keydown', key: 'ArrowLeft', altKey: true, ctrlKey: false, metaKey: false, shiftKey: false },
@@ -193,7 +193,7 @@ describe('terminalInputForMacOptionArrow', () => {
     ).toBeNull()
   })
 
-  test('returns null in application cursor keys mode', async () => {
+  test('returns null in application cursor keys mode', () => {
     expect(
       terminalInputForMacOptionArrow(
         { type: 'keydown', key: 'ArrowLeft', altKey: true, ctrlKey: false, metaKey: false, shiftKey: false },
@@ -228,7 +228,7 @@ describe('terminalInputForVirtualKey', () => {
 })
 
 describe('isMacNavigatorPlatform', () => {
-  test('recognizes Mac platforms', async () => {
+  test('recognizes Mac platforms', () => {
     expect(isMacNavigatorPlatform('MacIntel')).toBe(true)
     expect(isMacNavigatorPlatform('iPhone')).toBe(true)
     expect(isMacNavigatorPlatform('iPad')).toBe(true)
@@ -238,7 +238,7 @@ describe('isMacNavigatorPlatform', () => {
 })
 
 describe('isDesktopMacNavigatorPlatform', () => {
-  test('excludes iOS platforms from the strict desktop gate', async () => {
+  test('excludes iOS platforms from the strict desktop gate', () => {
     expect(isDesktopMacNavigatorPlatform('MacIntel')).toBe(true)
     expect(isDesktopMacNavigatorPlatform('MacPPC')).toBe(true)
     expect(isDesktopMacNavigatorPlatform('iPhone')).toBe(false)
@@ -248,7 +248,7 @@ describe('isDesktopMacNavigatorPlatform', () => {
 })
 
 describe('isImeOwnedKeyboardEvent', () => {
-  test('recognizes active composition and the WebKit compatibility event', async () => {
+  test('recognizes active composition and the WebKit compatibility event', () => {
     expect(isImeOwnedKeyboardEvent({ isComposing: true, keyCode: 0 })).toBe(true)
     expect(isImeOwnedKeyboardEvent({ isComposing: false, keyCode: 229 })).toBe(true)
     expect(isImeOwnedKeyboardEvent({ isComposing: false, keyCode: 27 })).toBe(false)

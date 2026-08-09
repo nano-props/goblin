@@ -6,7 +6,7 @@ import {
 } from '#/shared/worktree-create.ts'
 
 describe('worktree create helpers', () => {
-  test('accepts a new branch create request', async () => {
+  test('accepts a new branch create request', () => {
     expect(
       normalizeCreateWorktreeInput({
         worktreePath: '/tmp/repo-feature',
@@ -18,7 +18,7 @@ describe('worktree create helpers', () => {
     })
   })
 
-  test('accepts existing branch and trackRemoteBranch requests', async () => {
+  test('accepts existing branch and trackRemoteBranch requests', () => {
     expect(
       normalizeCreateWorktreeInput({
         worktreePath: '/tmp/repo-existing',
@@ -44,7 +44,7 @@ describe('worktree create helpers', () => {
     })
   })
 
-  test('rejects malformed requests', async () => {
+  test('rejects malformed requests', () => {
     expect(
       normalizeCreateWorktreeInput({ worktreePath: '', mode: { kind: 'existingBranch', branch: 'main' } }),
     ).toBeNull()
@@ -64,7 +64,7 @@ describe('worktree create helpers', () => {
     ).toBeNull()
   })
 
-  test('parses and filters remote-tracking refs', async () => {
+  test('parses and filters remote-tracking refs', () => {
     expect(
       parseRemoteTrackingRefs(
         'refs/remotes/origin/HEAD\nrefs/remotes/origin/main\nrefs/remotes/origin/feature/a\nrefs/remotes/upstream/release/v1\n',
@@ -80,7 +80,7 @@ describe('worktree create helpers', () => {
     ])
   })
 
-  test('derives local branch names from remote refs', async () => {
+  test('derives local branch names from remote refs', () => {
     expect(
       deriveLocalBranchFromRemoteRef({
         ref: 'refs/remotes/team/backend/feature/a',
@@ -90,7 +90,7 @@ describe('worktree create helpers', () => {
     ).toBe('feature/a')
   })
 
-  test('rejects a ref owned by multiple authoritative fetch mappings', async () => {
+  test('rejects a ref owned by multiple authoritative fetch mappings', () => {
     expect(() =>
       parseRemoteTrackingRefs('refs/remotes/team/backend/main\n', [
         { name: 'team', fetchSpecs: ['+refs/heads/*:refs/remotes/team/*'] },
@@ -99,7 +99,7 @@ describe('worktree create helpers', () => {
     ).toThrow('Ambiguous remote-tracking ref ownership')
   })
 
-  test('applies wildcard and exact negative fetch refspecs to source refs', async () => {
+  test('applies wildcard and exact negative fetch refspecs to source refs', () => {
     expect(
       parseRemoteTrackingRefs('refs/remotes/origin/main\n', [
         {
@@ -121,7 +121,7 @@ describe('worktree create helpers', () => {
     ).toEqual([{ ref: 'refs/remotes/origin/main', remote: 'origin', branch: 'main' }])
   })
 
-  test('ignores valid fetch refspecs that do not produce remote branch ownership', async () => {
+  test('ignores valid fetch refspecs that do not produce remote branch ownership', () => {
     expect(
       parseRemoteTrackingRefs('refs/remotes/origin/main\n', [
         {

@@ -1,13 +1,16 @@
 import { defineComponent } from 'vue'
 import type { Component, ComponentOptions, PropType, VNodeChild } from 'vue'
-import { SelectRoot, SelectValue } from 'reka-ui'
+import type { LucideIcon } from '@lucide/vue'
+import { SelectRoot } from 'reka-ui'
 import { SelectContent, SelectItem, SelectTrigger } from '#/web/components/ui/select.tsx'
+import { SelectValue } from '#/web/components/ui/SelectValue.tsx'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 type SettingsElement = string | Exclude<Component, ComponentOptions>
 type SettingsItemSize = 'sm' | 'md' | 'lg' | 'xl'
 type SettingsSelectValue = string | number
+type SettingsSelectOption = { value: SettingsSelectValue; label: string; icon?: LucideIcon }
 
 export const SettingsGroup = defineComponent(
   (props: { label: VNodeChild; hint?: string; action?: VNodeChild }, { slots }) => {
@@ -127,12 +130,14 @@ export const SettingsSelect = defineComponent(
   (props: {
     id: string
     value: SettingsSelectValue
-    options: Array<{ value: SettingsSelectValue; label: string; icon?: VNodeChild }>
+    options: SettingsSelectOption[]
     onChange: (value: SettingsSelectValue) => void
   }) => {
     const compact = useIsCompactUi()
     return () => {
       const optionsSignature = props.options.map((option) => `${String(option.value)}:${option.label}`).join('|')
+      const selectedOption = props.options.find((option) => String(option.value) === String(props.value))
+      const SelectedIcon = selectedOption?.icon
       return (
         <SelectRoot
           key={optionsSignature}
@@ -149,15 +154,21 @@ export const SettingsSelect = defineComponent(
               compact.value ? 'w-full min-w-0' : 'min-w-36',
             )}
           >
-            <SelectValue />
+            <SelectValue>
+              {SelectedIcon ? <SelectedIcon class="size-4" /> : null}
+              {selectedOption?.label}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {props.options.map((option) => (
-              <SelectItem key={String(option.value)} value={String(option.value)} textValue={option.label}>
-                {option.icon}
-                {option.label}
-              </SelectItem>
-            ))}
+            {props.options.map((option) => {
+              const Icon = option.icon
+              return (
+                <SelectItem key={String(option.value)} value={String(option.value)} textValue={option.label}>
+                  {Icon ? <Icon class="size-4" /> : null}
+                  {option.label}
+                </SelectItem>
+              )
+            })}
           </SelectContent>
         </SelectRoot>
       )
@@ -169,7 +180,7 @@ export const SettingsSelect = defineComponent(
       id: { type: String, required: true },
       value: { type: [String, Number] as PropType<SettingsSelectValue>, required: true },
       options: {
-        type: Array as PropType<Array<{ value: SettingsSelectValue; label: string; icon?: VNodeChild }>>,
+        type: Array as PropType<SettingsSelectOption[]>,
         required: true,
       },
       onChange: { type: Function as PropType<(value: SettingsSelectValue) => void>, required: true },

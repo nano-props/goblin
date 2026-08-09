@@ -103,7 +103,7 @@ describe('PullRequestStatusRow', () => {
     expect(retry).toHaveBeenCalledOnce()
   })
 
-  test('renders the PR summary chip as a clickable button', async () => {
+  test('renders the PR summary chip as a clickable button', () => {
     const pullRequest = createPullRequest(178, {
       state: 'open',
       url: 'https://github.com/acme/repo/pull/178',

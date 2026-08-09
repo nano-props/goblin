@@ -7,12 +7,17 @@ Keep component contracts explicit, ownership local, and rendering declarative.
 
 - Write rendered UI in TSX. Do not use `h(...)` in production code, tests,
   fixtures, or examples.
+- When a file primarily defines one component, name the file after that
+  component in PascalCase, such as `SelectValue.tsx`.
 - Use `class`, not `className`, in JSX.
 - Give inline CSS lengths explicit units. Vue does not infer `px` from numeric
   values; keep numbers only for genuinely unitless CSS values.
 - Define Vue components in TSX. Prefer the object form of `defineComponent` so
   the public contract, lifecycle, behavior, and render function stay visible in
   one place.
+- Prefer the explicit `FunctionalComponent` type name over a generic `FC`
+  alias. When local repetition warrants an alias, name it for its role rather
+  than introducing a project-wide abbreviation.
 - Prefer a TypeScript interface as the prop type source. TSX still lists prop
   names at runtime so Vue can separate them from attrs. Use runtime prop options
   when defaults, coercion, or runtime validation are part of the contract.

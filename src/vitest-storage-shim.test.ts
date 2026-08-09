@@ -8,7 +8,7 @@
 import { describe, expect, test } from 'vitest'
 
 describe('vitest Storage shims', () => {
-  test('globalThis and window expose the same storage objects', async () => {
+  test('globalThis and window expose the same storage objects', () => {
     expect(globalThis.localStorage).toBe(window.localStorage)
     expect(globalThis.sessionStorage).toBe(window.sessionStorage)
   })

@@ -16,7 +16,7 @@ import {
 } from '#/server/test-utils/terminal-session-manager.ts'
 
 describe('TerminalSessionManager admission', () => {
-  test('rejects target-incompatible presentation before committing prepared or existing sessions', async () => {
+  test('rejects target-incompatible presentation before committing prepared or existing sessions', () => {
     const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
     const input = {
       userId: USER_ID,
@@ -44,7 +44,7 @@ describe('TerminalSessionManager admission', () => {
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)).toEqual(baseline)
   })
 
-  test('prepares a session without sampling client presence', async () => {
+  test('prepares a session without sampling client presence', () => {
     let presenceFails = true
     const manager = new TerminalSessionManager<string>(
       createDeferredPtySupervisor(),
@@ -74,7 +74,7 @@ describe('TerminalSessionManager admission', () => {
     })
   })
 
-  test('updates an existing presentation without sampling client presence', async () => {
+  test('updates an existing presentation without sampling client presence', () => {
     let presenceFails = false
     const manager = new TerminalSessionManager<string>(
       createDeferredPtySupervisor(),
@@ -112,7 +112,7 @@ describe('TerminalSessionManager admission', () => {
     })
   })
 
-  test('retires a prepared opening session before attach without leaving catalog membership', async () => {
+  test('retires a prepared opening session before attach without leaving catalog membership', () => {
     const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
     const prepared = manager.prepareSession({
       userId: USER_ID,
@@ -128,7 +128,7 @@ describe('TerminalSessionManager admission', () => {
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
   })
 
-  test('defers an existing presentation mutation until placement admission commits', async () => {
+  test('defers an existing presentation mutation until placement admission commits', () => {
     const onIdentity = vi.fn()
     const onSessionsProjectionChanged = vi.fn()
     const manager = createAlwaysOnlineManager(createDeferredPtySupervisor(), {
@@ -180,7 +180,7 @@ describe('TerminalSessionManager admission', () => {
     })
   })
 
-  test('reports no catalog effect when reuse leaves presentation unchanged', async () => {
+  test('reports no catalog effect when reuse leaves presentation unchanged', () => {
     const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
     const input = {
       userId: USER_ID,
@@ -209,7 +209,7 @@ describe('TerminalSessionManager admission', () => {
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).revision).toBe(beforeReuse)
   })
 
-  test('rejects reuse under a different worktree path even with the same physical identity', async () => {
+  test('rejects reuse under a different worktree path even with the same physical identity', () => {
     const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)
     const input = {

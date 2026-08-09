@@ -9,7 +9,7 @@ import {
 } from '#/server/terminal/terminal-session-lifecycle.ts'
 
 describe('terminal session lifecycle helpers', () => {
-  test('drives the session through explicit lifecycle phases', async () => {
+  test('drives the session through explicit lifecycle phases', () => {
     const state: TerminalLifecycleState = {
       phase: 'opening',
       message: 'stale',

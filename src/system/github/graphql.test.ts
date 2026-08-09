@@ -33,13 +33,13 @@ afterEach(() => {
 })
 
 describe('GitHub GraphQL transport', () => {
-  test('uses the configured GitHub API timeout', async () => {
+  test('uses the configured GitHub API timeout', () => {
     expect(GITHUB_API_TIMEOUT_MS).toBe(17_000)
   })
 })
 
 describe('GitHub repo reference parsing', () => {
-  test('parses https remotes', async () => {
+  test('parses https remotes', () => {
     expect(parseGitHubRemoteUrl('https://github.com/acme/repo.git')).toEqual({
       host: 'github.com',
       owner: 'acme',
@@ -47,7 +47,7 @@ describe('GitHub repo reference parsing', () => {
     })
   })
 
-  test('parses ssh and scp-like remotes', async () => {
+  test('parses ssh and scp-like remotes', () => {
     expect(parseGitHubRemoteUrl('ssh://git@github.example.com/acme/repo.git')).toEqual({
       host: 'github.example.com',
       owner: 'acme',
@@ -60,12 +60,12 @@ describe('GitHub repo reference parsing', () => {
     })
   })
 
-  test('ignores GitLab remotes', async () => {
+  test('ignores GitLab remotes', () => {
     expect(parseGitHubRemoteUrl('https://gitlab.com/acme/repo.git')).toBeNull()
     expect(parseGitHubRemoteUrl('git@gitlab.example.com:acme/repo.git')).toBeNull()
   })
 
-  test('ignores unknown remotes', async () => {
+  test('ignores unknown remotes', () => {
     expect(parseGitHubRemoteUrl('https://code.example.com/acme/repo.git')).toBeNull()
   })
 
@@ -194,7 +194,7 @@ describe('graphqlRequestResult transport', () => {
     expect(results.every((result) => result.ok)).toBe(true)
   })
 
-  test('formats structured errors for logs', async () => {
+  test('formats structured errors for logs', () => {
     const error: GraphqlRequestError = {
       code: 'UNAUTHORIZED',
       message: 'Bad credentials',

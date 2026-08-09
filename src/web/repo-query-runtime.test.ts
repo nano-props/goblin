@@ -64,7 +64,7 @@ beforeEach(() => {
 })
 
 describe('repository query authorities', () => {
-  test('stores the runtime snapshot under a branch-independent key', async () => {
+  test('stores the runtime snapshot under a branch-independent key', () => {
     const client = new QueryClient()
     setRepoSnapshotQueryData(WORKSPACE_ID, 'repo-runtime-1', snapshot('main').snapshot, client)
 
@@ -72,7 +72,7 @@ describe('repository query authorities', () => {
     expect(client.getQueryData(repoSnapshotQueryKey(WORKSPACE_ID, 'repo-runtime-1'))).toEqual(snapshot('main'))
   })
 
-  test('uses exact, non-overlapping pull-request scope keys', async () => {
+  test('uses exact, non-overlapping pull-request scope keys', () => {
     const branchA = repoPullRequestsQueryKey(WORKSPACE_ID, 'repo-runtime-1', {
       kind: 'branch-detail',
       branch: 'feature/a',
@@ -376,7 +376,7 @@ describe('repository query authorities', () => {
     read.resolve(snapshot('main'))
   })
 
-  test('does not expose retained operations data after its query enters an error state', async () => {
+  test('does not expose retained operations data after its query enters an error state', () => {
     const client = new QueryClient()
     const key = repoOperationsQueryKey(WORKSPACE_ID, 'repo-runtime-1')
     client.setQueryData(key, repoOperationsForTest(1))

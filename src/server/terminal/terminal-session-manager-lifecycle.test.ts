@@ -262,7 +262,7 @@ describe('TerminalSessionManager session lifecycle', () => {
     await vi.waitFor(() => expect(release).toHaveBeenCalledOnce())
   })
 
-  test('releases the admission reservation when runtime retention rejects a stale generation', async () => {
+  test('releases the admission reservation when runtime retention rejects a stale generation', () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = new TerminalSessionManager<string>(
       supervisor,

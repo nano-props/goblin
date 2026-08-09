@@ -11,7 +11,7 @@ import {
 } from '#/server/modules/repo-mutation-impact.ts'
 
 describe('repo mutation impact', () => {
-  test('deduplicates affected repos while preserving the mutation result', async () => {
+  test('deduplicates affected repos while preserving the mutation result', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace/main')
     const result = { ok: false, message: 'partial failure' }
 
@@ -22,7 +22,7 @@ describe('repo mutation impact', () => {
     expect(withRepoIdsToInvalidate(result, [])).toBe(result)
   })
 
-  test('projects non-bare local worktrees to canonical workspace ids', async () => {
+  test('projects non-bare local worktrees to canonical workspace ids', () => {
     const workspaceId = workspaceIdForLocalWorktreePath('/workspace/main')
     if (!workspaceId) throw new Error('expected local workspace id')
 
@@ -34,7 +34,7 @@ describe('repo mutation impact', () => {
     ).toEqual([workspaceId])
   })
 
-  test('projects remote worktree paths through the captured workspace alias', async () => {
+  test('projects remote worktree paths through the captured workspace alias', () => {
     const target: RemoteWorkspaceTarget = {
       id: workspaceIdForTest('goblin+ssh://example/workspace/main'),
       alias: 'example',
@@ -52,7 +52,7 @@ describe('repo mutation impact', () => {
     expect(remoteWorktreeRepoIds(target, undefined)).toEqual([])
   })
 
-  test('appends a new recovery notice after established notices', async () => {
+  test('appends a new recovery notice after established notices', () => {
     expect(
       appendRepoMutationRecoveryMessageKey(
         ['error.worktree-created-followup-failed'],
@@ -61,7 +61,7 @@ describe('repo mutation impact', () => {
     ).toEqual(['error.worktree-created-followup-failed', 'error.workspace-runtime-settlement-failed'])
   })
 
-  test('preserves the authoritative list when the notice is already present', async () => {
+  test('preserves the authoritative list when the notice is already present', () => {
     const recoveryMessageKeys = ['error.workspace-runtime-settlement-failed'] as const
 
     expect(appendRepoMutationRecoveryMessageKey(recoveryMessageKeys, 'error.workspace-runtime-settlement-failed')).toBe(
@@ -69,7 +69,7 @@ describe('repo mutation impact', () => {
     )
   })
 
-  test('keeps the first recovery notice occurrence when normalizing a combined result', async () => {
+  test('keeps the first recovery notice occurrence when normalizing a combined result', () => {
     expect(
       uniqueRepoMutationRecoveryMessageKeys([
         'error.worktree-removed-followup-failed',

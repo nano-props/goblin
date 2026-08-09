@@ -511,7 +511,7 @@ describe('TerminalSessionProjection create flow', () => {
     })
   })
 
-  test('clears the native badge when the projection starts', async () => {
+  test('clears the native badge when the projection starts', () => {
     expect(mocks.setBadgeMock).toHaveBeenCalledWith(0)
   })
 

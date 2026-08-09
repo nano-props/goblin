@@ -8,7 +8,7 @@ import {
 } from '#/system/github/queue.ts'
 
 describe('GitHub API request queue', () => {
-  test('uses conservative default limits', async () => {
+  test('uses conservative default limits', () => {
     expect(GITHUB_API_CONCURRENCY).toBe(3)
     expect(GITHUB_API_INTERVAL_CAP).toBe(10)
     expect(GITHUB_API_INTERVAL_MS).toBe(1_000)

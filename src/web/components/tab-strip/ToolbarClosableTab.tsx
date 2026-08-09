@@ -84,7 +84,7 @@ interface ToolbarTabCloseActionProps {
 }
 
 const TOOLBAR_TAB_CLOSE_BASE_CLASS =
-  'relative z-10 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 before:absolute before:-inset-x-1.5 before:-inset-y-1 before:content-[""] hover:bg-accent hover:text-accent-foreground'
+  'relative z-10 ml-auto shrink-0 cursor-pointer rounded border-0 bg-transparent p-0.5 text-muted-foreground transition-colors duration-100 before:absolute before:-inset-x-1.5 before:-inset-y-1 before:content-[""] hover:bg-accent hover:text-accent-foreground'
 
 function toolbarTabCloseVisibilityClass(visible: boolean, disabled: boolean): string {
   if (visible) return disabled ? 'pointer-events-none opacity-100' : 'pointer-events-auto opacity-100'

@@ -23,7 +23,7 @@ describe('restorable-workspace-state', () => {
     resetWorkspacesStore()
   })
 
-  test('maps restorable workspace state into ClientWorkspaceState', async () => {
+  test('maps restorable workspace state into ClientWorkspaceState', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -67,7 +67,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('persists a plain Workspace root without synthetic Git targets', async () => {
+  test('persists a plain Workspace root without synthetic Git targets', () => {
     const workspace = emptyWorkspace('goblin+file:///tmp/repo-without-query-model', 'repo-runtime-without-query')
     acceptWorkspaceProbeState(workspace, {
       status: 'ready',
@@ -114,7 +114,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('drops target-scoped state for worktrees absent from the authoritative branch projection', async () => {
+  test('drops target-scoped state for worktrees absent from the authoritative branch projection', () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       branchSnapshots: [createBranchSnapshot('main')],
@@ -148,7 +148,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('preserves target-scoped baseline state for restore stub Workspaces', async () => {
+  test('preserves target-scoped baseline state for restore stub Workspaces', () => {
     const activeTargetKey = worktreeTargetKey('goblin+file:///tmp/repo-a', '/tmp/active-worktree')
     const stubTargetKey = worktreeTargetKey('goblin+file:///tmp/repo-b', '/tmp/stub-worktree')
     const activeRepo = seedRepoWithReadModelForTest({
@@ -231,7 +231,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('persists changes as a session-restorable preferred tab when its static tab is open', async () => {
+  test('persists changes as a session-restorable preferred tab when its static tab is open', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -264,7 +264,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('persists an explicit empty workspace pane preference', async () => {
+  test('persists an explicit empty workspace pane preference', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -297,7 +297,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('does not persist a branch preferred tab whose tab is closed', async () => {
+  test('does not persist a branch preferred tab whose tab is closed', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -330,7 +330,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('restores restorable workspace state from ClientWorkspaceState', async () => {
+  test('restores restorable workspace state from ClientWorkspaceState', () => {
     expect(
       restoreRestorableWorkspaceStateFromClientWorkspace({
         restoredWorkspaceId: workspaceIdForTest('goblin+file:///tmp/repo'),
@@ -355,7 +355,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('persists files as a session-restorable preferred tab when its static tab is open', async () => {
+  test('persists files as a session-restorable preferred tab when its static tab is open', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -388,7 +388,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('uses server tab projection to validate a restorable preferred tab', async () => {
+  test('uses server tab projection to validate a restorable preferred tab', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -421,7 +421,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('persists file tree view state into session state', async () => {
+  test('persists file tree view state into session state', () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       branchSnapshots: [

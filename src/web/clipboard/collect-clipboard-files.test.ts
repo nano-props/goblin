@@ -37,11 +37,11 @@ function stringItem(text: string): DataTransferItem {
 }
 
 describe('collectClipboardFiles', () => {
-  test('returns [] when data is null', async () => {
+  test('returns [] when data is null', () => {
     expect(collectClipboardFiles(null)).toEqual([])
   })
 
-  test('prefers data.files over data.items when both are present', async () => {
+  test('prefers data.files over data.items when both are present', () => {
     const a = new File([new Uint8Array([1])], 'a.png')
     const b = new File([new Uint8Array([2])], 'b.png')
     const dt = mockDataTransfer({ files: [a], items: [fileItem(b)] })
@@ -49,38 +49,38 @@ describe('collectClipboardFiles', () => {
     expect(result).toEqual([a])
   })
 
-  test('falls back to data.items when data.files is empty', async () => {
+  test('falls back to data.items when data.files is empty', () => {
     const a = new File([new Uint8Array([1])], 'a.png')
     const dt = mockDataTransfer({ files: [], items: [fileItem(a)] })
     expect(collectClipboardFiles(dt)).toEqual([a])
   })
 
-  test('keeps named zero-byte files so their filesystem path can be pasted', async () => {
+  test('keeps named zero-byte files so their filesystem path can be pasted', () => {
     const empty = new File([], 'empty.txt')
     const real = new File([new Uint8Array([1])], 'real.png')
     const dt = mockDataTransfer({ files: [empty, real] })
     expect(collectClipboardFiles(dt)).toEqual([empty, real])
   })
 
-  test('filters out zero-byte placeholder files with no name', async () => {
+  test('filters out zero-byte placeholder files with no name', () => {
     const placeholder = new File([], '')
     const real = new File([new Uint8Array([1])], 'real.png')
     const dt = mockDataTransfer({ files: [placeholder, real] })
     expect(collectClipboardFiles(dt)).toEqual([real])
   })
 
-  test('ignores string items when reading clipboard items', async () => {
+  test('ignores string items when reading clipboard items', () => {
     const dt = mockDataTransfer({ files: [], items: [stringItem('hello'), stringItem('world')] })
     expect(collectClipboardFiles(dt)).toEqual([])
   })
 
-  test('returns [] when neither files nor items have anything', async () => {
+  test('returns [] when neither files nor items have anything', () => {
     expect(collectClipboardFiles(mockDataTransfer({}))).toEqual([])
   })
 })
 
 describe('isNonPlaceholderClipboardFile', () => {
-  test('keeps named and non-empty files but rejects null and unnamed empty placeholders', async () => {
+  test('keeps named and non-empty files but rejects null and unnamed empty placeholders', () => {
     expect(isNonPlaceholderClipboardFile(null)).toBe(false)
     expect(isNonPlaceholderClipboardFile(new File([], ''))).toBe(false)
     expect(isNonPlaceholderClipboardFile(new File([], 'empty.txt'))).toBe(true)

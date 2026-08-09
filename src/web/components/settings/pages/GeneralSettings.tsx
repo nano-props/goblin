@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue'
-import type { VNodeChild } from 'vue'
 import { Laptop, Moon, Sun } from '@lucide/vue'
+import type { LucideIcon } from '@lucide/vue'
 import {
   SettingsGroup,
   SettingsCard,
@@ -23,10 +23,10 @@ export const GeneralSettings = defineComponent(
     const langPref = useStoreSelector(i18nStore, (state) => state.pref)
     const { setPref: setThemePref, setColorTheme } = themeStore.getState()
     const setLangPref = i18nStore.getState().setPref
-    const appearanceOptions: { value: ThemePref; labelKey: string; icon: VNodeChild }[] = [
-      { value: 'auto', labelKey: 'settings.appearance.auto', icon: <Laptop class="size-4" /> },
-      { value: 'light', labelKey: 'settings.appearance.light', icon: <Sun class="size-4" /> },
-      { value: 'dark', labelKey: 'settings.appearance.dark', icon: <Moon class="size-4" /> },
+    const appearanceOptions: { value: ThemePref; labelKey: string; icon: LucideIcon }[] = [
+      { value: 'auto', labelKey: 'settings.appearance.auto', icon: Laptop },
+      { value: 'light', labelKey: 'settings.appearance.light', icon: Sun },
+      { value: 'dark', labelKey: 'settings.appearance.dark', icon: Moon },
     ]
     const themePresetOptions: { value: ColorTheme; labelKey: string }[] = COLOR_THEMES.map((value) => ({
       value,

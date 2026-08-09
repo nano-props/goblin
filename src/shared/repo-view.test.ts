@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 import { RepoViewResultSchema } from '#/shared/repo-view.ts'
 
 describe('repo view response schema', () => {
-  test('accepts the current success and failure contracts', async () => {
+  test('accepts the current success and failure contracts', () => {
     expect(v.parse(RepoViewResultSchema, { ok: true })).toEqual({ ok: true })
     expect(v.parse(RepoViewResultSchema, { ok: false, code: 'NO_CLIENT', message: 'no client' })).toEqual({
       ok: false,

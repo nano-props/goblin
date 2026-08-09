@@ -1,9 +1,13 @@
-import { defineComponent, onScopeDispose, provide } from 'vue'
-import type { PropType } from 'vue'
 import { VUE_QUERY_CLIENT } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
+import { defineComponent, onScopeDispose, provide } from 'vue'
+import type { PropType } from 'vue'
 
-export const VueQueryClientScope = defineComponent({
+interface VueQueryClientScopeProps {
+  client: QueryClient
+}
+
+export const VueQueryClientScope = defineComponent<VueQueryClientScopeProps>({
   name: 'VueQueryClientScope',
   inheritAttrs: false,
   props: {

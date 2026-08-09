@@ -14,7 +14,7 @@ describe('terminal write failure feedback', () => {
     mocks.warning.mockClear()
   })
 
-  test('deduplicates failures from the same realtime outage across sessions', async () => {
+  test('deduplicates failures from the same realtime outage across sessions', () => {
     const reporter = createTerminalWriteFailureReporter()
     const first = new ClientRealtimeRequestError('closed', {
       kind: 'disconnected',
@@ -42,7 +42,7 @@ describe('terminal write failure feedback', () => {
     })
   })
 
-  test('reports a later outage independently and maps failure kinds', async () => {
+  test('reports a later outage independently and maps failure kinds', () => {
     const reporter = createTerminalWriteFailureReporter()
     reporter.report({
       terminalRuntimeSessionId: 'pty_session_first_123456',
@@ -88,7 +88,7 @@ describe('terminal write failure feedback', () => {
     ])
   })
 
-  test('does not report shutdown as an outage', async () => {
+  test('does not report shutdown as an outage', () => {
     const reporter = createTerminalWriteFailureReporter()
     reporter.report({
       terminalRuntimeSessionId: 'pty_session_first_123456',
@@ -105,7 +105,7 @@ describe('terminal write failure feedback', () => {
     expect(mocks.warning).not.toHaveBeenCalled()
   })
 
-  test('does not re-report a delayed failure from an older outage', async () => {
+  test('does not re-report a delayed failure from an older outage', () => {
     const reporter = createTerminalWriteFailureReporter()
     for (const outageId of [2, 1]) {
       reporter.report({

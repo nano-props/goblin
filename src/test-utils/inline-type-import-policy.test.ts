@@ -4,7 +4,7 @@ import { findInlineTypeImportViolations, INLINE_TYPE_IMPORT_SOURCE_GLOBS } from 
 const file = 'src/example.ts'
 
 describe('inline type import policy', () => {
-  test('covers repository TypeScript while excluding dependencies and generated output', async () => {
+  test('covers repository TypeScript while excluding dependencies and generated output', () => {
     expect(INLINE_TYPE_IMPORT_SOURCE_GLOBS).toEqual([
       '**/*.{ts,tsx}',
       '!node_modules/**',
@@ -23,7 +23,7 @@ describe('inline type import policy', () => {
     },
   )
 
-  test('accepts top-level type imports', async () => {
+  test('accepts top-level type imports', () => {
     expect(
       findInlineTypeImportViolations(
         "import type { Example } from 'example'\nimport type * as ExampleModule from 'example'\ntype Copy = Example\ntype ModuleCopy = typeof ExampleModule",
@@ -32,7 +32,7 @@ describe('inline type import policy', () => {
     ).toEqual([])
   })
 
-  test('accepts runtime dynamic imports', async () => {
+  test('accepts runtime dynamic imports', () => {
     expect(findInlineTypeImportViolations("const module = await import('example')", file)).toEqual([])
   })
 })

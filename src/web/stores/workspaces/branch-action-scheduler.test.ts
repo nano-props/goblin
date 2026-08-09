@@ -20,7 +20,7 @@ function decision(input: {
 }
 
 describe('isNetworkBranchActionKind', () => {
-  test('identifies pull and push as network branch actions', async () => {
+  test('identifies pull and push as network branch actions', () => {
     expect(ACTIONS.filter(isNetworkBranchActionKind)).toEqual(['pull', 'push'])
   })
 })

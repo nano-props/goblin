@@ -36,7 +36,7 @@ describe('client app realtime', () => {
     dispose()
   })
 
-  test('surfaces server configuration failures when opening realtime', async () => {
+  test('surfaces server configuration failures when opening realtime', () => {
     const failure = new Error('invalid server configuration')
     const client = createClientAppRealtime({
       getServerConfig: () => {

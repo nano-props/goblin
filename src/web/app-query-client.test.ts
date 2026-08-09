@@ -10,7 +10,7 @@ describe('app query focus events', () => {
     vi.restoreAllMocks()
   })
 
-  test('coalesces overlapping browser activation events into focus state transitions', async () => {
+  test('coalesces overlapping browser activation events into focus state transitions', () => {
     let focused = true
     let visibility: DocumentVisibilityState = 'visible'
     vi.spyOn(document, 'hasFocus').mockImplementation(() => focused)

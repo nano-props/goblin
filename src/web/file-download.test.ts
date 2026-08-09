@@ -12,7 +12,7 @@ import { downloadWorkspaceFile } from '#/web/file-download.ts'
 afterEach(() => vi.restoreAllMocks())
 
 describe('workspace file download URL', () => {
-  test('opens a browser download URL in a new tab with scalar target parameters', async () => {
+  test('opens a browser download URL in a new tab with scalar target parameters', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null)
     const workspaceId = workspaceIdForTest('goblin+file:///repo')
 

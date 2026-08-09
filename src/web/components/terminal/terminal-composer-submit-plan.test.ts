@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { planTerminalComposerSubmit } from '#/web/components/terminal/terminal-composer-submit-plan.ts'
 
 describe('planTerminalComposerSubmit', () => {
-  test('preserves paste submission for non-Devin and ambiguous process names', async () => {
+  test('preserves paste submission for non-Devin and ambiguous process names', () => {
     for (const processName of ['zsh', 'node', 'devin-cli', '']) {
       expect(planTerminalComposerSubmit({ text: 'first\r\nsecond', processName })).toEqual({
         strategy: 'paste-then-enter',
@@ -11,7 +11,7 @@ describe('planTerminalComposerSubmit', () => {
     }
   })
 
-  test('normalizes Devin typed multiline text while preserving printable Unicode', async () => {
+  test('normalizes Devin typed multiline text while preserving printable Unicode', () => {
     expect(
       planTerminalComposerSubmit({
         text: 'first\r\nsecond\rthird \"quoted\" 你好 /tmp/file name.txt',

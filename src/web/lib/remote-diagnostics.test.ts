@@ -9,13 +9,13 @@ import {
 } from '#/web/lib/remote-diagnostics.ts'
 
 describe('remote diagnostics helpers', () => {
-  test('formats translated and untranslated reasons safely', async () => {
+  test('formats translated and untranslated reasons safely', () => {
     const t = (key: string) => (key === 'error.ssh-config-changed' ? 'SSH config changed' : key)
     expect(formatTranslatableReason(t, 'error.ssh-config-changed')).toBe('SSH config changed')
     expect(formatTranslatableReason(t, 'Permission denied')).toBe('Permission denied')
   })
 
-  test('maps remote unavailable reasons to more specific body copy', async () => {
+  test('maps remote unavailable reasons to more specific body copy', () => {
     expect(unavailableBodyKey(false, 'error.failed-read-repo')).toBe('workspace-unavailable.body')
     expect(unavailableBodyKey(true, 'error.ssh-config-changed')).toBe('workspace-unavailable.remote-config-changed')
     expect(unavailableBodyKey(true, 'workspace-picker.open-remote-home-unavailable')).toBe(
@@ -26,7 +26,7 @@ describe('remote diagnostics helpers', () => {
     expect(unavailableBodyKey(true, 'unreachable')).toBe('workspace-unavailable.remote-connect-failed')
   })
 
-  test('offers SSH settings only for SSH configuration and auth failures', async () => {
+  test('offers SSH settings only for SSH configuration and auth failures', () => {
     expect(shouldOfferSshSettings('error.ssh-config-changed')).toBe(true)
     expect(shouldOfferSshSettings('auth-failed')).toBe(true)
     expect(shouldOfferSshSettings('host-key')).toBe(true)
@@ -34,7 +34,7 @@ describe('remote diagnostics helpers', () => {
     expect(shouldOfferSshSettings(null)).toBe(false)
   })
 
-  test('derives the failed diagnostics category and ssh command', async () => {
+  test('derives the failed diagnostics category and ssh command', () => {
     expect(
       failedDiagnosticsCategory({
         ok: false,
@@ -58,13 +58,13 @@ describe('remote diagnostics helpers', () => {
     expect(remoteSshCommand({ alias: 'prod' })).toBe('ssh prod')
   })
 
-  test('translates remote diagnostic categories through the diagnostics dictionary keys', async () => {
+  test('translates remote diagnostic categories through the diagnostics dictionary keys', () => {
     const t = (key: string) =>
       key === 'workspace-picker.open-remote-diagnostics-category-auth-failed' ? 'Authentication failed' : key
     expect(formatTranslatableReason(t, 'auth-failed')).toBe('Authentication failed')
   })
 
-  test('falls back to the original remote diagnostic reason when the translation key is missing', async () => {
+  test('falls back to the original remote diagnostic reason when the translation key is missing', () => {
     const t = (key: string) => key
     expect(formatTranslatableReason(t, 'auth-failed')).toBe('auth-failed')
   })

@@ -250,7 +250,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     expect(tab.getAttribute('aria-setsize')).toBeNull()
   })
 
-  test('does not scroll when compact mode renders without a scroll viewport', async () => {
+  test('does not scroll when compact mode renders without a scroll viewport', () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"
@@ -330,7 +330,7 @@ describe('WorkspacePaneTabStrip compact', () => {
     expect(document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).toBeNull()
   })
 
-  test('keeps the compact tab visually unselected and free of close chrome when its panel is active', async () => {
+  test('keeps the compact tab visually unselected and free of close chrome when its panel is active', () => {
     render(
       <TestWorkspacePaneTabStrip
         terminalFilesystemTargetKey="/repo\0/repo/worktree"

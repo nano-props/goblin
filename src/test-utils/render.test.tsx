@@ -62,7 +62,7 @@ describe('waitForNextMacrotask', () => {
 })
 
 describe('useFakeTimers', () => {
-  test('fakes the standard timer surface', async () => {
+  test('fakes the standard timer surface', () => {
     useFakeTimers()
     expect(vi.isFakeTimers()).toBe(true)
   })

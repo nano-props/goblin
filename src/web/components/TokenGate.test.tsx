@@ -30,7 +30,7 @@ beforeEach(() => {
 })
 
 describe('TokenGate', () => {
-  test('passes through authenticated children', async () => {
+  test('passes through authenticated children', () => {
     authMock.status.state = 'authenticated'
 
     renderInJsdom(
