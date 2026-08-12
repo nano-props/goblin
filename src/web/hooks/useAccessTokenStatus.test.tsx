@@ -6,17 +6,17 @@ import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { useAccessTokenStatus } from '#/web/hooks/useAccessTokenStatus.ts'
-import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
+import { fetchServerJson, postServerCommandJson } from '#/web/lib/server-fetch.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 vi.mock('#/web/lib/server-fetch.ts', () => ({
   fetchServerJson: vi.fn(),
-  postServerJson: vi.fn(),
+  postServerCommandJson: vi.fn(),
 }))
 
 beforeEach(() => {
   vi.mocked(fetchServerJson).mockReset()
-  vi.mocked(postServerJson).mockReset()
+  vi.mocked(postServerCommandJson).mockReset()
   window.history.replaceState({}, '', '/')
 })
 
@@ -83,12 +83,12 @@ describe('useAccessTokenStatus', () => {
 
   test('strips a URL token before the login request settles', async () => {
     const login = Promise.withResolvers<{ ok: true }>()
-    vi.mocked(postServerJson).mockReturnValue(login.promise)
+    vi.mocked(postServerCommandJson).mockReturnValue(login.promise)
     window.history.replaceState({}, '', '/?accessToken=url-token&x=1')
 
     renderInJsdom(<Harness />)
 
-    expect(postServerJson).toHaveBeenCalledWith('/api/login', { token: 'url-token' }, expect.any(Function), {
+    expect(postServerCommandJson).toHaveBeenCalledWith('/api/login', { token: 'url-token' }, expect.any(Function), {
       signal: expect.any(AbortSignal),
     })
     expect(window.location.search).toBe('?x=1')
@@ -101,7 +101,7 @@ describe('useAccessTokenStatus', () => {
 
   test('clears the auth timeout when URL token login fails before whoami', async () => {
     useFakeTimers()
-    vi.mocked(postServerJson).mockRejectedValueOnce(new Error('bad token'))
+    vi.mocked(postServerCommandJson).mockRejectedValueOnce(new Error('bad token'))
     window.history.replaceState({}, '', '/?accessToken=bad-token')
 
     renderInJsdom(<Harness />)

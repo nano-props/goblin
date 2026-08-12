@@ -8,6 +8,7 @@ import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { filetreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
 import { trashWorkspaceFile } from '#/web/workspace-filesystem-client.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 interface Props {
   readonly currentWorkspaceId: WorkspaceId | null
@@ -54,13 +55,22 @@ export const FiletreeActionDialogHost = defineComponent<Props>({
         onConfirm={async () => {
           const payload = trashFileConfirm.value
           if (!payload) return
-          const result = await trashWorkspaceFile(payload.target, payload.path)
-          if (result.ok) {
-            closeTrashFileConfirm()
-            return
+          try {
+            const result = await trashWorkspaceFile(payload.target, payload.path)
+            if (result.ok) {
+              closeTrashFileConfirm()
+              return
+            }
+            const errorMessageKey = result.message || 'error.failed-trash-file'
+            toast.error(t(errorMessageKey))
+          } catch (error) {
+            if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) {
+              closeTrashFileConfirm()
+              toast.warning(t('error.trash-file-outcome-uncertain'))
+              return
+            }
+            toast.error(t('error.failed-trash-file'))
           }
-          const errorMessageKey = result.message || 'error.failed-trash-file'
-          toast.error(t(errorMessageKey))
         }}
       />
     )

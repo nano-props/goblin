@@ -37,14 +37,25 @@ export interface TerminalController {
 
 export type TerminalExecutionTarget = WorkspacePaneFilesystemExecutionTarget
 
+export interface WorkspaceRootTerminalPresentation {
+  kind: 'workspace-root'
+}
+
+export interface GitWorktreeTerminalPresentation {
+  kind: 'git-worktree'
+  head: GitHead
+}
+
+export type TerminalPresentation = WorkspaceRootTerminalPresentation | GitWorktreeTerminalPresentation
+
 export type TerminalSessionBase =
   | {
       target: Extract<TerminalExecutionTarget, { kind: 'workspace-root' }>
-      presentation: Extract<TerminalPresentation, { kind: 'workspace-root' }>
+      presentation: WorkspaceRootTerminalPresentation
     }
   | {
       target: Extract<TerminalExecutionTarget, { kind: 'git-worktree' }>
-      presentation: Extract<TerminalPresentation, { kind: 'git-worktree' }>
+      presentation: GitWorktreeTerminalPresentation
     }
 
 /** Constructs a transport-safe session base and enforces target/presentation agreement. */
@@ -227,28 +238,29 @@ export type TerminalRestartResult =
 
 export type TerminalCreateAction = 'created' | 'restored' | 'reused'
 
-export type TerminalPresentation = { kind: 'workspace-root' } | { kind: 'git-worktree'; head: GitHead }
-
-export function terminalGitWorktreePresentation(
-  branchName: string | null,
-): Extract<TerminalPresentation, { kind: 'git-worktree' }> {
+export function terminalGitWorktreePresentation(branchName: string | null): GitWorktreeTerminalPresentation {
   return {
     kind: 'git-worktree',
     head: gitHead(branchName),
   }
 }
 
-export type TerminalCreateResult =
-  | ({
-      ok: true
-      action: TerminalCreateAction
-      /** Canonical presentation resolved at the admission commit boundary. */
-      presentation: TerminalPresentation
-      terminalSessionId: string
-      /** Catalog mutation committed by this admission operation. */
-      terminalProjectionEffect: TerminalProjectionEffect
-    } & TerminalRuntimeMetadata)
-  | { ok: false; message: string }
+export interface TerminalCreateSuccess extends TerminalRuntimeMetadata {
+  ok: true
+  action: TerminalCreateAction
+  /** Canonical presentation resolved at the admission commit boundary. */
+  presentation: TerminalPresentation
+  terminalSessionId: string
+  /** Catalog mutation committed by this admission operation. */
+  terminalProjectionEffect: TerminalProjectionEffect
+}
+
+export interface TerminalCreateFailure {
+  ok: false
+  message: string
+}
+
+export type TerminalCreateResult = TerminalCreateSuccess | TerminalCreateFailure
 
 export interface TerminalWriteInput {
   terminalRuntimeSessionId: string

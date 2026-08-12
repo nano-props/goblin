@@ -1,6 +1,8 @@
 import { describe, expect, test, vi } from 'vitest'
 import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+
+const EXPECTED_TERMINAL_SESSION_CAPACITY = 1024
 import {
   BRANCH_NAME,
   SCOPE,
@@ -16,6 +18,73 @@ import {
 } from '#/server/test-utils/terminal-session-manager.ts'
 
 describe('TerminalSessionManager admission', () => {
+  test('reserves one global capacity slot per new session and releases an aborted reservation', () => {
+    const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
+    const admissions = Array.from({ length: EXPECTED_TERMINAL_SESSION_CAPACITY }, (_, index) =>
+      manager.prepareSession({
+        userId: `user-${index % 2}`,
+        target: WORKTREE_TARGET,
+        terminalSessionId: `terminal-${index}`,
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+        cwd: '/tmp',
+      }),
+    )
+    expect(admissions.every((admission) => admission.ok)).toBe(true)
+
+    expect(
+      manager.prepareSession({
+        userId: 'another-user',
+        target: WORKTREE_TARGET,
+        terminalSessionId: 'terminal-over-limit',
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+        cwd: '/tmp',
+      }),
+    ).toEqual({ ok: false, message: 'error.terminal-session-limit-reached' })
+
+    const first = admissions[0]
+    if (!first?.ok) throw new Error('expected a prepared terminal admission')
+    first.admission.abort()
+
+    expect(
+      manager.prepareSession({
+        userId: 'another-user',
+        target: WORKTREE_TARGET,
+        terminalSessionId: 'terminal-after-abort',
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+        cwd: '/tmp',
+      }),
+    ).toMatchObject({ ok: true })
+  })
+
+  test('revokes prepared admissions when shutdown begins', () => {
+    const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
+    const prepared = manager.prepareSession({
+      userId: USER_ID,
+      target: WORKTREE_TARGET,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+      cwd: '/tmp',
+    })
+    if (!prepared.ok) throw new Error(prepared.message)
+
+    manager.forceShutdown()
+
+    expect(() =>
+      prepared.admission.commit({
+        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      }),
+    ).toThrow('error.unavailable')
+    expect(
+      manager.prepareSession({
+        userId: USER_ID,
+        target: WORKTREE_TARGET,
+        terminalSessionId: 'terminal-after-shutdown',
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+        cwd: '/tmp',
+      }),
+    ).toEqual({ ok: false, message: 'error.unavailable' })
+  })
+
   test('rejects target-incompatible presentation before committing prepared or existing sessions', () => {
     const manager = createAlwaysOnlineManager(createDeferredPtySupervisor())
     const input = {

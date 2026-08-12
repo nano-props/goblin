@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { CodedError } from '#/shared/coded-error.ts'
 import { defaultUserSettings, defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -43,20 +44,6 @@ describe('main settings server client', () => {
     )
   })
 
-  test('loads settings prefs through the embedded server runtime', async () => {
-    const prefs = defaultUserSettings({ lang: 'ja', theme: 'dark', colorTheme: 'github' })
-    mocks.requestEmbeddedServerJson.mockResolvedValueOnce(prefs)
-
-    const mod = await import('#/main/settings-server-client.ts')
-    await expect(mod.getUserSettings()).resolves.toBe(prefs)
-    expect(mocks.requestEmbeddedServerJson).toHaveBeenCalledWith(
-      { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
-      '/api/settings/prefs',
-      expect.any(Function),
-      undefined,
-    )
-  })
-
   test('persists settings prefs patches through the embedded server runtime', async () => {
     const prefs = defaultUserSettings({ theme: 'dark', colorTheme: 'github', globalShortcut: 'Alt+K' })
     mocks.postEmbeddedServerJson.mockResolvedValueOnce({ ok: true, prefs })
@@ -84,17 +71,6 @@ describe('main settings server client', () => {
     )
   })
 
-  test.each([
-    ['missing required field', { ...defaultUserSettings(), lang: undefined }],
-    ['wrong field type', { ...defaultUserSettings(), shortcutsDisabled: 'false' }],
-    ['unknown field', { ...defaultUserSettings(), legacyTheme: 'dark' }],
-  ])('rejects a settings prefs response with %s', async (_name, payload) => {
-    mocks.requestEmbeddedServerJson.mockImplementationOnce((_runtime, _path, decode) => decode(payload))
-
-    const mod = await import('#/main/settings-server-client.ts')
-    await expect(mod.getUserSettings()).rejects.toThrow('Embedded server rejected settings prefs request')
-  })
-
   test('rejects a malformed settings update response', async () => {
     mocks.postEmbeddedServerJson.mockImplementationOnce(async (_runtime, _path, _body, decode) =>
       decode({ ok: true, prefs: defaultUserSettings(), legacy: true }),
@@ -113,6 +89,19 @@ describe('main settings server client', () => {
     await expect(mod.setGlobalShortcutState(true)).rejects.toThrow(
       'Embedded server rejected global shortcut state update',
     )
+  })
+
+  test('preserves an uncertain settings update across the main-process client boundary', async () => {
+    mocks.postEmbeddedServerJson.mockRejectedValueOnce(
+      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'settings update outcome uncertain' }),
+    )
+
+    const mod = await import('#/main/settings-server-client.ts')
+
+    await expect(mod.updateUserSettings({ theme: 'dark' })).rejects.toMatchObject({
+      name: 'CodedError',
+      code: 'OUTCOME_UNCERTAIN',
+    })
   })
 
   test('rejects requests when the embedded server runtime is unavailable', async () => {

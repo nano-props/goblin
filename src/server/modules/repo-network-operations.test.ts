@@ -3,6 +3,7 @@ import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { CommandOutcome } from '#/system/command-execution.ts'
 import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import { REPO_ID, expectNoRepoMetadataInvalidations, mocks } from '#/server/test-utils/repo-module.ts'
+import { repoRuntimeCapabilityForTest } from '#/server/test-utils/repo-module.ts'
 
 describe('fetchRepo coordination', () => {
   test('serializes different SSH aliases for the same resolved repository', async () => {
@@ -28,9 +29,9 @@ describe('fetchRepo coordination', () => {
     mocks.fetchRemoteRepo.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched second alias' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const first = fetchRepo(firstRepoId, 'background')
+    const first = fetchRepo(firstRepoId, repoRuntimeCapabilityForTest(firstRepoId, 'test-runtime'), 'background')
     await vi.waitFor(() => expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1))
-    const second = fetchRepo(secondRepoId, 'user')
+    const second = fetchRepo(secondRepoId, repoRuntimeCapabilityForTest(secondRepoId, 'test-runtime'), 'user')
     await Promise.resolve()
     expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
 
@@ -73,8 +74,8 @@ describe('fetchRepo coordination', () => {
     )
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const first = fetchRepo(firstRepoId, 'background')
-    const second = fetchRepo(secondRepoId, 'background')
+    const first = fetchRepo(firstRepoId, repoRuntimeCapabilityForTest(firstRepoId, 'test-runtime'), 'background')
+    const second = fetchRepo(secondRepoId, repoRuntimeCapabilityForTest(secondRepoId, 'test-runtime'), 'background')
     await vi.waitFor(() => expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2))
 
     firstFetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched proxy a' }))
@@ -117,12 +118,12 @@ describe('fetchRepo coordination', () => {
     })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const active = fetchRepo(repoId, 'background')
+    const active = fetchRepo(repoId, repoRuntimeCapabilityForTest(repoId, 'test-runtime'), 'background')
     await vi.waitFor(() => {
       expect(fetchPaths).toEqual(['/srv/repo-a'])
     })
 
-    const other = fetchRepo(otherRepoId, 'background')
+    const other = fetchRepo(otherRepoId, repoRuntimeCapabilityForTest(otherRepoId, 'test-runtime'), 'background')
     await vi.waitFor(() => {
       expect(fetchPaths).toEqual(['/srv/repo-a', '/srv/repo-b'])
     })
@@ -142,12 +143,12 @@ describe('fetchRepo coordination', () => {
     const { deleteRepoBranch, fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
-    const write = deleteRepoBranch(REPO_ID, 'feature/a')
+    const write = deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
     await vi.waitFor(() => {
       expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
     })
 
-    const background = fetchRepo(REPO_ID, 'background')
+    const background = fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'background')
     await vi.waitFor(async () => {
       expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual(
         expect.arrayContaining([expect.objectContaining({ kind: 'fetch', phase: 'queued' })]),
@@ -155,7 +156,7 @@ describe('fetchRepo coordination', () => {
     })
 
     const caller = new AbortController()
-    const user = fetchRepo(REPO_ID, 'user', caller.signal)
+    const user = fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'user', caller.signal)
     await vi.waitFor(async () => {
       expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual(
         expect.arrayContaining([expect.objectContaining({ kind: 'fetch', phase: 'queued', source: 'user' })]),
@@ -193,7 +194,7 @@ describe('fetchRepo coordination', () => {
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: false, message: 'fatal: offline' }, 'not-started'))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo(REPO_ID, 'background')
+    const result = await fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'background')
 
     expect(result).toEqual({ ok: false, message: 'fatal: offline' })
     expectNoRepoMetadataInvalidations()

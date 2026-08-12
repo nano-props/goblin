@@ -30,7 +30,6 @@ const workspacePaneTabsHost = {
     repaired: false,
   })),
   listWorkspaceTabs: vi.fn(),
-  replaceTabs: vi.fn(),
   updateTabs: vi.fn(),
 } satisfies ServerWorkspacePaneTabsHost
 
@@ -160,7 +159,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
     )
     expect(res.status).toBe(401)
     const json = (await res.json()) as { ok: false; code: string }
-    expect(json.code).toBe('FORBIDDEN')
+    expect(json.code).toBe('UNAUTHORIZED')
   })
 
   test('accepts request with access token and fans out the intent (200)', async () => {

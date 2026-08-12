@@ -1,17 +1,11 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
-  createTerminalWithAdmissionForTest,
-  setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge,
-} from '#/web/test-utils/terminal-session-command-bridge.ts'
-import {
-  canCloseWorkspacePaneRuntimeTabWithContext,
-  canConfirmWorkspacePaneRuntimeTabCloseWithContext,
-  readWorkspacePaneRuntimeTabCloseContext,
-} from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
-import { terminalRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
+  setTerminalSessionCommandBridge,
+  type TerminalSessionCommandBridge,
+} from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { readWorkspacePaneRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const terminalBase: TerminalSessionBase = {
@@ -23,44 +17,29 @@ const terminalBase: TerminalSessionBase = {
   },
   presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
 }
-const closeTarget = terminalBase
-
 afterEach(() => {
   setTerminalSessionCommandBridge(null)
 })
 
 describe('workspace pane runtime tab close context', () => {
   test('reads terminal close capability from the command bridge', async () => {
-    const closeTerminalByDescriptor = vi.fn(async () => true)
+    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
     setTerminalSessionCommandBridge(terminalCommandBridge({ closeTerminalByDescriptor }))
 
     const context = readWorkspacePaneRuntimeTabCloseContext()
 
-    expect(canCloseWorkspacePaneRuntimeTabWithContext({ type: 'terminal', target: closeTarget }, context)).toBe(true)
-    expect(
-      canConfirmWorkspacePaneRuntimeTabCloseWithContext(
-        { type: 'terminal', sessionId: 'term-111111111111111111111', target: closeTarget },
-        context,
-      ),
-    ).toBe(true)
-    const terminalContext = terminalRuntimeTabCloseContext(context)
-    await expect(
-      terminalContext?.closeTerminalByDescriptor?.('term-111111111111111111111', terminalBase),
-    ).resolves.toBe(true)
+    if (!context) throw new Error('terminal close context missing')
+    await expect(context.closeTerminalByDescriptor('term-111111111111111111111', terminalBase)).resolves.toEqual({
+      kind: 'committed',
+      projection: 'applied',
+    })
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', terminalBase)
   })
 
   test('rejects confirmed close when terminal capability is unavailable', () => {
     const context = readWorkspacePaneRuntimeTabCloseContext()
 
-    expect(terminalRuntimeTabCloseContext(context)).toBeUndefined()
-    expect(canCloseWorkspacePaneRuntimeTabWithContext({ type: 'terminal', target: closeTarget }, context)).toBe(false)
-    expect(
-      canConfirmWorkspacePaneRuntimeTabCloseWithContext(
-        { type: 'terminal', sessionId: 'term-111111111111111111111', target: closeTarget },
-        context,
-      ),
-    ).toBe(false)
+    expect(context).toBeNull()
   })
 })
 
@@ -81,7 +60,13 @@ function terminalCommandBridge({
       createPending: false,
     }),
     createTerminal,
-    createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
+    createTerminalWithAdmission: vi.fn(async (base) => ({
+      terminalSessionId: 'term-111111111111111111111',
+      presentation: base.presentation,
+      requestRole: 'leader' as const,
+      resourceDisposition: 'created' as const,
+      runtimeProjectionApplied: true,
+    })),
     selectTerminal: vi.fn(),
     focusTerminal: vi.fn(),
     closeTerminalByDescriptor,

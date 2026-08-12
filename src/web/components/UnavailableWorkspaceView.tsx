@@ -13,6 +13,7 @@ import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-c
 import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
 import { remoteWorkspaceTarget, workspaceOperationalFailureReason } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { reportCloseWorkspaceFailure } from '#/web/lib/open-workspace-result-feedback.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 interface Props {
@@ -31,10 +32,7 @@ export const UnavailableWorkspaceView = defineComponent<Props>({
 
     async function handleClose() {
       const result = await navigation.closeWorkspace(props.workspace.id)
-      if (!result.ok) {
-        const messageKey = result.message
-        toast.error(t(messageKey))
-      }
+      reportCloseWorkspaceFailure(result, t)
     }
 
     async function handleRetry() {
@@ -42,7 +40,8 @@ export const UnavailableWorkspaceView = defineComponent<Props>({
       if (workspace.admission.kind === 'remote' && workspace.admission.lifecycle?.kind === 'failed') {
         const outcome = await workspacesStore.getState().retryRemoteWorkspaceConnection(workspace.id)
         if (outcome && !outcome.ok) {
-          toast.error(formatTranslatableReason(t, outcome.reason ?? 'unknown'))
+          if (outcome.kind === 'uncertain') toast.warning(t('error.operation-outcome-uncertain'))
+          else toast.error(formatTranslatableReason(t, outcome.reason))
         }
         return
       }

@@ -73,7 +73,9 @@ Live commands:
 
 1. Each client serializes open and close commands per workspace.
 2. A local workspace becomes visible only after its runtime and durable workspace
-   membership are both accepted.
+   membership are both accepted. While admission is in flight, it retains the
+   runtime epoch without publishing or replacing a membership generation;
+   success commits one fresh generation, and invalidation fails the admission.
 3. A remote workspace commits membership before lifecycle probing, so an unavailable
    remote remains a shared, retryable workspace entry.
 4. Lifecycle completion never writes membership; only explicit open and close
@@ -109,8 +111,18 @@ Realtime recovery:
   overlay/index/clock only. It never deletes durable pane layout; a new epoch
   immediately projects the durable pane layout without restore-time copying.
 - Do not let the client mint or validate `workspaceRuntimeId` locally.
-- Server routes that mutate repo-scoped runtime resources should validate the
-  server-owned `workspaceRuntimeId` when the operation targets runtime state.
+- A user command accepted through a realtime client carries the exact
+  membership-generation capability that admitted it. Server-owned lifecycle
+  and reconciliation effects carry an exact runtime-epoch capability instead.
+- If an operation crosses an asynchronous boundary, the owner of an
+  authoritative write must validate the capability when it enters its
+  serialized commit boundary. An irreversible asynchronous publication must
+  synchronously acquire runtime-epoch commit ownership before it begins and
+  retain that ownership until durable state and its in-process projection have
+  both been published.
+- A stale capability stops the operation directly. It does not negotiate a new
+  generation, replay the command, or compensate an authoritative write that
+  was already accepted.
 - Client cache keys for runtime-scoped resources should include
   `workspaceRuntimeId` where stale runtime separation matters.
 - Do not use `beforeunload`, periodic scans, or a second client-side presence

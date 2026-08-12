@@ -1,6 +1,7 @@
 import { resolveApiBaseUrl } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
 import { requireClientServerConfig } from '#/web/lib/server-config.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 import * as v from 'valibot'
 
 const ServerErrorResponseSchema = v.strictObject({
@@ -63,6 +64,15 @@ export async function fetchServerJson<T>(
   decode: (value: unknown) => T,
   init?: ServerFetchOptions,
 ): Promise<T> {
+  return await requestServerJson(path, decode, init, 'query')
+}
+
+async function requestServerJson<T>(
+  path: string | URL,
+  decode: (value: unknown) => T,
+  init: ServerFetchOptions | undefined,
+  requestKind: 'query' | 'command',
+): Promise<T> {
   const server = requireClientServerConfig()
   const url = typeof path === 'string' ? new URL(path, resolveApiBaseUrl(server.url)).toString() : path.toString()
   const { headers: extraHeaders, timeoutMs = DEFAULT_SERVER_REQUEST_TIMEOUT_MS, signal, ...rest } = init ?? {}
@@ -82,9 +92,24 @@ export async function fetchServerJson<T>(
   // `credentials: 'include'` makes the browser attach the cookie on
   // cross-origin LAN requests; for same-origin (the Vite dev proxy
   // case) it's a no-op.
+  if (signal?.aborted) throw signal.reason
   const requestSignal = composeRequestSignal(signal, timeoutMs)
   try {
-    const response = await fetch(url, { ...rest, signal: requestSignal.signal, headers, credentials: 'include' })
+    let response: Response
+    try {
+      response = await fetch(url, { ...rest, signal: requestSignal.signal, headers, credentials: 'include' })
+    } catch (error) {
+      if (signal?.aborted && !requestSignal.timedOut() && requestKind === 'query') throw error
+      const message = requestSignal.timedOut() ? SERVER_REQUEST_TIMEOUT_ERROR : 'Server request failed'
+      if (requestKind === 'command') {
+        throw new CodedError({
+          code: 'OUTCOME_UNCERTAIN',
+          message: requestSignal.timedOut() ? message : 'Server request outcome is uncertain',
+          cause: error,
+        })
+      }
+      throw new Error(message, { cause: error })
+    }
     if (!response.ok) {
       let body: v.InferOutput<typeof ServerErrorResponseSchema> | undefined
       try {
@@ -93,29 +118,62 @@ export async function fetchServerJson<T>(
       } catch {}
       throw new ServerRequestError({ status: response.status, code: body?.code, message: body?.message })
     }
-    return decode(await response.json())
-  } catch (err) {
-    if (requestSignal.timedOut()) throw new Error(SERVER_REQUEST_TIMEOUT_ERROR)
-    throw err
+    try {
+      return decode(await response.json())
+    } catch (error) {
+      if (signal?.aborted && !requestSignal.timedOut() && requestKind === 'query') throw error
+      const message = requestSignal.timedOut()
+        ? SERVER_REQUEST_TIMEOUT_ERROR
+        : 'Server returned an invalid successful response'
+      if (requestKind === 'command') throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message, cause: error })
+      throw new Error(message, { cause: error })
+    }
   } finally {
     requestSignal.dispose()
   }
+}
+
+export async function postServerCommandJson<TInput extends object, TOutput>(
+  path: string,
+  input: TInput,
+  decode: (value: unknown) => TOutput,
+  options?: { signal?: AbortSignal; keepalive?: boolean; timeoutMs?: number },
+): Promise<TOutput> {
+  return await requestServerJson(
+    path,
+    decode,
+    {
+      method: 'POST',
+      signal: options?.signal,
+      keepalive: options?.keepalive,
+      timeoutMs: options?.timeoutMs,
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    },
+    'command',
+  )
 }
 
 export async function postServerJson<TInput extends object, TOutput>(
   path: string,
   input: TInput,
   decode: (value: unknown) => TOutput,
-  options?: { signal?: AbortSignal; keepalive?: boolean; timeoutMs?: number },
+  options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<TOutput> {
-  return await fetchServerJson(path, decode, {
-    method: 'POST',
-    signal: options?.signal,
-    keepalive: options?.keepalive,
-    timeoutMs: options?.timeoutMs,
-    headers: {
-      'content-type': 'application/json',
+  return await requestServerJson(
+    path,
+    decode,
+    {
+      method: 'POST',
+      signal: options?.signal,
+      timeoutMs: options?.timeoutMs,
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(input),
     },
-    body: JSON.stringify(input),
-  })
+    'query',
+  )
 }

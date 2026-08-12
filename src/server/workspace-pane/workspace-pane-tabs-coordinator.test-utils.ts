@@ -5,6 +5,7 @@ import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-p
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
 import {
   workspacePaneTabsBranchIdentity,
   workspacePaneTabsTargetWorktreePath,
@@ -14,6 +15,16 @@ import {
 // Vitest has no reusable fixture for coordinator repositories and runtime target projections.
 export const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 export const LOCAL_WORKSPACE_ENTRY = localWorkspaceSessionEntry(WORKSPACE_ID)
+export const TEST_EPOCH_CAPABILITY = testWorkspaceRuntimeEpochCapability({
+  userId: 'user-a',
+  workspaceId: WORKSPACE_ID,
+  workspaceRuntimeId: 'runtime-a',
+})
+export const TEST_MEMBERSHIP_CAPABILITY = {
+  ...TEST_EPOCH_CAPABILITY,
+  clientId: 'client-a',
+  generation: 1,
+}
 
 export function aggregateFor(
   repository: WorkspacePaneLayoutRepository,

@@ -1,12 +1,12 @@
 import { AlertCircle, RefreshCw, X } from '@lucide/vue'
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { toast } from 'vue-sonner'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import { reportCloseWorkspaceFailure } from '#/web/lib/open-workspace-result-feedback.ts'
 
 interface WorkspaceProjectionFailureViewProps {
   workspace: WorkspaceState
@@ -28,10 +28,7 @@ export const WorkspaceProjectionFailureView = defineComponent<WorkspaceProjectio
 
     async function handleClose() {
       const result = await navigation.closeWorkspace(props.workspace.id)
-      if (!result.ok) {
-        const messageKey = result.message
-        toast.error(t(messageKey))
-      }
+      reportCloseWorkspaceFailure(result, t)
     }
 
     return () => (

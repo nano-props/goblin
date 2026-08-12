@@ -16,7 +16,7 @@ import type {
   TerminalSessionsSnapshot,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsWriteResult } from '#/shared/workspace-pane-tabs.ts'
 import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
 import {
   WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS,
@@ -26,6 +26,7 @@ import {
 import { vi } from 'vitest'
 import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 export type IpcTestHandler = (input: any) => unknown
 interface TerminalClientTestOutputs {
@@ -35,8 +36,7 @@ interface TerminalClientTestOutputs {
   'terminal.resize': TerminalResizeResult
   'terminal.takeover': TerminalTakeoverResult
   'terminal.recoverSessions': TerminalSessionsSnapshot
-  'workspacePaneTabs.replace': WorkspacePaneTabsSnapshot
-  'workspacePaneTabs.update': WorkspacePaneTabsSnapshot
+  'workspacePaneTabs.update': WorkspacePaneTabsWriteResult
   'workspacePaneTabs.list': WorkspacePaneTabsSnapshot
   'workspacePaneRuntime.open': WorkspacePaneRuntimeOpenResult
   'workspacePaneRuntime.close': WorkspacePaneRuntimeCloseResult
@@ -54,8 +54,6 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
       return 'terminal.resize'
     case 'takeover':
       return 'terminal.takeover'
-    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace:
-      return 'workspacePaneTabs.replace'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update:
       return 'workspacePaneTabs.update'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list:
@@ -110,7 +108,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         },
         abortIpc: () => Promise.resolve(false),
         notifyAppQuitDrained: () => Promise.resolve(true),
-        onEvent: () => () => {},
+        onAppQuitting: () => () => {},
         onIntent: () => () => {},
         pathForFile: () => '',
         host: {
@@ -137,7 +135,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           sendTestNotification: () => Promise.resolve(true),
           setBadge: () => {},
         },
-        rotateAccessToken: () => Promise.resolve({ accessToken: 'test-access-token' }),
+        getAccessTokenProjection: () =>
+          Promise.resolve({ accessToken: 'test-access-token', activation: 'current' as const }),
+        rotateAccessToken: () =>
+          Promise.resolve({ accessToken: 'test-access-token', activation: 'after-restart' as const }),
       },
       location: {
         href: 'http://127.0.0.1:32100/',
@@ -162,10 +163,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     name: 'terminal.takeover',
     payload: unknown,
   ): TerminalClientTestOutputs['terminal.takeover']
-  function callTerminalHandler(
-    name: 'workspacePaneTabs.replace',
-    payload: unknown,
-  ): TerminalClientTestOutputs['workspacePaneTabs.replace']
   function callTerminalHandler(
     name: 'workspacePaneTabs.update',
     payload: unknown,
@@ -206,7 +203,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return { ok: false, message: `unhandled ${name}` } satisfies TerminalResizeResult
         case 'terminal.takeover':
           throw new Error(`Unhandled terminal handler: ${name}`)
-        case 'workspacePaneTabs.replace':
         case 'workspacePaneTabs.update':
           throw new Error(`Unhandled terminal handler: ${name}`)
         case 'workspacePaneTabs.list':
@@ -276,12 +272,12 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       const url = new URL(typeof input === 'string' ? input : input.toString())
       const body =
         typeof init?.body === 'string' && init.body.length > 0 ? (JSON.parse(init.body) as Record<string, unknown>) : {}
-      const call = (name: string, payload: unknown) => {
+      const call = async (name: string, payload: unknown): Promise<unknown> => {
         const handler = handlers[name]
         if (!handler) {
           throw new Error(`Unhandled server route: ${name}`)
         }
-        return handler(payload)
+        return await handler(payload)
       }
       const openWorkspaceRuntime = async (payload: unknown) => {
         const workspaceId =
@@ -529,9 +525,23 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           )
         })
       }
-      return {
-        ok: true,
-        json: async () => await withAbort(result),
+      try {
+        const resolved = await withAbort(result)
+        return {
+          ok: true,
+          status: 200,
+          json: async () => resolved,
+        }
+      } catch (error) {
+        if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) throw error
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({
+            ok: false,
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        }
       }
     }),
   )

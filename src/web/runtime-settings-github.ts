@@ -11,8 +11,8 @@ export function useGitHubSettingsController() {
   )
   return {
     refreshingGitHubCli: refreshMutation.isPending,
-    async refreshGitHubCli(): Promise<void> {
-      await refreshMutation.mutateAsync(undefined)
+    refreshGitHubCli(): void {
+      refreshMutation.mutate(undefined)
     },
   }
 }

@@ -15,64 +15,59 @@ describe('app lifecycle', () => {
     })
   })
 
-  test('marks the app as quitting from the low-level native intent subscription', async () => {
-    const listeners: Array<(event: { type: string }) => void> = []
-    ;(window.goblinNative.onIntent as ReturnType<typeof vi.fn>).mockImplementation(
-      (cb: (event: { type: string }) => void) => {
-        listeners.push(cb)
-        return () => {}
-      },
-    )
-    const { isAppQuitting, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
+  test('marks the app as quitting and notifies listeners', async () => {
+    const { isAppQuitting, markAppQuitting, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
     const onQuit = vi.fn()
     subscribeAppQuitting(onQuit)
 
-    listeners[0]?.({ type: 'app-quitting' })
+    await markAppQuitting()
 
     expect(isAppQuitting()).toBe(true)
     expect(onQuit).toHaveBeenCalledTimes(1)
   })
 
+  test('receives native app quitting before authenticated UI mounts', async () => {
+    let nativeQuit: (() => void) | undefined
+    window.goblinNative.onAppQuitting = vi.fn((listener) => {
+      nativeQuit = listener
+      return () => {}
+    })
+    const { startNativeAppQuitIngress, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const onQuit = vi.fn()
+    subscribeAppQuitting(onQuit)
+    startNativeAppQuitIngress()
+
+    nativeQuit?.()
+    await vi.waitFor(() => expect(window.goblinNative.notifyAppQuitDrained).toHaveBeenCalledWith({ ok: true }))
+
+    expect(onQuit).toHaveBeenCalledOnce()
+  })
+
   test('notifies native only after async quit listeners finish', async () => {
-    const listeners: Array<(event: { type: string }) => void> = []
-    ;(window.goblinNative.onIntent as ReturnType<typeof vi.fn>).mockImplementation(
-      (cb: (event: { type: string }) => void) => {
-        listeners.push(cb)
-        return () => {}
-      },
-    )
     const listenerStarted = Promise.withResolvers<void>()
     const drained = Promise.withResolvers<void>()
-    const { subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const { markAppQuitting, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
     subscribeAppQuitting(async () => {
       listenerStarted.resolve()
       await drained.promise
     })
 
-    listeners[0]?.({ type: 'app-quitting' })
+    const quitting = markAppQuitting()
     await listenerStarted.promise
     expect(window.goblinNative.notifyAppQuitDrained).not.toHaveBeenCalled()
 
     drained.resolve()
-    await vi.waitFor(() => {
-      expect(window.goblinNative.notifyAppQuitDrained).toHaveBeenCalledWith({ ok: true })
-    })
+    await quitting
+    expect(window.goblinNative.notifyAppQuitDrained).toHaveBeenCalledWith({ ok: true })
   })
 
   test('notifies native with a failed result when a quit listener fails', async () => {
-    const listeners: Array<(event: { type: string }) => void> = []
-    ;(window.goblinNative.onIntent as ReturnType<typeof vi.fn>).mockImplementation(
-      (cb: (event: { type: string }) => void) => {
-        listeners.push(cb)
-        return () => {}
-      },
-    )
     const { markAppQuitting, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
     subscribeAppQuitting(async () => {
       throw new Error('save failed')
     })
 
-    await expect(markAppQuitting()).rejects.toThrow('save failed')
+    await markAppQuitting()
     expect(window.goblinNative.notifyAppQuitDrained).toHaveBeenCalledWith({
       ok: false,
       error: { name: 'Error', message: 'save failed' },
@@ -96,7 +91,7 @@ describe('app lifecycle', () => {
     expect(window.goblinNative.notifyAppQuitDrained).not.toHaveBeenCalled()
 
     slow.resolve()
-    await expect(quitting).rejects.toThrow('save failed')
+    await quitting
     expect(window.goblinNative.notifyAppQuitDrained).toHaveBeenCalledWith({
       ok: false,
       error: { name: 'Error', message: 'save failed' },

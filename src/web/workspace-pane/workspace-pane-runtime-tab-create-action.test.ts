@@ -461,6 +461,22 @@ describe('workspace pane runtime tab create action', () => {
     expect(workspacesStore.getState().workspaces[REPO_ROOT]?.workspaceRuntimeId).toBe('repo-runtime-replacement')
   })
 
+  test('does not navigate or record opener when a newer terminal projection supersedes the create response', async () => {
+    const showCreatedTerminalTab = vi.fn(() => true)
+
+    await expect(
+      commitCreatedTerminalWorkspacePaneRuntimeTab({
+        base: BASE,
+        admission: { ...createAdmission(), runtimeProjectionApplied: false },
+        openerIdentity: 'workspace-pane:status',
+        showCreatedTerminalTab,
+      }),
+    ).resolves.toEqual({ status: 'superseded' })
+
+    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
+    expect(workspacePaneTabOpener(PANE_TARGET, WORKSPACE_RUNTIME_ID, `terminal:${TERMINAL_SESSION_ID}`)).toBeNull()
+  })
+
   test('rejects a server presentation that does not match the execution target', async () => {
     const showCreatedTerminalTab = vi.fn(() => true)
 

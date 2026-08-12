@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { BrowserWindow } from 'electron'
-import { HOST_IPC_EVENT_CHANNEL } from '#/shared/ipc-channels.ts'
+import { CLIENT_EFFECT_INTENT_CHANNEL } from '#/shared/ipc-channels.ts'
 
 const mocks = vi.hoisted(() => ({
   getFocusedWindow: vi.fn<() => BrowserWindow | null>(() => null),
@@ -64,9 +64,13 @@ describe('client surface registry', () => {
     const primary = makeWindow()
 
     registry.registerClientWindowSurface(primary, { windowKey: 'primary', capabilities: { ipcBroadcast: true } })
-    registry.broadcastToSurfaceCapability('ipcBroadcast', HOST_IPC_EVENT_CHANNEL, [{ type: 'settings-write-error' }])
+    registry.broadcastToSurfaceCapability('ipcBroadcast', CLIENT_EFFECT_INTENT_CHANNEL, [
+      { type: 'external-open-enqueued' },
+    ])
 
-    expect(primary.webContents.send).toHaveBeenCalledWith(HOST_IPC_EVENT_CHANNEL, { type: 'settings-write-error' })
+    expect(primary.webContents.send).toHaveBeenCalledWith(CLIENT_EFFECT_INTENT_CHANNEL, {
+      type: 'external-open-enqueued',
+    })
   })
 
   test('filters surfaces by capability', async () => {

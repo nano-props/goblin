@@ -6,6 +6,7 @@ import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { describe, expect, test } from 'vitest'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 import {
   workspaceRootPaneFilesystemTarget,
   gitWorktreePaneFilesystemTarget,
@@ -100,6 +101,47 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
         'ghostty',
       ),
     )
+  })
+
+  test('warns the user to check the external app when opening has an uncertain outcome', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/uncertain-external-app-workspace')
+    seedRepoWithReadModelForTest({
+      id: workspaceId,
+      workspaceRuntimeId: 'workspace-runtime-uncertain-external-app',
+    })
+    const target = workspaceRootPaneFilesystemTarget({
+      workspaceId,
+      workspaceRuntimeId: 'workspace-runtime-uncertain-external-app',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+    })
+    workspaceExternalAppMocks.openWorkspaceTerminal.mockRejectedValueOnce(
+      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost' }),
+    )
+    const { container } = renderInJsdom(
+      <VueQueryClientScope
+        client={seededQueryClientWithWorkspaceSettings([
+          {
+            workspaceId,
+            workspaceExternalAppRecent: { byTarget: { 'workspace-root': 'terminal:ghostty' } },
+          },
+        ])}
+      >
+        <WorkspaceExternalAppLauncherHarness target={target} />
+      </VueQueryClientScope>,
+    )
+
+    const primary = container.querySelector<HTMLButtonElement>(
+      '[data-testid="workspace-external-app-launcher-primary"]',
+    )
+    if (!primary) throw new Error('missing external app primary action')
+    await flushTestUpdates(() => primary.click())
+
+    await waitFor(() => expect(toastMocks.warning).toHaveBeenCalledWith('error.external-app-outcome-uncertain'))
+    expect(toastMocks.error).not.toHaveBeenCalled()
   })
 
   test('opens a detached worktree through its filesystem execution target', async () => {

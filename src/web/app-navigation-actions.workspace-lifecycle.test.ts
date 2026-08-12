@@ -1,7 +1,7 @@
 import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   REPO_ID,
@@ -97,7 +97,12 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
@@ -265,7 +270,12 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
     const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
@@ -303,12 +313,17 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
       workspaceOrder: [REPO_A_ID, REPO_B_ID],
-      closeWorkspace: vi.fn(async () => ({ ok: false as const, message: 'error.failed-read-repo' })),
+      closeWorkspace: vi.fn(async () => ({
+        ok: false as const,
+        kind: 'failed' as const,
+        message: 'error.failed-read-repo',
+      })),
       routeNavigation: navigation,
     })
 
     await expect(actions.closeWorkspace(REPO_A_ID)).resolves.toEqual({
       ok: false,
+      kind: 'failed',
       message: 'error.failed-read-repo',
     })
     expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()

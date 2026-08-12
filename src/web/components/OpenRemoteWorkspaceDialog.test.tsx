@@ -90,7 +90,6 @@ beforeEach(() => {
       pathForFile: () => '',
       invokeIpc: async () => null,
       abortIpc: async () => true,
-      onEvent: () => () => {},
     },
   })
 })
@@ -571,7 +570,11 @@ describe('OpenRemoteWorkspaceDialog', () => {
         }
       }
       if (url.pathname === '/api/remote/test-workspace') {
-        throw new Error('Permission denied')
+        return {
+          ok: false,
+          status: 403,
+          json: async () => ({ ok: false, message: 'Permission denied' }),
+        }
       }
       if (url.pathname === '/api/remote/path-suggestions') {
         return { ok: true, json: async () => [] }
@@ -591,18 +594,26 @@ describe('OpenRemoteWorkspaceDialog', () => {
     await click('button[type="submit"]')
     await flush()
 
-    expect(document.body.textContent).toContain('Permission denied')
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('Permission denied')
+    })
 
     await setInputValue('#remote-path', '/srv/repo-next')
 
-    expect(document.body.textContent).not.toContain('Permission denied')
+    await waitFor(() => {
+      expect(document.body.textContent).not.toContain('Permission denied')
+    })
   })
 
   test('keeps the ssh host loading error visible while editing other inputs', async () => {
     mockFetch(async (input: RequestInfo | URL) => {
       const url = new URL(fetchInputUrl(input))
       if (url.pathname === '/api/remote/ssh-hosts') {
-        throw new Error('SSH config unavailable')
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ ok: false, message: 'SSH config unavailable' }),
+        }
       }
       if (url.pathname === '/api/remote/path-suggestions') {
         return { ok: true, json: async () => [] }

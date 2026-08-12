@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
-import { flushTestUpdates } from '#/test-utils/render.tsx'
+import { flushTestUpdates, renderComposableInJsdom } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { WorkspaceRuntimeInvalidationEvent } from '#/shared/workspace-runtime-invalidation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
@@ -32,11 +31,6 @@ vi.mock('#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts', () =
   acceptRemoteWorkspaceLifecycleSnapshot: vi.fn(),
 }))
 
-function Harness() {
-  useWorkspaceRuntimeInvalidationRefresh()
-  return null
-}
-
 describe('useWorkspaceRuntimeInvalidationRefresh', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -47,7 +41,7 @@ describe('useWorkspaceRuntimeInvalidationRefresh', () => {
   test('projects lifecycle without writing capability from the runtime snapshot', async () => {
     const snapshot = { runtimes: [] }
     vi.mocked(invalidateWorkspaceRuntimes).mockResolvedValue(snapshot)
-    renderInJsdom(<Harness />)
+    renderComposableInJsdom(useWorkspaceRuntimeInvalidationRefresh)
 
     await flushTestUpdates(async () => {
       mocks.listener?.({ type: 'workspace-runtime-invalidated', workspaceId })
@@ -65,7 +59,7 @@ describe('useWorkspaceRuntimeInvalidationRefresh', () => {
     vi.mocked(invalidateWorkspaceRuntimes)
       .mockImplementationOnce(async () => await new Promise((resolve) => (resolveFirst = resolve)))
       .mockResolvedValueOnce(secondSnapshot)
-    renderInJsdom(<Harness />)
+    renderComposableInJsdom(useWorkspaceRuntimeInvalidationRefresh)
 
     await flushTestUpdates(async () => {
       mocks.listener?.({ type: 'workspace-runtime-invalidated', workspaceId })

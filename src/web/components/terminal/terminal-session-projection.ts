@@ -4,7 +4,7 @@ import {
   terminalSessionBase,
   terminalSessionCoordinates,
   type TerminalAttachResult,
-  type TerminalCreateResult,
+  type TerminalCreateSuccess,
   type TerminalRestartResult,
   type TerminalSessionBase,
   type TerminalSessionSummary as ServerTerminalSessionSummary,
@@ -47,7 +47,7 @@ export function projectTerminalStartResultForClient(
 
 export function projectCreateResultForClient(
   base: TerminalSessionBase,
-  result: Extract<TerminalCreateResult, { ok: true }>,
+  result: TerminalCreateSuccess,
 ): ProjectedCreateTerminalSession {
   const target = base.target
   if (target.kind !== result.presentation.kind) {
@@ -98,7 +98,7 @@ export function projectServerTerminalSession(input: {
 
 function createSessionSummaryFromCreate(
   base: TerminalSessionBase,
-  result: Extract<TerminalCreateResult, { ok: true }>,
+  result: TerminalCreateSuccess,
 ): ServerTerminalSessionSummary {
   const coordinates = terminalSessionCoordinates(base)
   const common = {

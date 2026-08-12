@@ -1,16 +1,20 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
+import type { BrowserWindow } from 'electron'
 import { HOST_IPC_ABORT_CHANNEL, HOST_IPC_CALL_CHANNEL } from '#/shared/ipc-channels.ts'
 import { isAncestor, getCurrentBranch, getUpstream, isGitRepo } from '#/system/git/branches.ts'
 import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { getWorkingStatus } from '#/system/git/status.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
 import { pullBranch } from '#/system/git/remote.ts'
-import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
+import { registerClientWindowSurface } from '#/main/client-surface-registry.ts'
+import { registerTrustedAppUrl } from '#/main/ipc/trusted-webcontents.ts'
 import { wireNativeHostIpc } from '#/main/native-host-ipc-router.ts'
-import { getUserSettings } from '#/main/settings-server-client.ts'
+import { setGlobalShortcutState, updateUserSettings } from '#/main/settings-server-client.ts'
+import { refreshNativeSettingsProjection } from '#/main/native-settings-projection-sync.ts'
 import type { IpcResponse } from '#/shared/api-types.ts'
 import type { UserSettings } from '#/shared/settings.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 
 const ipcHandlers = new Map<string, (_event: unknown, input: any) => Promise<unknown>>()
 const browserWindowFromWebContents = vi.hoisted(() => vi.fn(() => null))
@@ -120,13 +124,6 @@ vi.mock('#/main/window.ts', () => ({
   getPrimaryWindow: vi.fn(() => null),
 }))
 
-vi.mock('#/main/client-surface-registry.ts', () => ({
-  focusedRegisteredSurface: vi.fn(() => null),
-  allRegisteredSurfacesWithCapability: vi.fn(() => []),
-  isRegisteredClientSurfaceId: vi.fn(() => false),
-  registeredClientSurfaceByWebContentsId: vi.fn(() => null),
-}))
-
 vi.mock('#/main/theme.ts', () => ({
   applyThemeSettingsProjection: vi.fn(),
   getTheme: vi.fn(() => ({ pref: 'auto', resolved: 'light', colorTheme: 'macos' })),
@@ -136,9 +133,16 @@ vi.mock('#/main/theme.ts', () => ({
 }))
 
 vi.mock('#/main/shortcuts.ts', () => ({
-  isGlobalShortcutRegistered: vi.fn(() => false),
-  replaceGlobalShortcut: vi.fn(() => true),
-  syncGlobalShortcuts: vi.fn(),
+  isGlobalShortcutRegistered: vi.fn(() => true),
+  syncGlobalShortcuts: vi.fn(() => true),
+}))
+
+vi.mock('#/main/native-settings-projection-sync.ts', () => ({
+  refreshNativeSettingsProjection: vi.fn(async () => ({
+    ...userSettings({ globalShortcut: 'Alt+K' }),
+    globalShortcutRegistered: true,
+    recentWorkspaces: [],
+  })),
 }))
 
 vi.mock('#/main/menu.ts', () => ({
@@ -148,8 +152,6 @@ vi.mock('#/main/menu.ts', () => ({
 
 vi.mock('#/main/i18n/index.ts', () => ({
   applyLangPref: vi.fn(),
-  getCurrentLang: vi.fn(() => 'en'),
-  getDictionary: vi.fn(() => ({})),
   resolveLang: vi.fn((pref: string) => (pref === 'auto' ? 'en' : pref)),
   setCurrentLang: vi.fn(),
 }))
@@ -170,14 +172,8 @@ vi.mock('#/system/editors.ts', () => ({
   openRemoteInPreferredEditor: vi.fn(),
 }))
 
-vi.mock('#/main/client-surface-events.ts', () => ({
-  broadcastIpcEvent: vi.fn(),
-  sendIpcEvent: vi.fn(),
-}))
-
 vi.mock('#/main/settings-server-client.ts', () => ({
   setGlobalShortcutState: vi.fn(async () => true),
-  getUserSettings: vi.fn(async () => userSettings()),
   getSettingsSnapshot: vi.fn(),
   updateUserSettings: vi.fn(async (patch: Record<string, unknown>) => ({ ...userSettings(), ...patch })),
 }))
@@ -250,7 +246,13 @@ async function invokeAbortIpc(input: unknown, event: unknown = trustedEvent): Pr
 describe('main repo ipc cancellation', () => {
   beforeAll(() => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
-    registerTrustedWebContents({ id: 1, once: vi.fn() })
+    registerClientWindowSurface(
+      {
+        isDestroyed: () => false,
+        webContents: { id: 1, isDestroyed: () => false },
+      } as unknown as BrowserWindow,
+      { windowKey: 'primary' },
+    )
     wireNativeHostIpc()
   })
 
@@ -310,7 +312,7 @@ describe('main repo ipc cancellation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: { name: 'IpcError', code: 'FORBIDDEN', message: 'Untrusted IPC sender' },
+      error: { name: 'CodedError', code: 'FORBIDDEN', message: 'Untrusted IPC sender' },
     })
   })
 
@@ -364,7 +366,7 @@ describe('main repo ipc cancellation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: { name: 'IpcError', code: 'FORBIDDEN', message: 'Untrusted IPC sender' },
+      error: { name: 'CodedError', code: 'FORBIDDEN', message: 'Untrusted IPC sender' },
     })
   })
 
@@ -381,7 +383,7 @@ describe('main repo ipc cancellation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: { name: 'IpcError', code: 'NOT_FOUND', message: 'Unknown IPC procedure: repo.status' },
+      error: { name: 'CodedError', code: 'NOT_FOUND', message: 'Unknown IPC procedure: repo.status' },
     })
     expect(fetchMock).not.toHaveBeenCalled()
     expect(getWorkingStatus).not.toHaveBeenCalled()
@@ -410,7 +412,7 @@ describe('main repo ipc cancellation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: { name: 'IpcError', code: 'NOT_FOUND', message: 'Unknown IPC procedure: remote.resolveTarget' },
+      error: { name: 'CodedError', code: 'NOT_FOUND', message: 'Unknown IPC procedure: remote.resolveTarget' },
     })
     expect(fetchMock).not.toHaveBeenCalled()
     expect(resolveRemoteTargetMock).not.toHaveBeenCalled()
@@ -421,7 +423,7 @@ describe('main repo ipc cancellation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: { name: 'IpcError', code: 'NOT_FOUND', message: 'Unknown IPC procedure: repo.deleteBranch' },
+      error: { name: 'CodedError', code: 'NOT_FOUND', message: 'Unknown IPC procedure: repo.deleteBranch' },
     })
   })
 
@@ -453,20 +455,73 @@ describe('main repo ipc cancellation', () => {
     expect(aborted).toBe(false)
   })
 
-  test('prefers embedded server prefs when validating a global shortcut change', async () => {
-    vi.mocked(getUserSettings).mockResolvedValueOnce(
+  test('commits the shortcut preference before awaiting its authoritative native projection', async () => {
+    vi.mocked(updateUserSettings).mockResolvedValueOnce(
       userSettings({
-        globalShortcut: 'Alt+G',
+        globalShortcut: 'Alt+K',
         globalShortcutDisabled: false,
       }),
     )
-    vi.mocked((await import('#/main/shortcuts.ts')).replaceGlobalShortcut).mockReturnValueOnce(false)
-
     const result = await invokeIpc('settings.setGlobalShortcut', { accelerator: 'Alt+K' })
 
     expect(result).toEqual({
       ok: true,
-      data: { accelerator: 'Alt+G', registered: false },
+      data: { kind: 'projected', accelerator: 'Alt+K', registered: true },
+    })
+    expect(updateUserSettings).toHaveBeenCalledWith({ globalShortcut: 'Alt+K' })
+    expect(vi.mocked(updateUserSettings).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(refreshNativeSettingsProjection).mock.invocationCallOrder[0]!,
+    )
+    expect(setGlobalShortcutState).not.toHaveBeenCalled()
+  })
+
+  test('does not change the native shortcut when the authoritative preference write fails', async () => {
+    vi.mocked(updateUserSettings).mockRejectedValueOnce(new Error('settings unavailable'))
+    const { syncGlobalShortcuts } = await import('#/main/shortcuts.ts')
+
+    const result = await invokeIpc('settings.setGlobalShortcut', { accelerator: 'Alt+K' })
+
+    expect(result).toMatchObject({ ok: false })
+    expect(syncGlobalShortcuts).not.toHaveBeenCalled()
+    expect(setGlobalShortcutState).not.toHaveBeenCalled()
+  })
+
+  test('preserves an uncertain preference outcome without applying the native shortcut', async () => {
+    vi.mocked(updateUserSettings).mockRejectedValueOnce(
+      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'settings outcome uncertain' }),
+    )
+    const { syncGlobalShortcuts } = await import('#/main/shortcuts.ts')
+
+    await expect(invokeIpc('settings.setGlobalShortcut', { accelerator: 'Alt+K' })).resolves.toEqual({
+      ok: false,
+      error: {
+        name: 'CodedError',
+        code: 'OUTCOME_UNCERTAIN',
+        message: 'settings outcome uncertain',
+      },
+    })
+    expect(syncGlobalShortcuts).not.toHaveBeenCalled()
+  })
+
+  test('returns the state established by the authoritative projection owner', async () => {
+    vi.mocked(updateUserSettings).mockResolvedValueOnce(
+      userSettings({ globalShortcut: 'Alt+K', globalShortcutDisabled: false }),
+    )
+    await expect(invokeIpc('settings.setGlobalShortcut', { accelerator: 'Alt+K' })).resolves.toEqual({
+      ok: true,
+      data: { kind: 'projected', accelerator: 'Alt+K', registered: true },
+    })
+  })
+
+  test('preserves a committed shortcut preference when native projection fails', async () => {
+    vi.mocked(updateUserSettings).mockResolvedValueOnce(
+      userSettings({ globalShortcut: 'Alt+K', globalShortcutDisabled: false }),
+    )
+    vi.mocked(refreshNativeSettingsProjection).mockRejectedValueOnce(new Error('projection unavailable'))
+
+    await expect(invokeIpc('settings.setGlobalShortcut', { accelerator: 'Alt+K' })).resolves.toEqual({
+      ok: true,
+      data: { kind: 'committed-projection-failed' },
     })
   })
 
@@ -475,9 +530,9 @@ describe('main repo ipc cancellation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: { name: 'IpcError', code: 'BAD_REQUEST', message: 'Invalid IPC input' },
+      error: { name: 'CodedError', code: 'BAD_REQUEST', message: 'Invalid IPC input' },
     })
-    expect(getUserSettings).not.toHaveBeenCalled()
+    expect(updateUserSettings).not.toHaveBeenCalled()
   })
 
   test('returns NOT_FOUND for removed native namespaces like externalApps', async () => {
@@ -485,7 +540,7 @@ describe('main repo ipc cancellation', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: { name: 'IpcError', code: 'NOT_FOUND', message: 'Unknown IPC procedure: externalApps.get' },
+      error: { name: 'CodedError', code: 'NOT_FOUND', message: 'Unknown IPC procedure: externalApps.get' },
     })
   })
 })

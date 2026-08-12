@@ -67,7 +67,6 @@ const workspacePaneTabsHostStub = {
     repaired: false,
   })),
   listWorkspaceTabs: vi.fn(),
-  replaceTabs: vi.fn(),
   updateTabs: vi.fn(),
 } satisfies ServerWorkspacePaneTabsHost
 

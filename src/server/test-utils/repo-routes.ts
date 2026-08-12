@@ -2,10 +2,10 @@ import { expect, vi } from 'vitest'
 import {
   acquireWorkspaceRuntime,
   clearWorkspaceRuntimesForUser,
-  commitWorkspaceProbeState,
   listWorkspaceRuntimes,
   runRemoteWorkspaceLifecycle,
 } from '#/server/modules/workspace-runtimes.ts'
+import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -144,16 +144,12 @@ export function createTestRepoRoutes(
       )
     },
   },
-  repoMutationApplication: Parameters<typeof createRepoRoutes>[0]['repoMutationApplication'] = {
-    deleteBranch: async (_userId, input) => await input.deleteBranch(),
-  },
   workspaceCapabilityTransitionHost: Parameters<typeof createRepoRoutes>[0]['workspaceCapabilityTransitionHost'] = {
     commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
   },
 ) {
   return createRepoRoutes({
     worktreeRemovalApplication,
-    repoMutationApplication,
     workspaceCapabilityTransitionHost,
   })
 }
@@ -180,11 +176,13 @@ export async function openTestWorkspaceRuntime(repoRoot = WORKSPACE_ID): Promise
       },
     }))
   }
-  commitWorkspaceProbeState({
-    userId: 'user-test',
-    workspaceId: repoRoot,
-    workspaceRuntimeId,
-    probe: {
+  await settleWorkspaceProbeForTest(
+    {
+      userId: 'user-test',
+      workspaceId: repoRoot,
+      workspaceRuntimeId,
+    },
+    {
       status: 'ready',
       capabilities: {
         files: { read: true, write: true },
@@ -193,7 +191,7 @@ export async function openTestWorkspaceRuntime(repoRoot = WORKSPACE_ID): Promise
       },
       diagnostics: [],
     },
-  })
+  )
   return workspaceRuntimeId
 }
 

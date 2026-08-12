@@ -22,12 +22,6 @@ export function syncGlobalShortcuts(disabled: boolean, accelerator = DEFAULT_GLO
   }
 }
 
-export function replaceGlobalShortcut(disabled: boolean, previous: string, next: string): boolean {
-  const registered = syncGlobalShortcuts(disabled, next)
-  if (!registered && !disabled) syncGlobalShortcuts(false, previous)
-  return registered
-}
-
 export function isGlobalShortcutRegistered(): boolean {
   return registeredShortcut !== null && globalShortcut.isRegistered(registeredShortcut)
 }

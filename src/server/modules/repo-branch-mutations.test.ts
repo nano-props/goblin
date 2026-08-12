@@ -9,14 +9,17 @@ import {
   WORKTREE_REPO_ID,
   createLocalRepoWorktreeWithBootstrap,
   mocks,
+  repoRuntimeCapabilityForTest,
 } from '#/server/test-utils/repo-module.ts'
+
+const SKIP_WORKTREE_BOOTSTRAP = { kind: 'skip' as const }
 
 describe('repo branch mutations', () => {
   test('deleteRepoBranch settles the write operation and returns its projection impact', async () => {
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
     const { listRepoWriteOperationsForRepo } = await import('#/server/modules/repo-write-operation-coordinator.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: true, message: 'ok', repoIdsToInvalidate: [REPO_ID] })
     await expect(listRepoWriteOperationsForRepo(REPO_ID, { includeSettled: true })).resolves.toMatchObject([
@@ -25,8 +28,16 @@ describe('repo branch mutations', () => {
   })
 
   test.each([
-    ['pullRepoBranch', async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
-    ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
+    [
+      'pullRepoBranch',
+      async (repo: typeof RepoWritePaths) =>
+        repo.pullRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
+    ],
+    [
+      'pushRepoBranch',
+      async (repo: typeof RepoWritePaths) =>
+        repo.pushRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
+    ],
   ])('%s records the network mutation in the repo write coordinator', async (name, run) => {
     const repo = await import('#/server/modules/repo-write-paths.ts')
     const { listRepoWriteOperationsForRepo } = await import('#/server/modules/repo-write-operation-coordinator.ts')
@@ -58,7 +69,12 @@ describe('repo branch mutations', () => {
     )
     const { pullRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await pullRepoBranch(REPO_ID, 'feature/a', '/tmp/repo-worktree')
+    const result = await pullRepoBranch(
+      REPO_ID,
+      'feature/a',
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      '/tmp/repo-worktree',
+    )
 
     expect(result).toMatchObject({
       ok: true,
@@ -76,7 +92,11 @@ describe('repo branch mutations', () => {
     )
     const repo = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await repo.pullRepoBranch(REPO_ID, 'feature/a')
+    const result = await repo.pullRepoBranch(
+      REPO_ID,
+      'feature/a',
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+    )
 
     expect(result).toMatchObject({ ok: false, message: 'fatal: pull failed' })
     expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
@@ -90,7 +110,8 @@ describe('repo branch mutations', () => {
         mocks.pullBranch.mockResolvedValueOnce(
           commandOutcomeForTest({ ok: false, message: 'git timed out after 90s' }, 'timed-out'),
         ),
-      async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
+      async (repo: typeof RepoWritePaths) =>
+        repo.pullRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
     ],
     [
       'pushRepoBranch',
@@ -98,7 +119,8 @@ describe('repo branch mutations', () => {
         mocks.pushBranch.mockResolvedValueOnce(
           commandOutcomeForTest({ ok: false, message: 'git timed out after 90s' }, 'timed-out'),
         ),
-      async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a'),
+      async (repo: typeof RepoWritePaths) =>
+        repo.pushRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
     ],
   ])('%s reports an uncertain result after timeout', async (_name, setup, run) => {
     setup()
@@ -117,7 +139,8 @@ describe('repo branch mutations', () => {
         mocks.pullBranch.mockResolvedValueOnce(
           commandOutcomeForTest({ ok: false, message: 'fatal: pull failed' }, 'not-started'),
         ),
-      async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a'),
+      async (repo: typeof RepoWritePaths) =>
+        repo.pullRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
     ],
     [
       'pushRepoBranch',
@@ -125,7 +148,8 @@ describe('repo branch mutations', () => {
         mocks.pushBranch.mockResolvedValueOnce(
           commandOutcomeForTest({ ok: false, message: 'fatal: push failed' }, 'not-started'),
         ),
-      async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a'),
+      async (repo: typeof RepoWritePaths) =>
+        repo.pushRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
     ],
     [
       'createRepoWorktree',
@@ -134,10 +158,15 @@ describe('repo branch mutations', () => {
           commandOutcomeForTest({ ok: false, message: 'fatal: worktree failed' }, 'not-started'),
         ),
       async (repo: typeof RepoWritePaths) =>
-        repo.createRepoWorktree(REPO_ID, {
-          worktreePath: '/tmp/repo-worktree',
-          mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-        }),
+        repo.createRepoWorktree(
+          REPO_ID,
+          {
+            worktreePath: '/tmp/repo-worktree',
+            mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+          },
+          repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+          SKIP_WORKTREE_BOOTSTRAP,
+        ),
     ],
   ])('%s does not publish snapshot invalidation after failure', async (_name, setup, run) => {
     setup()
@@ -154,7 +183,7 @@ describe('repo branch mutations', () => {
     )
     const { pushRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await pushRepoBranch(REPO_ID, 'feature/a')
+    const result = await pushRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: false, message: 'fatal: push failed' })
     expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
@@ -169,7 +198,7 @@ describe('repo branch mutations', () => {
     )
     const { pushRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await pushRepoBranch(repoId, 'feature/a')
+    const result = await pushRepoBranch(repoId, 'feature/a', repoRuntimeCapabilityForTest(repoId, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: false, message: 'connection closed after push' })
     expect(result.repoIdsToInvalidate).toEqual([repoId, linkedRepoId])
@@ -201,7 +230,7 @@ describe('repo branch mutations', () => {
       ),
     )
     await expect(
-      pushRepoBranch(repoId, 'feature/a', undefined, { workspaceRuntimeId: 'runtime-test' }),
+      pushRepoBranch(repoId, 'feature/a', repoRuntimeCapabilityForTest(repoId, 'runtime-test'), undefined),
     ).rejects.toMatchObject({ runtimeFailure, mutation: { repoIdsToInvalidate: [repoId, linkedRepoId] } })
   })
 
@@ -231,9 +260,13 @@ describe('repo branch mutations', () => {
       ),
     )
     await expect(
-      deleteRepoBranch(repoId, 'feature/a', { deleteUpstream: true }, undefined, {
-        workspaceRuntimeId: 'runtime-test',
-      }),
+      deleteRepoBranch(
+        repoId,
+        'feature/a',
+        repoRuntimeCapabilityForTest(repoId, 'runtime-test'),
+        { deleteUpstream: true },
+        undefined,
+      ),
     ).rejects.toMatchObject({ runtimeFailure, mutation: { repoIdsToInvalidate: [repoId, linkedRepoId] } })
   })
 
@@ -243,10 +276,15 @@ describe('repo branch mutations', () => {
     )
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepoWorktree(REPO_ID, {
-      worktreePath: '/tmp/repo-worktree',
-      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-    })
+    const result = await createRepoWorktree(
+      REPO_ID,
+      {
+        worktreePath: '/tmp/repo-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      SKIP_WORKTREE_BOOTSTRAP,
+    )
 
     expect(result).toMatchObject({ ok: false, message: 'fatal: worktree failed' })
     expect(result.repoIdsToInvalidate).toEqual([REPO_ID, WORKTREE_REPO_ID])
@@ -322,14 +360,13 @@ describe('repo branch mutations', () => {
         worktreePath: '/srv/repo-feature',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
-      undefined,
+      repoRuntimeCapabilityForTest(repoId, 'test-runtime'),
       {
-        worktreeBootstrap: {
-          kind: 'run',
-          configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
-          configTrusted: false,
-        },
+        kind: 'run',
+        configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
+        configTrusted: false,
       },
+      undefined,
     )
 
     expect(result).toMatchObject({
@@ -359,14 +396,13 @@ describe('repo branch mutations', () => {
         worktreePath: '/srv/repo-feature',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
-      undefined,
+      repoRuntimeCapabilityForTest(repoId, 'test-runtime'),
       {
-        worktreeBootstrap: {
-          kind: 'run',
-          configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
-          configTrusted: false,
-        },
+        kind: 'run',
+        configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
+        configTrusted: false,
       },
+      undefined,
     )
 
     expect(result).toMatchObject({
@@ -385,10 +421,15 @@ describe('repo branch mutations', () => {
     )
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepoWorktree(repoId, {
-      worktreePath: '/srv/repo-feature',
-      mode: { kind: 'existingBranch', branch: 'feature/a' },
-    })
+    const result = await createRepoWorktree(
+      repoId,
+      {
+        worktreePath: '/srv/repo-feature',
+        mode: { kind: 'existingBranch', branch: 'feature/a' },
+      },
+      repoRuntimeCapabilityForTest(repoId, 'test-runtime'),
+      SKIP_WORKTREE_BOOTSTRAP,
+    )
 
     expect(result).toMatchObject({ ok: false, message: 'error.worktree-create-timeout-check-state' })
     expect(result.repoIdsToInvalidate).toEqual([repoId, worktreeRepoId])
@@ -416,10 +457,15 @@ describe('repo branch mutations', () => {
   test('createRepoWorktree rejects non-absolute paths before calling git', async () => {
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepoWorktree(REPO_ID, {
-      worktreePath: 'relative/path',
-      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-    })
+    const result = await createRepoWorktree(
+      REPO_ID,
+      {
+        worktreePath: 'relative/path',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      SKIP_WORKTREE_BOOTSTRAP,
+    )
 
     expect(result).toMatchObject({ ok: false, message: 'error.invalid-path' })
     expect(mocks.createWorktree).not.toHaveBeenCalled()
@@ -430,7 +476,7 @@ describe('repo branch mutations', () => {
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect((await readRepoOperationsSnapshot(REPO_ID)).operations).toEqual([])
@@ -453,7 +499,9 @@ describe('repo branch mutations', () => {
     })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(repoId, 'feature/a', { deleteUpstream: true })
+    const result = await deleteRepoBranch(repoId, 'feature/a', repoRuntimeCapabilityForTest(repoId, 'test-runtime'), {
+      deleteUpstream: true,
+    })
 
     expect(result).toMatchObject({
       ok: false,
@@ -473,9 +521,21 @@ describe('repo branch mutations', () => {
   })
 
   test.each([
-    ['pullRepoBranch', async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
-    ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
-    ['deleteRepoBranch', async (repo: typeof RepoWritePaths) => repo.deleteRepoBranch(REPO_ID, 'feature/a')],
+    [
+      'pullRepoBranch',
+      async (repo: typeof RepoWritePaths) =>
+        repo.pullRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
+    ],
+    [
+      'pushRepoBranch',
+      async (repo: typeof RepoWritePaths) =>
+        repo.pushRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
+    ],
+    [
+      'deleteRepoBranch',
+      async (repo: typeof RepoWritePaths) =>
+        repo.deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
+    ],
   ])('%s publishes sibling worktree snapshot invalidations after success', async (_name, run) => {
     mocks.readWorktreeMembership.mockResolvedValue([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
@@ -493,7 +553,7 @@ describe('repo branch mutations', () => {
     mocks.getCurrentBranch.mockResolvedValueOnce('feature/current')
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'main')
+    const result = await deleteRepoBranch(REPO_ID, 'main', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: false, message: 'error.cannot-delete-protected-branch' })
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
@@ -507,7 +567,7 @@ describe('repo branch mutations', () => {
     mocks.getUpstream.mockResolvedValueOnce(null)
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect(mocks.isAncestor).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'release/1.0', undefined)
@@ -525,7 +585,7 @@ describe('repo branch mutations', () => {
     })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: false, message: 'error.branch-not-fully-merged' })
     expect(mocks.isAncestor).toHaveBeenCalledOnce()
@@ -550,7 +610,9 @@ describe('repo branch mutations', () => {
       })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), {
+      deleteUpstream: true,
+    })
 
     expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect(mocks.getUpstream).toHaveBeenCalledTimes(1)
@@ -572,7 +634,9 @@ describe('repo branch mutations', () => {
     )
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), {
+      deleteUpstream: true,
+    })
 
     expect(result).toMatchObject({
       ok: false,
@@ -593,7 +657,11 @@ describe('repo branch mutations', () => {
     })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    await expect(deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })).resolves.toMatchObject({
+    await expect(
+      deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), {
+        deleteUpstream: true,
+      }),
+    ).resolves.toMatchObject({
       ok: true,
       message: 'ok',
     })
@@ -607,7 +675,7 @@ describe('repo branch mutations', () => {
     )
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
     expect(result.repoIdsToInvalidate).toBeUndefined()
   })
@@ -618,7 +686,7 @@ describe('repo branch mutations', () => {
     )
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: false, message: 'connection closed' })
     expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
@@ -628,7 +696,7 @@ describe('repo branch mutations', () => {
     mocks.deleteBranch.mockResolvedValueOnce(commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'cancelled'))
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: false, message: 'error.git-command-cancelled-check-state' })
     expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
@@ -640,7 +708,7 @@ describe('repo branch mutations', () => {
     )
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: false, message: 'error.git-command-timeout-check-state' })
     expect(result.repoIdsToInvalidate).toEqual([REPO_ID])
@@ -659,7 +727,9 @@ describe('repo branch mutations', () => {
     )
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a', { deleteUpstream: true })
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), {
+      deleteUpstream: true,
+    })
 
     expect(result).toMatchObject({
       ok: false,
@@ -680,7 +750,7 @@ describe('repo branch mutations', () => {
     })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(repoId, 'feature/a')
+    const result = await deleteRepoBranch(repoId, 'feature/a', repoRuntimeCapabilityForTest(repoId, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: false, message: 'error.git-command-timeout-check-state' })
     expect(result.repoIdsToInvalidate).toEqual([repoId])
@@ -692,7 +762,7 @@ describe('repo branch mutations', () => {
     )
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(REPO_ID, 'feature/a')
+    const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
     expect(result).toMatchObject({ ok: false, message: 'error: branch is not fully merged' })
     expect(result.repoIdsToInvalidate).toEqual([REPO_ID])

@@ -8,7 +8,6 @@ export function appNavigationActionsForTest(overrides: Partial<AppNavigationActi
     closeWorkspace: unexpectedNavigationAction('closeWorkspace'),
     cycleWorkspace: unexpectedNavigationAction('cycleWorkspace'),
     selectRepoBranch: unexpectedNavigationAction('selectRepoBranch'),
-    showRepoWorktreeTerminalSession: unexpectedNavigationAction('showRepoWorktreeTerminalSession'),
     showWorkspaceRootPaneTab: unexpectedNavigationAction('showWorkspaceRootPaneTab'),
     commitFilesystemWorkspacePaneRoute: unexpectedNavigationAction('commitFilesystemWorkspacePaneRoute'),
     commitWorkspaceRootTerminalSession: unexpectedNavigationAction('commitWorkspaceRootTerminalSession'),

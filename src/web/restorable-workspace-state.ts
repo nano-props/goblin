@@ -244,9 +244,7 @@ function preferredWorkspacePaneTabsForClientWorkspace(
       if (!target) continue
       if (tab !== null && !isWorkspacePaneSessionTabType(tab)) continue
       if (tab !== null && target.kind === 'branch' && workspacePaneTabRequiresWorktree(tab)) continue
-      const targetTabs =
-        workspacePaneTabsByTargetByWorkspace[id]?.[targetKey] ??
-        defaultWorkspacePaneTabs()
+      const targetTabs = workspacePaneTabsByTargetByWorkspace[id]?.[targetKey] ?? defaultWorkspacePaneTabs()
       if (
         tab !== null &&
         isWorkspacePaneStaticTabType(tab) &&

@@ -3,16 +3,18 @@ import { Hono } from 'hono'
 import { errorJson } from '#/server/common/responses.ts'
 
 describe('errorJson', () => {
-  test('maps IpcErrorCode to the same status as the createRouteApp IpcError handler', async () => {
+  test('maps CodedErrorCode to the same status as the createRouteApp CodedError handler', async () => {
     const app = new Hono()
     app.get('/bad', (c) => errorJson(c, 'BAD_REQUEST', 'nope'))
     app.get('/missing', (c) => errorJson(c, 'NOT_FOUND', 'gone'))
+    app.get('/unauthorized', (c) => errorJson(c, 'UNAUTHORIZED', 'sign in'))
     app.get('/denied', (c) => errorJson(c, 'FORBIDDEN', 'no'))
     app.get('/boom', (c) => errorJson(c, 'INTERNAL_SERVER_ERROR', 'broken'))
     for (const [path, status] of [
       ['/bad', 400],
       ['/missing', 404],
-      ['/denied', 401],
+      ['/unauthorized', 401],
+      ['/denied', 403],
       ['/boom', 500],
     ] as const) {
       const res = await app.request(`http://localhost${path}`)

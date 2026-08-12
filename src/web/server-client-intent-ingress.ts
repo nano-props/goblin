@@ -1,24 +1,19 @@
-import { isClientEffectIntent, type ClientEffectIntent } from '#/shared/client-effect-intents.ts'
+import { isRepoViewClientIntent, type RepoViewClientIntent } from '#/shared/client-effect-intents.ts'
 import { createServerWebSocketIngress } from '#/web/lib/server-ws-ingress.ts'
 
-// Server-controlled ingress for client effect intents (e.g. those
-// dispatched by `g delta` from a Goblin PTY). Client-side counterpart
-// to `#/server/modules/client-intent-broker.ts` and
-// `#/server/routes/realtime.ts` (`/ws/client-intent`). The server
-// fans intents out as envelopes of the form
+// Server-controlled ingress for repo-view navigation requested by commands
+// such as `g delta` in a Goblin PTY. Client-side counterpart to
+// `#/server/modules/client-intent-broker.ts` and the `/ws/client-intent`
+// realtime route. The server sends envelopes of the form
 //
-//   { type: 'client-effect-intent', intent: ClientEffectIntent }
-//
-// The envelope wraps `ClientEffectIntent` so the same wire format
-// can later carry additional control messages without collision with
-// data-plane invalidations on `/ws/invalidation`.
+//   { type: 'client-effect-intent', intent: RepoViewClientIntent }
 
 interface ClientIntentEnvelope {
   type: 'client-effect-intent'
   intent: unknown
 }
 
-function parseServerClientIntentMessage(data: unknown): ClientEffectIntent | null {
+function parseServerClientIntentMessage(data: unknown): RepoViewClientIntent | null {
   if (typeof data !== 'string') return null
   let parsed: unknown
   try {
@@ -29,11 +24,11 @@ function parseServerClientIntentMessage(data: unknown): ClientEffectIntent | nul
   if (!parsed || typeof parsed !== 'object') return null
   const envelope = parsed as Partial<ClientIntentEnvelope>
   if (envelope.type !== 'client-effect-intent') return null
-  if (!isClientEffectIntent(envelope.intent)) return null
+  if (!isRepoViewClientIntent(envelope.intent)) return null
   return envelope.intent
 }
 
-const ingress = createServerWebSocketIngress<ClientEffectIntent>({
+const ingress = createServerWebSocketIngress<RepoViewClientIntent>({
   path: '/ws/client-intent',
   parseMessage: parseServerClientIntentMessage,
 })

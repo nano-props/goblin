@@ -6,7 +6,7 @@ import {
 } from '#/web/settings-read-projection.ts'
 import { setGlobalShortcut, setGlobalShortcutDisabled, setShortcutsDisabled } from '#/web/settings-actions.ts'
 import { useSettingsMutation } from '#/web/settings-mutations.ts'
-import type { GlobalShortcutState } from '#/shared/api-types.ts'
+import type { SetGlobalShortcutResult } from '#/shared/api-types.ts'
 
 export function getRuntimeShortcutSettings() {
   return readRuntimeShortcutSettings(currentRuntimeSettingsSnapshot())
@@ -32,14 +32,15 @@ export function useShortcutSettingsController() {
     async (accelerator: string) => await setGlobalShortcut(accelerator),
   )
   return {
-    async setShortcutsDisabled(disabled: boolean): Promise<void> {
-      await shortcutsDisabledMutation.mutateAsync(disabled)
+    setShortcutsDisabled(disabled: boolean): void {
+      shortcutsDisabledMutation.mutate(disabled)
     },
-    async setGlobalShortcutDisabled(disabled: boolean): Promise<void> {
-      await globalShortcutDisabledMutation.mutateAsync(disabled)
+    setGlobalShortcutDisabled(disabled: boolean): void {
+      globalShortcutDisabledMutation.mutate(disabled)
     },
-    async setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState | null> {
-      return await globalShortcutMutation.mutateAsync(accelerator)
+    setGlobalShortcut(accelerator: string, onSuccess: (result: SetGlobalShortcutResult) => void): void {
+      globalShortcutMutation.mutate(accelerator, { onSuccess: (result) => onSuccess(result) })
     },
+    globalShortcutPending: globalShortcutMutation.isPending,
   }
 }

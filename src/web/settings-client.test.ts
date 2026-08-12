@@ -180,7 +180,11 @@ describe('settings-client', () => {
   })
 
   test('sets the global shortcut through the native bridge even when the embedded server is available', async () => {
-    const invokeIpc = vi.fn(async () => ({ accelerator: 'CommandOrControl+Shift+K', registered: true }))
+    const invokeIpc = vi.fn(async () => ({
+      kind: 'projected' as const,
+      accelerator: 'CommandOrControl+Shift+K',
+      registered: true,
+    }))
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: {
@@ -190,7 +194,6 @@ describe('settings-client', () => {
         goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
-          onEvent: () => () => {},
           pathForFile: () => '',
         }),
         location: {
@@ -204,6 +207,7 @@ describe('settings-client', () => {
     const fetchMock = mockFetch()
     const { setGlobalShortcut } = await import('#/web/settings-client.ts')
     await expect(setGlobalShortcut('CommandOrControl+Shift+K')).resolves.toEqual({
+      kind: 'projected',
       accelerator: 'CommandOrControl+Shift+K',
       registered: true,
     })
@@ -227,7 +231,6 @@ describe('settings-client', () => {
         goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
-          onEvent: () => () => {},
           pathForFile: () => '',
         }),
         location: {
@@ -278,7 +281,6 @@ describe('settings-client', () => {
         goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
-          onEvent: () => () => {},
           pathForFile: () => '',
         }),
         location: {
@@ -324,7 +326,6 @@ describe('settings-client', () => {
         goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
-          onEvent: () => () => {},
           onIntent: () => () => {},
           pathForFile: () => '',
         }),
@@ -363,7 +364,6 @@ describe('settings-client', () => {
         goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
-          onEvent: () => () => {},
           pathForFile: () => '',
         }),
         location: {
@@ -403,7 +403,6 @@ describe('settings-client', () => {
         goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
-          onEvent: () => () => {},
           pathForFile: () => '',
         }),
         location: {
@@ -440,7 +439,6 @@ describe('settings-client', () => {
         goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
-          onEvent: () => () => {},
           pathForFile: () => '',
         }),
         location: {
@@ -480,7 +478,6 @@ describe('settings-client', () => {
         goblinNative: currentNativeBridge({
           invokeIpc,
           abortIpc: async () => true,
-          onEvent: () => () => {},
           pathForFile: () => '',
         }),
         location: {

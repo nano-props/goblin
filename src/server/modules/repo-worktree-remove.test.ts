@@ -10,6 +10,7 @@ import {
   removeRepoWorktreeForTest,
   successfulRemovalLifecycle,
 } from '#/server/test-utils/repo-module.ts'
+import { repoRuntimeCapabilityForTest } from '#/server/test-utils/repo-module.ts'
 
 describe('repo worktree removal', () => {
   async function removeRemoteWorktreeForTest() {
@@ -53,6 +54,7 @@ describe('repo worktree removal', () => {
       { branch: 'feature/a', worktreePath: '/srv/repo-feature', deleteBranch: false },
       successfulRemovalLifecycle,
       capability,
+      repoRuntimeCapabilityForTest(repoId, 'test-runtime'),
     )
     return { repoId, result }
   }

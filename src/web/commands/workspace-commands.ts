@@ -4,9 +4,9 @@ import {
   dispatchCloseCurrentWorkspacePaneTabAction,
   dispatchCloseWorkspacePaneTabAction,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
-  dispatchRetiredTerminalWorkspacePaneTabPresentationAction,
   type ConfirmedTerminalWorkspacePaneTabClose,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
+import { dispatchRetiredTerminalWorkspacePaneTabPresentationAction } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import {
   dispatchMoveWorkspacePaneTabAction,

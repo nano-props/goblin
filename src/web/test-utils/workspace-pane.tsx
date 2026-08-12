@@ -56,6 +56,8 @@ export const terminalReadContext: TerminalSessionReadContextValue = {
   subscribeTerminalFilesystemTarget: () => () => {},
   workspaceBellCount: () => 0,
   subscribeWorkspaceBellCount: () => () => {},
+  workspaceTerminalSessions: () => [],
+  subscribeWorkspaceTerminalSessions: () => () => {},
   snapshot: () => EMPTY_TERMINAL_SNAPSHOT,
   subscribeSnapshot: () => () => {},
 }
@@ -65,7 +67,7 @@ export const terminalCommandContext: TerminalSessionContextValue = terminalSessi
   selectTerminal: vi.fn(),
   scrollToBottom: vi.fn(),
   clearBell: vi.fn(() => false),
-  closeTerminalByDescriptor: vi.fn(async () => true),
+  closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const })),
   attach: vi.fn(),
   detach: vi.fn(),
   restart: vi.fn(),

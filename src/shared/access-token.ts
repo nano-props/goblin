@@ -44,3 +44,8 @@ export const ACCESS_TOKEN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365
  *  reader (`access-token-file.ts`) imports it back from here so the
  *  string lives in exactly one place. */
 export const ACCESS_TOKEN_FILE_NAME = 'server-token'
+
+export type AccessTokenProjection = {
+  accessToken: string
+  activation: 'current' | 'after-restart'
+}

@@ -10,10 +10,16 @@ import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bo
 import type { CloneRepoResult } from '#/shared/api-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
+import { CodedError } from '#/shared/coded-error.ts'
+
+const feedbackMocks = vi.hoisted(() => ({ warning: vi.fn() }))
+
+vi.mock('vue-sonner', () => ({ toast: { warning: feedbackMocks.warning } }))
 
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 
 beforeEach(() => {
+  feedbackMocks.warning.mockReset()
   setClientBridgeForTests(null)
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: {
@@ -123,6 +129,26 @@ describe('CloneRepositoryDialog', () => {
     })
   })
 
+  test('reports an uncertain clone outcome without closing or clearing the draft', async () => {
+    const onClose = vi.fn()
+    const onClone = vi.fn(async () => {
+      throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost' })
+    })
+
+    renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+
+    await setInputValue('#clone-url', 'https://example.com/repo.git')
+    await setInputValue('#clone-directory-name', 'repo')
+    await click('button[type="submit"]')
+
+    await waitFor(() => {
+      expect(onClose).not.toHaveBeenCalled()
+      expect(input('#clone-url').value).toBe('https://example.com/repo.git')
+      expect(input('#clone-directory-name').value).toBe('repo')
+      expect(feedbackMocks.warning).toHaveBeenCalledWith('error.clone-outcome-uncertain')
+    })
+  })
+
   test('cancel aborts an in-flight clone and closes the dialog', async () => {
     const deferred = Promise.withResolvers<CloneRepoResult>()
     const onClose = vi.fn()
@@ -144,6 +170,25 @@ describe('CloneRepositoryDialog', () => {
       await deferred.promise
     })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('does not surface an uncertain result after its dialog cycle is cancelled', async () => {
+    const deferred = Promise.withResolvers<CloneRepoResult>()
+    const onClose = vi.fn()
+    const onClone = vi.fn((_input: CloneRepositoryInput, _signal: AbortSignal) => deferred.promise)
+
+    renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
+
+    await setInputValue('#clone-url', 'https://example.com/repo.git')
+    await setInputValue('#clone-directory-name', 'repo')
+    await click('button[type="submit"]')
+    await clickButtonByText('dialog.cancel')
+
+    deferred.reject(new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost' }))
+    await deferred.promise.catch(() => {})
+
+    expect(feedbackMocks.warning).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledOnce()
   })
 
   test('does not apply a parent path selected for an earlier open cycle', async () => {

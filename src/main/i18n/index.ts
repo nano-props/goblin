@@ -55,10 +55,6 @@ export function setCurrentLang(lang: Lang): void {
   currentLang = lang
 }
 
-export function getCurrentLang(): Lang {
-  return currentLang
-}
-
 export function t(key: DictKey, params?: Record<string, string | number>): string {
   const dict = DICTS[currentLang]
   const raw = dict[key] ?? en[key] ?? String(key)
@@ -67,10 +63,6 @@ export function t(key: DictKey, params?: Record<string, string | number>): strin
     const v = params[name]
     return v == null ? m : String(v)
   })
-}
-
-export function getDictionary(): Record<DictKey, string> {
-  return DICTS[currentLang]
 }
 
 /**

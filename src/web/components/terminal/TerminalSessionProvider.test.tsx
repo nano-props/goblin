@@ -42,6 +42,8 @@ const projection = vi.hoisted(() => ({
   subscribeTerminalFilesystemTarget: vi.fn(() => () => {}),
   workspaceBellCount: vi.fn(() => 0),
   subscribeWorkspaceBellCount: vi.fn(() => () => {}),
+  workspaceTerminalSessions: () => [],
+  subscribeWorkspaceTerminalSessions: () => () => {},
   snapshot: vi.fn(() => EMPTY_TERMINAL_SNAPSHOT),
   subscribeSnapshot: vi.fn(() => () => {}),
   createTerminal: vi.fn(),
@@ -284,6 +286,8 @@ describe('TerminalSessionProvider', () => {
       subscribeTerminalFilesystemTarget: projection.subscribeTerminalFilesystemTarget,
       workspaceBellCount: projection.workspaceBellCount,
       subscribeWorkspaceBellCount: projection.subscribeWorkspaceBellCount,
+      workspaceTerminalSessions: projection.workspaceTerminalSessions,
+      subscribeWorkspaceTerminalSessions: projection.subscribeWorkspaceTerminalSessions,
       snapshot: projection.snapshot,
       subscribeSnapshot: projection.subscribeSnapshot,
     })

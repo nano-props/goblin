@@ -4,6 +4,7 @@ import { useFakeTimers } from '#/test-utils/timers.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import {
   nativeProjectionFromSnapshots,
+  refreshNativeSettingsProjection,
   startNativeSettingsProjectionSync,
   stopNativeSettingsProjectionSync,
 } from '#/main/native-settings-projection-sync.ts'
@@ -128,5 +129,36 @@ describe('native settings projection sync', () => {
     await flushRefreshQueue()
 
     expect(applyNativeHostProjection).toHaveBeenCalledTimes(2)
+  })
+
+  test('serializes command refreshes so a stale projection is followed by the latest authoritative snapshot', async () => {
+    const initial = defaultSettingsSnapshot()
+    const stale = defaultSettingsSnapshot({ globalShortcut: 'Alt+A' })
+    const latest = defaultSettingsSnapshot({ globalShortcut: 'Alt+B' })
+    const delayedStaleRead = Promise.withResolvers<typeof stale>()
+    vi.mocked(getSettingsSnapshot).mockReturnValueOnce(delayedStaleRead.promise).mockResolvedValueOnce(latest)
+
+    startNativeSettingsProjectionSync(initial)
+
+    const olderCommandRefresh = refreshNativeSettingsProjection()
+    await vi.waitFor(() => expect(getSettingsSnapshot).toHaveBeenCalledOnce())
+    const newerCommandRefresh = refreshNativeSettingsProjection()
+    delayedStaleRead.resolve(stale)
+
+    await expect(olderCommandRefresh).resolves.toEqual(stale)
+    await expect(newerCommandRefresh).resolves.toEqual(latest)
+    expect(applyNativeHostProjection).toHaveBeenCalledTimes(2)
+    expect(applyNativeHostProjection).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        prefs: expect.objectContaining({ patch: { globalShortcut: 'Alt+A' } }),
+      }),
+    )
+    expect(applyNativeHostProjection).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        prefs: expect.objectContaining({ patch: { globalShortcut: 'Alt+B' } }),
+      }),
+    )
   })
 })

@@ -1,115 +1,65 @@
 import { app, ipcMain } from 'electron'
-import { ROTATE_ACCESS_TOKEN_CHANNEL } from '#/shared/ipc-channels.ts'
-import { readOrCreateAccessToken, removeAccessTokenFile } from '#/shared/access-token-file.ts'
-import { startEmbeddedServer, stopEmbeddedServer, getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
-import { getPrimaryWindow } from '#/main/window.ts'
-import { createBrowserEntryUrl } from '#/main/window-security.ts'
-import { replantEmbedAuthCookieForRotation } from '#/main/cookie-bootstrap.ts'
+import { GET_ACCESS_TOKEN_PROJECTION_CHANNEL, ROTATE_ACCESS_TOKEN_CHANNEL } from '#/shared/ipc-channels.ts'
+import { readOrCreateAccessToken, rotateAccessTokenFile } from '#/shared/access-token-file.ts'
+import type { AccessTokenProjection } from '#/shared/access-token.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
-import { accessTokenNodeLog } from '#/node/logger.ts'
+import { getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
 
 /**
  * Wire the access-token rotation IPC.
  *
- * The client calls `goblin:rotateAccessToken` to invalidate the
- * current token. The flow:
+ * The client calls `goblin:rotateAccessToken` to stage the token for
+ * the next server start. The flow:
  *
- *  1. Delete the on-disk token file so the next read produces a
- *     fresh value.
- *  2. Stop the embedded server so it drops its in-memory copy of
- *     the old token.
- *  3. Restart the embedded server — it reads (or generates) the
- *     new token, and the embedded main replants the new cookie on
- *     the client's `webContents.session` (see
- *     `#/main/cookie-bootstrap.ts`).
+ *  1. Generate and atomically persist a fresh token.
+ *  2. Keep the running server and current cookie unchanged.
+ *  3. Activate the persisted token on the next user-initiated restart.
  *
  * Concurrency: a module-level Promise chain serializes concurrent
  * rotation calls. Without this, two rapid clicks (or two clients
- * firing the IPC) race on `unlink` + `stop` + `start` + `read`:
- * the second `unlink` may delete the freshly written token, the
- * second `stop` may issue SIGKILL against the first start's proc,
- * and the second `read` may return a token that no longer matches
- * the server's in-memory state. The mutex is the cheapest way to
- * keep the four steps atomic from the client's perspective.
+ * firing the IPC) could otherwise each return a different value while
+ * only the last atomic rename remains on disk. Serialization ensures
+ * each rotation is applied at one unambiguous persistence boundary.
  *
- * Note: the `get-access-token` and `get-embedded-server-url` IPC
- * channels that used to live here are gone. The client no longer
- * needs the access token in the bootstrap (auth is now via a
- * session cookie planted by `plantEmbedAuthCookie` before
- * `loadURL`), and the server URL is just `window.location.origin`
- * with a Vite proxy in dev. Fewer IPC channels, fewer race
- * surfaces, single auth mechanism.
+ * The read channel exposes the relationship between the running token and
+ * the persisted next-start token. It does not participate in authentication;
+ * the active client still authenticates with the cookie planted before load.
  */
-let rotationPromise: Promise<unknown> = Promise.resolve()
+let tokenFileOperationTail: Promise<unknown> = Promise.resolve()
 
-function rotateToken(): Promise<{ accessToken: string }> {
-  const next = rotationPromise.then(() => doRotate())
+function serializeTokenFileOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const next = tokenFileOperationTail.then(operation)
   // Swallow rejections on the chain itself so one failure doesn't
-  // poison subsequent rotations; the inner promise's rejection is
+  // poison subsequent reads or rotations; the inner promise's rejection is
   // surfaced to the original caller.
-  rotationPromise = next.catch(() => undefined)
+  tokenFileOperationTail = next.catch(() => undefined)
   return next
 }
 
-async function doRotate(): Promise<{ accessToken: string }> {
-  const dataDir = app.getPath('userData')
-  await removeAccessTokenFile(dataDir)
-  await stopEmbeddedServer('access-token-rotation')
-  await startEmbeddedServer()
-  // After the server is back up, read the freshly written file so
-  // the value we return is the one the running server is using.
-  // (Could be replaced with `runtime.accessToken` once the
-  // runtime token and the file token are guaranteed to match —
-  // they are today because `startEmbeddedServer` always sets them
-  // from the same `readOrCreateAccessToken` call.)
-  const accessToken = await readOrCreateAccessToken(dataDir)
-  // The embedded client authenticates against the server with an
-  // http-only cookie on its `webContents.session`. Without this
-  // replant, the cookie still holds the OLD token after the server
-  // restart and the next authenticated request fires with a stale
-  // credential — the user sees the token gate re-appear even
-  // though the rotation IPC returned the new token successfully.
-  // Errors are non-fatal: the client's `useAccessTokenStatus`
-  // hook falls back to the URL-token path (`?accessToken=…` →
-  // POST /api/login → Set-Cookie), so a transient cookie-replant
-  // failure (e.g. window destroyed mid-rotation) self-heals on
-  // the next page load.
-  await tryReplantEmbedAuthCookie(accessToken)
-  return { accessToken }
-}
-
-/**
- * Replant the auth cookie on the primary window's session. Best-effort:
- * a missing runtime, missing window, or cookies.set failure must
- * never propagate up to the rotation IPC handler — the caller (the
- * settings UI) needs the new access token regardless.
- */
-async function tryReplantEmbedAuthCookie(accessToken: string): Promise<void> {
+function accessTokenProjection(accessToken: string): AccessTokenProjection {
   const runtime = getEmbeddedServerRuntime()
-  const primary = getPrimaryWindow()
-  if (!primary || runtime?.accessToken !== accessToken) return
-  try {
-    const { url } = createBrowserEntryUrl({ routePath: '/' })
-    await replantEmbedAuthCookieForRotation({
-      accessToken,
-      url: url.toString(),
-      webContents: primary.webContents,
-    })
-  } catch (err) {
-    accessTokenNodeLog.warn(
-      { err },
-      'failed to replant embed auth cookie after rotation; client will fall back to URL-token path',
-    )
+  if (!runtime) throw new Error('Embedded server unavailable')
+  return {
+    accessToken,
+    activation: accessToken === runtime.accessToken ? 'current' : 'after-restart',
   }
 }
 
+async function readAccessTokenProjection(): Promise<AccessTokenProjection> {
+  const dataDir = app.getPath('userData')
+  return accessTokenProjection(await readOrCreateAccessToken(dataDir))
+}
+
+async function rotateToken(): Promise<AccessTokenProjection> {
+  const dataDir = app.getPath('userData')
+  const accessToken = await rotateAccessTokenFile(dataDir)
+  return accessTokenProjection(accessToken)
+}
+
 export function wireAccessTokenIpc(): void {
-  // Token rotation: deletes the on-disk token, restarts the
-  // server, replants the new cookie. The gating matters here
-  // because rotation is a destructive operation: a popup could
-  // otherwise spin-restart the server, briefly denying the primary
-  // window service, or race the user into losing their
-  // session-resume state.
+  // Token rotation atomically stages the next-start token. Trust gating
+  // prevents an auxiliary or compromised surface from replacing the
+  // credential that will become authoritative after restart.
   //
   // Host info (home dir, platform) used to live here too under
   // `goblin:get-home-dir` / `goblin:get-platform`. They were
@@ -117,10 +67,14 @@ export function wireAccessTokenIpc(): void {
   // endpoint (see `#/server/modules/host-info.ts` and
   // `#/web/stores/host-info.ts`); the embedded client now
   // fetches it the same way the standalone web path does.
-  ipcMain.handle(ROTATE_ACCESS_TOKEN_CHANNEL, async (event): Promise<{ accessToken: string }> => {
+  ipcMain.handle(GET_ACCESS_TOKEN_PROJECTION_CHANNEL, async (event): Promise<AccessTokenProjection> => {
+    if (!isTrustedIpcEvent(event)) throw new Error('Untrusted IPC sender for get-access-token-projection')
+    return await serializeTokenFileOperation(readAccessTokenProjection)
+  })
+  ipcMain.handle(ROTATE_ACCESS_TOKEN_CHANNEL, async (event): Promise<AccessTokenProjection> => {
     if (!isTrustedIpcEvent(event)) {
       throw new Error('Untrusted IPC sender for rotate-access-token')
     }
-    return await rotateToken()
+    return await serializeTokenFileOperation(rotateToken)
   })
 }

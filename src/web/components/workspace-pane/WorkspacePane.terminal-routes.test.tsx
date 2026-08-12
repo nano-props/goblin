@@ -31,7 +31,7 @@ import {
   createTerminalWithAdmissionForContextTest,
   terminalSessionContextForTest,
 } from '#/web/test-utils/terminal-session-context.ts'
-import { setTerminalSessionCommandBridgeForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
@@ -90,16 +90,17 @@ describe('WorkspacePane terminal routes', () => {
         workspaceRuntimeId: repo.workspaceRuntimeId,
         tabs: [workspacePaneStaticTabEntry('files')],
       })
-      return true
+      return { kind: 'committed' as const, projection: 'applied' as const }
     })
     const workspaceTerminalCommands = terminalSessionContextForTest({
       ...terminalCommandContext,
       closeTerminalByDescriptor,
     })
     const workspaceTerminalReadContext = terminalReadContextWithSession(terminalFilesystemTargetKey, terminalSessionId)
-    const resetTerminalCommandBridge = setTerminalSessionCommandBridgeForTest({
+    const resetTerminalCommandBridge = setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: workspaceTerminalReadContext.terminalFilesystemTargetSnapshot,
       createTerminal: terminalCommandContext.createTerminal,
+      createTerminalWithAdmission: terminalCommandContext.createTerminalWithAdmission,
       selectTerminal: terminalCommandContext.selectTerminal,
       focusTerminal: workspaceTerminalCommands.focusTerminal,
       closeTerminalByDescriptor,

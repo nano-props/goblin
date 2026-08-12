@@ -15,11 +15,22 @@ import {
   removeRepoWorktreeForTest,
   successfulRemovalLifecycle,
 } from '#/server/test-utils/repo-module.ts'
+import { repoRuntimeCapabilityForTest } from '#/server/test-utils/repo-module.ts'
+
+const SKIP_WORKTREE_BOOTSTRAP = { kind: 'skip' as const }
 
 describe('repo worktree creation', () => {
   test.each([
-    ['pullRepoBranch', async (repo: typeof RepoWritePaths) => repo.pullRepoBranch(REPO_ID, 'feature/a')],
-    ['pushRepoBranch', async (repo: typeof RepoWritePaths) => repo.pushRepoBranch(REPO_ID, 'feature/a')],
+    [
+      'pullRepoBranch',
+      async (repo: typeof RepoWritePaths) =>
+        repo.pullRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
+    ],
+    [
+      'pushRepoBranch',
+      async (repo: typeof RepoWritePaths) =>
+        repo.pushRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
+    ],
   ])('%s returns snapshot invalidation impact after success', async (_name, run) => {
     const repo = await import('#/server/modules/repo-write-paths.ts')
 
@@ -36,10 +47,15 @@ describe('repo worktree creation', () => {
     ])
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepoWorktree(REPO_ID, {
-      worktreePath: '/tmp/repo-worktree',
-      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-    })
+    const result = await createRepoWorktree(
+      REPO_ID,
+      {
+        worktreePath: '/tmp/repo-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      SKIP_WORKTREE_BOOTSTRAP,
+    )
 
     expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect(result.repoIdsToInvalidate).toEqual([REPO_ID, LINKED_REPO_ID, WORKTREE_REPO_ID])
@@ -55,10 +71,15 @@ describe('repo worktree creation', () => {
     )
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepoWorktree(REPO_ID, {
-      worktreePath: '/tmp/repo-worktree',
-      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-    })
+    const result = await createRepoWorktree(
+      REPO_ID,
+      {
+        worktreePath: '/tmp/repo-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      SKIP_WORKTREE_BOOTSTRAP,
+    )
 
     expect(result).toMatchObject({ ok: false, message: 'error.worktree-create-timeout-check-state' })
     expect(result.repoIdsToInvalidate).toEqual([REPO_ID, LINKED_REPO_ID, WORKTREE_REPO_ID])
@@ -71,10 +92,15 @@ describe('repo worktree creation', () => {
     )
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepoWorktree(REPO_ID, {
-      worktreePath: '/tmp/repo-worktree',
-      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-    })
+    const result = await createRepoWorktree(
+      REPO_ID,
+      {
+        worktreePath: '/tmp/repo-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      SKIP_WORKTREE_BOOTSTRAP,
+    )
 
     expect(result).toMatchObject({ ok: false, message: 'cancelled' })
     expect(result.repoIdsToInvalidate).toBeUndefined()
@@ -84,10 +110,15 @@ describe('repo worktree creation', () => {
     mocks.createWorktree.mockResolvedValueOnce(commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'cancelled'))
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepoWorktree(REPO_ID, {
-      worktreePath: '/tmp/repo-worktree',
-      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-    })
+    const result = await createRepoWorktree(
+      REPO_ID,
+      {
+        worktreePath: '/tmp/repo-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      SKIP_WORKTREE_BOOTSTRAP,
+    )
 
     expect(result).toMatchObject({ ok: false, message: 'error.git-command-cancelled-check-state' })
     expect(result.repoIdsToInvalidate).toEqual([REPO_ID, WORKTREE_REPO_ID])
@@ -96,10 +127,15 @@ describe('repo worktree creation', () => {
   test('createRepoWorktree skips bootstrap unless run is explicitly requested', async () => {
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await createRepoWorktree(REPO_ID, {
-      worktreePath: '/tmp/repo-worktree',
-      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
-    })
+    const result = await createRepoWorktree(
+      REPO_ID,
+      {
+        worktreePath: '/tmp/repo-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      SKIP_WORKTREE_BOOTSTRAP,
+    )
 
     expect(result).toMatchObject({ ok: true, message: 'ok' })
     expect(mocks.bootstrapWorktreeAfterCreate).not.toHaveBeenCalled()
@@ -245,14 +281,13 @@ describe('repo worktree creation', () => {
         worktreePath: '/tmp/repo-worktree-a',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
-      undefined,
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
       {
-        worktreeBootstrap: {
-          kind: 'run',
-          configHash,
-          configTrusted: true,
-        },
+        kind: 'run',
+        configHash,
+        configTrusted: true,
       },
+      undefined,
     )
     await vi.waitFor(() => {
       expect(mocks.createWorktree).toHaveBeenCalledTimes(1)
@@ -273,14 +308,13 @@ describe('repo worktree creation', () => {
         worktreePath: '/tmp/repo-worktree-b',
         mode: { kind: 'newBranch', newBranch: 'feature/b', baseRef: 'main' },
       },
-      undefined,
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
       {
-        worktreeBootstrap: {
-          kind: 'run',
-          configHash,
-          configTrusted: false,
-        },
+        kind: 'run',
+        configHash,
+        configTrusted: false,
       },
+      undefined,
     )
     await vi.waitFor(async () => {
       expect(
@@ -352,7 +386,7 @@ describe('repo worktree creation', () => {
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
-    const first = deleteRepoBranch(REPO_ID, 'feature/a')
+    const first = deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
     await vi.waitFor(() => {
       expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
     })
@@ -419,7 +453,7 @@ describe('repo worktree creation', () => {
     const { resolveRepoWriteBoundaryForRead } = await import('#/server/modules/repo-write-operation-coordinator.ts')
     await resolveRepoWriteBoundaryForRead(LINKED_REPO_ID)
 
-    const first = deleteRepoBranch(REPO_ID, 'feature/a')
+    const first = deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
     await vi.waitFor(() => {
       expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
     })
@@ -477,12 +511,16 @@ describe('repo worktree creation', () => {
     mocks.pullBranch.mockImplementationOnce(async () => await secondPull.promise)
     const { deleteRepoBranch, pullRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const first = deleteRepoBranch(REPO_ID, 'feature/a')
+    const first = deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
     await vi.waitFor(() => {
       expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
     })
 
-    const second = pullRepoBranch(LINKED_REPO_ID, 'feature/b')
+    const second = pullRepoBranch(
+      LINKED_REPO_ID,
+      'feature/b',
+      repoRuntimeCapabilityForTest(LINKED_REPO_ID, 'test-runtime'),
+    )
     await flushMicrotasks(2)
 
     expect(mocks.pullBranch).not.toHaveBeenCalled()

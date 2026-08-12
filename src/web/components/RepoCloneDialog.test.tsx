@@ -21,6 +21,7 @@ import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
+  toastWarning: vi.fn(),
 }))
 
 const CLONE_URL = 'https://example.com/repo.git'
@@ -30,6 +31,7 @@ vi.mock('vue-sonner', () => ({
   toast: {
     error: mocks.toastError,
     success: mocks.toastSuccess,
+    warning: mocks.toastWarning,
   },
 }))
 
@@ -170,7 +172,7 @@ describe('RepoCloneDialog', () => {
   test.each([
     {
       name: 'when the cloned workspace cannot be opened',
-      open: async () => ({ ok: false as const, message: 'error.workspace-open-failed' }),
+      open: async () => ({ ok: false as const, kind: 'failed' as const, message: 'error.workspace-open-failed' }),
       message: 'error.workspace-open-failed',
     },
     {

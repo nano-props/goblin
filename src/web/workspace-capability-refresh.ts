@@ -1,9 +1,13 @@
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
 import { refreshWorkspace } from '#/web/workspace-client.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 export type WorkspaceCapabilityRefreshOutcome =
-  { kind: 'completed'; result: WorkspaceRefreshResult } | { kind: 'cancelled' } | { kind: 'failed'; message: string }
+  | { kind: 'completed'; result: WorkspaceRefreshResult }
+  | { kind: 'cancelled' }
+  | { kind: 'outcome-uncertain' }
+  | { kind: 'failed'; message: string }
 
 interface WorkspaceCapabilityRefreshAdmission {
   controller: AbortController
@@ -54,6 +58,7 @@ async function runWorkspaceCapabilityRefresh(
   try {
     return { kind: 'completed', result: await refreshWorkspace(workspaceId, workspaceRuntimeId, signal) }
   } catch (error) {
+    if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) return { kind: 'outcome-uncertain' }
     if (signal.aborted || isAbortError(error)) return { kind: 'cancelled' }
     return { kind: 'failed', message: error instanceof Error ? error.message : String(error) }
   }

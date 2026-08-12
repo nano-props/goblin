@@ -1,7 +1,7 @@
 import { app, dialog, ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
-import { activatePrimaryWindow } from '#/main/window.ts'
+import { activatePrimaryWindow, sendExistingPrimaryWindowEffectIntent } from '#/main/window.ts'
 import { initTheme } from '#/main/theme.ts'
 import { flushWindowState } from '#/main/window-state.ts'
 import { buildAppMenu } from '#/main/menu.ts'
@@ -15,9 +15,8 @@ import { windowNodeLog, windowStateNodeLog } from '#/node/logger.ts'
 import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
 import { enqueueExternalOpenPath } from '#/main/external-open.ts'
-import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
 import { APP_QUIT_DRAINED_CHANNEL } from '#/shared/ipc-channels.ts'
-import { isAppQuitDrainResult, type AppQuitDrainResult } from '#/shared/app-quit-drain.ts'
+import { errorToAppQuitDrainResult, isAppQuitDrainResult, type AppQuitDrainResult } from '#/shared/app-quit-drain.ts'
 import { getSettingsSnapshot, setGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { startEmbeddedServer, stopEmbeddedServer } from '#/main/embedded-server-lifecycle.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
@@ -46,6 +45,11 @@ let finalizationPromise: Promise<void> | null = null
 let finalizationComplete = false
 const CLIENT_QUIT_DRAIN_TIMEOUT_MS = 1000
 type ClientQuitDrain = AppQuitDrainResult | { ok: false; timedOut: true }
+
+interface ClientQuitDrainOwner {
+  outcome: Promise<ClientQuitDrain>
+  failDelivery: (error: unknown) => void
+}
 
 app.on('open-file', (event, path) => {
   event.preventDefault()
@@ -98,9 +102,15 @@ async function main(): Promise<void> {
 async function finalizeNativeHostExit(): Promise<void> {
   try {
     if (clientActivated) {
-      const clientQuitDrain = waitForClientQuitDrain()
-      broadcastClientEffectIntent({ type: 'app-quitting' })
-      const clientQuitDrainResult = await clientQuitDrain
+      const clientQuitDrain = beginClientQuitDrain()
+      void sendExistingPrimaryWindowEffectIntent({ type: 'app-quitting' })
+        .then((delivered) => {
+          if (!delivered) {
+            clientQuitDrain.failDelivery(new Error('Primary window is unavailable for quit persistence drain'))
+          }
+        })
+        .catch(clientQuitDrain.failDelivery)
+      const clientQuitDrainResult = await clientQuitDrain.outcome
       if ('timedOut' in clientQuitDrainResult) {
         windowNodeLog.warn('timed out waiting for client quit persistence drain')
       } else if (!clientQuitDrainResult.ok) {
@@ -122,8 +132,9 @@ async function activateClient(): Promise<void> {
   clientActivated = true
 }
 
-async function waitForClientQuitDrain(): Promise<ClientQuitDrain> {
-  return await new Promise((resolve) => {
+function beginClientQuitDrain(): ClientQuitDrainOwner {
+  let finishOwner: (drain: ClientQuitDrain) => void = () => {}
+  const outcome = new Promise<ClientQuitDrain>((resolve) => {
     let settled = false
     const finish = (drain: ClientQuitDrain) => {
       if (settled) return
@@ -136,7 +147,14 @@ async function waitForClientQuitDrain(): Promise<ClientQuitDrain> {
     ipcMain.handle(APP_QUIT_DRAINED_CHANNEL, (event, result: unknown) =>
       handleTrustedClientQuitDrainBoundary(event, result, finish),
     )
+    finishOwner = finish
   })
+  return {
+    outcome,
+    failDelivery: (error) => {
+      finishOwner(errorToAppQuitDrainResult(error))
+    },
+  }
 }
 
 function handleTrustedClientQuitDrainBoundary(
@@ -157,7 +175,7 @@ async function initializeNativeHost(): Promise<void> {
   await app.whenReady()
   await startEmbeddedServer()
   const settingsSnapshot = await getSettingsSnapshot()
-  await initTheme({ theme: settingsSnapshot.theme, colorTheme: settingsSnapshot.colorTheme })
+  initTheme({ theme: settingsSnapshot.theme, colorTheme: settingsSnapshot.colorTheme })
   await initializeRuntimeState(settingsSnapshot)
   wireNativeHostIpc()
   wireShellIpc()

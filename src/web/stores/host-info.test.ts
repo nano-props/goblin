@@ -50,11 +50,19 @@ describe('hostInfoStore', () => {
       json: async () => ({ homeDir: '/Users/recovered', platform: 'darwin', hostname: 'host', pid: 2 }),
     })
 
-    await expect(hostInfoStore.getState().hydrate()).rejects.toBe(failure)
+    await expect(hostInfoStore.getState().hydrate()).rejects.toMatchObject({
+      name: 'Error',
+      message: 'Server request failed',
+      cause: failure,
+    })
 
     expect(hostInfoStore.getState().snapshot).toBeNull()
     expect(hostInfoStore.getState().status).toBe('error')
-    expect(hostInfoStore.getState().error).toBe(failure)
+    expect(hostInfoStore.getState().error).toMatchObject({
+      name: 'Error',
+      message: 'Server request failed',
+      cause: failure,
+    })
 
     await expect(hostInfoStore.getState().hydrate()).resolves.toBeUndefined()
     expect(hostInfoStore.getState()).toMatchObject({

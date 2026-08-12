@@ -180,4 +180,5 @@ const filesystemTestRoutes: RouteRecordRaw[] = [
     name: 'workspace-worktree-terminal',
     component: { render: () => null },
   },
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: { render: () => null } },
 ]

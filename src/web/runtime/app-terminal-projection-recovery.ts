@@ -70,6 +70,15 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
     this.run(scope, requirement, async () => await this.dependencies.recoverSessions(scope.target))
   }
 
+  retry(scope: RuntimeProjectionScope): void {
+    scope.commit(() => {
+      this.dependencies.beginHydration(scope.target.workspaceId, scope.target.workspaceRuntimeId)
+    })
+    this.run(scope, { kind: 'minimum-revision', revision: 0 }, async () =>
+      await this.dependencies.recoverSessions(scope.target),
+    )
+  }
+
   private run(
     scope: RuntimeProjectionScope,
     requirement: TerminalProjectionRecoveryRequirement | { kind: 'reconnect' },

@@ -1,6 +1,7 @@
 import type { ClientBootstrapSnapshot, ClientNativeCapability, ClientRuntimeKind } from '#/shared/bootstrap.ts'
-import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
+import type { IpcRequest } from '#/shared/api-types.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
+import type { AccessTokenProjection } from '#/shared/access-token.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type {
@@ -31,9 +32,9 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
   WorkspacePaneTabsChangedRealtimeMessage,
   WorkspacePaneTabsListInput,
-  WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
+  WorkspacePaneTabsWriteResult,
 } from '#/shared/workspace-pane-tabs.ts'
 import type {
   WorkspacePaneRuntimeCloseInput,
@@ -74,8 +75,7 @@ export interface ClientTerminal {
 
 export interface ClientWorkspacePaneTabs {
   list: (input: WorkspacePaneTabsListInput) => Promise<WorkspacePaneTabsSnapshot>
-  replace: (input: WorkspacePaneTabsReplaceInput) => Promise<WorkspacePaneTabsSnapshot>
-  update: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabsSnapshot>
+  update: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabsWriteResult>
   onChanged: (cb: (message: WorkspacePaneTabsChangedRealtimeMessage) => void) => () => void
 }
 
@@ -106,7 +106,6 @@ export interface ClientBridge {
   getBootstrap(): ClientBootstrapSnapshot
   invokeIpc(request: IpcRequest): Promise<unknown>
   abortIpc(requestId: string): Promise<boolean>
-  onIpcEvent(cb: (event: IpcEvent) => void): () => void
   onEffectIntent(cb: (event: ClientEffectIntent) => void): () => void
   pathForFile(file: File): string
   /**
@@ -120,14 +119,15 @@ export interface ClientBridge {
    */
   saveClipboardFiles(files: File[]): Promise<string[]>
   /**
-   * Electron-only: invalidate the current access token, restart the
-   * embedded server, and return the freshly-generated token. The
-   * client surfaces the new value in the Web settings page so
-   * the user can re-authenticate. Throws (via the IPC reject path)
+   * Electron-only: atomically stage a freshly generated access token
+   * for the next embedded-server start. The running server and current
+   * authentication cookie remain authoritative until the user restarts.
+   * Throws (via the IPC reject path)
    * when called from a non-Electron runtime; the Web settings page
    * gates the rotation button on `kind() === 'electron'`.
    */
-  rotateAccessToken?(): Promise<{ accessToken: string }>
+  getAccessTokenProjection(): Promise<AccessTokenProjection>
+  rotateAccessToken(): Promise<AccessTokenProjection>
   host(): ClientHostBridge | null
   appRealtime(): ClientAppRealtimeLifecycle
   terminal(): ClientTerminal

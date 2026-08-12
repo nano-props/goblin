@@ -16,7 +16,10 @@ import { SelectValue } from '#/web/components/ui/SelectValue.tsx'
 import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
+import {
+  reportOpenWorkspacePostOpenEffects,
+  reportOpenWorkspaceUncertainty,
+} from '#/web/lib/open-workspace-result-feedback.ts'
 import {
   getRemoteSshHosts,
   resolveRemoteWorkspaceTarget,
@@ -162,7 +165,9 @@ export const OpenRemoteWorkspaceDialog = defineComponent<Props>({
         const openResult = await workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target))
         if (signal.aborted) return
         if (!openResult.ok) {
-          actionError.value = formatRemoteDialogError(t, openResult.message)
+          if (!reportOpenWorkspaceUncertainty(openResult, t, { descriptionPrefix: target.displayName })) {
+            actionError.value = formatRemoteDialogError(t, openResult.message)
+          }
           return
         }
         navigation.activateWorkspace(openResult.workspaceId)

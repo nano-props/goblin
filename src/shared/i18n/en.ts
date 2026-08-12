@@ -47,6 +47,8 @@ export const en = {
   'menu.file.close-workspace': 'Close Workspace',
   'menu.file.settings': 'Settings…',
   'menu.file.quit': 'Quit',
+  'menu.client-intent-delivery-failed':
+    'The action could not be sent because the app window changed or failed to load. Please try again.',
 
   // ---- Menu — Edit --------------------------------------------------------
   'menu.edit.undo': 'Undo',
@@ -240,6 +242,15 @@ export const en = {
   'dashboard.recent.title': 'Recent branches',
   'dashboard.recent.description': 'Repository activity sorted by latest commit.',
   'dashboard.checks-failing': '{count} failing check(s)',
+  'dashboard.terminals.description': '{count} open in this workspace',
+  'dashboard.terminals.loading': 'Loading terminals...',
+  'dashboard.terminals.unavailable': 'Terminal list unavailable',
+  'dashboard.terminals.open': 'Open {name}',
+  'dashboard.terminals.open-failed': 'Could not open terminal',
+  'dashboard.terminals.stale': 'Showing the last known terminal list.',
+  'dashboard.terminals.error': 'Error',
+  'dashboard.terminals.workspace-root': 'Workspace',
+  'dashboard.terminals.detached-worktree': 'Detached worktree',
   'tab.branches': 'Branches',
   'workspace.navigation-title': 'Workspace',
   'tab.status': 'Status',
@@ -571,12 +582,24 @@ export const en = {
   'error.filetree-delete-directory-unsupported': 'Only files can be moved to Trash from the file tree',
   'error.trash-unavailable': 'System Trash is not available',
   'error.failed-trash-file': 'Could not move the file to Trash',
+  'error.trash-file-outcome-uncertain':
+    'Could not confirm whether the file was moved to Trash. Check the file tree before trying again.',
+  'error.clone-outcome-uncertain':
+    'Could not confirm whether cloning completed. Check the target directory before trying again.',
+  'error.external-app-outcome-uncertain':
+    'Could not confirm whether the external app opened. Check the app before trying again.',
   'error.git-command-cancelled-check-state':
     'The Git operation was cancelled. Repository state may have changed; check it before trying again.',
   'error.git-command-timeout-check-state':
     'The Git operation timed out. Repository state may have changed; check it before trying again.',
   'error.invalid-arguments': 'Invalid arguments',
   'error.workspace-runtime-stale': 'Workspace runtime is stale',
+  'error.workspace-tabs-committed-projection-failed':
+    'The tab change was saved, but the current view could not be refreshed. Reopen the workspace to continue.',
+  'error.workspace-tabs-outcome-uncertain':
+    'Could not confirm whether the tab change was saved. Reopen the workspace and check its current state.',
+  'error.operation-outcome-uncertain':
+    'Could not confirm whether the operation completed. Check the current state before trying again.',
   'error.workspace-target-stale': 'Workspace target changed. Please try again.',
   'error.worktree-removal-in-progress': 'This worktree is being removed',
   'error.not-controller': 'Another session is controlling this terminal',
@@ -609,6 +632,7 @@ export const en = {
   'error.ghostty-not-installed': 'Ghostty not installed',
   'error.terminal-not-installed': 'Terminal not installed',
   'error.terminal-create-failed': 'Terminal could not be created',
+  'error.terminal-session-limit-reached': 'The 1,024-terminal limit has been reached. Close a terminal and try again.',
   'error.terminal-connection-timeout': 'Timed out connecting to the terminal service. Try again.',
   'error.terminal-create-timeout': 'Timed out creating the terminal. Try again.',
   'error.terminal-connection-unavailable': 'Terminal service is not available. Try again.',
@@ -707,11 +731,14 @@ export const en = {
   'settings.web.token-copy': 'Copy token',
   'settings.web.token-copied': 'Token copied to clipboard.',
   'settings.web.token-copy-failed': 'Could not copy to clipboard.',
+  'settings.web.token-read-failed': 'Could not read token state. Reopen settings to try again.',
   'settings.web.token-rotate': 'Rotate token',
-  'settings.web.token-rotated': 'Token rotated. Re-authenticate to continue.',
+  'settings.web.token-rotated': 'New token saved. It will take effect after you restart Goblin.',
   'settings.web.token-rotate-failed': 'Token rotation failed.',
   'settings.web.token-rotation-hint':
-    'The QR codes below include this token. Scanning them auto-fills the gate on the target device.',
+    'The QR codes below include the currently active token. Scanning them auto-fills the gate on the target device.',
+  'settings.web.token-pending-restart-hint':
+    'The displayed token and QR codes become valid when Goblin next starts. The current token remains active until then.',
   'settings.web.lan': 'Network',
   'settings.web.lan-urls': 'LAN addresses',
   'settings.web.lan-urls-hint': 'Other devices on the same local network can use these addresses to access Goblin.',
@@ -776,6 +803,8 @@ export const en = {
   'settings.global-shortcut-recording': 'Press keys…',
   'settings.global-shortcut-reset': 'Reset',
   'settings.global-shortcut-conflict': 'Registration failed. It may be in use.',
+  'settings.global-shortcut-projection-failed':
+    'The preference was saved, but the app shortcut could not be updated. Reopen the app to apply it.',
   'settings.global-shortcut-invalid': 'Use Command, Control, or Option with a key.',
   'settings.open-github': 'Open project on GitHub',
   'about.app': 'Goblin',

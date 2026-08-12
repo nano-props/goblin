@@ -4,7 +4,6 @@ import type { WorkspacePaneTerminalTabSummary } from '#/web/workspace-pane/works
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
   confirmWorkspacePaneRuntimeTabClose,
-  terminalBaseForRuntimeTabCloseTarget,
   workspacePaneRuntimeTabCloseConfirmRequest,
   workspacePaneRuntimeTabConfirmedCloseIdentity,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
@@ -68,15 +67,15 @@ describe('workspace pane runtime tab close actions', () => {
     ).toBeNull()
   })
 
-  test('confirms terminal runtime close through the runtime close registry', async () => {
-    const closeTerminalByDescriptor = vi.fn(async () => true)
+  test('confirms terminal runtime close through the terminal close context', async () => {
+    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
 
     await expect(
       confirmWorkspacePaneRuntimeTabClose(
         { type: 'terminal', sessionId: 'term-111111111111111111111', target: closeTarget },
-        { byType: { terminal: { closeTerminalByDescriptor } } },
+        { closeTerminalByDescriptor },
       ),
-    ).resolves.toBe(true)
+    ).resolves.toEqual({ kind: 'committed', projection: 'applied' })
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', terminalBase)
     expect(
@@ -88,7 +87,14 @@ describe('workspace pane runtime tab close actions', () => {
     ).toBe('terminal:term-111111111111111111111')
   })
 
-  test('uses the canonical terminal base as the runtime close target', () => {
-    expect(terminalBaseForRuntimeTabCloseTarget(closeTarget)).toEqual(terminalBase)
+  test('stops pane presentation when terminal close committed without a current pane projection', async () => {
+    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'failed' as const }))
+
+    await expect(
+      confirmWorkspacePaneRuntimeTabClose(
+        { type: 'terminal', sessionId: 'term-111111111111111111111', target: closeTarget },
+        { closeTerminalByDescriptor },
+      ),
+    ).resolves.toEqual({ kind: 'committed', projection: 'failed' })
   })
 })

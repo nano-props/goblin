@@ -1,71 +1,49 @@
 import { isShellProcessName } from '#/shared/terminal-process-name.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabCloseOutcome } from '#/web/workspace-pane/workspace-pane-tab-close-outcome.ts'
 import { workspacePaneRuntimeTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
-export type WorkspacePaneRuntimeTabCloseTarget = TerminalSessionBase
 
 export interface WorkspacePaneRuntimeTabCloseConfirmInput {
-  type: WorkspacePaneRuntimeTabType
+  type: 'terminal'
   identity: string
   sessionId: string
   view: WorkspacePaneRuntimeTabSummary
-  target: WorkspacePaneRuntimeTabCloseTarget
+  target: TerminalSessionBase
 }
 
 export interface WorkspacePaneRuntimeTabCloseConfirmRequest {
-  type: WorkspacePaneRuntimeTabType
+  type: 'terminal'
   identity: string
   sessionId: string
-  target: WorkspacePaneRuntimeTabCloseTarget
+  target: TerminalSessionBase
   processName?: string
 }
 
 export interface ConfirmedWorkspacePaneRuntimeTabClose {
-  type: WorkspacePaneRuntimeTabType
+  type: 'terminal'
   sessionId: string
-  target: WorkspacePaneRuntimeTabCloseTarget
-}
-
-export interface WorkspacePaneRuntimeTabCloseContext {
-  byType: Partial<Record<WorkspacePaneRuntimeTabType, unknown>>
+  target: TerminalSessionBase
 }
 
 export interface TerminalWorkspacePaneRuntimeTabCloseContext {
-  closeTerminalByDescriptor?: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
-}
-
-interface WorkspacePaneRuntimeTabCloseActions {
-  closeConfirmRequest: (
-    input: WorkspacePaneRuntimeTabCloseConfirmInput,
-  ) => WorkspacePaneRuntimeTabCloseConfirmRequest | null
-  confirmClose: (
-    confirmed: ConfirmedWorkspacePaneRuntimeTabClose,
-    context: WorkspacePaneRuntimeTabCloseContext,
-  ) => Promise<boolean>
-}
-
-const WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE: Record<
-  WorkspacePaneRuntimeTabType,
-  WorkspacePaneRuntimeTabCloseActions
-> = {
-  terminal: {
-    closeConfirmRequest: terminalCloseConfirmRequest,
-    confirmClose: confirmTerminalClose,
-  },
+  closeTerminalByDescriptor: (
+    terminalSessionId: string,
+    base: TerminalSessionBase,
+  ) => Promise<WorkspacePaneTabCloseOutcome>
 }
 
 export function workspacePaneRuntimeTabCloseConfirmRequest(
   input: WorkspacePaneRuntimeTabCloseConfirmInput,
 ): WorkspacePaneRuntimeTabCloseConfirmRequest | null {
-  return WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE[input.type].closeConfirmRequest(input)
+  return terminalCloseConfirmRequest(input)
 }
 
 export async function confirmWorkspacePaneRuntimeTabClose(
   confirmed: ConfirmedWorkspacePaneRuntimeTabClose,
-  context: WorkspacePaneRuntimeTabCloseContext,
-): Promise<boolean> {
-  return await WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE[confirmed.type].confirmClose(confirmed, context)
+  context: TerminalWorkspacePaneRuntimeTabCloseContext,
+): Promise<WorkspacePaneTabCloseOutcome> {
+  return await confirmTerminalClose(confirmed, context)
 }
 
 export function workspacePaneRuntimeTabConfirmedCloseIdentity(
@@ -78,7 +56,6 @@ function terminalCloseConfirmRequest(
   input: WorkspacePaneRuntimeTabCloseConfirmInput,
 ): WorkspacePaneRuntimeTabCloseConfirmRequest | null {
   if (input.view.type !== 'terminal') return null
-  if (!terminalBaseForRuntimeTabCloseTarget(input.target)) return null
   if (input.view.phase !== 'open') return null
   const processName = input.view.processName?.trim()
   if (!processName || isShellProcessName(processName)) return null
@@ -93,21 +70,7 @@ function terminalCloseConfirmRequest(
 
 async function confirmTerminalClose(
   confirmed: ConfirmedWorkspacePaneRuntimeTabClose,
-  context: WorkspacePaneRuntimeTabCloseContext,
-): Promise<boolean> {
-  const terminalBase = terminalBaseForRuntimeTabCloseTarget(confirmed.target)
-  if (!terminalBase) return false
-  const closeTerminalByDescriptor = terminalRuntimeTabCloseContext(context)?.closeTerminalByDescriptor
-  if (!closeTerminalByDescriptor) return false
-  return await closeTerminalByDescriptor(confirmed.sessionId, terminalBase)
-}
-
-export function terminalRuntimeTabCloseContext(
-  context: WorkspacePaneRuntimeTabCloseContext,
-): TerminalWorkspacePaneRuntimeTabCloseContext | undefined {
-  return context.byType.terminal as TerminalWorkspacePaneRuntimeTabCloseContext | undefined
-}
-
-export function terminalBaseForRuntimeTabCloseTarget(target: WorkspacePaneRuntimeTabCloseTarget): TerminalSessionBase {
-  return target
+  context: TerminalWorkspacePaneRuntimeTabCloseContext,
+): Promise<WorkspacePaneTabCloseOutcome> {
+  return await context.closeTerminalByDescriptor(confirmed.sessionId, confirmed.target)
 }

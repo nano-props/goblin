@@ -303,15 +303,3 @@ export async function graphqlRequestResult<TData>(
     }
   })
 }
-
-export async function graphqlRequest<TData>(
-  cwd: string,
-  repo: GitHubRepoRef,
-  query: string,
-  variables: Record<string, unknown>,
-  operationName: string,
-  signal?: AbortSignal,
-): Promise<TData | null> {
-  const result = await graphqlRequestResult<TData>(cwd, repo, query, variables, operationName, signal)
-  return result.ok ? result.data : null
-}

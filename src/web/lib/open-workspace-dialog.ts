@@ -24,9 +24,10 @@ export async function openWorkspaceFromDialog({
   if (!path) return
   const result = await openWorkspaceMembership(path)
   if (!result.ok) {
-    toast.error(t('drop.open-failed'), {
-      description: t(result.message),
-    })
+    const message = t('drop.open-failed')
+    const options = { description: t(result.message) }
+    if (result.kind === 'uncertain') toast.warning(message, options)
+    else toast.error(message, options)
     return
   }
   reportOpenWorkspacePostOpenEffects(result, t)

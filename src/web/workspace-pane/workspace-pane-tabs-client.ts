@@ -14,9 +14,6 @@ export const workspacePaneTabsClient: WorkspacePaneTabsClient = {
   list(input) {
     return getWorkspacePaneTabsClient().list(input)
   },
-  replace(input) {
-    return getWorkspacePaneTabsClient().replace(input)
-  },
   update(input) {
     return getWorkspacePaneTabsClient().update(input)
   },

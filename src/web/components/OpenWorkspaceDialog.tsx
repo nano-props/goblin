@@ -11,7 +11,10 @@ import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggest
 import { useLatestAsyncTask } from '#/web/hooks/useLatestAsyncTask.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
+import {
+  reportOpenWorkspacePostOpenEffects,
+  reportOpenWorkspaceUncertainty,
+} from '#/web/lib/open-workspace-result-feedback.ts'
 import { tildify, untildify } from '#/web/lib/paths.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
@@ -90,8 +93,7 @@ export const OpenWorkspaceDialog = defineComponent<Props>({
           onClose()
           return
         }
-        const messageKey = result.value.message
-        error.value = t(messageKey)
+        if (!reportOpenWorkspaceUncertainty(result.value, t)) error.value = t(result.value.message)
       } catch (caught) {
         if (!signal.aborted) error.value = caught instanceof Error ? caught.message : t('error.unknown')
       }

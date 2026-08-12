@@ -6,6 +6,7 @@ import {
   runtimeTabsCoordinator,
   terminalCreateSuccess,
   terminalSession,
+  workspaceRuntimeMembershipCapability,
   workspaceId,
 } from '#/server/test-utils/workspace-pane-runtime-application.ts'
 import {
@@ -32,7 +33,8 @@ describe('close reconciliation', () => {
         ensureRuntimeTabForSession: vi.fn(),
         reconcileWorktreeAdmitted,
       }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged,
     })
 
@@ -66,7 +68,12 @@ describe('close reconciliation', () => {
         worktreePath: request.worktreePath,
         physicalWorktreeCapability: expect.anything(),
         permit: expect.anything(),
-        assertCurrent: expect.any(Function),
+        epochCapability: expect.objectContaining({
+          userId: 'user-test',
+          workspaceId,
+          workspaceRuntimeId: request.workspaceRuntimeId,
+          assertCurrent: expect.any(Function),
+        }),
       }),
     )
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(
@@ -89,7 +96,8 @@ describe('close reconciliation', () => {
         ensureRuntimeTabForSession: vi.fn(),
         reconcileWorktreeAdmitted,
       }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -112,6 +120,44 @@ describe('close reconciliation', () => {
     })
     expect(close).not.toHaveBeenCalled()
     expect(reconcileWorktreeAdmitted).toHaveBeenCalledOnce()
+  })
+
+  test('preserves a committed terminal close when the tabs projection cannot be refreshed', async () => {
+    const session = terminalSession('term-projectionfailed001', 'pty_projection_aaaaaaaa')
+    const close = vi.fn(() => ({ kind: 'closed' as const }))
+    const projectionError = new Error('projection unavailable')
+    const invalidateWorkspaceTabs = vi.fn()
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      terminalSessions: { listSessionsForUser: async () => [session] },
+      terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
+      workspaceTabsCoordinator: runtimeTabsCoordinator({
+        ensureRuntimeTabForSession: vi.fn(),
+        reconcileWorktreeAdmitted: vi.fn(async () => {
+          throw projectionError
+        }),
+      }),
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs,
+      broadcastWorkspaceTabsChanged,
+    })
+
+    await expect(
+      application.close('client-test', 'user-test', {
+        runtimeType: 'terminal',
+        sessionId: session.terminalSessionId,
+        target: { target: request.target },
+      }),
+    ).resolves.toMatchObject({
+      ok: true,
+      runtime: { action: 'closed', terminalSessionId: session.terminalSessionId },
+      paneTabsSnapshot: null,
+    })
+    expect(close).toHaveBeenCalledOnce()
+    expect(invalidateWorkspaceTabs).toHaveBeenCalledWith('user-test', workspaceId)
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
   test('does not close a same-path terminal owned by a different execution target', async () => {
@@ -141,7 +187,8 @@ describe('close reconciliation', () => {
       terminalSessions: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -182,7 +229,8 @@ describe('close reconciliation', () => {
       terminalSessions: { listSessionsForUser: async () => [session] },
       terminal: { createAdmitted: async () => terminalCreateSuccess(), close },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -207,7 +255,8 @@ describe('close reconciliation', () => {
         close: async () => ({ kind: 'failed' as const }),
       },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -236,7 +285,8 @@ describe('close reconciliation', () => {
         ensureRuntimeTabForSession: vi.fn(),
         reconcileWorktreeAdmitted: vi.fn(async () => paneTabsSnapshot),
       }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 

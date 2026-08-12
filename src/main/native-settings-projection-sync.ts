@@ -24,6 +24,21 @@ export function startNativeSettingsProjectionSync(initialSnapshot: SettingsSnaps
   connect(currentGeneration)
 }
 
+/**
+ * Converge native effects through the same ordered authoritative projection
+ * owner used by invalidation events. Commands that first mutate server-owned
+ * settings await this boundary instead of applying native state themselves.
+ */
+export async function refreshNativeSettingsProjection(): Promise<SettingsSnapshot> {
+  const currentGeneration = generation
+  if (!isActiveGeneration(currentGeneration)) {
+    throw new Error('Native settings projection unavailable')
+  }
+  const snapshot = await enqueueRefresh(currentGeneration)
+  if (!snapshot) throw new Error('Native settings projection unavailable')
+  return snapshot
+}
+
 export function stopNativeSettingsProjectionSync(): void {
   generation += 1
   stopped = true
@@ -77,20 +92,24 @@ function handleMessage(raw: string, currentGeneration: number): void {
   enqueueRefresh(currentGeneration)
 }
 
-function enqueueRefresh(currentGeneration: number): void {
-  refreshQueue = refreshQueue
-    .then(async () => {
-      if (!isActiveGeneration(currentGeneration)) return
-      const previous = authoritativeSnapshot
-      if (!previous) return
-      const current = await getSettingsSnapshot()
-      if (!isActiveGeneration(currentGeneration)) return
-      const projection = nativeProjectionFromSnapshots(previous, current)
-      if (projection) await applyNativeHostProjection(projection)
-      if (!isActiveGeneration(currentGeneration)) return
-      authoritativeSnapshot = current
-    })
-    .catch((error) => windowNodeLog.error({ err: error }, 'failed to apply server settings to native host'))
+function enqueueRefresh(currentGeneration: number): Promise<SettingsSnapshot | null> {
+  const operation = refreshQueue.then(async () => {
+    if (!isActiveGeneration(currentGeneration)) return null
+    const previous = authoritativeSnapshot
+    if (!previous) return null
+    const current = await getSettingsSnapshot()
+    if (!isActiveGeneration(currentGeneration)) return null
+    const projection = nativeProjectionFromSnapshots(previous, current)
+    if (projection) await applyNativeHostProjection(projection)
+    if (!isActiveGeneration(currentGeneration)) return null
+    authoritativeSnapshot = current
+    return current
+  })
+  refreshQueue = operation.then(
+    () => undefined,
+    (error) => windowNodeLog.error({ err: error }, 'failed to apply server settings to native host'),
+  )
+  return operation
 }
 
 export function nativeProjectionFromSnapshots(

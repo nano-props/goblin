@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, expect, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import {
-  acquireWorkspaceRuntime,
-  clearWorkspaceRuntimesForUser,
-  commitWorkspaceProbeState,
-} from '#/server/modules/workspace-runtimes.ts'
+import { acquireWorkspaceRuntime, clearWorkspaceRuntimesForUser } from '#/server/modules/workspace-runtimes.ts'
+import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 import { REALTIME_LIVENESS_DEADLINE_MS } from '#/server/realtime/realtime-broker.ts'
@@ -39,7 +36,6 @@ export let WORKSPACE_RUNTIME_ID = ''
 export let SSH_WORKSPACE_RUNTIME_ID = ''
 export let USER_2_WORKSPACE_RUNTIME_ID = ''
 export const TEST_NOW = new Date('2026-06-24T00:00:00Z')
-export const DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 export const CLIENT_STATE_GRACE_MS = 30_000
 export const LIVENESS_SILENCE_MS = REALTIME_LIVENESS_DEADLINE_MS
 
@@ -62,12 +58,14 @@ export function workspacePaneWorktreeTarget(workspaceRuntimeId: string) {
   }
 }
 
-export function commitTerminalReadyProbe(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
-  const committed = commitWorkspaceProbeState({
-    userId,
-    workspaceId,
-    workspaceRuntimeId,
-    probe: {
+export async function commitTerminalReadyProbe(
+  userId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+): Promise<void> {
+  await settleWorkspaceProbeForTest(
+    { userId, workspaceId, workspaceRuntimeId },
+    {
       status: 'ready',
       capabilities: {
         files: { read: true, write: true },
@@ -76,8 +74,7 @@ export function commitTerminalReadyProbe(userId: string, workspaceId: WorkspaceI
       },
       diagnostics: [],
     },
-  })
-  if (!committed) throw new Error('test runtime probe was not awaiting its authoritative initial result')
+  )
 }
 
 vi.mock('#/system/git/worktrees.ts', () => ({
@@ -271,36 +268,16 @@ const testWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
   },
 }
 
-export function buildRuntime(
+export async function buildRuntime(
   options: {
     captureTargets?: WorkspacePaneTargetProjectionProvider['captureTargets']
   } = {},
-): RuntimeHandle {
+): Promise<RuntimeHandle> {
   const runtime = createServerTerminalRuntime({
     ptySupervisor: createInProcessPtySupervisor(),
     workspacePaneLayoutRepository: testWorkspacePaneLayoutRepository,
     workspacePaneTargetProjection: {
-      captureTargets:
-        options.captureTargets ??
-        (async (_userId, repoRoot, scope) => {
-          const workspaceId = canonicalWorkspaceLocator(repoRoot)
-          if (!workspaceId) throw new Error('invalid test workspace id')
-          const separator = scope.lastIndexOf('\0')
-          const workspaceRuntimeId = scope.slice(separator + 1)
-          const nativeWorktreePath = repoRoot.startsWith('goblin+ssh://') ? '/srv/repo' : '/repo-linked'
-          return [
-            {
-              target: {
-                kind: 'git-worktree',
-                workspaceId,
-                workspaceRuntimeId,
-                root: repoRoot.startsWith('goblin+ssh://') ? workspaceId : LINKED_REPO_ROOT,
-              },
-              nativeWorktreePath,
-              canonicalBranch: 'feature',
-            },
-          ]
-        }),
+      captureTargets: options.captureTargets ?? captureTestWorkspacePaneTargets,
     },
   })
   WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_a')
@@ -308,10 +285,10 @@ export function buildRuntime(
   SSH_WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_1, sshWorkspaceId, 'client_a')
   USER_2_WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_2, REPO_ROOT, 'client_b')
   const user2SshWorkspaceRuntimeId = acquireWorkspaceRuntime(USER_2, sshWorkspaceId, 'client_b')
-  commitTerminalReadyProbe(USER_1, REPO_ROOT, WORKSPACE_RUNTIME_ID)
-  commitTerminalReadyProbe(USER_1, sshWorkspaceId, SSH_WORKSPACE_RUNTIME_ID)
-  commitTerminalReadyProbe(USER_2, REPO_ROOT, USER_2_WORKSPACE_RUNTIME_ID)
-  commitTerminalReadyProbe(USER_2, sshWorkspaceId, user2SshWorkspaceRuntimeId)
+  await commitTerminalReadyProbe(USER_1, REPO_ROOT, WORKSPACE_RUNTIME_ID)
+  await commitTerminalReadyProbe(USER_1, sshWorkspaceId, SSH_WORKSPACE_RUNTIME_ID)
+  await commitTerminalReadyProbe(USER_2, REPO_ROOT, USER_2_WORKSPACE_RUNTIME_ID)
+  await commitTerminalReadyProbe(USER_2, sshWorkspaceId, user2SshWorkspaceRuntimeId)
   createTerminalApplications.set(runtime.host, runtime.workspacePaneRuntimeHost)
   const shutdown = () => {
     if (!activeRuntimeShutdowns.delete(shutdown)) return
@@ -324,6 +301,30 @@ export function buildRuntime(
     shutdown,
     isClientOnline: (clientId: string) => runtime.host.isClientOnline(USER_1, clientId),
   }
+}
+
+export const captureTestWorkspacePaneTargets: WorkspacePaneTargetProjectionProvider['captureTargets'] = async (
+  _userId,
+  repoRoot,
+  scope,
+) => {
+  const workspaceId = canonicalWorkspaceLocator(repoRoot)
+  if (!workspaceId) throw new Error('invalid test workspace id')
+  const separator = scope.lastIndexOf('\0')
+  const workspaceRuntimeId = scope.slice(separator + 1)
+  const nativeWorktreePath = repoRoot.startsWith('goblin+ssh://') ? '/srv/repo' : '/repo-linked'
+  return [
+    {
+      target: {
+        kind: 'git-worktree',
+        workspaceId,
+        workspaceRuntimeId,
+        root: repoRoot.startsWith('goblin+ssh://') ? workspaceId : LINKED_REPO_ROOT,
+      },
+      nativeWorktreePath,
+      canonicalBranch: 'feature',
+    },
+  ]
 }
 
 beforeEach(() => {
@@ -432,7 +433,7 @@ export function createLocalWorktreeTerminal(
 }
 
 export async function startControlledTerminalRuntime() {
-  const { host, shutdown } = buildRuntime()
+  const { host, shutdown } = await buildRuntime()
   const socket = appRealtimeSocket()
   host.registerSocket('client_a', USER_1, socket)
   const terminalRuntimeSessionId = await createTerminalSession(host, 'client_a')

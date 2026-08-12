@@ -26,7 +26,6 @@ import { createNativeShortcutRegistrationState } from '#/server/modules/native-s
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_HTTP_BODY_BYTES } from '#/shared/clipboard-paste.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
-import { createRepoMutationApplication } from '#/server/repo-mutation/repo-mutation-application.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { isJsonContentType } from '#/server/common/http-validate.ts'
 
@@ -261,7 +260,6 @@ export function createApp(options: ServerAppOptions): Hono {
     '/api/repo',
     createRepoRoutes({
       worktreeRemovalApplication: options.worktreeRemovalApplication,
-      repoMutationApplication: createRepoMutationApplication(),
       workspaceCapabilityTransitionHost: options.workspaceCapabilityTransitionHost,
     }),
   )

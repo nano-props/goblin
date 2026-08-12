@@ -3,9 +3,10 @@
 import { describe, expect, test, vi } from 'vitest'
 import {
   acquireWorkspaceRuntime,
+  captureWorkspaceRuntimeMembershipCapability,
   clearWorkspaceRuntimesForUser,
-  isCurrentWorkspaceRuntimeMembership,
   releaseWorkspaceRuntime,
+  type WorkspaceRuntimeMembershipCapability,
 } from '#/server/modules/workspace-runtimes.ts'
 import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -36,26 +37,28 @@ function makeActions(
       },
     ],
   }
-  const replacedSnapshot = { revision: 2, entries: listedSnapshot.entries }
   const updatedSnapshot = {
     revision: 3,
     entries: [{ ...listedSnapshot.entries[0], tabs: [workspacePaneStaticTabEntry('history')] }],
   }
   const sessionService = {
     listWorkspaceTabs: vi.fn(
-      async (_userId: string, _workspaceId: WorkspaceId, _workspaceRuntimeId: string, assertCurrent: () => void) => {
-        assertCurrent()
+      async (
+        _userId: string,
+        _workspaceId: WorkspaceId,
+        _workspaceRuntimeId: string,
+        runtimeCapability: WorkspaceRuntimeMembershipCapability,
+      ) => {
+        runtimeCapability.assertCurrent()
         return listedSnapshot
       },
     ),
-    replaceTabs: vi.fn(async (_userId: string, _input: unknown, assertCurrent: () => void) => {
-      assertCurrent()
-      return replacedSnapshot
-    }),
-    updateTabs: vi.fn(async (_userId: string, _input: unknown, assertCurrent: () => void) => {
-      assertCurrent()
-      return updatedSnapshot
-    }),
+    updateTabs: vi.fn(
+      async (_userId: string, _input: unknown, runtimeCapability: WorkspaceRuntimeMembershipCapability) => {
+        runtimeCapability.assertCurrent()
+        return { kind: 'projected' as const, snapshot: updatedSnapshot }
+      },
+    ),
   }
   const isValidClientId = options.isValidClientId ?? ((value: unknown): value is string => value === CLIENT_ID)
 
@@ -63,7 +66,7 @@ function makeActions(
     actions: createWorkspacePaneTabsActions({
       sessionService,
       isValidClientId,
-      isCurrentWorkspaceRuntimeMembership,
+      captureWorkspaceRuntimeMembershipCapability,
     }),
     sessionService,
   }
@@ -94,25 +97,8 @@ describe('workspace-pane-tabs-actions', () => {
       USER_ID,
       REPO_ROOT,
       WORKSPACE_RUNTIME_ID,
-      expect.any(Function),
+      expect.objectContaining({ clientId: CLIENT_ID }),
     )
-  })
-
-  test('delegates replaceTabs after validation succeeds', async () => {
-    clearWorkspaceRuntimesForUser(USER_ID)
-    syncCurrentWorkspaceRuntime()
-    const { actions, sessionService } = makeActions()
-
-    await expect(
-      actions.replaceTabs(CLIENT_ID, USER_ID, {
-        workspaceId: REPO_ROOT,
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        target: runtimeTarget(),
-        tabs: [workspacePaneStaticTabEntry('status')],
-      }),
-    ).resolves.toMatchObject({ revision: 2 })
-
-    expect(sessionService.replaceTabs).toHaveBeenCalledOnce()
   })
 
   test('delegates updateTabs after validation succeeds', async () => {
@@ -127,26 +113,26 @@ describe('workspace-pane-tabs-actions', () => {
         target: runtimeTarget(),
         operation: { type: 'open-static', tabType: 'status' },
       }),
-    ).resolves.toMatchObject({ revision: 3 })
+    ).resolves.toMatchObject({ kind: 'projected', snapshot: { revision: 3 } })
 
     expect(sessionService.updateTabs).toHaveBeenCalledOnce()
   })
 
-  test('rejects a replaceTabs input whose target belongs to another workspace', async () => {
+  test('rejects an update input whose target belongs to another workspace', async () => {
     clearWorkspaceRuntimesForUser(USER_ID)
     syncCurrentWorkspaceRuntime()
     const { actions, sessionService } = makeActions()
 
     await expect(
-      actions.replaceTabs(CLIENT_ID, USER_ID, {
+      actions.updateTabs(CLIENT_ID, USER_ID, {
         workspaceId: OTHER_WORKSPACE_ID,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         target: runtimeTarget(),
-        tabs: [workspacePaneStaticTabEntry('status')],
+        operation: { type: 'open-static', tabType: 'status' },
       }),
-    ).resolves.toEqual({ revision: 0, entries: [] })
+    ).resolves.toEqual({ kind: 'projected', snapshot: { revision: 0, entries: [] } })
 
-    expect(sessionService.replaceTabs).not.toHaveBeenCalled()
+    expect(sessionService.updateTabs).not.toHaveBeenCalled()
   })
 
   test('rejects stale workspace runtimes before touching workspace tab state', async () => {
@@ -188,7 +174,7 @@ describe('workspace-pane-tabs-actions', () => {
     const otherClientActions = createWorkspacePaneTabsActions({
       sessionService,
       isValidClientId: (value: unknown): value is string => value === otherClientId,
-      isCurrentWorkspaceRuntimeMembership,
+      captureWorkspaceRuntimeMembershipCapability,
     })
     await expect(
       otherClientActions.listWorkspaceTabs(otherClientId, USER_ID, {
@@ -204,10 +190,10 @@ describe('workspace-pane-tabs-actions', () => {
     const otherClientId = 'client_workspace_pane_tabs_other'
     expect(acquireWorkspaceRuntime(USER_ID, REPO_ROOT, otherClientId)).toBe(WORKSPACE_RUNTIME_ID)
     const { actions, sessionService } = makeActions()
-    sessionService.updateTabs.mockImplementationOnce(async (_userId, _input, assertCurrent) => {
+    sessionService.updateTabs.mockImplementationOnce(async (_userId, _input, runtimeCapability) => {
       releaseWorkspaceRuntime(USER_ID, REPO_ROOT, WORKSPACE_RUNTIME_ID, CLIENT_ID)
-      assertCurrent()
-      return { revision: 99, entries: [] }
+      runtimeCapability.assertCurrent()
+      return { kind: 'projected', snapshot: { revision: 99, entries: [] } }
     })
 
     await expect(

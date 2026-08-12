@@ -4,11 +4,11 @@ import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-p
 import {
   acquireWorkspaceRuntimeLease,
   clearWorkspaceRuntimesForUser,
-  commitWorkspaceProbeState,
   isCurrentWorkspaceRuntime,
   isCurrentWorkspaceRuntimeMembership,
   releaseWorkspaceRuntimeMembershipLease,
 } from '#/server/modules/workspace-runtimes.ts'
+import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -66,11 +66,13 @@ describe('session restore runtime ownership', () => {
 
   test('preserves membership while restoring the accepted repository snapshot', async () => {
     const lease = acquireWorkspaceRuntimeLease(USER_ID, REPO_ROOT, CLIENT_ID)
-    commitWorkspaceProbeState({
-      userId: USER_ID,
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: lease.workspaceRuntimeId,
-      probe: {
+    await settleWorkspaceProbeForTest(
+      {
+        userId: USER_ID,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: lease.workspaceRuntimeId,
+      },
+      {
         status: 'ready',
         capabilities: {
           files: { read: true, write: true },
@@ -79,7 +81,7 @@ describe('session restore runtime ownership', () => {
         },
         diagnostics: [],
       },
-    })
+    )
     expect(isCurrentWorkspaceRuntimeMembership(USER_ID, REPO_ROOT, lease.workspaceRuntimeId, CLIENT_ID)).toBe(true)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
@@ -95,12 +97,21 @@ describe('session restore runtime ownership', () => {
 
     expect(result.workspace).toMatchObject({ workspaceId: REPO_ROOT, repoSnapshot: { current: 'main' } })
     expect(result.snapshot).toEqual({ revision: 0, entries: [] })
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: lease.workspaceRuntimeId,
-      expectedWorkspaceEntry: { id: REPO_ROOT },
-      targets: [{ kind: 'workspace-root' }],
-    })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(
+      USER_ID,
+      {
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: lease.workspaceRuntimeId,
+        expectedWorkspaceEntry: { id: REPO_ROOT },
+        targets: [{ kind: 'workspace-root' }],
+      },
+      expect.objectContaining({
+        userId: USER_ID,
+        clientId: CLIENT_ID,
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: lease.workspaceRuntimeId,
+      }),
+    )
     expect(isCurrentWorkspaceRuntime(USER_ID, REPO_ROOT, lease.workspaceRuntimeId)).toBe(true)
     expect(releaseWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID, lease)).toEqual({
       released: true,

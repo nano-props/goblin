@@ -6,9 +6,9 @@ import { getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
 import {
   GlobalShortcutStateResponseSchema,
   SettingsSnapshotSchema,
-  UserSettingsSchema,
   UserSettingsUpdateResponseSchema,
 } from '#/shared/settings-response-schema.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 // Main-process client for server-owned settings APIs.
 export type UserSettingsPatch = Partial<UserSettings>
@@ -49,18 +49,10 @@ export async function updateUserSettings(settings: UserSettingsPatch): Promise<U
   const json = await postEmbeddedServerJson(runtime, '/api/settings/prefs', { prefs: settings }, (value) =>
     v.parse(UserSettingsUpdateResponseSchema, value),
   ).catch((error) => {
+    if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) throw error
     throw new Error(`Embedded server rejected settings update${error instanceof Error ? `: ${error.message}` : ''}`)
   })
   return json.prefs
-}
-
-export async function getUserSettings(): Promise<UserSettings> {
-  return await requestSettingsJson<UserSettings>(
-    '/api/settings/prefs',
-    (value) => v.parse(UserSettingsSchema, value),
-    undefined,
-    'Embedded server rejected settings prefs request',
-  )
 }
 
 export async function setGlobalShortcutState(registered: boolean): Promise<boolean> {
@@ -68,6 +60,7 @@ export async function setGlobalShortcutState(registered: boolean): Promise<boole
   const json = await postEmbeddedServerJson(runtime, '/api/settings/global-shortcut-state', { registered }, (value) =>
     v.parse(GlobalShortcutStateResponseSchema, value),
   ).catch((error) => {
+    if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) throw error
     throw new Error(
       `Embedded server rejected global shortcut state update${error instanceof Error ? `: ${error.message}` : ''}`,
     )

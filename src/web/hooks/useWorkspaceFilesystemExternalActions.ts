@@ -54,9 +54,16 @@ export async function runWorkspaceFilesystemExternalAction(
   target: WorkspacePaneFilesystemTarget,
   action: () => Promise<ExecResult>,
 ): Promise<ExecResult | null> {
-  const result = await runWorkspaceUiAction(action)
-  if (!result) return null
+  try {
+    const result = await runWorkspaceUiAction(action)
+    if (!result) return null
+    return targetIsCurrent(target) ? result : null
+  } catch (error) {
+    if (targetIsCurrent(target)) throw error
+    return null
+  }
+}
+
+function targetIsCurrent(target: WorkspacePaneFilesystemTarget): boolean {
   return currentWorkspaceRuntimeId(workspacesStore.getState(), target.workspaceId) === target.workspaceRuntimeId
-    ? result
-    : null
 }

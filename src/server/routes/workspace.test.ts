@@ -4,9 +4,10 @@ import {
   acquireWorkspaceRuntime,
   captureWorkspaceRuntimeMembershipLease,
   clearWorkspaceRuntimesForUser,
-  commitWorkspaceProbeState,
   listWorkspaceRuntimes,
+  WorkspaceRuntimeStaleError,
 } from '#/server/modules/workspace-runtimes.ts'
+import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
@@ -181,6 +182,26 @@ describe('workspace routes', () => {
     await expect((await post(app, '/runtime-list', {})).json()).resolves.toEqual({ runtimes: [] })
   })
 
+  test('maps a stale runtime during initial capability cleanup to an actionable HTTP rejection', async () => {
+    const app = createWorkspaceRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityRemoval: vi.fn(async () => ({
+          kind: 'failed-before-commit' as const,
+          error: new WorkspaceRuntimeStaleError(),
+        })),
+      },
+    })
+
+    const response = await post(app, '/runtime-open', {
+      workspaceInput: '/tmp/workspace-route',
+      clientId: CLIENT_ID,
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ message: 'error.workspace-runtime-stale' })
+    expect(captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries).toEqual([])
+  })
+
   test('restores an existing membership generation when renewed admission cleanup fails', async () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, WORKSPACE_ID, CLIENT_ID)
     const before = captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries[0]
@@ -227,6 +248,51 @@ describe('workspace routes', () => {
     await expect(second).resolves.toMatchObject({ status: 500 })
     expect(commitGitCapabilityRemoval).toHaveBeenCalledTimes(2)
     expect(captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries).toEqual([before])
+  })
+
+  test('rejects a runtime admission released while its initial capability commit is in flight', async () => {
+    const cleanupStarted = Promise.withResolvers<void>()
+    const finishCleanup = Promise.withResolvers<void>()
+    let cleanupCommitted = false
+    const app = createWorkspaceRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityRemoval: vi.fn(async ({ runtimeCapability }) => {
+          cleanupStarted.resolve()
+          await finishCleanup.promise
+          try {
+            runtimeCapability.assertCurrent()
+            cleanupCommitted = true
+            return { kind: 'committed' as const }
+          } catch (error) {
+            return { kind: 'failed-before-commit' as const, error }
+          }
+        }),
+      },
+    })
+
+    const open = post(app, '/runtime-open', {
+      workspaceInput: '/tmp/workspace-route',
+      clientId: CLIENT_ID,
+    })
+    await cleanupStarted.promise
+    const workspaceRuntimeId = listWorkspaceRuntimes(USER_ID)[0]?.workspaceRuntimeId
+    if (!workspaceRuntimeId) throw new Error('missing pending runtime admission fixture')
+    expect(captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries).toEqual([])
+
+    await expect(
+      post(app, '/runtime-close', {
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId,
+        clientId: CLIENT_ID,
+      }),
+    ).resolves.toMatchObject({ status: 200 })
+    finishCleanup.resolve()
+
+    const response = await open
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ message: 'error.workspace-runtime-stale' })
+    expect(cleanupCommitted).toBe(false)
+    expect(captureWorkspaceRuntimeMembershipLease(USER_ID, CLIENT_ID).entries).toEqual([])
   })
 
   test('does not mint a runtime when command-input probing fails', async () => {
@@ -336,18 +402,20 @@ describe('workspace routes', () => {
     const opened = (await (
       await post(app, '/runtime-open', { workspaceId: WORKSPACE_ID, clientId: CLIENT_ID })
     ).json()) as { workspaceRuntimeId: string }
-    commitWorkspaceProbeState({
-      userId: USER_ID,
-      workspaceId: WORKSPACE_ID,
-      workspaceRuntimeId: opened.workspaceRuntimeId,
-      probe: {
+    await settleWorkspaceProbeForTest(
+      {
+        userId: USER_ID,
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: opened.workspaceRuntimeId,
+      },
+      {
         ...readyPlainWorkspace,
         capabilities: {
           ...readyPlainWorkspace.capabilities,
           git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
         },
       },
-    })
+    )
 
     const response = await post(app, '/refresh', {
       workspaceId: WORKSPACE_ID,
@@ -358,6 +426,37 @@ describe('workspace routes', () => {
       probe: { status: 'ready', capabilities: { git: { status: 'unavailable' } } },
     })
     expect(commitGitCapabilityRemoval).toHaveBeenCalledOnce()
+  })
+
+  test('maps runtime expiry at the refresh commit boundary to an actionable HTTP rejection', async () => {
+    const app = createWorkspaceRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityRemoval: vi.fn(async () => ({
+          kind: 'failed-before-commit' as const,
+          error: new WorkspaceRuntimeStaleError(),
+        })),
+      },
+    })
+    const workspaceRuntimeId = await openWorkspaceRuntime(app, WORKSPACE_ID)
+    await settleWorkspaceProbeForTest(
+      {
+        userId: USER_ID,
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId,
+      },
+      {
+        ...readyPlainWorkspace,
+        capabilities: {
+          ...readyPlainWorkspace.capabilities,
+          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+        },
+      },
+    )
+
+    const response = await post(app, '/refresh', { workspaceId: WORKSPACE_ID, workspaceRuntimeId })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ message: 'error.workspace-runtime-stale' })
   })
 
   test('routes filesystem operations through one runtime-bound target', async () => {

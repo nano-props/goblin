@@ -1,6 +1,6 @@
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
-import type { AppRealtimeClientMessage, AppRealtimeSocketServerMessage } from '#/shared/app-realtime-socket.ts'
+import type { AppRealtimeClientMessage } from '#/shared/app-realtime-socket.ts'
 import {
   isAppRealtimeWsMessageWithinLimit,
   normalizeAppRealtimeSocketServerMessage,
@@ -17,7 +17,9 @@ export function createAppRealtimeWebSocketUrl(baseUrl: string, accessToken: stri
   return httpUrl.toString()
 }
 
-export function parseAppRealtimeSocketServerMessage(data: unknown): AppRealtimeSocketServerMessage | null {
+export function parseAppRealtimeSocketServerMessage(
+  data: unknown,
+): ReturnType<typeof normalizeAppRealtimeSocketServerMessage> {
   if (typeof data !== 'string') return null
   try {
     return normalizeAppRealtimeSocketServerMessage(JSON.parse(data))

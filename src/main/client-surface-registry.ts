@@ -128,7 +128,7 @@ export function getFocusedRegisteredWindow(): BrowserWindowType | null {
   return focused === getPrimaryWindow() ? focused : null
 }
 
-export function sendToRegisteredWindow(
+function sendToRegisteredWindow(
   win: BrowserWindowType | null | undefined,
   channel: string,
   args: unknown[] = [],

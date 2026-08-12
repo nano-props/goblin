@@ -10,7 +10,7 @@ import {
   runShowWorkspacePaneTabCommand as runShowWorkspacePaneTabCommandRaw,
   runTerminalPrimaryActionCommand as runTerminalPrimaryActionCommandRaw,
 } from '#/web/commands/workspace-commands.ts'
-import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -162,11 +162,13 @@ export const runTerminalPrimaryActionCommand = (
 
 const hoistedToastMocks = vi.hoisted(() => ({
   error: vi.fn(),
+  warning: vi.fn(),
 }))
 
 vi.mock('vue-sonner', () => ({
   toast: {
     error: hoistedToastMocks.error,
+    warning: hoistedToastMocks.warning,
   },
 }))
 

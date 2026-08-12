@@ -304,4 +304,32 @@ describe('theme store OS-appearance sync', () => {
       colorTheme: 'github',
     })
   })
+
+  test('serializes a preference write after an in-flight bootstrap hydrate', async () => {
+    installWindow({ matchMedia: createMediaQuery(false) })
+    const hydrateResponse = Promise.withResolvers<{
+      ok: true
+      json: () => Promise<ReturnType<typeof settingsResponse>>
+    }>()
+    let requestCount = 0
+    mockFetch(async () => {
+      requestCount += 1
+      if (requestCount === 1) return await hydrateResponse.promise
+      return {
+        ok: true,
+        json: async () => ({ ok: true, prefs: defaultUserSettings({ theme: 'dark', colorTheme: 'github' }) }),
+      }
+    })
+
+    const { themeStore } = await import('#/web/stores/theme.ts')
+    const hydrate = themeStore.getState().hydrate()
+    const write = themeStore.getState().setPref('dark')
+    hydrateResponse.resolve({
+      ok: true,
+      json: async () => settingsResponse({ theme: 'light', colorTheme: 'macos' }),
+    })
+    await Promise.all([hydrate, write])
+
+    expect(themeStore.getState()).toMatchObject({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
+  })
 })

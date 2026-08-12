@@ -32,9 +32,9 @@ interface RealtimeRouteOptions {
 // `/ws/invalidation` and `/ws/app` remain data-plane — they push server-
 // owned state changes (repo invalidations, runtime stream events) to
 // subscribers. `/ws/client-intent` is a control-plane relay: the server
-// receives a `ClientEffectIntent` over HTTP (e.g. from `g delta`), wraps it
+// receives the repo-view intent over HTTP (e.g. from `g delta`), wraps it
 // in a JSON envelope, and fans it out to subscribed clients. The server
-// does not interpret intent semantics — it just forwards. Interpretation
+// forwards only that narrow protocol. Interpretation
 // happens in the client's existing `useClientEffectIntentRouter`,
 // which already handles the same intents coming from Electron IPC.
 export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeRouteOptions) {

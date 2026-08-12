@@ -29,6 +29,8 @@ import { appQueryClient } from '#/web/app-query-client.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import { repoOperationsQueryKey } from '#/web/repo-query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-client-intent-handlers-repo')
 
@@ -56,6 +58,20 @@ describe('client effect intent handlers', () => {
       ],
       currentBranch: 'feature/query',
     })
+    appQueryClient.setQueryData(workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId), {
+      revision: 1,
+      entries: [
+        {
+          target: {
+            kind: 'git-worktree',
+            workspaceId: REPO_ID,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
+            root: workspaceIdForTest('goblin+file:///tmp/bell-worktree'),
+          },
+          tabs: [{ type: 'terminal', runtimeSessionId: 'term-queryqueryqueryquery1' }],
+        },
+      ],
+    })
     const d = deps(REPO_ID)
     const showRepoBranchTerminalSession = vi.mocked(d.navigation.showRepoBranchTerminalSession)
     handleTerminalBellClickIntent(
@@ -78,6 +94,36 @@ describe('client effect intent handlers', () => {
     await vi.waitFor(() => {
       expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'term-queryqueryqueryquery1')
     })
+  })
+
+  test('surfaces a terminal bell target whose repository projection is unavailable', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [],
+      currentBranchName: 'feature/query',
+    })
+    appQueryClient.clear()
+    const d = deps(REPO_ID)
+
+    handleTerminalBellClickIntent(
+      {
+        type: 'terminal-bell-click',
+        terminalSessionId: 'term-queryqueryqueryquery1',
+        session: {
+          target: {
+            kind: 'git-worktree',
+            workspaceId: REPO_ID,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
+            root: workspaceIdForTest('goblin+file:///tmp/bell-worktree'),
+          },
+          presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/query' } },
+        },
+      },
+      d,
+    )
+
+    expect(toast.error).toHaveBeenCalledWith('dashboard.terminals.open-failed')
+    expect(d.closeAllOverlays).not.toHaveBeenCalled()
   })
 
   test('returns false when changes cannot be shown for a branch without a worktree', async () => {
@@ -175,10 +221,13 @@ describe('client effect intent handlers', () => {
   })
 })
 
-function deps(currentWorkspaceId: string | null, currentBranchName = 'feature/worktree') {
+function deps(currentWorkspaceId: WorkspaceId | null, currentBranchName = 'feature/worktree') {
   return {
     navigation: navigationWithStoreActions(),
-    currentWorkspaceId,
+    currentWorkspace: currentWorkspaceId ? (workspacesStore.getState().workspaces[currentWorkspaceId] ?? null) : null,
+    terminalBellWorkspace: currentWorkspaceId
+      ? (workspacesStore.getState().workspaces[currentWorkspaceId] ?? null)
+      : null,
     currentWorkspacePaneCommandTarget: currentWorkspaceId
       ? {
           routeTarget: {
@@ -195,8 +244,9 @@ function deps(currentWorkspaceId: string | null, currentBranchName = 'feature/wo
     openCloneRepo: vi.fn(),
     openRemoteWorkspace: vi.fn(),
     openCreateWorktree: vi.fn(),
-    isOverlayOpen: () => false,
-    isWorkspaceShortcutSuppressed: () => false,
+    overlayBlocked: false,
+    workspaceShortcutSuppressed: false,
+    terminalFocused: false,
     openWorkspaceMembership: vi.fn(async (input: string | { id: string }) => ({
       ok: true as const,
       workspaceId: workspaceIdForTest(typeof input === 'string' ? input : input.id),

@@ -20,10 +20,6 @@ import type {
 //
 // Keep this module narrow: only retain effects that are actually shared across
 // multiple main-side call sites.
-async function persistNativeHostGlobalShortcutState(registered: boolean): Promise<void> {
-  await setGlobalShortcutState(registered)
-}
-
 function menuStatePatchFromSettingsProjection(input: {
   patch: NativeSettingsProjectionPatch
   settings: NativeSettingsProjectionState
@@ -66,7 +62,7 @@ async function applyGlobalShortcutDisabledProjectionPatch(input: {
 }): Promise<void> {
   if (input.patch.globalShortcutDisabled === undefined && input.patch.globalShortcut === undefined) return
   const registered = syncGlobalShortcuts(input.settings.globalShortcutDisabled, input.settings.globalShortcut)
-  await persistNativeHostGlobalShortcutState(registered)
+  await setGlobalShortcutState(registered)
 }
 
 async function applyNativeHostSettingsProjection(input: {

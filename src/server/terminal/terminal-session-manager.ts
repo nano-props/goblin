@@ -76,8 +76,9 @@ interface TerminalSessionRetirementResult {
   tabsBeforeRetirement: WorkspacePaneTabEntry[] | null
 }
 const terminalSessionManagerLogger = serverNodeLog.child({ module: 'terminal-session-manager' })
+const MAX_TERMINAL_SESSIONS = 1024
 
-export type TerminalSessionCloseReason = 'session' | 'workspace-pane' | 'scope' | 'detached-user' | 'shutdown'
+export type TerminalSessionCloseReason = 'session' | 'workspace-pane' | 'scope' | 'shutdown'
 
 interface TerminalPtyRestartResult {
   attempt: number
@@ -162,11 +163,6 @@ export type TerminalPhysicalWorktreeQuiescenceResult<TUser extends string | numb
   | { ok: true; scopes: TerminalPhysicalWorktreeScope<TUser>[] }
   | { ok: false; scopes: TerminalPhysicalWorktreeScope<TUser>[]; message: string }
 
-export interface TerminalBatchRetirementResult {
-  removedEffects: TerminalSessionSummary[]
-  failures: Array<{ terminalRuntimeSessionId: string; message: string }>
-}
-
 export interface TerminalSessionInvalidationCommit {
   removedSessions: readonly TerminalSessionSummary[]
   removedCount: number
@@ -198,6 +194,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   private readonly ptySupervisor: PtySupervisor
   private readonly isClientOnline: (userId: TUser, clientId: string) => boolean
   private readonly workspaceRuntimeRetentions: TerminalWorkspaceRuntimeRetentionHost<TUser>
+  private shuttingDown = false
 
   constructor(
     ptySupervisor: PtySupervisor,
@@ -212,6 +209,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   prepareSession(input: TerminalEnsureSessionInput<TUser>): TerminalSessionPrepareResult {
+    if (this.shuttingDown) return { ok: false, message: 'error.unavailable' }
     if (input.signal?.aborted) return { ok: false, message: 'error.workspace-runtime-stale' }
     const cwd = path.resolve(input.cwd)
     const userId = input.userId
@@ -242,6 +240,10 @@ export class TerminalSessionManager<TUser extends string | number> {
           kind: 'existing',
           commit: ({ presentation }) => {
             if (admissionState !== 'pending') throw new Error('error.unavailable')
+            if (this.shuttingDown) {
+              admissionState = 'aborted'
+              throw new Error('error.unavailable')
+            }
             assertTerminalPresentationMatchesTarget(input.target, presentation)
             if (!this.isSessionAvailableForAdmission(existing)) {
               admissionState = 'aborted'
@@ -279,6 +281,17 @@ export class TerminalSessionManager<TUser extends string | number> {
           },
         },
       }
+    }
+
+    // This is a steady-state admission ceiling, not a hard native-resource
+    // quota. Invalidation deliberately releases runtime ownership through an
+    // external synchronous boundary; a re-entrant admission during that handoff
+    // may transiently exceed the ceiling before every retiring PTY is recorded.
+    // The ceiling exists to stop unbounded retained-session growth, not to make
+    // resource retirement a second globally serialized authority.
+    const addressableCapacity = MAX_TERMINAL_SESSIONS - this.invalidatedSessionResourceRetirements.size
+    if (!this.directory.hasCapacity(addressableCapacity)) {
+      return { ok: false, message: 'error.terminal-session-limit-reached' }
     }
 
     const id = createTerminalRuntimeSessionId()
@@ -322,6 +335,11 @@ export class TerminalSessionManager<TUser extends string | number> {
       kind: 'prepared',
       commit: ({ presentation }) => {
         if (admissionState !== 'pending') throw new Error('error.unavailable')
+        if (this.shuttingDown) {
+          admissionState = 'aborted'
+          reservation.abort()
+          throw new Error('error.unavailable')
+        }
         assertTerminalPresentationMatchesTarget(input.target, presentation)
         const processName = terminalPtyProcessName(session)
         session.presentation = presentation
@@ -803,6 +821,15 @@ export class TerminalSessionManager<TUser extends string | number> {
     lifecycleChanged: boolean
   } {
     session.ptyBinding.revokeOwnership(session)
+    const detached = this.removeSessionAuthority(session)
+    this.releaseWorkspaceRuntimeRetention(session)
+    return detached
+  }
+
+  private removeSessionAuthority(session: TerminalSessionView<TUser>): {
+    summary: TerminalSessionSummary | null
+    lifecycleChanged: boolean
+  } {
     const lifecycleChanged = markTerminalSessionClosed(session)
     let summary: TerminalSessionSummary | null = null
     try {
@@ -813,8 +840,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         'failed to stage invalidated terminal session summary',
       )
     }
-    this.directory.remove(session)
-    this.releaseWorkspaceRuntimeRetention(session)
+    if (!this.directory.remove(session)) throw new Error('terminal session authority removal conflict')
     return { summary, lifecycleChanged }
   }
 
@@ -892,35 +918,25 @@ export class TerminalSessionManager<TUser extends string | number> {
     return retention
   }
 
-  async closeSessionsForUser(userId: TUser): Promise<TerminalBatchRetirementResult> {
-    const sessions = Array.from(this.directory.entries()).filter((session) => session.userId === userId)
-    return await this.retireSessions(sessions, 'detached-user')
-  }
-
   commitWorkspaceRuntimeSessionInvalidation(userId: TUser, scope: string): TerminalSessionInvalidationCommit {
-    return this.commitSessionInvalidation(userId, scope, () => true)
+    return this.commitSessionInvalidation(this.directory.entriesForScope(userId, scope))
   }
 
   commitGitSessionInvalidation(userId: TUser, scope: string): TerminalSessionInvalidationCommit {
-    return this.commitSessionInvalidation(userId, scope, (session) => session.target.kind !== 'workspace-root')
+    return this.commitSessionInvalidation(
+      this.directory.entriesForScope(userId, scope).filter((session) => session.target.kind !== 'workspace-root'),
+    )
   }
 
   private commitSessionInvalidation(
-    userId: TUser,
-    scope: string,
-    matches: (session: TerminalSessionView<TUser>) => boolean,
+    sessions: readonly TerminalSessionView<TUser>[],
   ): TerminalSessionInvalidationCommit {
-    const removed: Array<{
-      session: TerminalSessionView<TUser>
-      summary: TerminalSessionSummary | null
-      lifecycleChanged: boolean
-    }> = []
-    for (const session of Array.from(this.directory.entries())) {
-      if (session.userId !== userId || session.scope !== scope || !matches(session)) continue
-      const detached = this.detachSessionAuthority(session)
-      this.adoptInvalidatedSessionResourceRetirement(session)
-      removed.push({ session, ...detached })
-    }
+    for (const session of sessions) this.assertSessionInvalidationCandidate(session)
+    for (const session of sessions) session.ptyBinding.revokeOwnership(session)
+    const removed = sessions.map((session) => ({ session, ...this.removeSessionAuthority(session) }))
+    const retentions = sessions.map((session) => this.takeWorkspaceRuntimeRetention(session))
+    for (const retention of retentions) retention.release()
+    for (const session of sessions) this.adoptInvalidatedSessionResourceRetirement(session)
     let effectsPublished = false
     return {
       removedSessions: removed.flatMap((entry) => (entry.summary ? [entry.summary] : [])),
@@ -933,6 +949,11 @@ export class TerminalSessionManager<TUser extends string | number> {
         }
       },
     }
+  }
+
+  private assertSessionInvalidationCandidate(session: TerminalSessionView<TUser>): void {
+    if (this.directory.get(session.id) !== session) throw new Error('terminal session invalidation authority conflict')
+    if (!session.workspaceRuntimeRetention) throw new Error('terminal session lost its workspace runtime retention')
   }
 
   private adoptInvalidatedSessionResourceRetirement(session: TerminalSessionView<TUser>): void {
@@ -954,20 +975,6 @@ export class TerminalSessionManager<TUser extends string | number> {
         )
       },
     )
-  }
-
-  private async retireSessions(
-    sessions: readonly TerminalSessionView<TUser>[],
-    reason: TerminalSessionCloseReason,
-  ): Promise<TerminalBatchRetirementResult> {
-    const removedEffects: TerminalSessionSummary[] = []
-    const failures: TerminalBatchRetirementResult['failures'] = []
-    for (const session of sessions) {
-      const summary = this.sessionSummary(session)
-      if (await this.requestSessionRetirement(session.id, reason)) removedEffects.push(summary)
-      else failures.push({ terminalRuntimeSessionId: session.id, message: session.message ?? 'error.unavailable' })
-    }
-    return { removedEffects, failures }
   }
 
   /**
@@ -1039,6 +1046,8 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   forceShutdown(): void {
+    this.shuttingDown = true
+    this.directory.abortReservations()
     // Detached bindings already revoked their listeners and transferred native
     // exit observation to the supervisor. Runtime shutdown invokes supervisor
     // shutdown immediately after this method, which completes those durable
@@ -1127,6 +1136,10 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   getSessionCount(): number {
     return Array.from(this.directory.entries()).length
+  }
+
+  getPendingResourceRetirementCount(): number {
+    return this.invalidatedSessionResourceRetirements.size
   }
 
   private sessionSummary(session: TerminalSessionView<TUser>): TerminalSessionSummary {

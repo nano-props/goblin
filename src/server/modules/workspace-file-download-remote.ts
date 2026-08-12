@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import type { Readable } from 'node:stream'
-import { IpcError } from '#/shared/ipc-error.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { ResolvedWorkspaceFilesystemExecution } from '#/server/modules/workspace-filesystem-execution.ts'
 import {
@@ -100,7 +100,7 @@ function throwRemoteDownloadFailure(
     result,
   })
   if (runtimeFailure) throw runtimeFailure
-  throw new IpcError({ code: 'BAD_REQUEST', message: remoteDownloadError(result) })
+  throw new CodedError({ code: 'BAD_REQUEST', message: remoteDownloadError(result) })
 }
 
 async function authenticateRemoteStream(stream: Readable, marker: string): Promise<NodeReadableStart> {

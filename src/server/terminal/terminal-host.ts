@@ -63,6 +63,8 @@ export interface ServerTerminalHostDiagnostics {
   pty: PtySupervisorDiagnostics
   /** Number of in-memory logical sessions owned by the manager. */
   liveSessionCount: number
+  /** Native resources still retiring after their logical session authority was removed. */
+  pendingResourceRetirementCount: number
 }
 
 export interface ServerTerminalActionHost {

@@ -52,6 +52,8 @@ export function workspacePaneActionTargetFromFilesystemTarget(
 
 const queuesByTarget = new Map<string, PQueue>()
 
+type WorkspacePaneActionAdmission<T> = { kind: 'accepted'; result: T } | { kind: 'busy' }
+
 export async function runWorkspacePaneAction<T>(
   target: WorkspacePaneActionTarget,
   task: () => Promise<T> | T,
@@ -60,6 +62,20 @@ export async function runWorkspacePaneAction<T>(
   const queue = workspacePaneActionQueue(queueKey)
   try {
     return await queue.add(task)
+  } finally {
+    scheduleWorkspacePaneActionQueueCleanup(queueKey, queue)
+  }
+}
+
+export async function tryRunWorkspacePaneAction<T>(
+  target: WorkspacePaneActionTarget,
+  task: () => Promise<T> | T,
+): Promise<WorkspacePaneActionAdmission<T>> {
+  const queueKey = workspacePaneActionTargetKey(target)
+  const queue = workspacePaneActionQueue(queueKey)
+  if (queue.pending > 0 || queue.size > 0) return { kind: 'busy' }
+  try {
+    return { kind: 'accepted', result: await queue.add(task) }
   } finally {
     scheduleWorkspacePaneActionQueueCleanup(queueKey, queue)
   }

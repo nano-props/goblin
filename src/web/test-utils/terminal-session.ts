@@ -548,7 +548,6 @@ export function resetTerminalSessionHarness() {
       },
       initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
       pathForFile: vi.fn(),
-      onEvent: vi.fn(),
       host: {
         openSettingsWindow: vi.fn(),
         openExternalUrl: hostOpenExternalUrl.mockResolvedValue({ ok: true, message: 'https://example.com/path' }),
@@ -577,10 +576,14 @@ export function resetTerminalSessionHarness() {
     }),
     invokeIpc,
     abortIpc: vi.fn(async () => false),
-    onIpcEvent: vi.fn(() => () => {}),
     onEffectIntent: vi.fn(() => () => {}),
     pathForFile: vi.fn(() => ''),
     saveClipboardFiles: vi.fn(() => Promise.resolve([])),
+    getAccessTokenProjection: vi.fn(async () => ({ accessToken: 'test-access-token', activation: 'current' as const })),
+    rotateAccessToken: vi.fn(async () => ({
+      accessToken: 'test-access-token',
+      activation: 'after-restart' as const,
+    })),
     host: () => window.goblinNative.host ?? null,
     appRealtime: () => ({
       kickReconnect: () => {},
@@ -616,8 +619,8 @@ export function resetTerminalSessionHarness() {
       onSessionClosed: vi.fn(() => () => {}),
     }),
     workspacePaneTabs: () => ({
-      replace: vi.fn(async () => ({ revision: 0, entries: [] })),
-      update: vi.fn(async () => ({ revision: 0, entries: [] })),
+      replace: vi.fn(async () => ({ kind: 'projected' as const, snapshot: { revision: 0, entries: [] } })),
+      update: vi.fn(async () => ({ kind: 'projected' as const, snapshot: { revision: 0, entries: [] } })),
       list: vi.fn(async () => ({ revision: 0, entries: [] })),
       onChanged: vi.fn(() => () => {}),
     }),

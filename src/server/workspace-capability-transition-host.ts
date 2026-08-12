@@ -1,13 +1,10 @@
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
 
 export type WorkspaceCapabilityTransitionCommitResult =
   { kind: 'committed' } | { kind: 'failed-before-commit'; error: unknown }
 
 export interface WorkspaceCapabilityTransitionCommitInput {
-  userId: string
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
-  assertCurrent: () => void
+  runtimeCapability: WorkspaceRuntimeEpochCapability
 }
 
 export interface WorkspaceCapabilityTransitionHost {

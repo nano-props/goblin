@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacePaneRuntimeTabTargetKey } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-key.ts'
 import {
@@ -99,7 +99,12 @@ describe('workspace pane runtime tab target projection', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot,
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
 
     const projection = readWorkspacePaneRuntimeTabTargetProjection({
@@ -130,7 +135,12 @@ describe('workspace pane runtime tab target projection', () => {
         createPending: false,
       })),
       createTerminal: vi.fn(async () => 'term-333333333333333333333'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
     workspacesStore.setState({
       selectedTerminalSessionIdByTerminalFilesystemTarget: {

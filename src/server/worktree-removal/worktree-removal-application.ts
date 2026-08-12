@@ -9,6 +9,7 @@ import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-remo
 import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
 import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { WorkspaceRuntimeStaleError } from '#/server/modules/workspace-runtimes.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const worktreeRemovalLogger = serverNodeLog.child({ module: 'worktree-removal-application' })
@@ -218,7 +219,7 @@ function nativeTargetPath(root: string): string {
 }
 
 function abortMessage(error: unknown): string {
-  if (error instanceof Error && error.message === 'error.workspace-runtime-stale') return error.message
+  if (error instanceof WorkspaceRuntimeStaleError) return error.message
   return error instanceof Error && error.name !== 'AbortError' ? error.message : 'error.workspace-runtime-stale'
 }
 

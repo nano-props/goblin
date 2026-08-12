@@ -214,7 +214,7 @@ function terminalCommandContextWith(overrides: Partial<TerminalSessionContextVal
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
     clearBell: vi.fn(() => false),
-    closeTerminalByDescriptor: vi.fn(async () => true),
+    closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const })),
     attach: vi.fn(),
     detach: vi.fn(),
     restart: vi.fn(),

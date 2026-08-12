@@ -37,7 +37,9 @@ physical worktree permit
 -> synchronous epoch overlay commit
 ```
 
-The aggregate owns the per-`workspaceId` queue and canonical epoch projection clock. The repository CAS commits before overlay/revision state. A conflict re-reads current layout and re-plans the original intent. Persistence failure commits no overlay. Invalid persisted targets are filtered by the authoritative Workspace/Git target projection even when repair persistence fails. Provider snapshots are sampled again after persistence before returning the canonical snapshot.
+The aggregate owns the per-`workspaceId` queue and canonical epoch projection clock. A user command carries its exact membership-generation capability; a server-owned reconciliation carries its exact runtime-epoch capability. The repository carries that capability into the serialized settings mutation and acquires epoch commit ownership before the durable write. That ownership keeps the admitted epoch alive through durable publication and is the commit boundary; an entry check only avoids unnecessary work.
+
+The repository CAS commits before overlay/revision state. A conflict re-reads current layout and re-plans the original intent. Persistence failure commits no overlay. Once the CAS is accepted, projection is a separate best-effort outcome: stale authority or projection failure must not undo or misreport the durable fact, and the caller must invalidate the visible projection and surface explicit recovery when the accepted action is user-visible. Invalid persisted targets are filtered by the authoritative Workspace/Git target projection even when repair persistence fails. Provider snapshots are sampled again after persistence before returning the canonical snapshot.
 
 Target repair and branch retirement use the same aggregate boundary. Repair validates membership and filters invalid target keys from the settings transaction's current layout in one atomic write, preserving valid siblings without partial commits. The epoch physical index retains only a lightweight admission lease for each target: stable identity-queue admission plus the runtime-epoch signal. Current operations and removal require a separate execution capability captured at their boundary; they do not repeatedly validate filesystem generation against out-of-band changes. Stale-index cleanup uses exact lease ownership, so cleanup from an older same-path binding cannot clear a newer binding. Physical removal clears only the removed binding from affected live indexes and cannot authorize durable retirement. The authoritative server target catalog suppresses the now-invalid row, and the next membership-aware repair removes it atomically. Git failure returns directly without compensation. Git success followed by finalize failure retains an internal worktree-removed milestone and invalidates the complete captured projection scope; the public failure never describes physical deletion as rolled back.
 
@@ -48,7 +50,7 @@ Target repair and branch retirement use the same aggregate boundary. Repair vali
 | Absolute current-target: identity/index/open   | intent and navigation generation before queue            | resolve from current projection; latest absolute intent wins; router must remain on the target                    |
 | Relative current-target: next/previous         | `direction` before queue                                 | resolve route, projection, adjacent tab, and generation at execution; every queued step runs                      |
 | Exact transition: active close-back            | source, destination, opener, and generation before write | never rebase; commit only while router still equals the source                                                    |
-| Absolute destination                           | destination and target lease before queue                | independent of source route; destination lease must remain current                                                |
+| Route-only absolute destination                | destination and target lease at admission                | reject while the same target is busy; otherwise commit independently of the source route                          |
 | Resource command: create/close/open membership | write input and operation facts                          | server returns canonical projection; client accepts only the matching runtime, then follows the route class above |
 | Recovery/reconciliation                        | canonical server/runtime snapshot                        | converge after server state; never repair or reclassify a user command                                            |
 
@@ -63,18 +65,20 @@ Target repair and branch retirement use the same aggregate boundary. Repair vali
 7. Rejection, replacement, cleanup, and unmount leave no pending intent or operation-owned listener.
 8. Equal canonical revision implies equal normalized entries; durable-layout, repo-target-projection, overlay, and provider-only changes share one monotonic epoch clock.
 9. Runtime close clears only its epoch overlay/index/clock. Durable layout survives the next epoch and server restart.
+10. Route-only destination requests never wait behind a target mutation. Busy admission rejects without creating a navigation generation or another deferred intent.
 
 ## Required concurrency tests
 
-| Sequence                                            | Result                                                              |
-| --------------------------------------------------- | ------------------------------------------------------------------- |
-| Absolute A→B, then A→C before B settles             | C rebases within the target and finishes final; B may be superseded |
-| Relative next, next across `[A,B,C]`                | A→B→C; neither step is superseded                                   |
-| Relative move queued behind open/active-close       | resolve from the post-operation route and projection                |
-| Router leaves the repo/branch while a command waits | reject with no navigation                                           |
-| Runtime/worktree is replaced while a command waits  | reject with no effect on the replacement                            |
-| Close write commits, then source CAS fails          | resource stays closed; the stale URL renders an empty pane          |
-| One of two windows releases a shared runtime        | sibling remains current                                             |
-| Recovery resets projection scopes                   | cancel old work; keep effect-owned listeners installed              |
+| Sequence                                            | Result                                                                       |
+| --------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Absolute A→B, then A→C before B settles             | C rebases within the target and finishes final; B may be superseded          |
+| Relative next, next across `[A,B,C]`                | A→B→C; neither step is superseded                                            |
+| Relative move queued behind open/active-close       | resolve from the post-operation route and projection                         |
+| Route-only destination arrives during target write  | reject immediately; the accepted write and route generation remain unchanged |
+| Router leaves the repo/branch while a command waits | reject with no navigation                                                    |
+| Runtime/worktree is replaced while a command waits  | reject with no effect on the replacement                                     |
+| Close write commits, then source CAS fails          | resource stays closed; the stale URL renders an empty pane                   |
+| One of two windows releases a shared runtime        | sibling remains current                                                      |
+| Recovery resets projection scopes                   | cancel old work; keep effect-owned listeners installed                       |
 
 Queue tests must block between capture and execution. Router substitutes must track the observed route and enforce production preconditions. Assert command outcomes, final route, and zero effects on rejected targets; never encode a partial side effect as success.

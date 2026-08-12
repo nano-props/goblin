@@ -2,7 +2,6 @@
 // canonical workspace-picker component modules.
 
 import { computed, defineComponent } from 'vue'
-import { toast } from 'vue-sonner'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
@@ -11,6 +10,7 @@ import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePick
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'
 import type { WorkspacePickerItem, WorkspacePickerSurface } from '#/web/components/workspace-picker/types.ts'
 import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
+import { reportCloseWorkspaceFailure } from '#/web/lib/open-workspace-result-feedback.ts'
 import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -82,10 +82,7 @@ export const WorkspacePickerHost = defineComponent<WorkspacePickerHostProps>({
       const workspace = workspacesStore.getState().workspaces[workspaceId]
       if (!workspace) return
       const result = await navigation.closeWorkspace(workspace.id)
-      if (!result.ok) {
-        const errorMessageKey = result.message
-        toast.error(t(errorMessageKey))
-      }
+      reportCloseWorkspaceFailure(result, t)
     }
 
     return () => {

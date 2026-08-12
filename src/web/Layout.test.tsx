@@ -1,21 +1,30 @@
 // @vitest-environment jsdom
 
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { defineComponent } from 'vue'
+import { QueryClient } from '@tanstack/vue-query'
+import { defineComponent, ref } from 'vue'
 import { userEvent } from '@testing-library/user-event'
+import { waitFor } from '@testing-library/vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { renderInJsdom } from '#/test-utils/render.tsx'
+import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { Layout } from '#/web/Layout.tsx'
 import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 const authenticatedBootstrapMock = vi.hoisted(() => ({
-  state: { value: { status: 'ready' } as AuthenticatedAppBootstrapState },
   retry: vi.fn(),
 }))
+const authenticatedBootstrapState = ref<AuthenticatedAppBootstrapState>({ status: 'ready' })
+const clientIntentIngress = vi.hoisted(() => ({
+  listeners: new Set<(intent: { type: string }) => void>(),
+  subscriptionStarts: 0,
+}))
+const clientWorkspacePersistence = vi.hoisted(() => vi.fn())
+const layoutQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
 vi.mock('#/web/components/TokenGate.tsx', () => ({
   TokenGate: defineComponent({
@@ -27,12 +36,37 @@ vi.mock('#/web/components/TokenGate.tsx', () => ({
 }))
 
 vi.mock('#/web/hooks/useAuthenticatedAppBootstrap.ts', () => ({
-  useAuthenticatedAppBootstrap: () => authenticatedBootstrapMock,
+  useAuthenticatedAppBootstrap: () => ({ state: authenticatedBootstrapState, retry: authenticatedBootstrapMock.retry }),
 }))
 
-vi.mock('#/web/hooks/useSettingsWriteErrorToast.ts', () => ({
-  useSettingsWriteErrorToast: () => undefined,
+vi.mock('#/web/client-ingress.ts', () => ({
+  subscribeClientEffectIntent: (listener: (intent: { type: string }) => void) => {
+    clientIntentIngress.subscriptionStarts += 1
+    clientIntentIngress.listeners.add(listener)
+    return () => clientIntentIngress.listeners.delete(listener)
+  },
 }))
+
+vi.mock('#/web/hooks/useClientWorkspacePersistence.ts', () => ({
+  useClientWorkspacePersistence: clientWorkspacePersistence,
+}))
+
+vi.mock('#/web/server-client-intent-ingress.ts', () => ({
+  subscribeServerClientIntentIngress: () => () => {},
+}))
+
+vi.mock('#/web/components/WorkspaceOpenDialog.tsx', async () => {
+  const { defineComponent } = await import('vue')
+  return {
+    WorkspaceOpenDialog: defineComponent<{ open: boolean }>({
+      name: 'WorkspaceOpenDialogMock',
+      props: ['open'],
+      setup(props) {
+        return () => (props.open ? <span data-testid="workspace-open-dialog" /> : null)
+      },
+    }),
+  }
+})
 
 vi.mock('#/web/app-history-presentation.ts', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -56,6 +90,8 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     subscribeTerminalFilesystemTarget: () => () => {},
     workspaceBellCount: () => 4,
     subscribeWorkspaceBellCount: () => () => {},
+    workspaceTerminalSessions: () => [],
+    subscribeWorkspaceTerminalSessions: () => () => {},
     snapshot: () => ({
       phase: 'opening',
       message: null,
@@ -82,7 +118,7 @@ vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
     setComposerDraft: vi.fn(() => true),
     replaceComposerDraft: vi.fn(() => true),
     clearBell: vi.fn(() => false),
-    closeTerminalByDescriptor: vi.fn(async () => false),
+    closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     attach: vi.fn(),
     detach: vi.fn(),
     restart: vi.fn(),
@@ -119,40 +155,71 @@ const SettingsRetainedOutletTerminalConsumer = defineComponent({
 })
 
 beforeEach(() => {
-  authenticatedBootstrapMock.state.value = { status: 'ready' }
+  authenticatedBootstrapState.value = { status: 'ready' }
   authenticatedBootstrapMock.retry.mockReset()
+  clientIntentIngress.listeners.clear()
+  clientIntentIngress.subscriptionStarts = 0
+  clientWorkspacePersistence.mockClear()
+  layoutQueryClient.clear()
 })
 
 describe('Layout shell providers', () => {
+  test('owns the intent router on settings and keeps the single preload consumer across route changes', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/settings/general', name: 'settings', component: { template: '<div>settings</div>' } },
+        { path: '/', name: 'home', component: { template: '<div>workspace</div>' } },
+      ],
+    })
+    await router.push('/settings/general')
+    await router.isReady()
+    renderLayout(router)
+
+    expect(clientIntentIngress.subscriptionStarts).toBe(1)
+    expect(clientWorkspacePersistence).toHaveBeenCalledOnce()
+    await flushTestUpdates(() => {
+      for (const listener of clientIntentIngress.listeners) listener({ type: 'open-workspace-path-requested' })
+    })
+    await waitFor(() => expect(document.querySelector('[data-testid="workspace-open-dialog"]')).not.toBeNull())
+
+    await flushTestUpdates(async () => {
+      await router.push('/')
+    })
+
+    expect(clientIntentIngress.subscriptionStarts).toBe(1)
+    expect(clientWorkspacePersistence).toHaveBeenCalledOnce()
+  })
+
   test('keeps terminal read context above the settings shell outlet while workspace restore is pending', async () => {
-    authenticatedBootstrapMock.state.value = { status: 'restoring-workspace' }
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/settings/general', name: 'settings', component: SettingsRetainedOutletTerminalConsumer }],
     })
     await router.push('/settings/general')
     await router.isReady()
-    const { getByTestId } = renderInJsdom(<Layout />, { global: { plugins: [router] } })
+    const { getByTestId } = renderLayout(router)
 
     expect(getByTestId('settings-retained-terminal-consumer').textContent).toBe('4')
   })
 
   test('shows workspace restore progress before mounting the workspace shell', async () => {
-    authenticatedBootstrapMock.state.value = { status: 'restoring-workspace' }
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', name: 'home', component: { template: '<div>workspace</div>' } }],
     })
     await router.push('/')
     await router.isReady()
-    const { getByText, queryByText } = renderInJsdom(<Layout />, { global: { plugins: [router] } })
+    const { getByText, queryByText } = renderLayout(router)
 
     expect(getByText('Restoring workspace')).toBeDefined()
     expect(queryByText('workspace')).toBeNull()
   })
 
   test('does not classify a similarly prefixed not-found route as settings', async () => {
-    authenticatedBootstrapMock.state.value = { status: 'restoring-workspace' }
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
@@ -162,7 +229,7 @@ describe('Layout shell providers', () => {
     })
     await router.push('/settings-unknown')
     await router.isReady()
-    const { getByText, queryByText } = renderInJsdom(<Layout />, { global: { plugins: [router] } })
+    const { getByText, queryByText } = renderLayout(router)
 
     expect(getByText('Restoring workspace')).toBeDefined()
     expect(queryByText('settings')).toBeNull()
@@ -170,17 +237,26 @@ describe('Layout shell providers', () => {
 
   test('shows workspace restore failure and exposes the authoritative retry action', async () => {
     const user = userEvent.setup()
-    authenticatedBootstrapMock.state.value = { status: 'failed', message: 'Workspace restore failed for test' }
+    authenticatedBootstrapState.value = { status: 'failed', message: 'Workspace restore failed for test' }
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', name: 'home', component: { template: '<div>workspace</div>' } }],
     })
     await router.push('/')
     await router.isReady()
-    const { getByRole, getByText } = renderInJsdom(<Layout />, { global: { plugins: [router] } })
+    const { getByRole, getByText } = renderLayout(router)
 
     expect(getByText('Workspace restore failed for test')).toBeDefined()
     await user.click(getByRole('button'))
     expect(authenticatedBootstrapMock.retry).toHaveBeenCalledOnce()
   })
 })
+
+function renderLayout(router: ReturnType<typeof createRouter>) {
+  return renderInJsdom(
+    <VueQueryClientScope client={layoutQueryClient}>
+      <Layout />
+    </VueQueryClientScope>,
+    { global: { plugins: [router] } },
+  )
+}

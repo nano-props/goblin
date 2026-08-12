@@ -15,12 +15,16 @@
 // language whenever `setCurrentLang` fires (the i18n IPC handler
 // rebuilds this menu on lang change).
 
-import { app, Menu, type MenuItemConstructorOptions } from 'electron'
+import { app, dialog, Menu, type MenuItemConstructorOptions } from 'electron'
 import { partition } from 'es-toolkit'
-import { activatePrimaryWindow, getPrimaryWindow, resetPrimaryWindow } from '#/main/window.ts'
+import {
+  reloadPrimaryWindow,
+  resetPrimaryWindow,
+  sendExistingPrimaryWindowEffectIntent,
+  sendPrimaryWindowEffectIntent,
+} from '#/main/window.ts'
 import { menuNodeLog } from '#/node/logger.ts'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
-import { sendClientEffectIntent } from '#/main/client-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
 import { formatWorkspaceSessionEntryLocator } from '#/shared/workspace-display-location.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
@@ -70,12 +74,14 @@ function send(intent: ClientEffectIntent, missingWindow: MissingWindowPolicy = '
 
 async function sendClientIntent(intent: ClientEffectIntent, missingWindow: MissingWindowPolicy): Promise<void> {
   try {
-    const existingWindow = getPrimaryWindow() ?? focusedRegisteredSurface()?.window
-    if (!existingWindow && missingWindow === 'ignore') return
-    const win = existingWindow ?? (await activatePrimaryWindow())
-    sendClientEffectIntent(win, intent)
+    if (missingWindow === 'ignore') {
+      await sendExistingPrimaryWindowEffectIntent(intent)
+      return
+    }
+    await sendPrimaryWindowEffectIntent(intent)
   } catch (err) {
     menuNodeLog.warn({ err }, 'failed to send client intent')
+    dialog.showErrorBox(app.name, t('menu.client-intent-delivery-failed'))
   }
 }
 
@@ -234,7 +240,7 @@ function createViewMenu(state: AppMenuState): MenuItemConstructorOptions {
       {
         label: t('menu.view.reload-page'),
         accelerator: accelerator(state, 'CmdOrCtrl+R'),
-        click: () => focusedRegisteredSurface()?.window.webContents.reload(),
+        click: reloadPrimaryWindow,
       },
       // On macOS AppKit already injects an "Enter Full Screen" entry into
       // the View menu whenever the window is fullscreenable (the default),

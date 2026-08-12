@@ -13,8 +13,8 @@ export function useLanSettingsController() {
     await setLanEnabled(enabled)
   })
   return {
-    async setLanEnabled(enabled: boolean): Promise<void> {
-      await lanEnabledMutation.mutateAsync(enabled)
+    setLanEnabled(enabled: boolean): void {
+      lanEnabledMutation.mutate(enabled)
     },
   }
 }

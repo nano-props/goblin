@@ -11,9 +11,12 @@ import {
 } from '#/server/modules/repo-write-operation-coordinator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoWriteExecutionCapability } from '#/server/modules/repo-source.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
 import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
+import { repoRuntimeCapabilityForTest } from '#/server/test-utils/repo-module.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 const LINKED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace-linked')
@@ -21,6 +24,14 @@ const SLOW_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace-slow')
 const FAST_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace-fast')
 const WORKSPACE_BOUNDARY_KEY = '/workspace/.git'
 const LINKED_WORKSPACE_BOUNDARY_KEY = '/workspace-linked/.git'
+
+function runtimeCapability(workspaceRuntimeId: string, workspaceId: WorkspaceId = WORKSPACE_ID) {
+  return testWorkspaceRuntimeEpochCapability({
+    userId: 'user-a',
+    workspaceId,
+    workspaceRuntimeId,
+  })
+}
 
 const mocks = vi.hoisted(() => ({
   resolveRepoWriteBoundaryKey: vi.fn(
@@ -99,6 +110,7 @@ describe('repo write operation coordinator', () => {
       WORKSPACE_ID,
       undefined,
       {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
         repoId: WORKSPACE_ID,
         kind: 'create-worktree',
         source: 'user',
@@ -157,7 +169,12 @@ describe('repo write operation coordinator', () => {
     const mutation = enqueueRepoWriteOperation(
       LINKED_WORKSPACE_ID,
       undefined,
-      { repoId: LINKED_WORKSPACE_ID, kind: 'create-worktree', source: 'user' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(LINKED_WORKSPACE_ID, 'test-runtime'),
+        repoId: LINKED_WORKSPACE_ID,
+        kind: 'create-worktree',
+        source: 'user',
+      },
       (operation) => async () => {
         operation.start()
         await operation.runMembershipMutation(async () => {})
@@ -180,7 +197,12 @@ describe('repo write operation coordinator', () => {
     const slowWork = enqueueRepoWriteOperation(
       SLOW_WORKSPACE_ID,
       undefined,
-      { repoId: SLOW_WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(SLOW_WORKSPACE_ID, 'test-runtime'),
+        repoId: SLOW_WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true })
@@ -192,7 +214,12 @@ describe('repo write operation coordinator', () => {
       enqueueRepoWriteOperation(
         FAST_WORKSPACE_ID,
         undefined,
-        { repoId: FAST_WORKSPACE_ID, kind: 'fetch', source: 'background' },
+        {
+          runtimeCapability: repoRuntimeCapabilityForTest(FAST_WORKSPACE_ID, 'test-runtime'),
+          repoId: FAST_WORKSPACE_ID,
+          kind: 'fetch',
+          source: 'background',
+        },
         (operation) => async () => {
           operation.start()
           operation.settle({ ok: true })
@@ -217,7 +244,12 @@ describe('repo write operation coordinator', () => {
     const work = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       caller.signal,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       () => async () => ({ ok: true, message: 'unexpected' }),
     )
     caller.abort()
@@ -242,7 +274,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'fetch',
         source: 'background',
       },
@@ -261,6 +293,39 @@ describe('repo write operation coordinator', () => {
       queuedOperations: 0,
       runningOperations: 0,
     })
+  })
+
+  test('rejects a runtime capability invalidated during capture even when no close event was observed', async () => {
+    const capture = Promise.withResolvers<RepoWriteExecutionCapability>()
+    const task = vi.fn(async () => ({ ok: true, message: 'unexpected' }))
+    let current = true
+    const capability: WorkspaceRuntimeEpochCapability = {
+      userId: 'user-a',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: 'runtime-a',
+      isCurrent: () => current,
+      assertCurrent: () => {
+        if (!current) throw new Error('error.workspace-runtime-stale')
+      },
+    }
+    const work = enqueueRepoWriteOperation(
+      WORKSPACE_ID,
+      undefined,
+      {
+        repoId: WORKSPACE_ID,
+        runtimeCapability: capability,
+        kind: 'remove-worktree',
+        source: 'user',
+        captureExecution: async () => await capture.promise,
+      },
+      () => task,
+    )
+
+    current = false
+    capture.resolve({ boundaryKey: WORKSPACE_BOUNDARY_KEY } as unknown as RepoWriteExecutionCapability)
+
+    await expect(work).rejects.toThrow('error.workspace-runtime-stale')
+    expect(task).not.toHaveBeenCalled()
   })
 
   test('rejects read admission when its workspace runtime closes during boundary resolution', async () => {
@@ -290,7 +355,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'remove-worktree',
         source: 'user',
         captureExecution: async () => await capture.promise,
@@ -321,7 +386,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'remove-worktree',
         source: 'user',
         captureExecution: async () => await capture.promise,
@@ -347,7 +412,7 @@ describe('repo write operation coordinator', () => {
       captureSignal.signal,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'remove-worktree',
         source: 'user',
         captureExecution: async (signal) =>
@@ -376,7 +441,12 @@ describe('repo write operation coordinator', () => {
     const first = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
         order.push('first-start')
@@ -389,7 +459,12 @@ describe('repo write operation coordinator', () => {
     const second = enqueueRepoWriteOperation(
       LINKED_WORKSPACE_ID,
       undefined,
-      { repoId: LINKED_WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(LINKED_WORKSPACE_ID, 'test-runtime'),
+        repoId: LINKED_WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
         order.push('second')
@@ -409,7 +484,12 @@ describe('repo write operation coordinator', () => {
       enqueueRepoWriteOperation(
         WORKSPACE_ID,
         undefined,
-        { repoId: WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
+        {
+          runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+          repoId: WORKSPACE_ID,
+          kind: 'delete-branch',
+          source: 'user',
+        },
         (operation) => async () => {
           operation.start()
           throw new Error('boom')
@@ -431,21 +511,31 @@ describe('repo write operation coordinator', () => {
     })
   })
 
-  test('filters write operations by runtime while retaining repo-scoped operations', async () => {
+  test('filters write operations to the requested runtime', async () => {
     await enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: runtimeCapability('repo-runtime-other'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
-        operation.settle({ ok: true, message: 'repo-scoped' })
-        return { ok: true, message: 'repo-scoped' }
+        operation.settle({ ok: true, message: 'other' })
+        return { ok: true, message: 'other' }
       },
     )
     await enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-current', kind: 'delete-branch', source: 'user' },
+      {
+        repoId: WORKSPACE_ID,
+        runtimeCapability: runtimeCapability('repo-runtime-current'),
+        kind: 'delete-branch',
+        source: 'user',
+      },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true, message: 'current' })
@@ -455,7 +545,12 @@ describe('repo write operation coordinator', () => {
     await enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, workspaceRuntimeId: 'repo-runtime-stale', kind: 'remove-worktree', source: 'user' },
+      {
+        repoId: WORKSPACE_ID,
+        runtimeCapability: runtimeCapability('repo-runtime-stale'),
+        kind: 'remove-worktree',
+        source: 'user',
+      },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true, message: 'stale' })
@@ -468,10 +563,7 @@ describe('repo write operation coordinator', () => {
         workspaceRuntimeId: 'repo-runtime-current',
         includeSettled: true,
       }),
-    ).resolves.toMatchObject([
-      { kind: 'fetch', workspaceRuntimeId: null },
-      { kind: 'delete-branch', workspaceRuntimeId: 'repo-runtime-current' },
-    ])
+    ).resolves.toMatchObject([{ kind: 'delete-branch', workspaceRuntimeId: 'repo-runtime-current' }])
   })
 
   test('keeps settled write operations globally bounded', async () => {
@@ -482,7 +574,12 @@ describe('repo write operation coordinator', () => {
       await enqueueRepoWriteOperation(
         workspaceId,
         undefined,
-        { repoId: workspaceId, kind: 'fetch', source: 'background' },
+        {
+          runtimeCapability: repoRuntimeCapabilityForTest(workspaceId, 'test-runtime'),
+          repoId: workspaceId,
+          kind: 'fetch',
+          source: 'background',
+        },
         (operation) => async () => {
           operation.start()
           operation.settle({ ok: true, message: 'ok' })
@@ -513,7 +610,12 @@ describe('repo write operation coordinator', () => {
     const oldestCreated = enqueueRepoWriteOperation(
       oldestCreatedWorkspace,
       undefined,
-      { repoId: oldestCreatedWorkspace, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(oldestCreatedWorkspace, 'test-runtime'),
+        repoId: oldestCreatedWorkspace,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
         await new Promise<void>((resolve) => {
@@ -530,7 +632,12 @@ describe('repo write operation coordinator', () => {
       await enqueueRepoWriteOperation(
         workspaceId,
         undefined,
-        { repoId: workspaceId, kind: 'fetch', source: 'background' },
+        {
+          runtimeCapability: repoRuntimeCapabilityForTest(workspaceId, 'test-runtime'),
+          repoId: workspaceId,
+          kind: 'fetch',
+          source: 'background',
+        },
         (operation) => async () => {
           operation.start()
           operation.settle({ ok: true, message: 'ok' })
@@ -557,7 +664,12 @@ describe('repo write operation coordinator', () => {
     const work = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (_operation, context) => async () =>
         await context.runNetworkOperation(
           () =>
@@ -595,7 +707,12 @@ describe('repo write operation coordinator', () => {
     const work = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'delete-branch',
+        source: 'user',
+      },
       (operation) => async () => {
         operation.start()
         await release.promise
@@ -616,7 +733,12 @@ describe('repo write operation coordinator', () => {
     const active = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
         await release.promise
@@ -630,7 +752,12 @@ describe('repo write operation coordinator', () => {
     const queued = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'delete-branch',
+        source: 'user',
+      },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true })
@@ -660,7 +787,12 @@ describe('repo write operation coordinator', () => {
     await enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true })
@@ -677,7 +809,12 @@ describe('repo write operation coordinator', () => {
     await enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: false, message: 'offline' })
@@ -687,7 +824,12 @@ describe('repo write operation coordinator', () => {
     await enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'delete-branch',
+        source: 'user',
+      },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true })
@@ -708,7 +850,12 @@ describe('repo write operation coordinator', () => {
     await enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true, message: 'ok' })
@@ -739,7 +886,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-source',
+        runtimeCapability: runtimeCapability('runtime-source'),
         kind: 'fetch',
         source: 'background',
       },
@@ -777,7 +924,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-source',
+        runtimeCapability: runtimeCapability('runtime-source'),
         kind: 'delete-branch',
         source: 'user',
       },
@@ -816,7 +963,12 @@ describe('repo write operation coordinator', () => {
     await enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
         operation.settle({ ok: true, message: 'ok' })
@@ -843,7 +995,12 @@ describe('repo write operation coordinator', () => {
     const work = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       caller.signal,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'user' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'user',
+      },
       (_operation, context) => async () =>
         await context.runNetworkOperation(
           (signal) =>
@@ -889,7 +1046,12 @@ describe('repo write operation coordinator', () => {
     const work = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       caller.signal,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'user' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'user',
+      },
       (_operation, context) => async () =>
         await context.runNetworkOperation(
           (signal) =>
@@ -928,7 +1090,12 @@ describe('repo write operation coordinator', () => {
     const work = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       caller.signal,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'user' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'user',
+      },
       (_operation, context) => async () =>
         await context.runNetworkOperation(async () => {
           taskStarted.resolve()
@@ -952,7 +1119,12 @@ describe('repo write operation coordinator', () => {
     const first = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       caller.signal,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'user' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'user',
+      },
       (_operation, context) => async () =>
         await context.runNetworkOperation(async () => {
           firstStarted.resolve()
@@ -966,7 +1138,12 @@ describe('repo write operation coordinator', () => {
     const second = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'delete-branch', source: 'user' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'delete-branch',
+        source: 'user',
+      },
       (operation) => async () => {
         operation.start()
         const result = await secondTask()
@@ -1003,7 +1180,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'remove-worktree',
         source: 'user',
       },
@@ -1037,7 +1214,12 @@ describe('repo write operation coordinator', () => {
     const active = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
         await releaseActive.promise
@@ -1053,7 +1235,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'delete-branch',
         source: 'user',
       },
@@ -1085,7 +1267,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'pull',
         source: 'user',
       },
@@ -1114,7 +1296,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'delete-branch',
         source: 'user',
       },
@@ -1151,7 +1333,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'pull',
         source: 'user',
       },
@@ -1168,7 +1350,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'delete-branch',
         source: 'user',
       },
@@ -1188,7 +1370,12 @@ describe('repo write operation coordinator', () => {
     const active = enqueueRepoWriteOperation(
       WORKSPACE_ID,
       undefined,
-      { repoId: WORKSPACE_ID, kind: 'fetch', source: 'background' },
+      {
+        runtimeCapability: repoRuntimeCapabilityForTest(WORKSPACE_ID, 'test-runtime'),
+        repoId: WORKSPACE_ID,
+        kind: 'fetch',
+        source: 'background',
+      },
       (operation) => async () => {
         operation.start()
         await releaseActive.promise
@@ -1204,7 +1391,7 @@ describe('repo write operation coordinator', () => {
       undefined,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'delete-branch',
         source: 'user',
       },
@@ -1225,7 +1412,7 @@ describe('repo write operation coordinator', () => {
       caller.signal,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'push',
         source: 'user',
         captureExecution: async () => {
@@ -1255,7 +1442,7 @@ describe('repo write operation coordinator', () => {
       caller.signal,
       {
         repoId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime-a',
+        runtimeCapability: runtimeCapability('runtime-a'),
         kind: 'push',
         source: 'user',
         captureExecution: async () => {
@@ -1276,7 +1463,7 @@ describe('repo write operation coordinator', () => {
         undefined,
         {
           repoId: WORKSPACE_ID,
-          workspaceRuntimeId: 'runtime-a',
+          runtimeCapability: runtimeCapability('runtime-a'),
           kind: 'fetch',
           source: 'user',
         },
@@ -1287,52 +1474,5 @@ describe('repo write operation coordinator', () => {
         },
       ),
     ).resolves.toEqual({ ok: true, message: 'next admitted' })
-  })
-
-  test('reclaims an idle boundary group after its workspace runtime closes', async () => {
-    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID, { workspaceRuntimeId: 'runtime-a' })
-    expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
-      boundaryRuntimes: 1,
-      registeredBoundaries: 1,
-      registeredRepoIds: 1,
-    })
-
-    mocks.workspaceRuntimeClosed?.({ userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' })
-
-    expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
-      boundaryRuntimes: 0,
-      registeredBoundaries: 0,
-      registeredRepoIds: 0,
-    })
-  })
-
-  test('keeps a boundary registered until its final workspace runtime closes', async () => {
-    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID, { workspaceRuntimeId: 'runtime-a' })
-    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID, { workspaceRuntimeId: 'runtime-b' })
-
-    mocks.workspaceRuntimeClosed?.({ userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' })
-    expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
-      boundaryRuntimes: 1,
-      registeredRepoIds: 1,
-    })
-
-    mocks.workspaceRuntimeClosed?.({ userId: 'user-b', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-b' })
-    expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
-      boundaryRuntimes: 0,
-      registeredRepoIds: 0,
-    })
-  })
-
-  test('reclaims an idle descriptor when a repo resolves to a new boundary', async () => {
-    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
-    mocks.resolveRepoWriteBoundaryKey.mockResolvedValue(LINKED_WORKSPACE_BOUNDARY_KEY)
-
-    await resolveRepoWriteBoundaryForRead(WORKSPACE_ID)
-
-    expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
-      boundaryRuntimes: 1,
-      registeredBoundaries: 1,
-      registeredRepoIds: 1,
-    })
   })
 })

@@ -73,7 +73,7 @@ import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { renderInJsdom as renderInJsdomWithoutWorkspaceView } from '#/test-utils/render.tsx'
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import { terminalSessionContextWithCreatedAdmissionForTest } from '#/web/test-utils/terminal-session-context.ts'
@@ -109,6 +109,7 @@ const hoistedWorkspaceExternalAppMocks = vi.hoisted(() => ({
 }))
 const hoistedToastMocks = vi.hoisted(() => ({
   error: vi.fn(),
+  warning: vi.fn(),
 }))
 
 export const toolbarResponsiveMocks = hoistedToolbarResponsiveMocks
@@ -152,6 +153,7 @@ vi.stubGlobal('requestAnimationFrame', ((cb: FrameRequestCallback) => {
 vi.mock('vue-sonner', () => ({
   toast: {
     error: hoistedToastMocks.error,
+    warning: hoistedToastMocks.warning,
   },
 }))
 
@@ -230,6 +232,10 @@ beforeEach(() => {
   toolbarResponsiveMocks.compactUi = false
   runtimeExternalAppSettings.value = defaultRuntimeExternalAppSettings()
   appShellMocks.openExternalUrl.mockReset()
+  workspaceExternalAppMocks.openWorkspaceTerminal.mockReset()
+  workspaceExternalAppMocks.openWorkspaceTerminal.mockImplementation(async () => ({ ok: true, message: '' }))
+  workspaceExternalAppMocks.openWorkspaceEditor.mockReset()
+  workspaceExternalAppMocks.openWorkspaceEditor.mockImplementation(async () => ({ ok: true, message: '' }))
   workspaceExternalAppMocks.openWorkspaceInFinder.mockReset()
   workspaceExternalAppMocks.openWorkspaceInFinder.mockImplementation(async () => ({ ok: true, message: '' }))
   hostInfoStore.setState({
@@ -251,6 +257,7 @@ beforeEach(() => {
 
 afterEach(() => {
   toastMocks.error.mockClear()
+  toastMocks.warning.mockClear()
   appShellMocks.openExternalUrl.mockReset()
   workspaceExternalAppMocks.openWorkspaceInFinder.mockReset()
   hostInfoStore.setState({
@@ -395,6 +402,8 @@ export function renderToolbar(options: {
     subscribeTerminalFilesystemTarget: () => () => {},
     workspaceBellCount: () => 0,
     subscribeWorkspaceBellCount: () => () => {},
+    workspaceTerminalSessions: () => [],
+    subscribeWorkspaceTerminalSessions: () => () => {},
     snapshot: () => terminalSnapshot,
     subscribeSnapshot: () => () => {},
   }
@@ -414,7 +423,7 @@ export function renderToolbar(options: {
   })
   const selectTerminal = vi.fn()
   const scrollToBottom = vi.fn()
-  const closeTerminalByDescriptor = vi.fn(async () => true)
+  const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
   const showRepoBranchWorkspacePaneTab = vi.fn(options.navigation.showRepoBranchWorkspacePaneTab)
   const showRepoBranchTerminalSession = vi.fn(options.navigation.showRepoBranchTerminalSession)
   const commandContext: TerminalSessionContextValue = terminalSessionContextWithCreatedAdmissionForTest({
@@ -435,6 +444,7 @@ export function renderToolbar(options: {
   setTerminalSessionCommandBridge({
     terminalFilesystemTargetSnapshot: readContext.terminalFilesystemTargetSnapshot,
     createTerminal,
+    createTerminalWithAdmission: commandContext.createTerminalWithAdmission,
     selectTerminal,
     focusTerminal: commandContext.focusTerminal,
     closeTerminalByDescriptor,

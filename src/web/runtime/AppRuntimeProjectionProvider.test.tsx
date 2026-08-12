@@ -638,10 +638,14 @@ function testBridge(): ClientBridge {
     getBootstrap: () => window.__GOBLIN_BOOTSTRAP__!,
     invokeIpc: vi.fn(async () => null),
     abortIpc: vi.fn(async () => false),
-    onIpcEvent: vi.fn(() => () => {}),
     onEffectIntent: vi.fn(() => () => {}),
     pathForFile: vi.fn(() => ''),
     saveClipboardFiles: vi.fn(async () => []),
+    getAccessTokenProjection: vi.fn(async () => ({ accessToken: 'test-access-token', activation: 'current' as const })),
+    rotateAccessToken: vi.fn(async () => ({
+      accessToken: 'test-access-token',
+      activation: 'after-restart' as const,
+    })),
     host: () => null,
     appRealtime: () => ({
       kickReconnect: kickReconnectMock,
@@ -688,8 +692,8 @@ function testBridge(): ClientBridge {
       onSessionClosed: vi.fn(() => () => {}),
     }),
     workspacePaneTabs: () => ({
-      replace: vi.fn(async () => ({ revision: 1, entries: [] })),
-      update: vi.fn(async () => ({ revision: 1, entries: [] })),
+      replace: vi.fn(async () => ({ kind: 'projected' as const, snapshot: { revision: 1, entries: [] } })),
+      update: vi.fn(async () => ({ kind: 'projected' as const, snapshot: { revision: 1, entries: [] } })),
       list: vi.fn(async (input) => ({ revision: 1, entries: await listWorkspaceTabsMock(input) })),
       onChanged: vi.fn((cb: (message: WorkspacePaneTabsChangedRealtimeMessage) => void) => {
         workspaceTabsChangedHandler = cb

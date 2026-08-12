@@ -41,7 +41,11 @@ import type {
   WorkspacePaneLayoutRestoreTransaction,
   WorkspacePaneLayoutRestoreTransactionOutcome,
 } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
-import { closeWorkspaceRuntimesForDurableRemoval } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
+import {
+  closeWorkspaceRuntimesForDurableRemoval,
+  runWithWorkspaceRuntimeEpochCommitOwnership,
+} from '#/server/modules/workspace-runtimes.ts'
 import { MAX_RECENT_WORKSPACES, defaultUserSettings, defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import {
   currentSettingsData,
@@ -155,27 +159,60 @@ function unchangedUserSettings<T>(data: UserSettingsData, result: T): UserSettin
 async function mutateUserSettings<T>(
   mutation: (data: UserSettingsData) => Promise<UserSettingsMutation<T>> | UserSettingsMutation<T>,
 ): Promise<T> {
-  let result!: T
+  return await runUserSettingsMutation({ kind: 'unrestricted', mutation })
+}
+
+async function mutateUserSettingsForWorkspaceRuntime<T>(
+  workspaceId: WorkspaceId,
+  epochCapability: WorkspaceRuntimeEpochCapability,
+  mutation: (data: UserSettingsData) => Promise<UserSettingsMutation<T>> | UserSettingsMutation<T>,
+): Promise<T> {
+  return await runUserSettingsMutation({ kind: 'workspace-runtime', workspaceId, epochCapability, mutation })
+}
+
+type UserSettingsMutationOperation<T> =
+  | {
+      kind: 'unrestricted'
+      mutation: (data: UserSettingsData) => Promise<UserSettingsMutation<T>> | UserSettingsMutation<T>
+    }
+  | {
+      kind: 'workspace-runtime'
+      workspaceId: WorkspaceId
+      epochCapability: WorkspaceRuntimeEpochCapability
+      mutation: (data: UserSettingsData) => Promise<UserSettingsMutation<T>> | UserSettingsMutation<T>
+    }
+
+async function runUserSettingsMutation<T>(operation: UserSettingsMutationOperation<T>): Promise<T> {
   const run = settingsMutationPromise
     .catch(() => {})
     .then(async () => {
       const current = await loadUserSettings()
-      const commit = await mutation(current)
-      if (commit.changed !== false) {
-        await writeUserSettingsJson(commit.next)
-        settingsData = commit.next
-        settingsLoadPromise = Promise.resolve(commit.next)
-        invalidateRemovedWorkspaceRuntimes(current.workspace, commit.next.workspace)
+      const commit = await operation.mutation(current)
+      if (operation.kind === 'workspace-runtime') {
+        if (operation.epochCapability.workspaceId !== operation.workspaceId) {
+          throw new Error('workspace runtime epoch capability scope mismatch')
+        }
       }
-      commit.afterCommit?.()
-      result = commit.result
+      const publish = async () => {
+        if (commit.changed !== false) {
+          await writeUserSettingsJson(commit.next)
+          settingsData = commit.next
+          settingsLoadPromise = Promise.resolve(commit.next)
+          invalidateRemovedWorkspaceRuntimes(current.workspace, commit.next.workspace)
+        }
+        commit.afterCommit?.()
+        return commit.result
+      }
+      if (operation.kind === 'workspace-runtime') {
+        return await runWithWorkspaceRuntimeEpochCommitOwnership(operation.epochCapability, publish)
+      }
+      return await publish()
     })
   settingsMutationPromise = run.then(
     () => {},
     () => {},
   )
-  await run
-  return result!
+  return await run
 }
 
 function invalidateRemovedWorkspaceRuntimes(before: ServerWorkspaceState, after: ServerWorkspaceState): void {
@@ -366,6 +403,7 @@ async function compareAndSwapWorkspacePaneLayout(
   input: WorkspacePaneLayoutRepositoryCasInput,
 ): Promise<WorkspacePaneLayoutRepositoryCasOutcome> {
   return await mutateWorkspacePaneSettings<WorkspacePaneLayoutRepositoryCasOutcome>(
+    input,
     async (data) => {
       const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.workspaceId)
       const snapshot = { layout: currentLayout }
@@ -379,12 +417,13 @@ async function compareAndSwapWorkspacePaneLayout(
 }
 
 async function mutateWorkspacePaneSettings<T>(
+  input: Pick<WorkspacePaneLayoutRepositoryCasInput, 'workspaceId' | 'epochCapability'>,
   mutation: (data: UserSettingsData) => Promise<UserSettingsMutation<T>> | UserSettingsMutation<T>,
   onWriteFailure: (error: SettingsPersistenceWriteError, current: UserSettingsData) => T,
 ): Promise<T> {
   let writeBase: UserSettingsData | null = null
   try {
-    return await mutateUserSettings(async (data) => {
+    return await mutateUserSettingsForWorkspaceRuntime(input.workspaceId, input.epochCapability, async (data) => {
       const plan = await mutation(data)
       if (plan.changed !== false) writeBase = data
       return plan

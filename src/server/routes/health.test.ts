@@ -44,6 +44,7 @@ describe('health routes', () => {
           lastFailure: null,
         },
         liveSessionCount: 1,
+        pendingResourceRetirementCount: 0,
       },
     } satisfies ServerAppRealtimeDiagnostics)
 

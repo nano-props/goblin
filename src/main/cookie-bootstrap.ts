@@ -77,12 +77,11 @@ export interface EmbedAuthCookieOptions {
 /**
  * Plant the auth cookie on the client's session. Idempotent —
  * overwrites an existing cookie if one is already there (e.g. the
- * user rotated their token, or a previous run left a stale value).
+ * previous run left a stale value).
  * Awaits the underlying `cookies.set` so the caller can be sure
- * the cookie is in place before the client fires its first
- * request; the client is normally paused on `did-finish-load`
- * by the time the caller is ready, but in dev mode the proxy
- * round-trip is fast enough that this matters in practice.
+ * the cookie is in place before `loadURL` starts the client and its
+ * first request. In dev mode the proxy round-trip is fast enough
+ * that this ordering matters in practice.
  */
 export async function plantEmbedAuthCookie({ accessToken, url, webContents }: EmbedAuthCookieOptions): Promise<void> {
   // Keep the concrete URL for Electron; the cookie is host-scoped, not port-scoped.
@@ -102,36 +101,5 @@ export async function plantEmbedAuthCookie({ accessToken, url, webContents }: Em
     secure: parsed.protocol === 'https:',
     path: '/',
     expirationDate: Math.floor(Date.now() / 1000) + ONE_YEAR_SECONDS,
-  })
-}
-
-export interface ReplantEmbedAuthCookieForRotationOptions {
-  accessToken: string
-  url: string
-  webContents: EmbedAuthCookieWebContents
-}
-
-/**
- * Replant the auth cookie after the embedded server restarts with a
- * new access token. Thin wrapper over `plantEmbedAuthCookie` that
- * uses a narrow structural `webContents` type so the rotation flow in
- * `access-token-ipc.ts` can inject only the cookie surface it needs
- * without depending on the full Electron runtime module.
- *
- * Without this replant, a rotation leaves the client's
- * `webContents.session.cookies` holding the OLD token. The next
- * authenticated request fires with the stale cookie, the server
- * rejects it, and the user sees the token gate re-appear even
- * though the rotation IPC returned the new token successfully.
- */
-export async function replantEmbedAuthCookieForRotation({
-  accessToken,
-  url,
-  webContents,
-}: ReplantEmbedAuthCookieForRotationOptions): Promise<void> {
-  await plantEmbedAuthCookie({
-    accessToken,
-    url,
-    webContents,
   })
 }

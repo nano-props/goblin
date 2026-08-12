@@ -4,7 +4,10 @@ import type { CloneRepoResult } from '#/shared/api-types.ts'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { CloneRepositoryDialog } from '#/web/components/CloneRepositoryDialog.tsx'
 import type { CloneRepositoryInput } from '#/web/components/CloneRepositoryDialog.tsx'
-import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
+import {
+  reportOpenWorkspacePostOpenEffects,
+  reportOpenWorkspaceUncertainty,
+} from '#/web/lib/open-workspace-result-feedback.ts'
 import { sessionLog } from '#/web/logger.ts'
 import { cloneRepository as runCloneRepository } from '#/web/repo-client.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -53,8 +56,9 @@ export const RepoCloneDialog = defineComponent<RepoCloneDialogProps>({
         return result
       }
       if (!openResult.ok && !signal.aborted) {
-        const messageKey = openResult.message
-        reportAutomaticOpenFailure(path, t(messageKey))
+        if (!reportOpenWorkspaceUncertainty(openResult, t, { descriptionPrefix: path })) {
+          reportAutomaticOpenFailure(path, t(openResult.message))
+        }
       }
       return result
     }

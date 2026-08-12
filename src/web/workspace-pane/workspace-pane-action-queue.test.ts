@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
+  tryRunWorkspacePaneAction,
   workspacePaneActionTargetKey,
   workspacePaneActionTargetFromFilesystemTarget,
   workspacePaneActionTargetFromCoordinates,
@@ -41,6 +42,25 @@ describe('workspace pane action queue', () => {
     await Promise.all([first, second])
     expect(workspaceOrder).toEqual(['first-start', 'first-end', 'second'])
     await vi.waitFor(() => expect(workspacePaneActionQueueStatsForTest().targetQueues).toBe(0))
+  })
+
+  test('admits an idle presentation action and rejects one while the target is owned', async () => {
+    await expect(tryRunWorkspacePaneAction(TARGET, () => 'idle')).resolves.toEqual({
+      kind: 'accepted',
+      result: 'idle',
+    })
+
+    const started = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const occupied = runWorkspacePaneAction(TARGET, async () => {
+      started.resolve()
+      await release.promise
+    })
+    await started.promise
+
+    await expect(tryRunWorkspacePaneAction(TARGET, () => 'should-not-run')).resolves.toEqual({ kind: 'busy' })
+    release.resolve()
+    await occupied
   })
 
   test('serializes workspace-scoped actions without inventing a branch', async () => {

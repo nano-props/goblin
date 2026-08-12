@@ -16,8 +16,14 @@ import { projectRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 export function useRepoSnapshotReadModel(
   repoRoot: MaybeRefOrGetter<WorkspaceId>,
   workspaceRuntimeId: MaybeRefOrGetter<string>,
+  options: { enabled?: MaybeRefOrGetter<boolean | undefined> } = {},
 ) {
-  return useQuery(computed(() => repoSnapshotQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId))))
+  return useQuery(
+    computed(() => ({
+      ...repoSnapshotQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId)),
+      enabled: toValue(options.enabled) !== false,
+    })),
+  )
 }
 
 export function useRepoPullRequestsReadModel(

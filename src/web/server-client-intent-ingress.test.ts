@@ -62,4 +62,17 @@ describe('server client intent ingress', () => {
     expect(listener).not.toHaveBeenCalled()
     dispose()
   })
+
+  test('rejects native-only lifecycle intents from the server ingress', async () => {
+    const { subscribeServerClientIntentIngress } = await import('#/web/server-client-intent-ingress.ts')
+    const listener = vi.fn()
+    const dispose = subscribeServerClientIntentIngress(listener)
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing socket')
+
+    socket.emitMessage(JSON.stringify({ type: 'client-effect-intent', intent: { type: 'app-quitting' } }))
+
+    expect(listener).not.toHaveBeenCalled()
+    dispose()
+  })
 })

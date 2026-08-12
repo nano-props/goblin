@@ -19,7 +19,14 @@ type TestRealtimeMessage = { type: 'feature.changed'; value: string }
 type TestServerMessage =
   | TestRealtimeMessage
   | { type: 'response'; requestId: string; ok: true; action: 'echo'; payload: TestOutputs['echo'] }
-  | { type: 'response'; requestId: string; ok: false; action: 'echo'; error: string }
+  | {
+      type: 'response'
+      requestId: string
+      ok: false
+      action: 'echo'
+      error: string
+      outcome?: 'indeterminate'
+    }
   | { type: 'pong'; requestId: string }
 
 let wsMock: WebSocketMockHandle
@@ -55,6 +62,33 @@ describe('client realtime socket connection', () => {
 
     await expect(promise).resolves.toEqual({ echoed: 'hello' })
     expect(onRealtimeMessage).not.toHaveBeenCalled()
+  })
+
+  test('classifies an invalid successful response payload as indeterminate', async () => {
+    const connection = createTestConnection({ onRealtimeMessage: vi.fn() })
+    const promise = connection.request('echo', { value: 'hello' })
+    const socket = wsMock.instances[0]
+    socket?.emitOpen()
+    await Promise.resolve()
+    const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'request')
+
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
+        ok: false,
+        action: 'echo',
+        error: 'Invalid response payload',
+        outcome: 'indeterminate',
+      }),
+    )
+
+    await expect(promise).rejects.toMatchObject({
+      name: 'ClientRealtimeRequestError',
+      kind: 'invalid-response',
+      delivery: 'indeterminate',
+      outageId: null,
+    } satisfies Partial<ClientRealtimeRequestError>)
   })
 
   test('forwards feature realtime messages and verifies periodic socket liveness', async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import * as v from 'valibot'
-import { IpcError } from '#/shared/ipc-error.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 import { createRouteApp, parseHttpBody, parseHttpInput } from '#/server/common/http-validate.ts'
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 
@@ -11,28 +11,28 @@ describe('parseHttpInput', () => {
     expect(result).toEqual({ cwd: '/tmp/repo', branch: 'main' })
   })
 
-  test('throws BAD_REQUEST IpcError for missing required field', () => {
+  test('throws BAD_REQUEST CodedError for missing required field', () => {
     const schema = v.object({ cwd: v.string() })
-    expect(() => parseHttpInput(schema, {})).toThrow(IpcError)
+    expect(() => parseHttpInput(schema, {})).toThrow(CodedError)
     try {
       parseHttpInput(schema, {})
     } catch (err) {
-      expect(err).toBeInstanceOf(IpcError)
-      expect((err as IpcError).code).toBe('BAD_REQUEST')
-      expect((err as IpcError).message).toContain('cwd')
+      expect(err).toBeInstanceOf(CodedError)
+      expect((err as CodedError).code).toBe('BAD_REQUEST')
+      expect((err as CodedError).message).toContain('cwd')
     }
   })
 
-  test('throws BAD_REQUEST IpcError for wrong type', () => {
+  test('throws BAD_REQUEST CodedError for wrong type', () => {
     const schema = v.object({ cwd: v.string() })
-    expect(() => parseHttpInput(schema, { cwd: 123 })).toThrow(IpcError)
+    expect(() => parseHttpInput(schema, { cwd: 123 })).toThrow(CodedError)
   })
 
   test('rejects null and non-object inputs', () => {
     const schema = v.object({ cwd: v.string() })
-    expect(() => parseHttpInput(schema, null)).toThrow(IpcError)
-    expect(() => parseHttpInput(schema, 'string')).toThrow(IpcError)
-    expect(() => parseHttpInput(schema, 42)).toThrow(IpcError)
+    expect(() => parseHttpInput(schema, null)).toThrow(CodedError)
+    expect(() => parseHttpInput(schema, 'string')).toThrow(CodedError)
+    expect(() => parseHttpInput(schema, 42)).toThrow(CodedError)
   })
 })
 
@@ -49,7 +49,7 @@ describe('parseHttpBody', () => {
 
   test('treats an empty body as undefined so the schema can decide', async () => {
     // Schema requires cwd, so this should throw BAD_REQUEST.
-    await expect(parseHttpBody(schema, makeContext(''))).rejects.toThrow(IpcError)
+    await expect(parseHttpBody(schema, makeContext(''))).rejects.toThrow(CodedError)
   })
 
   test('throws BAD_REQUEST with a clear message for malformed JSON', async () => {
@@ -57,14 +57,14 @@ describe('parseHttpBody', () => {
       await parseHttpBody(schema, makeContext('{ not json'))
       expect.fail('expected to throw')
     } catch (err) {
-      expect(err).toBeInstanceOf(IpcError)
-      expect((err as IpcError).code).toBe('BAD_REQUEST')
-      expect((err as IpcError).message).toBe('Request body is not valid JSON')
+      expect(err).toBeInstanceOf(CodedError)
+      expect((err as CodedError).code).toBe('BAD_REQUEST')
+      expect((err as CodedError).message).toBe('Request body is not valid JSON')
     }
   })
 
   test('propagates schema validation errors as BAD_REQUEST', async () => {
-    await expect(parseHttpBody(schema, makeContext('{"branch":"main"}'))).rejects.toThrow(IpcError)
+    await expect(parseHttpBody(schema, makeContext('{"branch":"main"}'))).rejects.toThrow(CodedError)
   })
 
   test('rejects a JSON-shaped body with the wrong media type', async () => {

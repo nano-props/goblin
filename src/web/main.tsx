@@ -13,6 +13,7 @@ import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { createWebBootstrapOwner, startWebBootstrap } from '#/web/web-bootstrap.ts'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 import { vueAppErrorHandler } from '#/web/vue-app-error-handler.ts'
+import { startNativeAppQuitIngress } from '#/web/app-lifecycle.ts'
 
 const INITIAL_PUBLIC_BOOTSTRAP_TIMEOUT_MS = 15_000
 
@@ -20,6 +21,7 @@ type BootstrapPhase = { kind: 'loading' } | { kind: 'error'; retry: () => void }
 
 const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('root element missing')
+const stopNativeAppQuitIngress = startNativeAppQuitIngress()
 
 interface MainHotData {
   nextBootstrapGeneration?: number
@@ -111,6 +113,7 @@ export function disposeWebApp(): void {
   if (disposed) return
   disposed = true
   bootstrapOwner.dispose()
+  stopNativeAppQuitIngress()
   stopI18nProjection()
   app.unmount()
 }

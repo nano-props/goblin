@@ -29,23 +29,24 @@ import { isValidWorkspaceLocatorInput, toSafeWorkspaceLocator } from '#/shared/i
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
 
 const repoWriteLogger = serverNodeLog.child({ module: 'repo-write-paths' })
 
 async function runUserNetworkMutation(
   cwd: WorkspaceId,
+  runtimeCapability: WorkspaceRuntimeEpochCapability,
   signal: AbortSignal | undefined,
   operationKind: 'pull' | 'push',
   target: { branch?: string; worktreePath?: string } | null,
   task: (source: RepoSource, signal: AbortSignal | undefined) => Promise<RepoMutationResult>,
-  options: { workspaceRuntimeId?: string } = {},
 ): Promise<RepoMutationResult> {
   return await enqueueRepoWriteOperation<RepoMutationResult>(
     cwd,
     signal,
     {
       repoId: cwd,
-      workspaceRuntimeId: options.workspaceRuntimeId,
+      runtimeCapability,
       kind: operationKind,
       source: 'user',
       target,
@@ -74,7 +75,7 @@ function createWorktreeTargetBranch(input: CreateWorktreeInput): string {
 
 async function runRepoServerWriteOperation<T extends ExecResult>(options: {
   repoId: WorkspaceId
-  workspaceRuntimeId?: string
+  runtimeCapability: WorkspaceRuntimeEpochCapability
   kind: RepoServerOperationKind
   target?: RepoServerOperationTarget | null
   signal?: AbortSignal
@@ -86,7 +87,7 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
     options.signal,
     {
       repoId: options.repoId,
-      workspaceRuntimeId: options.workspaceRuntimeId,
+      runtimeCapability: options.runtimeCapability,
       kind: options.kind,
       source: 'user',
       target: options.target,
@@ -118,16 +119,16 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
 
 export async function fetchRepo(
   cwd: WorkspaceId,
+  runtimeCapability: WorkspaceRuntimeEpochCapability,
   kind: NetworkOpKind = 'user',
   signal?: AbortSignal,
-  workspaceRuntimeId?: string,
 ): Promise<RepoMutationResult> {
   return await enqueueRepoWriteOperation(
     cwd,
     signal,
     {
       repoId: cwd,
-      workspaceRuntimeId,
+      runtimeCapability,
       kind: 'fetch',
       source: kind,
       canCancelUnderlying: true,
@@ -142,45 +143,46 @@ export async function fetchRepo(
 export async function pullRepoBranch(
   cwd: WorkspaceId,
   branch: string,
+  runtimeCapability: WorkspaceRuntimeEpochCapability,
   worktreePath?: string,
   signal?: AbortSignal,
-  options: { workspaceRuntimeId?: string } = {},
 ): Promise<RepoMutationResult> {
   return await runUserNetworkMutation(
     cwd,
+    runtimeCapability,
     signal,
     'pull',
     { branch, worktreePath },
     async (source, mergedSignal) => {
       return await source.pull(branch, worktreePath, mergedSignal)
     },
-    options,
   )
 }
 
 export async function pushRepoBranch(
   cwd: WorkspaceId,
   branch: string,
+  runtimeCapability: WorkspaceRuntimeEpochCapability,
   signal?: AbortSignal,
-  options: { workspaceRuntimeId?: string } = {},
 ): Promise<RepoMutationResult> {
   return await runUserNetworkMutation(
     cwd,
+    runtimeCapability,
     signal,
     'push',
     { branch },
     async (source, mergedSignal) => {
       return await source.push(branch, mergedSignal)
     },
-    options,
   )
 }
 
 export async function createRepoWorktree(
   cwd: WorkspaceId,
   input: CreateWorktreeInput,
+  runtimeCapability: WorkspaceRuntimeEpochCapability,
+  worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
-  options?: { workspaceRuntimeId?: string; worktreeBootstrap?: WorktreeBootstrapDecision },
 ): Promise<RepoMutationResult> {
   const repoId = toSafeWorkspaceLocator(cwd)
   if (!repoId) return { ok: false, message: 'error.invalid-arguments' }
@@ -189,10 +191,9 @@ export async function createRepoWorktree(
   if (!path.isAbsolute(normalized.worktreePath) || /[\0-\x1f\x7f]/.test(normalized.worktreePath)) {
     return { ok: false, message: 'error.invalid-path' }
   }
-  const worktreeBootstrap = options?.worktreeBootstrap ?? { kind: 'skip' }
   return await runRepoServerWriteOperation({
     repoId,
-    workspaceRuntimeId: options?.workspaceRuntimeId,
+    runtimeCapability,
     kind: 'create-worktree',
     target: { branch: createWorktreeTargetBranch(normalized), worktreePath: normalized.worktreePath },
     signal,
@@ -246,13 +247,13 @@ export async function getRepoRemoteBranches(
 export async function deleteRepoBranch(
   cwd: WorkspaceId,
   branch: string,
+  runtimeCapability: WorkspaceRuntimeEpochCapability,
   options?: { force?: boolean; deleteUpstream?: boolean },
   signal?: AbortSignal,
-  runtime?: { workspaceRuntimeId?: string },
 ): Promise<RepoMutationResult> {
   return await runRepoServerWriteOperation({
     repoId: cwd,
-    workspaceRuntimeId: runtime?.workspaceRuntimeId,
+    runtimeCapability,
     kind: 'delete-branch',
     target: { branch },
     signal,
@@ -275,10 +276,17 @@ export async function removeCapturedRepoWorktree(
   },
   lifecycle: RepoWorktreeRemovalLifecycle,
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
+  runtimeCapability: WorkspaceRuntimeEpochCapability,
   signal?: AbortSignal,
-  options: { workspaceRuntimeId?: string } = {},
 ): Promise<RepoMutationResult> {
-  return await removeRepoWorktreeWithBinding(cwd, input, lifecycle, signal, physicalWorktreeCapability, options)
+  return await removeRepoWorktreeWithBinding(
+    cwd,
+    input,
+    lifecycle,
+    signal,
+    physicalWorktreeCapability,
+    runtimeCapability,
+  )
 }
 
 async function removeRepoWorktreeWithBinding(
@@ -293,11 +301,11 @@ async function removeRepoWorktreeWithBinding(
   lifecycle: RepoWorktreeRemovalLifecycle,
   signal: AbortSignal | undefined,
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
-  options: { workspaceRuntimeId?: string } = {},
+  runtimeCapability: WorkspaceRuntimeEpochCapability,
 ): Promise<RepoMutationResult> {
   return await runRepoServerWriteOperation({
     repoId: cwd,
-    workspaceRuntimeId: options.workspaceRuntimeId,
+    runtimeCapability,
     kind: 'remove-worktree',
     target: { branch: input.branch, worktreePath: input.worktreePath },
     signal,
@@ -305,7 +313,7 @@ async function removeRepoWorktreeWithBinding(
       await captureRepoWriteExecutionFromPhysicalWorktree(
         cwd,
         physicalWorktreeCapability,
-        options.workspaceRuntimeId ? { workspaceRuntimeId: options.workspaceRuntimeId } : undefined,
+        { workspaceRuntimeId: runtimeCapability.workspaceRuntimeId },
         captureSignal,
       ),
     task: async (context) => {

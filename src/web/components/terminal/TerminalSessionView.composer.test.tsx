@@ -34,7 +34,7 @@ async function chooseComposerFile(container: HTMLElement, draft: string, file: F
   const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]')
   if (!fileInput) throw new Error('expected composer file controls')
   await fireEvent.update(textarea, draft)
-  await fireEvent.change(fileInput, { target: { files: [file] } })
+  await userEvent.setup().upload(fileInput, file)
   return textarea
 }
 
@@ -445,7 +445,7 @@ describe('TerminalSessionView composer', () => {
 
       const file = new File(['content'], 'notes.txt', { type: 'text/plain' })
       Object.defineProperty(file, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
-      await fireEvent.change(fileInput, { target: { files: [file] } })
+      await userEvent.setup().upload(fileInput, file)
 
       await vi.waitFor(() => expect(textarea.value).toBe("cat '/abs/notes file.txt'"))
       expect(rendered.writeInput).not.toHaveBeenCalled()

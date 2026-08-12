@@ -57,7 +57,6 @@ beforeEach(() => {
     pathForFile: () => '',
     invokeIpc: async () => null,
     abortIpc: async () => true,
-    onEvent: () => () => {},
   }
 })
 

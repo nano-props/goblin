@@ -11,6 +11,7 @@ import { isRemoteWorkspaceId, normalizeRemoteWorkspaceRef, parseRemoteWorkspaceI
 import {
   isCurrentWorkspaceRuntime,
   onWorkspaceRuntimeClosed,
+  WorkspaceRuntimeStaleError,
   type WorkspaceRuntimeClosedEvent,
 } from '#/server/modules/workspace-runtimes.ts'
 import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
@@ -144,7 +145,7 @@ export class PhysicalWorktreeIdentityResolver implements PhysicalWorktreeCapture
   ): Promise<PhysicalWorktreeExecutionCapability> {
     let operation = epoch.inFlightByTarget.get(targetKey)
     if (!operation) {
-      operation = capture()
+      operation = this.captureForEpoch(epoch, capture)
       epoch.inFlightByTarget.set(targetKey, operation)
       const cleanup = () => {
         if (epoch.inFlightByTarget.get(targetKey) === operation) epoch.inFlightByTarget.delete(targetKey)
@@ -152,6 +153,18 @@ export class PhysicalWorktreeIdentityResolver implements PhysicalWorktreeCapture
       operation.then(cleanup, cleanup)
     }
     return awaitWithAbort(operation, signal)
+  }
+
+  private async captureForEpoch(
+    epoch: PhysicalWorktreeRuntimeEpoch,
+    capture: () => Promise<PhysicalWorktreeExecutionCapability>,
+  ): Promise<PhysicalWorktreeExecutionCapability> {
+    try {
+      return await capture()
+    } catch (error) {
+      if (!this.isEpochActive(epoch)) throw new WorkspaceRuntimeStaleError()
+      throw error
+    }
   }
 
   private async resolveWorkspaceAndBind(
@@ -313,7 +326,7 @@ export class PhysicalWorktreeIdentityResolver implements PhysicalWorktreeCapture
       this.disposed ||
       !this.deps.isCurrentWorkspaceRuntime(input.userId, input.workspaceId, input.workspaceRuntimeId)
     ) {
-      throw new Error('error.workspace-runtime-stale')
+      throw new WorkspaceRuntimeStaleError()
     }
     const key = runtimeKey(input)
     const existing = this.epochs.get(key)
@@ -336,19 +349,21 @@ export class PhysicalWorktreeIdentityResolver implements PhysicalWorktreeCapture
   }
 
   private assertEpochActive(epoch: PhysicalWorktreeRuntimeEpoch): void {
-    if (
-      this.disposed ||
-      !epoch.active ||
-      this.epochs.get(epoch.key) !== epoch ||
-      !this.deps.isCurrentWorkspaceRuntime(epoch.userId, epoch.workspaceId, epoch.workspaceRuntimeId)
-    ) {
-      throw new Error('error.workspace-runtime-stale')
-    }
+    if (!this.isEpochActive(epoch)) throw new WorkspaceRuntimeStaleError()
+  }
+
+  private isEpochActive(epoch: PhysicalWorktreeRuntimeEpoch): boolean {
+    return (
+      !this.disposed &&
+      epoch.active &&
+      this.epochs.get(epoch.key) === epoch &&
+      this.deps.isCurrentWorkspaceRuntime(epoch.userId, epoch.workspaceId, epoch.workspaceRuntimeId)
+    )
   }
 
   private captureRemoteConfigFingerprint(epoch: PhysicalWorktreeRuntimeEpoch, fingerprint: string): void {
     if (epoch.remoteConfigFingerprint && epoch.remoteConfigFingerprint !== fingerprint) {
-      throw new Error('error.workspace-runtime-stale')
+      throw new WorkspaceRuntimeStaleError()
     }
     epoch.remoteConfigFingerprint = fingerprint
   }
@@ -449,7 +464,7 @@ function runtimeKey(input: { userId: string; workspaceId: WorkspaceId; workspace
 function deactivateEpoch(epoch: PhysicalWorktreeRuntimeEpoch): void {
   if (!epoch.active) return
   epoch.active = false
-  epoch.abortController.abort(new Error('error.workspace-runtime-stale'))
+  epoch.abortController.abort(new WorkspaceRuntimeStaleError())
   epoch.inFlightByTarget.clear()
   epoch.remoteConfigFingerprint = null
 }

@@ -3,7 +3,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import {
   WorkspacePaneLayoutAggregate,
-  type WorkspacePaneLayoutReplaceInput,
   type WorkspacePaneLayoutUpdateInput,
   type WorkspacePaneLayoutValidationInput,
 } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
@@ -29,8 +28,18 @@ import {
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type {
+  WorkspaceRuntimeEpochCapability,
+  WorkspaceRuntimeMembershipCapability,
+} from '#/server/modules/workspace-runtimes.ts'
 
 const scope = { userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' }
+const testEpochCapability = epochCapabilityForTest(scope)
+const testMembershipCapability: WorkspaceRuntimeMembershipCapability = {
+  ...testEpochCapability,
+  clientId: 'client-a',
+  generation: 1,
+}
 const target = { branchName: 'feature/worktree', worktreePath: '/repo/worktree' }
 
 function memoryRepository(initial?: WorkspacePaneDurableLayout) {
@@ -110,40 +119,14 @@ describe('workspace pane layout aggregate', () => {
     const repository = memoryRepository(current)
 
     await expect(
-      repository.compareAndSwap({ workspaceId: WORKSPACE_ID, expected: { entries: [] }, replacement: { entries: [] } }),
+      repository.compareAndSwap({
+        workspaceId: WORKSPACE_ID,
+        expected: { entries: [] },
+        replacement: { entries: [] },
+        epochCapability: testEpochCapability,
+      }),
     ).resolves.toEqual({ kind: 'conflict', snapshot: { layout: current } })
     expect(repository.layout).toEqual(current)
-  })
-
-  test('splits a mixed command into durable static layout and epoch placement', async () => {
-    const repository = memoryRepository()
-    const aggregate = aggregateFor(repository)
-
-    await replace(aggregate, {
-      ...scope,
-      ...worktreeMutationTarget,
-      tabs: [workspacePaneStaticTabEntry('status'), terminal, workspacePaneStaticTabEntry('history')],
-      validTargets: [worktreeProjection(target.branchName)],
-      physicalWorktreeLease: physicalWorktreeAdmissionLease(
-        testPhysicalWorktreeExecutionCapability(target.worktreePath),
-      ),
-      providerSnapshots: providers,
-    })
-    const snapshot = await readSnapshot(aggregate, scope, [worktreeProjection(target.branchName)], providers)
-
-    expect(repository.layout).toEqual({
-      entries: [
-        {
-          target: { kind: 'git-worktree', root: worktreeRoot },
-          tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
-        },
-      ],
-    })
-    expect(snapshot.entries[0]?.tabs).toEqual([
-      workspacePaneStaticTabEntry('status'),
-      terminal,
-      workspacePaneStaticTabEntry('history'),
-    ])
   })
 
   test('re-reads and replans the original update intent after a CAS conflict', async () => {
@@ -176,6 +159,7 @@ describe('workspace pane layout aggregate', () => {
     })
     await update(aggregate, {
       ...scope,
+      epochCapability: testEpochCapability,
       ...worktreeMutationTarget,
       operation: { type: 'open-static', tabType: 'history' },
       validTargets: [worktreeProjection(target.branchName)],
@@ -191,57 +175,6 @@ describe('workspace pane layout aggregate', () => {
       workspacePaneStaticTabEntry('history'),
     ])
     expect(repository.compareAndSwap).toHaveBeenCalledTimes(2)
-  })
-
-  test('rejects an absolute replace after a CAS conflict instead of replaying stale layout', async () => {
-    const repository = memoryRepository({
-      entries: [{ target: { kind: 'git-worktree', root: worktreeRoot }, tabs: [] }],
-    })
-    const aggregate = aggregateFor(repository)
-    await validateTargets(aggregate, [worktreeProjection(target.branchName)])
-    repository.compareAndSwap = vi.fn(async () => ({
-      kind: 'conflict' as const,
-      snapshot: { layout: { entries: [] } },
-    }))
-    await expect(
-      replace(aggregate, {
-        ...scope,
-        ...worktreeMutationTarget,
-        tabs: [workspacePaneStaticTabEntry('history')],
-        validTargets: [worktreeProjection(target.branchName)],
-        physicalWorktreeLease: physicalWorktreeAdmissionLease(
-          testPhysicalWorktreeExecutionCapability(target.worktreePath),
-        ),
-        providerSnapshots: [],
-      }),
-    ).rejects.toThrow('error.workspace-tabs-layout-conflict')
-    expect(repository.compareAndSwap).toHaveBeenCalledOnce()
-  })
-
-  test('commits no overlay or revision when persistence fails', async () => {
-    const repository = memoryRepository()
-    repository.compareAndSwap = vi.fn(async () => ({
-      kind: 'write-failure' as const,
-      error: new Error('disk full'),
-    }))
-    const aggregate = aggregateFor(repository)
-
-    await expect(
-      replace(aggregate, {
-        ...scope,
-        ...worktreeMutationTarget,
-        tabs: [terminal, workspacePaneStaticTabEntry('status')],
-        validTargets: [worktreeProjection(target.branchName)],
-        physicalWorktreeLease: physicalWorktreeAdmissionLease(
-          testPhysicalWorktreeExecutionCapability(target.worktreePath),
-        ),
-        providerSnapshots: providers,
-      }),
-    ).rejects.toThrow('disk full')
-    await expect(readSnapshot(aggregate, scope, [], providers)).resolves.toMatchObject({
-      revision: 0,
-      entries: [{ tabs: [workspacePaneStaticTabEntry('status'), terminal] }],
-    })
   })
 
   test('keeps runtime target overlay, clock, and snapshot unchanged when admission fails', async () => {
@@ -260,6 +193,7 @@ describe('workspace pane layout aggregate', () => {
             intent: runtimeIntent,
             validTargets,
             stagedProviderSnapshots: providers,
+            epochCapability: testMembershipCapability,
           },
           () => {
             throw new Error('runtime admission failed')
@@ -267,8 +201,46 @@ describe('workspace pane layout aggregate', () => {
         ),
       ).rejects.toThrow('runtime admission failed')
       expect(operation.indexedAdmissionLeases(scope)).toEqual([])
-      await expect(operation.snapshot({ scope, validTargets, providerSnapshots: providers })).resolves.toEqual(baseline)
+      await expect(
+        operation.snapshot({ scope, validTargets, providerSnapshots: providers, epochCapability: testEpochCapability }),
+      ).resolves.toEqual(baseline)
     })
+  })
+
+  test('rejects a snapshot when its runtime expires during the durable layout read', async () => {
+    const repository = memoryRepository()
+    const load = repository.load
+    const loadStarted = Promise.withResolvers<void>()
+    const resumeLoad = Promise.withResolvers<void>()
+    repository.load = vi.fn(async (workspaceId) => {
+      loadStarted.resolve()
+      await resumeLoad.promise
+      return await load(workspaceId)
+    })
+    const aggregate = aggregateFor(repository)
+    let current = true
+    const snapshot = aggregate.runExclusive(
+      scope.workspaceId,
+      async (operation) =>
+        await operation.snapshot({
+          scope,
+          validTargets: [worktreeProjection(target.branchName)],
+          providerSnapshots: providers,
+          epochCapability: {
+            ...scope,
+            isCurrent: () => current,
+            assertCurrent: () => {
+              if (!current) throw new Error('error.workspace-runtime-stale')
+            },
+          },
+        }),
+    )
+
+    await loadStarted.promise
+    current = false
+    resumeLoad.resolve()
+
+    await expect(snapshot).rejects.toThrow('error.workspace-runtime-stale')
   })
 
   test('atomically swaps the staged runtime target state after the commit callback succeeds', async () => {
@@ -287,6 +259,7 @@ describe('workspace pane layout aggregate', () => {
           intent: runtimeIntent,
           validTargets,
           stagedProviderSnapshots: providers,
+          epochCapability: testMembershipCapability,
         },
         () => {
           callbackObservedUncommittedState = operation.indexedAdmissionLeases(scope).length === 0
@@ -295,7 +268,9 @@ describe('workspace pane layout aggregate', () => {
 
       expect(callbackObservedUncommittedState).toBe(true)
       expect(operation.indexedAdmissionLeases(scope)).toEqual([lease])
-      await expect(operation.snapshot({ scope, validTargets, providerSnapshots: providers })).resolves.toEqual(snapshot)
+      await expect(
+        operation.snapshot({ scope, validTargets, providerSnapshots: providers, epochCapability: testEpochCapability }),
+      ).resolves.toEqual(snapshot)
     })
   })
 
@@ -322,6 +297,7 @@ describe('workspace pane layout aggregate', () => {
                 intent: runtimeIntent,
                 validTargets,
                 stagedProviderSnapshots: providers,
+                epochCapability: testMembershipCapability,
               },
               commitAdmission,
             ),
@@ -375,6 +351,7 @@ describe('workspace pane layout aggregate', () => {
                 intent,
                 validTargets,
                 stagedProviderSnapshots,
+                epochCapability: testMembershipCapability,
               },
               () => undefined,
             ),
@@ -406,6 +383,7 @@ describe('workspace pane layout aggregate', () => {
           intent: runtimeIntent,
           validTargets,
           stagedProviderSnapshots: providers,
+          epochCapability: testMembershipCapability,
         },
         () => undefined,
       )
@@ -424,6 +402,7 @@ describe('workspace pane layout aggregate', () => {
               intent: runtimeIntent,
               validTargets,
               stagedProviderSnapshots: providers,
+              epochCapability: testMembershipCapability,
             },
             () => {
               throw new Error('replacement admission failed')
@@ -448,6 +427,7 @@ describe('workspace pane layout aggregate', () => {
       [scope, firstLease],
       [siblingScope, firstLease],
     ] as const) {
+      const epochCapability = epochCapabilityForTest(epochScope)
       await aggregate.runExclusive(scope.workspaceId, async (operation) => {
         await operation.commitRuntimeTabPlacement(
           {
@@ -457,6 +437,11 @@ describe('workspace pane layout aggregate', () => {
             intent: runtimeIntent,
             validTargets,
             stagedProviderSnapshots: providers,
+            epochCapability: {
+              ...epochCapability,
+              clientId: 'client-a',
+              generation: 1,
+            },
           },
           () => undefined,
         )
@@ -473,6 +458,7 @@ describe('workspace pane layout aggregate', () => {
           intent: runtimeIntent,
           validTargets,
           stagedProviderSnapshots: providers,
+          epochCapability: testMembershipCapability,
         },
         () => undefined,
       )
@@ -501,6 +487,7 @@ describe('workspace pane layout aggregate', () => {
               intent: runtimeIntent,
               validTargets: [],
               stagedProviderSnapshots: providers,
+              epochCapability: testMembershipCapability,
             },
             () => undefined,
           ),
@@ -518,6 +505,7 @@ describe('workspace pane layout aggregate', () => {
     const aggregate = aggregateFor(repository)
     const validated = await validate(aggregate, {
       ...scope,
+      epochCapability: testEpochCapability,
       validTargets: [branchTarget],
       physicalTargets: [],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
@@ -587,6 +575,7 @@ describe('workspace pane layout aggregate', () => {
 
     const result = await validate(aggregate, {
       ...scope,
+      epochCapability: testEpochCapability,
       validTargets: [branchProjection('main')],
       physicalTargets: [],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
@@ -626,6 +615,7 @@ describe('workspace pane layout aggregate', () => {
 
     await validate(aggregate, {
       ...scope,
+      epochCapability: testEpochCapability,
       validTargets: [branchProjection('main')],
       physicalTargets: [],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
@@ -646,6 +636,7 @@ describe('workspace pane layout aggregate', () => {
 
     const result = await validate(aggregate, {
       ...scope,
+      epochCapability: testEpochCapability,
       validTargets: [branchProjection('main')],
       physicalTargets: [],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
@@ -663,6 +654,7 @@ describe('workspace pane layout aggregate', () => {
     const aggregate = aggregateFor(repository)
     await validate(aggregate, {
       ...scope,
+      epochCapability: testEpochCapability,
       validTargets: [],
       physicalTargets: [],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
@@ -672,6 +664,7 @@ describe('workspace pane layout aggregate', () => {
     await expect(
       update(aggregate, {
         ...scope,
+        epochCapability: testEpochCapability,
         target: branchProjection('feature').target,
         nativeWorktreePath: null,
         operation: { type: 'open-static', tabType: 'history' },
@@ -689,6 +682,7 @@ describe('workspace pane layout aggregate', () => {
     await expect(
       update(aggregate, {
         ...scope,
+        epochCapability: testEpochCapability,
         ...worktreeMutationTarget,
         operation: { type: 'open-static', tabType: 'history' },
         validTargets: [],
@@ -717,6 +711,7 @@ describe('workspace pane layout aggregate', () => {
 
     const result = await validate(aggregate, {
       ...scope,
+      epochCapability: testEpochCapability,
       validTargets: [],
       physicalTargets: [],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
@@ -748,6 +743,7 @@ describe('workspace pane layout aggregate', () => {
 
     const result = await validate(aggregate, {
       ...scope,
+      epochCapability: testEpochCapability,
       validTargets: [],
       physicalTargets: [],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
@@ -781,6 +777,7 @@ describe('workspace pane layout aggregate', () => {
     await expect(
       validate(aggregate, {
         ...scope,
+        epochCapability: testEpochCapability,
         validTargets: [worktreeProjection(target.branchName)],
         physicalTargets: [],
         expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
@@ -803,13 +800,13 @@ describe('workspace pane layout aggregate', () => {
     await expect(
       validate(aggregate, {
         ...scope,
+        epochCapability: epochCapabilityForTest(scope, () => {
+          if (!current) throw new Error('error.workspace-runtime-stale')
+        }),
         validTargets: [branchProjection('main')],
         physicalTargets: [],
         expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
         providerSnapshots: [],
-        assertCurrent: () => {
-          if (!current) throw new Error('error.workspace-runtime-stale')
-        },
       }),
     ).rejects.toThrow('error.workspace-runtime-stale')
     expect(aggregate.activeEpochs(WORKSPACE_ID)).toEqual([])
@@ -827,6 +824,7 @@ describe('workspace pane layout aggregate', () => {
     await expect(
       validate(aggregate, {
         ...scope,
+        epochCapability: testEpochCapability,
         validTargets: [],
         physicalTargets: [],
         expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
@@ -848,6 +846,7 @@ describe('workspace pane layout aggregate', () => {
     const aggregate = aggregateFor(repository)
     const result = await validate(aggregate, {
       ...scope,
+      epochCapability: testEpochCapability,
       validTargets: [worktreeProjection('old-branch')],
       physicalTargets: [],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
@@ -886,6 +885,7 @@ describe('workspace pane layout aggregate', () => {
 
     const result = await validate(aggregate, {
       ...scope,
+      epochCapability: testEpochCapability,
       validTargets: [worktreeProjection('feature/current')],
       physicalTargets: [],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
@@ -920,6 +920,7 @@ describe('workspace pane layout aggregate', () => {
 
     const result = await update(aggregate, {
       ...scope,
+      epochCapability: testEpochCapability,
       target: mainTarget.target,
       nativeWorktreePath: null,
       operation: { type: 'open-static', tabType: 'history' },
@@ -927,7 +928,7 @@ describe('workspace pane layout aggregate', () => {
       providerSnapshots: [],
     })
 
-    expect(result).toEqual({ affectedUserIds: ['user-a'] })
+    expect(result).toEqual({ affectedUserIds: ['user-a'], projectionCurrent: true })
   })
 })
 
@@ -949,16 +950,13 @@ async function validateTargets(
 ): Promise<void> {
   const result = await validate(aggregate, {
     ...scope,
+    epochCapability: testEpochCapability,
     validTargets,
     physicalTargets: [],
     expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
     providerSnapshots: [],
   })
   if (result.kind !== 'validated') throw new Error('test target validation failed')
-}
-
-async function replace(aggregate: WorkspacePaneLayoutAggregate, input: WorkspacePaneLayoutReplaceInput) {
-  return await aggregate.runExclusive(input.workspaceId, async (operation) => await operation.replace(input))
 }
 
 async function update(aggregate: WorkspacePaneLayoutAggregate, input: WorkspacePaneLayoutUpdateInput) {
@@ -978,6 +976,7 @@ async function readSnapshot(
         scope: snapshotScope,
         validTargets,
         providerSnapshots,
+        epochCapability: epochCapabilityForTest(snapshotScope),
       }),
   )
 }
@@ -987,4 +986,22 @@ async function validate(aggregate: WorkspacePaneLayoutAggregate, input: Workspac
     input.workspaceId,
     async (operation) => await operation.validateMembershipAndSnapshot(input),
   )
+}
+
+function epochCapabilityForTest(
+  authorityScope: typeof scope,
+  assertCurrent: () => void = () => {},
+): WorkspaceRuntimeEpochCapability {
+  return {
+    ...authorityScope,
+    isCurrent: () => {
+      try {
+        assertCurrent()
+        return true
+      } catch {
+        return false
+      }
+    },
+    assertCurrent,
+  }
 }

@@ -1,8 +1,9 @@
 import { vi } from 'vitest'
-import type { ServerTerminalCreateResult } from '#/server/terminal/terminal-session-creator.ts'
+import type { ServerTerminalCreateSuccess } from '#/server/terminal/terminal-session-creator.ts'
 import type { WorkspacePaneRuntimeTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import { terminalGitWorktreePresentation, type TerminalCreateResult } from '#/shared/terminal-types.ts'
+import { terminalGitWorktreePresentation, type TerminalCreateSuccess } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { WorkspaceRuntimeMembershipCapability } from '#/server/modules/workspace-runtimes.ts'
 
 function requiredWorkspaceLocator(value: string) {
   const locator = canonicalWorkspaceLocator(value)
@@ -26,6 +27,28 @@ export const request = {
 
 export const paneTabsSnapshot = { revision: 1, entries: [] }
 
+export function workspaceRuntimeMembershipCapability(
+  assertCurrent: () => void = () => {},
+): WorkspaceRuntimeMembershipCapability {
+  const isCurrent = () => {
+    try {
+      assertCurrent()
+      return true
+    } catch {
+      return false
+    }
+  }
+  return {
+    userId: 'user-test',
+    clientId: 'client-test',
+    workspaceId,
+    workspaceRuntimeId: request.workspaceRuntimeId,
+    generation: 1,
+    isCurrent,
+    assertCurrent,
+  }
+}
+
 export function runtimeTabsCoordinator(
   overrides: Partial<WorkspacePaneRuntimeTabsCoordinator> = {},
 ): WorkspacePaneRuntimeTabsCoordinator {
@@ -42,7 +65,7 @@ export function runtimeTabsCoordinator(
 
 export function terminalCreateSuccess(
   action: 'created' | 'restored' | 'reused' = 'created',
-): Extract<ServerTerminalCreateResult, { ok: true }> {
+): ServerTerminalCreateSuccess {
   const terminalRuntimeSessionId = 'pty_session_1_aaaaaaaaa'
   const terminalSessionId = 'term-111111111111111111111'
   return {
@@ -79,9 +102,9 @@ function committedTerminalResult(
 }
 
 export function publishedTerminalResult(
-  runtime: Extract<ServerTerminalCreateResult, { ok: true }>,
+  runtime: ServerTerminalCreateSuccess,
   canonicalBranch = request.branch,
-): Extract<TerminalCreateResult, { ok: true }> {
+): TerminalCreateSuccess {
   return {
     ok: true,
     terminalSessionId: runtime.terminalSessionId,

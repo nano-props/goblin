@@ -699,14 +699,13 @@ describe('GitWorkspacePaneContent status-history', () => {
         />
       </TerminalSessionReadScope>,
     )
-    await flushAsyncWork()
-    await flushAsyncWork()
-
-    expect(repoClientMocks.getRepoLog).toHaveBeenCalledWith(
-      REPO_ID,
-      repo.workspaceRuntimeId,
-      'feature/history',
-      expect.objectContaining({ count: 100 }),
+    await waitFor(() =>
+      expect(repoClientMocks.getRepoLog).toHaveBeenCalledWith(
+        REPO_ID,
+        repo.workspaceRuntimeId,
+        'feature/history',
+        expect.objectContaining({ count: 100 }),
+      ),
     )
     await waitFor(() => {
       expect(container.querySelector('[data-history-commit-graph=""]')).not.toBeNull()

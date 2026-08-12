@@ -2,7 +2,7 @@ import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
@@ -494,7 +494,12 @@ describe('createAppNavigationActions presentation', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
     const navigation = routeNavigation()
     navigation.commitWorkspacePaneRoute = vi.fn(async (workspaceId, branchName, route, options) => {
@@ -609,7 +614,12 @@ describe('createAppNavigationActions presentation', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
     const peekWorkspaceNavigation = vi.fn((workspaceId: WorkspaceId, direction: 'back' | 'forward') =>
       workspacesStore.getState().peekWorkspaceNavigation(workspaceId, direction),

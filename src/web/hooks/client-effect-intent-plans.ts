@@ -1,4 +1,3 @@
-import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { terminalExecutionCoordinates } from '#/shared/terminal-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
@@ -12,12 +11,22 @@ import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-type ClientWorkspaceIntent = Extract<
+export type ClientAppIntent = Extract<
   ClientEffectIntent,
+  | { type: 'layout-reset-requested' }
+  | { type: 'open-settings-requested' }
+  | { type: 'theme-pref-set-requested' }
+  | { type: 'lang-pref-set-requested' }
+  | { type: 'clear-recent-workspaces-requested' }
+  | { type: 'open-recent-workspace-requested' }
   | { type: 'open-workspace-requested' }
   | { type: 'open-workspace-path-requested' }
-  | { type: 'open-remote-workspace-requested' }
   | { type: 'clone-repo-requested' }
+  | { type: 'open-remote-workspace-requested' }
+>
+
+export type ClientWorkspaceIntent = Extract<
+  ClientEffectIntent,
   | { type: 'create-worktree-requested' }
   | { type: 'terminal-new-tab-requested' }
   | { type: 'workspace-pane-close-tab-requested' }
@@ -30,22 +39,7 @@ type ClientWorkspaceIntent = Extract<
 >
 
 export type TerminalBellIntentPlan =
-  | { kind: 'noop' }
-  | { kind: 'unavailable'; reason: 'snapshot-unavailable' }
-  | { kind: 'show-workspace-root-terminal'; workspaceId: WorkspaceId; terminalSessionId: string }
-  | {
-      kind: 'show-worktree-terminal'
-      workspaceId: WorkspaceId
-      branch: string
-      terminalSessionId: string
-      terminalFilesystemTargetKey: string
-    }
-  | {
-      kind: 'show-detached-worktree-terminal'
-      workspaceId: WorkspaceId
-      worktreePath: string
-      terminalSessionId: string
-    }
+  { kind: 'noop' } | { kind: 'unavailable'; reason: 'snapshot-unavailable' } | { kind: 'show-terminal' }
 
 export type AppLevelIntentPlan =
   | { kind: 'noop' }
@@ -55,13 +49,13 @@ export type AppLevelIntentPlan =
   | { kind: 'set-lang-pref'; pref: LangPref }
   | { kind: 'clear-recent-workspaces' }
   | { kind: 'ensure-recent-workspace-open'; entry: WorkspaceSessionEntry }
-
-export type WorkspaceIntentPlan =
-  | { kind: 'noop' }
   | { kind: 'open-workspace' }
   | { kind: 'open-workspace-path' }
   | { kind: 'open-clone-repo' }
   | { kind: 'open-remote-workspace' }
+
+export type WorkspaceIntentPlan =
+  | { kind: 'noop' }
   | { kind: 'create-worktree' }
   | { kind: 'new-terminal-tab'; workspaceId: WorkspaceId; target: WorkspacePaneCommandTarget }
   | { kind: 'close-workspace-pane-tab'; workspaceId: WorkspaceId; target: WorkspacePaneCommandTarget }
@@ -78,6 +72,35 @@ export type WorkspaceIntentPlan =
   | { kind: 'toggle-zen-mode' }
 
 export type ExternalOpenDrainKickPlan = { kind: 'ignore' } | { kind: 'schedule-rerun' } | { kind: 'start-drain' }
+
+export function clientEffectIntentRequiresWorkspaceBootstrap(event: ClientEffectIntent): boolean {
+  switch (event.type) {
+    case 'app-quitting':
+    case 'open-settings-requested':
+    case 'theme-pref-set-requested':
+    case 'lang-pref-set-requested':
+    case 'open-workspace-path-requested':
+    case 'clone-repo-requested':
+    case 'open-remote-workspace-requested':
+      return false
+    case 'open-workspace-requested':
+    case 'create-worktree-requested':
+    case 'terminal-new-tab-requested':
+    case 'workspace-pane-close-tab-requested':
+    case 'close-workspace-requested':
+    case 'cycle-workspace-requested':
+    case 'workspace-refresh-requested':
+    case 'show-workspace-pane-tab-requested':
+    case 'terminal-primary-action-requested':
+    case 'workspace-zen-mode-toggle-requested':
+    case 'layout-reset-requested':
+    case 'clear-recent-workspaces-requested':
+    case 'open-recent-workspace-requested':
+    case 'terminal-bell-click':
+    case 'external-open-enqueued':
+      return true
+  }
+}
 
 interface AppLevelIntentPlanContext {
   overlayBlocked: boolean
@@ -103,11 +126,7 @@ export function createTerminalBellIntentPlan(
   const coordinates = terminalExecutionCoordinates(event.session.target)
   if (coordinates.workspaceId === workspace.id && coordinates.workspaceRuntimeId === workspace.workspaceRuntimeId) {
     if (event.session.target.kind === 'workspace-root' && event.session.presentation.kind === 'workspace-root') {
-      return {
-        kind: 'show-workspace-root-terminal',
-        workspaceId: workspace.id,
-        terminalSessionId: event.terminalSessionId,
-      }
+      return { kind: 'show-terminal' }
     }
     if (event.session.target.kind !== 'git-worktree' || event.session.presentation.kind !== 'git-worktree') {
       return { kind: 'noop' }
@@ -119,31 +138,17 @@ export function createTerminalBellIntentPlan(
     if (head.kind === 'branch') {
       const branch = repositoryFacts.snapshot.branches.find((candidate) => candidate.name === head.branchName)
       if (branch?.worktree?.path !== worktreePath) return { kind: 'noop' }
-      return {
-        kind: 'show-worktree-terminal',
-        workspaceId: workspace.id,
-        branch: head.branchName,
-        terminalSessionId: event.terminalSessionId,
-        terminalFilesystemTargetKey: formatTerminalFilesystemTargetKey(
-          coordinates.workspaceId,
-          coordinates.executionRootId,
-        ),
-      }
+      return { kind: 'show-terminal' }
     }
-    return {
-      kind: 'show-detached-worktree-terminal',
-      workspaceId: workspace.id,
-      worktreePath,
-      terminalSessionId: event.terminalSessionId,
-    }
+    return { kind: 'show-terminal' }
   }
   return { kind: 'noop' }
 }
 
 export function createAppLevelIntentPlan(
-  event: ClientEffectIntent,
+  event: ClientAppIntent,
   context: AppLevelIntentPlanContext,
-): AppLevelIntentPlan | null {
+): AppLevelIntentPlan {
   switch (event.type) {
     case 'layout-reset-requested':
       return { kind: 'reset-layout' }
@@ -157,15 +162,21 @@ export function createAppLevelIntentPlan(
       return context.overlayBlocked ? { kind: 'noop' } : { kind: 'clear-recent-workspaces' }
     case 'open-recent-workspace-requested':
       return context.overlayBlocked ? { kind: 'noop' } : { kind: 'ensure-recent-workspace-open', entry: event.entry }
+    case 'open-workspace-requested':
+      return context.overlayBlocked ? { kind: 'noop' } : { kind: 'open-workspace' }
+    case 'open-workspace-path-requested':
+      return context.overlayBlocked ? { kind: 'noop' } : { kind: 'open-workspace-path' }
+    case 'clone-repo-requested':
+      return context.overlayBlocked ? { kind: 'noop' } : { kind: 'open-clone-repo' }
+    case 'open-remote-workspace-requested':
+      return context.overlayBlocked ? { kind: 'noop' } : { kind: 'open-remote-workspace' }
   }
-  return null
 }
 
 export function createWorkspaceIntentPlan(
-  event: ClientEffectIntent,
+  event: ClientWorkspaceIntent,
   context: WorkspaceIntentPlanContext,
-): WorkspaceIntentPlan | null {
-  if (!isClientWorkspaceIntent(event)) return null
+): WorkspaceIntentPlan {
   if (event.type === 'workspace-pane-close-tab-requested') {
     if (!context.currentWorkspaceId || !context.currentWorkspacePaneCommandTarget) return { kind: 'noop' }
     if (context.overlayBlocked || context.workspaceShortcutSuppressed) return { kind: 'noop' }
@@ -177,12 +188,6 @@ export function createWorkspaceIntentPlan(
   }
   if (context.overlayBlocked) return { kind: 'noop' }
   switch (event.type) {
-    case 'open-workspace-requested':
-      return { kind: 'open-workspace' }
-    case 'open-workspace-path-requested':
-      return { kind: 'open-workspace-path' }
-    case 'clone-repo-requested':
-      return { kind: 'open-clone-repo' }
     case 'create-worktree-requested':
       if (
         context.workspaceShortcutSuppressed ||
@@ -193,8 +198,6 @@ export function createWorkspaceIntentPlan(
       )
         return { kind: 'noop' }
       return { kind: 'create-worktree' }
-    case 'open-remote-workspace-requested':
-      return { kind: 'open-remote-workspace' }
     case 'terminal-new-tab-requested':
       if (
         !context.currentWorkspaceId ||
@@ -272,22 +275,4 @@ export function createExternalOpenDrainKickPlan(context: {
   if (context.disposed) return { kind: 'ignore' }
   if (context.draining) return { kind: 'schedule-rerun' }
   return { kind: 'start-drain' }
-}
-
-function isClientWorkspaceIntent(event: ClientEffectIntent): event is ClientWorkspaceIntent {
-  return (
-    event.type === 'open-workspace-requested' ||
-    event.type === 'open-workspace-path-requested' ||
-    event.type === 'open-remote-workspace-requested' ||
-    event.type === 'clone-repo-requested' ||
-    event.type === 'create-worktree-requested' ||
-    event.type === 'terminal-new-tab-requested' ||
-    event.type === 'workspace-pane-close-tab-requested' ||
-    event.type === 'close-workspace-requested' ||
-    event.type === 'cycle-workspace-requested' ||
-    event.type === 'workspace-refresh-requested' ||
-    event.type === 'show-workspace-pane-tab-requested' ||
-    event.type === 'terminal-primary-action-requested' ||
-    event.type === 'workspace-zen-mode-toggle-requested'
-  )
 }

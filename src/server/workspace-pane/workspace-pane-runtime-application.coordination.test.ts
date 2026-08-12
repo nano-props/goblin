@@ -7,13 +7,14 @@ import {
   runtimeTabsCoordinator,
   terminalCreateSuccess,
   terminalSession,
+  workspaceRuntimeMembershipCapability,
 } from '#/server/test-utils/workspace-pane-runtime-application.ts'
 import {
   testPhysicalWorktreeExecutionCapability,
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
-import type { ServerTerminalCreateResult } from '#/server/terminal/terminal-session-creator.ts'
-import { WorkspacePaneRuntimeStaleError } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { ServerTerminalCreateSuccess } from '#/server/terminal/terminal-session-creator.ts'
+import { WorkspaceRuntimeStaleError } from '#/server/modules/workspace-runtimes.ts'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
 import {
   createPhysicalWorktreeOperationCoordinator,
@@ -39,7 +40,7 @@ vi.mock('#/server/modules/workspace-runtimes.ts', async (importActual) => {
 
 describe('removal coordination and failure settlement', () => {
   test('serializes open and close through the shared user/runtime/worktree queue', async () => {
-    const createResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
+    const createResult = deferred<ServerTerminalCreateSuccess>()
     const createStarted = deferred<void>()
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
     const listSessions = vi.fn().mockResolvedValueOnce([session]).mockResolvedValueOnce([])
@@ -61,7 +62,8 @@ describe('removal coordination and failure settlement', () => {
         },
         reconcileWorktreeAdmitted: vi.fn(async () => paneTabsSnapshot),
       }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: () => {},
     })
 
@@ -84,7 +86,7 @@ describe('removal coordination and failure settlement', () => {
 
   test('lets an earlier admitted open finish before a later removal that fails validation', async () => {
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
-    const createResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
+    const createResult = deferred<ServerTerminalCreateSuccess>()
     const create = vi.fn(async () => await createResult.promise)
     const close = vi.fn(async () => ({ kind: 'closed' as const }))
     const application = createWorkspacePaneRuntimeApplication({
@@ -103,7 +105,8 @@ describe('removal coordination and failure settlement', () => {
           return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
         },
       }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -137,7 +140,8 @@ describe('removal coordination and failure settlement', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -167,7 +171,8 @@ describe('removal coordination and failure settlement', () => {
           throw new Error('projection failed')
         },
       }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged,
     })
 
@@ -192,10 +197,11 @@ describe('removal coordination and failure settlement', () => {
       terminal: { createAdmitted: async () => runtime, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: runtimeTabsCoordinator({
         ensureRuntimeTabForSession: async () => {
-          throw new WorkspacePaneRuntimeStaleError()
+          throw new WorkspaceRuntimeStaleError()
         },
       }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -219,7 +225,8 @@ describe('removal coordination and failure settlement', () => {
       workspaceTabsCoordinator: runtimeTabsCoordinator({
         ensureRuntimeTabForSession: async () => ({ kind: 'target-stale' }),
       }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -250,7 +257,8 @@ describe('removal coordination and failure settlement', () => {
           throw new Error('invariant failure after admission')
         },
       }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged,
     })
 

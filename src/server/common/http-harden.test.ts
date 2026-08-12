@@ -34,7 +34,7 @@ describe('applyApiSecurityHeaders', () => {
     // logging, and the default handler would surface as stderr noise
     // under verbose reporters. Production wires a real `onError` in
     // `http-validate.ts:createRouteApp`; this minimal stub matches the
-    // shape production uses (IpcError-aware handler is unnecessary
+    // shape production uses (CodedError-aware handler is unnecessary
     // here because the test only throws plain Errors).
     app.onError((_err, c) => c.text('Internal Server Error', 500))
     app.use('/api/*', applyApiSecurityHeaders())

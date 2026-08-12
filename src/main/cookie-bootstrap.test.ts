@@ -19,16 +19,10 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('replantEmbedAuthCookieForRotation', () => {
-  test('plants the cookie with the new access token and same host scope', async () => {
-    // Regression: before this helper existed, a token rotation
-    // left the client's `webContents.session.cookies` holding
-    // the OLD token. The next authenticated request fired with
-    // a stale cookie and the server rejected it, re-prompting
-    // the gate. The rotation flow now calls this helper so the
-    // cookie is fresh by the time the IPC returns.
-    const { replantEmbedAuthCookieForRotation } = await import('#/main/cookie-bootstrap.ts')
-    await replantEmbedAuthCookieForRotation({
+describe('plantEmbedAuthCookie', () => {
+  test('plants the cookie with the access token and same host scope', async () => {
+    const { plantEmbedAuthCookie } = await import('#/main/cookie-bootstrap.ts')
+    await plantEmbedAuthCookie({
       accessToken: 'new-token-123',
       url: 'http://127.0.0.1:32100/',
       webContents: webContentsMock,
@@ -53,8 +47,8 @@ describe('replantEmbedAuthCookieForRotation', () => {
     // the client is served over TLS (e.g. on a LAN HTTPS
     // bind). The cookie must carry `secure: true` so the
     // browser refuses to send it on a downgrade.
-    const { replantEmbedAuthCookieForRotation } = await import('#/main/cookie-bootstrap.ts')
-    await replantEmbedAuthCookieForRotation({
+    const { plantEmbedAuthCookie } = await import('#/main/cookie-bootstrap.ts')
+    await plantEmbedAuthCookie({
       accessToken: 'new-token-https',
       url: 'https://goblin.lan:32100/',
       webContents: webContentsMock,
@@ -67,8 +61,8 @@ describe('replantEmbedAuthCookieForRotation', () => {
 
   test('plants the cookie with the Vite dev URL so dev-mode whoami probes authenticate', async () => {
     // Keep the concrete Vite URL; the cookie remains host-scoped with `Path=/`.
-    const { replantEmbedAuthCookieForRotation } = await import('#/main/cookie-bootstrap.ts')
-    await replantEmbedAuthCookieForRotation({
+    const { plantEmbedAuthCookie } = await import('#/main/cookie-bootstrap.ts')
+    await plantEmbedAuthCookie({
       accessToken: 'dev-token-xyz',
       url: 'http://127.0.0.1:5173/?theme=light',
       webContents: webContentsMock,
@@ -79,16 +73,11 @@ describe('replantEmbedAuthCookieForRotation', () => {
     expect(cookieArg.url).toBe('http://127.0.0.1:5173/')
   })
 
-  test('propagates a cookies.set failure so the rotation handler logs it', async () => {
-    // The wrapper intentionally does NOT swallow rejections —
-    // the rotation handler in `access-token-ipc.ts` is the
-    // seam that decides "best-effort, log and continue" vs
-    // "fatal, propagate to the IPC caller". Tests for that
-    // decision live in the IPC handler suite.
+  test('propagates a cookies.set failure to the bootstrap owner', async () => {
     cookieSetMock.mockRejectedValueOnce(new Error('cookies.set failed'))
-    const { replantEmbedAuthCookieForRotation } = await import('#/main/cookie-bootstrap.ts')
+    const { plantEmbedAuthCookie } = await import('#/main/cookie-bootstrap.ts')
     await expect(
-      replantEmbedAuthCookieForRotation({
+      plantEmbedAuthCookie({
         accessToken: 'new-token-123',
         url: 'http://127.0.0.1:32100/',
         webContents: webContentsMock,

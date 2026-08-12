@@ -26,10 +26,13 @@ import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
+  readWorkspacePaneTabsForTarget,
+  writeWorkspacePaneTabsSnapshotQueryData,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { repoPresentationFromQueryForTest } from '#/web/test-utils/repo-store.ts'
-import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import {
   observeWorkspacePaneRouteForTest,
@@ -39,12 +42,20 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
 import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
+import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
+
+const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
+
+vi.mock('vue-sonner', () => ({ toast: feedbackMocks }))
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-repo')
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 beforeEach(() => {
+  feedbackMocks.error.mockClear()
+  feedbackMocks.warning.mockClear()
   resetWorkspacesStore()
   installWorkspacePaneTabsTestBridge()
   setTerminalSessionCommandBridge(null)
@@ -298,7 +309,12 @@ describe('openWorkspacePaneTab', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshot({ createPending: true }),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
 
     await expect(
@@ -488,6 +504,39 @@ describe('openWorkspacePaneTab', () => {
     expect(
       workspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)],
     ).toBeUndefined()
+    expect(feedbackMocks.error).toHaveBeenCalledWith('error.workspace-operation-failed', {
+      id: 'workspace-pane-tab-open-failed',
+    })
+  })
+
+  test('surfaces an indeterminate static tab mutation and stops presentation', async () => {
+    seedWorktreeRepo('status')
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: async () => {
+        throw new ClientRealtimeRequestError('response was lost', {
+          kind: 'timeout',
+          delivery: 'indeterminate',
+          outageId: 1,
+        })
+      },
+    })
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+
+    await expect(
+      openWorkspacePaneTab({
+        workspacePaneRoute: undefined,
+        workspaceId: REPO_ID,
+        branchName: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+        type: 'changes',
+        navigation: navigationWithStoreActions(showRepoBranchWorkspacePaneTab),
+      }),
+    ).resolves.toBe(false)
+
+    expect(feedbackMocks.warning).toHaveBeenCalledWith('error.workspace-tabs-outcome-uncertain', {
+      id: 'workspace-pane-tabs-outcome-uncertain',
+    })
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
   test('does not select a stale opened tab when the server rejects a stale workspace runtime commit', async () => {
@@ -721,6 +770,56 @@ describe('openWorkspacePaneTab', () => {
     const scope = openers[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]
     expect(scope?.['workspace-pane:changes']).toBe('workspace-pane:status')
     expect(scope?.['workspace-pane:history']).toBe('workspace-pane:status')
+  })
+
+  test('stops open presentation when a newer pane projection supersedes the accepted response', async () => {
+    seedWorktreeRepo('status')
+    const repo = workspacesStore.getState().workspaces[REPO_ID]!
+    const requestStarted = Promise.withResolvers<void>()
+    const response = Promise.withResolvers<WorkspacePaneTabEntry[]>()
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: async () => {
+        requestStarted.resolve()
+        return await response.promise
+      },
+    })
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const opened = openWorkspacePaneTab({
+      workspacePaneRoute: undefined,
+      workspaceId: REPO_ID,
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      type: 'changes',
+      navigation: navigationWithStoreActions(showRepoBranchWorkspacePaneTab),
+    })
+
+    await requestStarted.promise
+    const sourceTabs = [workspacePaneStaticTabEntry('status')]
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ID, repo.workspaceRuntimeId, {
+      revision: 99,
+      entries: [
+        {
+          target: runtimeWorkspacePaneTargetForTest({
+            kind: 'git-worktree',
+            workspaceId: REPO_ID,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
+            worktreePath: WORKTREE_PATH,
+          }),
+          tabs: sourceTabs,
+        },
+      ],
+    })
+    response.resolve([...sourceTabs, workspacePaneStaticTabEntry('changes')])
+
+    await expect(opened).resolves.toBe(false)
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+    expect(
+      workspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
+        'workspace-pane:changes'
+      ],
+    ).toBeUndefined()
+    expect(feedbackMocks.error).not.toHaveBeenCalled()
+    expect(feedbackMocks.warning).not.toHaveBeenCalled()
   })
 
   test('completes a committed open even when a newer presentation supersedes its route', async () => {

@@ -5,7 +5,7 @@ export function currentNativeBridge(overrides: Partial<GoblinNativeBridge> = {})
     invokeIpc: async () => undefined,
     abortIpc: async () => false,
     notifyAppQuitDrained: async () => true,
-    onEvent: () => () => {},
+    onAppQuitting: () => () => {},
     onIntent: () => () => {},
     pathForFile: () => '',
     host: {
@@ -19,7 +19,8 @@ export function currentNativeBridge(overrides: Partial<GoblinNativeBridge> = {})
       sendTestNotification: async () => true,
       setBadge: () => {},
     },
-    rotateAccessToken: async () => ({ accessToken: 'test-access-token' }),
+    getAccessTokenProjection: async () => ({ accessToken: 'test-access-token', activation: 'current' as const }),
+    rotateAccessToken: async () => ({ accessToken: 'test-access-token', activation: 'after-restart' as const }),
     ...overrides,
   }
 }

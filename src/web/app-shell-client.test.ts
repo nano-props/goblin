@@ -34,10 +34,15 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
     }),
     invokeIpc: vi.fn(),
     abortIpc: vi.fn(async () => false),
-    onIpcEvent: () => () => {},
     onEffectIntent: () => () => {},
     pathForFile: () => '',
     saveClipboardFiles: () => Promise.resolve([]),
+    getAccessTokenProjection: async () => {
+      throw new Error('unused token projection')
+    },
+    rotateAccessToken: async () => {
+      throw new Error('unused token rotation')
+    },
     host: () => null,
     appRealtime: () => ({
       kickReconnect: () => {},

@@ -4,6 +4,7 @@ import type {
   TerminalClientMessage,
   TerminalRealtimeMessage,
   TerminalSocketRequestAction,
+  TerminalSocketResponseMessage,
   TerminalSocketServerMessage,
 } from '#/shared/terminal-socket.ts'
 import {
@@ -381,6 +382,7 @@ const TerminalSocketServerMessageSchema = v.variant('type', [
     ok: v.literal(false),
     action: v.picklist(TERMINAL_SOCKET_ACTIONS),
     error: v.string(),
+    outcome: v.optional(v.literal('indeterminate')),
   }),
 ])
 const TerminalClientMessageSchema = v.variant('type', [
@@ -480,33 +482,73 @@ export function normalizeTerminalSocketServerMessage(value: unknown): TerminalSo
   const message = parsed.output
   if (message.type !== 'response') return normalizeTerminalRealtimeMessage(message)
   if (!message.ok) return message
-  const payload = normalizeTerminalSocketResponsePayload(message.action, message.payload)
-  if (payload === null) {
+  const response = normalizeTerminalSocketSuccessResponse(message)
+  if (response === null) {
+    if (message.action === 'recover-sessions') {
+      return {
+        type: 'response',
+        requestId: message.requestId,
+        ok: false,
+        action: message.action,
+        error: TERMINAL_SOCKET_INVALID_RESPONSE_PAYLOAD_ERROR,
+      }
+    }
     return {
       type: 'response',
       requestId: message.requestId,
       ok: false,
       action: message.action,
       error: TERMINAL_SOCKET_INVALID_RESPONSE_PAYLOAD_ERROR,
-    } as TerminalSocketServerMessage
+      outcome: 'indeterminate',
+    } satisfies TerminalSocketResponseMessage
   }
-  return { ...message, payload } as TerminalSocketServerMessage
+  return response
 }
 
-function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAction, payload: unknown): unknown | null {
-  switch (action) {
-    case 'attach':
-      return normalizeWithSchema(TerminalAttachResultSchema, payload)
-    case 'restart':
-      return normalizeWithSchema(TerminalRestartResultSchema, payload)
-    case 'write':
-      return normalizeWithSchema(TerminalWriteResultSchema, payload)
-    case 'resize':
-      return normalizeWithSchema(TerminalResizeResultSchema, payload)
-    case 'takeover':
-      return normalizeWithSchema(TerminalTakeoverResultSchema, payload)
-    case 'recover-sessions':
-      return normalizeTerminalSessionsSnapshot(payload)
+function normalizeTerminalSocketSuccessResponse(message: {
+  type: 'response'
+  requestId: string
+  ok: true
+  action: TerminalSocketRequestAction
+  payload: unknown
+}): TerminalSocketResponseMessage | null {
+  switch (message.action) {
+    case 'attach': {
+      const payload = normalizeWithSchema(TerminalAttachResultSchema, message.payload)
+      return payload === null
+        ? null
+        : { type: 'response', requestId: message.requestId, ok: true, action: 'attach', payload }
+    }
+    case 'restart': {
+      const payload = normalizeWithSchema(TerminalRestartResultSchema, message.payload)
+      return payload === null
+        ? null
+        : { type: 'response', requestId: message.requestId, ok: true, action: 'restart', payload }
+    }
+    case 'write': {
+      const payload = normalizeWithSchema(TerminalWriteResultSchema, message.payload)
+      return payload === null
+        ? null
+        : { type: 'response', requestId: message.requestId, ok: true, action: 'write', payload }
+    }
+    case 'resize': {
+      const payload = normalizeWithSchema(TerminalResizeResultSchema, message.payload)
+      return payload === null
+        ? null
+        : { type: 'response', requestId: message.requestId, ok: true, action: 'resize', payload }
+    }
+    case 'takeover': {
+      const payload = normalizeWithSchema(TerminalTakeoverResultSchema, message.payload)
+      return payload === null
+        ? null
+        : { type: 'response', requestId: message.requestId, ok: true, action: 'takeover', payload }
+    }
+    case 'recover-sessions': {
+      const payload = normalizeTerminalSessionsSnapshot(message.payload)
+      return payload === null
+        ? null
+        : { type: 'response', requestId: message.requestId, ok: true, action: 'recover-sessions', payload }
+    }
   }
 }
 

@@ -1,25 +1,31 @@
 // @vitest-environment jsdom
 
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
-import { flushTestUpdates, renderComposableInJsdom } from '#/test-utils/render.tsx'
+import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { flushMicrotasks } from '#/test-utils/microtasks.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 
 const settingsActionsMocks = vi.hoisted(() => ({
   refreshExternalAppsDetection: vi.fn(async () => {}),
   refreshGitHubCliDetection: vi.fn(async () => {}),
-  runSettingsAction: vi.fn(async (_label: string, task: () => Promise<unknown>) => await task()),
   setFetchInterval: vi.fn(async () => 120),
-  setGlobalShortcut: vi.fn(async (accelerator: string) => ({ accelerator, registered: true })),
+  setGlobalShortcut: vi.fn(async (accelerator: string) => ({
+    kind: 'projected' as const,
+    accelerator,
+    registered: true,
+  })),
   setGlobalShortcutDisabled: vi.fn(async () => {}),
   setLanEnabled: vi.fn(async () => {}),
   setShortcutsDisabled: vi.fn(async () => {}),
   setTerminalNotificationsEnabled: vi.fn(async () => {}),
 }))
 
+const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
+
 vi.mock('#/web/settings-actions.ts', () => settingsActionsMocks)
+vi.mock('vue-sonner', () => ({ toast: feedbackMocks }))
 
 beforeEach(() => {
   appQueryClient.clear()
@@ -27,12 +33,16 @@ beforeEach(() => {
   settingsActionsMocks.refreshExternalAppsDetection.mockResolvedValue(undefined)
   settingsActionsMocks.refreshGitHubCliDetection.mockClear()
   settingsActionsMocks.refreshGitHubCliDetection.mockResolvedValue(undefined)
-  settingsActionsMocks.runSettingsAction.mockClear()
-  settingsActionsMocks.runSettingsAction.mockImplementation(async (_label, task) => await task())
+  feedbackMocks.error.mockClear()
+  feedbackMocks.warning.mockClear()
   settingsActionsMocks.setFetchInterval.mockClear()
   settingsActionsMocks.setFetchInterval.mockResolvedValue(120)
   settingsActionsMocks.setGlobalShortcut.mockClear()
-  settingsActionsMocks.setGlobalShortcut.mockImplementation(async (accelerator) => ({ accelerator, registered: true }))
+  settingsActionsMocks.setGlobalShortcut.mockImplementation(async (accelerator) => ({
+    kind: 'projected',
+    accelerator,
+    registered: true,
+  }))
   settingsActionsMocks.setGlobalShortcutDisabled.mockClear()
   settingsActionsMocks.setGlobalShortcutDisabled.mockResolvedValue(undefined)
   settingsActionsMocks.setLanEnabled.mockClear()
@@ -48,30 +58,54 @@ describe('runtime settings controllers', () => {
     const { useFetchSettingsController } = await import('#/web/runtime-settings-fetch.ts')
     const { result } = renderComposableInJsdom(() => useFetchSettingsController(), { wrapper: AppVueQueryClientScope })
 
-    await flushTestUpdates(async () => {
-      await result.value.setFetchInterval(300)
-      await result.value.setTerminalNotificationsEnabled(true)
+    result.value.setFetchInterval(300)
+    result.value.setTerminalNotificationsEnabled(true)
+    await vi.waitFor(() => {
+      expect(settingsActionsMocks.setFetchInterval).toHaveBeenCalledWith(300)
+      expect(settingsActionsMocks.setTerminalNotificationsEnabled).toHaveBeenCalledWith(true)
     })
 
-    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('fetch interval update', expect.any(Function))
-    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith(
-      'terminal notifications update',
-      expect.any(Function),
-    )
-    expect(settingsActionsMocks.setFetchInterval).toHaveBeenCalledWith(300)
-    expect(settingsActionsMocks.setTerminalNotificationsEnabled).toHaveBeenCalledWith(true)
+    expect(feedbackMocks.error).not.toHaveBeenCalled()
   })
 
   test('runs LAN settings writes through settings mutations', async () => {
     const { useLanSettingsController } = await import('#/web/runtime-settings-lan.ts')
     const { result } = renderComposableInJsdom(() => useLanSettingsController(), { wrapper: AppVueQueryClientScope })
 
-    await flushTestUpdates(async () => {
-      await result.value.setLanEnabled(true)
-    })
+    result.value.setLanEnabled(true)
+    await vi.waitFor(() => expect(settingsActionsMocks.setLanEnabled).toHaveBeenCalledWith(true))
 
-    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('lanEnabled update', expect.any(Function))
-    expect(settingsActionsMocks.setLanEnabled).toHaveBeenCalledWith(true)
+    expect(feedbackMocks.error).not.toHaveBeenCalled()
+  })
+
+  test('surfaces a rejected settings write once at the settings interaction boundary', async () => {
+    settingsActionsMocks.setLanEnabled.mockRejectedValueOnce(new Error('settings unavailable'))
+    const { useLanSettingsController } = await import('#/web/runtime-settings-lan.ts')
+    const { result } = renderComposableInJsdom(() => useLanSettingsController(), { wrapper: AppVueQueryClientScope })
+
+    result.value.setLanEnabled(true)
+
+    await vi.waitFor(() => {
+      expect(feedbackMocks.error).toHaveBeenCalledWith(expect.any(String), { id: 'settings-write-failed' })
+    })
+    expect(feedbackMocks.warning).not.toHaveBeenCalled()
+  })
+
+  test('surfaces an uncertain settings write without reporting a rejection', async () => {
+    settingsActionsMocks.setLanEnabled.mockRejectedValueOnce(
+      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'settings outcome uncertain' }),
+    )
+    const { useLanSettingsController } = await import('#/web/runtime-settings-lan.ts')
+    const { result } = renderComposableInJsdom(() => useLanSettingsController(), { wrapper: AppVueQueryClientScope })
+
+    result.value.setLanEnabled(true)
+
+    await vi.waitFor(() => {
+      expect(feedbackMocks.warning).toHaveBeenCalledWith(expect.any(String), {
+        id: 'settings-operation-outcome-uncertain',
+      })
+    })
+    expect(feedbackMocks.error).not.toHaveBeenCalled()
   })
 
   test('runs shortcut settings writes through settings mutations', async () => {
@@ -80,22 +114,22 @@ describe('runtime settings controllers', () => {
       wrapper: AppVueQueryClientScope,
     })
 
-    const globalShortcutResult = await flushTestUpdates(async () => {
-      await result.value.setShortcutsDisabled(true)
-      await result.value.setGlobalShortcutDisabled(true)
-      return await result.value.setGlobalShortcut('CommandOrControl+Shift+K')
+    const onShortcutSaved = vi.fn()
+    result.value.setShortcutsDisabled(true)
+    result.value.setGlobalShortcutDisabled(true)
+    result.value.setGlobalShortcut('CommandOrControl+Shift+K', onShortcutSaved)
+    await vi.waitFor(() => {
+      expect(settingsActionsMocks.setShortcutsDisabled).toHaveBeenCalledWith(true)
+      expect(settingsActionsMocks.setGlobalShortcutDisabled).toHaveBeenCalledWith(true)
+      expect(settingsActionsMocks.setGlobalShortcut).toHaveBeenCalledWith('CommandOrControl+Shift+K')
+      expect(onShortcutSaved).toHaveBeenCalledWith({
+        kind: 'projected',
+        accelerator: 'CommandOrControl+Shift+K',
+        registered: true,
+      })
     })
 
-    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('shortcuts update', expect.any(Function))
-    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith(
-      'global shortcut disabled update',
-      expect.any(Function),
-    )
-    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('global shortcut update', expect.any(Function))
-    expect(settingsActionsMocks.setShortcutsDisabled).toHaveBeenCalledWith(true)
-    expect(settingsActionsMocks.setGlobalShortcutDisabled).toHaveBeenCalledWith(true)
-    expect(settingsActionsMocks.setGlobalShortcut).toHaveBeenCalledWith('CommandOrControl+Shift+K')
-    expect(globalShortcutResult).toEqual({ accelerator: 'CommandOrControl+Shift+K', registered: true })
+    expect(feedbackMocks.error).not.toHaveBeenCalled()
   })
 
   test('runs external app refresh through settings mutations', async () => {
@@ -104,12 +138,10 @@ describe('runtime settings controllers', () => {
       wrapper: AppVueQueryClientScope,
     })
 
-    await flushTestUpdates(async () => {
-      await result.value.refreshExternalApps()
-    })
+    result.value.refreshExternalApps()
+    await vi.waitFor(() => expect(settingsActionsMocks.refreshExternalAppsDetection).toHaveBeenCalledTimes(1))
 
-    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('external app refresh', expect.any(Function))
-    expect(settingsActionsMocks.refreshExternalAppsDetection).toHaveBeenCalledTimes(1)
+    expect(feedbackMocks.error).not.toHaveBeenCalled()
   })
 
   test('coalesces concurrent external app refreshes', async () => {
@@ -120,32 +152,22 @@ describe('runtime settings controllers', () => {
       wrapper: AppVueQueryClientScope,
     })
 
-    const { firstRefresh, secondRefresh } = await flushTestUpdates(async () => {
-      const firstRefresh = result.value.refreshExternalApps()
-      const secondRefresh = result.value.refreshExternalApps()
-      await flushMicrotasks()
-      return { firstRefresh, secondRefresh }
-    })
-
-    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledTimes(1)
-    expect(settingsActionsMocks.refreshExternalAppsDetection).toHaveBeenCalledTimes(1)
+    result.value.refreshExternalApps()
+    result.value.refreshExternalApps()
+    await vi.waitFor(() => expect(settingsActionsMocks.refreshExternalAppsDetection).toHaveBeenCalledTimes(1))
 
     refresh.resolve()
-    await flushTestUpdates(async () => {
-      await Promise.all([firstRefresh, secondRefresh])
-    })
+    await vi.waitFor(() => expect(result.value.refreshing.value).toBe(false))
   })
 
   test('runs GitHub CLI refresh through settings mutations', async () => {
     const { useGitHubSettingsController } = await import('#/web/runtime-settings-github.ts')
     const { result } = renderComposableInJsdom(() => useGitHubSettingsController(), { wrapper: AppVueQueryClientScope })
 
-    await flushTestUpdates(async () => {
-      await result.value.refreshGitHubCli()
-    })
+    result.value.refreshGitHubCli()
+    await vi.waitFor(() => expect(settingsActionsMocks.refreshGitHubCliDetection).toHaveBeenCalledTimes(1))
 
-    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledWith('GitHub CLI refresh', expect.any(Function))
-    expect(settingsActionsMocks.refreshGitHubCliDetection).toHaveBeenCalledTimes(1)
+    expect(feedbackMocks.error).not.toHaveBeenCalled()
   })
 
   test('coalesces concurrent GitHub CLI refreshes', async () => {
@@ -154,20 +176,12 @@ describe('runtime settings controllers', () => {
     settingsActionsMocks.refreshGitHubCliDetection.mockImplementation(async () => await refresh.promise)
     const { result } = renderComposableInJsdom(() => useGitHubSettingsController(), { wrapper: AppVueQueryClientScope })
 
-    const { firstRefresh, secondRefresh } = await flushTestUpdates(async () => {
-      const firstRefresh = result.value.refreshGitHubCli()
-      const secondRefresh = result.value.refreshGitHubCli()
-      await flushMicrotasks()
-      return { firstRefresh, secondRefresh }
-    })
-
-    expect(settingsActionsMocks.runSettingsAction).toHaveBeenCalledTimes(1)
-    expect(settingsActionsMocks.refreshGitHubCliDetection).toHaveBeenCalledTimes(1)
+    result.value.refreshGitHubCli()
+    result.value.refreshGitHubCli()
+    await vi.waitFor(() => expect(settingsActionsMocks.refreshGitHubCliDetection).toHaveBeenCalledTimes(1))
 
     refresh.resolve()
-    await flushTestUpdates(async () => {
-      await Promise.all([firstRefresh, secondRefresh])
-    })
+    await vi.waitFor(() => expect(result.value.refreshingGitHubCli.value).toBe(false))
   })
 })
 

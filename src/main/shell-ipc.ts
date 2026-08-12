@@ -1,8 +1,7 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
-import { activatePrimaryWindow, getPrimaryWindow } from '#/main/window.ts'
+import { getPrimaryWindow, sendPrimaryWindowEffectIntent } from '#/main/window.ts'
 import { consumeExternalOpenPaths } from '#/main/external-open.ts'
 import { focusedRegisteredSurface } from '#/main/client-surface-registry.ts'
-import { sendClientEffectIntent } from '#/main/client-surface-events.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { openHttpExternal, openHttpsExternal } from '#/main/external-url.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
@@ -20,8 +19,7 @@ function callerWindow(event: Electron.IpcMainInvokeEvent): BrowserWindow | null 
 export function wireShellIpc(): void {
   ipcMain.handle(HOST_OPEN_SETTINGS_WINDOW_CHANNEL, async (event, input?: { page?: SettingsPage }) => {
     if (!isTrustedIpcEvent(event)) return false
-    const win = await activatePrimaryWindow()
-    sendClientEffectIntent(win, {
+    await sendPrimaryWindowEffectIntent({
       type: 'open-settings-requested',
       page: input?.page ?? 'general',
     })

@@ -6,6 +6,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resolveRemoteWorkspaceConnection } from '#/web/remote-workspace-client.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 
 vi.mock('#/web/remote-workspace-client.ts', () => ({ resolveRemoteWorkspaceConnection: vi.fn() }))
 vi.mock('#/web/stores/workspaces/refresh.ts', () => ({ requestRepoSnapshotRefresh: vi.fn(async () => {}) }))
@@ -176,6 +177,20 @@ describe('remote lifecycle command client', () => {
     expect(remoteAdmission()).toMatchObject({
       lifecycle: { kind: 'failed', reason: 'unreachable' },
     })
+  })
+
+  test('preserves an uncertain command outcome even when its signal was cancelled', async () => {
+    const controller = new AbortController()
+    controller.abort()
+    vi.mocked(resolveRemoteWorkspaceConnection).mockRejectedValue(
+      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'remote lifecycle outcome uncertain' }),
+    )
+
+    await expect(
+      runRemoteWorkspaceConnection(workspacesStore.setState, workspacesStore.getState, workspaceId, {
+        signal: controller.signal,
+      }),
+    ).resolves.toEqual({ kind: 'outcome-uncertain', workspaceId })
   })
 
   test('normalizes transport failure without synthesizing local lifecycle state', async () => {

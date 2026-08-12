@@ -1,5 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
-import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
+import type { BrowserWindow } from 'electron'
+import { registerClientWindowSurface } from '#/main/client-surface-registry.ts'
+import { registerTrustedAppUrl } from '#/main/ipc/trusted-webcontents.ts'
 import { wireShellIpc } from '#/main/shell-ipc.ts'
 import {
   HOST_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
@@ -8,14 +10,12 @@ import {
   HOST_OPEN_SETTINGS_WINDOW_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
-const { ipcHandlers, browserWindowFromWebContents, showOpenDialog, sendClientEffectIntent, activatePrimaryWindow } =
-  vi.hoisted(() => ({
-    ipcHandlers: new Map<string, (_event: unknown, input: unknown) => unknown>(),
-    browserWindowFromWebContents: vi.fn(),
-    showOpenDialog: vi.fn(),
-    sendClientEffectIntent: vi.fn(),
-    activatePrimaryWindow: vi.fn(),
-  }))
+const { ipcHandlers, browserWindowFromWebContents, showOpenDialog, sendPrimaryWindowEffectIntent } = vi.hoisted(() => ({
+  ipcHandlers: new Map<string, (_event: unknown, input: unknown) => unknown>(),
+  browserWindowFromWebContents: vi.fn(),
+  showOpenDialog: vi.fn(),
+  sendPrimaryWindowEffectIntent: vi.fn(async () => {}),
+}))
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -28,12 +28,8 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('#/main/window.ts', () => ({
-  activatePrimaryWindow,
   getPrimaryWindow: vi.fn(() => null),
-}))
-
-vi.mock('#/main/client-surface-events.ts', () => ({
-  sendClientEffectIntent,
+  sendPrimaryWindowEffectIntent,
 }))
 
 const trustedSender = { id: 1, once: vi.fn() }
@@ -45,7 +41,13 @@ const trustedEvent = {
 describe('shell IPC', () => {
   beforeAll(() => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
-    registerTrustedWebContents(trustedSender)
+    registerClientWindowSurface(
+      {
+        isDestroyed: () => false,
+        webContents: { ...trustedSender, isDestroyed: () => false },
+      } as unknown as BrowserWindow,
+      { windowKey: 'primary' },
+    )
     wireShellIpc()
   })
 
@@ -75,14 +77,11 @@ describe('shell IPC', () => {
     })
   })
 
-  test('opens settings through an effect intent on the activated primary window', async () => {
-    const primaryWindow = {}
-    activatePrimaryWindow.mockResolvedValue(primaryWindow)
-
+  test('opens settings through the primary window intent owner', async () => {
     const result = await invoke(HOST_OPEN_SETTINGS_WINDOW_CHANNEL, { page: 'about' })
 
     expect(result).toBe(true)
-    expect(sendClientEffectIntent).toHaveBeenCalledWith(primaryWindow, {
+    expect(sendPrimaryWindowEffectIntent).toHaveBeenCalledWith({
       type: 'open-settings-requested',
       page: 'about',
     })

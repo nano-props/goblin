@@ -1,10 +1,18 @@
-import { notifyNativeAppQuitDrained, subscribeNativeEffectIntent } from '#/web/native-bridge.ts'
+import { notifyNativeAppQuitDrained, readNativeBridge } from '#/web/native-bridge.ts'
 import { errorToAppQuitDrainResult } from '#/shared/app-quit-drain.ts'
 
 type Listener = () => void | Promise<void>
 
 const listeners = new Set<Listener>()
 let quitting = false
+
+export function startNativeAppQuitIngress(): () => void {
+  const bridge = readNativeBridge()
+  if (!bridge) return () => {}
+  return bridge.onAppQuitting(() => {
+    void markAppQuitting()
+  })
+}
 
 export function isAppQuitting(): boolean {
   return quitting
@@ -33,16 +41,4 @@ export async function markAppQuitting(): Promise<void> {
     return
   }
   await notifyNativeAppQuitDrained(errorToAppQuitDrainResult(failure.reason))
-  throw failure.reason
 }
-
-// Keep native quit lifecycle wiring at this low level so every Electron
-// client that imports app-lifecycle-aware realtime code inherits it, even if
-// a future surface does not mount the main client intent router.
-//
-// Pure web / serve.sh clients do not receive `app-quitting`; they rely on
-// browser teardown plus server-side graceful shutdown instead. Missing native
-// lifecycle wiring is therefore expected in web-only mode, not an error.
-subscribeNativeEffectIntent((event) => {
-  if (event.type === 'app-quitting') void markAppQuitting()
-})

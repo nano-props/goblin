@@ -17,7 +17,6 @@ const mocks = vi.hoisted(() => ({
     },
     workspacePaneTabsHost: {
       listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
       updateTabs: vi.fn(),
     },
     worktreeRemovalApplication: { removeWorktree: vi.fn() },
@@ -45,7 +44,6 @@ function makeWorkspacePaneTabsHost(): ServerWorkspacePaneTabsHost {
       repaired: false,
     })),
     listWorkspaceTabs: vi.fn(),
-    replaceTabs: vi.fn(),
     updateTabs: vi.fn(),
   }
 }

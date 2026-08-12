@@ -15,7 +15,14 @@ const CLIENT_ID = 'client_test000000000000'
 const RUNTIME_ID = 'repo-runtime-test'
 
 const mocks = vi.hoisted(() => ({
+  WorkspaceRuntimeStaleError: class WorkspaceRuntimeStaleError extends Error {
+    constructor() {
+      super('error.workspace-runtime-stale')
+      this.name = 'WorkspaceRuntimeStaleError'
+    }
+  },
   acquireWorkspaceRuntimeLease: vi.fn(),
+  captureWorkspaceRuntimeMembershipCapability: vi.fn(),
   releaseWorkspaceRuntimeMembershipLease: vi.fn(),
   isCurrentWorkspaceRuntimeMembership: vi.fn(),
   getServerWorkspaceState: vi.fn(),
@@ -32,10 +39,11 @@ const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
 }
 
 vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
+  WorkspaceRuntimeStaleError: mocks.WorkspaceRuntimeStaleError,
   acquireWorkspaceRuntimeLease: mocks.acquireWorkspaceRuntimeLease,
+  captureWorkspaceRuntimeMembershipCapability: mocks.captureWorkspaceRuntimeMembershipCapability,
   releaseWorkspaceRuntimeMembershipLease: mocks.releaseWorkspaceRuntimeMembershipLease,
   isCurrentWorkspaceRuntimeMembership: mocks.isCurrentWorkspaceRuntimeMembership,
-  commitWorkspaceProbeState: vi.fn(() => true),
   workspaceProbeStateForRuntime: mocks.workspaceProbeStateForRuntime,
   runSerializedInitialWorkspaceProbe: vi.fn(async (input) => {
     const probe = await input.probe()
@@ -89,6 +97,17 @@ describe('restoreWorkspaceTabs', () => {
       workspaceRuntimeId: RUNTIME_ID,
       generation: 1,
     }))
+    mocks.captureWorkspaceRuntimeMembershipCapability.mockImplementation(
+      (userId: string, workspaceId: string, workspaceRuntimeId: string, clientId: string) => {
+        const isCurrent = () =>
+          mocks.isCurrentWorkspaceRuntimeMembership(userId, workspaceId, workspaceRuntimeId, clientId)
+        const assertCurrent = () => {
+          if (!isCurrent()) throw new mocks.WorkspaceRuntimeStaleError()
+        }
+        assertCurrent()
+        return { userId, clientId, workspaceId, workspaceRuntimeId, generation: 1, isCurrent, assertCurrent }
+      },
+    )
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(true)
     mocks.workspaceProbeStateForRuntime.mockReturnValue(gitProbe())
     mocks.probeWorkspace.mockResolvedValue(gitProbe())
@@ -147,12 +166,16 @@ describe('restoreWorkspaceTabs', () => {
     expect(mocks.probeWorkspace).not.toHaveBeenCalled()
     expect(mocks.acquireWorkspaceRuntimeLease).not.toHaveBeenCalled()
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
-      workspaceId: 'goblin+file:///repo',
-      workspaceRuntimeId: RUNTIME_ID,
-      expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
-      targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
-    })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(
+      USER_ID,
+      {
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: RUNTIME_ID,
+        expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
+        targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
+      },
+      expect.objectContaining({ clientId: CLIENT_ID, generation: 1 }),
+    )
   })
 
   test('repairs invalid deferred tab state before initializing the runtime scope', async () => {
@@ -183,13 +206,16 @@ describe('restoreWorkspaceTabs', () => {
 
     expect(result.snapshot).toEqual({ revision: 0, entries: [] })
     expect(result.workspace.repoSnapshot).not.toBeNull()
-    expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
-      workspaceId: 'goblin+file:///repo',
-      workspaceRuntimeId: RUNTIME_ID,
-      expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
-      targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
-    })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(
+      USER_ID,
+      {
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: RUNTIME_ID,
+        expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
+        targets: [{ kind: 'workspace-root' }, { kind: 'git-worktree', root: 'goblin+file:///repo' }],
+      },
+      expect.objectContaining({ clientId: CLIENT_ID, generation: 1 }),
+    )
   })
 
   test('restores workspace tabs for a lazy local plain workspace without reading a Git projection', async () => {
@@ -215,18 +241,23 @@ describe('restoreWorkspaceTabs', () => {
     expect(result.workspace).toMatchObject({ repoSnapshot: null, workspaceProbe: { status: 'ready' } })
     expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledWith({
-      userId: USER_ID,
-      workspaceId: 'goblin+file:///repo',
-      workspaceRuntimeId: RUNTIME_ID,
-      assertCurrent: expect.any(Function),
+      runtimeCapability: expect.objectContaining({
+        userId: USER_ID,
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: RUNTIME_ID,
+      }),
     })
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).toHaveBeenCalledOnce()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
-      workspaceId: 'goblin+file:///repo',
-      workspaceRuntimeId: RUNTIME_ID,
-      expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
-      targets: [{ kind: 'workspace-root' }],
-    })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(
+      USER_ID,
+      {
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: RUNTIME_ID,
+        expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
+        targets: [{ kind: 'workspace-root' }],
+      },
+      expect.objectContaining({ clientId: CLIENT_ID, generation: 1 }),
+    )
   })
 
   test('restores workspace-root tabs while Git layout remains deferred after an operational diagnostic', async () => {
@@ -252,12 +283,16 @@ describe('restoreWorkspaceTabs', () => {
     })
 
     expect(TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST.commitGitCapabilityRemoval).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
-      workspaceId: 'goblin+file:///repo',
-      workspaceRuntimeId: RUNTIME_ID,
-      expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
-      targets: [{ kind: 'workspace-root' }],
-    })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(
+      USER_ID,
+      {
+        workspaceId: 'goblin+file:///repo',
+        workspaceRuntimeId: RUNTIME_ID,
+        expectedWorkspaceEntry: { id: 'goblin+file:///repo' },
+        targets: [{ kind: 'workspace-root' }],
+      },
+      expect.objectContaining({ clientId: CLIENT_ID, generation: 1 }),
+    )
     expect(result.snapshot).toEqual({ revision: 0, entries: [] })
   })
 
@@ -296,12 +331,16 @@ describe('restoreWorkspaceTabs', () => {
 
     expect(result.workspace.repoSnapshot).toBeNull()
     expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(USER_ID, {
-      workspaceId: entry.id,
-      workspaceRuntimeId: RUNTIME_ID,
-      expectedWorkspaceEntry: entry,
-      targets: [{ kind: 'workspace-root' }],
-    })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(
+      USER_ID,
+      {
+        workspaceId: entry.id,
+        workspaceRuntimeId: RUNTIME_ID,
+        expectedWorkspaceEntry: entry,
+        targets: [{ kind: 'workspace-root' }],
+      },
+      expect.objectContaining({ clientId: CLIENT_ID, generation: 1 }),
+    )
   })
 
   test('throws workspace-runtime-stale when clientId/workspaceRuntimeId does not match the active lease', async () => {
@@ -477,13 +516,48 @@ describe('restoreWorkspaceTabs', () => {
     expect(mocks.releaseWorkspaceRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
+  test('rejects a deferred remote restore when its membership generation expires before completion', async () => {
+    const remoteEntry = { id: REMOTE_WORKSPACE_ID }
+    mocks.getServerWorkspaceState.mockResolvedValue({
+      ...defaultServerWorkspaceState(),
+      openWorkspaceEntries: [remoteEntry],
+    })
+    mocks.runRemoteWorkspaceLifecycleWrite.mockResolvedValue({
+      kind: 'settled',
+      lifecycle: { kind: 'failed', attemptId: 4, reason: 'unreachable' },
+      workspaceProbe: {
+        status: 'unavailable',
+        reason: 'error.workspace-transport-unavailable',
+      },
+    })
+    mocks.isCurrentWorkspaceRuntimeMembership
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true)
+      .mockReturnValue(false)
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
+
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    await expect(
+      restoreWorkspaceTabs({
+        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+        userId: USER_ID,
+        clientId: CLIENT_ID,
+        workspaceId: remoteEntry.id,
+        workspaceRuntimeId: RUNTIME_ID,
+        workspacePaneTabsHost,
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
+
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
+  })
+
   test('rejects a projection if the membership becomes stale while reading', async () => {
     mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultServerWorkspaceState(),
       openWorkspaceEntries: [{ id: LOCAL_WORKSPACE_ID }],
     })
     mocks.isCurrentWorkspaceRuntimeMembership
-      .mockReturnValueOnce(true)
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(false)
@@ -500,6 +574,35 @@ describe('restoreWorkspaceTabs', () => {
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
-    expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
+  })
+
+  test('reports stale when membership expires during a non-ready initial probe', async () => {
+    mocks.getServerWorkspaceState.mockResolvedValue({
+      ...defaultServerWorkspaceState(),
+      openWorkspaceEntries: [{ id: LOCAL_WORKSPACE_ID }],
+    })
+    mocks.workspaceProbeStateForRuntime.mockReturnValue({ status: 'probing' })
+    mocks.probeWorkspace.mockImplementation(async () => {
+      mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(false)
+      return {
+        status: 'unavailable',
+        reason: 'error.workspace-transport-unavailable',
+      }
+    })
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
+
+    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    await expect(
+      restoreWorkspaceTabs({
+        workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
+        userId: USER_ID,
+        clientId: CLIENT_ID,
+        workspaceId: LOCAL_WORKSPACE_ID,
+        workspaceRuntimeId: RUNTIME_ID,
+        workspacePaneTabsHost,
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
+
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
   })
 })

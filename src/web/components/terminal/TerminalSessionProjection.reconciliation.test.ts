@@ -109,7 +109,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     expect(settled).toBe(false)
 
     serverClose.resolve(successfulRuntimeCloseSnapshot())
-    await expect(closePromise).resolves.toBe(true)
+    await expect(closePromise).resolves.toEqual({ kind: 'committed', projection: 'applied' })
     expect(settled).toBe(true)
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
@@ -146,7 +146,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     ).toEqual([terminalSessionId])
 
     serverClose.resolve(successfulRuntimeCloseSnapshot())
-    await expect(closePromise).resolves.toBe(true)
+    await expect(closePromise).resolves.toEqual({ kind: 'committed', projection: 'applied' })
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
@@ -177,7 +177,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     expect(retirement).not.toHaveBeenCalled()
 
     serverClose.resolve(successfulRuntimeCloseSnapshot())
-    await expect(closePromise).resolves.toBe(true)
+    await expect(closePromise).resolves.toEqual({ kind: 'committed', projection: 'applied' })
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
@@ -243,7 +243,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     )
     serverClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, 'pty_session_1_aaaaaaaaa'))
 
-    await expect(close).resolves.toBe(true)
+    await expect(close).resolves.toEqual({ kind: 'committed', projection: 'applied' })
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
     expect(requiredTerminalSession(projection, terminalSessionId)?.currentTerminalRuntimeSessionId()).toBe(
       'pty_session_2_aaaaaaaaa',
@@ -289,11 +289,11 @@ describe('TerminalSessionProjection reconciliation', () => {
 
     expect(workspacePaneRuntimeMocks.close).toHaveBeenCalledTimes(2)
     firstServerClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, 'pty_session_1_aaaaaaaaa'))
-    await expect(firstClose).resolves.toBe(true)
+    await expect(firstClose).resolves.toEqual({ kind: 'committed', projection: 'applied' })
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
 
     secondServerClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, 'pty_session_2_aaaaaaaaa'))
-    await expect(secondClose).resolves.toBe(true)
+    await expect(secondClose).resolves.toEqual({ kind: 'committed', projection: 'applied' })
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
@@ -332,7 +332,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     expect(closingSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-222222222222222222222')
 
     serverClose.resolve(successfulRuntimeCloseSnapshot(activeSessionId, 'pty_session_2_aaaaaaaaa'))
-    await expect(closePromise).resolves.toBe(true)
+    await expect(closePromise).resolves.toEqual({ kind: 'committed', projection: 'applied' })
     const closedSnapshot = projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY)
     expect(closedSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual([
       'term-111111111111111111111',
@@ -360,7 +360,7 @@ describe('TerminalSessionProjection reconciliation', () => {
         target: RUNTIME_TARGET,
         presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       }),
-    ).resolves.toBe(true)
+    ).resolves.toEqual({ kind: 'committed', projection: 'applied' })
 
     expect(workspacePaneTabsCommitMocks.writeCanonicalSnapshot).toHaveBeenCalledWith(REPO_ROOT, WORKSPACE_RUNTIME_ID, {
       revision: 7,
@@ -369,6 +369,92 @@ describe('TerminalSessionProjection reconciliation', () => {
     expect(
       projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
     ).toEqual(['term-222222222222222222222'])
+  })
+
+  test('keeps the terminal close while stopping presentation for a rejected runtime scope', async () => {
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
+      'client_local',
+    )
+    workspacePaneRuntimeMocks.close.mockResolvedValueOnce(successfulRuntimeCloseSnapshot())
+    workspacePaneTabsCommitMocks.writeCanonicalSnapshot.mockReturnValueOnce('scope-rejected')
+
+    await expect(
+      projection.closeTerminalByDescriptor('term-111111111111111111111', {
+        target: RUNTIME_TARGET,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      }),
+    ).resolves.toEqual({ kind: 'committed', projection: 'superseded' })
+
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
+  })
+
+  test('continues close presentation when a newer pane snapshot is already cached', async () => {
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
+      'client_local',
+    )
+    workspacePaneRuntimeMocks.close.mockResolvedValueOnce(successfulRuntimeCloseSnapshot())
+    workspacePaneTabsCommitMocks.writeCanonicalSnapshot.mockReturnValueOnce('newer-snapshot-preserved')
+    workspacePaneTabsCommitMocks.tabsAfterSnapshotCommit.mockReturnValueOnce([
+      { type: 'status', tabId: 'workspace-pane:status' },
+      { type: 'history', tabId: 'workspace-pane:history' },
+    ])
+
+    await expect(
+      projection.closeTerminalByDescriptor('term-111111111111111111111', {
+        target: RUNTIME_TARGET,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      }),
+    ).resolves.toEqual({ kind: 'committed', projection: 'applied' })
+  })
+
+  test('stops close presentation when a newer snapshot contains the terminal again', async () => {
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
+      'client_local',
+    )
+    workspacePaneRuntimeMocks.close.mockResolvedValueOnce(successfulRuntimeCloseSnapshot())
+    workspacePaneTabsCommitMocks.writeCanonicalSnapshot.mockReturnValueOnce('newer-snapshot-preserved')
+    workspacePaneTabsCommitMocks.tabsAfterSnapshotCommit.mockReturnValueOnce([
+      { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
+    ])
+
+    await expect(
+      projection.closeTerminalByDescriptor('term-111111111111111111111', {
+        target: RUNTIME_TARGET,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      }),
+    ).resolves.toEqual({ kind: 'committed', projection: 'superseded' })
+  })
+
+  test('applies a committed terminal close when pane projection recovery was invalidated', async () => {
+    projection.setRuntimeMembershipIndex(makeRuntimeMembershipIndex())
+    projection.reconcileServerSessions(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
+      'client_local',
+    )
+    workspacePaneRuntimeMocks.close.mockResolvedValueOnce({
+      ...successfulRuntimeCloseSnapshot(),
+      paneTabsSnapshot: null,
+    })
+
+    await expect(
+      projection.closeTerminalByDescriptor('term-111111111111111111111', {
+        target: RUNTIME_TARGET,
+        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      }),
+    ).resolves.toEqual({ kind: 'committed', projection: 'failed' })
+
+    expect(workspacePaneTabsCommitMocks.writeCanonicalSnapshot).not.toHaveBeenCalled()
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
   test('closeTerminalByDescriptor deduplicates repeated closes for the same terminal session', async () => {
@@ -396,8 +482,8 @@ describe('TerminalSessionProjection reconciliation', () => {
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
 
     serverClose.resolve(successfulRuntimeCloseSnapshot())
-    await expect(firstClose).resolves.toBe(true)
-    await expect(secondClose).resolves.toBe(true)
+    await expect(firstClose).resolves.toEqual({ kind: 'committed', projection: 'applied' })
+    await expect(secondClose).resolves.toEqual({ kind: 'committed', projection: 'applied' })
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
@@ -422,7 +508,7 @@ describe('TerminalSessionProjection reconciliation', () => {
 
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)
 
-    const expectation = expect(closePromise).resolves.toBe(false)
+    const expectation = expect(closePromise).rejects.toThrow('close failed')
     serverClose.reject(new Error('close failed'))
     await expectation
 
@@ -452,7 +538,7 @@ describe('TerminalSessionProjection reconciliation', () => {
         target: { ...RUNTIME_TARGET, workspaceRuntimeId: 'repo-runtime-new' },
         presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
       }),
-    ).resolves.toBe(false)
+    ).resolves.toEqual({ kind: 'not-committed' as const, message: 'error.workspace-runtime-stale' })
 
     expect(workspacePaneRuntimeMocks.close).toHaveBeenCalledOnce()
     expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(1)

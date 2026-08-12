@@ -57,6 +57,7 @@ const appRealtimeHostStub = {
         lastFailure: null,
       },
       liveSessionCount: 0,
+      pendingResourceRetirementCount: 0,
     },
   })),
   registerSocket: vi.fn(),
@@ -72,7 +73,6 @@ const workspacePaneTabsHostStub = {
     repaired: false,
   })),
   listWorkspaceTabs: vi.fn(),
-  replaceTabs: vi.fn(),
   updateTabs: vi.fn(),
 } satisfies ServerWorkspacePaneTabsHost
 

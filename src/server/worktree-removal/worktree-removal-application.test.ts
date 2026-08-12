@@ -11,6 +11,7 @@ import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physica
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import { WorkspaceRuntimeStaleError } from '#/server/modules/workspace-runtimes.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -200,7 +201,7 @@ describe('WorktreeRemovalApplication', () => {
       },
     })
     await entered.promise
-    runtime.abort(new Error('error.workspace-runtime-stale'))
+    runtime.abort(new WorkspaceRuntimeStaleError())
     await expect(removal).resolves.toEqual({ ok: false, message: 'error.workspace-runtime-stale' })
   })
 
@@ -238,7 +239,7 @@ describe('WorktreeRemovalApplication', () => {
     const remove = vi.fn(async () => ({ ok: true as const, message: 'removed' }))
     const application = createApplication({ operations, physicalWorktrees: { capture: async () => capability } })
     const queued = application.removeWorktree('user-a', { ...target, remove })
-    runtime.abort(new Error('error.workspace-runtime-stale'))
+    runtime.abort(new WorkspaceRuntimeStaleError())
     await expect(queued).resolves.toEqual({ ok: false, message: 'error.workspace-runtime-stale' })
     expect(remove).not.toHaveBeenCalled()
     gate.resolve()

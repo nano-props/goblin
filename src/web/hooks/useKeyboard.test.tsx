@@ -31,8 +31,12 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
-import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import type { TerminalFilesystemTargetSnapshot, TerminalFocusRequest } from '#/web/components/terminal/types.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import type {
+  TerminalCreateOptions,
+  TerminalFilesystemTargetSnapshot,
+  TerminalFocusRequest,
+} from '#/web/components/terminal/types.ts'
 import { terminalDescriptorForTest, terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
@@ -158,8 +162,12 @@ describe('useKeyboard', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal,
       focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
     await renderHookHost({
       currentWorkspaceId: REPO_ID,
@@ -303,8 +311,12 @@ describe('useKeyboard', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal,
       focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
     await renderHookHost({
       currentWorkspaceId: REPO_ID,
@@ -339,11 +351,22 @@ describe('useKeyboard', () => {
   test('primary modifier plus t dispatches every keydown event including autorepeat', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     seedTabbedWorktreeRepoForTest('terminal')
-    const createTerminal = vi.fn(async () => 'term-222222222222222222222')
+    const createTerminal = vi.fn(async (_base: unknown, _options?: TerminalCreateOptions) =>
+      Promise.resolve('term-222222222222222222222'),
+    )
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal,
+      createTerminalWithAdmission: vi.fn(async (base, options) => ({
+        terminalSessionId: await createTerminal(base, options),
+        presentation: base.presentation,
+        requestRole: 'leader' as const,
+        resourceDisposition: 'created' as const,
+        runtimeProjectionApplied: true,
+      })),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
     await renderHookHost({
       currentWorkspaceId: REPO_ID,
@@ -385,8 +408,16 @@ describe('useKeyboard', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal,
+      createTerminalWithAdmission: vi.fn(async (base) => ({
+        terminalSessionId: await createTerminal(),
+        presentation: base.presentation,
+        requestRole: 'leader' as const,
+        resourceDisposition: 'created' as const,
+        runtimeProjectionApplied: true,
+      })),
       selectTerminal: vi.fn(),
       focusTerminal,
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
     await renderHookHost({
       currentWorkspaceId: REPO_ID,
@@ -443,7 +474,9 @@ describe('useKeyboard', () => {
         diagnostics: [],
       },
     })
-    const createTerminal = vi.fn(async () => 'term-222222222222222222222')
+    const createTerminal = vi.fn(async (_base: unknown, _options?: TerminalCreateOptions) =>
+      Promise.resolve('term-222222222222222222222'),
+    )
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: (terminalFilesystemTargetKey) => ({
         terminalFilesystemTargetKey,
@@ -455,7 +488,16 @@ describe('useKeyboard', () => {
         createPending: false,
       }),
       createTerminal,
+      createTerminalWithAdmission: vi.fn(async (base, options) => ({
+        terminalSessionId: await createTerminal(base, options),
+        presentation: base.presentation,
+        requestRole: 'leader' as const,
+        resourceDisposition: 'created' as const,
+        runtimeProjectionApplied: true,
+      })),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     })
     await renderHookHost({
       currentWorkspaceId: REPO_ID,
@@ -612,12 +654,16 @@ describe('useKeyboard', () => {
     installNativeBridgeStub()
     seedTabbedWorktreeRepoForTest('terminal')
     const createTerminal = vi.fn(async () => 'term-222222222222222222222')
-    const closeTerminalByDescriptor = vi.fn(async () => true)
+    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
     const openCreateWorktree = vi.fn()
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal,
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
     await renderHookHost({ currentWorkspaceId: REPO_ID, openCreateWorktree })
@@ -639,11 +685,15 @@ describe('useKeyboard', () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     const createTerminal = vi.fn(async () => 'term-222222222222222222222')
-    const closeTerminalByDescriptor = vi.fn(async () => true)
+    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal,
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
 
@@ -663,11 +713,15 @@ describe('useKeyboard', () => {
   test('primary modifier plus w closes the selected terminal tab', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     seedTabbedWorktreeRepoForTest('terminal')
-    const closeTerminalByDescriptor = vi.fn(async () => true)
+    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
     await renderHookHost({
@@ -907,7 +961,6 @@ function installNativeBridgeStub() {
   testWindow.goblinNative = currentNativeBridge({
     invokeIpc: vi.fn(async () => null),
     abortIpc: vi.fn(async () => false),
-    onEvent: vi.fn(() => () => {}),
     onIntent: vi.fn(() => () => {}),
     pathForFile: vi.fn(() => ''),
     terminal: {

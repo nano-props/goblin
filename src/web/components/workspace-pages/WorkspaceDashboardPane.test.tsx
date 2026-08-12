@@ -30,6 +30,10 @@ vi.mock('#/web/repo-client.ts', () => ({
   getRepoPullRequests: repoClientMocks.getRepoPullRequests,
 }))
 
+vi.mock('#/web/components/workspace-pages/WorkspaceDashboardTerminals.tsx', () => ({
+  WorkspaceDashboardTerminals: () => null,
+}))
+
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
 function queryObserverCount(queryKey: readonly unknown[]): number {

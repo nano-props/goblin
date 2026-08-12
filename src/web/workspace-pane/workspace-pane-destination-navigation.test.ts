@@ -14,7 +14,10 @@ import {
 } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import type { WorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
 import { resolveWorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import {
+  resetWorkspacePaneActionQueueForTest,
+  runWorkspacePaneAction,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -56,6 +59,41 @@ describe('workspace pane destination navigation', () => {
     ).resolves.toEqual({ kind: 'completed', changed: true, presentation: 'router-settled' })
     expect(commitWorkspacePaneRoute).toHaveBeenCalledOnce()
     expect(setWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'status')
+  })
+
+  test('fails fast when the destination target is already running an action', async () => {
+    const repo = seedDestinationRepo()
+    const started = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const occupied = runWorkspacePaneAction(
+      {
+        kind: 'git-worktree',
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        worktreePath: DESTINATION_WORKTREE,
+      },
+      async () => {
+        started.resolve()
+        await release.promise
+      },
+    )
+    await started.promise
+    const commitWorkspacePaneRoute = acceptedRouteCommit()
+    const currentNavigation = beginAppNavigation()
+
+    await expect(
+      dispatchWorkspacePaneDestinationRoute({
+        workspaceId: REPO_ID,
+        branchName: 'feature/destination',
+        route: DESTINATION_ROUTE,
+        navigation: { commitWorkspacePaneRoute },
+      }),
+    ).resolves.toEqual({ kind: 'blocked' })
+    expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(appNavigationIsCurrent(currentNavigation)).toBe(true)
+
+    release.resolve()
+    await occupied
   })
 
   test('rejects worktree-scoped tabs for a destination without a worktree', async () => {

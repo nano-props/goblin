@@ -7,7 +7,7 @@ import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
-import { postServerJson } from '#/web/lib/server-fetch.ts'
+import { postServerCommandJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import { decodeWith } from '#/shared/http-response-schema.ts'
 import {
   StringArrayResponseSchema,
@@ -24,7 +24,7 @@ export async function refreshWorkspace(
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<WorkspaceRefreshResult> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/workspace/refresh',
     { workspaceId, workspaceRuntimeId },
     decodeWith(WorkspaceRefreshResponseSchema),
@@ -33,7 +33,7 @@ export async function refreshWorkspace(
 }
 
 export async function openWorkspaceRuntime(workspaceId: WorkspaceId): Promise<string> {
-  const result = await postServerJson(
+  const result = await postServerCommandJson(
     '/api/workspace/runtime-open',
     { workspaceId, clientId: readClientPageId() },
     decodeWith(WorkspaceRuntimeOpenIdResponseSchema),
@@ -42,7 +42,7 @@ export async function openWorkspaceRuntime(workspaceId: WorkspaceId): Promise<st
 }
 
 export async function openWorkspaceRuntimeForInput(workspaceInput: string): Promise<WorkspaceRuntimeOpenResult> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/workspace/runtime-open',
     { workspaceInput, clientId: readClientPageId() },
     decodeWith(WorkspaceRuntimeOpenResponseSchema),
@@ -52,7 +52,7 @@ export async function openWorkspaceRuntimeForInput(workspaceInput: string): Prom
 export async function reconcileWorkspaceRuntimeMemberships(
   workspaceIds: WorkspaceId[],
 ): Promise<WorkspaceRuntimeMembershipReconcileResult> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/workspace/runtime-reconcile',
     {
       clientId: readClientPageId(),
@@ -63,7 +63,7 @@ export async function reconcileWorkspaceRuntimeMemberships(
 }
 
 export async function closeWorkspaceRuntime(workspaceId: WorkspaceId, workspaceRuntimeId: string): Promise<boolean> {
-  const result = await postServerJson(
+  const result = await postServerCommandJson(
     '/api/workspace/runtime-close',
     {
       workspaceId,

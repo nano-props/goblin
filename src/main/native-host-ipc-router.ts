@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { createAppRouter, type IpcRequest, type IpcResponse } from '#/shared/api-types.ts'
-import { IpcError } from '#/shared/ipc-error.ts'
+import { createAppRouter, type IpcRequest, type IpcResponse, type IpcResponseError } from '#/shared/api-types.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 import { NATIVE_HOST_IPC_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { applyPrimaryWindowTitleBarTheme } from '#/main/window.ts'
 import { allRegisteredSurfacesWithCapability } from '#/main/client-surface-registry.ts'
@@ -39,15 +39,15 @@ export function wireNativeHostIpc(): void {
   ipcMain.handle(HOST_IPC_CALL_CHANNEL, async (event, request: IpcRequest): Promise<IpcResponse> => {
     try {
       if (!isTrustedIpcEvent(event)) {
-        throw new IpcError({ code: 'FORBIDDEN', message: 'Untrusted IPC sender' })
+        throw new CodedError({ code: 'FORBIDDEN', message: 'Untrusted IPC sender' })
       }
       if (!isValidIpcRequest(request)) {
-        throw new IpcError({ code: 'BAD_REQUEST', message: 'Invalid IPC request' })
+        throw new CodedError({ code: 'BAD_REQUEST', message: 'Invalid IPC request' })
       }
       const caller = router.createCaller()
       const procedure = request.path.split('.').reduce<unknown>(resolveIpcPathSegment, caller)
       if (typeof procedure !== 'function') {
-        throw new IpcError({ code: 'NOT_FOUND', message: `Unknown IPC procedure: ${request.path}` })
+        throw new CodedError({ code: 'NOT_FOUND', message: `Unknown IPC procedure: ${request.path}` })
       }
       const requestId = request.requestId
       if (!isValidIpcRequestId(requestId)) return { ok: true, data: await procedure(request.input) }
@@ -60,7 +60,7 @@ export function wireNativeHostIpc(): void {
         if (activeIpcControllers.get(requestId) === ctrl) activeIpcControllers.delete(requestId)
       }
     } catch (err) {
-      return { ok: false, error: toIpcError(err) }
+      return { ok: false, error: toIpcResponseError(err) }
     }
   })
 
@@ -110,8 +110,8 @@ function resolveIpcPathSegment(target: unknown, segment: string): unknown {
   return (target as Record<string, unknown>)[segment]
 }
 
-function toIpcError(err: unknown): Extract<IpcResponse, { ok: false }>['error'] {
-  if (err instanceof IpcError) return { name: err.name, code: err.code, message: err.message }
+function toIpcResponseError(err: unknown): IpcResponseError {
+  if (err instanceof CodedError) return { name: err.name, code: err.code, message: err.message }
   if (err instanceof Error) return { name: err.name, message: err.message }
   return { message: String(err) }
 }

@@ -1,5 +1,6 @@
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 export async function dispatchWorkspaceUiAction(
   workspaceId: WorkspaceId,
@@ -26,6 +27,7 @@ export async function runWorkspaceUiAction(action: () => Promise<ExecResult>): P
   try {
     result = await action()
   } catch (error) {
+    if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) throw error
     result = { ok: false, message: error instanceof Error ? error.message : String(error) }
   }
   if (!result.ok && result.message === 'cancelled') return null

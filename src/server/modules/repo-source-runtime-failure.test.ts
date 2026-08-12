@@ -3,6 +3,7 @@ import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-work
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { okRemoteResult, upstreamOutput, worktreePorcelain } from '#/system/ssh/git-test-utils.ts'
+import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
 
 const target: RemoteWorkspaceTarget = {
   id: workspaceIdForTest('goblin+ssh://prod/home/alice/service'),
@@ -12,6 +13,14 @@ const target: RemoteWorkspaceTarget = {
   host: 'example.test',
   user: 'alice',
   port: 22,
+}
+
+function runtimeCapability(workspaceRuntimeId: string) {
+  return testWorkspaceRuntimeEpochCapability({
+    userId: 'test-user',
+    workspaceId: target.id,
+    workspaceRuntimeId,
+  })
 }
 
 const mocks = vi.hoisted(() => ({
@@ -64,12 +73,14 @@ describe('repo source runtime failure classification', () => {
     })
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
 
-    await expect(fetchRepo(target.id, 'user', undefined, 'repo-runtime-test')).rejects.toMatchObject({
-      name: 'RemoteWorkspaceRuntimeFailureError',
-      workspaceId: target.id,
-      workspaceRuntimeId: 'repo-runtime-test',
-      reason: 'unreachable',
-    } satisfies Partial<RemoteWorkspaceRuntimeFailureError>)
+    await expect(fetchRepo(target.id, runtimeCapability('repo-runtime-test'), 'user', undefined)).rejects.toMatchObject(
+      {
+        name: 'RemoteWorkspaceRuntimeFailureError',
+        workspaceId: target.id,
+        workspaceRuntimeId: 'repo-runtime-test',
+        reason: 'unreachable',
+      } satisfies Partial<RemoteWorkspaceRuntimeFailureError>,
+    )
   })
 
   test('records a mutation transport failure without throwing before the domain consumes the result', async () => {
@@ -137,7 +148,7 @@ describe('repo source runtime failure classification', () => {
     const { pushRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
     await expect(
-      pushRepoBranch(target.id, 'feature/test', undefined, { workspaceRuntimeId: 'repo-runtime-test' }),
+      pushRepoBranch(target.id, 'feature/test', runtimeCapability('repo-runtime-test'), undefined),
     ).rejects.toMatchObject({
       name: 'RepoMutationRuntimeFailureError',
       mutation: {

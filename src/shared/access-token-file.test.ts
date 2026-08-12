@@ -7,6 +7,7 @@ import {
   generateAccessToken,
   readOrCreateAccessToken,
   removeAccessTokenFile,
+  rotateAccessTokenFile,
 } from '#/shared/access-token-file.ts'
 
 /**
@@ -20,7 +21,7 @@ import {
  *  - generated files persist as exactly 25 chars + newline
  *  - persisted files are created with mode 0o600
  *  - corrupt or short files are silently regenerated, not accepted
- *  - removal is idempotent but does not hide other filesystem failures
+ *  - rotation atomically replaces the persisted next-start token
  */
 
 const TOKEN_PATTERN = /^[0-9a-z]{25}$/
@@ -175,29 +176,33 @@ describe('readOrCreateAccessToken', () => {
   })
 })
 
-describe('removeAccessTokenFile', () => {
-  test('removes the persisted token', async () => {
+describe('rotateAccessTokenFile', () => {
+  test('atomically replaces the persisted token', async () => {
     const token = await readOrCreateAccessToken(dataDir)
 
-    await expect(removeAccessTokenFile(dataDir)).resolves.toBe(true)
-    await expect(readFile(accessTokenFilePath(dataDir), 'utf8')).rejects.toMatchObject({
-      code: 'ENOENT',
-    })
-
-    const replacement = await readOrCreateAccessToken(dataDir)
+    const replacement = await rotateAccessTokenFile(dataDir)
     expect(replacement).not.toBe(token)
+    await expect(readOrCreateAccessToken(dataDir)).resolves.toBe(replacement)
+    await expect(readFile(accessTokenFilePath(dataDir), 'utf8')).resolves.toBe(`${replacement}\n`)
   })
 
-  test('succeeds without creating anything when the token is already missing', async () => {
+  test('creates the staged token when the token is currently missing', async () => {
     const missingDataDir = path.join(dataDir, 'missing')
 
-    await expect(removeAccessTokenFile(missingDataDir)).resolves.toBe(false)
-    await expect(stat(missingDataDir)).rejects.toMatchObject({ code: 'ENOENT' })
+    const staged = await rotateAccessTokenFile(missingDataDir)
+    await expect(readOrCreateAccessToken(missingDataDir)).resolves.toBe(staged)
+  })
+})
+
+describe('removeAccessTokenFile', () => {
+  test('removes the persisted token for the standalone reset command', async () => {
+    await readOrCreateAccessToken(dataDir)
+
+    await expect(removeAccessTokenFile(dataDir)).resolves.toBe(true)
+    await expect(readFile(accessTokenFilePath(dataDir), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  test('surfaces filesystem errors other than a missing token', async () => {
-    await mkdir(accessTokenFilePath(dataDir))
-
-    await expect(removeAccessTokenFile(dataDir)).rejects.toHaveProperty('code')
+  test('is idempotent when the token is already missing', async () => {
+    await expect(removeAccessTokenFile(dataDir)).resolves.toBe(false)
   })
 })

@@ -58,10 +58,15 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
     getBootstrap: () => electronBootstrap(),
     invokeIpc: vi.fn(),
     abortIpc: vi.fn(async () => false),
-    onIpcEvent: () => () => {},
     onEffectIntent: () => () => {},
     pathForFile: () => '',
     saveClipboardFiles: () => Promise.resolve([]),
+    getAccessTokenProjection: async () => {
+      throw new Error('unused token projection')
+    },
+    rotateAccessToken: async () => {
+      throw new Error('unused token rotation')
+    },
     host: () => null,
     appRealtime: () => ({
       kickReconnect: () => {},
@@ -258,7 +263,7 @@ describe('repo-client', () => {
     )
   })
 
-  test('leaves Git network deadlines to the server while preserving caller cancellation', async () => {
+  test('leaves Git network deadlines to the server and preserves post-delivery cancellation as uncertain', async () => {
     useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const requestSignals: AbortSignal[] = []
@@ -277,7 +282,9 @@ describe('repo-client', () => {
       pullRepoBranch(workspaceId, workspaceRuntimeId, 'main', undefined, controllers[1]!.signal),
       pushRepoBranch(workspaceId, workspaceRuntimeId, 'main', controllers[2]!.signal),
     ]
-    const assertions = requests.map(async (request) => await expect(request).rejects.toThrow('caller cancelled'))
+    const assertions = requests.map(
+      async (request) => await expect(request).rejects.toMatchObject({ code: 'OUTCOME_UNCERTAIN' }),
+    )
 
     await vi.advanceTimersByTimeAsync(240_000)
     expect(requestSignals).toHaveLength(3)
@@ -299,7 +306,7 @@ describe('repo-client', () => {
     await expect(fetchRepo(workspaceId, workspaceRuntimeId)).rejects.toThrow()
   })
 
-  test('aborts the clone request after the clone request watchdog fires', async () => {
+  test('preserves an uncertain clone outcome after the clone request watchdog fires', async () => {
     useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     let requestSignal: AbortSignal | undefined
@@ -316,9 +323,13 @@ describe('repo-client', () => {
       parentPath: '/tmp',
       directoryName: 'repo',
     })
+    const assertion = expect(request).rejects.toMatchObject({
+      code: 'OUTCOME_UNCERTAIN',
+      message: 'error.request-timeout',
+    })
 
     await vi.advanceTimersByTimeAsync(360_000)
-    await expect(request).resolves.toEqual({ ok: false, message: 'error.request-timeout' })
+    await assertion
     expect(requestSignal?.aborted).toBe(true)
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(new URL(String((fetchMock.mock.calls[0] as unknown as [unknown])[0])).pathname).toBe('/api/repo/clone')
@@ -357,10 +368,10 @@ describe('repo-client', () => {
     expect(requestSignal.aborted).toBe(false)
 
     caller.abort(new Error('caller cancelled'))
-    await expect(request).rejects.toThrow('caller cancelled')
+    await expect(request).rejects.toMatchObject({ code: 'OUTCOME_UNCERTAIN' })
   })
 
-  test('does not reclassify caller cancellation as a create-worktree timeout', async () => {
+  test('classifies create-worktree cancellation after delivery as uncertain rather than timeout', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const caller = new AbortController()
     mockFetch((_url, init) => {
@@ -383,7 +394,7 @@ describe('repo-client', () => {
     )
     caller.abort(new Error('caller cancelled'))
 
-    await expect(request).rejects.toThrow('caller cancelled')
+    await expect(request).rejects.toMatchObject({ code: 'OUTCOME_UNCERTAIN' })
   })
 
   test('does not impose the former client watchdog on create-worktree', async () => {
@@ -418,7 +429,7 @@ describe('repo-client', () => {
     expect(requestSignal.aborted).toBe(false)
 
     caller.abort(new Error('caller cancelled'))
-    await expect(request).rejects.toThrow('caller cancelled')
+    await expect(request).rejects.toMatchObject({ code: 'OUTCOME_UNCERTAIN' })
   })
 
   test('gives patch generation an explicit long-read request budget', async () => {
@@ -487,7 +498,6 @@ describe('repo-client', () => {
         goblinNative: currentNativeBridge({
           invokeIpc: vi.fn(),
           abortIpc: async () => true,
-          onEvent: () => () => {},
           pathForFile: () => '',
         }),
         location: {

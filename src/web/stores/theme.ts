@@ -4,7 +4,7 @@
 // client also listens for `(prefers-color-scheme: dark)` changes so
 // OS appearance flips propagate without a server round-trip —
 // Chromium's matchMedia tracks `nativeTheme` in Electron, so this
-// covers both the desktop and plain-browser repoOperationSchedulers. Electron main
+// covers both the desktop and plain-browser runtimes. Electron main
 // still projects the server-owned preference into native host state,
 // but it is not the business source of truth.
 // Theme hydration can read the transport snapshot directly; theme writes go
@@ -13,18 +13,17 @@
 import { createStore } from 'zustand/vanilla'
 import type { StoreApi } from 'zustand/vanilla'
 import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
-import type { SettingsSnapshot, ThemeState } from '#/shared/api-types.ts'
+import type { ThemeState } from '#/shared/api-types.ts'
 import type { ResolvedTheme, ThemePref } from '#/shared/settings.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import { getThemeState, resolveThemeStateFromSettings } from '#/web/settings-client.ts'
-import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
+import { getThemeState } from '#/web/settings-client.ts'
+import { createSettingsProjectionOwner } from '#/web/settings-projection-owner.ts'
 import { setThemeColorThemePreference, setThemePreference } from '#/web/settings-actions.ts'
 
 interface ThemeStore extends ThemeState {
   setPref: (pref: ThemePref) => Promise<void>
   setColorTheme: (colorTheme: ColorTheme) => Promise<void>
   hydrate: () => Promise<void>
-  hydrateFromSettingsSnapshot: (snapshot: Pick<SettingsSnapshot, 'theme' | 'colorTheme'>) => Promise<void>
 }
 
 // `set` / `get` aliases keep helper signatures aligned with the
@@ -39,16 +38,11 @@ const PREFERS_DARK_MEDIA_QUERY = '(prefers-color-scheme: dark)'
 
 let unsubscribe: (() => void) | null = null
 let mediaQueryListenerDisposer: (() => void) | null = null
-let hydrateVersion = 0
+const projectionOwner = createSettingsProjectionOwner('theme')
 
 function applyHtmlAttrs(resolved: ResolvedTheme, colorTheme: ColorTheme) {
   document.documentElement.setAttribute('data-theme', resolved)
   document.documentElement.setAttribute('data-color-theme', colorTheme)
-}
-
-function clearThemeSubscription() {
-  unsubscribe?.()
-  unsubscribe = null
 }
 
 function clearMediaQueryListener() {
@@ -67,7 +61,7 @@ function resolveOsTheme(): ResolvedTheme | null {
   // client shares Chromium's media-query implementation with the
   // host process; in a plain browser it tracks the OS via the
   // browser's own plumbing. Either way the listener below covers
-  // both repoOperationSchedulers.
+  // both runtimes.
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null
   return window.matchMedia(PREFERS_DARK_MEDIA_QUERY).matches ? 'dark' : 'light'
 }
@@ -107,22 +101,18 @@ function installMediaQueryListener(set: ThemeSet, get: ThemeGet): void {
   mediaQueryListenerDisposer = () => mql.removeEventListener('change', handleOsThemeChange)
 }
 
-function commitHydratedThemeState(set: ThemeSet, get: ThemeGet, version: number, state: ThemeState): void {
-  if (version !== hydrateVersion) return
-  commitThemeState(set, state)
-  if (version !== hydrateVersion) return
-  const nextUnsubscribe = subscribeSettingsInvalidationRefetch({
+function ensureThemeSubscription(set: ThemeSet): void {
+  if (unsubscribe) return
+  unsubscribe = projectionOwner.subscribe({
     scope: 'theme',
-    fetch: getThemeState,
-    label: 'theme',
+    read: getThemeState,
     apply: (next) => commitThemeState(set, next),
   })
-  if (version !== hydrateVersion) {
-    nextUnsubscribe()
-    return
-  }
-  clearThemeSubscription()
-  unsubscribe = nextUnsubscribe
+}
+
+function commitThemeProjection(set: ThemeSet, get: ThemeGet, state: ThemeState): void {
+  commitThemeState(set, state)
+  ensureThemeSubscription(set)
   installMediaQueryListener(set, get)
 }
 
@@ -135,25 +125,20 @@ export const themeStore = createStore<ThemeStore>((set, get) => ({
   colorTheme: colorThemeFromHtmlAttr(),
 
   async hydrate() {
-    const version = ++hydrateVersion
-    const state = await getThemeState()
-    commitHydratedThemeState(set, get, version, state)
-  },
-
-  async hydrateFromSettingsSnapshot(snapshot) {
-    const version = ++hydrateVersion
-    commitHydratedThemeState(set, get, version, resolveThemeStateFromSettings(snapshot))
+    await projectionOwner.run(async () => {
+      commitThemeProjection(set, get, await getThemeState())
+    })
   },
 
   async setPref(pref) {
-    if (pref === get().pref) return
-    const next = await setThemePreference(pref)
-    commitThemeState(set, next)
+    await projectionOwner.run(async () => {
+      commitThemeProjection(set, get, await setThemePreference(pref))
+    })
   },
 
   async setColorTheme(colorTheme) {
-    if (colorTheme === get().colorTheme) return
-    const next = await setThemeColorThemePreference(colorTheme)
-    commitThemeState(set, next)
+    await projectionOwner.run(async () => {
+      commitThemeProjection(set, get, await setThemeColorThemePreference(colorTheme))
+    })
   },
 }))

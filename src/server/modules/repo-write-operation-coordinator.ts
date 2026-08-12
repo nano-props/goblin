@@ -14,6 +14,7 @@ import {
   type RemoteWorkspaceRuntimeFailureError,
 } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { onWorkspaceRuntimeClosed, onWorkspaceRuntimeFailed } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
 import type {
   RepoOperationCancellationReason,
   RepoServerOperationKind,
@@ -51,7 +52,7 @@ export interface RepoWriteOperationContext {
 
 interface BeginRepoWriteOperationInput {
   repoId?: WorkspaceId | null
-  workspaceRuntimeId?: string | null
+  runtimeCapability: WorkspaceRuntimeEpochCapability
   kind: RepoServerOperationKind
   source: RepoServerOperationSource
   target?: RepoServerOperationTarget | null
@@ -202,7 +203,7 @@ function beginRepoWriteOperation(
   const operation: RepoServerOperationState = {
     id: freshWriteOperationId(),
     repoId: input.repoId ?? null,
-    workspaceRuntimeId: input.workspaceRuntimeId ?? null,
+    workspaceRuntimeId: input.runtimeCapability.workspaceRuntimeId,
     kind: input.kind,
     phase: 'queued',
     source: input.source,
@@ -487,16 +488,16 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
   prepareTask: (operation: RepoWriteOperationLifecycle, context: RepoWriteOperationContext) => () => Promise<T>,
 ): Promise<T> {
   if (signal?.aborted) return cancelledRepoWriteResult()
-  const runtimeRegistration = registerWorkspaceRuntime(repoId, operationInput.workspaceRuntimeId)
+  const runtimeCapability = operationInput.runtimeCapability
+  assertRepoWriteRuntimeCapability(runtimeCapability, repoId)
+  const workspaceRuntimeId = runtimeCapability.workspaceRuntimeId
+  const runtimeRegistration = registerWorkspaceRuntime(repoId, workspaceRuntimeId)
   const capture = await observePromise(async () =>
     operationInput.captureExecution
       ? await operationInput.captureExecution(signal)
-      : await captureRepoWriteExecution(
-          repoId,
-          operationInput.workspaceRuntimeId ? { workspaceRuntimeId: operationInput.workspaceRuntimeId } : undefined,
-          signal,
-        ),
+      : await captureRepoWriteExecution(repoId, { workspaceRuntimeId }, signal),
   )
+  assertRepoWriteRuntimeCapability(runtimeCapability, repoId)
   assertWorkspaceRuntimeRegistrationActive(runtimeRegistration)
   if (!capture.ok) {
     if (closeWorkspaceRuntimeAdmissionForFailure(runtimeRegistration, capture.error)) throw capture.error
@@ -519,6 +520,7 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
     group,
     operation,
     async () => {
+      assertRepoWriteRuntimeCapability(runtimeCapability, repoId)
       const admissionError = workspaceRuntimeRegistrationClosedError(runtimeRegistration)
       if (admissionError) {
         operation.settle({ ok: false, message: admissionError.message })
@@ -534,6 +536,11 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
     },
     signal,
   )
+}
+
+function assertRepoWriteRuntimeCapability(capability: WorkspaceRuntimeEpochCapability, repoId: WorkspaceId): void {
+  if (capability.workspaceId !== repoId) throw new Error('repository write runtime capability scope mismatch')
+  capability.assertCurrent()
 }
 
 export async function listRepoWriteOperationsForRepo(

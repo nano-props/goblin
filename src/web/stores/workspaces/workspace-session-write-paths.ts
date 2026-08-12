@@ -5,7 +5,6 @@ import { requestInitialRepoSnapshotLoad, requestRepoSnapshotRefresh } from '#/we
 import { closeWorkspaceRuntime, openWorkspaceRuntime, openWorkspaceRuntimeForInput } from '#/web/workspace-client.ts'
 import { addWorkspaceToSession, recordRecentWorkspace, removeWorkspaceFromSession } from '#/web/settings-actions.ts'
 import {
-  invalidateWorkspaceRuntimes,
   removeWorkspaceRuntimeFromCache,
   refreshWorkspaceRuntimes,
   updateWorkspaceRuntimeCache,
@@ -41,6 +40,7 @@ import {
   type ResolvedWorkspace,
 } from '#/web/stores/workspaces/workspace-session-state.ts'
 import { runWorkspaceRuntimeMembershipCommand } from '#/web/stores/workspaces/workspace-runtime-membership-scheduler.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 export interface RuntimeOpenResolvedWorkspace {
   input: string
@@ -135,9 +135,6 @@ async function closeWorkspaceRuntimeWithCacheNow(workspaceId: WorkspaceId, works
     const released = await closeWorkspaceRuntime(workspaceId, workspaceRuntimeId)
     if (released) await removeWorkspaceRuntimeFromCache({ workspaceId, workspaceRuntimeId })
     else await refreshWorkspaceRuntimes()
-  } catch (err) {
-    await refreshWorkspaceRuntimes()
-    throw err
   } finally {
     clearWorkspacePaneTabsProjectionState(workspaceId, workspaceRuntimeId)
     disposeRepoRuntimeReadState(workspaceId, workspaceRuntimeId)
@@ -162,7 +159,7 @@ async function runWorkspaceCommand<T>(workspaceKey: string, command: () => Promi
   }
 }
 
-async function rollbackNewWorkspace(
+async function discardRejectedRemoteWorkspaceOpen(
   set: WorkspacesSet,
   get: WorkspacesGet,
   workspaceId: WorkspaceId,
@@ -179,48 +176,31 @@ async function rollbackNewWorkspace(
   try {
     await closeWorkspaceRuntimeWithCache(workspaceId, workspaceRuntimeId)
   } catch (err) {
-    workspacesLog.warn('failed to release workspace runtime after workspace membership write failed', {
+    workspacesLog.warn('failed to release workspace runtime after rejected workspace membership write', {
       workspaceId,
       workspaceRuntimeId,
       err,
     })
-    try {
-      await invalidateWorkspaceRuntimes()
-    } catch (refreshErr) {
-      workspacesLog.warn('failed to refresh workspace runtimes after workspace open rollback', {
-        workspaceId,
-        workspaceRuntimeId,
-        err: refreshErr,
-      })
-    }
   }
 }
 
-type WorkspaceMembershipWriteResult = { ok: true } | { ok: false; error: unknown }
+type WorkspaceMembershipWriteOutcome = 'committed' | 'uncertain'
 
-async function addWorkspaceMembershipResult(entry: WorkspaceSessionEntry): Promise<WorkspaceMembershipWriteResult> {
+async function addWorkspaceMembership(entry: WorkspaceSessionEntry): Promise<WorkspaceMembershipWriteOutcome> {
   try {
     await addWorkspaceToSession(entry)
-    return { ok: true }
+    return 'committed'
   } catch (error) {
-    return { ok: false, error }
+    if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) return 'uncertain'
+    throw error
   }
 }
 
-async function removeWorkspaceMembershipResult(workspaceId: WorkspaceId): Promise<WorkspaceMembershipWriteResult> {
-  try {
-    await removeWorkspaceFromSession(workspaceId)
-    return { ok: true }
-  } catch (error) {
-    return { ok: false, error }
-  }
-}
-
-async function releaseUncommittedWorkspaceRuntime(workspaceId: WorkspaceId, workspaceRuntimeId: string): Promise<void> {
+async function releaseRejectedWorkspaceRuntime(workspaceId: WorkspaceId, workspaceRuntimeId: string): Promise<void> {
   try {
     await closeWorkspaceRuntimeWithCacheNow(workspaceId, workspaceRuntimeId)
   } catch (err) {
-    workspacesLog.warn('failed to release uncommitted workspace runtime', { workspaceId, workspaceRuntimeId, err })
+    workspacesLog.warn('failed to release rejected workspace runtime', { workspaceId, workspaceRuntimeId, err })
   }
 }
 
@@ -230,6 +210,9 @@ async function recordRecentWorkspacePostOpen(workspace: WorkspaceSessionEntry): 
     return []
   } catch (err) {
     workspacesLog.warn('failed to record recent workspace after opening workspace', { workspace, err })
+    if (hasErrorCode(err, 'OUTCOME_UNCERTAIN')) {
+      return [{ kind: 'operation-outcome-uncertain', message: 'error.operation-outcome-uncertain' }]
+    }
     return [
       { kind: 'recent-workspace', message: err instanceof Error ? err.message : 'workspace-picker.recent-save-failed' },
     ]
@@ -243,6 +226,25 @@ export function refreshInitialWorkspaceState(set: WorkspacesSet, get: Workspaces
   void requestInitialRepoSnapshotLoad({ get, set }, refresh.id, {
     workspaceRuntimeId: refresh.workspaceRuntimeId,
   })
+}
+
+function projectResolvedWorkspaceIntoSession(
+  set: WorkspacesSet,
+  workspace: ResolvedWorkspace,
+  workspaceRuntimeId: string,
+): InitialWorkspaceRefresh | null {
+  const initialRefreshRef: { current: InitialWorkspaceRefresh | null } = { current: null }
+  set((state) => {
+    const { workspaces, workspaceOrder, changed } = addResolvedWorkspace(state, workspace, workspaceRuntimeId)
+    if (changed) {
+      initialRefreshRef.current = {
+        id: workspace.id,
+        workspaceRuntimeId: workspaces[workspace.id]!.workspaceRuntimeId,
+      }
+    }
+    return changed ? { workspaces, workspaceOrder } : state
+  })
+  return initialRefreshRef.current
 }
 
 export function createWorkspaceLifecycleActions(set: WorkspacesSet, get: WorkspacesGet): WorkspaceMembershipActions {
@@ -266,9 +268,10 @@ export function createWorkspaceLifecycleActions(set: WorkspacesSet, get: Workspa
       const outcome = await runRemoteWorkspaceConnection(set, get, workspace.id, { mode: 'restart' })
       if (!outcome) return null
       if (outcome.kind === 'superseded' || outcome.kind === 'stale-runtime' || outcome.kind === 'cancelled') return null
-      if (outcome.kind === 'transport-failed') return { ok: false, reason: outcome.reason }
+      if (outcome.kind === 'outcome-uncertain') return { ok: false, kind: 'uncertain' }
+      if (outcome.kind === 'transport-failed') return { ok: false, kind: 'failed', reason: outcome.reason }
       if (outcome.kind === 'ready') return { ok: true }
-      return { ok: false, reason: outcome.reason ?? 'unknown' }
+      return { ok: false, kind: 'failed', reason: outcome.reason ?? 'unknown' }
     },
   }
 }
@@ -278,41 +281,48 @@ async function openLocalWorkspace(
   get: WorkspacesGet,
   workspaceInput: string,
 ): Promise<OpenWorkspaceResult> {
-  const initialRefreshRef: { current: InitialWorkspaceRefresh | null } = { current: null }
-  const resolved = await runWorkspaceRuntimeMembershipCommand(workspaceInput, async () => {
+  const prepared = await runWorkspaceRuntimeMembershipCommand(workspaceInput, async () => {
     const opened = await openLocalWorkspaceRuntimeForCommandInput(workspaceInput)
-    if (!opened.workspace || !opened.workspaceRuntimeId) return opened
+    if (!opened.workspace || !opened.workspaceRuntimeId) {
+      return { kind: 'rejected' as const, message: opened.reason ?? 'error.workspace-open-failed' }
+    }
     const workspace = opened.workspace
     const workspaceRuntimeId = opened.workspaceRuntimeId
     const workspaceEntry = workspace.target ? remoteWorkspaceSessionEntry(workspace.target) : { id: workspace.id }
-    const membership = await addWorkspaceMembershipResult(workspaceEntry)
-    if (!membership.ok) {
+    let membershipOutcome: WorkspaceMembershipWriteOutcome
+    try {
+      membershipOutcome = await addWorkspaceMembership(workspaceEntry)
+    } catch (error) {
       workspacesLog.warn('failed to add local workspace to server workspace', {
         workspaceId: workspace.id,
-        err: membership.error,
+        err: error,
       })
-      await releaseUncommittedWorkspaceRuntime(workspace.id, workspaceRuntimeId)
-      return { ...opened, reason: 'error.workspace-open-failed', workspace: null, workspaceRuntimeId: null }
+      await releaseRejectedWorkspaceRuntime(workspace.id, workspaceRuntimeId)
+      return { kind: 'rejected' as const, message: 'error.workspace-open-failed' }
     }
-    set((state) => {
-      const { workspaces, workspaceOrder, changed } = addResolvedWorkspace(state, workspace, workspaceRuntimeId)
-      if (changed)
-        initialRefreshRef.current = {
-          id: workspace.id,
-          workspaceRuntimeId: workspaces[workspace.id]!.workspaceRuntimeId,
-        }
-      return changed ? { workspaces, workspaceOrder } : state
-    })
-    return opened
+    const initialRefresh = projectResolvedWorkspaceIntoSession(set, workspace, workspaceRuntimeId)
+    return membershipOutcome === 'uncertain'
+      ? { kind: 'uncertain' as const, workspaceId: workspace.id }
+      : { kind: 'prepared' as const, workspace, initialRefresh }
   })
-  if (!resolved.workspace || !resolved.workspaceRuntimeId) {
-    return { ok: false, message: resolved.reason ?? 'error.workspace-open-failed' }
+  if (prepared.kind === 'rejected') return { ok: false, kind: 'failed', message: prepared.message }
+  if (prepared.kind === 'uncertain') {
+    return {
+      ok: false,
+      kind: 'uncertain',
+      workspaceId: prepared.workspaceId,
+      message: 'error.operation-outcome-uncertain',
+    }
   }
-  if (initialRefreshRef.current) refreshInitialWorkspaceState(set, get, initialRefreshRef.current)
-  const recentEntry = resolved.workspace.target
-    ? remoteWorkspaceSessionEntry(resolved.workspace.target)
-    : localWorkspaceSessionEntry(resolved.workspace.id)
-  return { ok: true, workspaceId: resolved.workspace.id, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
+  if (prepared.initialRefresh) refreshInitialWorkspaceState(set, get, prepared.initialRefresh)
+  const recentEntry = prepared.workspace.target
+    ? remoteWorkspaceSessionEntry(prepared.workspace.target)
+    : localWorkspaceSessionEntry(prepared.workspace.id)
+  return {
+    ok: true,
+    workspaceId: prepared.workspace.id,
+    postOpenEffects: recordRecentWorkspacePostOpen(recentEntry),
+  }
 }
 
 async function openRemoteWorkspace(
@@ -340,27 +350,53 @@ async function openRemoteWorkspace(
     }
     const workspaceRuntimeId = get().workspaces[entry.id]?.workspaceRuntimeId ?? null
     if (!workspaceRuntimeId) return null
-    const membership = await addWorkspaceMembershipResult(entry)
-    if (!membership.ok) {
-      if (openedWorkspaceRuntimeId) await rollbackNewWorkspace(set, get, entry.id, openedWorkspaceRuntimeId)
+    let membershipOutcome: WorkspaceMembershipWriteOutcome
+    try {
+      membershipOutcome = await addWorkspaceMembership(entry)
+    } catch (error) {
+      if (openedWorkspaceRuntimeId) {
+        await discardRejectedRemoteWorkspaceOpen(set, get, entry.id, openedWorkspaceRuntimeId)
+      }
       workspacesLog.warn('failed to add remote workspace to server workspace', {
         workspaceId: entry.id,
-        err: membership.error,
+        err: error,
       })
       return null
     }
-    return { workspaceRuntimeId }
+    return membershipOutcome === 'uncertain'
+      ? { kind: 'uncertain' as const, workspaceId: entry.id }
+      : { kind: 'prepared' as const, workspaceRuntimeId }
   })
-  if (!prepared) return { ok: false, message: 'error.workspace-open-failed' }
+  if (!prepared) return { ok: false, kind: 'failed', message: 'error.workspace-open-failed' }
+  if (prepared.kind === 'uncertain') {
+    return {
+      ok: false,
+      kind: 'uncertain',
+      workspaceId: prepared.workspaceId,
+      message: 'error.operation-outcome-uncertain',
+    }
+  }
 
   const outcome = await runRemoteWorkspaceConnection(set, get, entry.id, {
     workspaceRuntimeId: prepared.workspaceRuntimeId,
   })
+  if (outcome?.kind === 'outcome-uncertain') {
+    return {
+      ok: false,
+      kind: 'uncertain',
+      workspaceId: entry.id,
+      message: 'error.operation-outcome-uncertain',
+    }
+  }
   if (get().workspaces[entry.id]?.workspaceRuntimeId !== prepared.workspaceRuntimeId) {
-    return { ok: false, message: 'error.workspace-open-failed' }
+    return { ok: false, kind: 'failed', message: 'error.workspace-open-failed' }
   }
   const recentEntry = outcome?.kind === 'ready' ? remoteWorkspaceSessionEntry(outcome.target) : entry
-  return { ok: true, workspaceId: entry.id, postOpenEffects: recordRecentWorkspacePostOpen(recentEntry) }
+  return {
+    ok: true,
+    workspaceId: entry.id,
+    postOpenEffects: recordRecentWorkspacePostOpen(recentEntry),
+  }
 }
 
 async function closeWorkspaceMembership(
@@ -369,12 +405,15 @@ async function closeWorkspaceMembership(
   workspaceId: WorkspaceId,
 ): Promise<CloseWorkspaceResult> {
   const workspace = get().workspaces[workspaceId]
-  if (!workspace) return { ok: false, message: 'error.workspace-close-failed' }
+  if (!workspace) return { ok: false, kind: 'failed', message: 'error.workspace-close-failed' }
   const workspaceRuntimeId = workspace.workspaceRuntimeId
-  const membership = await removeWorkspaceMembershipResult(workspaceId)
-  if (!membership.ok) {
-    workspacesLog.warn('failed to remove workspace from server session', { workspaceId, err: membership.error })
-    return { ok: false, message: 'error.workspace-close-failed' }
+  try {
+    await removeWorkspaceFromSession(workspaceId)
+  } catch (error) {
+    workspacesLog.warn('failed to remove workspace from server session', { workspaceId, err: error })
+    return hasErrorCode(error, 'OUTCOME_UNCERTAIN')
+      ? { ok: false, kind: 'uncertain', message: 'error.operation-outcome-uncertain' }
+      : { ok: false, kind: 'failed', message: 'error.workspace-close-failed' }
   }
   cancelWorkspaceCapabilityRefreshes(workspaceId, workspaceRuntimeId)
   disposeRepoOperationScheduler(workspaceId)
@@ -383,13 +422,6 @@ async function closeWorkspaceMembership(
     await closeWorkspaceRuntimeWithCache(workspace.id, workspaceRuntimeId)
   } catch (err) {
     workspacesLog.warn('failed to close workspace runtime', { workspaceId, workspaceRuntimeId, err })
-    void invalidateWorkspaceRuntimes().catch((refreshErr) => {
-      workspacesLog.warn('failed to refresh workspace runtime membership after close failure', {
-        workspaceId,
-        workspaceRuntimeId,
-        err: refreshErr,
-      })
-    })
   }
   return { ok: true }
 }

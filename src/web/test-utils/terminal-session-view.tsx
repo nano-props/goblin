@@ -200,7 +200,7 @@ export async function renderTerminalSession(
     scrollToBottom: vi.fn(),
     readCopyText: vi.fn(() => null),
     clearBell: vi.fn(() => false),
-    closeTerminalByDescriptor: vi.fn(async () => true),
+    closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const })),
     attach: vi.fn(),
     detach: vi.fn(),
     restart: vi.fn(),
@@ -250,6 +250,8 @@ export async function renderTerminalSession(
     subscribeTerminalFilesystemTarget: () => () => {},
     workspaceBellCount: () => 0,
     subscribeWorkspaceBellCount: () => () => {},
+    workspaceTerminalSessions: () => [],
+    subscribeWorkspaceTerminalSessions: () => () => {},
     snapshot: () => snapshot,
     subscribeSnapshot: (_terminalSessionId, listener) => {
       snapshotListeners.add(listener)

@@ -4,7 +4,7 @@
 // this file aggregates what crosses process/transport boundaries.
 
 import * as v from 'valibot'
-import { IpcError } from '#/shared/ipc-error.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
   BranchSnapshotInfo,
@@ -163,10 +163,8 @@ export interface WorkspaceSettingsState {
 export interface SettingsSnapshot
   extends RuntimeSettingsSnapshot, RuntimeRecentWorkspacesState, WorkspaceSettingsState {}
 
-export interface GlobalShortcutState {
-  accelerator: string
-  registered: boolean
-}
+export type SetGlobalShortcutResult =
+  { kind: 'projected'; accelerator: string; registered: boolean } | { kind: 'committed-projection-failed' }
 
 export interface GitHubCliState {
   available: boolean
@@ -347,24 +345,17 @@ export interface IpcRequest {
 }
 
 /** Response envelope for the native Electron bridge IPC layer. */
-export type IpcResponse =
-  { ok: true; data: unknown } | { ok: false; error: { message: string; code?: string; name?: string } }
+export interface IpcResponseError {
+  message: string
+  code?: string
+  name?: string
+}
 
-export type I18nChangedEvent = { type: 'i18n-changed'; snapshot: I18nSnapshot }
-
-/** Events pushed from the native Electron bridge to the client. */
-export type IpcEvent =
-  | { type: 'fetch-interval-changed'; sec: number }
-  | { type: 'terminal-notifications-changed'; enabled: boolean }
-  | { type: 'shortcuts-disabled-changed'; disabled: boolean }
-  | { type: 'global-shortcut-disabled-changed'; disabled: boolean }
-  | { type: 'github-cli-changed'; state: GitHubCliState }
-  | { type: 'settings-write-error'; message: string }
-  | I18nChangedEvent
+export type IpcResponse = { ok: true; data: unknown } | { ok: false; error: IpcResponseError }
 
 export interface NativeHostSettingsIpcHandlers {
   settings: {
-    setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
+    setGlobalShortcut: (input: { accelerator: string }) => Promise<SetGlobalShortcutResult>
   }
 }
 
@@ -383,7 +374,7 @@ type IpcInputSchema<TInput> = v.BaseSchema<unknown, TInput, v.BaseIssue<unknown>
 
 function parseIpcInput<TInput>(schema: IpcInputSchema<TInput>, input: unknown): TInput {
   const parsed = v.safeParse(schema, input)
-  if (!parsed.success) throw new IpcError({ code: 'BAD_REQUEST', message: 'Invalid IPC input' })
+  if (!parsed.success) throw new CodedError({ code: 'BAD_REQUEST', message: 'Invalid IPC input' })
   return parsed.output
 }
 

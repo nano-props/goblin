@@ -1,6 +1,7 @@
 import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { normalizeRemoteTarget, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import type { RemoteWorkspaceTargetInput } from '#/shared/remote-workspace.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
@@ -15,6 +16,8 @@ import { addResolvedWorkspace, insertPlaceholderWorkspace } from '#/web/stores/w
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
+import { CodedError } from '#/shared/coded-error.ts'
+import { ServerRequestError } from '#/web/lib/server-fetch.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -26,16 +29,25 @@ import {
 
 beforeEach(resetLifecycleTest)
 
+function remoteTargetForTest(input: RemoteWorkspaceTargetInput) {
+  const target = normalizeRemoteTarget(input)
+  if (!target) throw new Error('expected normalized remote target')
+  return target
+}
+
+function standardRemoteTargetForTest() {
+  return remoteTargetForTest({
+    alias: 'example',
+    host: 'example.com',
+    user: 'developer',
+    port: 22,
+    remotePath: '/srv/repo',
+  })
+}
+
 describe('repo lifecycle', () => {
   test('creates a remote placeholder before its lifecycle resolves', () => {
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.com',
-      user: 'developer',
-      port: 22,
-      remotePath: '/srv/repo',
-    })
-    if (!target) throw new Error('expected normalized remote target')
+    const target = standardRemoteTargetForTest()
 
     const result = insertPlaceholderWorkspace(
       { workspaces: {}, workspaceOrder: [] },
@@ -47,14 +59,13 @@ describe('repo lifecycle', () => {
   })
 
   test('accepts a capability change for an unchanged ready remote target', () => {
-    const target = normalizeRemoteTarget({
+    const target = remoteTargetForTest({
       alias: 'example',
       host: 'example.test',
       user: 'developer',
       port: 22,
       remotePath: '/workspace',
     })
-    if (!target) throw new Error('expected normalized remote target')
     const workspaceRuntimeId = 'workspace-runtime-test'
     const workspace = emptyWorkspace(target.id, workspaceRuntimeId)
     workspace.session = { entry: remoteWorkspaceSessionEntry(target), projectionState: 'projected' }
@@ -130,22 +141,43 @@ describe('repo lifecycle', () => {
   test('openWorkspaceMembership rolls back a newly opened runtime when shared membership persistence fails', async () => {
     installGoblin({
       'settings.addWorkspaceEntry': () => {
-        throw new Error('workspace write failed')
+        throw new ServerRequestError({ status: 500, message: 'workspace write failed' })
       },
     })
 
     await expect(workspacesStore.getState().openWorkspaceMembership(REPO_A)).resolves.toEqual({
       ok: false,
+      kind: 'failed',
       message: 'error.workspace-open-failed',
     })
     expect(workspacesStore.getState().workspaces[REPO_A]).toBeUndefined()
     expect(workspacesStore.getState().workspaceOrder).not.toContain(REPO_A)
   })
 
+  test('preserves an opened runtime but rejects admission when membership persistence is uncertain', async () => {
+    const calls = installGoblin({
+      'settings.addWorkspaceEntry': () => {
+        throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'workspace write outcome uncertain' })
+      },
+    })
+
+    const result = await workspacesStore.getState().openWorkspaceMembership(REPO_A)
+
+    expect(result).toEqual({
+      ok: false,
+      kind: 'uncertain',
+      workspaceId: REPO_A,
+      message: 'error.operation-outcome-uncertain',
+    })
+    expect(workspacesStore.getState().workspaces[REPO_A]).toBeDefined()
+    expect(workspacesStore.getState().workspaceOrder).toContain(REPO_A)
+    expect(calls.recent).toEqual([])
+  })
+
   test('closeWorkspace keeps local state when shared membership persistence fails', async () => {
     installGoblin({
       'settings.removeWorkspaceEntry': () => {
-        throw new Error('workspace write failed')
+        throw new ServerRequestError({ status: 500, message: 'workspace write failed' })
       },
     })
     await expect(workspacesStore.getState().openWorkspaceMembership(REPO_A)).resolves.toMatchObject({ ok: true })
@@ -153,11 +185,29 @@ describe('repo lifecycle', () => {
 
     await expect(workspacesStore.getState().closeWorkspace(REPO_A)).resolves.toEqual({
       ok: false,
+      kind: 'failed',
       message: 'error.workspace-close-failed',
     })
 
     expect(workspacesStore.getState().workspaces[REPO_A]?.workspaceRuntimeId).toBe(workspaceRuntimeId)
     expect(workspacesStore.getState().workspaceOrder).toContain(REPO_A)
+  })
+
+  test('stops workspace close when membership removal outcome is uncertain', async () => {
+    installGoblin({
+      'settings.removeWorkspaceEntry': () => {
+        throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'workspace write outcome uncertain' })
+      },
+    })
+    await expect(workspacesStore.getState().openWorkspaceMembership(REPO_A)).resolves.toMatchObject({ ok: true })
+
+    await expect(workspacesStore.getState().closeWorkspace(REPO_A)).resolves.toEqual({
+      ok: false,
+      kind: 'uncertain',
+      message: 'error.operation-outcome-uncertain',
+    })
+
+    expect(workspacesStore.getState().workspaces[REPO_A]).toBeDefined()
   })
 
   test('closing a filesystem workspace does not enter the Git operation lifecycle', async () => {
@@ -239,7 +289,7 @@ describe('repo lifecycle', () => {
   test('openWorkspaceMembership reports recent-history write failures without rolling back the opened repo', async () => {
     installGoblin({
       'settings.addRecentWorkspace': () => {
-        throw new Error('recent write failed')
+        throw new ServerRequestError({ status: 500, message: 'recent write failed' })
       },
     })
 
@@ -423,36 +473,28 @@ describe('repo lifecycle', () => {
   })
 
   test('openWorkspaceMembership preserves remote target metadata for recent repos and later actions', async () => {
-    const target = normalizeRemoteTarget({
+    const target = remoteTargetForTest({
       alias: 'example',
       host: 'example.com',
       user: 'alice',
       port: 22,
       remotePath: '/srv/repo',
     })
-    expect(target).not.toBeNull()
     const calls = installGoblin()
 
-    const result = await workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target!))
+    const result = await workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target))
     if (result.ok) await result.postOpenEffects
 
-    expect(result).toMatchObject({ ok: true, workspaceId: target!.id })
-    expect(requireRemoteAdmissionForTest(workspacesStore.getState().workspaces[target!.id]).lifecycle).toEqual({
+    expect(result).toMatchObject({ ok: true, workspaceId: target.id })
+    expect(requireRemoteAdmissionForTest(workspacesStore.getState().workspaces[target.id]).lifecycle).toEqual({
       kind: 'ready',
       target,
     })
-    expect(calls.recent).toEqual([remoteWorkspaceSessionEntry(target!)])
+    expect(calls.recent).toEqual([remoteWorkspaceSessionEntry(target)])
   })
 
   test('keeps a remote workspace open when lifecycle transport is temporarily unavailable', async () => {
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.com',
-      user: 'developer',
-      port: 22,
-      remotePath: '/srv/repo',
-    })
-    expect(target).not.toBeNull()
+    const target = standardRemoteTargetForTest()
     const calls = installGoblin({
       'remote.lifecycle': () => {
         throw new Error('offline')
@@ -460,24 +502,59 @@ describe('repo lifecycle', () => {
     })
 
     await expect(
-      workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target!)),
+      workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target)),
     ).resolves.toMatchObject({
       ok: true,
-      workspaceId: target!.id,
+      workspaceId: target.id,
     })
-    expect(calls.workspaceEntries).toEqual([remoteWorkspaceSessionEntry(target!)])
-    expect(workspacesStore.getState().workspaces[target!.id]).toBeDefined()
+    expect(calls.workspaceEntries).toEqual([remoteWorkspaceSessionEntry(target)])
+    expect(workspacesStore.getState().workspaces[target.id]).toBeDefined()
+  })
+
+  test('stops remote open automation when lifecycle command outcome is uncertain', async () => {
+    const target = standardRemoteTargetForTest()
+    const calls = installGoblin({
+      'remote.lifecycle': () => {
+        throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'remote lifecycle outcome uncertain' })
+      },
+    })
+
+    await expect(
+      workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target)),
+    ).resolves.toEqual({
+      ok: false,
+      kind: 'uncertain',
+      workspaceId: target.id,
+      message: 'error.operation-outcome-uncertain',
+    })
+    expect(workspacesStore.getState().workspaces[target.id]).toBeDefined()
+    expect(calls.recent).toEqual([])
+  })
+
+  test('stops remote admission after an uncertain membership write', async () => {
+    const target = standardRemoteTargetForTest()
+    const lifecycle = vi.fn()
+    installGoblin({
+      'settings.addWorkspaceEntry': () => {
+        throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'workspace write outcome uncertain' })
+      },
+      'remote.lifecycle': lifecycle,
+    })
+
+    await expect(
+      workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target)),
+    ).resolves.toEqual({
+      ok: false,
+      kind: 'uncertain',
+      workspaceId: target.id,
+      message: 'error.operation-outcome-uncertain',
+    })
+    expect(lifecycle).not.toHaveBeenCalled()
+    expect(workspacesStore.getState().workspaces[target.id]).toBeDefined()
   })
 
   test('does not resurrect a remote repo closed during lifecycle probing', async () => {
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.com',
-      user: 'developer',
-      port: 22,
-      remotePath: '/srv/repo',
-    })
-    expect(target).not.toBeNull()
+    const target = standardRemoteTargetForTest()
     const lifecycle = Promise.withResolvers<{
       kind: 'settled'
       workspaceId: string
@@ -494,13 +571,13 @@ describe('repo lifecycle', () => {
     }>()
     const calls = installGoblin({ 'remote.lifecycle': () => lifecycle.promise })
 
-    const opening = workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target!))
-    await vi.waitFor(() => expect(calls.workspaceEntries).toEqual([remoteWorkspaceSessionEntry(target!)]))
-    await expect(workspacesStore.getState().closeWorkspace(target!.id)).resolves.toEqual({ ok: true })
+    const opening = workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target))
+    await vi.waitFor(() => expect(calls.workspaceEntries).toEqual([remoteWorkspaceSessionEntry(target)]))
+    await expect(workspacesStore.getState().closeWorkspace(target.id)).resolves.toEqual({ ok: true })
     lifecycle.resolve({
       kind: 'settled',
-      workspaceId: target!.id,
-      lifecycle: { kind: 'ready', attemptId: 1, target: target! },
+      workspaceId: target.id,
+      lifecycle: { kind: 'ready', attemptId: 1, target },
       workspaceProbe: {
         status: 'ready',
         capabilities: {
@@ -512,50 +589,42 @@ describe('repo lifecycle', () => {
       },
     })
 
-    await expect(opening).resolves.toEqual({ ok: false, message: 'error.workspace-open-failed' })
+    await expect(opening).resolves.toEqual({ ok: false, kind: 'failed', message: 'error.workspace-open-failed' })
     expect(calls.workspaceEntries).toEqual([])
-    expect(workspacesStore.getState().workspaces[target!.id]).toBeUndefined()
+    expect(workspacesStore.getState().workspaces[target.id]).toBeUndefined()
   })
 
   test('retryRemoteWorkspaceConnection returns a failure when the command transport fails', async () => {
-    const target = normalizeRemoteTarget({
-      alias: 'example',
-      host: 'example.com',
-      user: 'developer',
-      port: 22,
-      remotePath: '/srv/repo',
-    })
-    expect(target).not.toBeNull()
+    const target = standardRemoteTargetForTest()
     installGoblin({
       'remote.lifecycle': () => {
         throw new Error('offline')
       },
     })
-    await workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target!))
+    await workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(target))
 
-    await expect(workspacesStore.getState().retryRemoteWorkspaceConnection(target!.id)).resolves.toEqual({
+    await expect(workspacesStore.getState().retryRemoteWorkspaceConnection(target.id)).resolves.toEqual({
       ok: false,
+      kind: 'failed',
       reason: 'unknown',
     })
   })
 
   test('openWorkspaceMembership refreshes when a remote target changes between opens', async () => {
-    const oldTarget = normalizeRemoteTarget({
+    const oldTarget = remoteTargetForTest({
       alias: 'example',
       host: 'example.com',
       user: 'alice',
       port: 22,
       remotePath: '/srv/repo',
     })
-    const newTarget = normalizeRemoteTarget({
+    const newTarget = remoteTargetForTest({
       alias: 'example',
       host: 'example.org',
       user: 'alice',
       port: 22,
       remotePath: '/srv/repo',
     })
-    expect(oldTarget).not.toBeNull()
-    expect(newTarget).not.toBeNull()
 
     // The default IPC mock hardcodes the host by alias, so a same-alias
     // re-open would never see a target change. Override resolveTarget
@@ -568,9 +637,9 @@ describe('repo lifecycle', () => {
       },
     })
 
-    const first = await workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(oldTarget!))
-    expect(first).toMatchObject({ ok: true, workspaceId: oldTarget!.id })
-    expect(requireRemoteAdmissionForTest(workspacesStore.getState().workspaces[oldTarget!.id]).lifecycle).toEqual({
+    const first = await workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(oldTarget))
+    expect(first).toMatchObject({ ok: true, workspaceId: oldTarget.id })
+    expect(requireRemoteAdmissionForTest(workspacesStore.getState().workspaces[oldTarget.id]).lifecycle).toEqual({
       kind: 'ready',
       target: oldTarget,
     })
@@ -581,14 +650,14 @@ describe('repo lifecycle', () => {
     const calls = installGoblin({
       'remote.resolveTarget': () => ({ target: newTarget }),
     })
-    const second = await workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(newTarget!))
-    expect(second).toMatchObject({ ok: true, workspaceId: newTarget!.id })
-    expect(requireRemoteAdmissionForTest(workspacesStore.getState().workspaces[newTarget!.id]).lifecycle).toEqual({
+    const second = await workspacesStore.getState().openWorkspaceMembership(remoteWorkspaceSessionEntry(newTarget))
+    expect(second).toMatchObject({ ok: true, workspaceId: newTarget.id })
+    expect(requireRemoteAdmissionForTest(workspacesStore.getState().workspaces[newTarget.id]).lifecycle).toEqual({
       kind: 'ready',
       target: newTarget,
     })
     await vi.waitFor(() => {
-      expect(calls.snapshot).toEqual([newTarget!.id])
+      expect(calls.snapshot).toEqual([newTarget.id])
     })
   })
 

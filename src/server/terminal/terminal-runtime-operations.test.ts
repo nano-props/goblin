@@ -23,7 +23,7 @@ import {
 
 describe('server terminal runtime operations', () => {
   test('serializes concurrent primary creates for the same worktree', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
 
     const first = createLocalWorktreeTerminal(host, 'client_a', USER_1, 'primary')
     const second = createLocalWorktreeTerminal(host, 'client_b', USER_1, 'primary')
@@ -45,7 +45,7 @@ describe('server terminal runtime operations', () => {
   })
 
   test('reopening a prepared terminal preserves its unbound state until attach', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const browserSocket = appRealtimeSocket()
     host.registerSocket('client_browser', USER_1, browserSocket)
 
@@ -95,7 +95,7 @@ describe('server terminal runtime operations', () => {
     vi.mocked(spawn).mockImplementationOnce(() => {
       throw new Error('pty spawn failed')
     })
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
     socket.send.mockClear()
@@ -218,7 +218,7 @@ describe('server terminal runtime operations', () => {
   })
 
   test('a viewer cannot restart a session it does not control', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socketA = appRealtimeSocket()
     const socketB = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socketA)
@@ -258,7 +258,7 @@ describe('server terminal runtime operations', () => {
   })
 
   test('runtime-open returns prepared terminal metadata and canonical tabs without starting a PTY', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
     setMockDataToEmitOnRegistration('during-runtime-open')
@@ -322,7 +322,7 @@ describe('server terminal runtime operations', () => {
   })
 
   test('runtime-close resolves durable terminal identity on the server and returns a canonical snapshot', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
     const opened = await requestWorkspacePaneRuntime(
@@ -418,7 +418,7 @@ describe('server terminal runtime operations', () => {
         },
       ]
     }
-    const { host, shutdown } = buildRuntime({ captureTargets })
+    const { host, shutdown } = await buildRuntime({ captureTargets })
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
     const opened = await requestWorkspacePaneRuntime(
@@ -467,7 +467,7 @@ describe('server terminal runtime operations', () => {
   })
 
   test('rejects terminal IPC calls from untrusted senders', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const result = await createAdmittedTerminal(host, 'client_with_$pecial!chars' as never, USER_1, {
       repoRoot: REPO_ROOT,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -480,7 +480,7 @@ describe('server terminal runtime operations', () => {
   })
 
   test('takeover returns authoritative controller snapshot from the server', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socketA = appRealtimeSocket()
     const socketB = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socketA)
@@ -513,7 +513,7 @@ describe('server terminal runtime operations', () => {
   })
 
   test('realtime takeover injects the socket clientId so viewer tabs can take control', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socketA = appRealtimeSocket()
     const socketB = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socketA)

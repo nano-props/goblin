@@ -5,6 +5,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { describe, expect, test } from 'vitest'
 import {
+  clientEffectIntentRequiresWorkspaceBootstrap,
   createAppLevelIntentPlan,
   createExternalOpenDrainKickPlan,
   createTerminalBellIntentPlan,
@@ -13,7 +14,6 @@ import {
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import type { BranchSnapshotInfo, WorktreeStatus } from '#/shared/git-types.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
@@ -106,13 +106,7 @@ describe('client effect intent plans', () => {
       },
     })
 
-    expect(plan).toEqual({
-      kind: 'show-worktree-terminal',
-      workspaceId: repo.id,
-      branch: 'feature/test',
-      terminalSessionId: 'term-222222222222222222222',
-      terminalFilesystemTargetKey: formatTerminalFilesystemTargetKeyForPath(GIT_WORKSPACE_ID, '/tmp/repo-feature'),
-    })
+    expect(plan).toEqual({ kind: 'show-terminal' })
   })
 
   test('creates a workspace-root terminal bell plan without a Git read model', () => {
@@ -126,11 +120,7 @@ describe('client effect intent plans', () => {
       },
     })
 
-    expect(plan).toEqual({
-      kind: 'show-workspace-root-terminal',
-      workspaceId,
-      terminalSessionId: 'term-111111111111111111111',
-    })
+    expect(plan).toEqual({ kind: 'show-terminal' })
   })
 
   test('keeps a Git main-worktree bell on its branch presentation', () => {
@@ -161,11 +151,7 @@ describe('client effect intent plans', () => {
       },
     })
 
-    expect(plan).toMatchObject({
-      kind: 'show-worktree-terminal',
-      workspaceId: repo.id,
-      branch: 'main',
-    })
+    expect(plan).toEqual({ kind: 'show-terminal' })
   })
 
   test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
@@ -210,12 +196,7 @@ describe('client effect intent plans', () => {
       },
     )
 
-    expect(plan).toEqual({
-      kind: 'show-detached-worktree-terminal',
-      workspaceId: DETACHED_WORKSPACE_ID,
-      worktreePath,
-      terminalSessionId: 'term-333333333333333333333',
-    })
+    expect(plan).toEqual({ kind: 'show-terminal' })
   })
 
   test('keeps detached presentation authoritative when the current catalog associates the path with a branch', () => {
@@ -245,7 +226,7 @@ describe('client effect intent plans', () => {
       },
     )
 
-    expect(plan).toMatchObject({ kind: 'show-detached-worktree-terminal', worktreePath })
+    expect(plan).toEqual({ kind: 'show-terminal' })
   })
 
   test('rejects bell identities from a stale Workspace runtime', () => {
@@ -671,5 +652,26 @@ describe('client effect intent plans', () => {
     expect(createExternalOpenDrainKickPlan({ disposed: false, draining: true })).toEqual({
       kind: 'schedule-rerun',
     })
+  })
+
+  test.each([
+    { type: 'open-settings-requested' as const, page: 'general' as const },
+    { type: 'theme-pref-set-requested' as const, pref: 'dark' as const },
+    { type: 'lang-pref-set-requested' as const, pref: 'ko' as const },
+    { type: 'open-workspace-path-requested' as const },
+    { type: 'clone-repo-requested' as const },
+    { type: 'open-remote-workspace-requested' as const },
+  ])('does not bind $type to workspace bootstrap', (intent) => {
+    expect(clientEffectIntentRequiresWorkspaceBootstrap(intent)).toBe(false)
+  })
+
+  test.each([
+    { type: 'terminal-new-tab-requested' as const },
+    { type: 'layout-reset-requested' as const },
+    { type: 'clear-recent-workspaces-requested' as const },
+    { type: 'open-workspace-requested' as const },
+    { type: 'external-open-enqueued' as const },
+  ])('keeps $type behind workspace bootstrap', (intent) => {
+    expect(clientEffectIntentRequiresWorkspaceBootstrap(intent)).toBe(true)
   })
 })

@@ -31,7 +31,7 @@ interface EmbeddedServerRuntime {
 
 type ServerChildProcess = ChildProcessByStdio<null, Readable, Readable>
 
-export type EmbeddedServerStopReason = 'app-quit' | 'access-token-rotation' | 'startup-failure'
+export type EmbeddedServerStopReason = 'app-quit' | 'startup-failure'
 
 interface EmbeddedServerProcessRecord {
   proc: ServerChildProcess

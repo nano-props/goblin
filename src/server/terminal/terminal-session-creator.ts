@@ -1,11 +1,12 @@
 import {
   terminalExecutionCoordinates,
+  type TerminalCreateFailure,
   type TerminalCreateInput,
-  type TerminalCreateResult,
 } from '#/shared/terminal-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type {
+  TerminalSessionAdmission,
   TerminalSessionEnsureInput,
   TerminalSessionEnsureResult,
 } from '#/server/terminal/terminal-session-ensurer.ts'
@@ -13,15 +14,14 @@ import type { createTerminalSessionCreateCoordinator } from '#/server/terminal/t
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 
 type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionCreateCoordinator>
-type TerminalCreateFailure = Extract<TerminalCreateResult, { ok: false }>
-export type ServerTerminalCreateResult =
-  | {
-      ok: true
-      terminalSessionId: string
-      terminalRuntimeSessionId: string
-      admission: Extract<TerminalSessionEnsureResult, { ok: true }>['admission']
-    }
-  | TerminalCreateFailure
+export interface ServerTerminalCreateSuccess {
+  ok: true
+  terminalSessionId: string
+  terminalRuntimeSessionId: string
+  admission: TerminalSessionAdmission
+}
+
+export type ServerTerminalCreateResult = ServerTerminalCreateSuccess | TerminalCreateFailure
 
 export type ServerTerminalCreateInput = TerminalCreateInput
 

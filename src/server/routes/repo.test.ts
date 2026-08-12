@@ -432,9 +432,13 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.failed-read-repo' })
-    expect(mocks.pullRepoBranch).toHaveBeenCalledWith(repoId, 'feature/work', undefined, expect.any(AbortSignal), {
-      workspaceRuntimeId,
-    })
+    expect(mocks.pullRepoBranch).toHaveBeenCalledWith(
+      repoId,
+      'feature/work',
+      expect.objectContaining({ workspaceId: repoId, workspaceRuntimeId }),
+      undefined,
+      expect.any(AbortSignal),
+    )
     expectRemoteRuntimeFailed(repoId, workspaceRuntimeId)
   })
 

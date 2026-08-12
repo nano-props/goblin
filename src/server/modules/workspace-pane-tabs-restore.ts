@@ -6,6 +6,7 @@ import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.t
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ServerWorkspaceMatchOutcome } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type { WorkspaceRuntimeMembershipCapability } from '#/server/modules/workspace-runtimes.ts'
 
 interface WorkspacePaneTabsRestoreInput {
   userId: string
@@ -14,12 +15,15 @@ interface WorkspacePaneTabsRestoreInput {
   signal?: AbortSignal
 }
 
-export async function projectWorkspacePaneTabsWithMembershipGuard(input: {
+type WorkspacePaneTabsRestoreWorkspace = RestoredWorkspaceRuntime & {
+  runtimeCapability: WorkspaceRuntimeMembershipCapability
+}
+
+export async function restoreWorkspacePaneTabsForMemberships(input: {
   restoreInput: WorkspacePaneTabsRestoreInput
-  workspaces: RestoredWorkspaceRuntime[]
+  workspaces: WorkspacePaneTabsRestoreWorkspace[]
   confirmMembership: () => Promise<ServerWorkspaceMatchOutcome>
   membershipPolicy: 'transaction-authoritative' | 'confirm-after-restore'
-  assertCurrent?: () => void
 }): Promise<
   | {
       matched: true
@@ -32,7 +36,6 @@ export async function projectWorkspacePaneTabsWithMembershipGuard(input: {
   for (;;) {
     const restored = await restoreWorkspacePaneTabsForWorkspaces(input.restoreInput, input.workspaces)
     if (restored.kind === 'restored') {
-      input.assertCurrent?.()
       input.restoreInput.signal?.throwIfAborted()
       if (input.membershipPolicy === 'confirm-after-restore') {
         const committed = await input.confirmMembership()
@@ -47,7 +50,7 @@ export async function projectWorkspacePaneTabsWithMembershipGuard(input: {
 
 async function restoreWorkspacePaneTabsForWorkspaces(
   input: WorkspacePaneTabsRestoreInput,
-  workspaces: RestoredWorkspaceRuntime[],
+  workspaces: WorkspacePaneTabsRestoreWorkspace[],
 ) {
   const snapshots: Array<{
     workspaceId: WorkspaceId
@@ -59,12 +62,16 @@ async function restoreWorkspacePaneTabsForWorkspaces(
     input.signal?.throwIfAborted()
     const admission = workspacePaneLayoutRestoreAdmission(workspace)
     if (admission.kind === 'deferred') continue
-    const result = await input.workspacePaneTabsHost.restoreTabs(input.userId, {
-      workspaceId: workspace.workspaceId,
-      workspaceRuntimeId: workspace.workspaceRuntimeId,
-      expectedWorkspaceEntry: workspace.entry,
-      targets: admission.targets,
-    })
+    const result = await input.workspacePaneTabsHost.restoreTabs(
+      input.userId,
+      {
+        workspaceId: workspace.workspaceId,
+        workspaceRuntimeId: workspace.workspaceRuntimeId,
+        expectedWorkspaceEntry: workspace.entry,
+        targets: admission.targets,
+      },
+      workspace.runtimeCapability,
+    )
     if (result.kind === 'membership-conflict') return result
     snapshots.push({
       workspaceId: workspace.workspaceId,

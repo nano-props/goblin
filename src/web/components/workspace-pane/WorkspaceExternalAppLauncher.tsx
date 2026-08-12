@@ -24,6 +24,7 @@ import {
 } from '#/web/hooks/useWorkspaceFilesystemExternalActions.ts'
 import type { WorkspaceFilesystemExternalActions } from '#/web/hooks/useWorkspaceFilesystemExternalActions.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 type ExternalAppSettings = ReturnType<typeof useExternalAppSettings>['value']
 
@@ -99,14 +100,24 @@ export const WorkspaceExternalAppLauncher = defineComponent<{
             })
           }
         }
-        const result =
-          item.kind === 'terminal'
-            ? await actions.openTerminal(item.app)
-            : item.kind === 'editor'
-              ? await actions.openEditor(item.app)
-              : await actions.openFinder()
-        if (result && !result.ok) toast.error(t('action.result-error'), { description: result.message })
-        return result
+        try {
+          const result =
+            item.kind === 'terminal'
+              ? await actions.openTerminal(item.app)
+              : item.kind === 'editor'
+                ? await actions.openEditor(item.app)
+                : await actions.openFinder()
+          if (result && !result.ok) {
+            toast.error(t('action.result-error'), { description: result.message })
+          }
+          return result
+        } catch (error) {
+          if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) {
+            toast.warning(t('error.external-app-outcome-uncertain'))
+            return
+          }
+          throw error
+        }
       })
     }
 

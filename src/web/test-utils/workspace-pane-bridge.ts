@@ -6,7 +6,6 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneTabsEntry,
-  WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
@@ -53,9 +52,6 @@ function testWorkspacePaneRuntimeTabTarget(
 
 export function installWorkspacePaneTabsTestBridge(
   options: {
-    replaceWorkspaceTabs?: (
-      input: WorkspacePaneTabsReplaceInput,
-    ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
     updateWorkspaceTabs?: (
       input: WorkspacePaneTabsUpdateInput,
     ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
@@ -132,10 +128,11 @@ export function installWorkspacePaneTabsTestBridge(
       throw new Error(`Unhandled IPC path: ${path}`)
     },
     abortIpc: async () => false,
-    onIpcEvent: () => () => {},
     onEffectIntent: options.onEffectIntent ?? (() => () => {}),
     pathForFile: () => '',
     saveClipboardFiles: async () => [],
+    getAccessTokenProjection: async () => ({ accessToken: 'test-access-token', activation: 'current' }),
+    rotateAccessToken: async () => ({ accessToken: 'test-access-token', activation: 'after-restart' }),
     host: () => null,
     appRealtime: () => ({
       kickReconnect: () => {},
@@ -181,23 +178,16 @@ export function installWorkspacePaneTabsTestBridge(
       onSessionClosed: () => () => {},
     }),
     workspacePaneTabs: () => ({
-      replace: async (input) => {
-        const tabs = options.replaceWorkspaceTabs ? await options.replaceWorkspaceTabs(input) : [...input.tabs]
-        const target = workspacePaneTabsTargetFromRuntime(input.target)
-        if (!target) return serverSnapshot()
-        replaceServerTarget({ ...target, workspaceRuntimeId: input.workspaceRuntimeId }, tabs)
-        return commitServerSnapshot()
-      },
       update: async (input) => {
         const target = workspacePaneTabsTargetFromRuntime(input.target)
-        if (!target) return serverSnapshot()
-        const legacyInput = { ...target, workspaceRuntimeId: input.workspaceRuntimeId }
-        if (options.updateWorkspaceTabs) serverTabsForTarget(legacyInput)
+        if (!target) return { kind: 'projected', snapshot: serverSnapshot() }
+        const targetWithRuntime = { ...target, workspaceRuntimeId: input.workspaceRuntimeId }
+        if (options.updateWorkspaceTabs) serverTabsForTarget(targetWithRuntime)
         const tabs = options.updateWorkspaceTabs
           ? await options.updateWorkspaceTabs(input)
-          : workspacePaneTabsWithUpdateOperation(serverTabsForTarget(legacyInput), input.operation)
-        replaceServerTarget(legacyInput, tabs)
-        return commitServerSnapshot()
+          : workspacePaneTabsWithUpdateOperation(serverTabsForTarget(targetWithRuntime), input.operation)
+        replaceServerTarget(targetWithRuntime, tabs)
+        return { kind: 'projected', snapshot: commitServerSnapshot() }
       },
       list: async (input) => {
         return {

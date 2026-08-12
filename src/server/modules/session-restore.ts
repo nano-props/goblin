@@ -19,11 +19,13 @@ import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { readRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
 import {
   acquireWorkspaceRuntimeLease,
-  isCurrentWorkspaceRuntimeMembership,
+  captureWorkspaceRuntimeMembershipCapability,
   releaseWorkspaceRuntimeMembershipLease,
   runSerializedInitialWorkspaceProbe,
   workspaceProbeStateForRuntime,
+  WorkspaceRuntimeStaleError,
   type WorkspaceRuntimeMembershipLeaseEntry,
+  type WorkspaceRuntimeMembershipCapability,
 } from '#/server/modules/workspace-runtimes.ts'
 import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
 import {
@@ -38,12 +40,13 @@ import { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-worksp
 import { compareAndReplaceServerWorkspaceEntries, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { abortableWorkspaceRestore } from '#/server/modules/workspace-restore-utils.ts'
-import { projectWorkspacePaneTabsWithMembershipGuard } from '#/server/modules/workspace-pane-tabs-restore.ts'
+import { restoreWorkspacePaneTabsForMemberships } from '#/server/modules/workspace-pane-tabs-restore.ts'
 import {
   commitGitCapabilityRemovalOrThrow,
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
 import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 
 export interface RestoreServerWorkspaceInput {
   userId: string
@@ -61,15 +64,30 @@ export interface RestoreServerWorkspaceInput {
 type OpenWorkspaceResult = { kind: 'opened'; opened: OpenedWorkspaceRuntime } | { kind: 'invalid' }
 type OpenedWorkspaceRuntime = RestoredWorkspaceRuntime & {
   lease: WorkspaceRuntimeMembershipLeaseEntry
+  runtimeCapability: WorkspaceRuntimeMembershipCapability
 }
 type OpenedSnapshotWorkspace = SnapshotRestoredWorkspaceRuntime & {
   lease: WorkspaceRuntimeMembershipLeaseEntry
+  runtimeCapability: WorkspaceRuntimeMembershipCapability
 }
 
 const MAX_WORKSPACE_MEMBERSHIP_CONFLICT_RETRIES = 3
 const restoreQueues = new Map<string, PQueue>()
 
 export async function restoreServerWorkspace(input: RestoreServerWorkspaceInput): Promise<WorkspaceRestoreResult> {
+  try {
+    return await restoreServerWorkspaceForCurrentMemberships(input)
+  } catch (error) {
+    if (error instanceof WorkspaceRuntimeStaleError) {
+      throw new CodedError({ code: 'BAD_REQUEST', message: error.message })
+    }
+    throw error
+  }
+}
+
+async function restoreServerWorkspaceForCurrentMemberships(
+  input: RestoreServerWorkspaceInput,
+): Promise<WorkspaceRestoreResult> {
   input.signal?.throwIfAborted()
   const key = restoreQueueKey(input.userId, input.clientId)
   const queue = restoreQueueFor(key)
@@ -167,7 +185,7 @@ async function restoreServerWorkspaceSnapshot(
     (workspace) => isOpenedSnapshotWorkspace(workspace) || readableWorkspace(workspace.workspaceProbe),
   )
   const expectedMembership = membership.workspace.openWorkspaceEntries
-  const projectedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
+  const projectedTabs = await restoreWorkspacePaneTabsForMemberships({
     restoreInput: input,
     workspaces: openedForLayoutRestore,
     confirmMembership: async () =>
@@ -181,6 +199,7 @@ async function restoreServerWorkspaceSnapshot(
       repaired: workspaceRestoreFailed,
     }
   }
+  for (const workspace of opened) workspace.runtimeCapability.assertCurrent()
   return {
     kind: 'restored',
     value: {
@@ -221,9 +240,10 @@ async function openWorkspaceRuntime(
   input.signal?.throwIfAborted()
   if (!parseWorkspaceLocator(entry.id, serverLocatorPlatform())) return { kind: 'invalid' }
   if (isRemoteWorkspaceId(entry.id)) return await openRemoteWorkspace(input, entry, options)
-  return await withAcquiredWorkspaceRuntimeLease(input, entry.id, async (lease) => {
+  return await withAcquiredWorkspaceRuntimeLease(input, entry.id, async (lease, runtimeCapability) => {
     let authoritativeProbe = workspaceProbeStateForRuntime(input.userId, entry.id, lease.workspaceRuntimeId)
-    if (authoritativeProbe?.status === 'probing') {
+    if (!authoritativeProbe) throw new WorkspaceRuntimeStaleError()
+    if (authoritativeProbe.status === 'probing') {
       authoritativeProbe = await runSerializedInitialWorkspaceProbe({
         userId: input.userId,
         workspaceId: entry.id,
@@ -231,12 +251,9 @@ async function openWorkspaceRuntime(
         probe: async () => await probeWorkspace(entry.id, serverLocatorPlatform(), { signal: input.signal }),
         beforeCommit: async ({ before, after }) => {
           if (!workspaceGitCleanupRequired(before, after)) return
-          await commitGitCapabilityRemoval(input, entry.id, lease.workspaceRuntimeId)
+          await commitGitCapabilityRemoval(input, runtimeCapability)
         },
       })
-    }
-    if (!authoritativeProbe) {
-      throw new Error('workspace runtime was superseded during restore')
     }
     if (!workspaceGitAvailable(authoritativeProbe) || !options.active) {
       return {
@@ -247,6 +264,7 @@ async function openWorkspaceRuntime(
           workspaceProbe: authoritativeProbe,
           transport: { kind: 'file' },
           lease,
+          runtimeCapability,
         }),
       }
     }
@@ -263,6 +281,7 @@ async function openWorkspaceRuntime(
         transport: { kind: 'file' },
         repoSnapshot: snapshot,
         lease,
+        runtimeCapability,
       }),
     }
   })
@@ -273,7 +292,7 @@ async function openRemoteWorkspace(
   entry: WorkspaceSessionEntry,
   options: { active: boolean },
 ): Promise<OpenWorkspaceResult> {
-  return await withAcquiredWorkspaceRuntimeLease(input, entry.id, async (lease) => {
+  return await withAcquiredWorkspaceRuntimeLease(input, entry.id, async (lease, runtimeCapability) => {
     const lifecycle = await abortableWorkspaceRestore(
       runRemoteWorkspaceLifecycleWrite(
         {
@@ -282,10 +301,11 @@ async function openRemoteWorkspace(
           workspaceRuntimeId: lease.workspaceRuntimeId,
           mode: 'ensure',
         },
-        remoteCapabilityTransitionOptions(input, entry.id, lease.workspaceRuntimeId),
+        remoteCapabilityTransitionOptions(input, runtimeCapability),
       ),
       input.signal,
     )
+    runtimeCapability.assertCurrent()
     if (lifecycle.kind !== 'settled' || lifecycle.lifecycle.kind !== 'ready') {
       if (lifecycle.kind === 'settled') {
         return {
@@ -296,6 +316,7 @@ async function openRemoteWorkspace(
             workspaceProbe: lifecycle.workspaceProbe,
             transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
             lease,
+            runtimeCapability,
           }),
         }
       }
@@ -311,6 +332,7 @@ async function openRemoteWorkspace(
           workspaceProbe,
           transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
           lease,
+          runtimeCapability,
         }),
       }
     }
@@ -327,6 +349,7 @@ async function openRemoteWorkspace(
         transport: { kind: 'ssh', lifecycle: lifecycle.lifecycle },
         repoSnapshot: snapshot,
         lease,
+        runtimeCapability,
       }),
     }
   })
@@ -334,8 +357,7 @@ async function openRemoteWorkspace(
 
 function remoteCapabilityTransitionOptions(
   input: RestoreServerWorkspaceInput,
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
+  runtimeCapability: WorkspaceRuntimeMembershipCapability,
 ) {
   return {
     beforeCapabilityCommit: async ({
@@ -346,36 +368,37 @@ function remoteCapabilityTransitionOptions(
       after: WorkspaceSettledProbeState
     }) => {
       if (!workspaceGitCleanupRequired(before, after)) return
-      await commitGitCapabilityRemoval(input, workspaceId, workspaceRuntimeId)
+      await commitGitCapabilityRemoval(input, runtimeCapability)
     },
   }
 }
 
 async function commitGitCapabilityRemoval(
   input: RestoreServerWorkspaceInput,
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
+  runtimeCapability: WorkspaceRuntimeMembershipCapability,
 ): Promise<void> {
   await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
-    userId: input.userId,
-    workspaceId,
-    workspaceRuntimeId,
-    assertCurrent: () => {
-      if (!isCurrentWorkspaceRuntimeMembership(input.userId, workspaceId, workspaceRuntimeId, input.clientId)) {
-        throw new Error('error.workspace-runtime-stale')
-      }
-    },
+    runtimeCapability,
   })
 }
 
 async function withAcquiredWorkspaceRuntimeLease<T>(
   input: RestoreServerWorkspaceInput,
   workspaceId: WorkspaceId,
-  open: (lease: WorkspaceRuntimeMembershipLeaseEntry) => Promise<T>,
+  open: (
+    lease: WorkspaceRuntimeMembershipLeaseEntry,
+    runtimeCapability: WorkspaceRuntimeMembershipCapability,
+  ) => Promise<T>,
 ): Promise<T> {
   const lease = acquireWorkspaceRuntimeLease(input.userId, workspaceId, input.clientId)
   try {
-    return await open(lease)
+    const runtimeCapability = captureWorkspaceRuntimeMembershipCapability(
+      input.userId,
+      workspaceId,
+      lease.workspaceRuntimeId,
+      input.clientId,
+    )
+    return await open(lease, runtimeCapability)
   } catch (err) {
     releaseWorkspaceRuntimeLease(input, lease)
     throw err
@@ -386,6 +409,7 @@ interface OpenedWorkspaceRuntimeInputBase {
   workspaceId: WorkspaceId
   workspaceProbe: WorkspaceProbeState
   lease: WorkspaceRuntimeMembershipLeaseEntry
+  runtimeCapability: WorkspaceRuntimeMembershipCapability
 }
 
 type OpenedWorkspaceRuntimeTransport = {

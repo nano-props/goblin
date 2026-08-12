@@ -226,65 +226,6 @@ describe('shared terminal validators requests', () => {
     })
   })
 
-  test('rejects empty terminal ids in workspace tab replacement requests', () => {
-    expect(
-      normalizeAppRealtimeClientMessage({
-        type: 'request',
-        requestId: 'request_runtime_session_id',
-        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
-        input: {
-          workspaceId: 'goblin+file:///repo',
-          workspaceRuntimeId: 'repo-runtime-test',
-          target: {
-            kind: 'git-worktree',
-            workspaceId: 'goblin+file:///repo',
-            workspaceRuntimeId: 'repo-runtime-test',
-            root: 'goblin+file:///repo',
-          },
-          tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
-        },
-      }),
-    ).toMatchObject({ type: 'request', action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace })
-
-    expect(
-      normalizeAppRealtimeClientMessage({
-        type: 'request',
-        requestId: 'request_123',
-        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
-        input: {
-          workspaceId: 'goblin+file:///repo',
-          workspaceRuntimeId: 'repo-runtime-test',
-          target: {
-            kind: 'git-worktree',
-            workspaceId: 'goblin+file:///repo',
-            workspaceRuntimeId: 'repo-runtime-test',
-            root: 'goblin+file:///repo',
-          },
-          tabs: [{ type: 'terminal', terminalSessionId: '' }],
-        },
-      }),
-    ).toBeNull()
-
-    expect(
-      normalizeAppRealtimeClientMessage({
-        type: 'request',
-        requestId: 'request_123',
-        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
-        input: {
-          target: {
-            kind: 'git-worktree',
-            workspaceId: 'goblin+file:///repo',
-            workspaceRuntimeId: 'repo-runtime-test',
-            root: 'goblin+file:///repo/worktree',
-          },
-          branchName: 'main',
-          worktreePath: '/repo',
-          tabs: [{ type: 'terminal', runtimeSessionId: '' }],
-        },
-      }),
-    ).toBeNull()
-  })
-
   test('accepts workspace tab operation requests and rejects invalid identities', () => {
     expect(
       normalizeAppRealtimeClientMessage({
@@ -538,8 +479,10 @@ describe('shared terminal validators requests', () => {
         input: { ...message.input, repoRoot: message.input.workspaceId },
       }),
     ).toBeNull()
-    const { workspaceId, ...legacyInput } = message.input
-    expect(normalizeTerminalClientMessage({ ...message, input: { ...legacyInput, repoRoot: workspaceId } })).toBeNull()
+    const { workspaceId, ...obsoleteInput } = message.input
+    expect(
+      normalizeTerminalClientMessage({ ...message, input: { ...obsoleteInput, repoRoot: workspaceId } }),
+    ).toBeNull()
   })
 
   test('rejects legacy and dual workspace identity on terminal realtime events', () => {

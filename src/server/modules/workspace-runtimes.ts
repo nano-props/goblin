@@ -37,6 +37,7 @@ interface WorkspaceRuntimeState {
   workspaceId: WorkspaceId
   currentWorkspaceRuntimeId: string | null
   members: Map<string, number>
+  pendingMembershipAdmissions: Map<string, number>
   resourceRetainers: Set<string>
   nextMembershipGeneration: number
   remoteLifecycle: RemoteWorkspaceRuntimeLifecycle
@@ -121,6 +122,7 @@ function workspaceRuntimeState(userId: string, workspaceId: WorkspaceId): Worksp
     workspaceId,
     currentWorkspaceRuntimeId: null,
     members: new Map(),
+    pendingMembershipAdmissions: new Map(),
     resourceRetainers: new Set(),
     nextMembershipGeneration: 0,
     remoteLifecycle: { kind: 'idle', attemptId: 0 },
@@ -141,14 +143,14 @@ export function acquireWorkspaceRuntime(userId: string, workspaceId: WorkspaceId
 
 /**
  * Admit one client for work that must finish before the caller can own the
- * membership. A failed admission restores that client's exact preceding
- * generation without disturbing memberships acquired by other clients.
+ * membership. The pending admission retains the epoch but is not published as
+ * a committed membership; success commits one fresh generation atomically.
  */
 export async function withWorkspaceRuntimeAdmission<T>(
   userId: string,
   workspaceId: WorkspaceId,
   clientId: string,
-  admit: (workspaceRuntimeId: string) => Promise<T>,
+  admit: (capability: WorkspaceRuntimeAdmissionCapability) => Promise<T>,
 ): Promise<T> {
   const admissionKey = [userId, workspaceId, clientId].join('\0')
   const predecessor = workspaceRuntimeAdmissionTails.get(admissionKey) ?? Promise.resolve()
@@ -171,54 +173,58 @@ async function runWorkspaceRuntimeAdmission<T>(
   userId: string,
   workspaceId: WorkspaceId,
   clientId: string,
-  admit: (workspaceRuntimeId: string) => Promise<T>,
+  admit: (capability: WorkspaceRuntimeAdmissionCapability) => Promise<T>,
 ): Promise<T> {
   const state = workspaceRuntimeState(userId, workspaceId)
-  const previousWorkspaceRuntimeId = state.currentWorkspaceRuntimeId
-  const previousGeneration = state.members.get(clientId)
-  const lease = acquireWorkspaceRuntimeMembership(userId, workspaceId, clientId)
+  const workspaceRuntimeId = state.currentWorkspaceRuntimeId ?? startWorkspaceRuntimeEpoch(state)
+  state.nextMembershipGeneration += 1
+  const admissionGeneration = state.nextMembershipGeneration
+  state.pendingMembershipAdmissions.set(clientId, admissionGeneration)
+  const isCurrent = () =>
+    workspaceRuntimesByUser.get(userId)?.get(workspaceId) === state &&
+    state.currentWorkspaceRuntimeId === workspaceRuntimeId &&
+    state.pendingMembershipAdmissions.get(clientId) === admissionGeneration
+  const assertCurrent = () => {
+    if (!isCurrent()) throw new WorkspaceRuntimeStaleError()
+  }
+  const capability = Object.freeze({
+    userId,
+    clientId,
+    workspaceId,
+    workspaceRuntimeId,
+    generation: admissionGeneration,
+    isCurrent,
+    assertCurrent,
+  })
   try {
-    const result = await admit(lease.workspaceRuntimeId)
+    const result = await admit(capability)
+    capability.assertCurrent()
+    state.pendingMembershipAdmissions.delete(clientId)
+    state.members.set(clientId, admissionGeneration)
     emitWorkspaceRuntimeMembershipAcquired({ userId, clientId })
     return result
-  } catch (error) {
-    rollbackWorkspaceRuntimeAdmission({
-      userId,
-      clientId,
-      state,
-      lease,
-      previousWorkspaceRuntimeId,
-      previousGeneration,
-    })
-    throw error
+  } finally {
+    if (state.pendingMembershipAdmissions.get(clientId) === admissionGeneration) {
+      state.pendingMembershipAdmissions.delete(clientId)
+    }
+    closeWorkspaceRuntimeWithoutOwners(userId, state, workspaceRuntimeId)
   }
 }
 
-function rollbackWorkspaceRuntimeAdmission(input: {
-  userId: string
-  clientId: string
-  state: WorkspaceRuntimeState
-  lease: WorkspaceRuntimeMembershipLeaseEntry
-  previousWorkspaceRuntimeId: string | null
-  previousGeneration: number | undefined
-}): void {
-  const { userId, clientId, state, lease, previousWorkspaceRuntimeId, previousGeneration } = input
+function closeWorkspaceRuntimeWithoutOwners(
+  userId: string,
+  state: WorkspaceRuntimeState,
+  workspaceRuntimeId: string,
+): void {
   if (
-    workspaceRuntimesByUser.get(userId)?.get(lease.workspaceId) !== state ||
-    state.currentWorkspaceRuntimeId !== lease.workspaceRuntimeId ||
-    state.members.get(clientId) !== lease.generation
+    workspaceRuntimeHasOwners(state) ||
+    state.currentWorkspaceRuntimeId !== workspaceRuntimeId ||
+    workspaceRuntimesByUser.get(userId)?.get(state.workspaceId) !== state
   ) {
     return
   }
-  if (previousWorkspaceRuntimeId === lease.workspaceRuntimeId && previousGeneration !== undefined) {
-    state.members.set(clientId, previousGeneration)
-    return
-  }
-  state.members.delete(clientId)
-  if (workspaceRuntimeHasOwners(state)) return
-  const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(state)
-  if (!workspaceRuntimeId) return
-  emitWorkspaceRuntimeClosed({ userId, workspaceId: lease.workspaceId, workspaceRuntimeId })
+  stopWorkspaceRuntimeEpoch(state)
+  emitWorkspaceRuntimeClosed({ userId, workspaceId: state.workspaceId, workspaceRuntimeId })
 }
 
 export function acquireWorkspaceRuntimeLease(
@@ -240,6 +246,7 @@ function acquireWorkspaceRuntimeMembership(
   const state = workspaceRuntimeState(userId, workspaceId)
   const workspaceRuntimeId = state.currentWorkspaceRuntimeId ?? startWorkspaceRuntimeEpoch(state)
   state.nextMembershipGeneration += 1
+  state.pendingMembershipAdmissions.delete(clientId)
   state.members.set(clientId, state.nextMembershipGeneration)
   return { workspaceId, workspaceRuntimeId, generation: state.nextMembershipGeneration }
 }
@@ -254,12 +261,19 @@ export function releaseWorkspaceRuntime(
   runtimeClosed: boolean
 } {
   const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
-  if (!state?.members.has(clientId)) return { released: false, runtimeClosed: false }
-  return releaseWorkspaceRuntimeMembershipForCurrentState(userId, clientId, {
-    workspaceId: state.workspaceId,
-    workspaceRuntimeId,
-    generation: state.members.get(clientId)!,
-  })
+  if (!state || state.currentWorkspaceRuntimeId !== workspaceRuntimeId) {
+    return { released: false, runtimeClosed: false }
+  }
+  const releasedMembership = state.members.delete(clientId)
+  const cancelledAdmission = state.pendingMembershipAdmissions.delete(clientId)
+  if (!releasedMembership && !cancelledAdmission) return { released: false, runtimeClosed: false }
+  if (releasedMembership) {
+    emitWorkspaceRuntimeMembershipReleasedFor(userId, clientId, state.workspaceId, workspaceRuntimeId)
+  }
+  if (workspaceRuntimeHasOwners(state)) return { released: true, runtimeClosed: false }
+  stopWorkspaceRuntimeEpoch(state)
+  emitWorkspaceRuntimeClosed({ userId, workspaceId: state.workspaceId, workspaceRuntimeId })
+  return { released: true, runtimeClosed: true }
 }
 
 export function releaseWorkspaceRuntimeMembershipLease(
@@ -318,7 +332,9 @@ export function captureWorkspaceRuntimeMembershipLease(
 /**
  * Expires only the membership generations captured when presence was lost.
  * A later HTTP acquire renews its generation and cannot be removed by an old
- * disconnect timer, even if the realtime channel is still recovering.
+ * disconnect timer, even if the realtime channel is still recovering. Pending
+ * admissions retain the runtime epoch without publishing a membership, so a
+ * disconnect snapshot contains only committed generations.
  */
 export function expireWorkspaceRuntimeMembershipLease(
   lease: WorkspaceRuntimeMembershipLease,
@@ -377,7 +393,7 @@ export function retainWorkspaceRuntimeResource(
 ): WorkspaceRuntimeResourceRetention {
   const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
   if (!state || state.currentWorkspaceRuntimeId !== workspaceRuntimeId) {
-    throw new Error('error.workspace-runtime-stale')
+    throw new WorkspaceRuntimeStaleError()
   }
   if (state.resourceRetainers.has(resourceId)) throw new Error('workspace runtime resource retention conflict')
   state.resourceRetainers.add(resourceId)
@@ -434,8 +450,13 @@ export function replaceWorkspaceRuntimeMembershipsForClient(
     for (const [workspaceId, state] of states) {
       if (desired.has(state.workspaceId)) continue
       const workspaceRuntimeId = state.currentWorkspaceRuntimeId
-      if (!workspaceRuntimeId || !state.members.delete(clientId)) continue
-      emitWorkspaceRuntimeMembershipReleasedFor(userId, clientId, state.workspaceId, workspaceRuntimeId)
+      if (!workspaceRuntimeId) continue
+      const releasedMembership = state.members.delete(clientId)
+      const cancelledAdmission = state.pendingMembershipAdmissions.delete(clientId)
+      if (!releasedMembership && !cancelledAdmission) continue
+      if (releasedMembership) {
+        emitWorkspaceRuntimeMembershipReleasedFor(userId, clientId, state.workspaceId, workspaceRuntimeId)
+      }
       if (workspaceRuntimeHasOwners(state)) continue
       stopWorkspaceRuntimeEpoch(state)
       closed.push({ userId, workspaceId: state.workspaceId, workspaceRuntimeId })
@@ -462,6 +483,111 @@ export function isCurrentWorkspaceRuntime(
   return workspaceRuntimesByUser.get(userId)?.get(workspaceId)?.currentWorkspaceRuntimeId === workspaceRuntimeId
 }
 
+export interface WorkspaceRuntimeEpochCapability {
+  readonly userId: string
+  readonly workspaceId: WorkspaceId
+  readonly workspaceRuntimeId: string
+  isCurrent(): boolean
+  assertCurrent(): void
+}
+
+export class WorkspaceRuntimeStaleError extends Error {
+  constructor() {
+    super('error.workspace-runtime-stale')
+    this.name = 'WorkspaceRuntimeStaleError'
+  }
+}
+
+export interface WorkspaceRuntimeMembershipCapability extends WorkspaceRuntimeEpochCapability {
+  readonly clientId: string
+  readonly generation: number
+}
+
+export interface WorkspaceRuntimeAdmissionCapability extends WorkspaceRuntimeEpochCapability {
+  readonly clientId: string
+  readonly generation: number
+}
+
+export function captureWorkspaceRuntimeEpochCapability(
+  userId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+): WorkspaceRuntimeEpochCapability {
+  const isCurrent = () => isCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId)
+  if (!isCurrent()) throw new WorkspaceRuntimeStaleError()
+  const assertCurrent = () => {
+    if (!isCurrent()) throw new WorkspaceRuntimeStaleError()
+  }
+  return Object.freeze({
+    userId,
+    workspaceId,
+    workspaceRuntimeId,
+    isCurrent,
+    assertCurrent,
+  })
+}
+
+export function captureWorkspaceRuntimeMembershipCapability(
+  userId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  clientId: string,
+): WorkspaceRuntimeMembershipCapability {
+  const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
+  const generation = state?.members.get(clientId)
+  if (state?.currentWorkspaceRuntimeId !== workspaceRuntimeId || generation === undefined) {
+    throw new WorkspaceRuntimeStaleError()
+  }
+  const isCurrent = () => {
+    const current = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
+    return current?.currentWorkspaceRuntimeId === workspaceRuntimeId && current.members.get(clientId) === generation
+  }
+  const assertCurrent = () => {
+    if (!isCurrent()) throw new WorkspaceRuntimeStaleError()
+  }
+  return Object.freeze({
+    userId,
+    clientId,
+    workspaceId,
+    workspaceRuntimeId,
+    generation,
+    isCurrent,
+    assertCurrent,
+  })
+}
+
+export async function runWithWorkspaceRuntimeEpochCommitOwnership<T>(
+  capability: WorkspaceRuntimeEpochCapability,
+  commit: () => Promise<T> | T,
+): Promise<T> {
+  capability.assertCurrent()
+  const retention = retainWorkspaceRuntimeResource(
+    capability.userId,
+    capability.workspaceId,
+    capability.workspaceRuntimeId,
+    createOpaqueId('runtime-commit'),
+  )
+  try {
+    return await commit()
+  } finally {
+    retention.release()
+  }
+}
+
+export function assertWorkspaceRuntimeEpochCapability(
+  capability: WorkspaceRuntimeEpochCapability,
+  expected: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string },
+): void {
+  if (
+    capability.userId !== expected.userId ||
+    capability.workspaceId !== expected.workspaceId ||
+    capability.workspaceRuntimeId !== expected.workspaceRuntimeId
+  ) {
+    throw new Error('workspace runtime epoch capability scope mismatch')
+  }
+  capability.assertCurrent()
+}
+
 export function workspaceRuntimeHasGitCapability(
   userId: string,
   workspaceId: WorkspaceId,
@@ -486,42 +612,17 @@ export function workspaceProbeStateForRuntime(
   return state?.currentWorkspaceRuntimeId === workspaceRuntimeId ? exposedWorkspaceProbe(state) : null
 }
 
-export function commitWorkspaceProbeState(input: {
-  userId: string
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
-  probe: WorkspaceSettledProbeState
-}): boolean {
-  const state = workspaceRuntimesByUser.get(input.userId)?.get(input.workspaceId)
-  if (!state || state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId) return false
-  if (state.workspaceProbe.status !== 'probing') return false
-  state.workspaceProbe = input.probe
-  return true
-}
-
-export function commitOrReadInitialWorkspaceProbeState(input: {
-  userId: string
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
-  probe: WorkspaceSettledProbeState
-}): WorkspaceProbeState | null {
-  const state = workspaceRuntimesByUser.get(input.userId)?.get(input.workspaceId)
-  if (!state || state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId) return null
-  if (state.workspaceProbe.status === 'probing') state.workspaceProbe = input.probe
-  return state.workspaceProbe
-}
-
 export async function runSerializedInitialWorkspaceProbe(input: {
   userId: string
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
   probe: () => Promise<WorkspaceSettledProbeState>
   beforeCommit?: (input: { before: WorkspaceProbeState; after: WorkspaceSettledProbeState }) => Promise<void>
-}): Promise<WorkspaceProbeState | null> {
-  return await runSerializedWorkspaceLifecycleOperation(input, async (state) => {
+}): Promise<WorkspaceProbeState> {
+  const result = await runSerializedWorkspaceLifecycleOperation(input, async (state) => {
     if (state.workspaceProbe.status !== 'probing') return state.workspaceProbe
     const probe = await input.probe()
-    if (state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId) return null
+    if (state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId) throw new WorkspaceRuntimeStaleError()
     if (state.workspaceProbe.status !== 'probing') return state.workspaceProbe
     const before = state.workspaceProbe
     state.workspaceProbe = probe
@@ -529,15 +630,17 @@ export async function runSerializedInitialWorkspaceProbe(input: {
     try {
       await input.beforeCommit?.({ before, after: probe })
     } catch (error) {
-      if (state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId) return null
+      if (state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId) throw new WorkspaceRuntimeStaleError()
       state.workspaceProbe = before
       state.pendingWorkspaceProbeTransition = null
       throw error
     }
-    if (state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId) return null
+    if (state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId) throw new WorkspaceRuntimeStaleError()
     state.pendingWorkspaceProbeTransition = null
     return probe
   })
+  if (!result) throw new WorkspaceRuntimeStaleError()
+  return result
 }
 
 export async function runSerializedWorkspaceRefresh(input: {
@@ -608,6 +711,7 @@ function releaseWorkspaceLifecycleOperation(
   }
   if (
     state.activeWorkspaceLifecycleOperations > 0 ||
+    state.pendingMembershipAdmissions.size > 0 ||
     state.members.size > 0 ||
     state.resourceRetainers.size > 0 ||
     state.currentWorkspaceRuntimeId !== input.workspaceRuntimeId ||
@@ -903,6 +1007,9 @@ export function clearWorkspaceRuntimesForUser(userId: string): void {
       if (state.activeWorkspaceLifecycleOperations > 0) {
         throw new Error(`cannot reset workspace runtimes with active workspace lifecycle operations for ${workspaceId}`)
       }
+      if (state.pendingMembershipAdmissions.size > 0) {
+        throw new Error(`cannot reset workspace runtimes with pending membership admissions for ${workspaceId}`)
+      }
       const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(state)
       if (workspaceRuntimeId) {
         emitWorkspaceRuntimeClosed({
@@ -922,6 +1029,7 @@ function startWorkspaceRuntimeEpoch(state: WorkspaceRuntimeState): string {
     state.remoteAttemptController ||
     state.remoteAttemptPromise ||
     state.activeWorkspaceLifecycleOperations > 0 ||
+    state.pendingMembershipAdmissions.size > 0 ||
     state.resourceRetainers.size > 0
   ) {
     throw new Error('workspace runtime epoch must stop before it starts')
@@ -929,6 +1037,7 @@ function startWorkspaceRuntimeEpoch(state: WorkspaceRuntimeState): string {
   const workspaceRuntimeId = createOpaqueId('workspace-runtime')
   state.currentWorkspaceRuntimeId = workspaceRuntimeId
   state.members.clear()
+  state.pendingMembershipAdmissions.clear()
   state.resourceRetainers.clear()
   state.nextMembershipGeneration = 0
   state.remoteLifecycle = { kind: 'idle', attemptId: 0 }
@@ -944,12 +1053,18 @@ function stopWorkspaceRuntimeEpoch(state: WorkspaceRuntimeState): string | null 
   state.pendingWorkspaceProbeTransition = null
   state.currentWorkspaceRuntimeId = null
   state.members.clear()
+  state.pendingMembershipAdmissions.clear()
   state.resourceRetainers.clear()
   return workspaceRuntimeId
 }
 
 function workspaceRuntimeHasOwners(state: WorkspaceRuntimeState): boolean {
-  return state.members.size > 0 || state.resourceRetainers.size > 0 || state.activeWorkspaceLifecycleOperations > 0
+  return (
+    state.members.size > 0 ||
+    state.pendingMembershipAdmissions.size > 0 ||
+    state.resourceRetainers.size > 0 ||
+    state.activeWorkspaceLifecycleOperations > 0
+  )
 }
 
 export function onWorkspaceRuntimeClosed(listener: (event: WorkspaceRuntimeClosedEvent) => void): () => void {

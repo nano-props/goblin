@@ -41,6 +41,7 @@ export const ko: Record<DictKey, string> = {
   'menu.file.close-workspace': '워크스페이스 닫기',
   'menu.file.settings': '설정…',
   'menu.file.quit': '종료',
+  'menu.client-intent-delivery-failed': '앱 창이 변경되었거나 로드하지 못해 작업을 보낼 수 없습니다. 다시 시도하세요.',
 
   'menu.edit.undo': '실행 취소',
   'menu.edit.redo': '다시 실행',
@@ -231,6 +232,15 @@ export const ko: Record<DictKey, string> = {
   'dashboard.recent.title': '최근 브랜치',
   'dashboard.recent.description': '최신 커밋순 리포지토리 활동입니다.',
   'dashboard.checks-failing': '실패한 체크 {count}개',
+  'dashboard.terminals.description': '이 워크스페이스에서 {count}개 열림',
+  'dashboard.terminals.loading': '터미널 로딩 중...',
+  'dashboard.terminals.unavailable': '터미널 목록을 사용할 수 없음',
+  'dashboard.terminals.open': '{name} 열기',
+  'dashboard.terminals.open-failed': '터미널을 열 수 없음',
+  'dashboard.terminals.stale': '마지막으로 확인된 터미널 목록입니다.',
+  'dashboard.terminals.error': '오류',
+  'dashboard.terminals.workspace-root': '워크스페이스',
+  'dashboard.terminals.detached-worktree': '분리된 worktree',
   'tab.branches': '브랜치',
   'workspace.navigation-title': '워크스페이스',
   'tab.status': '상태',
@@ -564,12 +574,23 @@ export const ko: Record<DictKey, string> = {
   'error.filetree-delete-directory-unsupported': '파일 트리에서는 파일만 휴지통으로 이동할 수 있습니다',
   'error.trash-unavailable': '시스템 휴지통을 사용할 수 없습니다',
   'error.failed-trash-file': '파일을 휴지통으로 이동할 수 없습니다',
+  'error.trash-file-outcome-uncertain':
+    '파일이 휴지통으로 이동되었는지 확인할 수 없습니다. 다시 시도하기 전에 파일 트리를 확인하세요.',
+  'error.clone-outcome-uncertain':
+    '복제가 완료되었는지 확인할 수 없습니다. 다시 시도하기 전에 대상 디렉터리를 확인하세요.',
+  'error.external-app-outcome-uncertain': '외부 앱이 열렸는지 확인할 수 없습니다. 다시 시도하기 전에 앱을 확인하세요.',
   'error.git-command-cancelled-check-state':
     'Git 작업이 취소되었습니다. 저장소 상태가 변경되었을 수 있으므로 확인한 후 다시 시도하세요.',
   'error.git-command-timeout-check-state':
     'Git 작업이 시간 초과되었습니다. 저장소 상태가 변경되었을 수 있으므로 확인한 후 다시 시도하세요.',
   'error.invalid-arguments': '인수가 올바르지 않습니다',
   'error.workspace-runtime-stale': '워크스페이스 런타임이 만료되었습니다',
+  'error.workspace-tabs-committed-projection-failed':
+    '탭 변경 사항은 저장되었지만 현재 보기를 새로 고칠 수 없습니다. 작업 공간을 다시 여세요.',
+  'error.workspace-tabs-outcome-uncertain':
+    '탭 변경 사항이 저장되었는지 확인할 수 없습니다. 작업 공간을 다시 열고 현재 상태를 확인하세요.',
+  'error.operation-outcome-uncertain':
+    '작업이 완료되었는지 확인할 수 없습니다. 다시 시도하기 전에 현재 상태를 확인하세요.',
   'error.workspace-target-stale': '워크스페이스 대상이 변경되었습니다. 다시 시도해 주세요.',
   'error.worktree-removal-in-progress': '이 작업 트리를 삭제하는 중입니다',
   'error.not-controller': '이 터미널은 다른 세션이 제어하고 있습니다',
@@ -603,6 +624,7 @@ export const ko: Record<DictKey, string> = {
   'error.ghostty-not-installed': 'Ghostty가 설치되어 있지 않습니다',
   'error.terminal-not-installed': '터미널이 설치되어 있지 않습니다',
   'error.terminal-create-failed': '터미널을 만들 수 없습니다',
+  'error.terminal-session-limit-reached': '전역 터미널 한도 1,024개에 도달했습니다. 터미널을 닫고 다시 시도하세요.',
   'error.terminal-connection-timeout': '터미널 서비스 연결 시간이 초과되었습니다. 다시 시도하세요.',
   'error.terminal-create-timeout': '터미널 생성 시간이 초과되었습니다. 다시 시도하세요.',
   'error.terminal-connection-unavailable': '터미널 서비스를 사용할 수 없습니다. 다시 시도하세요.',
@@ -698,11 +720,14 @@ export const ko: Record<DictKey, string> = {
   'settings.web.token-copy': '토큰 복사',
   'settings.web.token-copied': '토큰이 클립보드에 복사되었습니다.',
   'settings.web.token-copy-failed': '클립보드에 복사하지 못했습니다.',
+  'settings.web.token-read-failed': '토큰 상태를 읽지 못했습니다. 설정을 다시 열어 재시도하세요.',
   'settings.web.token-rotate': '토큰 회전',
-  'settings.web.token-rotated': '토큰이 회전되었습니다. 계속하려면 다시 인증하세요.',
+  'settings.web.token-rotated': '새 토큰을 저장했습니다. 다음에 Goblin을 시작하면 적용됩니다.',
   'settings.web.token-rotate-failed': '토큰 회전에 실패했습니다.',
   'settings.web.token-rotation-hint':
-    '아래 QR 코드에는 이 토큰이 포함되어 있습니다. 스캔하면 대상 기기의 게이트에 자동으로 채워집니다.',
+    '아래 QR 코드에는 현재 유효한 토큰이 포함되어 있습니다. 스캔하면 대상 기기의 게이트에 자동으로 채워집니다.',
+  'settings.web.token-pending-restart-hint':
+    '표시된 토큰과 QR 코드는 다음 Goblin 시작 시 유효해집니다. 그때까지는 현재 토큰이 계속 유효합니다.',
   'settings.web.lan': '네트워크',
   'settings.web.lan-urls': 'LAN 주소',
   'settings.web.lan-urls-hint': '같은 로컬 네트워크의 다른 기기에서 이 주소로 Goblin에 접근할 수 있습니다.',
@@ -766,6 +791,8 @@ export const ko: Record<DictKey, string> = {
   'settings.global-shortcut-recording': '키 입력…',
   'settings.global-shortcut-reset': '초기화',
   'settings.global-shortcut-conflict': '등록 실패. 사용 중일 수 있습니다.',
+  'settings.global-shortcut-projection-failed':
+    '설정은 저장되었지만 앱 단축키를 업데이트하지 못했습니다. 적용하려면 앱을 다시 여세요.',
   'settings.global-shortcut-invalid': 'Command, Control 또는 Option과 키를 함께 사용하세요.',
   'settings.open-github': 'GitHub에서 프로젝트 열기',
   'about.app': 'Goblin',

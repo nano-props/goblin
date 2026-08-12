@@ -19,8 +19,9 @@ const IPC = {
   ipc: {
     call: 'goblin:ipc',
     abort: 'goblin:ipc-abort',
-    event: 'goblin:event',
     effectIntent: 'goblin:client-effect-intent',
+    effectIntentChallenge: 'goblin:client-effect-intent-challenge',
+    effectIntentReady: 'goblin:client-effect-intent-ready',
     appQuitDrained: 'goblin:app-quit-drained',
   },
   host: {
@@ -35,6 +36,7 @@ const IPC = {
     setBadge: 'goblin:terminal-set-badge',
   },
   accessToken: {
+    projection: 'goblin:get-access-token-projection',
     rotate: 'goblin:rotate-access-token',
   },
 }
@@ -61,7 +63,7 @@ function ipcCall(request) {
       if (response.ok) return response.data
       const error = isObject(response.error) ? response.error : null
       throw Object.assign(new Error(typeof error?.message === 'string' ? error.message : 'IPC request failed'), {
-        name: typeof error?.name === 'string' ? error.name : 'IpcError',
+        name: typeof error?.name === 'string' ? error.name : 'Error',
         code: typeof error?.code === 'string' ? error.code : undefined,
       })
     })
@@ -71,52 +73,33 @@ function ipcCall(request) {
     })
 }
 
-const ipcEventSubscribers = new Set()
-let ipcEventListener = null
+let effectIntentConsumer = null
+const queuedEffectIntents = []
+let externalOpenWakeupQueued = false
+let appQuittingConsumer = null
+let appQuittingQueued = false
 
-function ensureIpcEventListener() {
-  if (ipcEventListener) return
-  ipcEventListener = (_event, payload) => {
-    for (const cb of ipcEventSubscribers) {
-      try {
-        cb(payload)
-      } catch (err) {
-        console.warn('[ipc] goblin:event subscriber failed', err)
-      }
-    }
+// Main may finish loading the window before the Vue intent router mounts.
+// Listen for native intents for the entire preload lifetime and retain them
+// until the renderer establishes its consumer. Discrete user actions retain
+// their order. `external-open-enqueued` is only a wake-up for paths already
+// retained by main, so one pending wake-up represents all queued paths.
+ipcRenderer.on(IPC.ipc.effectIntent, (_event, payload) => {
+  if (payload?.type === 'app-quitting') {
+    if (appQuittingConsumer === null) appQuittingQueued = true
+    else appQuittingConsumer()
+    return
   }
-  ipcRenderer.on(IPC.ipc.event, ipcEventListener)
-}
-
-function maybeDisposeIpcEventListener() {
-  if (ipcEventSubscribers.size > 0 || !ipcEventListener) return
-  ipcRenderer.off(IPC.ipc.event, ipcEventListener)
-  ipcEventListener = null
-}
-
-const effectIntentSubscribers = new Set()
-let effectIntentListener = null
-
-function ensureEffectIntentListener() {
-  if (effectIntentListener) return
-  effectIntentListener = (_event, payload) => {
-    for (const cb of effectIntentSubscribers) {
-      try {
-        cb(payload)
-      } catch (err) {
-        console.warn('[ipc] goblin:client-effect-intent subscriber failed', err)
-      }
+  if (effectIntentConsumer === null) {
+    if (payload?.type === 'external-open-enqueued') {
+      if (externalOpenWakeupQueued) return
+      externalOpenWakeupQueued = true
     }
+    queuedEffectIntents.push(payload)
+    return
   }
-  ipcRenderer.on(IPC.ipc.effectIntent, effectIntentListener)
-}
-
-function maybeDisposeEffectIntentListener() {
-  if (effectIntentSubscribers.size > 0 || !effectIntentListener) return
-  ipcRenderer.off(IPC.ipc.effectIntent, effectIntentListener)
-  effectIntentListener = null
-}
-
+  effectIntentConsumer(payload)
+})
 contextBridge.exposeInMainWorld('goblinNative', {
   invokeIpc: ({ path, input, requestId }) => ipcCall({ path, input, requestId }),
   abortIpc: (requestId) => safeInvoke(IPC.ipc.abort, { requestId }),
@@ -135,23 +118,39 @@ contextBridge.exposeInMainWorld('goblinNative', {
       ipcRenderer.send(IPC.terminal.setBadge, count)
     },
   },
-  onEvent: (cb) => {
-    ipcEventSubscribers.add(cb)
-    ensureIpcEventListener()
-    return () => {
-      ipcEventSubscribers.delete(cb)
-      maybeDisposeIpcEventListener()
-    }
-  },
+  getAccessTokenProjection: () => safeInvoke(IPC.accessToken.projection),
   rotateAccessToken: () => safeInvoke(IPC.accessToken.rotate),
-  onIntent: (cb) => {
-    effectIntentSubscribers.add(cb)
-    ensureEffectIntentListener()
+  onAppQuitting: (cb) => {
+    if (appQuittingConsumer !== null) throw new Error('App quitting consumer is already registered')
+    appQuittingConsumer = cb
+    if (appQuittingQueued) {
+      appQuittingQueued = false
+      cb()
+    }
     return () => {
-      effectIntentSubscribers.delete(cb)
-      maybeDisposeEffectIntentListener()
+      if (appQuittingConsumer === cb) appQuittingConsumer = null
     }
   },
+  onIntent: (cb) => {
+    if (effectIntentConsumer !== null) throw new Error('Client effect intent consumer is already registered')
+    while (queuedEffectIntents.length > 0) {
+      const intent = queuedEffectIntents[0]
+      cb(intent)
+      queuedEffectIntents.shift()
+      if (intent?.type === 'external-open-enqueued') externalOpenWakeupQueued = false
+    }
+    effectIntentConsumer = cb
+    return () => {
+      if (effectIntentConsumer === cb) effectIntentConsumer = null
+    }
+  },
+})
+
+// Readiness is installed only after the lifetime intent listener and complete
+// renderer bridge. Main challenges the active document when loading stops.
+ipcRenderer.on(IPC.ipc.effectIntentChallenge, (_event, generation) => {
+  if (!Number.isSafeInteger(generation) || generation <= 0) return
+  ipcRenderer.send(IPC.ipc.effectIntentReady, generation)
 })
 
 // Auth model: the client is identical in every runtime. The

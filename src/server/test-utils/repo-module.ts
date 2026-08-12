@@ -7,6 +7,7 @@ import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktre
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type * as RepoWritePaths from '#/server/modules/repo-write-paths.ts'
 import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
+import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
 
 // No library fixture spans Git, SSH, settings, invalidation, and write-coordination boundaries.
 // Keep those module mocks shared while each suite owns one observable repository behavior.
@@ -14,6 +15,14 @@ export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo')
 export const LINKED_REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-linked')
 export const WORKTREE_REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-worktree')
 export const WORKTREE_BOOTSTRAP_CONFIG_HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+
+export function repoRuntimeCapabilityForTest(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
+  return testWorkspaceRuntimeEpochCapability({
+    userId: 'test-user',
+    workspaceId,
+    workspaceRuntimeId,
+  })
+}
 
 export const successfulRemovalLifecycle = {
   beforeRemove: async () => ({ ok: true as const, message: '' }),
@@ -56,7 +65,14 @@ export async function removeRepoWorktreeForTest(
     import('#/server/modules/repo-write-paths.ts'),
     physicalWorktreeCapabilityForTest(cwd, input.worktreePath),
   ])
-  return await removeCapturedRepoWorktree(cwd, input, lifecycle, physicalWorktreeCapability, signal)
+  return await removeCapturedRepoWorktree(
+    cwd,
+    input,
+    lifecycle,
+    physicalWorktreeCapability,
+    repoRuntimeCapabilityForTest(cwd, 'test-runtime'),
+    signal,
+  )
 }
 
 export function removeLocalRepoWorktreeForTest(
@@ -86,14 +102,13 @@ export function createLocalRepoWorktreeWithBootstrap(
       worktreePath: '/tmp/repo-worktree',
       mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
     },
-    undefined,
+    repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
     {
-      worktreeBootstrap: {
-        kind: 'run',
-        configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
-        configTrusted: options.configTrusted,
-      },
+      kind: 'run',
+      configHash: WORKTREE_BOOTSTRAP_CONFIG_HASH,
+      configTrusted: options.configTrusted,
     },
+    undefined,
   )
 }
 

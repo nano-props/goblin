@@ -34,7 +34,7 @@ describe('server terminal runtime sessions', () => {
         ]
       },
     )
-    const { host, shutdown } = buildRuntime({ captureTargets })
+    const { host, shutdown } = await buildRuntime({ captureTargets })
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
 
@@ -59,7 +59,7 @@ describe('server terminal runtime sessions', () => {
   })
 
   test('create prepares a session without controller control or geometry', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
 
@@ -95,7 +95,7 @@ describe('server terminal runtime sessions', () => {
   })
 
   test('application create and fresh binding activation both invalidate terminal sessions', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
 
@@ -133,7 +133,7 @@ describe('server terminal runtime sessions', () => {
   })
 
   test('a second attachment can attach as viewer without stealing controller control', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socketA = appRealtimeSocket()
     const socketB = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socketA)
@@ -188,7 +188,7 @@ describe('server terminal runtime sessions', () => {
     // current model keeps controller intent but derives the effective
     // controller from broker presence, so a reattach can reclaim with
     // fresh geometry when no effective controller is present.
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socketA = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socketA)
 
@@ -241,7 +241,7 @@ describe('server terminal runtime sessions', () => {
   })
 
   test('realtime attach injects the socket clientId and resizes an owned session to the live terminal size', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
 
@@ -441,7 +441,7 @@ describe('server terminal runtime sessions', () => {
   })
 
   test('reconciles workspace tabs when a PTY exits naturally', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
     const opened = await requestWorkspacePaneRuntime(

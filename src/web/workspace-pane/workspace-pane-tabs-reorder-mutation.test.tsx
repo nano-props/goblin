@@ -22,6 +22,11 @@ import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/sha
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
+
+const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
+
+vi.mock('vue-sonner', () => ({ toast: feedbackMocks }))
 
 const REPO_ROOT = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tabs-reorder-mutation-repo')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
@@ -39,6 +44,8 @@ let queryClient: QueryClient
 let controls: WorkspacePaneTabsReorderMutationResult | null = null
 
 beforeEach(() => {
+  feedbackMocks.error.mockClear()
+  feedbackMocks.warning.mockClear()
   resetWorkspacePaneActionQueueForTest()
   resetWorkspacesStore()
   seedWorkspacePaneTabsRepo(WORKSPACE_RUNTIME_ID)
@@ -99,11 +106,30 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     await vi.waitFor(() => expect(readWorkspacePaneTabs()).toEqual(secondTabs))
   })
 
-  test('reports failure without mutating or rolling back the canonical cache', async () => {
+  test.each([
+    {
+      label: 'a rejected reorder',
+      failure: new Error('server unavailable'),
+      feedback: 'error' as const,
+      messageKey: 'error.workspace-operation-failed',
+      toastId: 'workspace-pane-tabs-reorder-failed',
+    },
+    {
+      label: 'an indeterminate transport outcome',
+      failure: new ClientRealtimeRequestError('response was lost', {
+        kind: 'timeout',
+        delivery: 'indeterminate',
+        outageId: 1,
+      }),
+      feedback: 'warning' as const,
+      messageKey: 'error.workspace-tabs-outcome-uncertain',
+      toastId: 'workspace-pane-tabs-outcome-uncertain',
+    },
+  ])('surfaces $label without mutating or rolling back the canonical cache', async (input) => {
     const onSettled = vi.fn()
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: async () => {
-        throw new Error('server unavailable')
+        throw input.failure
       },
     })
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
@@ -114,6 +140,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
     await vi.waitFor(() => expect(onSettled).toHaveBeenCalledOnce())
     expect(readWorkspacePaneTabs()).toEqual(sourceTabs)
+    expect(feedbackMocks[input.feedback]).toHaveBeenCalledWith(input.messageKey, { id: input.toastId })
   })
 
   test('does not send a no-op reorder', async () => {

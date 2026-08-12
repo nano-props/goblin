@@ -2,6 +2,7 @@ import * as v from 'valibot'
 import { describe, expect, test } from 'vitest'
 import {
   isWorkspacePaneTabsUpdateOperation,
+  normalizeWorkspacePaneTabsWriteResult,
   WorkspacePaneFilesystemExecutionTargetSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
 
@@ -36,6 +37,21 @@ describe('workspace pane tabs update operation schema', () => {
     expect(isWorkspacePaneTabsUpdateOperation({ type: 'reorder', tabIdentities: ['bad\0identity'] })).toBe(false)
     expect(isWorkspacePaneTabsUpdateOperation({ type: 'reorder', tabIdentities: new Array(1) })).toBe(false)
     expect(isWorkspacePaneTabsUpdateOperation({ type: 'unsupported' })).toBe(false)
+  })
+})
+
+describe('workspace pane tabs write result schema', () => {
+  test('preserves projected and committed projection failure outcomes', () => {
+    expect(
+      normalizeWorkspacePaneTabsWriteResult({ kind: 'projected', snapshot: { revision: 2, entries: [] } }),
+    ).toEqual({ kind: 'projected', snapshot: { revision: 2, entries: [] } })
+    expect(normalizeWorkspacePaneTabsWriteResult({ kind: 'committed-projection-failed' })).toEqual({
+      kind: 'committed-projection-failed',
+    })
+  })
+
+  test('rejects a bare snapshot at the write protocol boundary', () => {
+    expect(normalizeWorkspacePaneTabsWriteResult({ revision: 2, entries: [] })).toBeNull()
   })
 })
 

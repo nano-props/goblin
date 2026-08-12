@@ -94,10 +94,15 @@ describe('client bootstrap', () => {
       getBootstrap: () => bootstrap,
       invokeIpc: async () => null,
       abortIpc: async () => false,
-      onIpcEvent: () => () => {},
       onEffectIntent: () => () => {},
       pathForFile: () => '',
       saveClipboardFiles: () => Promise.resolve([]),
+      getAccessTokenProjection: async () => {
+        throw new Error('unused token projection')
+      },
+      rotateAccessToken: async () => {
+        throw new Error('unused token rotation')
+      },
       host: () => null,
       appRealtime: () => ({
         kickReconnect: () => {},
@@ -124,16 +129,7 @@ describe('client bootstrap', () => {
         onSessionClosed: () => () => {},
       }),
       workspacePaneTabs: () => ({
-        replace: async (input) => ({
-          revision: 1,
-          entries: [
-            {
-              target: input.target,
-              tabs: input.tabs,
-            },
-          ],
-        }),
-        update: async () => ({ revision: 0, entries: [] }),
+        update: async () => ({ kind: 'projected' as const, snapshot: { revision: 0, entries: [] } }),
         list: async () => ({ revision: 0, entries: [] }),
         onChanged: () => () => {},
       }),

@@ -184,14 +184,6 @@ export class WorkspacePaneEpochOverlay {
     return this.epochs.has(epochKey(scope))
   }
 
-  epochsForUser(userId: string): WorkspacePaneEpochScope[] {
-    return Array.from(this.epochsByWorkspaceId.values()).flatMap((epochs) =>
-      Array.from(epochs.values())
-        .filter((scope) => scope.userId === userId)
-        .map((scope) => ({ ...scope })),
-    )
-  }
-
   revision(scope: WorkspacePaneEpochScope): number {
     return this.epochs.get(epochKey(scope))?.overlayRevision ?? 0
   }

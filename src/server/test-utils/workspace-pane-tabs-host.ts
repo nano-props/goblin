@@ -7,7 +7,7 @@ interface TestWorkspacePaneTabsHostOptions {
   repaired?: boolean
 }
 
-// The production host has four methods; most restore tests only need an inert, inspectable implementation.
+// Most restore tests only need an inert, inspectable implementation.
 export function createTestWorkspacePaneTabsHost(options: TestWorkspacePaneTabsHostOptions = {}) {
   const restoreTabs = vi.fn<ServerWorkspacePaneTabsHost['restoreTabs']>(async () => ({
     kind: 'restored',
@@ -17,7 +17,6 @@ export function createTestWorkspacePaneTabsHost(options: TestWorkspacePaneTabsHo
   return {
     restoreTabs,
     listWorkspaceTabs: vi.fn(),
-    replaceTabs: vi.fn(),
     updateTabs: vi.fn(),
   } satisfies ServerWorkspacePaneTabsHost
 }

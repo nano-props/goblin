@@ -33,6 +33,11 @@ import type { PhysicalWorktreeAdmissionLease } from '#/server/worktree-removal/p
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
+  assertWorkspaceRuntimeEpochCapability,
+  type WorkspaceRuntimeEpochCapability,
+  type WorkspaceRuntimeMembershipCapability,
+} from '#/server/modules/workspace-runtimes.ts'
+import {
   canonicalTabsForTarget,
   projectCanonicalEntries,
   runtimeTargetKey,
@@ -62,6 +67,7 @@ export type WorkspacePaneLayoutValidationResult =
 
 export interface WorkspacePaneLayoutCommitResult {
   affectedUserIds: string[]
+  projectionCurrent: boolean
 }
 
 type WorkspacePaneLayoutMutationTarget =
@@ -72,27 +78,23 @@ type WorkspacePaneLayoutMutationTarget =
       physicalWorktreeLease: PhysicalWorktreeAdmissionLease
     }
 
-export type WorkspacePaneLayoutReplaceInput = WorkspacePaneEpochScope &
-  WorkspacePaneLayoutMutationTarget & {
-    tabs: readonly WorkspacePaneTabEntry[]
-    validTargets: readonly WorkspacePaneTargetProjection[]
-    providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
-    assertCurrent?: () => void
-  }
-
 export type WorkspacePaneLayoutUpdateInput = WorkspacePaneEpochScope &
   WorkspacePaneLayoutMutationTarget & {
     operation: WorkspacePaneTabsUpdateOperation
     validTargets: readonly WorkspacePaneTargetProjection[]
     providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
-    assertCurrent?: () => void
+    epochCapability: WorkspaceRuntimeEpochCapability
   }
 
-export interface WorkspacePaneLayoutSnapshotInput {
+interface WorkspacePaneLayoutProjectionInput {
   scope: WorkspacePaneEpochScope
   validTargets: readonly WorkspacePaneTargetProjection[]
   providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
   knownLayout?: WorkspacePaneDurableLayout
+}
+
+export interface WorkspacePaneLayoutSnapshotInput extends WorkspacePaneLayoutProjectionInput {
+  epochCapability: WorkspaceRuntimeEpochCapability
 }
 
 export type WorkspacePaneLayoutValidationInput = WorkspacePaneEpochScope & {
@@ -100,14 +102,13 @@ export type WorkspacePaneLayoutValidationInput = WorkspacePaneEpochScope & {
   physicalTargets: readonly { target: RuntimeWorkspacePaneTarget; lease: PhysicalWorktreeAdmissionLease }[]
   expectedWorkspaceEntry: WorkspaceSessionEntry
   providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
-  assertCurrent?: () => void
+  epochCapability: WorkspaceRuntimeEpochCapability
 }
 
 export interface WorkspacePaneLayoutOperation {
-  replace(input: WorkspacePaneLayoutReplaceInput): Promise<WorkspacePaneLayoutCommitResult>
   update(input: WorkspacePaneLayoutUpdateInput): Promise<WorkspacePaneLayoutCommitResult>
   snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot>
-  projectEntriesForAdmission(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot['entries']>
+  projectEntriesForAdmission(input: WorkspacePaneLayoutProjectionInput): Promise<WorkspacePaneTabsSnapshot['entries']>
   validateMembershipAndSnapshot(input: WorkspacePaneLayoutValidationInput): Promise<WorkspacePaneLayoutValidationResult>
   commitRuntimeTabPlacement(
     input: WorkspacePaneEpochScope & {
@@ -120,6 +121,7 @@ export interface WorkspacePaneLayoutOperation {
       }
       validTargets: readonly WorkspacePaneTargetProjection[]
       stagedProviderSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+      epochCapability: WorkspaceRuntimeMembershipCapability
     },
     admissionCallback: () => void,
   ): Promise<WorkspacePaneTabsSnapshot>
@@ -128,6 +130,7 @@ export interface WorkspacePaneLayoutOperation {
     input: WorkspacePaneEpochScope & {
       targets: readonly WorkspacePaneTargetProjection[]
       physicalTargets: readonly { target: RuntimeWorkspacePaneTarget; lease: PhysicalWorktreeAdmissionLease }[]
+      epochCapability: WorkspaceRuntimeEpochCapability
     },
   ): void
   indexedAdmissionLeases(scope: WorkspacePaneEpochScope): PhysicalWorktreeAdmissionLease[]
@@ -163,7 +166,6 @@ export class WorkspacePaneLayoutAggregate {
     try {
       return await queue.add(() =>
         task({
-          replace: async (input) => await this.replace(input),
           update: async (input) => await this.update(input),
           snapshot: async (input) => await this.snapshot(input),
           projectEntriesForAdmission: async (input) => await this.projectEntriesForAdmission(input),
@@ -185,25 +187,20 @@ export class WorkspacePaneLayoutAggregate {
     }
   }
 
-  private async replace(input: WorkspacePaneLayoutReplaceInput): Promise<WorkspacePaneLayoutCommitResult> {
-    return await this.mutate(input, () => [...input.tabs], { retryConflicts: false })
-  }
-
   private async update(input: WorkspacePaneLayoutUpdateInput): Promise<WorkspacePaneLayoutCommitResult> {
-    return await this.mutate(input, (current) => workspacePaneTabsWithUpdateOperation(current, input.operation), {
-      retryConflicts: true,
-    })
+    return await this.mutate(input, (current) => workspacePaneTabsWithUpdateOperation(current, input.operation))
   }
 
   private async snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot> {
-    const { scope, validTargets, providerSnapshots, knownLayout } = input
+    const { scope, validTargets, providerSnapshots, knownLayout, epochCapability } = input
     const layout = knownLayout ?? (await this.repository.load(scope.workspaceId)).layout
+    assertWorkspaceRuntimeEpochCapability(epochCapability, scope)
     const entries = this.projectEntries(scope, layout, validTargets, providerSnapshots)
     return { revision: this.revision(scope, layout, validTargets, providerSnapshots, entries), entries }
   }
 
   private async projectEntriesForAdmission(
-    input: WorkspacePaneLayoutSnapshotInput,
+    input: WorkspacePaneLayoutProjectionInput,
   ): Promise<WorkspacePaneTabsSnapshot['entries']> {
     const { scope, validTargets, providerSnapshots } = input
     const layout = (await this.repository.load(scope.workspaceId)).layout
@@ -213,13 +210,13 @@ export class WorkspacePaneLayoutAggregate {
   private async validateMembershipAndSnapshot(
     input: WorkspacePaneLayoutValidationInput,
   ): Promise<WorkspacePaneLayoutValidationResult> {
-    input.assertCurrent?.()
+    assertWorkspaceRuntimeEpochCapability(input.epochCapability, input)
     const outcome = await this.restoreTransaction.validateMembershipAndLoad({
       workspaceId: input.workspaceId,
       expectedWorkspaceEntry: input.expectedWorkspaceEntry,
     })
     if (outcome.kind === 'membership-conflict') return { kind: 'membership-conflict' }
-    input.assertCurrent?.()
+    assertWorkspaceRuntimeEpochCapability(input.epochCapability, input)
     const overlayChanged = this.commitProjectionTargets({
       ...input,
       targets: input.validTargets,
@@ -232,6 +229,7 @@ export class WorkspacePaneLayoutAggregate {
         validTargets: input.validTargets,
         providerSnapshots: input.providerSnapshots,
         knownLayout: outcome.snapshot.layout,
+        epochCapability: input.epochCapability,
       }),
       affectedUserIds: this.affectedUserIds(input, false, overlayChanged ? [input.userId] : []),
     }
@@ -254,6 +252,7 @@ export class WorkspacePaneLayoutAggregate {
       }
       validTargets: readonly WorkspacePaneTargetProjection[]
       stagedProviderSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+      epochCapability: WorkspaceRuntimeMembershipCapability
     },
     admissionCallback: () => void,
   ): Promise<WorkspacePaneTabsSnapshot> {
@@ -287,6 +286,7 @@ export class WorkspacePaneLayoutAggregate {
       ),
       entries,
     }
+    assertWorkspaceRuntimeEpochCapability(input.epochCapability, input)
     admissionCallback()
     this.overlay.replaceEpochWith(stagedOverlay, input)
     const key = epochKey(input)
@@ -304,17 +304,12 @@ export class WorkspacePaneLayoutAggregate {
     return this.overlay.activeEpochs(workspaceId)
   }
 
-  epochsForUser(userId: string): WorkspacePaneEpochScope[] {
-    return this.overlay.epochsForUser(userId)
-  }
-
   private async mutate(
-    input: WorkspacePaneLayoutReplaceInput | WorkspacePaneLayoutUpdateInput,
+    input: WorkspacePaneLayoutUpdateInput,
     applyIntent: (current: WorkspacePaneTabEntry[]) => WorkspacePaneTabEntry[],
-    policy: { retryConflicts: boolean },
   ): Promise<WorkspacePaneLayoutCommitResult> {
     for (let conflicts = 0; ; conflicts += 1) {
-      input.assertCurrent?.()
+      assertWorkspaceRuntimeEpochCapability(input.epochCapability, input)
       const current = await this.repository.load(input.workspaceId)
       const target = resolveMutationTarget(input, input.validTargets)
       if (!target) throw new Error('error.workspace-tabs-target-invalid')
@@ -341,15 +336,17 @@ export class WorkspacePaneLayoutAggregate {
           entry,
         ],
       })
-      input.assertCurrent?.()
+      assertWorkspaceRuntimeEpochCapability(input.epochCapability, input)
       const outcome = await this.repository.compareAndSwap({
         workspaceId: input.workspaceId,
         expected: current.layout,
         replacement,
+        epochCapability: input.epochCapability,
       })
       if (outcome.kind === 'write-failure') throw outcome.error
-      if (outcome.kind === 'conflict' && policy.retryConflicts && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
+      if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
       if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
+      if (!input.epochCapability.isCurrent()) return this.commitResult(input, outcome.changed, [], false)
       const placementChanged = this.overlay.recordMixedOrder({ ...input, target: target.target, tabs: mixedTabs })
       if (input.physicalWorktreeLease) {
         this.overlay.registerPhysicalTarget({
@@ -376,8 +373,10 @@ export class WorkspacePaneLayoutAggregate {
     input: WorkspacePaneEpochScope & {
       targets: readonly WorkspacePaneTargetProjection[]
       physicalTargets: readonly { target: RuntimeWorkspacePaneTarget; lease: PhysicalWorktreeAdmissionLease }[]
+      epochCapability: WorkspaceRuntimeEpochCapability
     },
   ): boolean {
+    assertWorkspaceRuntimeEpochCapability(input.epochCapability, input)
     const next = targetMap(input.targets)
     const overlayChanged = this.overlay.retainTargets(input, new Set(next.keys()))
     for (const physical of input.physicalTargets) {
@@ -399,9 +398,11 @@ export class WorkspacePaneLayoutAggregate {
     scope: WorkspacePaneEpochScope,
     durableLayoutChanged: boolean,
     localAffectedUserIds: readonly string[] = [],
+    projectionCurrent = true,
   ): WorkspacePaneLayoutCommitResult {
     return {
       affectedUserIds: this.affectedUserIds(scope, durableLayoutChanged, localAffectedUserIds),
+      projectionCurrent,
     }
   }
 

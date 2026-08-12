@@ -89,7 +89,7 @@ function startAuthenticatedWorkspaceRestoreRun(
   void waitForPromiseWithSignal(appQueryClient.fetchQuery(externalAppsQueryOptions()), timeout.signal).catch((err) => {
     if (!timeout.signal.aborted) bootstrapLog.warn('external apps priming failed', { err })
   })
-  void hydrateNonCriticalAuthenticatedState(settingsSnapshot, timeout.signal)
+  void hydrateNonCriticalAuthenticatedState(timeout.signal)
   void restoreBootSession(settingsSnapshot, timeout.signal, activeWorkspaceId).then(async (outcome) => {
     if (!cancelled && outcome.status === 'failed' && timeout.signal.aborted) {
       await Promise.all([
@@ -109,20 +109,9 @@ function startAuthenticatedWorkspaceRestoreRun(
   }
 }
 
-async function hydrateNonCriticalAuthenticatedState(
-  settingsSnapshot: Promise<SettingsSnapshot>,
-  signal: AbortSignal,
-): Promise<void> {
+async function hydrateNonCriticalAuthenticatedState(signal: AbortSignal): Promise<void> {
   await Promise.all([
-    runOptionalBootstrapTask(
-      'theme hydrate',
-      async () => {
-        await themeStore
-          .getState()
-          .hydrateFromSettingsSnapshot(await waitForPromiseWithSignal(settingsSnapshot, signal))
-      },
-      signal,
-    ),
+    runOptionalBootstrapTask('theme hydrate', async () => await themeStore.getState().hydrate(), signal),
     Promise.resolve().then(() => i18nStore.getState().subscribeInvalidation()),
   ])
 }

@@ -122,6 +122,37 @@ describe('AppTerminalProjectionRecovery', () => {
     )
   })
 
+  test('moves a failed projection back to pending before an explicit retry and records another failure', async () => {
+    let phase: 'failed' | 'pending' = 'failed'
+    const beginHydration = vi.fn(() => {
+      phase = 'pending'
+    })
+    const markFailed = vi.fn()
+    const failure = new Error('catalog still unavailable')
+    const recovery = new AppTerminalProjectionRecovery({
+      projection: {
+        reconcileServerSessionsSnapshot: vi.fn(() => true),
+        resynchronizeConnectedViews: vi.fn(),
+        terminalSessionsCatalogCoverageRevision: vi.fn(() => null),
+      },
+      readClientId: () => 'client-test',
+      recoverSessions: async () => await Promise.reject(failure),
+      hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase }),
+      beginHydration,
+      markReady: vi.fn(),
+      markFailed,
+      isFocusRefreshDue: () => true,
+      logFailure: vi.fn(),
+    })
+
+    recovery.retry(new RuntimeProjectionScope(TARGET, () => true))
+
+    expect(beginHydration).toHaveBeenCalledWith(TARGET.workspaceId, TARGET.workspaceRuntimeId)
+    await vi.waitFor(() =>
+      expect(markFailed).toHaveBeenCalledWith(TARGET.workspaceId, TARGET.workspaceRuntimeId, failure.message),
+    )
+  })
+
   test('classifies a rejected active-runtime snapshot as a pending hydration failure', async () => {
     const markFailed = vi.fn()
     const recovery = new AppTerminalProjectionRecovery({

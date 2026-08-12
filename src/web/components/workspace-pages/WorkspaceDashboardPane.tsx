@@ -8,6 +8,7 @@ import { RepoReadNotice } from '#/web/components/RepoReadNotice.tsx'
 import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { DirectoryOverviewContent } from '#/web/components/workspace-pages/DirectoryOverviewContent.tsx'
+import { WorkspaceDashboardTerminals } from '#/web/components/workspace-pages/WorkspaceDashboardTerminals.tsx'
 import {
   DashboardAttention,
   DashboardHeader,
@@ -101,6 +102,7 @@ export const WorkspaceDashboardPane = defineComponent<WorkspaceDashboardPaneProp
           <ScrollArea class="min-h-0 flex-1 bg-background">
             <div class="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 sm:p-5">
               {renderDashboardContent(currentWorkspace, compact)}
+              {currentWorkspace ? <WorkspaceDashboardTerminals workspaceId={currentWorkspace.id} /> : null}
             </div>
           </ScrollArea>
         </WorkspacePagePane>

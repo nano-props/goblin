@@ -111,10 +111,28 @@ happened.
 
 ### Detached clients
 
-Temporary loss of all views does not destroy a session. Presence determines
-whether stored controller intent is effective; offline intent grants no input
-authority. Detached retention is bounded by server cleanup policy, after which
-resources may be retired.
+Temporary or indefinite loss of all views does not destroy a session. Presence
+determines whether stored controller intent is effective; offline intent grants
+no input authority. A session remains owned by its exact workspace runtime
+until the user explicitly closes it or an authoritative workspace, worktree, or
+runtime transition invalidates it. Native PTY retirement and tab projection
+convergence remain post-commit effects of those explicit invalidations.
+Server shutdown is the final resource boundary and retires every remaining PTY;
+there is no elapsed-time expiry for detached sessions.
+
+The server uses a global soft admission ceiling of 1,024 terminal resources,
+including slots reserved by creations that have not committed yet and
+invalidated PTYs whose native retirement has not completed. Reusing an existing
+session does not consume another slot. The ceiling prevents unbounded
+steady-state growth; it is not a hard native-resource quota, so a synchronous
+resource-ownership handoff may transiently exceed it. At capacity, a new
+creation fails explicitly; the user can close a terminal before trying again.
+The server never expires or automatically evicts a session to make room.
+
+An explicit close is accepted when the session owner publishes its serialized,
+single-flight retirement before revoking PTY ownership. Once accepted, later
+client membership loss does not cancel or replay that close; PTY termination,
+authority removal, and pane projection finish under the admitted operation.
 
 ## Workspace-pane integration
 
@@ -127,6 +145,13 @@ resources may be retired.
   infer a tab from local xterm state.
 - Terminal session collections and workspace-pane tab collections keep
   independent revisions.
+- The workspace dashboard derives one terminal list from the live session
+  projection across workspace-root and Git-worktree targets. Selecting an item
+  opens that existing session; recent-output and bell markers reuse the same
+  session presentation state as branch navigation.
+- Dashboard terminals follow workspace-root, repository branch/worktree, and
+  canonical pane-tab order. Missing branch or tab projections retain stable
+  session order and never hide an established live session.
 - Closing a tab is sequential: plan the close-back destination, await server
   retirement, then apply canonical projection and navigation. Projection or
   navigation failure after server commit never reopens or compensates the

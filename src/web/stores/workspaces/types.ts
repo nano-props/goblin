@@ -33,19 +33,24 @@ export type RepoEvent =
   | { id: number; kind: 'result'; result: RepoMutationExecResult; action?: RepoEventAction }
   | { id: number; kind: 'error'; message: string }
 
-/** Discriminated union: a successful open guarantees `workspaceId`; a failed
- *  open carries a translation key or raw message. The shape forces
- *  callers to narrow before reading either field. */
-export interface OpenWorkspacePostOpenError {
-  kind: 'recent-workspace'
-  message: string
-}
+/** A successful open may be activated immediately. An uncertain open preserves
+ *  the already-established workspace projection and exposes its identity, but
+ *  callers must stop automation and let the user inspect it deliberately. */
+export type OpenWorkspacePostOpenError =
+  | { kind: 'recent-workspace'; message: string }
+  | { kind: 'operation-outcome-uncertain'; message: 'error.operation-outcome-uncertain' }
+
+export type OpenWorkspaceFailure =
+  | { ok: false; kind: 'uncertain'; workspaceId: WorkspaceId; message: 'error.operation-outcome-uncertain' }
+  | { ok: false; kind: 'failed'; message: string }
 
 export type OpenWorkspaceResult =
-  | { ok: true; workspaceId: WorkspaceId; postOpenEffects?: Promise<OpenWorkspacePostOpenError[]> }
-  | { ok: false; message: string }
+  { ok: true; workspaceId: WorkspaceId; postOpenEffects?: Promise<OpenWorkspacePostOpenError[]> } | OpenWorkspaceFailure
 
-export type CloseWorkspaceResult = { ok: true } | { ok: false; message: string }
+export type CloseWorkspaceResult =
+  | { ok: true }
+  | { ok: false; kind: 'uncertain'; message: 'error.operation-outcome-uncertain' }
+  | { ok: false; kind: 'failed'; message: string }
 
 export interface WorkspaceUiState {
   /** Target-scoped selected workspace pane tab. Worktree-backed panes are keyed by
@@ -252,7 +257,9 @@ export interface WorkspaceMembershipActions {
    * the server starts a newer monotonic attempt.
    * Returns the new outcome, or `null` for non-remote ids.
    */
-  retryRemoteWorkspaceConnection: (id: WorkspaceId) => Promise<{ ok: boolean; reason?: string } | null>
+  retryRemoteWorkspaceConnection: (
+    id: WorkspaceId,
+  ) => Promise<{ ok: true } | { ok: false; kind: 'failed'; reason: string } | { ok: false; kind: 'uncertain' } | null>
 }
 
 export interface WorkspaceRuntimeRestoreActions {

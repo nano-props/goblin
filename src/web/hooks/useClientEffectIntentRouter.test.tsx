@@ -6,7 +6,7 @@ import {
   createBranchSnapshot,
 } from '#/web/test-utils/repo-store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 
 import { waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
@@ -32,7 +32,7 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { repoPresentationFromQueryForTest } from '#/web/test-utils/repo-store.ts'
-import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
   terminalExecutionPath,
   terminalPresentationBranch,
@@ -41,7 +41,8 @@ import {
 } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { IpcEvent } from '#/shared/api-types.ts'
+import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
+import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
@@ -55,7 +56,7 @@ import {
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
-vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
+vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentWorkspaceHistory: vi.fn(async () => {}),
@@ -67,13 +68,16 @@ vi.mock('#/web/settings-actions.ts', () => ({
   removeWorkspaceFromSession: appDataClientMocks.removeWorkspaceFromSession,
 }))
 
-const ipcEventListeners = new Set<(event: IpcEvent) => void>()
 const intentListeners = new Set<(event: any) => void>()
 let nativeIntentSubscriptionStarts = 0
 const closeAllOverlays = vi.fn()
+const openWorkspacePathDialogSpy = vi.fn()
+const openCloneRepoSpy = vi.fn()
+const openRemoteWorkspaceSpy = vi.fn()
 let overlayOpen = false
 let workspaceShortcutSuppressed = false
 let currentWorkspaceId: WorkspaceId | null = null
+const authenticatedBootstrapState = ref<AuthenticatedAppBootstrapState>({ status: 'ready' })
 let currentBranchName: string | null = null
 let currentWorkspacePaneRoute: WorkspacePaneRoute | null = null
 let currentFilesystemTarget: WorkspacePaneFilesystemTarget | null = null
@@ -83,17 +87,22 @@ const closeRepoSpy = vi.fn()
 const showRepoBranchWorkspacePaneTabSpy = vi.fn()
 const showRepoBranchTerminalSessionSpy = vi.fn()
 const showWorkspaceRootPaneTabSpy = vi.fn()
+const commitFilesystemWorkspacePaneRouteSpy = vi.fn()
 const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
 beforeEach(() => {
   resetWorkspacesStore()
   setClientBridgeForTests(null)
   closeAllOverlays.mockClear()
+  openWorkspacePathDialogSpy.mockClear()
+  openCloneRepoSpy.mockClear()
+  openRemoteWorkspaceSpy.mockClear()
   activateWorkspaceSpy.mockClear()
   closeRepoSpy.mockClear()
   showRepoBranchWorkspacePaneTabSpy.mockClear()
   showRepoBranchTerminalSessionSpy.mockClear()
   showWorkspaceRootPaneTabSpy.mockClear()
+  commitFilesystemWorkspacePaneRouteSpy.mockClear()
   appDataClientMocks.clearRecentWorkspaceHistory.mockReset()
   appDataClientMocks.clearRecentWorkspaceHistory.mockResolvedValue(undefined)
   appDataClientMocks.removeWorkspaceFromSession.mockReset()
@@ -103,10 +112,13 @@ beforeEach(() => {
   overlayOpen = false
   workspaceShortcutSuppressed = false
   currentWorkspaceId = null
+  authenticatedBootstrapState.value = { status: 'ready' }
   currentBranchName = null
   currentWorkspacePaneRoute = null
   currentFilesystemTarget = null
   nativeIntentSubscriptionStarts = 0
+  vi.mocked(toast.error).mockClear()
+  vi.mocked(toast.warning).mockClear()
   setTerminalSessionCommandBridge(null)
   navigation = observedAppNavigationActionsForTest({
     currentWorkspacePaneRoute: () => undefined,
@@ -134,6 +146,11 @@ beforeEach(() => {
       showWorkspaceRootPaneTabSpy(workspaceId, presentation)
       return true
     },
+    commitFilesystemWorkspacePaneRoute: async (target, route, options) => {
+      commitFilesystemWorkspacePaneRouteSpy(target, route)
+      options?.onCommit?.()
+      return true
+    },
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
@@ -144,12 +161,6 @@ beforeEach(() => {
     value: currentNativeBridge({
       invokeIpc: vi.fn(async () => null),
       abortIpc: vi.fn(async () => true),
-      onEvent: vi.fn((cb: (event: IpcEvent) => void) => {
-        ipcEventListeners.add(cb)
-        return () => {
-          ipcEventListeners.delete(cb)
-        }
-      }),
       onIntent: vi.fn((cb: (event: any) => void) => {
         nativeIntentSubscriptionStarts += 1
         intentListeners.add(cb)
@@ -168,13 +179,118 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  ipcEventListeners.clear()
   intentListeners.clear()
   setClientBridgeForTests(null)
   setTerminalSessionCommandBridge(null)
 })
 
 describe('useClientEffectIntentRouter', () => {
+  test('dispatches global dialogs while workspace bootstrap is still restoring', async () => {
+    currentWorkspaceId = null
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    await renderHookHost()
+
+    await flushTestUpdates(() => {
+      for (const listener of intentListeners) {
+        listener({ type: 'open-workspace-path-requested' })
+        listener({ type: 'clone-repo-requested' })
+        listener({ type: 'open-remote-workspace-requested' })
+      }
+    })
+
+    await waitFor(() => {
+      expect(openWorkspacePathDialogSpy).toHaveBeenCalledOnce()
+      expect(openCloneRepoSpy).toHaveBeenCalledOnce()
+      expect(openRemoteWorkspaceSpy).toHaveBeenCalledOnce()
+    })
+  })
+
+  test('admits a cold-start terminal bell only after bootstrap restores its workspace authority', async () => {
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace')
+    const workspaceRuntimeId = 'workspace-runtime-test'
+    const terminalSessionId = 'term-111111111111111111111'
+    await renderHookHost()
+
+    await flushTestUpdates(() => {
+      for (const listener of intentListeners) {
+        listener({
+          type: 'terminal-bell-click',
+          terminalSessionId,
+          session: {
+            target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId },
+            presentation: { kind: 'workspace-root' },
+          },
+        })
+      }
+    })
+    expect(commitFilesystemWorkspacePaneRouteSpy).not.toHaveBeenCalled()
+
+    const workspace = emptyWorkspace(workspaceId, workspaceRuntimeId)
+    workspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      workspaceId,
+      workspaceRuntimeId,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+    })
+    await flushTestUpdates(() => {
+      authenticatedBootstrapState.value = { status: 'ready' }
+    })
+
+    await waitFor(() => {
+      expect(commitFilesystemWorkspacePaneRouteSpy).toHaveBeenCalledWith(
+        {
+          routeTarget: { kind: 'workspace-root', workspaceId },
+          workspaceRuntimeId,
+          authority: { kind: 'workspace-runtime' },
+        },
+        { kind: 'terminal', terminalSessionId },
+      )
+    })
+  })
+
+  test('rejects pending intents on bootstrap failure without replaying them after a later retry', async () => {
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    const workspaceId = workspaceIdForTest('goblin+file:///pending-workspace')
+    const workspace = emptyWorkspace(workspaceId, 'pending-runtime')
+    workspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
+    currentWorkspaceId = workspaceId
+    await renderHookHost()
+    await flushTestUpdates(() => {
+      for (const listener of intentListeners) listener({ type: 'close-workspace-requested' })
+    })
+
+    authenticatedBootstrapState.value = { status: 'failed', message: 'restore failed for test' }
+    await flushTestUpdates(() => {})
+    expect(closeRepoSpy).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('workspace-restore.failed')
+
+    await flushTestUpdates(() => {
+      authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+      authenticatedBootstrapState.value = { status: 'ready' }
+    })
+    expect(closeRepoSpy).not.toHaveBeenCalled()
+  })
+
+  test('does not retain a workspace-only intent when the ready route has no workspace target', async () => {
+    currentWorkspaceId = null
+    await renderHookHost()
+    await flushTestUpdates(() => {
+      for (const listener of intentListeners) listener({ type: 'close-workspace-requested' })
+    })
+
+    const repo = seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo',
+      currentBranch: 'main',
+      currentBranchName: 'main',
+    })
+    currentWorkspaceId = repo.id
+    await flushTestUpdates(() => {})
+
+    expect(closeRepoSpy).not.toHaveBeenCalled()
+  })
+
   test('keeps one ingress subscription across route renders and reads the latest route state', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -228,6 +344,13 @@ describe('useClientEffectIntentRouter', () => {
     })
     currentWorkspaceId = repo.id
     const terminalSessionId = 'term-222222222222222222222'
+    setWorkspacePaneTabsForTargetQueryData({
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      branchName: 'feature/test',
+      worktreePath: '/tmp/repo-feature',
+      tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+    })
 
     await renderHookHost()
     seedInitialObservedWorkspacePaneRouteForTest({
@@ -266,6 +389,12 @@ describe('useClientEffectIntentRouter', () => {
     const workspace = emptyWorkspace(workspaceId, 'workspace-runtime-test')
     workspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
     const terminalSessionId = 'term-111111111111111111111'
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      workspaceId,
+      workspaceRuntimeId: workspace.workspaceRuntimeId,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+    })
 
     await renderHookHost()
     await flushTestUpdates(async () => {
@@ -281,10 +410,15 @@ describe('useClientEffectIntentRouter', () => {
       }
     })
 
-    expect(showWorkspaceRootPaneTabSpy).toHaveBeenCalledWith(workspaceId, {
-      kind: 'terminal',
-      terminalSessionId,
-    })
+    expect(commitFilesystemWorkspacePaneRouteSpy).toHaveBeenCalledWith(
+      {
+        routeTarget: { kind: 'workspace-root', workspaceId },
+        workspaceRuntimeId: workspace.workspaceRuntimeId,
+        authority: { kind: 'workspace-runtime' },
+      },
+      { kind: 'terminal', terminalSessionId },
+    )
+    expect(showWorkspaceRootPaneTabSpy).not.toHaveBeenCalled()
     expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
   })
 
@@ -317,6 +451,13 @@ describe('useClientEffectIntentRouter', () => {
     navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
     currentWorkspaceId = repo.id
     const terminalSessionId = 'term-222222222222222222222'
+    setWorkspacePaneTabsForTargetQueryData({
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      branchName: 'feature/test',
+      worktreePath: '/tmp/repo-feature',
+      tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+    })
 
     await renderHookHost()
     seedInitialObservedWorkspacePaneRouteForTest({
@@ -500,6 +641,42 @@ describe('useClientEffectIntentRouter', () => {
     })
   })
 
+  test('does not let an earlier open-recent result replace a later navigation intent', async () => {
+    const first = Promise.withResolvers<OpenWorkspaceResult>()
+    const second = Promise.withResolvers<OpenWorkspaceResult>()
+    const firstWorkspaceId = workspaceIdForTest('goblin+file:///tmp/first-recent-workspace')
+    const secondWorkspaceId = workspaceIdForTest('goblin+file:///tmp/second-recent-workspace')
+    workspacesStore.setState({
+      openWorkspaceMembership: vi
+        .fn()
+        .mockImplementationOnce(async () => await first.promise)
+        .mockImplementationOnce(async () => await second.promise),
+    })
+
+    await renderHookHost()
+
+    await flushTestUpdates(() => {
+      for (const listener of intentListeners) {
+        listener({ type: 'open-recent-workspace-requested', entry: { id: firstWorkspaceId } })
+        listener({ type: 'open-recent-workspace-requested', entry: { id: secondWorkspaceId } })
+      }
+    })
+    second.resolve({ ok: true, workspaceId: secondWorkspaceId })
+    await waitFor(() => expect(activateWorkspaceSpy).toHaveBeenCalledWith(secondWorkspaceId))
+    first.resolve({
+      ok: false,
+      kind: 'uncertain',
+      workspaceId: firstWorkspaceId,
+      message: 'error.operation-outcome-uncertain',
+    })
+    await flushTestUpdates(() => {})
+
+    expect(activateWorkspaceSpy).toHaveBeenCalledTimes(1)
+    expect(toast.warning).toHaveBeenCalledWith('error.operation-outcome-uncertain', {
+      id: 'workspace-open-outcome-uncertain',
+    })
+  })
+
   test('workspace view menu actions are suppressed while settings-like routes are active', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
@@ -604,13 +781,21 @@ describe('useClientEffectIntentRouter', () => {
           ...visibleSessionIds.map((id) => workspacePaneRuntimeTabEntry('terminal', id)),
         ],
       })
-      return Promise.resolve(true)
+      return Promise.resolve({ kind: 'committed' as const, projection: 'applied' as const })
     })
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () =>
         terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey, visibleSessionIds),
       createTerminal,
+      createTerminalWithAdmission: vi.fn(async (base) => ({
+        terminalSessionId: await createTerminal(base),
+        presentation: base.presentation,
+        requestRole: 'leader' as const,
+        resourceDisposition: 'created' as const,
+        runtimeProjectionApplied: true,
+      })),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
     workspacePaneTabsTestBridge = installWorkspacePaneTabsTestBridge({
@@ -701,6 +886,18 @@ describe('useClientEffectIntentRouter', () => {
     })
   })
 
+  test('does not drain startup external paths before bootstrap admission', async () => {
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    await renderHookHost()
+    await flushTestUpdates(() => {})
+    expect(consumeExternalOpenPathsSpy).not.toHaveBeenCalled()
+
+    await flushTestUpdates(() => {
+      authenticatedBootstrapState.value = { status: 'ready' }
+    })
+    await waitFor(() => expect(consumeExternalOpenPathsSpy).toHaveBeenCalledOnce())
+  })
+
   test('theme menu intents update theme through the client store', async () => {
     const setPref = vi.fn(async () => {})
     themeStore.setState((state) => ({ ...state, setPref }))
@@ -714,6 +911,22 @@ describe('useClientEffectIntentRouter', () => {
     await waitFor(() => {
       expect(setPref).toHaveBeenCalledWith('dark')
     })
+  })
+
+  test('does not block an unrelated dialog behind a pending settings intent', async () => {
+    const write = Promise.withResolvers<void>()
+    themeStore.setState((state) => ({ ...state, setPref: vi.fn(async () => await write.promise) }))
+    await renderHookHost()
+
+    await flushTestUpdates(() => {
+      for (const listener of intentListeners) {
+        listener({ type: 'theme-pref-set-requested', pref: 'dark' })
+        listener({ type: 'open-workspace-path-requested' })
+      }
+    })
+
+    expect(openWorkspacePathDialogSpy).toHaveBeenCalledOnce()
+    write.resolve()
   })
 
   test('language menu intents update i18n through the client store', async () => {
@@ -765,6 +978,7 @@ const HookHost = defineComponent({
   name: 'ClientEffectIntentRouterTestHost',
   setup() {
     useClientEffectIntentRouter({
+      authenticatedBootstrapState,
       navigation: () => navigation,
       currentWorkspaceId: () => currentWorkspaceId,
       currentWorkspacePaneCommandTarget: () =>
@@ -776,9 +990,9 @@ const HookHost = defineComponent({
             }
           : null,
       closeAllOverlays,
-      openWorkspacePathDialog: () => {},
-      openCloneRepo: () => {},
-      openRemoteWorkspace: () => {},
+      openWorkspacePathDialog: openWorkspacePathDialogSpy,
+      openCloneRepo: openCloneRepoSpy,
+      openRemoteWorkspace: openRemoteWorkspaceSpy,
       openCreateWorktree: () => {},
       isOverlayOpen: () => overlayOpen,
       isWorkspaceShortcutSuppressed: () => workspaceShortcutSuppressed,

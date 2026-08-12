@@ -1,7 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { BrowserWindow, Notification as ElectronNotification } from 'electron'
 import { wireTerminalIpc } from '#/main/terminal.ts'
-import { registerTrustedAppUrl, registerTrustedWebContents } from '#/main/ipc/trusted-webcontents.ts'
+import { registerClientWindowSurface } from '#/main/client-surface-registry.ts'
+import { registerTrustedAppUrl } from '#/main/ipc/trusted-webcontents.ts'
 import {
   TERMINAL_NOTIFY_BELL_CHANNEL,
   TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
@@ -12,24 +13,33 @@ import {
 // hoisted to the top of the file by vitest's transformer. Hoist the
 // storage too so the factory can write to it before the surrounding
 // module body has run.
-const { ipcHandlers, mockNotificationEmitting, broadcastClientEffectIntent } = vi.hoisted(() => {
-  const ipcHandlers = new Map<string, (_event: unknown, input: unknown) => unknown>()
-  const broadcastClientEffectIntent = vi.fn()
-  const mockNotificationEmitting = (emitEvent: 'show' | 'failed') =>
-    function MockNotification(this: ElectronNotification) {
-      const listeners = new Map<string, () => void>()
-      this.once = vi.fn((event: string, cb: () => void) => {
-        listeners.set(event, cb)
-        return this
-      }) as unknown as ElectronNotification['once']
-      this.show = vi.fn(() => {
-        listeners.get(emitEvent)?.()
-      })
+const { ipcHandlers, mockNotificationEmitting, activatePrimaryWindow, sendPrimaryWindowEffectIntent, showErrorBox } =
+  vi.hoisted(() => {
+    const ipcHandlers = new Map<string, (_event: unknown, input: unknown) => unknown>()
+    const activatedWindow = { id: 'primary-window' }
+    const activatePrimaryWindow = vi.fn(async () => activatedWindow)
+    const sendPrimaryWindowEffectIntent = vi.fn(async () => {})
+    const mockNotificationEmitting = (emitEvent: 'show' | 'failed') =>
+      function MockNotification(this: ElectronNotification) {
+        const listeners = new Map<string, () => void>()
+        this.once = vi.fn((event: string, cb: () => void) => {
+          listeners.set(event, cb)
+          return this
+        }) as unknown as ElectronNotification['once']
+        this.show = vi.fn(() => {
+          listeners.get(emitEvent)?.()
+        })
+      }
+    return {
+      ipcHandlers,
+      mockNotificationEmitting,
+      activatePrimaryWindow,
+      sendPrimaryWindowEffectIntent,
+      showErrorBox: vi.fn(),
     }
-  return { ipcHandlers, mockNotificationEmitting, broadcastClientEffectIntent }
-})
+  })
 
-vi.mock('#/main/client-surface-events.ts', () => ({ broadcastClientEffectIntent }))
+vi.mock('#/main/window.ts', () => ({ activatePrimaryWindow, sendPrimaryWindowEffectIntent }))
 
 vi.mock('electron', () => ({
   ipcMain: {
@@ -45,13 +55,20 @@ vi.mock('electron', () => ({
     fromWebContents: vi.fn(() => ({ isDestroyed: () => false, isFocused: () => false, flashFrame: vi.fn() })),
   },
   Notification: Object.assign(vi.fn(mockNotificationEmitting('show')), { isSupported: vi.fn(() => true) }),
-  app: { on: vi.fn(), getAppPath: vi.fn(() => '/app'), dock: { bounce: vi.fn(), setBadge: vi.fn() } },
+  app: { name: 'Goblin', on: vi.fn(), getAppPath: vi.fn(() => '/app'), dock: { bounce: vi.fn(), setBadge: vi.fn() } },
+  dialog: { showErrorBox },
 }))
 
 describe('terminal IPC', () => {
   beforeAll(() => {
     registerTrustedAppUrl('http://127.0.0.1:5173/')
-    registerTrustedWebContents({ id: 1, once: vi.fn() })
+    registerClientWindowSurface(
+      {
+        isDestroyed: () => false,
+        webContents: { id: 1, isDestroyed: () => false },
+      } as unknown as BrowserWindow,
+      { windowKey: 'primary' },
+    )
     wireTerminalIpc()
   })
 
@@ -192,11 +209,69 @@ describe('terminal IPC', () => {
     }
 
     await expect(invoke(TERMINAL_NOTIFY_BELL_CHANNEL, input)).resolves.toBe(true)
-    expect(broadcastClientEffectIntent).toHaveBeenCalledWith({
-      type: 'terminal-bell-click',
-      terminalSessionId: input.terminalSessionId,
-      session: input.session,
+    await vi.waitFor(() => {
+      expect(sendPrimaryWindowEffectIntent).toHaveBeenCalledWith({
+        type: 'terminal-bell-click',
+        terminalSessionId: input.terminalSessionId,
+        session: input.session,
+      })
     })
+  })
+
+  test('activates the primary window when a generic native notification is clicked', async () => {
+    const { Notification } = await import('electron')
+    vi.mocked(Notification).mockImplementationOnce(function MockNotification(this: ElectronNotification) {
+      const listeners = new Map<string, () => void>()
+      this.once = vi.fn((event: string, callback: () => void) => {
+        listeners.set(event, callback)
+        return this
+      }) as unknown as ElectronNotification['once']
+      this.show = vi.fn(() => {
+        listeners.get('show')?.()
+        listeners.get('click')?.()
+      })
+    })
+
+    await expect(
+      invoke(TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL, { title: 'Goblin', body: 'Notification test' }),
+    ).resolves.toBe(true)
+    await vi.waitFor(() => expect(activatePrimaryWindow).toHaveBeenCalledOnce())
+    expect(sendPrimaryWindowEffectIntent).not.toHaveBeenCalled()
+  })
+
+  test('stops notification navigation when the authoritative window cannot be activated', async () => {
+    const { Notification } = await import('electron')
+    vi.mocked(Notification).mockImplementationOnce(function MockNotification(this: ElectronNotification) {
+      const listeners = new Map<string, () => void>()
+      this.once = vi.fn((event: string, callback: () => void) => {
+        listeners.set(event, callback)
+        return this
+      }) as unknown as ElectronNotification['once']
+      this.show = vi.fn(() => {
+        listeners.get('show')?.()
+        listeners.get('click')?.()
+      })
+    })
+    sendPrimaryWindowEffectIntent.mockRejectedValueOnce(new Error('window unavailable'))
+
+    await expect(
+      invoke(TERMINAL_NOTIFY_BELL_CHANNEL, {
+        title: 'Terminal bell',
+        body: 'task completed',
+        terminalSessionId: 'term-111111111111111111111',
+        session: {
+          target: {
+            kind: 'workspace-root',
+            workspaceId: 'goblin+file:///tmp/repo',
+            workspaceRuntimeId: 'workspace-runtime-test',
+          },
+          presentation: { kind: 'workspace-root' },
+        },
+      }),
+    ).resolves.toBe(true)
+    await vi.waitFor(() => expect(sendPrimaryWindowEffectIntent).toHaveBeenCalledOnce())
+    expect(activatePrimaryWindow).not.toHaveBeenCalled()
+    expect(showErrorBox).toHaveBeenCalledWith('Goblin', expect.stringContaining('try again'))
   })
 
   test('returns true when Notification.isSupported() is false (flashFrame/bounce already fired)', async () => {

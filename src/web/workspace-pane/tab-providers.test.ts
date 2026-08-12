@@ -199,24 +199,4 @@ describe('workspace pane tab providers', () => {
     expect(terminalWorkspacePaneTabProvider.tooltip(input)).toBe('terminal.opening')
     expect(terminalWorkspacePaneTabProvider.closeLabel(input)).toBe('terminal.close-named:{"name":"terminal.opening"}')
   })
-
-  test('closes static tabs without requiring a branch owner', async () => {
-    const closeStaticTab = vi.fn()
-
-    await expect(
-      statusWorkspacePaneTabProvider.close({
-        closeStaticTab,
-      }),
-    ).resolves.toBe(true)
-
-    expect(closeStaticTab).toHaveBeenCalledWith('status')
-  })
-
-  test('runtime provider close is delegated to runtime close actions', async () => {
-    await expect(
-      terminalWorkspacePaneTabProvider.close({
-        runtimeSessionId: 'term-111111111111111111111',
-      }),
-    ).resolves.toBe(false)
-  })
 })

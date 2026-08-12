@@ -61,6 +61,8 @@ const terminalReadContext: TerminalSessionReadContextValue = {
   subscribeTerminalFilesystemTarget: () => () => {},
   workspaceBellCount: () => 0,
   subscribeWorkspaceBellCount: () => () => {},
+  workspaceTerminalSessions: () => [],
+  subscribeWorkspaceTerminalSessions: () => () => {},
   snapshot: () => ({
     phase: 'opening',
     message: null,

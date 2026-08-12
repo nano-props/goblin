@@ -33,7 +33,6 @@ beforeEach(() => {
     pathForFile: () => '',
     invokeIpc: async () => null,
     abortIpc: async () => true,
-    onEvent: () => () => {},
   }
   vi.mocked(getRepoRemoteBranches).mockResolvedValue([])
 })

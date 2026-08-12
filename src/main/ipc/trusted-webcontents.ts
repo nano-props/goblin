@@ -10,17 +10,8 @@ interface TrustedIpcEvent {
   senderFrame: { readonly url: string } | null
 }
 
-const explicitlyTrustedWebContentsIds = new Set<number>()
 const trustedAppUrls = new Set<string>()
 const trustedAppUrlsByWebContentsId = new Map<number, Set<string>>()
-
-export function registerTrustedWebContents(webContents: TrustedWebContentsHandle): void {
-  explicitlyTrustedWebContentsIds.add(webContents.id)
-  webContents.once('destroyed', () => {
-    explicitlyTrustedWebContentsIds.delete(webContents.id)
-    trustedAppUrlsByWebContentsId.delete(webContents.id)
-  })
-}
 
 export function registerTrustedAppUrl(value: string): void {
   const normalized = normalizeTrustedAppUrl(value)
@@ -38,11 +29,6 @@ export function allowTrustedAppUrlForWebContents(webContents: TrustedWebContents
   })
 }
 
-export function isTrustedAppUrl(value: string): boolean {
-  const normalized = normalizeTrustedAppUrl(value)
-  return normalized ? trustedAppUrls.has(normalized) : false
-}
-
 export function isTrustedAppUrlForWebContents(webContentsId: number, value: string): boolean {
   const normalized = normalizeTrustedAppUrl(value)
   if (!normalized || !trustedAppUrls.has(normalized)) return false
@@ -52,7 +38,7 @@ export function isTrustedAppUrlForWebContents(webContentsId: number, value: stri
 
 export function isTrustedIpcEvent(event: TrustedIpcEvent): boolean {
   return (
-    (isRegisteredClientSurfaceId(event.sender.id) || explicitlyTrustedWebContentsIds.has(event.sender.id)) &&
+    isRegisteredClientSurfaceId(event.sender.id) &&
     event.senderFrame !== null &&
     isTrustedAppUrlForWebContents(event.sender.id, event.senderFrame.url)
   )

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { repoRuntimeCapabilityForTest } from '#/server/test-utils/repo-module.ts'
 
 const mocks = vi.hoisted(() => ({ resolveRepoWriteBoundaryKey: vi.fn() }))
 
@@ -25,7 +26,12 @@ async function recordSuccessfulFetch(repoId: typeof REMOTE_REPO): Promise<void> 
   await enqueueRepoWriteOperation(
     repoId,
     undefined,
-    { repoId, kind: 'fetch', source: 'background' },
+    {
+      runtimeCapability: repoRuntimeCapabilityForTest(repoId, 'test-runtime'),
+      repoId,
+      kind: 'fetch',
+      source: 'background',
+    },
     (operation, context) => async () => {
       operation.start()
       operation.settle({ ok: true })

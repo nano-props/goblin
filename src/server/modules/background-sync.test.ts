@@ -2,8 +2,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import type { BackgroundSyncRegistrationAdmission } from '#/server/modules/background-sync.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
 
 const REPO = workspaceIdForTest('goblin+file:///workspace')
 const REPO_A = workspaceIdForTest('goblin+file:///workspace-a')
@@ -14,6 +17,21 @@ const USER_ID = 'background-sync-user'
 const CLIENT_ID = 'client_background_sync_test'
 const RUNTIME_ID = 'workspace-runtime-background-sync-test'
 let nextRegistrationRevision = 1
+
+function admitTargets(userId: string, targets: readonly GitBackgroundSyncTarget[]) {
+  return targets.map((target) => ({
+    ...target,
+    runtimeCapability: testWorkspaceRuntimeEpochCapability({
+      userId,
+      workspaceId: target.workspaceId,
+      workspaceRuntimeId: target.workspaceRuntimeId,
+    }),
+  }))
+}
+
+function expectedRuntimeCapability(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
+  return expect.objectContaining({ workspaceId, workspaceRuntimeId })
+}
 
 function requiredAdmission(admission: BackgroundSyncRegistrationAdmission | null): BackgroundSyncRegistrationAdmission {
   if (!admission) throw new Error('expected background sync admission')
@@ -26,7 +44,7 @@ async function registerRepos(workspaceIds: WorkspaceId[]): Promise<void> {
   await prepareBackgroundSync()
   const targets = workspaceIds.map((workspaceId) => ({ workspaceId, workspaceRuntimeId: RUNTIME_ID }))
   const admission = requiredAdmission(
-    beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, nextRegistrationRevision++, targets),
+    beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, nextRegistrationRevision++, admitTargets(USER_ID, targets)),
   )
   commitBackgroundSyncRegistration(admission)
 }
@@ -73,13 +91,30 @@ describe('server background sync scheduler', () => {
     mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     await registerRepos([REPO_A, REPO_B])
     await vi.runOnlyPendingTimersAsync()
-
-    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(1, REPO_A, 'background', expect.any(AbortSignal), RUNTIME_ID)
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(
+      1,
+      REPO_A,
+      expectedRuntimeCapability(REPO_A, RUNTIME_ID),
+      'background',
+      expect.any(AbortSignal),
+    )
     await vi.runOnlyPendingTimersAsync()
-    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(2, REPO_B, 'background', expect.any(AbortSignal), RUNTIME_ID)
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(
+      2,
+      REPO_B,
+      expectedRuntimeCapability(REPO_B, RUNTIME_ID),
+      'background',
+      expect.any(AbortSignal),
+    )
 
     await vi.advanceTimersByTimeAsync(5000)
-    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(3, REPO_A, 'background', expect.any(AbortSignal), RUNTIME_ID)
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(
+      3,
+      REPO_A,
+      expectedRuntimeCapability(REPO_A, RUNTIME_ID),
+      'background',
+      expect.any(AbortSignal),
+    )
   })
 
   test('settles a remote runtime and stops its automatic fetches after transport loss', async () => {
@@ -129,9 +164,12 @@ describe('server background sync scheduler', () => {
       await import('#/server/modules/background-sync.ts')
     await registerRepos([])
     const admission = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, nextRegistrationRevision++, [
-        { workspaceId: REMOTE_REPO, workspaceRuntimeId },
-      ]),
+      beginBackgroundSyncRegistration(
+        USER_ID,
+        CLIENT_ID,
+        nextRegistrationRevision++,
+        admitTargets(USER_ID, [{ workspaceId: REMOTE_REPO, workspaceRuntimeId }]),
+      ),
     )
     expect(commitBackgroundSyncRegistration(admission)).toBe(true)
 
@@ -158,9 +196,12 @@ describe('server background sync scheduler', () => {
       await import('#/server/modules/background-sync.ts')
     await registerRepos([REMOTE_REPO])
     const pending = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, 'pending-client', 1, [
-        { workspaceId: REMOTE_REPO, workspaceRuntimeId: RUNTIME_ID },
-      ]),
+      beginBackgroundSyncRegistration(
+        USER_ID,
+        'pending-client',
+        1,
+        admitTargets(USER_ID, [{ workspaceId: REMOTE_REPO, workspaceRuntimeId: RUNTIME_ID }]),
+      ),
     )
 
     await vi.runOnlyPendingTimersAsync()
@@ -175,9 +216,27 @@ describe('server background sync scheduler', () => {
     await vi.runOnlyPendingTimersAsync()
 
     await vi.waitFor(() => expect(mocks.fetchRepo).toHaveBeenCalledTimes(3))
-    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(1, REPO_A, 'background', expect.any(AbortSignal), RUNTIME_ID)
-    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(2, REPO_B, 'background', expect.any(AbortSignal), RUNTIME_ID)
-    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(3, REPO_C, 'background', expect.any(AbortSignal), RUNTIME_ID)
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(
+      1,
+      REPO_A,
+      expectedRuntimeCapability(REPO_A, RUNTIME_ID),
+      'background',
+      expect.any(AbortSignal),
+    )
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(
+      2,
+      REPO_B,
+      expectedRuntimeCapability(REPO_B, RUNTIME_ID),
+      'background',
+      expect.any(AbortSignal),
+    )
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(
+      3,
+      REPO_C,
+      expectedRuntimeCapability(REPO_C, RUNTIME_ID),
+      'background',
+      expect.any(AbortSignal),
+    )
   })
 
   test('stops scheduling when the repo set is cleared', async () => {
@@ -192,15 +251,22 @@ describe('server background sync scheduler', () => {
 
   test('aborts in-flight background fetches for repos removed from the active set', async () => {
     let repoASignal: AbortSignal | undefined
-    mocks.fetchRepo.mockImplementation(async (repoId: string, _kind: string, signal?: AbortSignal) => {
-      if (repoId === REPO_A) {
-        repoASignal = signal
-        return await new Promise<{ ok: boolean; message: string }>((resolve) => {
-          signal?.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }), { once: true })
-        })
-      }
-      return { ok: true, message: 'ok' }
-    })
+    mocks.fetchRepo.mockImplementation(
+      async (
+        repoId: string,
+        _runtimeCapability: WorkspaceRuntimeEpochCapability,
+        _kind: string,
+        signal?: AbortSignal,
+      ) => {
+        if (repoId === REPO_A) {
+          repoASignal = signal
+          return await new Promise<{ ok: boolean; message: string }>((resolve) => {
+            signal?.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }), { once: true })
+          })
+        }
+        return { ok: true, message: 'ok' }
+      },
+    )
     await registerRepos([REPO_A])
     await vi.waitFor(() => expect(repoASignal).toBeDefined())
     expect(repoASignal?.aborted).toBe(false)
@@ -211,20 +277,32 @@ describe('server background sync scheduler', () => {
 
   test('does not treat a removed in-flight background fetch as a completed cadence attempt', async () => {
     let repoASignal: AbortSignal | undefined
-    mocks.fetchRepo.mockImplementation(async (repoId: string, _kind: string, signal?: AbortSignal) => {
-      if (repoId === REPO_A && !repoASignal) {
-        repoASignal = signal
-        return await new Promise<{ ok: boolean; message: string }>((resolve) => {
-          signal?.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }), { once: true })
-        })
-      }
-      return { ok: true, message: 'ok' }
-    })
+    mocks.fetchRepo.mockImplementation(
+      async (
+        repoId: string,
+        _runtimeCapability: WorkspaceRuntimeEpochCapability,
+        _kind: string,
+        signal?: AbortSignal,
+      ) => {
+        if (repoId === REPO_A && !repoASignal) {
+          repoASignal = signal
+          return await new Promise<{ ok: boolean; message: string }>((resolve) => {
+            signal?.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }), { once: true })
+          })
+        }
+        return { ok: true, message: 'ok' }
+      },
+    )
     await registerRepos([REPO_A])
     await vi.waitFor(() => expect(repoASignal).toBeDefined())
     await registerRepos([REPO_B])
     await vi.waitFor(() => {
-      expect(mocks.fetchRepo).toHaveBeenCalledWith(REPO_B, 'background', expect.any(AbortSignal), RUNTIME_ID)
+      expect(mocks.fetchRepo).toHaveBeenCalledWith(
+        REPO_B,
+        expectedRuntimeCapability(REPO_B, RUNTIME_ID),
+        'background',
+        expect.any(AbortSignal),
+      )
     })
 
     await registerRepos([REPO_A])
@@ -240,12 +318,24 @@ describe('server background sync scheduler', () => {
 
     await registerRepos([REPO_A])
     await vi.runOnlyPendingTimersAsync()
-    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(1, REPO_A, 'background', expect.any(AbortSignal), RUNTIME_ID)
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(
+      1,
+      REPO_A,
+      expectedRuntimeCapability(REPO_A, RUNTIME_ID),
+      'background',
+      expect.any(AbortSignal),
+    )
 
     await vi.advanceTimersByTimeAsync(1000)
     await registerRepos([REPO_B])
     await vi.runOnlyPendingTimersAsync()
-    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(2, REPO_B, 'background', expect.any(AbortSignal), RUNTIME_ID)
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(
+      2,
+      REPO_B,
+      expectedRuntimeCapability(REPO_B, RUNTIME_ID),
+      'background',
+      expect.any(AbortSignal),
+    )
 
     await vi.advanceTimersByTimeAsync(1000)
     await registerRepos([REPO_A])
@@ -262,7 +352,13 @@ describe('server background sync scheduler', () => {
     expect(mocks.fetchRepo).toHaveBeenCalledTimes(2)
 
     await vi.advanceTimersByTimeAsync(1000)
-    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(3, REPO_A, 'background', expect.any(AbortSignal), RUNTIME_ID)
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(
+      3,
+      REPO_A,
+      expectedRuntimeCapability(REPO_A, RUNTIME_ID),
+      'background',
+      expect.any(AbortSignal),
+    )
   })
 
   test('re-schedules when the server fetch interval changes', async () => {
@@ -325,10 +421,15 @@ describe('server background sync scheduler', () => {
     // waitFor polls microtasks; using advanceTimersByTime would risk letting
     // the per-second cron catch B for us and mask a broken `finally` re-enqueue.
     await vi.waitFor(() =>
-      expect(mocks.fetchRepo).toHaveBeenCalledWith(REPO_B, 'background', expect.any(AbortSignal), RUNTIME_ID),
+      expect(mocks.fetchRepo).toHaveBeenCalledWith(
+        REPO_B,
+        expectedRuntimeCapability(REPO_B, RUNTIME_ID),
+        'background',
+        expect.any(AbortSignal),
+      ),
     )
 
-    const bCalls = mocks.fetchRepo.mock.calls.filter((c) => c[0] === REPO_B && c[1] === 'background')
+    const bCalls = mocks.fetchRepo.mock.calls.filter((c) => c[0] === REPO_B && c[2] === 'background')
     expect(bCalls.length).toBe(1)
   })
 
@@ -346,7 +447,12 @@ describe('server background sync scheduler', () => {
 
     await registerRepos([REPO_A])
     await vi.runOnlyPendingTimersAsync()
-    expect(mocks.fetchRepo).toHaveBeenCalledWith(REPO_A, 'background', expect.any(AbortSignal), RUNTIME_ID)
+    expect(mocks.fetchRepo).toHaveBeenCalledWith(
+      REPO_A,
+      expectedRuntimeCapability(REPO_A, RUNTIME_ID),
+      'background',
+      expect.any(AbortSignal),
+    )
 
     await registerRepos([REPO_B])
     await vi.advanceTimersByTimeAsync(15_000)
@@ -355,7 +461,12 @@ describe('server background sync scheduler', () => {
 
     resolveFetchA({ ok: true, message: 'ok' })
     await vi.waitFor(() =>
-      expect(mocks.fetchRepo).toHaveBeenCalledWith(REPO_B, 'background', expect.any(AbortSignal), RUNTIME_ID),
+      expect(mocks.fetchRepo).toHaveBeenCalledWith(
+        REPO_B,
+        expectedRuntimeCapability(REPO_B, RUNTIME_ID),
+        'background',
+        expect.any(AbortSignal),
+      ),
     )
     expect(getBackgroundSyncDiagnostics().idleDrainScheduled).toBe(false)
     expect(mocks.fetchRepo.mock.calls.filter((call) => call[0] === REPO_B)).toHaveLength(1)
@@ -436,7 +547,12 @@ describe('server background sync scheduler', () => {
     await registerRepos([REPO_A])
     const targets = [{ workspaceId: REPO_B, workspaceRuntimeId: secondRuntimeId }]
     const admission = requiredAdmission(
-      beginBackgroundSyncRegistration(secondUserId, 'client_background_sync_second', 1, targets),
+      beginBackgroundSyncRegistration(
+        secondUserId,
+        'client_background_sync_second',
+        1,
+        admitTargets(secondUserId, targets),
+      ),
     )
     commitBackgroundSyncRegistration(admission)
     await vi.runOnlyPendingTimersAsync()
@@ -444,8 +560,18 @@ describe('server background sync scheduler', () => {
 
     expect(getBackgroundSyncRepos(USER_ID)).toEqual([REPO_A])
     expect(getBackgroundSyncRepos(secondUserId)).toEqual([REPO_B])
-    expect(mocks.fetchRepo).toHaveBeenCalledWith(REPO_A, 'background', expect.any(AbortSignal), RUNTIME_ID)
-    expect(mocks.fetchRepo).toHaveBeenCalledWith(REPO_B, 'background', expect.any(AbortSignal), secondRuntimeId)
+    expect(mocks.fetchRepo).toHaveBeenCalledWith(
+      REPO_A,
+      expectedRuntimeCapability(REPO_A, RUNTIME_ID),
+      'background',
+      expect.any(AbortSignal),
+    )
+    expect(mocks.fetchRepo).toHaveBeenCalledWith(
+      REPO_B,
+      expectedRuntimeCapability(REPO_B, secondRuntimeId),
+      'background',
+      expect.any(AbortSignal),
+    )
   })
 
   test('unions client-owned registrations and executes a shared runtime target once', async () => {
@@ -461,13 +587,17 @@ describe('server background sync scheduler', () => {
     const firstClient = 'client_background_sync_first'
     const secondClient = 'client_background_sync_second'
     const firstTargets = [{ workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID }]
-    const firstAdmission = requiredAdmission(beginBackgroundSyncRegistration(USER_ID, firstClient, 1, firstTargets))
+    const firstAdmission = requiredAdmission(
+      beginBackgroundSyncRegistration(USER_ID, firstClient, 1, admitTargets(USER_ID, firstTargets)),
+    )
     commitBackgroundSyncRegistration(firstAdmission)
     const secondTargets = [
       { workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID },
       { workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID },
     ]
-    const secondAdmission = requiredAdmission(beginBackgroundSyncRegistration(USER_ID, secondClient, 1, secondTargets))
+    const secondAdmission = requiredAdmission(
+      beginBackgroundSyncRegistration(USER_ID, secondClient, 1, admitTargets(USER_ID, secondTargets)),
+    )
     commitBackgroundSyncRegistration(secondAdmission)
 
     await vi.runOnlyPendingTimersAsync()
@@ -488,10 +618,20 @@ describe('server background sync scheduler', () => {
     await prepareBackgroundSync()
 
     const olderAdmission = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 1, [{ workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID }]),
+      beginBackgroundSyncRegistration(
+        USER_ID,
+        CLIENT_ID,
+        1,
+        admitTargets(USER_ID, [{ workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID }]),
+      ),
     )
     const newerAdmission = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 2, [{ workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID }]),
+      beginBackgroundSyncRegistration(
+        USER_ID,
+        CLIENT_ID,
+        2,
+        admitTargets(USER_ID, [{ workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID }]),
+      ),
     )
     expect(olderAdmission.signal.aborted).toBe(true)
     expect(commitBackgroundSyncRegistration(newerAdmission)).toBe(true)
@@ -510,10 +650,20 @@ describe('server background sync scheduler', () => {
     await prepareBackgroundSync()
 
     const latestAdmission = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 2, [{ workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID }]),
+      beginBackgroundSyncRegistration(
+        USER_ID,
+        CLIENT_ID,
+        2,
+        admitTargets(USER_ID, [{ workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID }]),
+      ),
     )
     expect(
-      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 1, [{ workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID }]),
+      beginBackgroundSyncRegistration(
+        USER_ID,
+        CLIENT_ID,
+        1,
+        admitTargets(USER_ID, [{ workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID }]),
+      ),
     ).toBeNull()
     expect(latestAdmission.signal.aborted).toBe(false)
     expect(commitBackgroundSyncRegistration(latestAdmission)).toBe(true)
@@ -530,12 +680,20 @@ describe('server background sync scheduler', () => {
     await prepareBackgroundSync()
 
     const firstPage = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 2, [{ workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID }]),
+      beginBackgroundSyncRegistration(
+        USER_ID,
+        CLIENT_ID,
+        2,
+        admitTargets(USER_ID, [{ workspaceId: REPO_A, workspaceRuntimeId: RUNTIME_ID }]),
+      ),
     )
     const newPage = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, 'background-sync-new-page', 1, [
-        { workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID },
-      ]),
+      beginBackgroundSyncRegistration(
+        USER_ID,
+        'background-sync-new-page',
+        1,
+        admitTargets(USER_ID, [{ workspaceId: REPO_B, workspaceRuntimeId: RUNTIME_ID }]),
+      ),
     )
 
     expect(commitBackgroundSyncRegistration(firstPage)).toBe(true)
@@ -556,7 +714,12 @@ describe('server background sync scheduler', () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO, clientId)
     await prepareBackgroundSync()
     const admission = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, clientId, 1, [{ workspaceId: REPO, workspaceRuntimeId }]),
+      beginBackgroundSyncRegistration(
+        USER_ID,
+        clientId,
+        1,
+        admitTargets(USER_ID, [{ workspaceId: REPO, workspaceRuntimeId }]),
+      ),
     )
     commitBackgroundSyncRegistration(admission)
 
@@ -579,7 +742,12 @@ describe('server background sync scheduler', () => {
     const retention = retainWorkspaceRuntimeResource(USER_ID, REPO, workspaceRuntimeId, 'terminal-session')
     await prepareBackgroundSync()
     const admission = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, ownerClientId, 1, [{ workspaceId: REPO, workspaceRuntimeId }]),
+      beginBackgroundSyncRegistration(
+        USER_ID,
+        ownerClientId,
+        1,
+        admitTargets(USER_ID, [{ workspaceId: REPO, workspaceRuntimeId }]),
+      ),
     )
     commitBackgroundSyncRegistration(admission)
 
@@ -600,7 +768,12 @@ describe('server background sync scheduler', () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO, clientId)
     await prepareBackgroundSync()
     const admission = requiredAdmission(
-      beginBackgroundSyncRegistration(USER_ID, clientId, 1, [{ workspaceId: REPO, workspaceRuntimeId }]),
+      beginBackgroundSyncRegistration(
+        USER_ID,
+        clientId,
+        1,
+        admitTargets(USER_ID, [{ workspaceId: REPO, workspaceRuntimeId }]),
+      ),
     )
 
     releaseWorkspaceRuntime(USER_ID, REPO, workspaceRuntimeId, clientId)

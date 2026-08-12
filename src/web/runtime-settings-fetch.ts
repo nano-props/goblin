@@ -27,11 +27,11 @@ export function useFetchSettingsController() {
     },
   )
   return {
-    async setFetchInterval(sec: number): Promise<void> {
-      await fetchIntervalMutation.mutateAsync(sec)
+    setFetchInterval(sec: number): void {
+      fetchIntervalMutation.mutate(sec)
     },
-    async setTerminalNotificationsEnabled(enabled: boolean): Promise<void> {
-      await terminalNotificationsMutation.mutateAsync(enabled)
+    setTerminalNotificationsEnabled(enabled: boolean): void {
+      terminalNotificationsMutation.mutate(enabled)
     },
   }
 }

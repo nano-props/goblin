@@ -6,6 +6,10 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
+import {
+  reportOpenWorkspacePostOpenError,
+  reportOpenWorkspaceUncertainty,
+} from '#/web/lib/open-workspace-result-feedback.ts'
 import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 
 interface Options {
@@ -83,10 +87,13 @@ export function useWorkspaceDrop(options: Options) {
       await openWorkspacePaths(paths, {
         openWorkspaceMembership,
         activateWorkspace: (workspaceId) => toValue(options.navigation).activateWorkspace(workspaceId),
-        onOpenFailed: (_path, message) => {
-          toast.error(t('drop.open-failed'), {
-            description: t(message),
-          })
+        onOpenFailed: (_path, result) => {
+          if (!reportOpenWorkspaceUncertainty(result, t)) {
+            toast.error(t('drop.open-failed'), { description: t(result.message) })
+          }
+        },
+        onPostOpenError: (path, error) => {
+          reportOpenWorkspacePostOpenError(error, t, { descriptionPrefix: path })
         },
       })
     })()

@@ -1,4 +1,4 @@
-import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
+import { fetchServerJson, postServerCommandJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type {
   RemoteDiagnosticsResult,
@@ -44,7 +44,7 @@ export async function resolveRemoteWorkspaceConnection(
   input: { workspaceId: WorkspaceId; workspaceRuntimeId: string; mode?: 'restart' | 'ensure' },
   signal?: AbortSignal,
 ): Promise<RemoteWorkspaceLifecycleCommandResult> {
-  return await postServerJson('/api/remote/lifecycle', input, decodeWith(RemoteLifecycleResponseSchema), {
+  return await postServerCommandJson('/api/remote/lifecycle', input, decodeWith(RemoteLifecycleResponseSchema), {
     signal,
   })
 }
@@ -57,7 +57,9 @@ export async function getRemotePathSuggestions(
   input: RemoteDirectoryPathSuggestionsInput,
   signal?: AbortSignal,
 ): Promise<string[]> {
-  return await postServerJson('/api/remote/path-suggestions', input, decodeWith(StringArrayResponseSchema), { signal })
+  return await postServerJson('/api/remote/path-suggestions', input, decodeWith(StringArrayResponseSchema), {
+    signal,
+  })
 }
 
 export async function testRemoteWorkspaceConnection(

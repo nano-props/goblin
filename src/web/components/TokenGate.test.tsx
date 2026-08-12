@@ -5,7 +5,7 @@ import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
-import { postServerJson } from '#/web/lib/server-fetch.ts'
+import { postServerCommandJson } from '#/web/lib/server-fetch.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const authMock = vi.hoisted(() => ({
@@ -20,13 +20,13 @@ vi.mock('#/web/auth/AuthProvider.tsx', () => ({
 }))
 
 vi.mock('#/web/lib/server-fetch.ts', () => ({
-  postServerJson: vi.fn(),
+  postServerCommandJson: vi.fn(),
 }))
 
 beforeEach(() => {
   authMock.status.state = 'unauthenticated'
   authMock.status.refresh = vi.fn()
-  vi.mocked(postServerJson).mockReset()
+  vi.mocked(postServerCommandJson).mockReset()
 })
 
 describe('TokenGate', () => {
@@ -49,12 +49,12 @@ describe('TokenGate', () => {
     await user.click(screen.getByRole('button', { name: 'auth.gate.sign-in' }))
 
     expect(screen.getByText('auth.gate.error-empty')).toBeTruthy()
-    expect(postServerJson).not.toHaveBeenCalled()
+    expect(postServerCommandJson).not.toHaveBeenCalled()
   })
 
   test('surfaces login failures', async () => {
     const user = userEvent.setup()
-    vi.mocked(postServerJson).mockRejectedValueOnce(new Error('bad token'))
+    vi.mocked(postServerCommandJson).mockRejectedValueOnce(new Error('bad token'))
     renderLoginForm()
 
     await user.type(screen.getByRole('textbox', { name: 'auth.gate.token-label' }), 'bad-token')
@@ -63,7 +63,7 @@ describe('TokenGate', () => {
     await waitFor(() => {
       expect(screen.getByText('bad token')).toBeTruthy()
     })
-    expect(postServerJson).toHaveBeenCalledWith('/api/login', { token: 'bad-token' }, expect.any(Function), {
+    expect(postServerCommandJson).toHaveBeenCalledWith('/api/login', { token: 'bad-token' }, expect.any(Function), {
       signal: expect.any(AbortSignal),
     })
   })
@@ -71,7 +71,7 @@ describe('TokenGate', () => {
   test('hides the previous error while a retry is pending', async () => {
     const user = userEvent.setup()
     const retry = Promise.withResolvers<{ ok: true }>()
-    vi.mocked(postServerJson).mockRejectedValueOnce(new Error('bad token')).mockReturnValueOnce(retry.promise)
+    vi.mocked(postServerCommandJson).mockRejectedValueOnce(new Error('bad token')).mockReturnValueOnce(retry.promise)
     renderLoginForm()
 
     await user.type(screen.getByRole('textbox', { name: 'auth.gate.token-label' }), 'bad-token')
@@ -96,14 +96,14 @@ describe('TokenGate', () => {
 
   test('posts the token and refreshes auth state after a successful login', async () => {
     const user = userEvent.setup()
-    vi.mocked(postServerJson).mockResolvedValueOnce({ ok: true })
+    vi.mocked(postServerCommandJson).mockResolvedValueOnce({ ok: true })
     renderLoginForm()
 
     await user.type(screen.getByRole('textbox', { name: 'auth.gate.token-label' }), 'good-token')
     await user.click(screen.getByRole('button', { name: 'auth.gate.sign-in' }))
 
     await waitFor(() => {
-      expect(postServerJson).toHaveBeenCalledWith('/api/login', { token: 'good-token' }, expect.any(Function), {
+      expect(postServerCommandJson).toHaveBeenCalledWith('/api/login', { token: 'good-token' }, expect.any(Function), {
         signal: expect.any(AbortSignal),
       })
       expect(authMock.status.refresh).toHaveBeenCalledTimes(1)

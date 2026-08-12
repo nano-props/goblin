@@ -18,6 +18,8 @@ import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts
 import {
   WORKSPACE_ID,
   LOCAL_WORKSPACE_ENTRY,
+  TEST_EPOCH_CAPABILITY,
+  TEST_MEMBERSHIP_CAPABILITY,
   aggregateFor,
   testTargetProjection,
   testRuntimeTargetProjection,
@@ -50,7 +52,7 @@ describe('workspace pane tabs coordinator restore queues', () => {
         }),
       ],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
-      assertCurrent: () => {},
+      epochCapability: TEST_EPOCH_CAPABILITY,
     })
 
     expect(coordinator.physicalWorktreeTargets(testPhysicalWorktreeIdentity('/repo/worktree'))).toEqual([
@@ -94,7 +96,7 @@ describe('workspace pane tabs coordinator restore queues', () => {
       userId: 'user-a',
       workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
-      assertCurrent: () => {},
+      epochCapability: TEST_MEMBERSHIP_CAPABILITY,
     }
 
     await expect(
@@ -158,7 +160,7 @@ describe('workspace pane tabs coordinator restore queues', () => {
           }),
         ],
         expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
-        assertCurrent: () => {},
+        epochCapability: TEST_EPOCH_CAPABILITY,
       }),
     ).resolves.toEqual({ kind: 'membership-conflict' })
 
@@ -203,7 +205,7 @@ describe('workspace pane tabs coordinator restore queues', () => {
           }),
         ],
         expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
-        assertCurrent: () => {},
+        epochCapability: TEST_EPOCH_CAPABILITY,
       }),
     ).rejects.toThrow('error.worktree-removal-in-progress')
     expect(aggregate.activeEpochs(WORKSPACE_ID)).toEqual([])
@@ -261,7 +263,7 @@ describe('workspace pane tabs coordinator restore queues', () => {
       userId: 'user-a',
       workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
-      assertCurrent: () => {},
+      epochCapability: TEST_MEMBERSHIP_CAPABILITY,
     })
     await finalSampleStarted.promise
     let removalTaskStarted = false
@@ -352,7 +354,7 @@ describe('workspace pane tabs coordinator restore queues', () => {
       userId: 'user-a',
       workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
-      assertCurrent: () => {},
+      epochCapability: TEST_MEMBERSHIP_CAPABILITY,
     })
     await stableSampleStarted.promise
     let removalStarted = false
@@ -441,7 +443,7 @@ describe('workspace pane tabs coordinator restore queues', () => {
       userId: 'user-a',
       workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
-      assertCurrent: () => {},
+      epochCapability: TEST_MEMBERSHIP_CAPABILITY,
     }
     await coordinator.listWorkspaceTabs(input)
     expect(coordinator.physicalWorktreeTargets(capability.identity)).toHaveLength(1)
@@ -514,7 +516,7 @@ describe('workspace pane tabs coordinator restore queues', () => {
       userId: 'user-a',
       workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
-      assertCurrent: () => {},
+      epochCapability: TEST_MEMBERSHIP_CAPABILITY,
     }
     await coordinator.listWorkspaceTabs(listInput)
 
@@ -592,7 +594,7 @@ describe('workspace pane tabs coordinator restore queues', () => {
       userId: 'user-a',
       workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
-      assertCurrent: () => {},
+      epochCapability: TEST_MEMBERSHIP_CAPABILITY,
     }
     await coordinator.listWorkspaceTabs(input)
 

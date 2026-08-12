@@ -80,6 +80,14 @@ export async function readOrCreateAccessToken(dataDir: string = serverDataDir())
   return await createAccessTokenFile(dataDir, filePath)
 }
 
+/**
+ * Atomically replace the persisted token used by the next server start.
+ * A running server keeps its current in-memory token until that restart.
+ */
+export async function rotateAccessTokenFile(dataDir: string = serverDataDir()): Promise<string> {
+  return await createAccessTokenFile(dataDir, accessTokenFilePath(dataDir))
+}
+
 async function readExistingToken(filePath: string): Promise<string | null> {
   let raw: string
   try {

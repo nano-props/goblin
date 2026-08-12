@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   acquireWorkspaceRuntime,
   clearWorkspaceRuntimesForUser,
-  commitWorkspaceProbeState,
   closeWorkspaceRuntimesForDurableRemoval,
   failRemoteWorkspaceLifecycle,
   listWorkspaceRuntimes,
   releaseWorkspaceRuntime,
   runRemoteWorkspaceLifecycle,
+  runSerializedInitialWorkspaceProbe,
   workspaceRuntimeHasGitCapability,
 } from '#/server/modules/workspace-runtimes.ts'
 import type { RemoteWorkspaceConnectionResult, RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
@@ -91,11 +91,11 @@ describe('workspace runtime remote lifecycle', () => {
   test('ensure reuses the complete settled projection without resolving again', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     await runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, async () => ready)
-    commitWorkspaceProbeState({
+    await runSerializedInitialWorkspaceProbe({
       userId,
       workspaceId,
       workspaceRuntimeId: runtimeId,
-      probe: {
+      probe: async () => ({
         status: 'ready',
         capabilities: {
           files: { read: true, write: true },
@@ -103,7 +103,7 @@ describe('workspace runtime remote lifecycle', () => {
           git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
         },
         diagnostics: [],
-      },
+      }),
     })
     const resolver = vi.fn(async () => ready)
 
@@ -509,11 +509,11 @@ describe('workspace runtime remote lifecycle', () => {
   test('failed remote lifecycle closes server Git capability admission', async () => {
     const runtimeId = acquireWorkspaceRuntime(userId, workspaceId, clientId)
     await runRemoteWorkspaceLifecycle(userId, workspaceId, runtimeId, async () => ready)
-    commitWorkspaceProbeState({
+    await runSerializedInitialWorkspaceProbe({
       userId,
       workspaceId,
       workspaceRuntimeId: runtimeId,
-      probe: {
+      probe: async () => ({
         status: 'ready',
         capabilities: {
           files: { read: true, write: true },
@@ -521,7 +521,7 @@ describe('workspace runtime remote lifecycle', () => {
           git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
         },
         diagnostics: [],
-      },
+      }),
     })
     expect(workspaceRuntimeHasGitCapability(userId, workspaceId, runtimeId)).toBe(true)
 

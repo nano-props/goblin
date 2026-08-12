@@ -16,7 +16,7 @@ import type { StoreApi } from 'zustand/vanilla'
 import type { I18nSnapshot } from '#/shared/api-types.ts'
 import type { Lang, LangPref } from '#/shared/settings.ts'
 import { getI18nSnapshot } from '#/web/settings-client.ts'
-import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
+import { createSettingsProjectionOwner } from '#/web/settings-projection-owner.ts'
 import { setI18nPreference } from '#/web/settings-actions.ts'
 
 export type I18nDictionary = Record<string, string>
@@ -45,15 +45,13 @@ interface I18nState {
 type I18nSet = StoreApi<I18nState>['setState']
 
 let unsubscribe: (() => void) | null = null
-let hydrateVersion = 0
-let snapshotQueue = Promise.resolve()
+const projectionOwner = createSettingsProjectionOwner('i18n')
 
 function ensureI18nSubscription(set: I18nSet): void {
   if (unsubscribe) return
-  unsubscribe = subscribeSettingsInvalidationRefetch({
+  unsubscribe = projectionOwner.subscribe({
     scope: 'i18n',
-    fetch: getI18nSnapshot,
-    label: 'i18n',
+    read: getI18nSnapshot,
     apply: (next) => commitSnapshot(set, next),
   })
 }
@@ -65,11 +63,9 @@ export const i18nStore = createStore<I18nState>((set) => ({
   hydrated: false,
 
   async hydrate(options) {
-    const version = ++hydrateVersion
-    const snapshot = await getI18nSnapshot({ signal: options?.signal })
-    if (version !== hydrateVersion) return
-    await commitSnapshot(set, snapshot)
-    if (version !== hydrateVersion) return
+    await projectionOwner.run(async () => {
+      commitSnapshot(set, await getI18nSnapshot({ signal: options?.signal }))
+    })
     if (options?.subscribe === false) return
     ensureI18nSubscription(set)
   },
@@ -79,20 +75,14 @@ export const i18nStore = createStore<I18nState>((set) => ({
   },
 
   async setPref(pref) {
-    const snapshot = await setI18nPreference(pref)
-    if (snapshot) {
-      await commitSnapshot(set, snapshot)
-    }
+    await projectionOwner.run(async () => {
+      commitSnapshot(set, await setI18nPreference(pref))
+      ensureI18nSubscription(set)
+    })
   },
 }))
 
-function commitSnapshot(set: I18nSet, snapshot: I18nSnapshot): Promise<void> {
-  const work = snapshotQueue.then(() => commitSnapshotNow(set, snapshot))
-  snapshotQueue = work.catch(() => {})
-  return work
-}
-
-async function commitSnapshotNow(set: I18nSet, snapshot: I18nSnapshot): Promise<void> {
+function commitSnapshot(set: I18nSet, snapshot: I18nSnapshot): void {
   const current = i18nStore.getState()
   if (sameSnapshot(current, snapshot)) return
   set((s) =>

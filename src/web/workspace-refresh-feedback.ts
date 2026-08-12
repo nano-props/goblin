@@ -4,6 +4,7 @@ import type { WorkspaceRefreshOutcome } from '#/web/stores/workspaces/workspace-
 
 export function presentWorkspaceRefreshOutcome(outcome: WorkspaceRefreshOutcome, t: (key: string) => string): boolean {
   if (outcome.ok) return true
-  if (!('cancelled' in outcome)) toast.error(formatTranslatableReason(t, outcome.message))
+  if ('uncertain' in outcome) toast.warning(t(outcome.message), { id: 'workspace-refresh-outcome-uncertain' })
+  else if (!('cancelled' in outcome)) toast.error(formatTranslatableReason(t, outcome.message))
   return false
 }

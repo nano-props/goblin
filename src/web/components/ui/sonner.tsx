@@ -10,7 +10,9 @@ const ToastSuccessIcon: FunctionalComponent = () => <CircleCheckIcon class="size
 const ToastInfoIcon: FunctionalComponent = () => <InfoIcon class="size-4 text-brand-text" />
 const ToastWarningIcon: FunctionalComponent = () => <TriangleAlertIcon class="size-4 text-warning" />
 const ToastErrorIcon: FunctionalComponent = () => <CircleXIcon class="size-4 text-danger" />
-const ToastLoadingIcon: FunctionalComponent = () => <LoaderCircleIcon class="size-4 animate-spin text-muted-foreground" />
+const ToastLoadingIcon: FunctionalComponent = () => (
+  <LoaderCircleIcon class="size-4 animate-spin text-muted-foreground" />
+)
 
 type ToastStyle = CSSProperties & Record<`--${string}`, string>
 

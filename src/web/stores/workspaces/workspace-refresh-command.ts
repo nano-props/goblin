@@ -18,7 +18,11 @@ export interface WorkspaceRefreshStoreAccess {
   get: WorkspacesGet
 }
 
-export type WorkspaceRefreshOutcome = { ok: true } | { ok: false; message: string } | { ok: false; cancelled: true }
+export type WorkspaceRefreshOutcome =
+  | { ok: true }
+  | { ok: false; message: string }
+  | { ok: false; cancelled: true }
+  | { ok: false; uncertain: true; message: 'error.operation-outcome-uncertain' }
 
 const commands = new Map<string, Promise<WorkspaceRefreshOutcome>>()
 
@@ -50,6 +54,9 @@ async function runWorkspaceRefreshOnce(
 ): Promise<WorkspaceRefreshOutcome> {
   const outcome = await requestWorkspaceCapabilityRefresh(workspaceId, workspaceRuntimeId)
   if (outcome.kind === 'cancelled') return { ok: false, cancelled: true }
+  if (outcome.kind === 'outcome-uncertain') {
+    return { ok: false, uncertain: true, message: 'error.operation-outcome-uncertain' }
+  }
   if (outcome.kind === 'failed') return { ok: false, message: outcome.message }
   const refreshed: WorkspaceRefreshResult = outcome.result
   if (refreshed.kind === 'stale-runtime') return { ok: false, message: 'error.workspace-runtime-stale' }

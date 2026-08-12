@@ -54,10 +54,11 @@ import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import {
+  captureWorkspaceRuntimeMembershipCapability,
   isCurrentWorkspaceRuntime,
-  isCurrentWorkspaceRuntimeMembership,
   onWorkspaceRuntimeClosed,
   retainWorkspaceRuntimeResource,
+  type WorkspaceRuntimeEpochCapability,
 } from '#/server/modules/workspace-runtimes.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
@@ -65,14 +66,11 @@ import { createWorktreeRemovalApplication } from '#/server/worktree-removal/work
 import { createPhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 
-// Intentionally long TTL: we want terminals to survive as long as possible in
-// the background so users can leave builds or long-running tasks unattended.
-// 24 hours gives a full day for the user to reconnect before sessions are
-// forcibly cleaned up. Controller effectiveness derives from broker presence.
-const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 // Realtime presence detects a disconnected page. This additional grace absorbs
 // a normal socket reconnect without retaining an expired page's memberships,
-// background targets, or terminal authority for the terminal session TTL.
+// background targets, or controller authority. Terminal sessions are retained
+// by their workspace runtime until the user closes them or that runtime is
+// authoritatively invalidated.
 const CLIENT_STATE_DISCONNECT_GRACE_MS = 30_000
 const terminalRuntimeLogger = serverNodeLog.child({ module: 'terminal-runtime' })
 
@@ -159,8 +157,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   })
   const coordinator = createTerminalRuntimeCoordinator({
     manager,
-    workspaceTabsCoordinator,
-    detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
     clientStateTtlMs: CLIENT_STATE_DISCONNECT_GRACE_MS,
   })
   broker = coordinator.broker
@@ -236,7 +232,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broker,
     sessionService,
     isValidTerminalClientId,
-    isCurrentWorkspaceRuntimeMembership,
+    captureWorkspaceRuntimeMembershipCapability,
     worktreeOperations,
   })
   const terminalCreateProvider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
@@ -246,8 +242,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     physicalWorktrees,
     terminal: { ...terminalCreateProvider, close: actions.closeForWorkspacePane },
     terminalSessions: manager,
-    isCurrentWorkspaceRuntimeMembership,
+    captureWorkspaceRuntimeMembershipCapability,
     broadcastWorkspaceTabsChanged: publishWorkspaceTabsRevision,
+    invalidateWorkspaceTabs: publishWorkspaceTabsChanged,
   })
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
     worktreeOperations,
@@ -274,17 +271,14 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const workspacePaneTabsActions = createWorkspacePaneTabsActions({
     sessionService,
     isValidClientId: isValidTerminalClientId,
-    isCurrentWorkspaceRuntimeMembership,
+    captureWorkspaceRuntimeMembershipCapability,
   })
   const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
-    async restoreTabs(userId, input) {
-      return await sessionService.restoreTabs(userId, input)
+    async restoreTabs(userId, input, runtimeCapability) {
+      return await sessionService.restoreTabs(userId, input, runtimeCapability)
     },
     async listWorkspaceTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.listWorkspaceTabs(clientId, userId, input)
-    },
-    async replaceTabs(clientId, userId, input) {
-      return await workspacePaneTabsActions.replaceTabs(clientId, userId, input)
     },
     async updateTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.updateTabs(clientId, userId, input)
@@ -337,6 +331,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
           shuttingDown,
           pty,
           liveSessionCount: manager.getSessionCount(),
+          pendingResourceRetirementCount: manager.getPendingResourceRetirementCount(),
         },
       }
     },
@@ -365,12 +360,13 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   terminalRuntimeLogger.info({ ptyMode: ptySupervisor.getDiagnostics().mode }, 'server terminal runtime created')
 
   const workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost = {
-    async commitGitCapabilityRemoval({ userId, workspaceId, workspaceRuntimeId, assertCurrent }) {
+    async commitGitCapabilityRemoval({ runtimeCapability }) {
+      const { userId, workspaceId, workspaceRuntimeId } = runtimeCapability
       const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
       let durableLayoutChanged: boolean
       try {
-        assertCurrent()
-        durableLayoutChanged = await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, workspaceId)
+        runtimeCapability.assertCurrent()
+        durableLayoutChanged = await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, runtimeCapability)
       } catch (error) {
         return { kind: 'failed-before-commit', error }
       }
@@ -444,11 +440,13 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     )
     // The composed workspace-pane close reconciles tabs under its existing
     // physical-worktree permit and returns that canonical snapshot. General
-    // session retirement has no such command boundary, so it reconciles here.
+    // session retirement has no such command boundary, so it reconciles here
+    // from the complete live-session projection.
     if (reason === 'workspace-pane') return
     return sessionService
       .reconcileTerminalTabsForSession(userId, session)
-      .then(() => {
+      .then((result) => {
+        if (result.kind === 'runtime-stale') return
         publishWorkspaceTabsChanged(userId, coordinates.workspaceId)
       })
       .catch((err) => {
@@ -467,18 +465,21 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
 async function clearWorkspacePaneDurableLayout(
   repository: WorkspacePaneLayoutRepository,
-  workspaceId: WorkspaceId,
+  runtimeCapability: WorkspaceRuntimeEpochCapability,
 ): Promise<boolean> {
+  const { workspaceId } = runtimeCapability
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const current = await repository.load(workspaceId)
     const replacement = {
       entries: current.layout.entries.filter((entry) => entry.target.kind === 'workspace-root'),
     }
+    runtimeCapability.assertCurrent()
     if (workspacePaneDurableLayoutsEqual(workspaceId, current.layout, replacement)) return false
     const outcome = await repository.compareAndSwap({
       workspaceId,
       expected: current.layout,
       replacement,
+      epochCapability: runtimeCapability,
     })
     if (outcome.kind === 'accepted') return outcome.changed
     if (outcome.kind === 'write-failure') throw outcome.error

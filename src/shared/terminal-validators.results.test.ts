@@ -233,6 +233,42 @@ describe('shared terminal validators results', () => {
     expect(
       normalizeAppRealtimeSocketServerMessage({
         type: 'response',
+        requestId: 'req_1',
+        ok: false,
+        action: 'attach',
+        error: 'delivery uncertain',
+        outcome: 'indeterminate',
+      }),
+    ).toEqual({
+      type: 'response',
+      requestId: 'req_1',
+      ok: false,
+      action: 'attach',
+      error: 'delivery uncertain',
+      outcome: 'indeterminate',
+    })
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
+        requestId: 'req_workspace_tabs_indeterminate',
+        ok: false,
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
+        error: 'delivery uncertain',
+        outcome: 'indeterminate',
+      }),
+    ).toEqual({
+      type: 'response',
+      requestId: 'req_workspace_tabs_indeterminate',
+      ok: false,
+      action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
+      error: 'delivery uncertain',
+      outcome: 'indeterminate',
+    })
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
         requestId: 'req_workspace_tabs',
         ok: true,
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
@@ -258,7 +294,50 @@ describe('shared terminal validators results', () => {
       ok: false,
       action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
       error: 'Invalid realtime socket response payload',
+      outcome: 'indeterminate',
     })
+  })
+
+  const crossTransportEntry = {
+    target: {
+      kind: 'git-worktree' as const,
+      workspaceId: 'goblin+ssh://mock-host/repo',
+      workspaceRuntimeId: 'repo-runtime-test',
+      root: 'goblin+ssh://other-mock-host/repo/worktree',
+    },
+    tabs: [],
+  }
+
+  test.each([
+    {
+      label: 'read without implying a committed outcome',
+      action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+      payload: { revision: 3, entries: [crossTransportEntry] },
+      expectedOutcome: null,
+    },
+    {
+      label: 'write as indeterminate',
+      action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
+      payload: { kind: 'projected', snapshot: { revision: 3, entries: [crossTransportEntry] } },
+      expectedOutcome: 'indeterminate' as const,
+    },
+  ])('rejects a semantically invalid tabs $label', ({ action, payload, expectedOutcome }) => {
+    const result = normalizeAppRealtimeSocketServerMessage({
+      type: 'response',
+      requestId: 'req_workspace_tabs_invalid_target',
+      ok: true,
+      action,
+      payload,
+    })
+    const expected = {
+      type: 'response',
+      requestId: 'req_workspace_tabs_invalid_target',
+      ok: false,
+      action,
+      error: 'Invalid realtime socket response payload',
+    }
+
+    expect(result).toEqual(expectedOutcome === null ? expected : { ...expected, outcome: expectedOutcome })
   })
 
   test('normalizes runtime-open command responses', () => {
@@ -415,6 +494,50 @@ describe('shared terminal validators results', () => {
         error: 'Invalid realtime socket response payload',
       })
     }
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
+        requestId: 'request_runtime_close_invalid_generation',
+        ok: true,
+        action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+        payload: {
+          ok: true,
+          runtimeType: 'terminal',
+          runtime: { ...effects[0], terminalRuntimeGeneration: -1 },
+          paneTabsSnapshot,
+        },
+      }),
+    ).toMatchObject({
+      ok: false,
+      action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+      error: 'Invalid realtime socket response payload',
+      outcome: 'indeterminate',
+    })
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
+        requestId: 'request_runtime_close_projection_invalidated',
+        ok: true,
+        action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+        payload: {
+          ok: true,
+          runtimeType: 'terminal',
+          runtime: effects[0],
+          paneTabsSnapshot: null,
+        },
+      }),
+    ).toMatchObject({
+      type: 'response',
+      ok: true,
+      action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+      payload: {
+        ok: true,
+        runtime: effects[0],
+        paneTabsSnapshot: null,
+      },
+    })
 
     expect(
       normalizeAppRealtimeSocketServerMessage({

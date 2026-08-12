@@ -11,7 +11,7 @@ import {
   runCloseWorkspacePaneTabCommand as runCloseWorkspacePaneTabCommandRaw,
   runConfirmCloseTerminalWorkspacePaneTabCommand,
 } from '#/web/commands/workspace-commands.ts'
-import { setTerminalSessionCommandBridgeWithCreatedAdmissionForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { terminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
@@ -19,6 +19,7 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabCloseOutcome } from '#/web/workspace-pane/workspace-pane-tab-close-outcome.ts'
 import { workspacePaneStaticTabEntry as staticEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { seedInitialObservedWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
@@ -114,8 +115,12 @@ describe('workspace commands close', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(async () => true),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const })),
     })
     const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
 
@@ -170,11 +175,15 @@ describe('workspace commands close', () => {
         'feature/worktree': [staticEntry('status'), terminalEntry('term-111111111111111111111')],
       },
     })
-    const closeTerminalByDescriptor = vi.fn(async () => true)
+    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
     const workspacePaneRoute = { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' } as const
@@ -222,11 +231,15 @@ describe('workspace commands close', () => {
         ],
       },
     })
-    const closeTerminalByDescriptor = vi.fn(async () => true)
+    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
     const workspacePaneRoute = { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' } as const
@@ -269,8 +282,8 @@ describe('workspace commands close', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', expectedTerminalBase())
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
-    expect(presentationEffects.onCommit).toHaveBeenCalledOnce()
-    expect(presentationEffects.onAbandon).not.toHaveBeenCalled()
+    expect(presentationEffects.onCommit).not.toHaveBeenCalled()
+    expect(presentationEffects.onAbandon).toHaveBeenCalledOnce()
   })
 
   test('close workspace tab command uses each committed snapshot between rapid closes', async () => {
@@ -296,7 +309,7 @@ describe('workspace commands close', () => {
     let visibleSessionIds = ['term-111111111111111111111', 'term-222222222222222222222']
     const closeResolvers: Array<(value: boolean) => void> = []
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
-      return new Promise<boolean>((resolve) => {
+      return new Promise<WorkspacePaneTabCloseOutcome>((resolve) => {
         closeResolvers.push((value) => {
           if (value) {
             visibleSessionIds = visibleSessionIds.filter(
@@ -311,14 +324,18 @@ describe('workspace commands close', () => {
             })
             workspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, visibleSessionIds[0] ?? null)
           }
-          resolve(value)
+          resolve(value ? { kind: 'committed', projection: 'applied' } : { kind: 'not-committed' as const, message: null })
         })
       })
     })
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
       createTerminal: vi.fn(async () => 'term-333333333333333333333'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
     const showRepoBranchTerminalSession = vi.fn(() => true)
@@ -375,11 +392,15 @@ describe('workspace commands close', () => {
       },
     })
     workspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, 'term-222222222222222222222')
-    const closeTerminalByDescriptor = vi.fn(async () => true)
+    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithSecondTerminalSelected(),
       createTerminal: vi.fn(async () => 'term-333333333333333333333'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
 
@@ -462,7 +483,7 @@ describe('workspace commands close', () => {
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
       visibleSessionIds = visibleSessionIds.filter((id) => id !== terminalSessionId)
-      return Promise.resolve(true)
+      return Promise.resolve({ kind: 'committed' as const, projection: 'applied' as const })
     })
     const showRepoBranchWorkspacePaneTab = vi.fn((workspaceId, branch, tab) => {
       workspacesStore.getState().setWorkspacePaneTab(workspaceId, branch, tab)
@@ -472,7 +493,15 @@ describe('workspace commands close', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
       createTerminal,
+      createTerminalWithAdmission: vi.fn(async (base, options) => ({
+        terminalSessionId: await createTerminal(base),
+        presentation: base.presentation,
+        requestRole: 'leader' as const,
+        resourceDisposition: 'created' as const,
+        runtimeProjectionApplied: true,
+      })),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession })
@@ -605,8 +634,12 @@ describe('workspace commands close', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(async () => true),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const })),
     })
 
     expect(
@@ -638,8 +671,12 @@ describe('workspace commands close', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: true }),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
-      closeTerminalByDescriptor: vi.fn(async () => true),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const })),
     })
     const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
 
@@ -675,11 +712,15 @@ describe('workspace commands close', () => {
       },
     })
     workspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, terminalSessionId)
-    const closeTerminalByDescriptor = vi.fn(async () => true)
+    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => terminalSessionId),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
       selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
 

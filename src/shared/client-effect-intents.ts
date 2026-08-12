@@ -11,6 +11,8 @@ type TerminalBellClickIntent = {
   session: TerminalSessionBase
 }
 
+export type RepoViewClientIntent = { type: 'show-workspace-pane-tab-requested'; tab: WorkspacePaneTabType }
+
 export type ClientEffectIntent =
   | { type: 'open-workspace-requested' }
   | { type: 'open-workspace-path-requested' }
@@ -23,7 +25,7 @@ export type ClientEffectIntent =
   | { type: 'close-workspace-requested' }
   | { type: 'cycle-workspace-requested'; direction: 1 | -1 }
   | { type: 'workspace-refresh-requested' }
-  | { type: 'show-workspace-pane-tab-requested'; tab: WorkspacePaneTabType }
+  | RepoViewClientIntent
   | { type: 'terminal-primary-action-requested' }
   | { type: 'workspace-zen-mode-toggle-requested' }
   | { type: 'layout-reset-requested' }
@@ -73,6 +75,10 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     default:
       return false
   }
+}
+
+export function isRepoViewClientIntent(event: unknown): event is RepoViewClientIntent {
+  return isClientEffectIntent(event) && event.type === 'show-workspace-pane-tab-requested'
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

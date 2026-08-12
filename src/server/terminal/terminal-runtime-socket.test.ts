@@ -16,16 +16,16 @@ import {
 
 describe('server terminal runtime sockets and diagnostics', () => {
   test('exposes a closing-state supervisor after shutdown', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     expect(host.getDiagnostics().terminal.shuttingDown).toBe(false)
     shutdown()
     expect(host.getDiagnostics().terminal.shuttingDown).toBe(true)
   })
 
-  test('shutdown gracefully closes registered sockets without leaving detached-user timers', () => {
+  test('shutdown gracefully closes registered sockets without leaving client-state timers', async () => {
     useFakeTimers()
     try {
-      const { host, shutdown } = buildRuntime()
+      const { host, shutdown } = await buildRuntime()
       const socket = appRealtimeSocket()
       host.registerSocket('client_shutdown', USER_1, socket)
 
@@ -40,7 +40,7 @@ describe('server terminal runtime sockets and diagnostics', () => {
   })
 
   test('getDiagnostics exposes the live logical session count', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socket = appRealtimeSocket()
     host.registerSocket('client_1', USER_1, socket)
     try {
@@ -62,7 +62,7 @@ describe('server terminal runtime sockets and diagnostics', () => {
     }
   })
 
-  test('runtime routes a health ping to the registered socket liveness clock', () => {
+  test('runtime routes a health ping to the registered socket liveness clock', async () => {
     // The broker owns a distinct clock for every registered buffered socket.
     // This covers the raw-to-buffered transport lookup in
     // `handleRealtimeMessage`; recording the raw socket would silently miss
@@ -75,7 +75,7 @@ describe('server terminal runtime sockets and diagnostics', () => {
     // is about `isClientOnline`.
     useFakeTimers()
     vi.setSystemTime(TEST_NOW)
-    const { host, shutdown, isClientOnline } = buildRuntime()
+    const { host, shutdown, isClientOnline } = await buildRuntime()
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
     try {
@@ -107,8 +107,8 @@ describe('server terminal runtime sockets and diagnostics', () => {
     }
   })
 
-  test('does not route messages from a socket rejected by admission', () => {
-    const { host, shutdown } = buildRuntime()
+  test('does not route messages from a socket rejected by admission', async () => {
+    const { host, shutdown } = await buildRuntime()
     const admittedSockets = Array.from({ length: MAX_APP_REALTIME_SOCKETS }, (_, index) => ({
       clientId: `client_admitted_${index}`,
       socket: appRealtimeSocket(),
@@ -135,8 +135,8 @@ describe('server terminal runtime sockets and diagnostics', () => {
     }
   })
 
-  test('runtime answers terminal socket health pings with pong', () => {
-    const { host, shutdown } = buildRuntime()
+  test('runtime answers terminal socket health pings with pong', async () => {
+    const { host, shutdown } = await buildRuntime()
     const socket = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socket)
 
@@ -146,12 +146,12 @@ describe('server terminal runtime sockets and diagnostics', () => {
     shutdown()
   })
 
-  test('runtime health ping refreshes broker presence before the next liveness scan', () => {
+  test('runtime health ping refreshes broker presence before the next liveness scan', async () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       vi.setSystemTime(TEST_NOW)
-      const handle = buildRuntime()
+      const handle = await buildRuntime()
       const { host } = handle
       shutdownFn = handle.shutdown
       const socket = appRealtimeSocket()

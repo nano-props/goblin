@@ -17,7 +17,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   workspacePaneActionTargetFromCoordinates,
-  runWorkspacePaneAction,
+  tryRunWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 export interface WorkspacePaneDestinationPresentation {
@@ -53,16 +53,22 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
   if (!workspacePaneDestinationRouteSupported(lease, input.route)) {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
-  const presentation = beginWorkspacePaneDestinationPresentation(lease)
-  return await runWorkspacePaneAction(
+  const admission = await tryRunWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
       workspaceId: lease.workspaceId,
       workspaceRuntimeId: lease.workspaceRuntimeId,
       branchName: lease.branchName,
       worktreePath: lease.worktreePath,
     }),
-    () => commitWorkspacePaneDestinationRoute(presentation, input.route, input.navigation, input.options),
+    () =>
+      commitWorkspacePaneDestinationRoute(
+        beginWorkspacePaneDestinationPresentation(lease),
+        input.route,
+        input.navigation,
+        input.options,
+      ),
   )
+  return admission.kind === 'busy' ? { kind: 'blocked' } : admission.result
 }
 
 /**

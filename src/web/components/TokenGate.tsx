@@ -5,7 +5,7 @@ import { OkResponseSchema } from '#/shared/settings-response-schema.ts'
 import { useAuth } from '#/web/auth/AuthProvider.tsx'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
-import { postServerJson } from '#/web/lib/server-fetch.ts'
+import { postServerCommandJson } from '#/web/lib/server-fetch.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
 const LOGIN_TIMEOUT_MS = 15_000
@@ -48,7 +48,9 @@ const LoginForm = defineComponent<{ onSuccess: () => void }>({
       const timeout = createTimeoutAbortController(LOGIN_TIMEOUT_MS, `login timed out after ${LOGIN_TIMEOUT_MS}ms`)
       activeTimeout = timeout
       try {
-        await postServerJson('/api/login', { token: trimmed }, decodeWith(OkResponseSchema), { signal: timeout.signal })
+        await postServerCommandJson('/api/login', { token: trimmed }, decodeWith(OkResponseSchema), {
+          signal: timeout.signal,
+        })
         onSuccess()
       } catch (caught) {
         error.value = caught instanceof Error ? caught.message : t('auth.gate.error-failed')

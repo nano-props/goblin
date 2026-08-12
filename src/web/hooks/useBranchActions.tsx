@@ -1,6 +1,7 @@
 import { computed, reactive, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { useMutation } from '@tanstack/vue-query'
+import { toast } from 'vue-sonner'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
@@ -30,6 +31,8 @@ import {
   requiredGitWorkspacePaneTabsTarget,
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 const SILENT_SUCCESS_OPS = new Set<string>(['terminal', 'editor', 'finder'])
 type BranchUiActionOpId = 'copyPatch' | 'terminal' | 'editor' | 'finder'
@@ -97,6 +100,7 @@ export function useBranchActions(
   repo: MaybeRefOrGetter<BranchActionRepo>,
   branch: MaybeRefOrGetter<BranchSnapshotInfo>,
 ): BranchActions {
+  const t = useT()
   const { setLastResult, runBranchAction } = workspacesStore.getState()
   const copyPatchMutation = useMutation({
     mutationKey: ['repo-data', 'patch'],
@@ -130,21 +134,31 @@ export function useBranchActions(
     })
   }
 
-  function runUiAction(
-    op: BranchUiActionOpId,
-    fn: () => Promise<ExecResult>,
-    options?: { handleResult?: (result: ExecResult) => boolean },
-  ): Promise<ExecResult | null> {
+  function runUiAction(op: BranchUiActionOpId, fn: () => Promise<ExecResult>): Promise<ExecResult | null> {
     if (guardBusy()) return Promise.resolve(null)
     const currentRepo = toValue(repo)
     const request = run(op, async () => {
       return await dispatchWorkspaceUiAction(currentRepo.id, currentRepo.workspaceRuntimeId, op, fn, {
         silentSuccessOps: SILENT_SUCCESS_OPS,
-        handleResult: options?.handleResult,
         reportResult: setLastResult,
       })
     })
     return (request ?? Promise.resolve(null)) as Promise<ExecResult | null>
+  }
+
+  async function runExternalAppAction(
+    op: 'terminal' | 'editor' | 'finder',
+    action: () => Promise<ExecResult>,
+  ): Promise<ExecResult | null> {
+    try {
+      return await runUiAction(op, action)
+    } catch (error) {
+      if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) {
+        toast.warning(t('error.external-app-outcome-uncertain'))
+        return null
+      }
+      throw error
+    }
   }
 
   function copyPatch(): Promise<boolean> {
@@ -209,7 +223,7 @@ export function useBranchActions(
     if (!worktreePath) return
     const target = gitWorktreeFilesystemExecutionTarget(currentRepo.id, currentRepo.workspaceRuntimeId, worktreePath)
     if (!target) return
-    return runUiAction('terminal', () => openWorkspaceTerminal(target, app))
+    return runExternalAppAction('terminal', () => openWorkspaceTerminal(target, app))
   }
 
   function openEditor(app: EditorApp) {
@@ -218,7 +232,7 @@ export function useBranchActions(
     if (!worktreePath) return
     const target = gitWorktreeFilesystemExecutionTarget(currentRepo.id, currentRepo.workspaceRuntimeId, worktreePath)
     if (!target) return
-    return runUiAction('editor', () => openWorkspaceEditor(target, app))
+    return runExternalAppAction('editor', () => openWorkspaceEditor(target, app))
   }
 
   function openFinder() {
@@ -227,7 +241,7 @@ export function useBranchActions(
     if (!worktreePath || isRemoteWorkspaceId(currentRepo.id)) return
     const target = gitWorktreeFilesystemExecutionTarget(currentRepo.id, currentRepo.workspaceRuntimeId, worktreePath)
     if (!target) return
-    return runUiAction('finder', () => openWorkspaceInFinder(target))
+    return runExternalAppAction('finder', () => openWorkspaceInFinder(target))
   }
 
   function requestDeleteBranch() {

@@ -4,6 +4,7 @@ import { defineComponent, onMounted, onUnmounted } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { waitFor } from '@testing-library/vue'
 import { useFakeTimers } from '#/test-utils/timers.ts'
+import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 let hydrateI18n: ReturnType<typeof vi.fn>
 let hydrateHostInfo: ReturnType<typeof vi.fn>
@@ -53,6 +54,7 @@ beforeEach(() => {
 
 afterEach(() => {
   disposeWebApp?.()
+  delete (window as Partial<Window>).goblinNative
   document.body.innerHTML = ''
 })
 
@@ -62,6 +64,30 @@ async function loadMain(): Promise<void> {
 }
 
 describe('client entrypoint', () => {
+  test('registers native quit lifecycle before public bootstrap finishes', async () => {
+    const hydration = Promise.withResolvers<void>()
+    hydrateI18n.mockReturnValue(hydration.promise)
+    let nativeQuit: (() => void) | undefined
+    const notifyAppQuitDrained = vi.fn(async () => true)
+    Object.defineProperty(window, 'goblinNative', {
+      configurable: true,
+      value: currentNativeBridge({
+        notifyAppQuitDrained,
+        onAppQuitting(listener) {
+          nativeQuit = listener
+          return () => {}
+        },
+      }),
+    })
+
+    await loadMain()
+    nativeQuit?.()
+
+    await waitFor(() => expect(notifyAppQuitDrained).toHaveBeenCalledWith({ ok: true }))
+    expect(document.body.textContent).toContain('Loading')
+    hydration.resolve()
+  })
+
   test('mounts the app only after the initial hydration succeeds', async () => {
     let resolveHydrate!: () => void
     const hydratePromise = new Promise<void>((resolve) => {

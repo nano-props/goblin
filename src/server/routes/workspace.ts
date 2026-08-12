@@ -21,6 +21,7 @@ import {
 } from '#/server/modules/workspace-external-apps.ts'
 import {
   requireCurrentWorkspaceRuntime,
+  requireWorkspaceRuntimeEpochCapability,
   runWorkspaceRuntimeRequest,
 } from '#/server/modules/workspace-runtime-request.ts'
 import {
@@ -33,7 +34,7 @@ import {
   commitGitCapabilityRemovalOrThrow,
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
-import { IpcError } from '#/shared/ipc-error.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 import { WORKSPACE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { WorkspaceId, WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
 import { homedir } from 'node:os'
@@ -54,23 +55,31 @@ export function createWorkspaceRoutes(options: {
 
   app.post('/refresh', async (c) => {
     const { workspaceId, workspaceRuntimeId } = await parseHttpBody(WORKSPACE_PROCEDURE_SCHEMAS.refresh, c)
-    const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), workspaceId, workspaceRuntimeId)
+    const runtimeCapability = requireWorkspaceRuntimeEpochCapability(
+      userIdFromContext(c),
+      workspaceId,
+      workspaceRuntimeId,
+    )
+    const { userId } = runtimeCapability
     const platform = serverLocatorPlatform()
     return c.json(
-      await runSerializedWorkspaceRefresh({
+      await runWorkspaceRuntimeRequest({
         userId,
-        workspaceId,
-        workspaceRuntimeId,
-        probe: () => probeWorkspace(workspaceId, platform, { signal: c.req.raw.signal }),
-        beforeCommit: async ({ before, after }) => {
-          if (!workspaceGitCleanupRequired(before, after)) return
-          await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
+        label: 'workspace-refresh',
+        signal: c.req.raw.signal,
+        run: async () =>
+          await runSerializedWorkspaceRefresh({
             userId,
             workspaceId,
             workspaceRuntimeId,
-            assertCurrent: () => requireCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId),
-          })
-        },
+            probe: () => probeWorkspace(workspaceId, platform, { signal: c.req.raw.signal }),
+            beforeCommit: async ({ before, after }) => {
+              if (!workspaceGitCleanupRequired(before, after)) return
+              await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
+                runtimeCapability,
+              })
+            },
+          }),
       }),
     )
   })
@@ -89,32 +98,39 @@ export function createWorkspaceRoutes(options: {
         return c.json({ ok: false as const, input: input.workspaceInput, reason: probe.reason })
       }
       return c.json(
-        await withWorkspaceRuntimeAdmission(userId, workspaceId, input.clientId, async (workspaceRuntimeId) => {
-          const authoritativeProbe = await runSerializedInitialWorkspaceProbe({
-            userId,
-            workspaceId,
-            workspaceRuntimeId,
-            probe: async () => probe,
-            beforeCommit: async ({ before, after }) => {
-              if (!workspaceGitCleanupRequired(before, after)) return
-              await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
+        await runWorkspaceRuntimeRequest({
+          userId,
+          label: 'workspace-runtime-open',
+          signal: c.req.raw.signal,
+          run: async () =>
+            await withWorkspaceRuntimeAdmission(userId, workspaceId, input.clientId, async (runtimeCapability) => {
+              const { workspaceRuntimeId } = runtimeCapability
+              const authoritativeProbe = await runSerializedInitialWorkspaceProbe({
                 userId,
                 workspaceId,
                 workspaceRuntimeId,
-                assertCurrent: () => requireCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId),
+                probe: async () => probe,
+                beforeCommit: async ({ before, after }) => {
+                  if (!workspaceGitCleanupRequired(before, after)) return
+                  await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
+                    runtimeCapability,
+                  })
+                },
               })
-            },
-          })
-          if (!authoritativeProbe || authoritativeProbe.status !== 'ready') {
-            throw new IpcError({ code: 'INTERNAL_SERVER_ERROR', message: 'error.workspace-transport-unavailable' })
-          }
-          return {
-            ok: true as const,
-            workspace: { id: workspaceId },
-            workspaceRuntimeId,
-            capabilities: authoritativeProbe.capabilities,
-            diagnostics: authoritativeProbe.diagnostics,
-          }
+              if (authoritativeProbe.status !== 'ready') {
+                throw new CodedError({
+                  code: 'INTERNAL_SERVER_ERROR',
+                  message: 'error.workspace-transport-unavailable',
+                })
+              }
+              return {
+                ok: true as const,
+                workspace: { id: workspaceId },
+                workspaceRuntimeId,
+                capabilities: authoritativeProbe.capabilities,
+                diagnostics: authoritativeProbe.diagnostics,
+              }
+            }),
         }),
       )
     }
@@ -325,7 +341,7 @@ export function createWorkspaceRoutes(options: {
 }
 
 function requireUserId(userId: string | null | undefined): string {
-  if (!userId) throw new IpcError({ code: 'UNAUTHORIZED', message: 'Unauthorized' })
+  if (!userId) throw new CodedError({ code: 'UNAUTHORIZED', message: 'Unauthorized' })
   return userId
 }
 
@@ -342,7 +358,7 @@ function workspaceFileContentDisposition(filename: string): string {
 function requiredFilesystemExecutionTarget(target: RuntimeWorkspacePaneTarget): WorkspacePaneFilesystemExecutionTarget {
   const canonical = canonicalRuntimeWorkspacePaneTarget(target)
   if (!canonical || canonical.kind === 'git-branch') {
-    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-target-transport-mismatch' })
+    throw new CodedError({ code: 'BAD_REQUEST', message: 'error.workspace-target-transport-mismatch' })
   }
   return canonical
 }

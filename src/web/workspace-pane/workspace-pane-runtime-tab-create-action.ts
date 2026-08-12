@@ -226,7 +226,9 @@ export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
 ): Promise<TerminalCreatedTabCommitResult> {
   const canonicalBase = terminalSessionBase(options.base.target, options.admission.presentation)
   const canonicalOptions = { ...options, base: canonicalBase }
-  if (!terminalCreateTargetRuntimeIsCurrent(canonicalOptions.base)) return { status: 'superseded' }
+  if (!options.admission.runtimeProjectionApplied || !terminalCreateTargetRuntimeIsCurrent(canonicalOptions.base)) {
+    return { status: 'superseded' }
+  }
   recordCreatedTerminalWorkspacePaneRuntimeTabOpener(canonicalOptions)
   const navigationCommitted = await options.showCreatedTerminalTab(
     options.admission.terminalSessionId,

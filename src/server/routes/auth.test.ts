@@ -85,7 +85,7 @@ describe('POST /api/login', () => {
     )
     expect(res.status).toBe(401)
     const body = (await res.json()) as { ok: false; code: string; message: string }
-    expect(body.code).toBe('FORBIDDEN')
+    expect(body.code).toBe('UNAUTHORIZED')
   })
 
   test.each([

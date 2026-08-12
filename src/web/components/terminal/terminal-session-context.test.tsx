@@ -42,7 +42,7 @@ function makeCommandContext(overrides: Partial<TerminalSessionContextValue> = {}
     selectTerminal: vi.fn(),
     scrollToBottom: vi.fn(),
     clearBell: vi.fn(() => false),
-    closeTerminalByDescriptor: vi.fn(async () => false),
+    closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     attach: vi.fn(),
     detach: vi.fn(),
     restart: vi.fn(),
@@ -82,6 +82,8 @@ describe('useTerminalSessionReadContext', () => {
       subscribeTerminalFilesystemTarget: () => () => {},
       workspaceBellCount: () => 3,
       subscribeWorkspaceBellCount: () => () => {},
+      workspaceTerminalSessions: () => [],
+      subscribeWorkspaceTerminalSessions: () => () => {},
       snapshot: () => ({
         phase: 'opening',
         message: null,

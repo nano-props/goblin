@@ -4,7 +4,6 @@ import { REALTIME_LIVENESS_PROBE_INTERVAL_MS } from '#/server/realtime/realtime-
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import {
   CLIENT_STATE_GRACE_MS,
-  DETACHED_TTL_MS,
   LIVENESS_SILENCE_MS,
   REPO_ROOT,
   TEST_NOW,
@@ -13,8 +12,9 @@ import {
   appRealtimeSocket,
   buildRuntime,
   createTerminalSession,
-  setWorkspaceRuntimeId,
 } from '#/server/test-utils/terminal-runtime.ts'
+
+const LONG_IDLE_MS = 24 * 60 * 60 * 1_000
 
 describe('server terminal runtime expiry', () => {
   test('runtime: controller projection recovers when a long-idle client reconnects', async () => {
@@ -22,7 +22,7 @@ describe('server terminal runtime expiry', () => {
     let shutdownFn: (() => void) | undefined
     try {
       vi.setSystemTime(TEST_NOW)
-      const handle = buildRuntime()
+      const handle = await buildRuntime()
       const { host } = handle
       shutdownFn = handle.shutdown
       const socket = appRealtimeSocket()
@@ -75,54 +75,12 @@ describe('server terminal runtime expiry', () => {
     }
   })
 
-  test('runtime: recovered health probes cancel detached cleanup after a liveness timeout', async () => {
+  test('runtime: a long-idle disconnected terminal remains recoverable', async () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       vi.setSystemTime(TEST_NOW)
-      const handle = buildRuntime()
-      const { host } = handle
-      shutdownFn = handle.shutdown
-      const socket = appRealtimeSocket()
-      acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_recovered')
-      host.registerSocket('client_recovered', USER_1, socket)
-      await createTerminalSession(host, 'client_recovered')
-
-      vi.advanceTimersByTime(LIVENESS_SILENCE_MS)
-      expect(handle.isClientOnline('client_recovered')).toBe(false)
-
-      const reconnectedSocket = appRealtimeSocket()
-      host.registerSocket('client_recovered', USER_1, reconnectedSocket)
-      expect(handle.isClientOnline('client_recovered')).toBe(true)
-
-      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += REALTIME_LIVENESS_PROBE_INTERVAL_MS) {
-        await advanceTimersAndFlush(REALTIME_LIVENESS_PROBE_INTERVAL_MS)
-        host.handleRealtimeMessage(
-          'client_recovered',
-          USER_1,
-          reconnectedSocket,
-          JSON.stringify({ type: 'ping', requestId: `health_recovered_${elapsed}` }),
-        )
-      }
-      await vi.runOnlyPendingTimersAsync()
-      await expect(
-        host.listSessions('client_recovered', USER_1, {
-          workspaceId: REPO_ROOT,
-          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        }),
-      ).resolves.toHaveLength(1)
-    } finally {
-      vi.useRealTimers()
-      shutdownFn?.()
-    }
-  })
-
-  test('runtime: detached TTL cleans up when liveness timeout leaves only half-open sockets', async () => {
-    useFakeTimers()
-    let shutdownFn: (() => void) | undefined
-    try {
-      vi.setSystemTime(TEST_NOW)
-      const handle = buildRuntime()
+      const handle = await buildRuntime()
       const { host } = handle
       shutdownFn = handle.shutdown
       const socket = appRealtimeSocket()
@@ -134,52 +92,16 @@ describe('server terminal runtime expiry', () => {
       expect(host.getDiagnostics().terminal.registeredSockets).toBe(0)
       expect(handle.isClientOnline('client_half_open')).toBe(false)
 
-      await advanceTimersAndFlush(DETACHED_TTL_MS + 1)
-      await vi.runOnlyPendingTimersAsync()
+      await advanceTimersAndFlush(LONG_IDLE_MS)
 
-      expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
-      setWorkspaceRuntimeId(acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_half_open'))
+      expect(host.getDiagnostics().terminal.liveSessionCount).toBe(1)
+      expect(acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_reconnected')).toBe(WORKSPACE_RUNTIME_ID)
       await expect(
-        host.listSessions('client_half_open', USER_1, {
+        host.listSessions('client_reconnected', USER_1, {
           workspaceId: REPO_ROOT,
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         }),
-      ).resolves.toEqual([])
-    } finally {
-      vi.useRealTimers()
-      shutdownFn?.()
-    }
-  })
-
-  test('runtime: late socket drain does not extend detached TTL after liveness timeout', async () => {
-    useFakeTimers()
-    let shutdownFn: (() => void) | undefined
-    try {
-      vi.setSystemTime(TEST_NOW)
-      const handle = buildRuntime()
-      const { host } = handle
-      shutdownFn = handle.shutdown
-      const socket = appRealtimeSocket()
-      acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_late_drain')
-      host.registerSocket('client_late_drain', USER_1, socket)
-      await createTerminalSession(host, 'client_late_drain')
-
-      vi.advanceTimersByTime(LIVENESS_SILENCE_MS)
-      expect(handle.isClientOnline('client_late_drain')).toBe(false)
-
-      await advanceTimersAndFlush(DETACHED_TTL_MS - 1_000)
-      host.unregisterSocket('client_late_drain', USER_1, socket)
-      await advanceTimersAndFlush(1_001)
-      await vi.runOnlyPendingTimersAsync()
-
-      expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
-      setWorkspaceRuntimeId(acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_late_drain'))
-      await expect(
-        host.listSessions('client_late_drain', USER_1, {
-          workspaceId: REPO_ROOT,
-          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        }),
-      ).resolves.toEqual([])
+      ).resolves.toHaveLength(1)
     } finally {
       vi.useRealTimers()
       shutdownFn?.()
@@ -190,7 +112,7 @@ describe('server terminal runtime expiry', () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
-      const handle = buildRuntime()
+      const handle = await buildRuntime()
       shutdownFn = handle.shutdown
       expect(acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_expiring')).toBe(WORKSPACE_RUNTIME_ID)
       acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_survivor')
@@ -220,7 +142,7 @@ describe('server terminal runtime expiry', () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
-      const handle = buildRuntime()
+      const handle = await buildRuntime()
       shutdownFn = handle.shutdown
       const oldClientId = 'client_before_reload'
       const replacementClientId = 'client_after_reload'
@@ -264,7 +186,7 @@ describe('server terminal runtime expiry', () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
-      const handle = buildRuntime()
+      const handle = await buildRuntime()
       shutdownFn = handle.shutdown
       const runtimeId = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_never_online')
 
@@ -284,13 +206,13 @@ describe('server terminal runtime expiry', () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
-      const handle = buildRuntime()
+      const handle = await buildRuntime()
       shutdownFn = handle.shutdown
       const runtimeId = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_claimed_before_expiry')
       const socket = appRealtimeSocket()
       handle.host.registerSocket('client_claimed_before_expiry', USER_1, socket)
 
-      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += REALTIME_LIVENESS_PROBE_INTERVAL_MS) {
+      for (let elapsed = 0; elapsed < CLIENT_STATE_GRACE_MS * 2; elapsed += REALTIME_LIVENESS_PROBE_INTERVAL_MS) {
         handle.host.handleRealtimeMessage(
           'client_claimed_before_expiry',
           USER_1,
@@ -314,13 +236,13 @@ describe('server terminal runtime expiry', () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
-      const handle = buildRuntime()
+      const handle = await buildRuntime()
       shutdownFn = handle.shutdown
       const socket = appRealtimeSocket()
       handle.host.registerSocket('client_online_before_acquire', USER_1, socket)
       const runtimeId = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_online_before_acquire')
 
-      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += REALTIME_LIVENESS_PROBE_INTERVAL_MS) {
+      for (let elapsed = 0; elapsed < CLIENT_STATE_GRACE_MS * 2; elapsed += REALTIME_LIVENESS_PROBE_INTERVAL_MS) {
         handle.host.handleRealtimeMessage(
           'client_online_before_acquire',
           USER_1,
@@ -344,7 +266,7 @@ describe('server terminal runtime expiry', () => {
     useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
-      const handle = buildRuntime()
+      const handle = await buildRuntime()
       shutdownFn = handle.shutdown
       expect(acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_renewed')).toBe(WORKSPACE_RUNTIME_ID)
       const socket = appRealtimeSocket()

@@ -6,11 +6,13 @@ import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { CLIENT_BRIDGE_VERSION, WEB_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
+  toastWarning: vi.fn(),
 }))
 
 vi.mock('vue-sonner', () => ({
   toast: {
     error: mocks.toastError,
+    warning: mocks.toastWarning,
   },
 }))
 
@@ -70,6 +72,7 @@ describe('openWorkspaceFromDialog', () => {
     })
     const openWorkspaceMembership = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
       ok: false,
+      kind: 'failed',
       message: 'error.workspace-git-unavailable',
     }))
     const activateWorkspace = vi.fn()
@@ -84,6 +87,27 @@ describe('openWorkspaceFromDialog', () => {
     expect(activateWorkspace).not.toHaveBeenCalled()
     expect(mocks.toastError).toHaveBeenCalledWith('drop.open-failed', {
       description: 'error.workspace-git-unavailable',
+    })
+  })
+
+  test('surfaces an uncertain open without activating the established workspace', async () => {
+    installGoblinTestBridge({
+      'workspace.openDialog': () => '/tmp/repo',
+    })
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/repo')
+    const openWorkspaceMembership = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
+      ok: false,
+      kind: 'uncertain',
+      workspaceId,
+      message: 'error.operation-outcome-uncertain',
+    }))
+    const activateWorkspace = vi.fn()
+
+    await openWorkspaceFromDialog({ openWorkspaceMembership, activateWorkspace, t: (key) => key })
+
+    expect(activateWorkspace).not.toHaveBeenCalled()
+    expect(mocks.toastWarning).toHaveBeenCalledWith('drop.open-failed', {
+      description: 'error.operation-outcome-uncertain',
     })
   })
 

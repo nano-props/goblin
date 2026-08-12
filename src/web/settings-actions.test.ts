@@ -7,6 +7,7 @@ import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type {
   GitHubCliState,
+  SetGlobalShortcutResult,
   WorkspaceSettingsState,
   WorkspaceRestoreResult,
   WorkspaceTabsRestoreResult,
@@ -92,7 +93,11 @@ const appDataClientMocks = vi.hoisted(() => ({
     },
     snapshot: null,
   })),
-  setGlobalShortcut: vi.fn(async (accelerator) => ({ accelerator, registered: true })),
+  setGlobalShortcut: vi.fn<(accelerator: string) => Promise<SetGlobalShortcutResult>>(async (accelerator) => ({
+    kind: 'projected',
+    accelerator,
+    registered: true,
+  })),
   setGlobalShortcutDisabled: vi.fn(async (disabled) => disabled),
   setLanEnabled: vi.fn(async (enabled) => enabled),
   setRecentWorkspaceExternalApp: vi.fn<() => Promise<WorkspaceSettingsState>>(async () => ({ workspaceSettings: [] })),
@@ -184,7 +189,11 @@ describe('settings actions', () => {
       snapshot: null,
     })
     appDataClientMocks.setGlobalShortcut.mockReset()
-    appDataClientMocks.setGlobalShortcut.mockImplementation(async (accelerator) => ({ accelerator, registered: true }))
+    appDataClientMocks.setGlobalShortcut.mockImplementation(async (accelerator) => ({
+      kind: 'projected',
+      accelerator,
+      registered: true,
+    }))
     appDataClientMocks.setGlobalShortcutDisabled.mockReset()
     appDataClientMocks.setGlobalShortcutDisabled.mockImplementation(async (disabled) => disabled)
     appDataClientMocks.setLanEnabled.mockReset()
@@ -361,15 +370,38 @@ describe('settings actions', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ globalShortcut: 'Alt+Space', globalShortcutRegistered: true }),
     )
-    appDataClientMocks.setGlobalShortcut.mockResolvedValue({ accelerator: 'Ctrl+Space', registered: false })
+    appDataClientMocks.setGlobalShortcut.mockResolvedValue({
+      kind: 'projected',
+      accelerator: 'Ctrl+Space',
+      registered: false,
+    })
     const { setGlobalShortcut } = await import('#/web/settings-actions.ts')
 
     const state = await setGlobalShortcut('Ctrl+Space')
 
-    expect(state).toEqual({ accelerator: 'Ctrl+Space', registered: false })
+    expect(state).toEqual({ kind: 'projected', accelerator: 'Ctrl+Space', registered: false })
     expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       globalShortcut: 'Ctrl+Space',
       globalShortcutRegistered: false,
+    })
+  })
+
+  test('preserves registration projection when the shortcut preference commits without native projection', async () => {
+    appQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({ globalShortcut: 'Alt+Space', globalShortcutRegistered: true }),
+    )
+    appDataClientMocks.setGlobalShortcut.mockResolvedValue({
+      kind: 'committed-projection-failed',
+    })
+    const { setGlobalShortcut } = await import('#/web/settings-actions.ts')
+
+    await expect(setGlobalShortcut('Ctrl+Space')).resolves.toEqual({
+      kind: 'committed-projection-failed',
+    })
+    expect(appQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
+      globalShortcut: 'Alt+Space',
+      globalShortcutRegistered: true,
     })
   })
 

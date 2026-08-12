@@ -3,6 +3,10 @@ import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-work
 import type * as RemoteWorkspaceFailureSettlement from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 import type * as WorkspaceRuntimesModule from '#/server/modules/workspace-runtimes.ts'
 import {
+  WorkspaceRuntimeStaleError,
+  type WorkspaceRuntimeMembershipCapability,
+} from '#/server/modules/workspace-runtimes.ts'
+import {
   paneTabsSnapshot,
   publishedTerminalResult,
   request,
@@ -10,13 +14,14 @@ import {
   terminalCreateSuccess,
   terminalSession,
   deferred,
+  workspaceRuntimeMembershipCapability,
   workspaceId,
 } from '#/server/test-utils/workspace-pane-runtime-application.ts'
 import {
   testPhysicalWorktreeExecutionCapability,
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
-import type { ServerTerminalCreateResult } from '#/server/terminal/terminal-session-creator.ts'
+import type { ServerTerminalCreateSuccess } from '#/server/terminal/terminal-session-creator.ts'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
@@ -44,7 +49,9 @@ vi.mock('#/server/modules/workspace-runtimes.ts', async (importActual) => {
 
 describe('open admission', () => {
   test('rejects runtime commands when the calling client no longer owns the workspace membership', async () => {
-    const isCurrentWorkspaceRuntimeMembership = vi.fn(() => false)
+    const captureWorkspaceRuntimeMembershipCapability = vi.fn(() => {
+      throw new WorkspaceRuntimeStaleError()
+    })
     const capture = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
@@ -52,7 +59,8 @@ describe('open admission', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: vi.fn(), close: vi.fn() },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
-      isCurrentWorkspaceRuntimeMembership,
+      captureWorkspaceRuntimeMembershipCapability,
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -72,7 +80,7 @@ describe('open admission', () => {
       runtimeType: 'terminal',
       message: 'error.workspace-runtime-stale',
     })
-    expect(isCurrentWorkspaceRuntimeMembership).toHaveBeenCalledWith(
+    expect(captureWorkspaceRuntimeMembershipCapability).toHaveBeenCalledWith(
       'user-test',
       request.target.workspaceId,
       request.target.workspaceRuntimeId,
@@ -99,7 +107,8 @@ describe('open admission', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -121,7 +130,8 @@ describe('open admission', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: vi.fn(), close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -161,7 +171,8 @@ describe('open admission', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -191,7 +202,8 @@ describe('open admission', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged,
     })
 
@@ -252,7 +264,8 @@ describe('open admission', () => {
         close: () => ({ kind: 'failed' as const }),
       },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged,
     })
 
@@ -280,7 +293,8 @@ describe('open admission', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -322,7 +336,8 @@ describe('open admission', () => {
         ensureRuntimeTabForSession: vi.fn(),
         reconcileWorktreeAdmitted: vi.fn(async () => paneTabsSnapshot),
       }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -353,7 +368,11 @@ describe('open admission', () => {
       },
       terminal: { createAdmitted: async () => ({ ok: false, message: 'unexpected' }), close },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession: vi.fn() }),
-      isCurrentWorkspaceRuntimeMembership: () => current,
+      captureWorkspaceRuntimeMembershipCapability: () =>
+        workspaceRuntimeMembershipCapability(() => {
+          if (!current) throw new WorkspaceRuntimeStaleError()
+        }),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -393,7 +412,8 @@ describe('open admission', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close: () => ({ kind: 'failed' as const }) },
       workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession }),
-      isCurrentWorkspaceRuntimeMembership: () => true,
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -418,27 +438,34 @@ describe('open admission', () => {
           : { ...runtime.admission, kind: 'existing', abort: vi.fn() }
       const close = vi.fn(() => ({ kind: 'closed' as const }))
       const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.workspace-runtime-stale' }
-      const ensureRuntimeTabForSession = vi.fn(async (input: { isRuntimeCurrent: () => boolean }) =>
-        input.isRuntimeCurrent()
-          ? { kind: 'committed' as const, snapshot: paneTabsSnapshot }
-          : { kind: 'runtime-stale' as const },
+      const ensureRuntimeTabForSession = vi.fn(
+        async (input: { epochCapability: WorkspaceRuntimeMembershipCapability }) => {
+          input.epochCapability.assertCurrent()
+          return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
+        },
       )
       const broadcastWorkspaceTabsChanged = vi.fn()
-      const providerResult = deferred<Extract<ServerTerminalCreateResult, { ok: true }>>()
+      const providerResult = deferred<ServerTerminalCreateSuccess>()
       let current = true
       const create = vi.fn(async () => {
         const result = await providerResult.promise
         current = false
         return result
       })
-      const isCurrentWorkspaceRuntimeMembership = vi.fn(() => current)
+      const assertCurrent = vi.fn(() => {
+        if (!current) throw new WorkspaceRuntimeStaleError()
+      })
+      const captureWorkspaceRuntimeMembershipCapability = vi.fn(() =>
+        workspaceRuntimeMembershipCapability(assertCurrent),
+      )
       const application = createWorkspacePaneRuntimeApplication({
         worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
         physicalWorktrees: testPhysicalWorktrees,
         terminalSessions: { listSessionsForUser: async () => [] },
         terminal: { createAdmitted: create, close },
         workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession }),
-        isCurrentWorkspaceRuntimeMembership,
+        captureWorkspaceRuntimeMembershipCapability,
+        invalidateWorkspaceTabs: vi.fn(),
         broadcastWorkspaceTabsChanged,
       })
 
@@ -448,7 +475,8 @@ describe('open admission', () => {
       providerResult.resolve(runtime)
       await expect(open).resolves.toEqual(stale)
       expect(current).toBe(false)
-      expect(isCurrentWorkspaceRuntimeMembership).toHaveBeenCalledTimes(3)
+      expect(captureWorkspaceRuntimeMembershipCapability).toHaveBeenCalledOnce()
+      expect(assertCurrent).toHaveBeenCalledTimes(2)
       expect(ensureRuntimeTabForSession).toHaveBeenCalledOnce()
       expect(retire).toHaveBeenCalledTimes(action === 'created' ? 1 : 0)
       expect(close).not.toHaveBeenCalled()

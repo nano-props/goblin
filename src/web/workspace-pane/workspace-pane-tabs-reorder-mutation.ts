@@ -21,6 +21,9 @@ import {
   workspacePaneTabsTargetWorktreePath,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
+import { translate } from '#/web/stores/i18n-vue.ts'
+import { toast } from 'vue-sonner'
 
 export type WorkspacePaneTabsReorderMutationInput = WorkspacePaneTabsTarget & {
   workspaceRuntimeId: string
@@ -97,11 +100,16 @@ async function runWorkspacePaneTabsReorderInQueue(
   queryClient: QueryClient,
 ): Promise<void> {
   try {
-    const snapshot = await updateWorkspacePaneTabsOnServer({
+    const result = await updateWorkspacePaneTabsOnServer({
       ...target,
       operation: { type: 'reorder', tabIdentities: draggedTabs.map(workspacePaneTabEntryIdentity) },
     })
-    writeCanonicalWorkspacePaneTabsSnapshot(target.workspaceId, target.workspaceRuntimeId, snapshot, queryClient)
+    if (result.kind === 'committed-projection-failed') {
+      const messageKey = 'error.workspace-tabs-committed-projection-failed'
+      toast.warning(translate(messageKey), { id: 'workspace-pane-tabs-reorder-projection-failed' })
+      return
+    }
+    writeCanonicalWorkspacePaneTabsSnapshot(target.workspaceId, target.workspaceRuntimeId, result.snapshot, queryClient)
   } catch (err) {
     reportWorkspacePaneTabsFailure({
       operation: 'reorder',
@@ -110,6 +118,13 @@ async function runWorkspacePaneTabsReorderInQueue(
       worktreePath: workspacePaneTabsTargetWorktreePath(target),
       error: err,
     })
+    if (err instanceof ClientRealtimeRequestError && err.delivery === 'indeterminate') {
+      const messageKey = 'error.workspace-tabs-outcome-uncertain'
+      toast.warning(translate(messageKey), { id: 'workspace-pane-tabs-outcome-uncertain' })
+      return
+    }
+    const messageKey = 'error.workspace-operation-failed'
+    toast.error(translate(messageKey), { id: 'workspace-pane-tabs-reorder-failed' })
   }
 }
 

@@ -9,6 +9,7 @@ import type {
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import type { WorkspacePaneTabCloseOutcome } from '#/web/workspace-pane/workspace-pane-tab-close-outcome.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 type TerminalDescriptorIdentity = {
@@ -204,6 +205,11 @@ export interface TerminalFilesystemTargetSnapshot {
   createPending: boolean
 }
 
+/** Dashboard projection of every live terminal owned by one workspace runtime. */
+export interface WorkspaceTerminalSessionSummary extends TerminalSessionSummary {
+  base: TerminalSessionBase
+}
+
 export interface TerminalSessionContextValue {
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
   createTerminalWithAdmission: (
@@ -215,7 +221,10 @@ export interface TerminalSessionContextValue {
   scrollToBottom: (terminalSessionId: string) => void
   readCopyText: (terminalSessionId: string) => string | null
   clearBell: (terminalSessionId: string) => boolean
-  closeTerminalByDescriptor: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
+  closeTerminalByDescriptor: (
+    terminalSessionId: string,
+    base: TerminalSessionBase,
+  ) => Promise<WorkspacePaneTabCloseOutcome>
   attach: (descriptor: TerminalDescriptor, host: HTMLElement) => void
   detach: (terminalSessionId: string, host: HTMLElement) => void
   restart: (terminalSessionId: string) => void
@@ -248,6 +257,8 @@ export interface TerminalSessionReadContextValue {
   subscribeTerminalFilesystemTarget: (terminalFilesystemTargetKey: string, listener: () => void) => () => void
   workspaceBellCount: (workspaceId: WorkspaceId) => number
   subscribeWorkspaceBellCount: (workspaceId: WorkspaceId, listener: () => void) => () => void
+  workspaceTerminalSessions: (workspaceId: WorkspaceId) => WorkspaceTerminalSessionSummary[]
+  subscribeWorkspaceTerminalSessions: (workspaceId: WorkspaceId, listener: () => void) => () => void
   snapshot: (terminalSessionId: string) => TerminalSnapshot
   subscribeSnapshot: (terminalSessionId: string, listener: () => void) => () => void
 }

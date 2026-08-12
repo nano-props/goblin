@@ -1,4 +1,4 @@
-import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
+import type { RepoViewClientIntent } from '#/shared/client-effect-intents.ts'
 
 interface ClientIntentSocket {
   send(data: string): unknown
@@ -46,13 +46,9 @@ export function disconnectAllClientIntentSockets(): void {
 // (notably `POST /api/repo/view`) translate that into a 503 so the
 // CLI prints a clear error instead of silently doing nothing.
 //
-// We deliberately broadcast (no per-ownerId routing) because the
-// view-switching intents we publish here are non-sensitive
-// ("switch to the changes tab") and the broadcast matches the
-// invalidation broker's fanout semantics. If a future intent needs
-// per-owner routing, layer it on top — but don't repurpose this
-// broker; the simpler shape is the right default.
-export function publishClientIntent(intent: ClientEffectIntent): boolean {
+// The only server-originated intent is a non-sensitive view switch, so it is
+// broadcast with the same fanout semantics as invalidations.
+export function publishClientIntent(intent: RepoViewClientIntent): boolean {
   if (sockets.size === 0) return false
   const payload = JSON.stringify({ type: 'client-effect-intent', intent })
   for (const socket of Array.from(sockets)) {

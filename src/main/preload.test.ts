@@ -5,10 +5,15 @@ import { describe, expect, test, vi } from 'vitest'
 import type { GoblinNativeBridge } from '#/shared/goblin-native-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
-type ExposedGoblinNativeBridge = Omit<GoblinNativeBridge, 'host' | 'terminal' | 'onIntent' | 'rotateAccessToken'> & {
+type ExposedGoblinNativeBridge = Omit<
+  GoblinNativeBridge,
+  'host' | 'terminal' | 'onAppQuitting' | 'onIntent' | 'getAccessTokenProjection' | 'rotateAccessToken'
+> & {
   host: NonNullable<GoblinNativeBridge['host']>
   terminal: Required<GoblinNativeBridge['terminal']>
+  onAppQuitting: GoblinNativeBridge['onAppQuitting']
   onIntent: NonNullable<GoblinNativeBridge['onIntent']>
+  getAccessTokenProjection: NonNullable<GoblinNativeBridge['getAccessTokenProjection']>
   rotateAccessToken: NonNullable<GoblinNativeBridge['rotateAccessToken']>
 }
 
@@ -24,8 +29,8 @@ type ExposedGoblinNativeBridge = Omit<GoblinNativeBridge, 'host' | 'terminal' | 
  *
  * The literal regex requires a `:` so it doesn't pick up unrelated
  * identifiers like `'goblinNative'` (the contextBridge key) or
- * `'IpcError'` (a class name) — those don't have a namespace prefix
- * because IPC channels always do (`goblin:event`, `shell:open-external-url`, …).
+ * `'CodedError'` (a class name) — those don't have a namespace prefix
+ * because IPC channels always do (`goblin:client-effect-intent`, `shell:open-external-url`, …).
  */
 function extractIpcChannelLiterals(source: string): string[] {
   const literal = /'([a-z][a-z0-9-]*:[a-z0-9-]+)'/gi
@@ -38,10 +43,11 @@ function extractIpcChannelLiterals(source: string): string[] {
 }
 import {
   APP_QUIT_DRAINED_CHANNEL,
+  CLIENT_EFFECT_INTENT_CHALLENGE_CHANNEL,
   CLIENT_EFFECT_INTENT_CHANNEL,
+  CLIENT_EFFECT_INTENT_READY_CHANNEL,
   HOST_IPC_ABORT_CHANNEL,
   HOST_IPC_CALL_CHANNEL,
-  HOST_IPC_EVENT_CHANNEL,
   HOST_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
   HOST_OPEN_DIRECTORY_DIALOG_CHANNEL,
   HOST_OPEN_EXTERNAL_URL_CHANNEL,
@@ -50,6 +56,7 @@ import {
   TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
   TERMINAL_SET_BADGE_CHANNEL,
   ROTATE_ACCESS_TOKEN_CHANNEL,
+  GET_ACCESS_TOKEN_PROJECTION_CHANNEL,
 } from '#/shared/ipc-channels.ts'
 
 function loadPreload(
@@ -133,7 +140,7 @@ describe('preload goblinNative bridge', () => {
     expect(goblinNative).toHaveProperty('pathForFile')
     expect(goblinNative).toHaveProperty('host')
     expect(goblinNative).toHaveProperty('terminal')
-    expect(goblinNative).toHaveProperty('onEvent')
+    expect(goblinNative).toHaveProperty('onAppQuitting')
     expect(goblinNative).toHaveProperty('onIntent')
   })
 
@@ -199,8 +206,6 @@ describe('preload goblinNative bridge', () => {
       TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL,
     ])
     expect(invocations[1]?.args).toEqual([{ title: 'Goblin', body: 'Test' }])
-    expect(ipcRenderer.on).not.toHaveBeenCalled()
-    expect(ipcRenderer.off).not.toHaveBeenCalled()
     expect(sends).toContainEqual({ channel: TERMINAL_SET_BADGE_CHANNEL, args: [2] })
   })
 
@@ -219,82 +224,120 @@ describe('preload goblinNative bridge', () => {
     warn.mockRestore()
   })
 
-  test('shares a single goblin:event ipc listener across subscribers', () => {
+  test('uses one renderer consumer for the preload-lifetime effect-intent listener', () => {
     const { goblinNative, ipcRenderer } = loadPreload()
-    const cb1 = vi.fn()
-    const cb2 = vi.fn()
-
-    const off1 = goblinNative.onEvent(cb1)
-    const off2 = goblinNative.onEvent(cb2)
-
-    expect(ipcRenderer.on).toHaveBeenCalledTimes(1)
-    expect(ipcRenderer.on).toHaveBeenCalledWith(HOST_IPC_EVENT_CHANNEL, expect.any(Function))
-
-    const listener = ipcRenderer.on.mock.calls[0]?.[1] as ((event: unknown, payload: unknown) => void) | undefined
-    listener?.(null, { type: 'settings-write-error', message: 'failed' })
-    expect(cb1).toHaveBeenCalledWith({ type: 'settings-write-error', message: 'failed' })
-    expect(cb2).toHaveBeenCalledWith({ type: 'settings-write-error', message: 'failed' })
-
-    off1()
-    expect(ipcRenderer.off).not.toHaveBeenCalled()
-
-    off2()
-    expect(ipcRenderer.off).toHaveBeenCalledTimes(1)
-    expect(ipcRenderer.off).toHaveBeenCalledWith(HOST_IPC_EVENT_CHANNEL, listener)
-  })
-
-  test('continues delivering goblin:event when one subscriber throws', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const { goblinNative, ipcRenderer } = loadPreload()
-    const cb1 = vi.fn(() => {
-      throw new Error('boom')
-    })
-    const cb2 = vi.fn()
-
-    goblinNative.onEvent(cb1)
-    goblinNative.onEvent(cb2)
-
-    const listener = ipcRenderer.on.mock.calls[0]?.[1] as ((event: unknown, payload: unknown) => void) | undefined
-    listener?.(null, { type: 'settings-write-error', message: 'failed' })
-
-    expect(cb1).toHaveBeenCalledWith({ type: 'settings-write-error', message: 'failed' })
-    expect(cb2).toHaveBeenCalledWith({ type: 'settings-write-error', message: 'failed' })
-    expect(warn).toHaveBeenCalledWith('[ipc] goblin:event subscriber failed', expect.any(Error))
-    expect((warn.mock.calls[0]?.[1] as Error | undefined)?.message).toBe('boom')
-    warn.mockRestore()
-  })
-
-  test('uses a dedicated effect-intent ipc listener across subscribers', () => {
-    const { goblinNative, ipcRenderer } = loadPreload()
-    const cb1 = vi.fn()
-    const cb2 = vi.fn()
-
-    const off1 = goblinNative.onIntent(cb1)
-    const off2 = goblinNative.onIntent(cb2)
+    const consumer = vi.fn()
 
     expect(ipcRenderer.on).toHaveBeenCalledWith(CLIENT_EFFECT_INTENT_CHANNEL, expect.any(Function))
 
     const intentListener = ipcRenderer.on.mock.calls.find(
       ([channel]) => channel === CLIENT_EFFECT_INTENT_CHANNEL,
     )?.[1] as ((event: unknown, payload: unknown) => void) | undefined
+    const off = goblinNative.onIntent(consumer)
+    expect(() => goblinNative.onIntent(vi.fn())).toThrow('Client effect intent consumer is already registered')
     intentListener?.(null, { type: 'external-open-enqueued' })
-    expect(cb1).toHaveBeenCalledWith({ type: 'external-open-enqueued' })
-    expect(cb2).toHaveBeenCalledWith({ type: 'external-open-enqueued' })
+    expect(consumer).toHaveBeenCalledWith({ type: 'external-open-enqueued' })
 
-    off1()
+    off()
     expect(ipcRenderer.off).not.toHaveBeenCalledWith(CLIENT_EFFECT_INTENT_CHANNEL, intentListener)
-
-    off2()
-    expect(ipcRenderer.off).toHaveBeenCalledWith(CLIENT_EFFECT_INTENT_CHANNEL, intentListener)
   })
 
-  test('forwards access-token rotation to its native IPC channel', async () => {
+  test('delivers app quitting independently from the UI intent consumer', () => {
+    const { goblinNative, ipcRenderer } = loadPreload()
+    const intentListener = ipcRenderer.on.mock.calls.find(
+      ([channel]) => channel === CLIENT_EFFECT_INTENT_CHANNEL,
+    )?.[1] as ((event: unknown, payload: unknown) => void) | undefined
+    const uiConsumer = vi.fn()
+    const quittingConsumer = vi.fn()
+    goblinNative.onIntent(uiConsumer)
+
+    intentListener?.(null, { type: 'app-quitting' })
+    expect(uiConsumer).not.toHaveBeenCalled()
+    goblinNative.onAppQuitting(quittingConsumer)
+
+    expect(quittingConsumer).toHaveBeenCalledOnce()
+  })
+
+  test('echoes only a valid challenged document generation', () => {
+    const { sends, ipcRenderer } = loadPreload()
+
+    expect(ipcRenderer.on).toHaveBeenCalledWith(CLIENT_EFFECT_INTENT_CHANNEL, expect.any(Function))
+    expect(ipcRenderer.on).toHaveBeenCalledWith(CLIENT_EFFECT_INTENT_CHALLENGE_CHANNEL, expect.any(Function))
+    expect(sends).toEqual([])
+
+    const challengeListener = ipcRenderer.on.mock.calls.find(
+      ([channel]) => channel === CLIENT_EFFECT_INTENT_CHALLENGE_CHANNEL,
+    )?.[1] as ((event: unknown, generation: unknown) => void) | undefined
+    challengeListener?.(null, 0)
+    challengeListener?.(null, '7')
+    expect(sends).toEqual([])
+    challengeListener?.(null, 7)
+
+    expect(sends).toContainEqual({ channel: CLIENT_EFFECT_INTENT_READY_CHANNEL, args: [7] })
+  })
+
+  test('drains effect intents received before the renderer subscribes', () => {
+    const { goblinNative, ipcRenderer } = loadPreload()
+    const intentListener = ipcRenderer.on.mock.calls.find(
+      ([channel]) => channel === CLIENT_EFFECT_INTENT_CHANNEL,
+    )?.[1] as ((event: unknown, payload: unknown) => void) | undefined
+    const intent = { type: 'terminal-bell-click', terminalSessionId: 'term-111111111111111111111' }
+
+    intentListener?.(null, intent)
+    const subscriber = vi.fn()
+    goblinNative.onIntent(subscriber)
+
+    expect(subscriber).toHaveBeenCalledOnce()
+    expect(subscriber).toHaveBeenCalledWith(intent)
+  })
+
+  test('coalesces queued external-open wakeups while preserving discrete user intents', () => {
+    const { goblinNative, ipcRenderer } = loadPreload()
+    const intentListener = ipcRenderer.on.mock.calls.find(
+      ([channel]) => channel === CLIENT_EFFECT_INTENT_CHANNEL,
+    )?.[1] as ((event: unknown, payload: unknown) => void) | undefined
+    const bell = { type: 'terminal-bell-click', terminalSessionId: 'term-111111111111111111111' }
+
+    intentListener?.(null, { type: 'external-open-enqueued' })
+    intentListener?.(null, bell)
+    intentListener?.(null, { type: 'external-open-enqueued' })
+    intentListener?.(null, bell)
+    const consumer = vi.fn()
+    goblinNative.onIntent(consumer)
+
+    expect(consumer.mock.calls.map(([intent]) => intent)).toEqual([{ type: 'external-open-enqueued' }, bell, bell])
+  })
+
+  test('queues new effect intents after the renderer consumer unsubscribes', () => {
+    const { goblinNative, ipcRenderer } = loadPreload()
+    const intentListener = ipcRenderer.on.mock.calls.find(
+      ([channel]) => channel === CLIENT_EFFECT_INTENT_CHANNEL,
+    )?.[1] as ((event: unknown, payload: unknown) => void) | undefined
+    const firstConsumer = vi.fn()
+    const off = goblinNative.onIntent(firstConsumer)
+    off()
+
+    const queuedIntent = { type: 'external-open-enqueued' }
+    intentListener?.(null, queuedIntent)
+    expect(firstConsumer).not.toHaveBeenCalled()
+
+    const nextConsumer = vi.fn()
+    goblinNative.onIntent(nextConsumer)
+    expect(nextConsumer).toHaveBeenCalledOnce()
+    expect(nextConsumer).toHaveBeenCalledWith(queuedIntent)
+  })
+
+  test('forwards access-token projection and rotation to their native IPC channels', async () => {
     // Token rotation exists only in the embedded Electron build because
-    // only main owns the embedded server lifecycle.
+    // main owns the canonical next-start token file.
     const { goblinNative, invocations } = loadPreload()
+    await goblinNative.getAccessTokenProjection()
     await goblinNative.rotateAccessToken()
 
-    expect(invocations.map((entry) => entry.channel)).toEqual([ROTATE_ACCESS_TOKEN_CHANNEL])
+    expect(invocations.map((entry) => entry.channel)).toEqual([
+      GET_ACCESS_TOKEN_PROJECTION_CHANNEL,
+      ROTATE_ACCESS_TOKEN_CHANNEL,
+    ])
   })
 
   test('locks the goblinNative IPC surface to browser-missing capabilities', () => {
@@ -313,8 +356,11 @@ describe('preload goblinNative bridge', () => {
       [HOST_IPC_CALL_CHANNEL]:
         'native-only RPC dispatch — currently used for global-shortcut registration, native menu rebuilds, and workspace-layout menu gating',
       [HOST_IPC_ABORT_CHANNEL]: 'paired with HOST_IPC_CALL_CHANNEL for cancellation',
-      [HOST_IPC_EVENT_CHANNEL]: 'main → client event broadcast (Electron-only transport)',
       [CLIENT_EFFECT_INTENT_CHANNEL]: 'client effect intent dispatch (paired with the IPC dispatch channel)',
+      [CLIENT_EFFECT_INTENT_CHALLENGE_CHANNEL]:
+        'main → renderer exact-document readiness challenge before native intent delivery',
+      [CLIENT_EFFECT_INTENT_READY_CHANNEL]:
+        'renderer document readiness handshake — main must not dispatch native actions before preload is listening',
       [APP_QUIT_DRAINED_CHANNEL]:
         'renderer → main quit drain acknowledgement — main owns native app/server shutdown ordering',
       [HOST_OPEN_SETTINGS_WINDOW_CHANNEL]:
@@ -329,7 +375,9 @@ describe('preload goblinNative bridge', () => {
       [TERMINAL_SEND_TEST_NOTIFICATION_CHANNEL]:
         'paired with TERMINAL_NOTIFY_BELL_CHANNEL for the settings-page "test" button',
       [TERMINAL_SET_BADGE_CHANNEL]: 'app.dock.setBadge / taskbar badge count — Electron BrowserWindow only',
-      [ROTATE_ACCESS_TOKEN_CHANNEL]: 'embedded-server restart — only Electron main owns the server lifecycle',
+      [GET_ACCESS_TOKEN_PROJECTION_CHANNEL]:
+        'running-vs-next-start credential projection — only Electron main owns both authority sources',
+      [ROTATE_ACCESS_TOKEN_CHANNEL]: 'next-start credential replacement — only Electron main owns its data path',
     }
 
     // Every channel the preload touches must appear in the manifest.
@@ -384,7 +432,7 @@ describe('preload goblinNative bridge', () => {
       safeInvoke('goblin:ipc', payload)
       safeInvoke('shell:brand-new-channel', payload)
       const api = 'goblinNative'
-      const errorName = 'IpcError'
+      const errorName = 'CodedError'
     `
     const detected = extractIpcChannelLiterals(synthetic)
     expect(detected).toContain('goblin:ipc')
@@ -393,6 +441,6 @@ describe('preload goblinNative bridge', () => {
     // lockdown test relies on this so contextBridge keys and class
     // names don't pollute the channel set.
     expect(detected).not.toContain('goblinNative')
-    expect(detected).not.toContain('IpcError')
+    expect(detected).not.toContain('CodedError')
   })
 })

@@ -1,4 +1,4 @@
-import type { TerminalCreateResult, TerminalSessionInput, TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type { TerminalCreateSuccess, TerminalSessionInput, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { terminalExecutionPath, terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
 import type {
   TerminalWorkspacePaneRuntimeOpenInput,
@@ -8,10 +8,7 @@ import type {
   WorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
-import {
-  WorkspacePaneRuntimeStaleError,
-  type WorkspacePaneRuntimeTabsCoordinator,
-} from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { WorkspacePaneRuntimeTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,
@@ -25,11 +22,16 @@ import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-remo
 import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+import {
+  WorkspaceRuntimeStaleError,
+  type WorkspaceRuntimeMembershipCapability,
+} from '#/server/modules/workspace-runtimes.ts'
 import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
 import { workspaceProbeStateForRuntime } from '#/server/modules/workspace-runtimes.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { TerminalCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
 
 type MaybePromise<T> = T | Promise<T>
@@ -45,18 +47,19 @@ interface WorkspacePaneRuntimeApplicationDependencies {
   terminalSessions: {
     listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
   }
-  isCurrentWorkspaceRuntimeMembership(
+  captureWorkspaceRuntimeMembershipCapability(
     userId: string,
     workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
     clientId: string,
-  ): boolean
+  ): WorkspaceRuntimeMembershipCapability
   broadcastWorkspaceTabsChanged(
     userId: string,
     workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
     revision: number,
   ): void
+  invalidateWorkspaceTabs(userId: string, workspaceId: WorkspaceId): void
 }
 
 /**
@@ -86,8 +89,19 @@ export class WorkspacePaneRuntimeApplication {
       return runtimeFailure(input.runtimeType, 'error.invalid-arguments')
     }
     const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
-    if (!this.isCurrentMembership(clientId, userId, workspaceId, workspaceRuntimeId)) {
-      return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
+    let runtimeCapability: WorkspaceRuntimeMembershipCapability
+    try {
+      runtimeCapability = this.deps.captureWorkspaceRuntimeMembershipCapability(
+        userId,
+        workspaceId,
+        workspaceRuntimeId,
+        clientId,
+      )
+    } catch (error) {
+      if (error instanceof WorkspaceRuntimeStaleError) {
+        return runtimeFailure(input.runtimeType, error.message)
+      }
+      throw error
     }
     // Runtime admission is a server-owned capability boundary. The client may
     // still render a terminal action from an older projection while a probe
@@ -109,9 +123,7 @@ export class WorkspacePaneRuntimeApplication {
     let result: { admitted: true; value: WorkspacePaneRuntimeOpenResult } | { admitted: false }
     try {
       result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
-        if (!this.isCurrentMembership(clientId, userId, workspaceId, workspaceRuntimeId)) {
-          return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
-        }
+        runtimeCapability.assertCurrent()
         if (!this.terminalCapabilityAvailable(userId, workspaceId, workspaceRuntimeId)) {
           return runtimeFailure(input.runtimeType, 'error.unavailable')
         }
@@ -126,6 +138,7 @@ export class WorkspacePaneRuntimeApplication {
               executionPath,
               physicalCapability,
               permit,
+              runtimeCapability,
             )
         }
       })
@@ -145,8 +158,19 @@ export class WorkspacePaneRuntimeApplication {
     const executionPath = terminalSessionTargetExecutionPath(target.target)
     if (!executionPath) return runtimeFailure(input.runtimeType, 'error.invalid-arguments')
     const scope = terminalSessionRuntimeScope(target.target.workspaceId, target.target.workspaceRuntimeId)
-    if (!this.isCurrentTarget(clientId, userId, target)) {
-      return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
+    let runtimeCapability: WorkspaceRuntimeMembershipCapability
+    try {
+      runtimeCapability = this.deps.captureWorkspaceRuntimeMembershipCapability(
+        userId,
+        target.target.workspaceId,
+        target.target.workspaceRuntimeId,
+        clientId,
+      )
+    } catch (error) {
+      if (error instanceof WorkspaceRuntimeStaleError) {
+        return runtimeFailure(input.runtimeType, error.message)
+      }
+      throw error
     }
     let physicalCapability: PhysicalWorktreeExecutionCapability
     try {
@@ -162,8 +186,7 @@ export class WorkspacePaneRuntimeApplication {
     let result: { admitted: true; value: WorkspacePaneRuntimeCloseResult } | { admitted: false }
     try {
       result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
-        if (!this.isCurrentTarget(clientId, userId, target))
-          return runtimeFailure(input.runtimeType, 'error.workspace-runtime-stale')
+        runtimeCapability.assertCurrent()
         switch (input.runtimeType) {
           case 'terminal':
             return await this.closeTerminal(
@@ -175,7 +198,7 @@ export class WorkspacePaneRuntimeApplication {
               scope,
               physicalCapability,
               permit,
-              () => this.isCurrentTarget(clientId, userId, target),
+              runtimeCapability,
             )
         }
       })
@@ -195,6 +218,7 @@ export class WorkspacePaneRuntimeApplication {
     requestedExecutionPath: string,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
+    runtimeCapability: WorkspaceRuntimeMembershipCapability,
   ): Promise<WorkspacePaneRuntimeOpenResult> {
     const runtime = await this.deps.terminal.createAdmitted(
       clientId,
@@ -212,7 +236,7 @@ export class WorkspacePaneRuntimeApplication {
     if (!runtime.ok) return { ok: false, runtimeType: 'terminal', message: runtime.message }
 
     const executionPath = requestedExecutionPath
-    let committedRuntime: Extract<TerminalCreateResult, { ok: true }> | null = null
+    let committedRuntime: TerminalCreateSuccess | null = null
     let paneCommit
     try {
       paneCommit = await this.deps.workspaceTabsCoordinator.ensureRuntimeTabForSession({
@@ -224,8 +248,7 @@ export class WorkspacePaneRuntimeApplication {
         insertAfterIdentity: input.insertAfterIdentity,
         permit,
         physicalWorktreeCapability,
-        isRuntimeCurrent: () =>
-          this.isCurrentMembership(clientId, userId, target.workspaceId, target.workspaceRuntimeId),
+        epochCapability: runtimeCapability,
         commitAdmission: (canonicalBranch) => {
           const presentation =
             target.kind === 'workspace-root'
@@ -240,14 +263,14 @@ export class WorkspacePaneRuntimeApplication {
       })
     } catch (error) {
       if (committedRuntime === null) runtime.admission.abort()
+      if (error instanceof WorkspaceRuntimeStaleError) {
+        return runtimeFailure('terminal', error.message)
+      }
       workspacePaneRuntimeApplicationLogger.error(
         { error, userId, workspaceId: target.workspaceId, executionPath },
         'terminal open application command failed',
       )
-      return runtimeFailure(
-        'terminal',
-        error instanceof WorkspacePaneRuntimeStaleError ? 'error.workspace-runtime-stale' : 'error.unavailable',
-      )
+      return runtimeFailure('terminal', 'error.unavailable')
     }
     if (paneCommit.kind === 'runtime-stale' || paneCommit.kind === 'target-stale') {
       runtime.admission.abort()
@@ -282,10 +305,10 @@ export class WorkspacePaneRuntimeApplication {
     scope: string,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
-    isCurrentMembership: () => boolean,
+    runtimeCapability: WorkspaceRuntimeMembershipCapability,
   ): Promise<WorkspacePaneRuntimeCloseResult> {
     const sessions = await this.listTerminalSessions(userId, scope)
-    if (!isCurrentMembership()) return runtimeFailure('terminal', 'error.workspace-runtime-stale')
+    runtimeCapability.assertCurrent()
     const targetKey = runtimeWorkspacePaneTargetKey(target)
     if (!targetKey) return runtimeFailure('terminal', 'error.invalid-arguments')
     const session = sessions.find((candidate) => candidate.terminalSessionId === terminalSessionId)
@@ -316,21 +339,33 @@ export class WorkspacePaneRuntimeApplication {
       runtime = { action: 'already-closed', terminalSessionId }
     }
 
-    const paneTabsSnapshot = await this.deps.workspaceTabsCoordinator.reconcileWorktreeAdmitted({
-      userId,
-      workspaceId: target.workspaceId,
-      scope,
-      worktreePath: executionPath,
-      physicalWorktreeCapability,
-      permit,
-      assertCurrent: isCurrentMembership,
-    })
-    this.deps.broadcastWorkspaceTabsChanged(
-      userId,
-      target.workspaceId,
-      target.workspaceRuntimeId,
-      paneTabsSnapshot.revision,
-    )
+    let paneTabsSnapshot: WorkspacePaneTabsSnapshot | null
+    try {
+      paneTabsSnapshot = await this.deps.workspaceTabsCoordinator.reconcileWorktreeAdmitted({
+        userId,
+        workspaceId: target.workspaceId,
+        scope,
+        worktreePath: executionPath,
+        physicalWorktreeCapability,
+        permit,
+        epochCapability: runtimeCapability,
+      })
+      this.deps.broadcastWorkspaceTabsChanged(
+        userId,
+        target.workspaceId,
+        target.workspaceRuntimeId,
+        paneTabsSnapshot.revision,
+      )
+    } catch (error) {
+      this.deps.invalidateWorkspaceTabs(userId, target.workspaceId)
+      if (!(error instanceof WorkspaceRuntimeStaleError)) {
+        workspacePaneRuntimeApplicationLogger.warn(
+          { error, userId, workspaceId: target.workspaceId, terminalSessionId },
+          'terminal close committed but workspace tabs projection failed',
+        )
+      }
+      paneTabsSnapshot = null
+    }
     return {
       ok: true,
       runtimeType: 'terminal',
@@ -341,19 +376,6 @@ export class WorkspacePaneRuntimeApplication {
 
   private async listTerminalSessions(userId: string, scope: string): Promise<TerminalSessionSummary[]> {
     return await this.deps.terminalSessions.listSessionsForUser(userId, scope)
-  }
-
-  private isCurrentTarget(clientId: string, userId: string, target: WorkspacePaneRuntimeCommandTarget): boolean {
-    return this.isCurrentMembership(clientId, userId, target.target.workspaceId, target.target.workspaceRuntimeId)
-  }
-
-  private isCurrentMembership(
-    clientId: string,
-    userId: string,
-    workspaceId: WorkspaceId,
-    workspaceRuntimeId: string,
-  ): boolean {
-    return this.deps.isCurrentWorkspaceRuntimeMembership(userId, workspaceId, workspaceRuntimeId, clientId)
   }
 
   private terminalCapabilityAvailable(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean {

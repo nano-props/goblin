@@ -86,27 +86,33 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
     expect(request).toHaveBeenNthCalledWith(1, WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close, closeInput)
   })
 
-  test('rejects malformed runtime effects returned by runtime close', async () => {
-    const client = createServerWorkspacePaneRuntimeClient(
-      realtimeWithRequest(
-        vi.fn(async () => ({
-          ok: true,
-          runtimeType: 'terminal',
-          paneTabsSnapshot: { revision: 2, entries: [] },
-          runtime: {
-            action: 'closed',
-            terminalSessionId: 'term-111111111111111111111',
-            terminalRuntimeSessionId: 'pty_1234567890abcdef',
-            terminalRuntimeGeneration: -1,
-          },
-        })),
-      ),
-    )
+  test.each([{ revision: 2, entries: [] }, null])(
+    'rejects a runtime close effect for a different requested session with snapshot %j',
+    async (paneTabsSnapshot) => {
+      const client = createServerWorkspacePaneRuntimeClient(
+        realtimeWithRequest(
+          vi.fn(async () => ({
+            ok: true,
+            runtimeType: 'terminal',
+            paneTabsSnapshot,
+            runtime: {
+              action: 'closed',
+              terminalSessionId: 'term-222222222222222222222',
+              terminalRuntimeSessionId: 'pty_1234567890abcdef',
+              terminalRuntimeGeneration: 1,
+            },
+          })),
+        ),
+      )
 
-    await expect(
-      client.close({ runtimeType: 'terminal', sessionId: 'term-111111111111111111111', target }),
-    ).rejects.toThrow('invalid close response')
-  })
+      await expect(
+        client.close({ runtimeType: 'terminal', sessionId: 'term-111111111111111111111', target }),
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('invalid close response'),
+        delivery: 'indeterminate',
+      })
+    },
+  )
 })
 
 function realtimeWithRequest(request: (...args: any[]) => Promise<any>): ClientAppRealtime {

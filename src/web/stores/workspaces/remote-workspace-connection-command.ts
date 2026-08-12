@@ -9,6 +9,7 @@ import { acceptRemoteWorkspaceRuntimeProjection } from '#/web/stores/workspaces/
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 export type RemoteWorkspaceConnectionOutcome =
   | { kind: 'ready'; workspaceId: WorkspaceId; target: RemoteWorkspaceTarget }
@@ -21,6 +22,7 @@ export type RemoteWorkspaceConnectionOutcome =
   | { kind: 'superseded'; workspaceId: WorkspaceId }
   | { kind: 'stale-runtime'; workspaceId: WorkspaceId }
   | { kind: 'cancelled'; workspaceId: WorkspaceId }
+  | { kind: 'outcome-uncertain'; workspaceId: WorkspaceId }
   | { kind: 'transport-failed'; workspaceId: WorkspaceId; reason: 'unknown' }
 
 function commandOutcome(
@@ -68,6 +70,7 @@ export async function runRemoteWorkspaceConnection(
       options.signal,
     )
   } catch (error) {
+    if (hasErrorCode(error, 'OUTCOME_UNCERTAIN')) return { kind: 'outcome-uncertain', workspaceId }
     if (options.signal?.aborted || isAbortError(error)) return { kind: 'cancelled', workspaceId }
     return { kind: 'transport-failed', workspaceId, reason: 'unknown' }
   }

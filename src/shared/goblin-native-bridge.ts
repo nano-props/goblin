@@ -1,8 +1,9 @@
 import type { AppQuitDrainResult } from '#/shared/app-quit-drain.ts'
-import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
+import type { IpcRequest } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
+import type { AccessTokenProjection } from '#/shared/access-token.ts'
 import type {
   TerminalMutationResult,
   TerminalNotifyBellInput,
@@ -14,7 +15,7 @@ export interface GoblinNativeBridge {
   invokeIpc: (request: IpcRequest) => Promise<unknown>
   abortIpc: (requestId: string) => Promise<boolean>
   notifyAppQuitDrained: (result: AppQuitDrainResult) => Promise<boolean>
-  onEvent: (cb: (event: IpcEvent) => void) => () => void
+  onAppQuitting: (cb: () => void) => () => void
   onIntent: (cb: (event: ClientEffectIntent) => void) => () => void
   pathForFile: (file: File) => string
   host: {
@@ -28,5 +29,6 @@ export interface GoblinNativeBridge {
     sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>
     setBadge: (count: number) => void
   }
-  rotateAccessToken: () => Promise<{ accessToken: string }>
+  getAccessTokenProjection: () => Promise<AccessTokenProjection>
+  rotateAccessToken: () => Promise<AccessTokenProjection>
 }

@@ -21,6 +21,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { requireGitWorkspaceClientState } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
+import { CodedError } from '#/shared/coded-error.ts'
 
 const mocks = vi.hoisted(() => ({
   getRepoPatch: vi.fn(),
@@ -29,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   openWorkspaceTerminal: vi.fn(),
   openRepoUrl: vi.fn(),
   openExternalUrl: vi.fn(),
+  toastWarning: vi.fn(),
 }))
 
 vi.mock('#/web/repo-client.ts', () => ({
@@ -45,6 +47,10 @@ vi.mock('#/web/app-shell-client.ts', () => ({
   openExternalUrl: mocks.openExternalUrl,
 }))
 
+vi.mock('vue-sonner', () => ({
+  toast: { error: vi.fn(), warning: mocks.toastWarning },
+}))
+
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-use-branch-actions-test-repo')
 
 describe('useBranchActions', () => {
@@ -54,6 +60,7 @@ describe('useBranchActions', () => {
     mocks.openWorkspaceEditor.mockReset()
     mocks.openWorkspaceInFinder.mockReset()
     mocks.openWorkspaceTerminal.mockReset()
+    mocks.toastWarning.mockReset()
   })
 
   test('openTerminal routes to the remote IPC for remote repos', async () => {
@@ -226,6 +233,28 @@ describe('useBranchActions', () => {
       worktreeTarget(REPO_ID, repo.workspaceRuntimeId, '/tmp/local-feature'),
       'ghostty',
     )
+  })
+
+  test('reports an uncertain external app outcome as a warning without queuing an ordinary failure', async () => {
+    const branch = createRepoBranch('feature/local', {
+      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
+    })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [branch],
+    })
+    mocks.openWorkspaceTerminal.mockRejectedValue(
+      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost' }),
+    )
+
+    const { result } = renderBranchActions(repoPresentationFromQueryForTest(repo))
+
+    await flushTestUpdates(async () => {
+      await requiredAction(result.value.actions.openTerminal, 'openTerminal')('ghostty')
+    })
+
+    expect(mocks.toastWarning).toHaveBeenCalledWith('error.external-app-outcome-uncertain')
+    expect(requireGitWorkspaceClientState(workspacesStore.getState().workspaces[REPO_ID]!).events).toEqual([])
   })
 
   test('openEditor forwards an explicit editor app for local repos', async () => {

@@ -16,7 +16,10 @@ const hoistedWorkspacePaneRuntimeMocks = vi.hoisted(() => ({
   close: vi.fn(),
 }))
 const hoistedWorkspacePaneTabsCommitMocks = vi.hoisted(() => ({
-  writeCanonicalSnapshot: vi.fn(() => true),
+  writeCanonicalSnapshot: vi.fn(() => 'applied'),
+  tabsAfterSnapshotCommit: vi.fn((commit: string): WorkspacePaneTabEntry[] | null =>
+    commit === 'scope-rejected' ? null : [],
+  ),
 }))
 
 vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
@@ -27,6 +30,7 @@ vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
 
 vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
   writeCanonicalWorkspacePaneTabsSnapshot: hoistedWorkspacePaneTabsCommitMocks.writeCanonicalSnapshot,
+  workspacePaneTabsAfterSnapshotCommit: hoistedWorkspacePaneTabsCommitMocks.tabsAfterSnapshotCommit,
 }))
 
 function workspaceIdFixture(input: string) {
@@ -152,6 +156,7 @@ beforeEach(() => {
   workspacePaneRuntimeMocks.close.mockReset()
   workspacePaneRuntimeMocks.close.mockResolvedValue(successfulRuntimeCloseSnapshot())
   workspacePaneTabsCommitMocks.writeCanonicalSnapshot.mockClear()
+  workspacePaneTabsCommitMocks.tabsAfterSnapshotCommit.mockClear()
   selectedChanges = []
   projection = new TerminalSessionProjection((terminalFilesystemTargetKey, terminalSessionId) =>
     selectedChanges.push({ terminalFilesystemTargetKey, terminalSessionId }),

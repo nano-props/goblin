@@ -50,7 +50,7 @@ export function createAuthRoutes({ accessToken }: AuthRouteOptions): Hono {
     }
     if (!safeEqualString(submitted, accessToken)) {
       await delay(LOGIN_MISS_DELAY_MS)
-      return errorJson(c, 'FORBIDDEN', 'Invalid token', 401)
+      return errorJson(c, 'UNAUTHORIZED', 'Invalid token')
     }
     setCookie(c, ACCESS_TOKEN_COOKIE, accessToken, {
       path: '/',

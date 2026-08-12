@@ -18,6 +18,7 @@ import { AppTerminalProjectionRecovery } from '#/web/runtime/app-terminal-projec
 import { WorkspacePaneTabsRecovery } from '#/web/runtime/workspace-pane-tabs-recovery.ts'
 import { WorkspaceRuntimeReconnectRecovery } from '#/web/runtime/workspace-runtime-reconnect-recovery.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { provideTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 
 export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId: WorkspaceId | null }>({
   name: 'AppRuntimeProjectionProvider',
@@ -74,6 +75,14 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
         appRuntimeProjectionLog.warn('failed to reconcile workspace runtime memberships after realtime recovery', {
           error,
         })
+      },
+    })
+    provideTerminalProjectionRecoveryActions({
+      retryWorkspace(workspaceId) {
+        const workspaceRuntimeId = workspaceRuntimeIdForRoot(workspaceId)
+        if (!workspaceRuntimeId) return
+        const scope = scopeRegistry.scopeFor({ workspaceId, workspaceRuntimeId })
+        terminalRecovery.retry(scope)
       },
     })
 

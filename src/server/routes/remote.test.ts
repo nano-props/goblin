@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
 import type {
   RunRemoteWorkspaceLifecycleInput,
@@ -6,8 +6,12 @@ import type {
 } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
 import type { RemoteWorkspaceLifecycleCommandResult } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { acquireWorkspaceRuntime, clearWorkspaceRuntimesForUser } from '#/server/modules/workspace-runtimes.ts'
 
 const REMOTE_ID = workspaceIdForTest('goblin+ssh://example/repo')
+const USER_ID = 'user-test'
+const CLIENT_ID = 'client-test'
+let workspaceRuntimeId: string
 
 type RunRemoteWorkspaceLifecycleWrite = (
   input: RunRemoteWorkspaceLifecycleInput,
@@ -30,7 +34,12 @@ vi.mock('#/server/modules/remote-workspace.ts', () => ({
   testServerRemoteWorkspace: vi.fn(),
 }))
 describe('remote lifecycle route', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    clearWorkspaceRuntimesForUser(USER_ID)
+    workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REMOTE_ID, CLIENT_ID)
+  })
+  afterEach(() => clearWorkspaceRuntimesForUser(USER_ID))
 
   test('passes authenticated and validated input to the write path', async () => {
     mocks.runLifecycleWrite.mockResolvedValue({
@@ -50,7 +59,7 @@ describe('remote lifecycle route', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           workspaceId: 'goblin+ssh://example/repo',
-          workspaceRuntimeId: 'repo-runtime-test',
+          workspaceRuntimeId,
         }),
       }),
     )
@@ -60,7 +69,7 @@ describe('remote lifecycle route', () => {
       {
         userId: 'user-test',
         workspaceId: 'goblin+ssh://example/repo',
-        workspaceRuntimeId: 'repo-runtime-test',
+        workspaceRuntimeId,
         mode: 'restart',
       },
       { beforeCapabilityCommit: expect.any(Function) },
@@ -149,18 +158,38 @@ describe('remote lifecycle route', () => {
       new Request('http://localhost/lifecycle', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workspaceId: 'goblin+ssh://example/repo', workspaceRuntimeId: 'repo-runtime-test' }),
+        body: JSON.stringify({ workspaceId: 'goblin+ssh://example/repo', workspaceRuntimeId }),
       }),
     )
 
     expect(response.status).toBe(200)
     expect(commitGitCapabilityRemoval).toHaveBeenCalledWith(
       expect.objectContaining({
-        userId: 'user-test',
-        workspaceId: 'goblin+ssh://example/repo',
-        workspaceRuntimeId: 'repo-runtime-test',
+        runtimeCapability: expect.objectContaining({
+          userId: 'user-test',
+          workspaceId: 'goblin+ssh://example/repo',
+          workspaceRuntimeId,
+        }),
       }),
     )
+  })
+
+  test('rejects a stale runtime at the HTTP admission boundary', async () => {
+    clearWorkspaceRuntimesForUser(USER_ID)
+
+    const response = await createRemoteRoutes({
+      workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval: vi.fn() },
+    }).request(
+      new Request('http://localhost/lifecycle', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId: REMOTE_ID, workspaceRuntimeId }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ message: 'error.workspace-runtime-stale' })
+    expect(mocks.runLifecycleWrite).not.toHaveBeenCalled()
   })
 
   test('returns validation errors before invoking the write path', async () => {

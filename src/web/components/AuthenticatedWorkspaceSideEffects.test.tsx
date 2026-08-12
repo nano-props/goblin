@@ -11,8 +11,6 @@ import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-
 
 const sideEffectMocks = vi.hoisted(() => ({
   useBackgroundFetch: vi.fn(),
-  useClientEffectIntentRouter: vi.fn(),
-  useClientWorkspacePersistence: vi.fn(),
   useKeyboard: vi.fn(),
   useRepoStoreInvalidationRefresh: vi.fn(),
   useWorkspaceRuntimeInvalidationRefresh: vi.fn(),
@@ -23,12 +21,6 @@ const sideEffectMocks = vi.hoisted(() => ({
 
 vi.mock('#/web/hooks/useBackgroundFetch.ts', () => ({
   useBackgroundFetch: sideEffectMocks.useBackgroundFetch,
-}))
-vi.mock('#/web/hooks/useClientEffectIntentRouter.ts', () => ({
-  useClientEffectIntentRouter: sideEffectMocks.useClientEffectIntentRouter,
-}))
-vi.mock('#/web/hooks/useClientWorkspacePersistence.ts', () => ({
-  useClientWorkspacePersistence: sideEffectMocks.useClientWorkspacePersistence,
 }))
 vi.mock('#/web/hooks/useKeyboard.ts', () => ({ useKeyboard: sideEffectMocks.useKeyboard }))
 vi.mock('#/web/hooks/useRepoStoreInvalidationRefresh.ts', () => ({
@@ -77,16 +69,11 @@ describe('AuthenticatedWorkspaceSideEffects', () => {
       setup() {
         return () => (
           <AuthenticatedWorkspaceSideEffects
-            routedWorkspaceId={WORKSPACE_ID}
             hydratedRouteWorkspaceId={WORKSPACE_ID}
             currentBranchName={currentBranchName.value}
             currentWorkspacePaneCommandTarget={currentWorkspacePaneCommandTarget}
             routeContext={routeContext.value}
             navigation={navigation}
-            closeAllOverlays={() => {}}
-            openWorkspacePathDialog={() => {}}
-            openCloneRepo={() => {}}
-            openRemoteWorkspace={() => {}}
             modalOpen={false}
             navigateToSettingsShortcuts={() => {}}
             navigateToIndex={() => {}}
@@ -97,14 +84,12 @@ describe('AuthenticatedWorkspaceSideEffects', () => {
 
     renderInJsdom(<SideEffectsHost />)
 
-    const intentOptions = sideEffectMocks.useClientEffectIntentRouter.mock.calls[0]?.[0]
     const keyboardOptions = sideEffectMocks.useKeyboard.mock.calls[0]?.[0]
     const retirementOptions = sideEffectMocks.useTerminalRetirementWorkspacePanePresentation.mock.calls[0]?.[0]
     const historyOptions = sideEffectMocks.useWorkspaceNavigationHistory.mock.calls[0]?.[0]
-    if (!intentOptions || !keyboardOptions || !retirementOptions || !historyOptions) {
+    if (!keyboardOptions || !retirementOptions || !historyOptions) {
       throw new Error('Missing side-effect owner inputs')
     }
-    expect(intentOptions.currentWorkspacePaneCommandTarget()).toEqual(firstTarget)
 
     await flushTestUpdates(() => {
       currentBranchName.value = 'feature/second'
@@ -123,7 +108,6 @@ describe('AuthenticatedWorkspaceSideEffects', () => {
     // Query-backed background fetch is a nested conditional resource owner;
     // the stable ingress owner does not fabricate a target for an absent repo.
     expect(sideEffectMocks.useBackgroundFetch).not.toHaveBeenCalled()
-    expect(intentOptions.currentWorkspacePaneCommandTarget()).toEqual(secondTarget)
     expect(keyboardOptions.currentWorkspacePaneCommandTarget()).toEqual(secondTarget)
     expect(keyboardOptions.currentBranchName()).toBe('feature/second')
     expect(retirementOptions.currentTarget()).toEqual(secondTarget)

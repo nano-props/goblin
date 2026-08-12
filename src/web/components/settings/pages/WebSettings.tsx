@@ -23,11 +23,10 @@ import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
  *   token-bearing QR codes, and any active LAN URLs.
  * - Electron only: the `lanEnabled` toggle (the bind address is
  *   owned by the host process) and the `Rotate token` action
- *   (the rotation requires restarting the embedded server, which
- *   only the native host can do).
+ *   (the native host atomically stages the next-start credential).
  *
  * In web / `bun run serve.sh` mode the operator owns the process
- * and the bind address; rotation is a manual delete + restart, so
+ * and the bind address; rotation is an operator-owned file change, so
  * we don't surface those native-host controls. Server-reported LAN
  * addresses remain visible because they are useful in either runtime.
  */
@@ -52,18 +51,35 @@ export const WebSettings = defineComponent({
     // token for copy/QR; HttpOnly is not an XSS boundary for this renderer.
     const bootstrapToken = getInitialBootstrap().initialServer?.accessToken
     const accessToken = ref<string | null>(bootstrapToken ?? null)
+    const accessTokenActivation = ref<'current' | 'after-restart'>('current')
     const accessTokenController = new AbortController()
     onMounted(() => {
-      if (bootstrapToken) return
       void (async () => {
-        try {
-          const response = await fetchServerJson('/api/access-token', decodeWith(AccessTokenResponseSchema), {
-            signal: accessTokenController.signal,
-          })
-          accessToken.value = response.accessToken
-        } catch {
-          if (!accessTokenController.signal.aborted) accessToken.value = null
+        if (isElectron) {
+          const projectionResult = await bridge.getAccessTokenProjection().then(
+            (projection) => ({ ok: true as const, projection }),
+            () => ({ ok: false as const }),
+          )
+          if (!projectionResult.ok) {
+            if (!accessTokenController.signal.aborted) toast.error(t('settings.web.token-read-failed'))
+            return
+          }
+          const projection = projectionResult.projection
+          if (accessTokenController.signal.aborted) return
+          if (accessTokenActivation.value === 'after-restart' && projection.activation === 'current') return
+          accessToken.value = projection.accessToken
+          accessTokenActivation.value = projection.activation
+          return
         }
+        if (bootstrapToken) return
+        const currentToken = await fetchServerJson('/api/access-token', decodeWith(AccessTokenResponseSchema), {
+          signal: accessTokenController.signal,
+        }).then(
+          ({ accessToken }) => accessToken,
+          () => null,
+        )
+        if (accessTokenController.signal.aborted) return
+        accessToken.value = currentToken
       })()
     })
     onScopeDispose(() => accessTokenController.abort('web-settings-unmounted'))
@@ -91,19 +107,12 @@ export const WebSettings = defineComponent({
     }
 
     const handleRotate = async () => {
-      if (!isElectron || !bridge.rotateAccessToken) return
+      if (!isElectron) return
       try {
-        const { accessToken: next } = await bridge.rotateAccessToken()
+        const { accessToken: next, activation } = await bridge.rotateAccessToken()
         accessToken.value = next
-        // The native host replants the embedded client's auth
-        // cookie with the new token before this IPC returns, so the
-        // cookie path is now self-consistent. A full reload is still
-        // required because the preload's `__GOBLIN_BOOTSTRAP__` was
-        // captured once with the OLD token; the client's HTTP
-        // client (`server-fetch`) prefers the bootstrap header when
-        // present. After the reload the preload runs again, captures
-        // the new token via IPC, and the gate stays clear.
-        window.location.reload()
+        accessTokenActivation.value = activation
+        toast.success(t('settings.web.token-rotated'))
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t('settings.web.token-rotate-failed'))
       }
@@ -113,6 +122,10 @@ export const WebSettings = defineComponent({
       const currentLanInfo = lanInfo.value
       const lanEnabled = lanSettings.value.lanEnabled
       const lanUrls = currentLanInfo?.lanUrls ?? []
+      const accessTokenHintKey =
+        accessTokenActivation.value === 'after-restart'
+          ? 'settings.web.token-pending-restart-hint'
+          : 'settings.web.token-rotation-hint'
       // For each LAN URL, build the QR-target that includes the access
       // token. Scanning the QR opens the page with `?accessToken=...`.
       const qrTargets = accessToken.value
@@ -176,7 +189,7 @@ export const WebSettings = defineComponent({
                 }
               />
             </SettingsList>
-            <div class="px-4 py-2 text-sm text-muted-foreground">{t('settings.web.token-rotation-hint')}</div>
+            <div class="px-4 py-2 text-sm text-muted-foreground">{t(accessTokenHintKey)}</div>
           </SettingsGroup>
 
           {showNetworkGroup ? (

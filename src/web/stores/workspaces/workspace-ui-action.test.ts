@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { dispatchWorkspaceUiAction } from '#/web/stores/workspaces/workspace-ui-action.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace-ui-action')
 const WORKSPACE_RUNTIME_ID = 'workspace-runtime-ui-action'
@@ -39,6 +40,23 @@ describe('workspace UI action result boundary', () => {
         { reportResult },
       ),
     ).resolves.toBeNull()
+    expect(reportResult).not.toHaveBeenCalled()
+  })
+
+  test('leaves uncertain command outcomes for the presentation boundary', async () => {
+    const reportResult = vi.fn()
+
+    await expect(
+      dispatchWorkspaceUiAction(
+        WORKSPACE_ID,
+        WORKSPACE_RUNTIME_ID,
+        'editor',
+        async () => {
+          throw new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost' })
+        },
+        { reportResult },
+      ),
+    ).rejects.toMatchObject({ code: 'OUTCOME_UNCERTAIN' })
     expect(reportResult).not.toHaveBeenCalled()
   })
 

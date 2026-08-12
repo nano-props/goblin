@@ -8,6 +8,12 @@ import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-targ
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  assertWorkspaceRuntimeEpochCapability,
+  WorkspaceRuntimeStaleError,
+  type WorkspaceRuntimeEpochCapability,
+  type WorkspaceRuntimeMembershipCapability,
+} from '#/server/modules/workspace-runtimes.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,
@@ -34,12 +40,6 @@ import {
   workspaceRuntimeTabWorktreePaths,
 } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
 
-export class WorkspacePaneRuntimeStaleError extends Error {
-  constructor() {
-    super('error.workspace-runtime-stale')
-    this.name = 'WorkspacePaneRuntimeStaleError'
-  }
-}
 import type {
   WorkspacePaneLayoutAggregate,
   WorkspacePaneLayoutCommitResult,
@@ -74,9 +74,9 @@ export interface WorkspacePaneTargetProjectionProvider {
   ): Promise<readonly WorkspacePaneTargetProjection[]>
 }
 
-export interface WorkspacePaneTabsCommandResult extends WorkspacePaneLayoutCommitResult {
-  snapshot: WorkspacePaneTabsSnapshot
-}
+export type WorkspacePaneTabsCommandResult =
+  | (WorkspacePaneLayoutCommitResult & { kind: 'projected'; snapshot: WorkspacePaneTabsSnapshot })
+  | (WorkspacePaneLayoutCommitResult & { kind: 'committed-projection-failed'; error: unknown })
 
 export type WorkspacePaneRuntimeTabCommitResult =
   { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot } | { kind: 'runtime-stale' } | { kind: 'target-stale' }
@@ -90,7 +90,7 @@ export interface WorkspaceRuntimeTabPlacementInput {
   insertAfterIdentity?: string | null
   permit: PhysicalWorktreeOperationPermit
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
-  isRuntimeCurrent: () => boolean
+  epochCapability: WorkspaceRuntimeMembershipCapability
   commitAdmission: (canonicalBranchName: string | null) => void
 }
 
@@ -103,7 +103,7 @@ export interface WorkspacePaneRuntimeTabsCoordinator {
     worktreePath: string
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
     permit: PhysicalWorktreeOperationPermit
-    assertCurrent?: () => void
+    epochCapability: WorkspaceRuntimeEpochCapability
   }): Promise<WorkspacePaneTabsSnapshot>
 }
 
@@ -146,6 +146,8 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     }
     const workspaceId = input.target.workspaceId
     const runtimeScope = `${input.target.workspaceId}\0${input.target.workspaceRuntimeId}`
+    const scope = aggregateScope(input.userId, workspaceId, runtimeScope)
+    assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
     return await this.runWorkspaceTabsOperation(workspaceId, async (layout) => {
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
       const capturedTargets = await this.targetProjection.captureTargets(input.userId, workspaceId, runtimeScope)
@@ -156,9 +158,8 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
         return { kind: 'target-stale' }
       }
       const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, runtimeScope)
-      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
+      assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
-      const scope = aggregateScope(input.userId, workspaceId, runtimeScope)
       // The complete catalog is the authoritative before-set used by the
       // atomic layout projection below. Re-reading this one worktree here did
       // not make Git state atomic (HEAD can change after either command), but
@@ -173,7 +174,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
         branch: capturedTarget.canonicalBranch,
         worktreePath: input.worktreePath,
       })
-      if (!input.isRuntimeCurrent()) return { kind: 'runtime-stale' }
+      assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
       const snapshot = await layout.commitRuntimeTabPlacement(
         {
@@ -187,9 +188,9 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
           },
           validTargets: capturedTargets,
           stagedProviderSnapshots: pendingProviderSnapshots,
+          epochCapability: input.epochCapability,
         },
         () => {
-          if (!input.isRuntimeCurrent()) throw new WorkspacePaneRuntimeStaleError()
           this.worktreeOperations.assertPermit(physicalCapability, input.permit)
           input.commitAdmission(capturedTarget.canonicalBranch)
         },
@@ -198,60 +199,18 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     })
   }
 
-  async replaceTabs(input: {
-    userId: string
-    workspaceId: WorkspaceId
-    scope: string
-    target: RuntimeWorkspacePaneTarget
-    nativeWorktreePath: string | null
-    tabs: readonly WorkspacePaneTabEntry[]
-    assertCurrent: () => void
-  }): Promise<WorkspacePaneTabsCommandResult> {
-    if (input.nativeWorktreePath === null) {
-      return await this.runAggregateCommand(input, async (layout, validTargets, providerSnapshots) => {
-        return await layout.replace({
-          ...aggregateScope(input.userId, input.workspaceId, input.scope),
-          target: input.target,
-          nativeWorktreePath: null,
-          tabs: input.tabs,
-          validTargets,
-          providerSnapshots,
-          assertCurrent: input.assertCurrent,
-        })
-      })
-    }
-    const worktreePath = input.nativeWorktreePath
-    const physicalCapability = await this.capturePhysicalWorktree(input, worktreePath)
-    const result = await this.worktreeOperations.runOperation(
-      physicalCapability,
-      async () =>
-        await this.runAggregateCommand(
-          input,
-          async (layout, validTargets, providerSnapshots) =>
-            await layout.replace({
-              ...aggregateScope(input.userId, input.workspaceId, input.scope),
-              target: input.target,
-              nativeWorktreePath: worktreePath,
-              tabs: input.tabs,
-              validTargets,
-              providerSnapshots,
-              physicalWorktreeLease: physicalWorktreeAdmissionLease(physicalCapability),
-              assertCurrent: input.assertCurrent,
-            }),
-        ),
-    )
-    if (!result.admitted) throw new Error('error.worktree-removal-in-progress')
-    return result.value
-  }
-
   async restoreScope(input: {
     userId: string
     workspaceId: WorkspaceId
     scope: string
     targets: readonly WorkspacePaneTargetProjection[]
     expectedWorkspaceEntry: WorkspaceSessionEntry
-    assertCurrent: () => void
+    epochCapability: WorkspaceRuntimeEpochCapability
   }): Promise<WorkspacePaneLayoutValidationResult> {
+    assertWorkspaceRuntimeEpochCapability(
+      input.epochCapability,
+      aggregateScope(input.userId, input.workspaceId, input.scope),
+    )
     const worktreeTargets = input.targets.filter(isWorkspacePaneWorktreeTarget)
     const capturedWorktrees = await Promise.all(
       worktreeTargets.map(async (target) => ({
@@ -286,9 +245,8 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
               expandedLockTargets = uniqueSortedAdmissionLeases([...lockTargets, ...requiredLockTargets])
               return null
             }
-            input.assertCurrent()
             const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
-            input.assertCurrent()
+            assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
             return await layout.validateMembershipAndSnapshot({
               ...scope,
               validTargets: input.targets,
@@ -298,7 +256,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
               })),
               expectedWorkspaceEntry: input.expectedWorkspaceEntry,
               providerSnapshots: providers,
-              assertCurrent: input.assertCurrent,
+              epochCapability: input.epochCapability,
             })
           }),
       )
@@ -315,10 +273,14 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     target: RuntimeWorkspacePaneTarget
     nativeWorktreePath: string | null
     operation: WorkspacePaneTabsUpdateOperation
-    assertCurrent: () => void
+    epochCapability: WorkspaceRuntimeMembershipCapability
   }): Promise<WorkspacePaneTabsCommandResult> {
+    assertWorkspaceRuntimeEpochCapability(
+      input.epochCapability,
+      aggregateScope(input.userId, input.workspaceId, input.scope),
+    )
     if (input.nativeWorktreePath === null) {
-      return await this.runAggregateCommand(input, async (layout, validTargets, providerSnapshots) => {
+      return await this.runAggregateCommand(input, async (layout, validTargets, providerSnapshots, epochCapability) => {
         return await layout.update({
           ...aggregateScope(input.userId, input.workspaceId, input.scope),
           target: input.target,
@@ -326,7 +288,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
           operation: input.operation,
           validTargets,
           providerSnapshots,
-          assertCurrent: input.assertCurrent,
+          epochCapability,
         })
       })
     }
@@ -337,7 +299,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
       async () =>
         await this.runAggregateCommand(
           input,
-          async (layout, validTargets, providerSnapshots) =>
+          async (layout, validTargets, providerSnapshots, epochCapability) =>
             await layout.update({
               ...aggregateScope(input.userId, input.workspaceId, input.scope),
               target: input.target,
@@ -346,7 +308,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
               validTargets,
               providerSnapshots,
               physicalWorktreeLease: physicalWorktreeAdmissionLease(physicalCapability),
-              assertCurrent: input.assertCurrent,
+              epochCapability,
             }),
         ),
     )
@@ -359,8 +321,12 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     workspaceId: WorkspaceId
     scope: string
     worktreePath: string
-    assertCurrent?: () => void
+    epochCapability: WorkspaceRuntimeEpochCapability
   }): Promise<WorkspacePaneTabsSnapshot> {
+    assertWorkspaceRuntimeEpochCapability(
+      input.epochCapability,
+      aggregateScope(input.userId, input.workspaceId, input.scope),
+    )
     const capability = await this.capturePhysicalWorktree(input, input.worktreePath)
     const result = await this.worktreeOperations.runOperation(
       capability,
@@ -378,18 +344,22 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     worktreePath: string
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
     permit: PhysicalWorktreeOperationPermit
-    assertCurrent?: () => void
+    epochCapability: WorkspaceRuntimeEpochCapability
   }): Promise<WorkspacePaneTabsSnapshot> {
     this.worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
     return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
       const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const validTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
       this.worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
-      input.assertCurrent?.()
+      assertWorkspaceRuntimeEpochCapability(
+        input.epochCapability,
+        aggregateScope(input.userId, input.workspaceId, input.scope),
+      )
       return await layout.snapshot({
         scope: aggregateScope(input.userId, input.workspaceId, input.scope),
         validTargets,
         providerSnapshots,
+        epochCapability: input.epochCapability,
       })
     })
   }
@@ -398,7 +368,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     userId: string
     workspaceId: WorkspaceId
     scope: string
-    assertCurrent: () => void
+    epochCapability: WorkspaceRuntimeMembershipCapability
   }): Promise<WorkspacePaneTabsSnapshot> {
     return await this.reconcileWorkspaceTabsProjectionBoundary(input)
   }
@@ -407,7 +377,12 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     userId: string
     workspaceId: WorkspaceId
     scope: string
+    epochCapability: WorkspaceRuntimeEpochCapability
   }): Promise<WorkspacePaneTabsSnapshot> {
+    assertWorkspaceRuntimeEpochCapability(
+      input.epochCapability,
+      aggregateScope(input.userId, input.workspaceId, input.scope),
+    )
     return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
       const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const validTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
@@ -415,14 +390,24 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
         scope: aggregateScope(input.userId, input.workspaceId, input.scope),
         validTargets,
         providerSnapshots: providers,
+        epochCapability: input.epochCapability,
       })
     })
   }
 
   async withExclusiveSnapshot(
-    input: { userId: string; workspaceId: WorkspaceId; scope: string },
+    input: {
+      userId: string
+      workspaceId: WorkspaceId
+      scope: string
+      epochCapability: WorkspaceRuntimeEpochCapability
+    },
     commit: (snapshot: WorkspacePaneTabsSnapshot) => undefined,
   ): Promise<void> {
+    assertWorkspaceRuntimeEpochCapability(
+      input.epochCapability,
+      aggregateScope(input.userId, input.workspaceId, input.scope),
+    )
     return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
       const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
       const validTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
@@ -430,6 +415,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
         scope: aggregateScope(input.userId, input.workspaceId, input.scope),
         validTargets,
         providerSnapshots: providers,
+        epochCapability: input.epochCapability,
       })
       commit(snapshot)
     })
@@ -465,14 +451,6 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     )
   }
 
-  async closeUser(input: { userId: string }): Promise<void> {
-    await Promise.all(
-      this.layoutAggregate.epochsForUser(input.userId).map(async (scope) => {
-        await this.closeScope({ userId: scope.userId, scope: scopeFromAggregate(scope) })
-      }),
-    )
-  }
-
   private async runtimeProviderSnapshotsForScope(
     userId: string,
     scope: string,
@@ -489,12 +467,13 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     userId: string
     workspaceId: WorkspaceId
     scope: string
-    assertCurrent: () => void
+    epochCapability: WorkspaceRuntimeMembershipCapability
   }): Promise<WorkspacePaneTabsSnapshot> {
+    const scope = aggregateScope(input.userId, input.workspaceId, input.scope)
+    assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
     const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
     const validTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
-    input.assertCurrent()
-    const scope = aggregateScope(input.userId, input.workspaceId, input.scope)
+    assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
     const admissionSeed = await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => ({
       entries: await layout.projectEntriesForAdmission({
         scope: aggregateScope(input.userId, input.workspaceId, input.scope),
@@ -520,7 +499,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
         validatedCapabilities,
         async () =>
           await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
-            input.assertCurrent()
+            assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
             const currentProviders = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
             const currentTargets = await this.targetProjection.captureTargets(
               input.userId,
@@ -563,7 +542,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
               )
               return null
             }
-            input.assertCurrent()
+            assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
             layout.commitProjectionTargets({
               ...scope,
               targets: currentEntries.map((entry) => {
@@ -583,11 +562,13 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
                       : []
                   }),
                 ),
+              epochCapability: input.epochCapability,
             })
             return await layout.snapshot({
               scope,
               validTargets: currentTargets,
               providerSnapshots: currentProviders,
+              epochCapability: input.epochCapability,
             })
           }),
       )
@@ -610,28 +591,47 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
   }
 
   private async runAggregateCommand(
-    input: { userId: string; workspaceId: WorkspaceId; scope: string; assertCurrent?: () => void },
+    input: {
+      userId: string
+      workspaceId: WorkspaceId
+      scope: string
+      epochCapability: WorkspaceRuntimeMembershipCapability
+    },
     command: (
       layout: WorkspacePaneLayoutOperation,
       validTargets: readonly WorkspacePaneTargetProjection[],
       providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
+      epochCapability: WorkspaceRuntimeEpochCapability,
     ) => Promise<WorkspacePaneLayoutCommitResult>,
   ): Promise<WorkspacePaneTabsCommandResult> {
     return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
-      input.assertCurrent?.()
+      const scope = aggregateScope(input.userId, input.workspaceId, input.scope)
+      assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
       const validTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
       const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
-      input.assertCurrent?.()
-      const result = await command(layout, validTargets, providers)
-      const resampled = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
-      const resampledTargets = await this.targetProjection.captureTargets(input.userId, input.workspaceId, input.scope)
-      input.assertCurrent?.()
-      const snapshot = await layout.snapshot({
-        scope: aggregateScope(input.userId, input.workspaceId, input.scope),
-        validTargets: resampledTargets,
-        providerSnapshots: resampled,
-      })
-      return { ...result, snapshot }
+      assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
+      const result = await command(layout, validTargets, providers, input.epochCapability)
+      if (!result.projectionCurrent) {
+        return { ...result, kind: 'committed-projection-failed', error: new WorkspaceRuntimeStaleError() }
+      }
+      try {
+        const resampled = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
+        const resampledTargets = await this.targetProjection.captureTargets(
+          input.userId,
+          input.workspaceId,
+          input.scope,
+        )
+        assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
+        const snapshot = await layout.snapshot({
+          scope,
+          validTargets: resampledTargets,
+          providerSnapshots: resampled,
+          epochCapability: input.epochCapability,
+        })
+        return { ...result, kind: 'projected', snapshot }
+      } catch (error) {
+        return { ...result, kind: 'committed-projection-failed', error }
+      }
     })
   }
 
@@ -639,12 +639,10 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     input: { userId: string; workspaceId: WorkspaceId; scope: string },
     worktreePath: string,
   ): Promise<PhysicalWorktreeExecutionCapability> {
-    const separator = input.scope.lastIndexOf('\0')
-    const workspaceRuntimeId = separator >= 0 ? input.scope.slice(separator + 1) : ''
     return await this.physicalWorktrees.capture({
       userId: input.userId,
       workspaceId: input.workspaceId,
-      workspaceRuntimeId,
+      workspaceRuntimeId: workspaceRuntimeIdFromScope(input.scope),
       worktreePath,
     })
   }

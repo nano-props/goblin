@@ -19,6 +19,7 @@ import type {
   TerminalDescriptor,
   TerminalSessionSummary,
   TerminalFilesystemTargetSnapshot,
+  WorkspaceTerminalSessionSummary,
 } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
@@ -115,6 +116,27 @@ export function useWorkspaceTerminalBellCounts(
   )
 
   return computed(() => counts.value)
+}
+
+export function useWorkspaceTerminalSessions(
+  workspaceId: MaybeRefOrGetter<WorkspaceId>,
+): ComputedRef<WorkspaceTerminalSessionSummary[]> {
+  const { workspaceTerminalSessions, subscribeWorkspaceTerminalSessions } = useTerminalSessionReadContext()
+  const sessions = shallowRef<WorkspaceTerminalSessionSummary[]>([])
+
+  watch(
+    () => toValue(workspaceId),
+    (nextWorkspaceId, _previous, onCleanup) => {
+      const update = () => {
+        sessions.value = workspaceTerminalSessions(nextWorkspaceId)
+      }
+      update()
+      onCleanup(subscribeWorkspaceTerminalSessions(nextWorkspaceId, update))
+    },
+    { immediate: true },
+  )
+
+  return computed(() => sessions.value)
 }
 
 export function useTerminalFilesystemTargetOutputActive(

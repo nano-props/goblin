@@ -91,6 +91,8 @@ export const TerminalSessionProvider = defineComponent({
       subscribeTerminalFilesystemTarget: projection.subscribeTerminalFilesystemTarget,
       workspaceBellCount: projection.workspaceBellCount,
       subscribeWorkspaceBellCount: projection.subscribeWorkspaceBellCount,
+      workspaceTerminalSessions: projection.workspaceTerminalSessions,
+      subscribeWorkspaceTerminalSessions: projection.subscribeWorkspaceTerminalSessions,
       snapshot: projection.snapshot,
       subscribeSnapshot: projection.subscribeSnapshot,
     }

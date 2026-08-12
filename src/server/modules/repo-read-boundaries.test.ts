@@ -7,6 +7,7 @@ import {
   pullRequest,
   repoSnapshot,
 } from '#/server/test-utils/repo-module.ts'
+import { repoRuntimeCapabilityForTest } from '#/server/test-utils/repo-module.ts'
 
 describe('resolveRemoteWorkspaceTarget', () => {
   test('threads cancellation into SSH config resolution', async () => {
@@ -29,6 +30,7 @@ describe('getRepoSnapshot', () => {
       REPO_ID,
       undefined,
       {
+        runtimeCapability: repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
         repoId: REPO_ID,
         kind: 'create-worktree',
         source: 'user',

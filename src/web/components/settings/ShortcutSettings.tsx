@@ -1,4 +1,4 @@
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import { RefreshCw } from '@lucide/vue'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Switch } from '#/web/components/ui/switch.tsx'
@@ -8,26 +8,36 @@ import { useShortcutSettingsController, useShortcutSettings } from '#/web/runtim
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { DEFAULT_GLOBAL_SHORTCUT, formatAccelerator, globalShortcutFromKeyboardEvent } from '#/shared/accelerator.ts'
+
+const SHORTCUT_ISSUE_KEYS = {
+  projectionFailed: 'settings.global-shortcut-projection-failed',
+  conflict: 'settings.global-shortcut-conflict',
+  invalid: 'settings.global-shortcut-invalid',
+} as const
+
+type ShortcutIssueKey = (typeof SHORTCUT_ISSUE_KEYS)[keyof typeof SHORTCUT_ISSUE_KEYS]
+
 export const ShortcutSettings = defineComponent({
   name: 'ShortcutSettings',
   setup() {
     const t = useT()
     const shortcutStatusId = 'global-shortcut-status'
     const shortcutSettings = useShortcutSettings()
-    const { setShortcutsDisabled, setGlobalShortcutDisabled, setGlobalShortcut } = useShortcutSettingsController()
+    const { setShortcutsDisabled, setGlobalShortcutDisabled, setGlobalShortcut, globalShortcutPending } =
+      useShortcutSettingsController()
     const recordingShortcut = ref(false)
-    const shortcutError = ref<string | null>(null)
+    const shortcutIssueKey = ref<ShortcutIssueKey | null>(null)
     const globalShortcutSupported = canUseGlobalShortcutSettings()
 
     const saveGlobalShortcut = (accelerator: string) => {
-      void setGlobalShortcut(accelerator).then((state) => {
-        if (!state) {
-          shortcutError.value = t('settings.global-shortcut-conflict')
+      setGlobalShortcut(accelerator, (result) => {
+        if (result.kind === 'committed-projection-failed') {
+          shortcutIssueKey.value = SHORTCUT_ISSUE_KEYS.projectionFailed
           return
         }
         const failedToUseRequested =
-          state.accelerator !== accelerator || (!shortcutSettings.value.globalShortcutDisabled && !state.registered)
-        shortcutError.value = failedToUseRequested ? t('settings.global-shortcut-conflict') : null
+          result.accelerator !== accelerator || (!shortcutSettings.value.globalShortcutDisabled && !result.registered)
+        shortcutIssueKey.value = failedToUseRequested ? SHORTCUT_ISSUE_KEYS.conflict : null
       })
     }
 
@@ -41,12 +51,12 @@ export const ShortcutSettings = defineComponent({
       e.stopPropagation()
       if (e.key === 'Escape') {
         recordingShortcut.value = false
-        shortcutError.value = null
+        shortcutIssueKey.value = null
         return
       }
       const accelerator = globalShortcutFromKeyboardEvent(e)
       if (!accelerator) {
-        shortcutError.value = t('settings.global-shortcut-invalid')
+        shortcutIssueKey.value = SHORTCUT_ISSUE_KEYS.invalid
         return
       }
       recordingShortcut.value = false
@@ -55,18 +65,35 @@ export const ShortcutSettings = defineComponent({
 
     const shortcutStatus = computed(() => {
       const settings = shortcutSettings.value
-      return shortcutError.value
-        ? { text: shortcutError.value, tone: 'error' as const }
-        : !globalShortcutSupported
-          ? { text: t('settings.global-shortcut-disabled-hint'), tone: 'muted' as const }
-          : !settings.globalShortcutDisabled && !settings.globalShortcutRegistered
-            ? { text: t('settings.global-shortcut-conflict'), tone: 'error' as const }
-            : recordingShortcut.value
-              ? { text: t('settings.global-shortcut-hint'), tone: 'muted' as const }
-              : settings.globalShortcutDisabled
-                ? { text: t('settings.global-shortcut-disabled-hint'), tone: 'muted' as const }
-                : null
+      if (!globalShortcutSupported) {
+        return { text: t('settings.global-shortcut-disabled-hint'), tone: 'muted' as const }
+      }
+      if (settings.globalShortcutDisabled) {
+        return { text: t('settings.global-shortcut-disabled-hint'), tone: 'muted' as const }
+      }
+      if (shortcutIssueKey.value) {
+        return { text: t(shortcutIssueKey.value), tone: 'error' as const }
+      }
+      if (!settings.globalShortcutRegistered) {
+        return {
+          text: t('settings.global-shortcut-conflict'),
+          tone: 'error' as const,
+        }
+      }
+      if (recordingShortcut.value) {
+        return { text: t('settings.global-shortcut-hint'), tone: 'muted' as const }
+      }
+      return null
     })
+
+    watch(
+      () => shortcutSettings.value.globalShortcutDisabled,
+      (disabled) => {
+        if (!disabled) return
+        recordingShortcut.value = false
+        shortcutIssueKey.value = null
+      },
+    )
 
     return () => {
       const settings = shortcutSettings.value
@@ -100,16 +127,23 @@ export const ShortcutSettings = defineComponent({
               modelValue={settings.globalShortcutDisabled}
               onUpdate:modelValue={(disabled) => void setGlobalShortcutDisabled(disabled)}
               aria-label={t('settings.shortcuts-disable-global')}
-              disabled={!globalShortcutSupported}
+              disabled={!globalShortcutSupported || globalShortcutPending.value}
             />
           </SettingsListItem>
 
           <SettingsListItem size="md">
             <div class="min-w-0">
               <div class="truncate text-sm text-foreground">{t('settings.global-shortcut')}</div>
-              <div id={shortcutStatusId} class="sr-only" aria-live="polite" role="status">
-                {status?.text ?? ''}
-              </div>
+              {status ? (
+                <div
+                  id={shortcutStatusId}
+                  class={cn('mt-0.5 text-xs', status.tone === 'error' ? 'text-destructive' : 'text-muted-foreground')}
+                  aria-live="polite"
+                  role="status"
+                >
+                  {status.text}
+                </div>
+              ) : null}
             </div>
             <div class="flex shrink-0 items-center gap-1.5">
               <Button
@@ -119,7 +153,7 @@ export const ShortcutSettings = defineComponent({
                 onClick={() => {
                   if (!globalShortcutSupported) return
                   recordingShortcut.value = true
-                  shortcutError.value = null
+                  shortcutIssueKey.value = null
                 }}
                 onKeydown={recordGlobalShortcut}
                 onBlur={() => {
@@ -136,8 +170,8 @@ export const ShortcutSettings = defineComponent({
                 )}
                 aria-label={t(recordShortcutLabelKey)}
                 aria-pressed={recordingShortcut.value}
-                aria-describedby={shortcutStatusId}
-                disabled={!globalShortcutSupported}
+                aria-describedby={status ? shortcutStatusId : undefined}
+                disabled={!globalShortcutSupported || globalShortcutPending.value}
               >
                 <span class="truncate">{formatAccelerator(settings.globalShortcut)}</span>
                 <span
@@ -156,7 +190,7 @@ export const ShortcutSettings = defineComponent({
                 class="text-muted-foreground hover:text-foreground"
                 aria-label={t('settings.global-shortcut-reset')}
                 title={t('settings.global-shortcut-reset')}
-                disabled={!globalShortcutSupported}
+                disabled={!globalShortcutSupported || globalShortcutPending.value}
               >
                 <RefreshCw class="size-3.5" aria-hidden="true" />
               </Button>

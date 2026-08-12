@@ -49,7 +49,7 @@ const mocks = vi.hoisted(() => {
     enqueueExternalOpenPath: vi.fn(() => true),
     unregisterAppShortcuts: vi.fn(),
     wireNativeHostIpc: vi.fn(),
-    broadcastClientEffectIntent: vi.fn(),
+    sendExistingPrimaryWindowEffectIntent: vi.fn(() => Promise.resolve(true)),
     wireShellIpc: vi.fn(),
     wireTerminalIpc: vi.fn(),
     wireAccessTokenIpc: vi.fn(),
@@ -103,6 +103,7 @@ vi.mock('#/main/native-settings-projection-sync.ts', () => ({
 
 vi.mock('#/main/window.ts', () => ({
   activatePrimaryWindow: mocks.activatePrimaryWindow,
+  sendExistingPrimaryWindowEffectIntent: mocks.sendExistingPrimaryWindowEffectIntent,
 }))
 
 vi.mock('#/main/theme.ts', () => ({
@@ -134,10 +135,6 @@ vi.mock('#/main/i18n/index.ts', () => ({
 
 vi.mock('#/main/native-host-ipc-router.ts', () => ({
   wireNativeHostIpc: mocks.wireNativeHostIpc,
-}))
-
-vi.mock('#/main/client-surface-events.ts', () => ({
-  broadcastClientEffectIntent: mocks.broadcastClientEffectIntent,
 }))
 
 vi.mock('#/main/shell-ipc.ts', () => ({
@@ -190,6 +187,8 @@ describe('native host startup lifecycle', () => {
     mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mocks.startEmbeddedServer.mockResolvedValue()
     mocks.stopEmbeddedServer.mockResolvedValue()
+    mocks.sendExistingPrimaryWindowEffectIntent.mockReset()
+    mocks.sendExistingPrimaryWindowEffectIntent.mockResolvedValue(true)
   })
 
   test('flushes settings and shortcut cleanup before exiting', async () => {
@@ -200,7 +199,7 @@ describe('native host startup lifecycle', () => {
     const event = { preventDefault: vi.fn() }
     const quitting = emit('before-quit', event)
     await vi.waitFor(() => {
-      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
+      expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
     })
     expect(mocks.flushWindowState).not.toHaveBeenCalled()
     await mocks.ipcHandlers.get('goblin:app-quit-drained')?.(null, { ok: true })
@@ -209,7 +208,7 @@ describe('native host startup lifecycle', () => {
     await emit('before-quit', secondPassEvent)
 
     expect(event.preventDefault).toHaveBeenCalledTimes(1)
-    expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
+    expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
     expect(mocks.flushWindowState).toHaveBeenCalledTimes(1)
     expect(mocks.unregisterAppShortcuts).toHaveBeenCalledTimes(1)
     expect(mocks.exit).toHaveBeenCalledWith(0)
@@ -235,7 +234,7 @@ describe('native host startup lifecycle', () => {
     const event = { preventDefault: vi.fn() }
     const quitting = emit('before-quit', event)
     await vi.waitFor(() => {
-      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
+      expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
     })
 
     await mocks.ipcHandlers.get('goblin:app-quit-drained')?.(null, {
@@ -251,6 +250,38 @@ describe('native host startup lifecycle', () => {
     expect(mocks.exit).toHaveBeenCalledTimes(1)
   })
 
+  test('ends the quit drain immediately when exact-document delivery fails', async () => {
+    mocks.sendExistingPrimaryWindowEffectIntent.mockRejectedValueOnce(new Error('renderer superseded'))
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+    await vi.waitFor(() => expect(mocks.activatePrimaryWindow).toHaveBeenCalled())
+
+    const quitting = emit('before-quit', { preventDefault: vi.fn() })
+    await quitting
+
+    expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
+    expect(mocks.timeouts.size).toBe(0)
+    expect(mocks.flushWindowState).toHaveBeenCalledOnce()
+    expect(mocks.exit).toHaveBeenCalledWith(0)
+  })
+
+  test('bounds the whole quit delivery and acknowledgement lifecycle when renderer readiness stays pending', async () => {
+    const delivery = Promise.withResolvers<boolean>()
+    mocks.sendExistingPrimaryWindowEffectIntent.mockReturnValueOnce(delivery.promise)
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+    await vi.waitFor(() => expect(mocks.activatePrimaryWindow).toHaveBeenCalled())
+
+    const quitting = emit('before-quit', { preventDefault: vi.fn() })
+    await quitting
+
+    expect(mocks.flushWindowState).toHaveBeenCalledOnce()
+    expect(mocks.exit).toHaveBeenCalledWith(0)
+    delivery.reject(new Error('renderer closed during exit'))
+    await flushMicrotasks()
+    expect(mocks.exit).toHaveBeenCalledTimes(1)
+  })
+
   test('ignores untrusted client quit drain acknowledgements', async () => {
     await import('#/main/main.ts')
     mocks.resolveReady()
@@ -259,7 +290,7 @@ describe('native host startup lifecycle', () => {
     const event = { preventDefault: vi.fn() }
     const quitting = emit('before-quit', event)
     await vi.waitFor(() => {
-      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
+      expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
     })
 
     mocks.isTrustedIpcEvent.mockReturnValueOnce(false)
@@ -318,7 +349,7 @@ describe('native host startup lifecycle', () => {
     await emit('before-quit', { preventDefault: vi.fn() })
 
     expect(mocks.showErrorBox).toHaveBeenCalledTimes(1)
-    expect(mocks.broadcastClientEffectIntent).not.toHaveBeenCalled()
+    expect(mocks.sendExistingPrimaryWindowEffectIntent).not.toHaveBeenCalled()
     expect(mocks.flushWindowState).not.toHaveBeenCalled()
     expect(mocks.timeouts.size).toBe(0)
     expect(mocks.stopEmbeddedServer).toHaveBeenCalledTimes(1)
@@ -392,6 +423,17 @@ describe('native host startup lifecycle', () => {
     await vi.waitFor(() => {
       expect(mocks.syncGlobalShortcuts).toHaveBeenCalledWith(true, 'Alt+K')
     })
+  })
+
+  test('fails startup when shortcut registration status cannot be persisted', async () => {
+    mocks.setGlobalShortcutState.mockRejectedValueOnce(new Error('settings unavailable'))
+
+    await import('#/main/main.ts')
+    mocks.resolveReady()
+
+    await vi.waitFor(() => expect(mocks.showErrorBox).toHaveBeenCalledTimes(1))
+    expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
+    expect(mocks.quit).toHaveBeenCalledTimes(1)
   })
 
   test('queues open-file paths and defers activation until startup initialization finishes', async () => {

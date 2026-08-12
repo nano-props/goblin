@@ -8,6 +8,7 @@ import {
   expectNoRepoMetadataInvalidations,
   mocks,
   removeLocalRepoWorktreeForTest,
+  repoRuntimeCapabilityForTest,
 } from '#/server/test-utils/repo-module.ts'
 
 describe('fetchRepo canonical boundaries', () => {
@@ -16,7 +17,9 @@ describe('fetchRepo canonical boundaries', () => {
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
 
-    await expect(fetchRepo(REPO_ID, 'user')).rejects.toThrow('worktree discovery failed')
+    await expect(fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'user')).rejects.toThrow(
+      'worktree discovery failed',
+    )
     expect(mocks.fetchAll).not.toHaveBeenCalled()
     expectNoRepoMetadataInvalidations()
   })
@@ -27,7 +30,9 @@ describe('fetchRepo canonical boundaries', () => {
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
 
-    await expect(fetchRepo(repoId, 'user')).rejects.toThrow('remote worktree discovery failed')
+    await expect(fetchRepo(repoId, repoRuntimeCapabilityForTest(repoId, 'test-runtime'), 'user')).rejects.toThrow(
+      'remote worktree discovery failed',
+    )
     expect(mocks.fetchRemoteRepo).not.toHaveBeenCalled()
     expectNoRepoMetadataInvalidations()
   })
@@ -39,7 +44,11 @@ describe('fetchRepo canonical boundaries', () => {
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo(REPO_ID, kind as 'user' | 'background')
+    const result = await fetchRepo(
+      REPO_ID,
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      kind as 'user' | 'background',
+    )
 
     expect(result).toEqual({ ok: true, message: 'fetched', repoIdsToInvalidate: [REPO_ID] })
     expect(mocks.fetchAll).toHaveBeenCalledWith('/tmp/repo', expect.any(AbortSignal))
@@ -56,7 +65,12 @@ describe('fetchRepo canonical boundaries', () => {
     })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo(REPO_ID, 'user', caller.signal)
+    const result = await fetchRepo(
+      REPO_ID,
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      'user',
+      caller.signal,
+    )
 
     expect(result).toEqual({
       ok: false,
@@ -72,7 +86,7 @@ describe('fetchRepo canonical boundaries', () => {
     )
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo(REPO_ID, 'user')
+    const result = await fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'user')
 
     expect(result).toEqual({
       ok: false,
@@ -93,7 +107,7 @@ describe('fetchRepo canonical boundaries', () => {
     )
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo(repoId, 'user')
+    const result = await fetchRepo(repoId, repoRuntimeCapabilityForTest(repoId, 'test-runtime'), 'user')
 
     expect(result).toEqual({
       ok: false,
@@ -107,7 +121,7 @@ describe('fetchRepo canonical boundaries', () => {
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo(REPO_ID, 'user')
+    const result = await fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'user')
 
     expect(result).toEqual({ ok: true, message: 'fetched', repoIdsToInvalidate: [REPO_ID] })
     expectNoRepoMetadataInvalidations()
@@ -125,7 +139,7 @@ describe('fetchRepo canonical boundaries', () => {
     const { resolveRepoWriteBoundaryForRead } = await import('#/server/modules/repo-write-operation-coordinator.ts')
 
     await resolveRepoWriteBoundaryForRead(LINKED_REPO_ID, { workspaceRuntimeId: 'workspace-runtime-b' })
-    await fetchRepo(REPO_ID, 'user', undefined, 'workspace-runtime-a')
+    await fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'workspace-runtime-a'), 'user', undefined)
 
     const primary = await readRepoOperationsSnapshot(REPO_ID, { workspaceRuntimeId: 'workspace-runtime-a' })
     const linked = await readRepoOperationsSnapshot(LINKED_REPO_ID, { workspaceRuntimeId: 'workspace-runtime-b' })
@@ -141,7 +155,7 @@ describe('fetchRepo canonical boundaries', () => {
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo(REPO_ID, 'user')
+    const result = await fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'user')
 
     expect(result).toEqual({
       ok: true,
@@ -164,11 +178,11 @@ describe('fetchRepo canonical boundaries', () => {
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched by user' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const background = fetchRepo(REPO_ID, 'background')
+    const background = fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'background')
     await vi.waitFor(() => {
       expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
     })
-    const user = fetchRepo(LINKED_REPO_ID, 'user')
+    const user = fetchRepo(LINKED_REPO_ID, repoRuntimeCapabilityForTest(LINKED_REPO_ID, 'test-runtime'), 'user')
 
     fetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched in background' }))
     const [backgroundResult, userResult] = await Promise.all([background, user])
@@ -196,11 +210,11 @@ describe('fetchRepo canonical boundaries', () => {
     mocks.fetchRemoteRepo.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched by user' }))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const background = fetchRepo(repoId, 'background')
+    const background = fetchRepo(repoId, repoRuntimeCapabilityForTest(repoId, 'test-runtime'), 'background')
     await vi.waitFor(() => {
       expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
     })
-    const user = fetchRepo(linkedRepoId, 'user')
+    const user = fetchRepo(linkedRepoId, repoRuntimeCapabilityForTest(linkedRepoId, 'test-runtime'), 'user')
 
     fetch.resolve(commandOutcomeForTest({ ok: true, message: 'fetched in background' }))
     const [backgroundResult, userResult] = await Promise.all([background, user])
@@ -224,7 +238,9 @@ describe('fetchRepo canonical boundaries', () => {
     mocks.resolveRemoteRepoCommonDir.mockResolvedValue(null)
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    await expect(fetchRepo(repoId, 'user')).rejects.toThrow('error.repository-boundary-unavailable')
+    await expect(fetchRepo(repoId, repoRuntimeCapabilityForTest(repoId, 'test-runtime'), 'user')).rejects.toThrow(
+      'error.repository-boundary-unavailable',
+    )
     expect(mocks.fetchRemoteRepo).not.toHaveBeenCalled()
   })
 
@@ -232,7 +248,9 @@ describe('fetchRepo canonical boundaries', () => {
     mocks.resolveRepoCommonDir.mockRejectedValueOnce(new Error('git unavailable'))
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    await expect(fetchRepo(REPO_ID, 'user')).rejects.toThrow('error.repository-boundary-unavailable')
+    await expect(fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'user')).rejects.toThrow(
+      'error.repository-boundary-unavailable',
+    )
     expect(mocks.fetchAll).not.toHaveBeenCalled()
   })
 
@@ -282,6 +300,7 @@ describe('fetchRepo canonical boundaries', () => {
         { branch: 'feature/a', worktreePath: '/tmp/repo-worktree', deleteBranch: true },
         lifecycle,
         physicalWorktreeCapability,
+        repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
       ),
     ).rejects.toThrow('error.repository-boundary-unavailable')
     expect(beforeRemove).not.toHaveBeenCalled()
@@ -362,8 +381,8 @@ describe('fetchRepo canonical boundaries', () => {
         afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
       },
       physicalWorktreeCapability,
+      repoRuntimeCapabilityForTest(REPO_ID, lease.workspaceRuntimeId),
       undefined,
-      { workspaceRuntimeId: lease.workspaceRuntimeId },
     )
 
     try {

@@ -6,6 +6,7 @@ export type WorkspacePaneActionOutcome =
   | { kind: 'target-missing' }
   | { kind: 'blocked' }
   | { kind: 'mutation-failed' }
+  | { kind: 'committed-projection-failed' }
   | { kind: 'navigation-rejected' }
 
 export function workspacePaneActionOutcomeSucceeded(outcome: WorkspacePaneActionOutcome): boolean {

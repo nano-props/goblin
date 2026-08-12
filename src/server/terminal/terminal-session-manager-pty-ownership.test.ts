@@ -1,11 +1,15 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createPtyHandle } from '#/server/terminal/pty-supervisor.ts'
 import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
+import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
+
+const EXPECTED_TERMINAL_SESSION_CAPACITY = 1024
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import {
   BRANCH_NAME,
   CLIENT_ID,
+  LINKED_WORKTREE_TARGET,
   SCOPE,
   TERMINAL_SESSION_ID,
   USER_ID,
@@ -207,7 +211,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     expect(kill).not.toHaveBeenCalled()
   })
 
-  test('transfers a failed invalidation retirement to supervisor shutdown without retrying', async () => {
+  test('transfers a failed scope retirement to supervisor shutdown without retrying', async () => {
     const supervisor = createDeferredPtySupervisor()
     const eventualExit = Promise.withResolvers<void>()
     const killAndWait = vi.fn(async () => {
@@ -220,13 +224,56 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const manager = createAlwaysOnlineManager(supervisor)
     await createSession(manager, supervisor)
 
-    manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
+    const invalidation = manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
+    expect(invalidation.removedCount).toBe(1)
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
     await vi.waitFor(() => expect(killAndWait).toHaveBeenCalledOnce())
     await Promise.resolve()
     manager.forceShutdown()
 
     expect(kill).not.toHaveBeenCalled()
     eventualExit.resolve()
+  })
+
+  test('keeps an invalidated PTY capacity slot until native retirement completes', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const retirement = Promise.withResolvers<void>()
+    supervisor.killAndWait = vi.fn(async () => await retirement.promise)
+    const manager = createAlwaysOnlineManager(supervisor)
+    await createSession(manager, supervisor)
+
+    manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
+    const reservations = Array.from({ length: EXPECTED_TERMINAL_SESSION_CAPACITY - 1 }, (_, index) =>
+      manager.prepareSession({
+        userId: USER_ID,
+        target: WORKTREE_TARGET,
+        terminalSessionId: `replacement-${index}`,
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+        cwd: '/tmp',
+      }),
+    )
+    expect(reservations.every((reservation) => reservation.ok)).toBe(true)
+    expect(
+      manager.prepareSession({
+        userId: USER_ID,
+        target: WORKTREE_TARGET,
+        terminalSessionId: 'replacement-over-limit',
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+        cwd: '/tmp',
+      }),
+    ).toEqual({ ok: false, message: 'error.terminal-session-limit-reached' })
+
+    retirement.resolve()
+    await vi.waitFor(() => expect(manager.getPendingResourceRetirementCount()).toBe(0))
+    expect(
+      manager.prepareSession({
+        userId: USER_ID,
+        target: WORKTREE_TARGET,
+        terminalSessionId: 'replacement-after-retirement',
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+        cwd: '/tmp',
+      }),
+    ).toMatchObject({ ok: true })
   })
 
   test('keeps invalidation retirement ownership until a late native spawn exits', async () => {
@@ -267,19 +314,81 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     expect(kill).not.toHaveBeenCalled()
   })
 
-  test('reports detached-user close reason for detached TTL cleanup', async () => {
+  test('commits scope invalidation before publishing its close effects', async () => {
     const supervisor = createDeferredPtySupervisor()
     const onSessionClosed = vi.fn()
     const manager = createAlwaysOnlineManager(supervisor, { onSessionClosed })
     const created = await createSession(manager, supervisor)
 
-    await manager.closeSessionsForUser(USER_ID)
+    const invalidation = manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
+
+    expect(invalidation.removedSessions).toEqual([
+      expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
+    ])
+    await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
+    expect(onSessionClosed).not.toHaveBeenCalled()
+
+    invalidation.publishEffects()
 
     expect(onSessionClosed).toHaveBeenCalledWith(
       USER_ID,
       expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
-      'detached-user',
+      'scope',
     )
+  })
+
+  test('commits the complete runtime scope before releasing runtime retentions', () => {
+    const supervisor = createDeferredPtySupervisor()
+    const observedSessionCounts: number[] = []
+    let manager: TerminalSessionManager<string>
+    manager = new TerminalSessionManager<string>(
+      supervisor,
+      { onOutput: vi.fn(), onExit: vi.fn(), withRetirementTabsSnapshot: noRetirementTabsSnapshot },
+      () => true,
+      {
+        retain: vi.fn(() => ({
+          release: () => observedSessionCounts.push(manager.getSessionCount()),
+        })),
+      },
+    )
+    for (const terminalSessionId of ['term-batch-session-11111', 'term-batch-session-22222']) {
+      const prepared = manager.prepareSession({
+        userId: USER_ID,
+        target: WORKTREE_TARGET,
+        terminalSessionId,
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
+        cwd: WORKTREE_PATH,
+      })
+      if (!prepared.ok) throw new Error(prepared.message)
+      prepared.admission.commit({
+        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      })
+    }
+
+    manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
+
+    expect(observedSessionCounts).toEqual([0, 0])
+  })
+
+  test('revokes invalidated PTY output ownership before releasing runtime retention', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onOutput = vi.fn()
+    const release = vi.fn(() => supervisor.emitData('pty_initial_123456', 'output during runtime release'))
+    const manager = new TerminalSessionManager<string>(
+      supervisor,
+      { onOutput, onExit: vi.fn(), withRetirementTabsSnapshot: noRetirementTabsSnapshot },
+      () => true,
+      {
+        retain: vi.fn(() => ({ release })),
+      },
+    )
+    await createSession(manager, supervisor)
+    onOutput.mockClear()
+
+    manager.commitWorkspaceRuntimeSessionInvalidation(USER_ID, SCOPE)
+
+    expect(release).toHaveBeenCalledOnce()
+    expect(onOutput).not.toHaveBeenCalled()
   })
 
   test('supersedes an older restart before spawning the latest replacement', async () => {

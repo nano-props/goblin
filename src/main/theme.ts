@@ -5,7 +5,6 @@
 // emits updates, but it is not the persistence source of truth.
 
 import { nativeTheme } from 'electron'
-import { getUserSettings } from '#/main/settings-server-client.ts'
 import { themeNodeLog } from '#/node/logger.ts'
 import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'
 import type { ThemeState } from '#/shared/api-types.ts'
@@ -42,11 +41,10 @@ function emit(): void {
   }
 }
 
-export async function initTheme(initial?: { theme: ThemePref; colorTheme: ColorTheme }): Promise<void> {
+export function initTheme(initial: { theme: ThemePref; colorTheme: ColorTheme }): void {
   if (inited) return
   inited = true
-  const serverSettings = initial ?? (await getUserSettings())
-  applyThemeSettingsProjection({ theme: serverSettings.theme, colorTheme: serverSettings.colorTheme })
+  applyThemeSettingsProjection(initial)
 
   // Fires both on OS appearance changes AND when we assign themeSource
   // ourselves. We only care about the former, only when pref === 'auto'.

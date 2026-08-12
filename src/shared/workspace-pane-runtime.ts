@@ -1,4 +1,4 @@
-import type { TerminalCreateInput, TerminalCreateResult, TerminalExecutionTarget } from '#/shared/terminal-types.ts'
+import type { TerminalCreateInput, TerminalCreateSuccess, TerminalExecutionTarget } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
@@ -43,7 +43,7 @@ export type TerminalWorkspacePaneRuntimeOpenResult =
   | {
       ok: true
       runtimeType: 'terminal'
-      runtime: Extract<TerminalCreateResult, { ok: true }>
+      runtime: TerminalCreateSuccess
       paneTabsSnapshot: WorkspacePaneTabsSnapshot
     }
   | {
@@ -67,7 +67,8 @@ interface TerminalWorkspacePaneRuntimeCloseSuccess {
   ok: true
   runtimeType: 'terminal'
   runtime: TerminalWorkspacePaneRuntimeCloseEffect
-  paneTabsSnapshot: WorkspacePaneTabsSnapshot
+  /** Null means the close committed and the invalidation stream owns projection recovery. */
+  paneTabsSnapshot: WorkspacePaneTabsSnapshot | null
 }
 
 export type WorkspacePaneRuntimeCloseResult =

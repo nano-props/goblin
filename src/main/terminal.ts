@@ -1,10 +1,10 @@
-import { BrowserWindow, Notification, app, ipcMain } from 'electron'
+import { BrowserWindow, Notification, app, dialog, ipcMain } from 'electron'
 import type { WebContents } from 'electron'
-import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
-import { activatePrimaryWindow } from '#/main/window.ts'
+import { activatePrimaryWindow, sendPrimaryWindowEffectIntent } from '#/main/window.ts'
 import { platform } from '#/main/platform.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 import { terminalNodeLog } from '#/node/logger.ts'
+import { t } from '#/main/i18n/index.ts'
 import { isValidTerminalNotifyBellInput, isValidTerminalTestNotificationInput } from '#/shared/terminal-validators.ts'
 import type {
   TerminalMutationResult,
@@ -116,15 +116,27 @@ function showNotificationWithResult(
     notif.once('show', () => settle(true))
     notif.once('failed', () => settle(false))
     notif.once('click', () => {
-      // Bring the window to the foreground, then tell the client to switch
-      // to the workspace and open the terminal view.
-      void activatePrimaryWindow().catch(() => {})
-      if (clickTarget)
-        broadcastClientEffectIntent({
-          type: 'terminal-bell-click',
-          ...clickTarget,
-        })
+      void openTerminalNotificationDestination(clickTarget)
     })
     notif.show()
   })
+}
+
+async function openTerminalNotificationDestination(clickTarget?: {
+  terminalSessionId: string
+  session: TerminalSessionBase
+}): Promise<void> {
+  try {
+    if (!clickTarget) {
+      await activatePrimaryWindow()
+      return
+    }
+    await sendPrimaryWindowEffectIntent({
+      type: 'terminal-bell-click',
+      ...clickTarget,
+    })
+  } catch (err) {
+    terminalNodeLog.warn({ err }, 'failed to activate terminal notification destination')
+    dialog.showErrorBox(app.name, t('menu.client-intent-delivery-failed'))
+  }
 }

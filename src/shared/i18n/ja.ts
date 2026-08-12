@@ -44,6 +44,8 @@ export const ja: Record<DictKey, string> = {
   'menu.file.close-workspace': 'ワークスペースを閉じる',
   'menu.file.settings': '設定…',
   'menu.file.quit': '終了',
+  'menu.client-intent-delivery-failed':
+    'アプリウィンドウが変更されたか読み込みに失敗したため、操作を送信できませんでした。もう一度お試しください。',
 
   // ---- Menu — Edit -------------------------------------------------------
   'menu.edit.undo': '取り消す',
@@ -240,6 +242,15 @@ export const ja: Record<DictKey, string> = {
   'dashboard.recent.title': '最近のブランチ',
   'dashboard.recent.description': '最新コミット順のリポジトリアクティビティ。',
   'dashboard.checks-failing': '{count} 件のチェック失敗',
+  'dashboard.terminals.description': 'このワークスペースで {count} 件開いています',
+  'dashboard.terminals.loading': 'ターミナルを読み込み中...',
+  'dashboard.terminals.unavailable': 'ターミナル一覧を取得できません',
+  'dashboard.terminals.open': '{name} を開く',
+  'dashboard.terminals.open-failed': 'ターミナルを開けませんでした',
+  'dashboard.terminals.stale': '最後に確認できたターミナル一覧を表示しています。',
+  'dashboard.terminals.error': 'エラー',
+  'dashboard.terminals.workspace-root': 'ワークスペース',
+  'dashboard.terminals.detached-worktree': '切り離されたワークツリー',
   'tab.branches': 'ブランチ',
   'workspace.navigation-title': 'ワークスペース',
   'tab.status': 'ステータス',
@@ -575,12 +586,24 @@ export const ja: Record<DictKey, string> = {
   'error.filetree-delete-directory-unsupported': 'ファイルツリーからごみ箱に移動できるのはファイルのみです',
   'error.trash-unavailable': 'システムのごみ箱を利用できません',
   'error.failed-trash-file': 'ファイルをごみ箱に移動できませんでした',
+  'error.trash-file-outcome-uncertain':
+    'ファイルがごみ箱に移動されたか確認できませんでした。再試行する前にファイルツリーを確認してください。',
+  'error.clone-outcome-uncertain':
+    'クローンが完了したか確認できませんでした。再試行する前に保存先ディレクトリを確認してください。',
+  'error.external-app-outcome-uncertain':
+    '外部アプリが開いたか確認できませんでした。再試行する前にアプリを確認してください。',
   'error.git-command-cancelled-check-state':
     'Git 操作はキャンセルされました。リポジトリの状態が変更された可能性があります。確認してから再試行してください。',
   'error.git-command-timeout-check-state':
     'Git 操作はタイムアウトしました。リポジトリの状態が変更された可能性があります。確認してから再試行してください。',
   'error.invalid-arguments': '無効な引数',
   'error.workspace-runtime-stale': 'ワークスペースランタイムが無効です',
+  'error.workspace-tabs-committed-projection-failed':
+    'タブの変更は保存されましたが、現在の表示を更新できませんでした。ワークスペースを開き直してください。',
+  'error.workspace-tabs-outcome-uncertain':
+    'タブの変更が保存されたか確認できませんでした。ワークスペースを開き直して現在の状態を確認してください。',
+  'error.operation-outcome-uncertain':
+    '操作が完了したか確認できませんでした。現在の状態を確認してから、もう一度お試しください。',
   'error.workspace-target-stale': 'ワークスペースの対象が変更されました。もう一度お試しください。',
   'error.worktree-removal-in-progress': 'このワークツリーを削除しています',
   'error.not-controller': 'このターミナルは他のセッションが制御しています',
@@ -614,6 +637,8 @@ export const ja: Record<DictKey, string> = {
   'error.ghostty-not-installed': 'Ghostty がインストールされていません',
   'error.terminal-not-installed': 'ターミナルがインストールされていません',
   'error.terminal-create-failed': 'ターミナルを作成できませんでした',
+  'error.terminal-session-limit-reached':
+    'ターミナルのグローバル上限（1,024 個）に達しました。ターミナルを閉じてから再試行してください。',
   'error.terminal-connection-timeout': 'ターミナルサービスへの接続がタイムアウトしました。もう一度お試しください。',
   'error.terminal-create-timeout': 'ターミナルの作成がタイムアウトしました。もう一度お試しください。',
   'error.terminal-connection-unavailable': 'ターミナルサービスを利用できません。もう一度お試しください。',
@@ -709,11 +734,14 @@ export const ja: Record<DictKey, string> = {
   'settings.web.token-copy': 'トークンをコピー',
   'settings.web.token-copied': 'トークンをクリップボードにコピーしました。',
   'settings.web.token-copy-failed': 'クリップボードへのコピーに失敗しました。',
+  'settings.web.token-read-failed': 'トークン状態を読み取れませんでした。設定を開き直して再試行してください。',
   'settings.web.token-rotate': 'トークンを再生成',
-  'settings.web.token-rotated': 'トークンを再生成しました。続行するには再認証してください。',
+  'settings.web.token-rotated': '新しいトークンを保存しました。Goblin の次回起動後に有効になります。',
   'settings.web.token-rotate-failed': 'トークンの再生成に失敗しました。',
   'settings.web.token-rotation-hint':
-    '下のQRコードにはこのトークンが含まれています。スキャンすると対象デバイスのゲートに自動入力されます。',
+    '下のQRコードには現在有効なトークンが含まれています。スキャンすると対象デバイスのゲートに自動入力されます。',
+  'settings.web.token-pending-restart-hint':
+    '表示されたトークンとQRコードは Goblin の次回起動時に有効になります。それまでは現在のトークンが有効です。',
   'settings.web.lan': 'ネットワーク',
   'settings.web.lan-urls': 'LANアドレス',
   'settings.web.lan-urls-hint':
@@ -779,6 +807,8 @@ export const ja: Record<DictKey, string> = {
   'settings.global-shortcut-recording': 'キーを押してください…',
   'settings.global-shortcut-reset': 'リセット',
   'settings.global-shortcut-conflict': '登録できません。使用中の可能性があります。',
+  'settings.global-shortcut-projection-failed':
+    '設定は保存されましたが、アプリのショートカットを更新できませんでした。適用するにはアプリを開き直してください。',
   'settings.global-shortcut-invalid': 'Command、Control、Option とキーを組み合わせてください。',
   'settings.open-github': 'GitHub でプロジェクトを開く',
   'about.app': 'Goblin',

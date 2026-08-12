@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { BrowserWindowConstructorOptions } from 'electron'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { CLIENT_EFFECT_INTENT_CHALLENGE_CHANNEL, CLIENT_EFFECT_INTENT_READY_CHANNEL } from '#/shared/ipc-channels.ts'
 
 const mocks = vi.hoisted(() => {
   const clientIndexHtml = '<!doctype html><script type="module" src="./assets/index-testhash.js"></script>'
@@ -10,9 +11,13 @@ const mocks = vi.hoisted(() => {
     clientIndexHtml,
     windows: [] as unknown[],
     windowOptions: [] as BrowserWindowConstructorOptions[],
+    ipcMainOn: vi.fn(),
     webContentsOn: vi.fn(),
     setWindowOpenHandler: vi.fn(),
     downloadURL: vi.fn(),
+    send: vi.fn(),
+    challengeSend: vi.fn(),
+    reload: vi.fn(),
     windowOn: vi.fn(),
     windowOnce: vi.fn(),
     loadURL: vi.fn(),
@@ -36,6 +41,14 @@ const mocks = vi.hoisted(() => {
         ? clientIndexHtml
         : JSON.stringify({ file: 'preload-0.1.0-testhash.cjs' }),
     ),
+    mainFrame: {
+      processId: 10,
+      routingId: 20,
+      url: 'http://127.0.0.1:32100/',
+      detached: false,
+      isDestroyed: () => false,
+      send: vi.fn(),
+    },
   }
   const BrowserWindow = Object.assign(
     vi.fn(function BrowserWindow(options: BrowserWindowConstructorOptions) {
@@ -45,8 +58,13 @@ const mocks = vi.hoisted(() => {
           on: state.webContentsOn,
           setWindowOpenHandler: state.setWindowOpenHandler,
           downloadURL: state.downloadURL,
+          send: state.send,
+          reload: state.reload,
           isDestroyed: () => false,
           once: vi.fn(),
+          get mainFrame() {
+            return state.mainFrame
+          },
           // Mirror Electron's per-window session shape so the
           // cookie-bootstrap call in `createPrimaryWindow` can plant
           // the auth cookie on `webContents.session.cookies`. The
@@ -97,7 +115,7 @@ vi.mock('electron', () => ({
   },
   BrowserWindow: mocks.BrowserWindow,
   ipcMain: {
-    on: vi.fn(),
+    on: mocks.ipcMainOn,
     handle: vi.fn(),
     removeHandler: vi.fn(),
     removeAllListeners: vi.fn(),
@@ -118,11 +136,6 @@ vi.mock('#/main/window-state.ts', () => ({
 
 vi.mock('#/main/theme.ts', () => ({
   getTheme: () => ({ resolved: 'light', colorTheme: 'macos' }),
-}))
-
-vi.mock('#/main/i18n/index.ts', () => ({
-  getCurrentLang: () => 'en',
-  getDictionary: () => ({}),
 }))
 
 vi.mock('#/main/settings-server-client.ts', () => ({
@@ -147,6 +160,7 @@ describe('primary window navigation boundaries', () => {
     mocks.isPackaged = false
     mocks.windows.length = 0
     mocks.windowOptions.length = 0
+    mocks.ipcMainOn.mockReset()
     mocks.readFileSync.mockReset()
     mocks.readFileSync.mockImplementation((filePath: string) =>
       filePath.endsWith('/dist/web/index.html')
@@ -158,6 +172,20 @@ describe('primary window navigation boundaries', () => {
     mocks.cookieSetMock.mockReset()
     mocks.cookieSetMock.mockResolvedValue(undefined)
     mocks.downloadURL.mockReset()
+    mocks.loadURL.mockReset()
+    mocks.loadURL.mockResolvedValue(undefined)
+    mocks.send.mockReset()
+    mocks.challengeSend.mockReset()
+    mocks.mainFrame.processId = 10
+    mocks.mainFrame.routingId = 20
+    mocks.mainFrame.url = 'http://127.0.0.1:32100/'
+    mocks.mainFrame.detached = false
+    mocks.mainFrame.send.mockReset()
+    mocks.mainFrame.send.mockImplementation((channel: string, ...args: unknown[]) => {
+      if (channel === CLIENT_EFFECT_INTENT_CHALLENGE_CHANNEL) mocks.challengeSend(channel, ...args)
+      else mocks.send(channel, ...args)
+    })
+    mocks.reload.mockReset()
     mocks.getEmbeddedServerRuntime.mockReset()
     mocks.getEmbeddedServerRuntime.mockReturnValue({
       url: 'http://127.0.0.1:32100/',
@@ -240,13 +268,268 @@ describe('primary window navigation boundaries', () => {
     // a second time (no recreation), and the load failure is handled
     // without throwing out of `getOrCreatePrimaryWindow()`.
     mocks.loadURL.mockRejectedValueOnce(new Error('load failed'))
-    const { getOrCreatePrimaryWindow } = await import('#/main/window.ts')
+    const { getOrCreatePrimaryWindow, sendPrimaryWindowEffectIntent } = await import('#/main/window.ts')
 
     const first = await getOrCreatePrimaryWindow()
     const second = await getOrCreatePrimaryWindow()
 
     expect(first).toBe(second)
     expect(mocks.BrowserWindow).toHaveBeenCalledTimes(1)
+    await expect(sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })).rejects.toThrow('load failed')
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
+  test('rejects an intent until the initial app document is ready', async () => {
+    const cookie = Promise.withResolvers<void>()
+    mocks.cookieSetMock.mockImplementationOnce(async () => await cookie.promise)
+    const { getOrCreatePrimaryWindow, sendPrimaryWindowEffectIntent } = await import('#/main/window.ts')
+
+    const creation = getOrCreatePrimaryWindow()
+    await vi.waitFor(() => expect(mocks.BrowserWindow).toHaveBeenCalledOnce())
+    const delivery = sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+    await Promise.resolve()
+
+    expect(mocks.send).not.toHaveBeenCalled()
+    cookie.resolve()
+    await creation
+    await expect(delivery).rejects.toThrow('Primary window renderer is not ready')
+    expect(mocks.send).not.toHaveBeenCalled()
+    emitIntentReady()
+    await sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+
+    expect(mocks.send).toHaveBeenCalledWith('goblin:client-effect-intent', {
+      type: 'open-workspace-requested',
+    })
+  })
+
+  test('ignores an untrusted document readiness handshake', async () => {
+    const { getOrCreatePrimaryWindow, sendPrimaryWindowEffectIntent } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+    const delivery = sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+
+    emitIntentReady('https://example.com/')
+    await Promise.resolve()
+    expect(mocks.send).not.toHaveBeenCalled()
+
+    emitIntentReady()
+    await delivery
+    expect(mocks.send).toHaveBeenCalledOnce()
+  })
+
+  test('rejects an intent when its renderer generation is superseded during reload', async () => {
+    const { getOrCreatePrimaryWindow, reloadPrimaryWindow, sendPrimaryWindowEffectIntent } =
+      await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+    const didStartNavigation = mocks.webContentsOn.mock.calls.find(
+      ([eventName]) => eventName === 'did-start-navigation',
+    )?.[1]
+    expect(didStartNavigation).toBeTypeOf('function')
+
+    expect(reloadPrimaryWindow()).toBe(true)
+    expect(mocks.reload).toHaveBeenCalledOnce()
+    didStartNavigation({ isMainFrame: true, isSameDocument: false })
+    const staleDelivery = sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+    await Promise.resolve()
+    expect(mocks.send).not.toHaveBeenCalled()
+
+    expect(reloadPrimaryWindow()).toBe(true)
+    didStartNavigation({ isMainFrame: true, isSameDocument: false })
+    await expect(staleDelivery).rejects.toThrow('superseded')
+    expect(mocks.send).not.toHaveBeenCalled()
+
+    emitIntentReady()
+    await sendPrimaryWindowEffectIntent({ type: 'open-settings-requested', page: 'general' })
+    expect(mocks.send).toHaveBeenCalledOnce()
+    expect(mocks.send).toHaveBeenCalledWith('goblin:client-effect-intent', {
+      type: 'open-settings-requested',
+      page: 'general',
+    })
+  })
+
+  test('does not let a stale document readiness response settle the reloaded document', async () => {
+    const { getOrCreatePrimaryWindow, reloadPrimaryWindow, sendPrimaryWindowEffectIntent } =
+      await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+    emitIntentReady()
+    const didStartNavigation = mocks.webContentsOn.mock.calls.find(
+      ([eventName]) => eventName === 'did-start-navigation',
+    )?.[1]
+    const didStopLoading = mocks.webContentsOn.mock.calls.find(([eventName]) => eventName === 'did-stop-loading')?.[1]
+
+    expect(reloadPrimaryWindow()).toBe(true)
+    didStartNavigation({ isMainFrame: true, isSameDocument: false })
+    mocks.mainFrame.routingId = 21
+    didStopLoading()
+    const delivery = sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+
+    emitIntentReady(undefined, { generation: 1, routingId: 20 })
+    await Promise.resolve()
+    expect(mocks.send).not.toHaveBeenCalled()
+
+    emitIntentReady(undefined, { generation: 2, routingId: 21 })
+    await delivery
+    expect(mocks.send).toHaveBeenCalledOnce()
+  })
+
+  test('fails the current document when its preload throws', async () => {
+    const { getOrCreatePrimaryWindow, sendPrimaryWindowEffectIntent } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+    const preloadError = mocks.webContentsOn.mock.calls.find(([eventName]) => eventName === 'preload-error')?.[1]
+
+    preloadError({}, '/app/src/preload/preload.cjs', new Error('preload boom'))
+
+    await expect(sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })).rejects.toThrow(
+      'preload failed: preload boom',
+    )
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
+  test('fails directly when the active document cannot receive the readiness challenge', async () => {
+    mocks.mainFrame.send.mockImplementationOnce(() => {
+      throw new Error('frame detached')
+    })
+    const { getOrCreatePrimaryWindow, sendPrimaryWindowEffectIntent } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+    const delivery = sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+    const didStopLoading = mocks.webContentsOn.mock.calls.find(([eventName]) => eventName === 'did-stop-loading')?.[1]
+
+    didStopLoading()
+
+    await expect(delivery).rejects.toThrow('frame detached')
+  })
+
+  test('re-establishes readiness for the active document after navigation is cancelled without a successor', async () => {
+    const { getOrCreatePrimaryWindow, reloadPrimaryWindow, sendPrimaryWindowEffectIntent } =
+      await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+    emitIntentReady()
+    const didFailLoad = mocks.webContentsOn.mock.calls.find(([eventName]) => eventName === 'did-fail-load')?.[1]
+    const didStopLoading = mocks.webContentsOn.mock.calls.find(([eventName]) => eventName === 'did-stop-loading')?.[1]
+
+    expect(reloadPrimaryWindow()).toBe(true)
+    const delivery = sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+    didFailLoad({}, -3, 'ERR_ABORTED', 'http://127.0.0.1:32100/', true)
+    didStopLoading()
+    emitIntentReady(undefined, { generation: 2, routingId: 20 })
+
+    await delivery
+    expect(mocks.send).toHaveBeenCalledOnce()
+  })
+
+  test('does not fail a successor generation when an earlier navigation reports cancellation late', async () => {
+    const { getOrCreatePrimaryWindow, reloadPrimaryWindow, sendPrimaryWindowEffectIntent } =
+      await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+    emitIntentReady()
+    const didFailLoad = mocks.webContentsOn.mock.calls.find(([eventName]) => eventName === 'did-fail-load')?.[1]
+    const didStartNavigation = mocks.webContentsOn.mock.calls.find(
+      ([eventName]) => eventName === 'did-start-navigation',
+    )?.[1]
+
+    expect(reloadPrimaryWindow()).toBe(true)
+    didStartNavigation({ isMainFrame: true, isSameDocument: false })
+    didStartNavigation({ isMainFrame: true, isSameDocument: false })
+    mocks.mainFrame.routingId = 21
+    const didStopLoading = mocks.webContentsOn.mock.calls.find(([eventName]) => eventName === 'did-stop-loading')?.[1]
+    didStopLoading()
+    const delivery = sendPrimaryWindowEffectIntent({ type: 'open-settings-requested', page: 'general' })
+    didFailLoad({}, -3, 'ERR_ABORTED', 'http://127.0.0.1:32100/', true)
+    emitIntentReady(undefined, { generation: 3, routingId: 21 })
+
+    await delivery
+    expect(mocks.send).toHaveBeenCalledOnce()
+  })
+
+  test('does not let the initial load result settle a newer reload generation', async () => {
+    const initialLoad = Promise.withResolvers<void>()
+    mocks.loadURL.mockImplementationOnce(async () => await initialLoad.promise)
+    const { getOrCreatePrimaryWindow, reloadPrimaryWindow, sendPrimaryWindowEffectIntent } =
+      await import('#/main/window.ts')
+
+    const creation = getOrCreatePrimaryWindow()
+    await vi.waitFor(() => expect(mocks.loadURL).toHaveBeenCalledOnce())
+    const didStartNavigation = mocks.webContentsOn.mock.calls.find(
+      ([eventName]) => eventName === 'did-start-navigation',
+    )?.[1]
+    expect(didStartNavigation).toBeTypeOf('function')
+
+    expect(reloadPrimaryWindow()).toBe(true)
+    didStartNavigation({ isMainFrame: true, isSameDocument: false })
+    initialLoad.reject(new Error('initial navigation cancelled'))
+    await creation
+
+    const delivery = sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+    await Promise.resolve()
+    expect(mocks.send).not.toHaveBeenCalled()
+    emitIntentReady()
+    await delivery
+
+    expect(mocks.send).toHaveBeenCalledOnce()
+  })
+
+  test('does not transfer a window-creating intent to a reload generation', async () => {
+    const initialLoad = Promise.withResolvers<void>()
+    mocks.loadURL.mockImplementationOnce(async () => await initialLoad.promise)
+    const { reloadPrimaryWindow, sendPrimaryWindowEffectIntent } = await import('#/main/window.ts')
+
+    const delivery = sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+    await vi.waitFor(() => expect(mocks.loadURL).toHaveBeenCalledOnce())
+    const didStartNavigation = mocks.webContentsOn.mock.calls.find(
+      ([eventName]) => eventName === 'did-start-navigation',
+    )?.[1]
+    expect(didStartNavigation).toBeTypeOf('function')
+
+    expect(reloadPrimaryWindow()).toBe(true)
+    didStartNavigation({ isMainFrame: true, isSameDocument: false })
+    initialLoad.reject(new Error('initial navigation cancelled'))
+
+    await expect(delivery).rejects.toThrow('generation 1 was superseded')
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
+  test('invalidates a ready document when its renderer exits', async () => {
+    const { getOrCreatePrimaryWindow, sendPrimaryWindowEffectIntent } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+    emitIntentReady()
+    const renderProcessGone = mocks.webContentsOn.mock.calls.find(
+      ([eventName]) => eventName === 'render-process-gone',
+    )?.[1]
+    expect(renderProcessGone).toBeTypeOf('function')
+
+    renderProcessGone({}, { reason: 'crashed' })
+
+    await expect(sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })).rejects.toThrow(
+      'renderer exited: crashed',
+    )
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
+  test('fails directly when Electron rejects delivery to a ready document', async () => {
+    mocks.send.mockImplementationOnce(() => {
+      throw new Error('renderer unavailable')
+    })
+    const { getOrCreatePrimaryWindow, sendPrimaryWindowEffectIntent } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+    emitIntentReady()
+
+    await expect(sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })).rejects.toThrow(
+      'renderer unavailable',
+    )
+  })
+
+  test('keeps the ready document authoritative when reload fails before navigation starts', async () => {
+    mocks.reload.mockImplementationOnce(() => {
+      throw new Error('reload unavailable')
+    })
+    const { getOrCreatePrimaryWindow, reloadPrimaryWindow, sendPrimaryWindowEffectIntent } =
+      await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+    emitIntentReady()
+
+    expect(() => reloadPrimaryWindow()).toThrow('reload unavailable')
+    await sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+
+    expect(mocks.send).toHaveBeenCalledOnce()
   })
 
   test('loads the configured client dev server URL in development', async () => {
@@ -429,3 +712,26 @@ describe('primary window navigation boundaries', () => {
     expect(mocks.setBounds).not.toHaveBeenCalled()
   })
 })
+
+function emitIntentReady(
+  url = 'http://127.0.0.1:32100/',
+  options: { generation?: number; processId?: number; routingId?: number } = {},
+): void {
+  const didStopLoading = mocks.webContentsOn.mock.calls.find(([eventName]) => eventName === 'did-stop-loading')?.[1]
+  if (options.generation === undefined) didStopLoading?.()
+  const generation = options.generation ?? mocks.challengeSend.mock.calls.at(-1)?.[1]
+  const handler = mocks.ipcMainOn.mock.calls.find(([channel]) => channel === CLIENT_EFFECT_INTENT_READY_CHANNEL)?.[1]
+  const win = mocks.windows[0] as { webContents: { id: number } } | undefined
+  if (!handler || !win) throw new Error('expected primary window intent readiness handler')
+  handler(
+    {
+      sender: win.webContents,
+      senderFrame: {
+        url,
+        processId: options.processId ?? mocks.mainFrame.processId,
+        routingId: options.routingId ?? mocks.mainFrame.routingId,
+      },
+    },
+    generation,
+  )
+}

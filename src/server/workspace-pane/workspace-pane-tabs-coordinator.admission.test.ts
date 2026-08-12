@@ -17,6 +17,8 @@ import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import {
   WORKSPACE_ID,
   LOCAL_WORKSPACE_ENTRY,
+  TEST_EPOCH_CAPABILITY,
+  TEST_MEMBERSHIP_CAPABILITY,
   aggregateFor,
   testTargetProjection,
   testRuntimeTargetProjection,
@@ -66,7 +68,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
           insertAfterIdentity: 'workspace-pane:status',
           permit,
           physicalWorktreeCapability: capability,
-          isRuntimeCurrent: () => true,
+          epochCapability: TEST_MEMBERSHIP_CAPABILITY,
           commitAdmission,
         }),
     )
@@ -120,7 +122,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
           sessionId: 'term-preparedprepared001',
           permit,
           physicalWorktreeCapability: capability,
-          isRuntimeCurrent: () => true,
+          epochCapability: TEST_MEMBERSHIP_CAPABILITY,
           commitAdmission,
         }),
     )
@@ -166,7 +168,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
             insertAfterIdentity: 'workspace-pane:status',
             permit,
             physicalWorktreeCapability: capability,
-            isRuntimeCurrent: () => true,
+            epochCapability: TEST_MEMBERSHIP_CAPABILITY,
             commitAdmission: () => {
               throw new Error('terminal admission failed')
             },
@@ -180,7 +182,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
         userId: 'user-a',
         workspaceId: WORKSPACE_ID,
         scope: 'goblin+file:///repo\0runtime-a',
-        assertCurrent: () => undefined,
+        epochCapability: TEST_MEMBERSHIP_CAPABILITY,
       }),
     ).resolves.toMatchObject({
       revision: 0,
@@ -230,7 +232,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
             sessionId: 'term-snapshotfailure0001',
             permit,
             physicalWorktreeCapability: capability,
-            isRuntimeCurrent: () => true,
+            epochCapability: TEST_MEMBERSHIP_CAPABILITY,
             commitAdmission,
           }),
       ),
@@ -273,7 +275,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
           sessionId: 'term-workspaceworkspace001',
           permit,
           physicalWorktreeCapability: capability,
-          isRuntimeCurrent: () => true,
+          epochCapability: TEST_MEMBERSHIP_CAPABILITY,
           commitAdmission,
         }),
     )
@@ -333,7 +335,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
           sessionId: 'term-detacheddetached001',
           permit,
           physicalWorktreeCapability: capability,
-          isRuntimeCurrent: () => true,
+          epochCapability: TEST_MEMBERSHIP_CAPABILITY,
           commitAdmission,
         }),
     )
@@ -376,7 +378,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
           sessionId: 'term-workspaceworkspace002',
           permit,
           physicalWorktreeCapability: capability,
-          isRuntimeCurrent: () => true,
+          epochCapability: TEST_MEMBERSHIP_CAPABILITY,
           commitAdmission,
         }),
     )
@@ -434,7 +436,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
           sessionId: 'term-preparedprepared001',
           permit,
           physicalWorktreeCapability: capability,
-          isRuntimeCurrent: () => true,
+          epochCapability: TEST_MEMBERSHIP_CAPABILITY,
           commitAdmission,
         }),
     )
@@ -475,7 +477,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
           sessionId: 'term-preparedprepared001',
           permit,
           physicalWorktreeCapability: capability,
-          isRuntimeCurrent: () => true,
+          epochCapability: TEST_MEMBERSHIP_CAPABILITY,
           commitAdmission,
         }),
     )
@@ -538,7 +540,12 @@ describe('workspace pane tabs coordinator admission queues', () => {
           sessionId: 'term-preparedprepared001',
           permit,
           physicalWorktreeCapability: capability,
-          isRuntimeCurrent: () => runtimeCurrent,
+          epochCapability: {
+            ...TEST_MEMBERSHIP_CAPABILITY,
+            assertCurrent: () => {
+              if (!runtimeCurrent) throw new Error('error.workspace-runtime-stale')
+            },
+          },
           commitAdmission,
         }),
     )
@@ -546,7 +553,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
     runtimeCurrent = false
     releaseProvider()
 
-    await expect(admitted).resolves.toEqual({ admitted: true, value: { kind: 'runtime-stale' } })
+    await expect(admitted).rejects.toThrow('error.workspace-runtime-stale')
     expect(captureTargets).toHaveBeenCalledOnce()
     expect(commitAdmission).not.toHaveBeenCalled()
   })
@@ -604,7 +611,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
           sessionId: 'term-preparedprepared001',
           permit,
           physicalWorktreeCapability: capability,
-          isRuntimeCurrent: () => true,
+          epochCapability: TEST_MEMBERSHIP_CAPABILITY,
           commitAdmission,
         }),
     )
@@ -686,6 +693,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
           physicalTargets: [],
           expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
           providerSnapshots: [],
+          epochCapability: TEST_EPOCH_CAPABILITY,
         }),
     )
     loadCount = 0
@@ -701,7 +709,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
       userId: 'user-a',
       workspaceId: WORKSPACE_ID,
       scope: 'goblin+file:///repo\0runtime-a',
-      assertCurrent: () => {},
+      epochCapability: TEST_MEMBERSHIP_CAPABILITY,
     }
     const list = coordinator.listWorkspaceTabs(input)
     await firstLoadStarted.promise

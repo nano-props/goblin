@@ -48,7 +48,7 @@ function createAccessTokenMiddlewareForChannels(token: string, allowQuery: boole
       c.set('userId', deriveUserId(token))
       return next()
     }
-    return errorJson(c, 'FORBIDDEN', 'Unauthorized', 401)
+    return errorJson(c, 'UNAUTHORIZED', 'Unauthorized')
   }
 }
 

@@ -1,9 +1,10 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import type { WorkspaceRuntimeClosedEvent } from '#/server/modules/workspace-runtimes.ts'
+import { WorkspaceRuntimeStaleError, type WorkspaceRuntimeClosedEvent } from '#/server/modules/workspace-runtimes.ts'
 import { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 
 const LOCAL_INPUT = {
   userId: 'user-1',
@@ -159,8 +160,8 @@ describe('PhysicalWorktreeIdentityResolver', () => {
     })
     await resolver.capture({ ...LOCAL_INPUT, workspaceId, worktreePath: firstPath })
     configFingerprint = 'config-b'
-    await expect(resolver.capture({ ...LOCAL_INPUT, workspaceId, worktreePath: secondPath })).rejects.toThrow(
-      'error.workspace-runtime-stale',
+    await expect(resolver.capture({ ...LOCAL_INPUT, workspaceId, worktreePath: secondPath })).rejects.toBeInstanceOf(
+      WorkspaceRuntimeStaleError,
     )
     expect(runRemoteCommand).toHaveBeenCalledOnce()
     resolver.dispose()
@@ -237,8 +238,8 @@ describe('PhysicalWorktreeIdentityResolver', () => {
     })
     worktrees.resolve([{ path: LOCAL_INPUT.worktreePath } as WorktreeInfo])
 
-    await expect(pending).rejects.toThrow('error.workspace-runtime-stale')
-    await expect(resolver.capture(LOCAL_INPUT)).rejects.toThrow('error.workspace-runtime-stale')
+    await expect(pending).rejects.toBeInstanceOf(WorkspaceRuntimeStaleError)
+    await expect(resolver.capture(LOCAL_INPUT)).rejects.toBeInstanceOf(WorkspaceRuntimeStaleError)
     resolver.dispose()
   })
 
@@ -270,7 +271,7 @@ describe('PhysicalWorktreeIdentityResolver', () => {
     const resolver = new PhysicalWorktreeIdentityResolver({
       async getLocalWorktrees(_workspacePath, signal) {
         return await new Promise<WorktreeInfo[]>((_resolve, reject) => {
-          signal?.addEventListener('abort', () => reject(new Error('runtime-aborted')), { once: true })
+          signal?.addEventListener('abort', () => reject(new OperationCancelledError()), { once: true })
         })
       },
       isCurrentWorkspaceRuntime: () => true,
@@ -287,8 +288,8 @@ describe('PhysicalWorktreeIdentityResolver', () => {
       workspaceRuntimeId: LOCAL_INPUT.workspaceRuntimeId,
     })
 
-    await expect(first).rejects.toThrow('runtime-aborted')
-    await expect(second).rejects.toThrow('runtime-aborted')
+    await expect(first).rejects.toBeInstanceOf(WorkspaceRuntimeStaleError)
+    await expect(second).rejects.toBeInstanceOf(WorkspaceRuntimeStaleError)
     resolver.dispose()
   })
 

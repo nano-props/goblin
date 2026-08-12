@@ -9,11 +9,8 @@ import {
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
 import type { createRepoRoutes } from '#/server/routes/repo.ts'
-import {
-  acquireWorkspaceRuntime,
-  commitWorkspaceProbeState,
-  releaseWorkspaceRuntime,
-} from '#/server/modules/workspace-runtimes.ts'
+import { acquireWorkspaceRuntime, releaseWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
+import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -53,7 +50,11 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     expect(accepted.status).toBe(200)
     expect(mocks.commitBackgroundSyncRegistration).toHaveBeenCalledOnce()
     expect(mocks.beginBackgroundSyncRegistration).toHaveBeenCalledWith('user-test', CLIENT_ID, 1, [
-      { workspaceId: WORKSPACE_ID, workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/) },
+      expect.objectContaining({
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: expect.stringMatching(/^workspace-runtime-/),
+        runtimeCapability: expect.objectContaining({ workspaceId: WORKSPACE_ID }),
+      }),
     ])
     expect(mocks.commitBackgroundSyncRegistration).toHaveBeenCalledWith(
       mocks.beginBackgroundSyncRegistration.mock.results[0]?.value,
@@ -100,11 +101,13 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
     const clientId = 'client-background-sync-test'
     const workspaceRuntimeId = acquireWorkspaceRuntime('user-test', workspaceId, clientId)
-    commitWorkspaceProbeState({
-      userId: 'user-test',
-      workspaceId,
-      workspaceRuntimeId,
-      probe: {
+    await settleWorkspaceProbeForTest(
+      {
+        userId: 'user-test',
+        workspaceId,
+        workspaceRuntimeId,
+      },
+      {
         status: 'ready',
         capabilities: {
           files: { read: true, write: true },
@@ -113,7 +116,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         },
         diagnostics: [],
       },
-    })
+    )
 
     const response = await app.request(
       new Request('http://localhost/background-sync-repos', {
@@ -255,7 +258,12 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.fetchRepo).toHaveBeenCalledWith(WORKSPACE_ID, 'user', expect.any(AbortSignal), workspaceRuntimeId)
+    expect(mocks.fetchRepo).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      expect.objectContaining({ workspaceId: WORKSPACE_ID, workspaceRuntimeId }),
+      'user',
+      expect.any(AbortSignal),
+    )
   })
 
   test('returns a stable repository boundary error from writes', async () => {
@@ -377,8 +385,8 @@ describe('repo routes — POST body validation (action endpoints)', () => {
           endpoint: '/tmp/repo-remove',
         }),
       }),
+      expect.objectContaining({ workspaceId: WORKSPACE_ID, workspaceRuntimeId }),
       expect.any(AbortSignal),
-      { workspaceRuntimeId },
     )
   })
 
@@ -441,9 +449,8 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
   })
 
-  test('delegates branch deletion to the repo mutation application', async () => {
-    const deleteBranch = vi.fn(async (_userId, input) => await input.deleteBranch())
-    const app = createTestRepoRoutes(undefined, { deleteBranch })
+  test('runs branch deletion through the runtime-bound mutation path', async () => {
+    const app = createTestRepoRoutes()
     const workspaceRuntimeId = await openTestWorkspaceRuntime()
     mocks.deleteRepoBranch.mockResolvedValueOnce({ ok: true, message: 'ok' })
 
@@ -454,12 +461,13 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     })
 
     expect(response.status).toBe(200)
-    expect(deleteBranch).toHaveBeenCalledWith('user-test', {
-      repoRoot: WORKSPACE_ID,
-      workspaceRuntimeId,
-      branchName: 'feature/retired',
-      deleteBranch: expect.any(Function),
-    })
+    expect(mocks.deleteRepoBranch).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      'feature/retired',
+      expect.objectContaining({ workspaceRuntimeId }),
+      { deleteUpstream: undefined, force: undefined },
+      expect.objectContaining({ aborted: false }),
+    )
 
     mocks.deleteRepoBranch.mockResolvedValueOnce({ ok: false, message: 'delete failed' })
     await app.request('/delete-branch', {
@@ -467,6 +475,6 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ cwd: WORKSPACE_ID, workspaceRuntimeId, branch: 'feature/kept' }),
     })
-    expect(deleteBranch).toHaveBeenCalledTimes(2)
+    expect(mocks.deleteRepoBranch).toHaveBeenCalledTimes(2)
   })
 })

@@ -127,6 +127,15 @@ export class TerminalDirectory<TUser extends string | number, TEntry extends Ter
     return this.entriesByRuntimeId.values()
   }
 
+  hasCapacity(limit: number): boolean {
+    return this.entriesByRuntimeId.size + this.reservationsByRuntimeId.size < limit
+  }
+
+  abortReservations(): void {
+    this.reservationsByRuntimeId.clear()
+    this.reservedRuntimeIdByUserSession.clear()
+  }
+
   entriesForScope(userId: TUser, scope: string): TEntry[] {
     return Array.from(this.entriesByRuntimeId.values()).filter(
       (entry) => entry.userId === userId && entry.scope === scope,

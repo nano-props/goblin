@@ -72,8 +72,7 @@ export function canonicalTabsForTarget(
   providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
 ): WorkspacePaneTabEntry[] {
   const durable = layout.entries.find((entry) => durableTargetKey(input, entry.target) === targetProjectionKey(input))
-  const staticTabs =
-    durable?.tabs ?? defaultWorkspacePaneTabEntries()
+  const staticTabs = durable?.tabs ?? defaultWorkspacePaneTabEntries()
   const liveRuntimeTabs = providers.flatMap((provider) =>
     provider.liveSessions
       .filter((session) => input.nativeWorktreePath !== null && session.worktreePath === input.nativeWorktreePath)

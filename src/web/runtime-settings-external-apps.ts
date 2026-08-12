@@ -19,8 +19,8 @@ export function useExternalAppSettingsController() {
   )
   return {
     refreshing: refreshMutation.isPending,
-    async refreshExternalApps(): Promise<void> {
-      await refreshMutation.mutateAsync(undefined)
+    refreshExternalApps(): void {
+      refreshMutation.mutate(undefined)
     },
   }
 }

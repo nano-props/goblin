@@ -4,22 +4,17 @@ import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/sha
 import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import {
-  commitWorkspacePaneCurrentTargetRoute,
-  selectWorkspacePaneControllerTab,
-} from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { workspacePaneTabControllerTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
-import {
-  beginWorkspacePaneDestinationPresentation,
-  commitWorkspacePaneDestinationRoute,
-  workspacePaneDestinationPresentationIsCurrent,
-  type WorkspacePaneDestinationPresentation,
-} from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
+import { beginWorkspacePaneDestinationPresentation } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import {
   workspacePaneActionOutcomeSucceeded,
   type WorkspacePaneActionOutcome,
 } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
-import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import {
+  updateWorkspacePaneTabs,
+  workspacePaneTabsInteractionBlockedForTarget,
+} from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   requiredGitWorkspacePaneTabsTarget,
@@ -32,20 +27,22 @@ import {
   recordWorkspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
-  resolveWorkspacePaneTabTargetForBranch,
   resolveWorkspacePaneDestinationTarget,
-  workspacePaneTabInteractionBlockedForBranch,
+  workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   workspacePaneActionTargetFromCoordinates,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
 import {
-  beginAppNavigation,
-  appNavigationIsCurrent,
-  type AppNavigationGeneration,
-} from '#/web/app-navigation-lifecycle.ts'
+  commitWorkspacePaneStaticTabPresentation,
+  showWorkspacePaneTabOpenCommittedProjectionFailure,
+  showWorkspacePaneTabOpenMutationFailure,
+  workspacePaneStaticTabTransactionIsCurrent,
+  type WorkspacePaneStaticTabRouteTransaction,
+} from '#/web/workspace-pane/workspace-pane-tab-open-presentation.ts'
 
 export interface OpenWorkspacePaneTargetStaticTabActionOptions {
   workspaceId: WorkspaceId
@@ -71,57 +68,35 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
   } else if (input.worktreeHead?.kind === 'branch') {
     branchName = input.worktreeHead.branchName
   }
-  const provider = workspacePaneStaticTabProvider(input.type)
-  const hasFilesystemRoot = input.paneTarget.kind !== 'git-branch'
-  if (!provider.canOpen({ hasWorktree: hasFilesystemRoot })) {
-    return { kind: 'unsupported', reason: 'worktree-required' }
-  }
   const navigationGeneration = beginAppNavigation()
+  const openerIdentity = captureWorkspacePaneActiveTabIdentity(input.paneTarget, workspaceRuntimeId, {
+    workspacePaneRoute: input.workspacePaneRoute,
+  })
+  const placement: WorkspacePaneStaticTabPlacement = openerIdentity
+    ? { kind: 'after-opener', openerIdentity }
+    : { kind: 'append', openerIdentity: null }
+  const resolvedInput: ResolvedWorkspacePaneStaticTabOpenInput = {
+    workspaceId: input.workspaceId,
+    workspaceRuntimeId,
+    branchName,
+    worktreePath,
+    routeTarget: input.routeTarget,
+    paneTarget: input.paneTarget,
+    worktreeHead: input.worktreeHead,
+    type: input.type,
+    sourceRoute: input.workspacePaneRoute,
+    placement,
+    navigation: input.navigation,
+  }
   const actionTarget = workspacePaneActionTargetFromCoordinates({
     workspaceId: input.workspaceId,
     workspaceRuntimeId,
     branchName,
     worktreePath,
   })
-  return await runWorkspacePaneAction(actionTarget, async () => {
-    if (!appNavigationIsCurrent(navigationGeneration)) return { kind: 'superseded' }
-    const target = { ...input.paneTarget, workspaceRuntimeId }
-    const currentTabs = readWorkspacePaneTabsForTarget(target)
-    const alreadyOpen = currentTabs.some((entry) => entry.type === input.type)
-    const openerIdentity = alreadyOpen
-      ? null
-      : captureWorkspacePaneActiveTabIdentity(input.paneTarget, workspaceRuntimeId, {
-          workspacePaneRoute: input.workspacePaneRoute,
-        })
-    const committed = await updateWorkspacePaneTabs({
-      ...target,
-      operation: { type: 'open-static', tabType: input.type, insertAfterIdentity: null },
-    })
-    if (!committed.ok) return { kind: 'mutation-failed' }
-    if (!committed.projectionApplied) return { kind: 'superseded' }
-    const model = workspacePaneTabTargetForPaneTarget({
-      paneTarget: input.paneTarget,
-      routeTarget: input.routeTarget,
-      workspacePaneRoute: input.workspacePaneRoute,
-      worktreeHead: input.worktreeHead,
-    })
-    const tab = model?.tabs.find((candidate) => candidate.type === input.type)
-    if (!model || !tab || !appNavigationIsCurrent(navigationGeneration)) {
-      return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
-    }
-    if (openerIdentity) {
-      recordWorkspacePaneTabOpener(
-        input.paneTarget,
-        workspaceRuntimeId,
-        workspacePaneStaticTabId(input.type),
-        openerIdentity,
-      )
-    }
-    const presented = await selectWorkspacePaneControllerTab(model, tab, input.navigation, { navigationGeneration })
-    return presented
-      ? { kind: 'completed', changed: !alreadyOpen, presentation: 'observed' }
-      : { kind: 'navigation-rejected' }
-  })
+  return await runWorkspacePaneAction(actionTarget, () =>
+    openWorkspacePaneStaticTabAction(resolvedInput, { kind: 'current', navigationGeneration }),
+  )
 }
 
 export interface OpenWorkspacePaneStaticTabActionOptions {
@@ -144,14 +119,18 @@ export interface ShowWorkspacePaneStaticTabActionOptions {
 type WorkspacePaneStaticTabPlacement =
   { kind: 'after-opener'; openerIdentity: string } | { kind: 'append'; openerIdentity: string | null }
 
-type ResolvedOpenWorkspacePaneStaticTabActionOptions = Omit<
-  OpenWorkspacePaneStaticTabActionOptions,
-  'worktreePath' | 'workspacePaneRoute'
-> & {
+interface ResolvedWorkspacePaneStaticTabOpenInput {
+  workspaceId: WorkspaceId
   workspaceRuntimeId: string
+  branchName: string | null
   worktreePath: string | null
+  routeTarget: WorkspacePaneTabsTarget
+  paneTarget: WorkspacePaneTabsTarget
+  worktreeHead?: GitHead
+  type: WorkspacePaneStaticTabType
   sourceRoute: ParsedWorkspacePaneRoute | null | undefined
   placement: WorkspacePaneStaticTabPlacement
+  navigation: FilesystemWorkspacePaneRouteCommitActions
 }
 
 export async function dispatchShowWorkspacePaneStaticTabAction({
@@ -174,11 +153,13 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
     workspacePaneRoute,
   })
   const presentation = beginWorkspacePaneDestinationPresentation(lease)
-  const input: ResolvedOpenWorkspacePaneStaticTabActionOptions = {
+  const input: ResolvedWorkspacePaneStaticTabOpenInput = {
     workspaceId,
     workspaceRuntimeId: lease.workspaceRuntimeId,
     branchName: lease.branchName,
     worktreePath: lease.worktreePath,
+    routeTarget: { kind: 'git-branch', workspaceId, branchName: lease.branchName },
+    paneTarget,
     type,
     sourceRoute: workspacePaneRoute,
     placement: { kind: 'append', openerIdentity },
@@ -212,11 +193,13 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
   const placement: WorkspacePaneStaticTabPlacement = openerIdentity
     ? { kind: 'after-opener', openerIdentity }
     : { kind: 'append', openerIdentity: null }
-  const resolvedInput: ResolvedOpenWorkspacePaneStaticTabActionOptions = {
+  const resolvedInput: ResolvedWorkspacePaneStaticTabOpenInput = {
     workspaceId: input.workspaceId,
     workspaceRuntimeId,
     branchName: input.branchName,
     worktreePath: input.worktreePath ?? null,
+    routeTarget: { kind: 'git-branch', workspaceId: input.workspaceId, branchName: input.branchName },
+    paneTarget,
     type: input.type,
     sourceRoute,
     placement,
@@ -239,47 +222,29 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
   return workspacePaneActionOutcomeSucceeded(outcome)
 }
 
-type WorkspacePaneStaticTabRouteTransaction =
-  | {
-      kind: 'current'
-      navigationGeneration: AppNavigationGeneration
-    }
-  | {
-      kind: 'destination'
-      presentation: WorkspacePaneDestinationPresentation
-    }
-
-function workspacePaneStaticTabTransactionIsCurrent(transaction: WorkspacePaneStaticTabRouteTransaction): boolean {
-  if (transaction.kind === 'current') return appNavigationIsCurrent(transaction.navigationGeneration)
-  return workspacePaneDestinationPresentationIsCurrent(transaction.presentation)
-}
-
 async function openWorkspacePaneStaticTabAction(
-  input: ResolvedOpenWorkspacePaneStaticTabActionOptions,
+  input: ResolvedWorkspacePaneStaticTabOpenInput,
   transaction: WorkspacePaneStaticTabRouteTransaction,
 ): Promise<WorkspacePaneActionOutcome> {
   const provider = workspacePaneStaticTabProvider(input.type)
-  if (!provider.canOpen({ hasWorktree: !!input.worktreePath })) {
+  if (!provider.canOpen({ hasWorktree: input.paneTarget.kind !== 'git-branch' })) {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
   if (!workspacePaneStaticTabTransactionIsCurrent(transaction)) return { kind: 'superseded' }
-  if (
-    transaction.kind === 'current' &&
-    workspacePaneTabInteractionBlockedForBranch(input.workspaceId, input.branchName, {
-      workspacePaneRoute: input.sourceRoute,
-    })
-  )
-    return { kind: 'blocked' }
   const state = workspacesStore.getState()
   const workspace = state.workspaces[input.workspaceId]
   if (!workspace) return { kind: 'target-missing' }
   if (workspace.workspaceRuntimeId !== input.workspaceRuntimeId) return { kind: 'superseded' }
-  const branchName = input.branchName
   const sourceRoute = input.sourceRoute
-  const target = {
-    ...requiredGitWorkspacePaneTabsTarget(input.workspaceId, branchName, input.worktreePath),
-    workspaceRuntimeId: input.workspaceRuntimeId,
+  const modelBefore = resolveOpenWorkspacePaneStaticTabModel(input)
+  if (
+    modelBefore
+      ? workspacePaneTabTargetBlocksInteraction(modelBefore)
+      : workspacePaneTabsInteractionBlockedForTarget(input.paneTarget)
+  ) {
+    return { kind: 'blocked' }
   }
+  const target = { ...input.paneTarget, workspaceRuntimeId: input.workspaceRuntimeId }
   // Chrome-tab-style opener tracking: reopening/refocusing an already-open
   // static tab shouldn't overwrite its opener.
   const currentTabs = readWorkspacePaneTabsForTarget(target)
@@ -294,59 +259,46 @@ async function openWorkspacePaneStaticTabAction(
       insertAfterIdentity,
     },
   })
-  if (!committed.ok) return { kind: 'mutation-failed' }
-  const liveTarget = resolveWorkspacePaneDestinationTarget(input.workspaceId, branchName)
-  if (
-    currentWorkspaceRuntimeId(workspacesStore.getState(), input.workspaceId) !== input.workspaceRuntimeId ||
-    liveTarget.kind !== 'ready' ||
-    liveTarget.lease.workspaceRuntimeId !== input.workspaceRuntimeId ||
-    liveTarget.lease.worktreePath !== input.worktreePath
-  ) {
-    return { kind: 'superseded' }
+  if (!committed.ok) {
+    showWorkspacePaneTabOpenMutationFailure(committed.error)
+    return { kind: 'mutation-failed' }
   }
+  if (committed.projection === 'failed') {
+    showWorkspacePaneTabOpenCommittedProjectionFailure()
+    return { kind: 'committed-projection-failed' }
+  }
+  if (committed.projection === 'superseded') return { kind: 'superseded' }
+  const model = resolveOpenWorkspacePaneStaticTabModel(input)
+  if (!model || !workspacePaneTabControllerTargetIsCurrent(model)) return { kind: 'superseded' }
   if (openerIdentity) {
-    recordWorkspacePaneTabOpener(target, input.workspaceRuntimeId, workspacePaneStaticTabId(input.type), openerIdentity)
+    recordWorkspacePaneTabOpener(
+      input.paneTarget,
+      input.workspaceRuntimeId,
+      workspacePaneStaticTabId(input.type),
+      openerIdentity,
+    )
   }
   if (!workspacePaneStaticTabTransactionIsCurrent(transaction)) {
     return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
   }
-  const navigationOutcome = await commitWorkspacePaneStaticTab(input, sourceRoute, transaction)
+  const navigationOutcome = await commitWorkspacePaneStaticTabPresentation(
+    { ...input, model },
+    sourceRoute,
+    transaction,
+  )
   if (!workspacePaneActionOutcomeSucceeded(navigationOutcome)) return navigationOutcome
   return navigationOutcome.kind === 'completed' ? { ...navigationOutcome, changed: !alreadyOpen } : navigationOutcome
 }
 
-async function commitWorkspacePaneStaticTab(
-  input: {
-    workspaceId: WorkspaceId
-    workspaceRuntimeId: string
-    branchName: string
-    worktreePath: string | null
-    type: WorkspacePaneStaticTabType
-    navigation: FilesystemWorkspacePaneRouteCommitActions
-  },
-  sourceRoute: ParsedWorkspacePaneRoute | null | undefined,
-  transaction: WorkspacePaneStaticTabRouteTransaction,
-): Promise<WorkspacePaneActionOutcome> {
-  const route = { kind: 'static' as const, tab: input.type }
-  if (transaction.kind === 'destination') {
-    return commitWorkspacePaneDestinationRoute(transaction.presentation, route, input.navigation)
-  }
-  const committed = await commitWorkspacePaneCurrentTargetRoute(
-    {
-      workspaceId: input.workspaceId,
-      workspaceRuntimeId: input.workspaceRuntimeId,
-      routeTarget: { kind: 'git-branch', workspaceId: input.workspaceId, branchName: input.branchName },
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
-      paneTarget: requiredGitWorkspacePaneTabsTarget(input.workspaceId, input.branchName, input.worktreePath),
-    },
-    route,
-    input.navigation,
-    undefined,
-    transaction.navigationGeneration,
-  )
-  if (!committed && !appNavigationIsCurrent(transaction.navigationGeneration)) {
-    return { kind: 'completed', changed: true, presentation: 'superseded' }
-  }
-  return committed ? { kind: 'completed', changed: true, presentation: 'observed' } : { kind: 'navigation-rejected' }
+function resolveOpenWorkspacePaneStaticTabModel(input: ResolvedWorkspacePaneStaticTabOpenInput) {
+  return workspacePaneTabTargetForPaneTarget({
+    paneTarget: input.paneTarget,
+    routeTarget: input.routeTarget,
+    workspacePaneRoute: input.sourceRoute,
+    worktreeHead:
+      input.worktreeHead ??
+      (input.paneTarget.kind === 'git-worktree' && input.branchName
+        ? { kind: 'branch', branchName: input.branchName }
+        : undefined),
+  })
 }

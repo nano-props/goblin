@@ -1,9 +1,12 @@
 import { describe, expect, test, vi } from 'vitest'
-import { acquireWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
-import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
+import {
+  acquireWorkspaceRuntime,
+  captureWorkspaceRuntimeMembershipLease,
+  withWorkspaceRuntimeAdmission,
+} from '#/server/modules/workspace-runtimes.ts'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import {
-  DETACHED_TTL_MS,
+  CLIENT_STATE_GRACE_MS,
   REPO_ROOT,
   USER_1,
   USER_2,
@@ -11,20 +14,64 @@ import {
   WORKSPACE_RUNTIME_ID,
   appRealtimeSocket,
   buildRuntime,
-  commitTerminalReadyProbe,
   createAdmittedTerminal,
   createLocalWorktreeTerminal,
   createTerminalSession,
   mockPtys,
-  requestWorkspacePaneTabs,
-  setWorkspaceRuntimeId,
   startControlledTerminalRuntime,
-  workspacePaneTabsListInput,
 } from '#/server/test-utils/terminal-runtime.ts'
 
 describe('server terminal runtime user presence', () => {
+  test('expires committed membership when an already-offline client admission later fails', async () => {
+    useFakeTimers()
+    const { host, shutdown, socket } = await startControlledTerminalRuntime()
+    const admissionStarted = Promise.withResolvers<void>()
+    const finishAdmission = Promise.withResolvers<void>()
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    const admission = withWorkspaceRuntimeAdmission(USER_1, REPO_ROOT, 'client_a', async () => {
+      admissionStarted.resolve()
+      await finishAdmission.promise
+    })
+    await admissionStarted.promise
+
+    await advanceTimersAndFlush(CLIENT_STATE_GRACE_MS + 1)
+    expect(captureWorkspaceRuntimeMembershipLease(USER_1, 'client_a').entries).toEqual([])
+    finishAdmission.reject(new Error('admission failed'))
+    await expect(admission).rejects.toThrow('admission failed')
+    expect(captureWorkspaceRuntimeMembershipLease(USER_1, 'client_a').entries).toEqual([])
+
+    shutdown()
+  })
+
+  test('commits a fresh membership only after admission succeeds for an offline client', async () => {
+    useFakeTimers()
+    const { host, shutdown, socket } = await startControlledTerminalRuntime()
+    const admissionStarted = Promise.withResolvers<void>()
+    const finishAdmission = Promise.withResolvers<void>()
+
+    const admission = withWorkspaceRuntimeAdmission(USER_1, REPO_ROOT, 'client_a', async () => {
+      admissionStarted.resolve()
+      await finishAdmission.promise
+      return 'accepted'
+    })
+    await admissionStarted.promise
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    await advanceTimersAndFlush(CLIENT_STATE_GRACE_MS + 1)
+    expect(captureWorkspaceRuntimeMembershipLease(USER_1, 'client_a').entries).toEqual([])
+    finishAdmission.resolve()
+    await expect(admission).resolves.toBe('accepted')
+    expect(captureWorkspaceRuntimeMembershipLease(USER_1, 'client_a').entries).toHaveLength(1)
+
+    await advanceTimersAndFlush(CLIENT_STATE_GRACE_MS + 1)
+    expect(captureWorkspaceRuntimeMembershipLease(USER_1, 'client_a').entries).toEqual([])
+
+    shutdown()
+  })
+
   test('lists repo sessions across clients sharing a userId and broadcasts lifecycle invalidations to that user', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socketA = appRealtimeSocket()
     const socketB = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socketA)
@@ -60,7 +107,7 @@ describe('server terminal runtime user presence', () => {
   })
 
   test('isolates terminal session service reads and lifecycle broadcasts by userId', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const userASocket = appRealtimeSocket()
     const userBSocket = appRealtimeSocket()
     host.registerSocket('client_shared_attachment_a', USER_1, userASocket)
@@ -139,7 +186,7 @@ describe('server terminal runtime user presence', () => {
     shutdown()
   })
 
-  test('cleans up detached user sessions after the detached TTL elapses', async () => {
+  test('keeps a terminal after client authority expires so another client can recover it', async () => {
     useFakeTimers()
     const { host, shutdown, socket, terminalRuntimeSessionId } = await startControlledTerminalRuntime()
 
@@ -153,35 +200,29 @@ describe('server terminal runtime user presence', () => {
     expect(mockPtys).toHaveLength(1)
 
     host.unregisterSocket('client_a', USER_1, socket)
-    await advanceTimersAndFlush(DETACHED_TTL_MS + 1)
-    await vi.runOnlyPendingTimersAsync()
-    await Promise.resolve()
+    await advanceTimersAndFlush(CLIENT_STATE_GRACE_MS + 1)
 
     const socket2 = appRealtimeSocket()
     host.registerSocket('client_b', USER_1, socket2)
-    setWorkspaceRuntimeId(acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_b'))
-    commitTerminalReadyProbe(USER_1, REPO_ROOT, WORKSPACE_RUNTIME_ID)
+    expect(acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_b')).toBe(WORKSPACE_RUNTIME_ID)
     await expect(
-      requestWorkspacePaneTabs(
-        host,
-        socket2,
-        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-        workspacePaneTabsListInput(WORKSPACE_RUNTIME_ID),
-        'req_list_after_detached_ttl',
-        { clientId: 'client_b', userId: USER_1 },
-      ),
-    ).resolves.toMatchObject({ entries: [] })
+      host.listSessions('client_b', USER_1, {
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      }),
+    ).resolves.toEqual([expect.objectContaining({ terminalRuntimeSessionId, controller: null })])
 
-    const recreatedSessionId = await createTerminalSession(host, 'client_b')
     const replacementAttach = await host.attach('client_b', USER_1, {
-      terminalRuntimeSessionId: recreatedSessionId,
+      terminalRuntimeSessionId,
       terminalRuntimeGeneration: 1,
       cols: 80,
       rows: 24,
     })
-    expect(replacementAttach.ok).toBe(true)
-    if (!first.ok || !replacementAttach.ok) return
-    expect(replacementAttach.terminalRuntimeSessionId).not.toBe(first.terminalRuntimeSessionId)
+    expect(replacementAttach).toMatchObject({
+      ok: true,
+      terminalRuntimeSessionId,
+      controller: { clientId: 'client_b', status: 'connected' },
+    })
 
     host.unregisterSocket('client_b', USER_1, socket2)
     shutdown()
@@ -192,7 +233,7 @@ describe('server terminal runtime user presence', () => {
     // create); A's socket closes, so A is no longer the effective
     // controller. B then attaches and auto-claims without explicit
     // takeover because no effective controller is present.
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socketA = appRealtimeSocket()
     const socketB = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socketA)
@@ -233,7 +274,7 @@ describe('server terminal runtime user presence', () => {
     // briefly going offline") does not apply. The sibling claimed through the
     // ordinary attach rule while there was no effective controller. Recovery
     // for A is an explicit takeover; ordinary input cannot mutate control.
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socketA = appRealtimeSocket()
     const socketB = appRealtimeSocket()
     const socketAReconnect = appRealtimeSocket()
@@ -322,12 +363,10 @@ describe('server terminal runtime user presence', () => {
   test('viewer presence going offline leaves the current controller unchanged', async () => {
     // The previous revision had a grace sub-state that, on expiry,
     // would remove the offline viewer via `expireAttachment`.
-    // The current model has no per-attachment grace — only the
-    // detached TTL fires (after 24h), which is far longer than the
-    // test. The relevant invariant is that an offline viewer
-    // doesn't disturb the controller.
+    // Client-state expiry removes the offline viewer's attachment. The
+    // relevant invariant is that doing so does not disturb the controller.
     useFakeTimers()
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socketA = appRealtimeSocket()
     const socketB = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socketA)
@@ -355,9 +394,7 @@ describe('server terminal runtime user presence', () => {
     expect(viewerAttach.ok).toBe(true)
 
     host.unregisterSocket('client_b', USER_1, socketB)
-    // The detached TTL is 24h — far longer than any grace we used
-    // to have. Run a small tick to flush the socket-offline
-    // microtask without firing any timer.
+    // Flush the socket-offline microtask without firing the client-state timer.
     await Promise.resolve()
 
     const sessionsAfterExpiry = await host.listSessions('client_a', USER_1, {

@@ -195,20 +195,14 @@ describe('web invalidation sync', () => {
         }),
     )
 
-    const { subscribeSettingsInvalidationRefetch } = await import('#/web/settings-invalidation-refetch.ts')
-    const dispose = subscribeSettingsInvalidationRefetch({
-      scope: 'settings-snapshot',
-      fetch,
-      apply,
-      label: 'test-sync',
-    })
+    const { createSettingsProjectionOwner } = await import('#/web/settings-projection-owner.ts')
+    const owner = createSettingsProjectionOwner('test-sync')
+    const dispose = owner.subscribe({ scope: 'settings-snapshot', read: fetch, apply })
 
     emitServerMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
     emitServerMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
     emitServerMessage({ type: 'settings-invalidated', scopes: ['settings-snapshot'] })
-    await flushMicrotasks()
-
-    expect(fetch).toHaveBeenCalledTimes(1)
 
     const resolveFirstFetch = resolvers.shift()
     if (!resolveFirstFetch) throw new Error('Expected first fetch resolver')
@@ -227,5 +221,54 @@ describe('web invalidation sync', () => {
     })
 
     dispose()
+  })
+
+  test('settings projection owner serializes an accepted write after an older invalidation read', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+
+    const staleRead = Promise.withResolvers<string>()
+    const applied: string[] = []
+    const { createSettingsProjectionOwner } = await import('#/web/settings-projection-owner.ts')
+    const owner = createSettingsProjectionOwner('test-sync')
+    const dispose = owner.subscribe({
+      scope: 'theme',
+      read: async () => await staleRead.promise,
+      apply: (value) => {
+        applied.push(value)
+      },
+    })
+
+    emitServerMessage({ type: 'settings-invalidated', scopes: ['theme'] })
+    await flushMicrotasks()
+    const write = owner.run(() => {
+      applied.push('current')
+    })
+    staleRead.resolve('stale')
+    await write
+
+    expect(applied).toEqual(['stale', 'current'])
+    dispose()
+  })
+
+  test('disposed settings projection does not apply an in-flight read', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+
+    const read = Promise.withResolvers<string>()
+    const apply = vi.fn()
+    const { createSettingsProjectionOwner } = await import('#/web/settings-projection-owner.ts')
+    const owner = createSettingsProjectionOwner('test-sync')
+    const dispose = owner.subscribe({
+      scope: 'theme',
+      read: async () => await read.promise,
+      apply,
+    })
+
+    emitServerMessage({ type: 'settings-invalidated', scopes: ['theme'] })
+    await flushMicrotasks()
+    dispose()
+    read.resolve('stale')
+    await flushMicrotasks()
+
+    expect(apply).not.toHaveBeenCalled()
   })
 })

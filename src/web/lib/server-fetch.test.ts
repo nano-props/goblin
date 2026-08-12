@@ -6,6 +6,19 @@ import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 const fetchMock = mockFetch()
 const decodeJson = (value: unknown) => value
+type RequestKind = 'read' | 'post-query' | 'command'
+
+async function requestJson(kind: RequestKind, decode: (value: unknown) => unknown = decodeJson) {
+  const { fetchServerJson, postServerCommandJson, postServerJson } = await import('#/web/lib/server-fetch.ts')
+  switch (kind) {
+    case 'read':
+      return await fetchServerJson('/api/settings', decode)
+    case 'post-query':
+      return await postServerJson('/api/repo/snapshot', { cwd: '/repo' }, decode)
+    case 'command':
+      return await postServerCommandJson('/api/settings/prefs', { prefs: {} }, decode)
+  }
+}
 
 describe('server-fetch', () => {
   beforeEach(() => {
@@ -24,7 +37,7 @@ describe('server-fetch', () => {
 
     const { fetchServerJson } = await import('#/web/lib/server-fetch.ts')
     const request = fetchServerJson('/api/slow', decodeJson, { timeoutMs: 1_000 })
-    const assertion = expect(request).rejects.toThrow('error.request-timeout')
+    const assertion = expect(request).rejects.toMatchObject({ message: 'error.request-timeout' })
 
     await vi.advanceTimersByTimeAsync(1_000)
     await assertion
@@ -53,6 +66,59 @@ describe('server-fetch', () => {
 
     await assertion
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  test('preserves query cancellation while reading a successful response body', async () => {
+    const caller = new AbortController()
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        new Promise((_resolve, reject) => {
+          caller.signal.addEventListener('abort', () => reject(caller.signal.reason), { once: true })
+        }),
+    })
+
+    const { fetchServerJson } = await import('#/web/lib/server-fetch.ts')
+    const request = fetchServerJson('/api/settings', decodeJson, { signal: caller.signal })
+    await Promise.resolve()
+    caller.abort(new Error('caller cancelled'))
+
+    await expect(request).rejects.toBe(caller.signal.reason)
+  })
+
+  test('classifies command cancellation after fetch starts as indeterminate', async () => {
+    const caller = new AbortController()
+    fetchMock.mockImplementation((_url, init) => {
+      const signal = (init as RequestInit | undefined)?.signal
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    })
+
+    const { postServerCommandJson } = await import('#/web/lib/server-fetch.ts')
+    const request = postServerCommandJson('/api/settings/prefs', { prefs: {} }, decodeJson, {
+      signal: caller.signal,
+    })
+    await Promise.resolve()
+    caller.abort(new Error('caller cancelled'))
+
+    await expect(request).rejects.toMatchObject({
+      name: 'CodedError',
+      code: 'OUTCOME_UNCERTAIN',
+    })
+  })
+
+  test('preserves a command cancellation that happened before fetch admission', async () => {
+    const caller = new AbortController()
+    caller.abort(new Error('caller cancelled'))
+    fetchMock.mockRejectedValueOnce(caller.signal.reason)
+
+    const { postServerCommandJson } = await import('#/web/lib/server-fetch.ts')
+
+    await expect(
+      postServerCommandJson('/api/settings/prefs', { prefs: {} }, decodeJson, { signal: caller.signal }),
+    ).rejects.toBe(caller.signal.reason)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   test('clears the watchdog after a successful response', async () => {
@@ -122,5 +188,51 @@ describe('server-fetch', () => {
       status: 400,
       code: 'BAD_REQUEST',
     } satisfies Partial<InstanceType<typeof ServerRequestError>>)
+  })
+
+  test.each([
+    {
+      label: 'read request',
+      kind: 'read' as const,
+      expected: { name: 'Error', message: 'Server request failed' },
+    },
+    {
+      label: 'POST query',
+      kind: 'post-query' as const,
+      expected: { name: 'Error', message: 'Server request failed' },
+    },
+    {
+      label: 'command',
+      kind: 'command' as const,
+      expected: { name: 'CodedError', code: 'OUTCOME_UNCERTAIN' },
+    },
+  ])('classifies a transport failure for a $label', async ({ kind, expected }) => {
+    fetchMock.mockRejectedValueOnce(new Error('connection reset'))
+
+    await expect(requestJson(kind)).rejects.toMatchObject(expected)
+  })
+
+  test.each([
+    {
+      label: 'read response',
+      kind: 'read' as const,
+      expected: { name: 'Error', message: 'Server returned an invalid successful response' },
+    },
+    {
+      label: 'command response',
+      kind: 'command' as const,
+      expected: { name: 'CodedError', code: 'OUTCOME_UNCERTAIN' },
+    },
+  ])('classifies an invalid successful $label', async ({ kind, expected }) => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ok: true }),
+    })
+
+    await expect(
+      requestJson(kind, () => {
+        throw new Error('invalid payload')
+      }),
+    ).rejects.toMatchObject(expected)
   })
 })

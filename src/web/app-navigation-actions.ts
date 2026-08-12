@@ -59,16 +59,10 @@ export interface FilesystemWorkspacePaneRouteCommitActions extends WorkspacePane
 }
 
 export interface AppNavigationActions extends FilesystemWorkspacePaneRouteCommitActions {
-  activateWorkspace: (workspaceId: WorkspaceId) => void
+  activateWorkspace: (workspaceId: WorkspaceId, options?: Pick<AppNavigationOptions, 'navigationGeneration'>) => void
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   cycleWorkspace: (direction: 1 | -1) => void
   selectRepoBranch: (workspaceId: WorkspaceId, branch: string, options?: { replace?: boolean }) => boolean
-  showRepoWorktreeTerminalSession: (
-    workspaceId: WorkspaceId,
-    worktreePath: string,
-    terminalSessionId: string,
-    options?: AppNavigationOptions,
-  ) => boolean
   showWorkspaceRootPaneTab: (
     workspaceId: WorkspaceId,
     presentation: WorkspaceRootPanePresentation,
@@ -126,8 +120,8 @@ export function createAppNavigationActions({
     currentWorkspacePaneRoute(workspaceId, branchName) {
       return routeNavigation.currentWorkspacePaneRoute(workspaceId, branchName)
     },
-    activateWorkspace(workspaceId) {
-      const navigationGeneration = beginAppNavigation()
+    activateWorkspace(workspaceId, options) {
+      const navigationGeneration = options?.navigationGeneration ?? beginAppNavigation()
       restoreWorkspacePresentationOrOpenDashboard(workspaceId, routeNavigation, navigationGeneration, {
         onBlocked: 'stay',
       })
@@ -157,13 +151,6 @@ export function createAppNavigationActions({
     selectRepoBranch(workspaceId, branch, options) {
       const navigationGeneration = beginAppNavigation()
       return openWorkspacePaneRoute(routeNavigation, workspaceId, branch, { ...options, navigationGeneration })
-    },
-    showRepoWorktreeTerminalSession(workspaceId, worktreePath, terminalSessionId, options) {
-      const generation = options?.navigationGeneration ?? beginAppNavigation()
-      return routeNavigation.openRepoWorktreeTerminal(workspaceId, worktreePath, terminalSessionId, {
-        ...options,
-        navigationGeneration: generation,
-      })
     },
     showWorkspaceRootPaneTab(workspaceId, presentation, options) {
       const generation = options?.navigationGeneration ?? beginAppNavigation()

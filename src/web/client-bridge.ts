@@ -1,5 +1,5 @@
 import type { ClientNativeCapability } from '#/shared/bootstrap.ts'
-import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
+import type { IpcRequest } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ClientHostBridge, ClientBridge } from '#/web/client-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
@@ -155,11 +155,6 @@ function createClientBridge(): ClientBridge {
       if (!bridge) return false
       return bridge.abortIpc(requestId)
     },
-    onIpcEvent(cb: (event: IpcEvent) => void) {
-      const bridge = readNativeBridge()
-      if (!bridge) return () => {}
-      return bridge.onEvent(cb)
-    },
     onEffectIntent(cb: (event: ClientEffectIntent) => void) {
       const bridge = readNativeBridge()
       return bridge ? bridge.onIntent(cb) : () => {}
@@ -172,6 +167,11 @@ function createClientBridge(): ClientBridge {
     saveClipboardFiles(files: File[]) {
       if (!clipboardBackend) throw new Error('Clipboard file persistence is unavailable')
       return clipboardBackend.saveClipboardFiles(files)
+    },
+    async getAccessTokenProjection() {
+      const bridge = readNativeBridge()
+      if (!bridge) throw new Error('Token projection is unavailable in this runtime')
+      return await bridge.getAccessTokenProjection()
     },
     async rotateAccessToken() {
       const bridge = readNativeBridge()

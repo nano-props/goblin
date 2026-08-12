@@ -4,7 +4,7 @@ import {
   ClientRealtimeRequestError,
   type ClientRealtimeRequestFailureKind,
 } from '#/web/realtime/client-realtime-request-error.ts'
-import type { RealtimeRpcAction, RealtimeRpcOutputs } from '#/shared/realtime-rpc.ts'
+import type { RealtimeRpcAction, RealtimeRpcOutputs, RealtimeRpcResponseMessage } from '#/shared/realtime-rpc.ts'
 
 const CLIENT_REALTIME_LIVENESS_PROBE_INTERVAL_MS = 30_000
 const REALTIME_SOCKET_OPEN_TIMEOUT_MS = 10_000
@@ -23,22 +23,6 @@ type PendingSocketRequest<TAction extends string, TValue> = {
   timeout: ReturnType<typeof setTimeout>
 }
 
-type RealtimeResponseMessage<TAction extends string> =
-  | {
-      type: 'response'
-      requestId: string
-      ok: true
-      action: TAction
-      payload: unknown
-    }
-  | {
-      type: 'response'
-      requestId: string
-      ok: false
-      action: TAction
-      error: string
-    }
-
 type RealtimePongMessage = { type: 'pong'; requestId: string }
 type SocketDemandIntent = 'open-now' | 'reconnect' | 'idle'
 
@@ -53,7 +37,7 @@ export interface ClientRealtimeSocketConnectionOptions<
   onRealtimeMessage(message: TRealtimeMessage, currentClientId: string): void
   parseServerMessage(
     data: unknown,
-  ): TRealtimeMessage | RealtimeResponseMessage<RealtimeRpcAction<TInputs>> | RealtimePongMessage | null
+  ): TRealtimeMessage | RealtimeRpcResponseMessage<TInputs, TOutputs> | RealtimePongMessage | null
   encodeClientMessage(message: unknown): string
   createRequestId(): string
   errorPrefix: string
@@ -277,10 +261,10 @@ export function createClientRealtimeSocketConnection<
   }
 
   function handleSocketMessage(
-    message: TRealtimeMessage | RealtimeResponseMessage<Action> | RealtimePongMessage,
+    message: TRealtimeMessage | RealtimeRpcResponseMessage<TInputs, TOutputs> | RealtimePongMessage,
     currentClientId: string,
   ): void {
-    if (isRealtimeResponseMessage<Action>(message)) {
+    if (isRealtimeResponseMessage<TInputs, TOutputs>(message)) {
       settleSocketRequest(message)
       return
     }
@@ -352,13 +336,24 @@ export function createClientRealtimeSocketConnection<
     reconcileSocketDemand('idle')
   }
 
-  function settleSocketRequest(message: RealtimeResponseMessage<Action>) {
+  function settleSocketRequest(message: RealtimeRpcResponseMessage<TInputs, TOutputs>) {
     const pending = pendingSocketRequests.get(message.requestId)
     if (!pending || pending.action !== message.action) return
     pendingSocketRequests.delete(message.requestId)
     clearTimeout(pending.timeout)
-    if (message.ok) pending.resolve(message.payload as Output)
-    else pending.reject(new Error(message.error))
+    if (message.ok) {
+      pending.resolve(message.payload)
+    } else if ('outcome' in message) {
+      pending.reject(
+        new ClientRealtimeRequestError(message.error, {
+          kind: 'invalid-response',
+          delivery: 'indeterminate',
+          outageId: null,
+        }),
+      )
+    } else {
+      pending.reject(new Error(message.error))
+    }
     closeSocketIfIdle()
   }
 
@@ -492,7 +487,9 @@ export function createClientRealtimeSocketConnection<
   }
 }
 
-function isRealtimeResponseMessage<TAction extends string>(value: unknown): value is RealtimeResponseMessage<TAction> {
+function isRealtimeResponseMessage<TInputs extends object, TOutputs extends RealtimeRpcOutputs<TInputs>>(
+  value: unknown,
+): value is RealtimeRpcResponseMessage<TInputs, TOutputs> {
   if (!value || typeof value !== 'object') return false
   const message = value as { type?: unknown; requestId?: unknown; action?: unknown; ok?: unknown }
   return (

@@ -1,5 +1,5 @@
 import { openExternalUrl } from '#/web/app-shell-client.ts'
-import { SERVER_REQUEST_TIMEOUT_ERROR, postServerJson } from '#/web/lib/server-fetch.ts'
+import { SERVER_REQUEST_TIMEOUT_ERROR, postServerCommandJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   CloneRepoResult,
   RepoOperationsSnapshot,
@@ -15,6 +15,7 @@ import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { REPO_MEMBERSHIP_READ_CONFLICT_KEY } from '#/shared/repo-membership-read.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
 import {
   decodeWith,
@@ -60,11 +61,12 @@ export async function cloneRepository(
   options?: { signal?: AbortSignal },
 ): Promise<CloneRepoResult> {
   try {
-    return await postServerJson('/api/repo/clone', input, decodeWith(CloneRepoResponseSchema), {
+    return await postServerCommandJson('/api/repo/clone', input, decodeWith(CloneRepoResponseSchema), {
       signal: options?.signal,
       timeoutMs: REPO_REQUEST_TIMEOUT_MS.clone,
     })
   } catch (err) {
+    if (hasErrorCode(err, 'OUTCOME_UNCERTAIN')) throw err
     if (err instanceof Error && err.message === SERVER_REQUEST_TIMEOUT_ERROR) {
       return { ok: false, message: SERVER_REQUEST_TIMEOUT_ERROR }
     }
@@ -174,7 +176,7 @@ export async function fetchRepo(
   workspaceRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<RepoMutationExecResult> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/repo/fetch',
     { cwd, workspaceRuntimeId },
     decodeWith(RepoMutationExecResultResponseSchema),
@@ -192,7 +194,7 @@ export async function pullRepoBranch(
   worktreePath?: string,
   signal?: AbortSignal,
 ): Promise<RepoMutationExecResult> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/repo/pull',
     { cwd, workspaceRuntimeId, branch, worktreePath },
     decodeWith(RepoMutationExecResultResponseSchema),
@@ -206,7 +208,7 @@ export async function pushRepoBranch(
   branch: string,
   signal?: AbortSignal,
 ): Promise<RepoMutationExecResult> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/repo/push',
     { cwd, workspaceRuntimeId, branch },
     decodeWith(RepoMutationExecResultResponseSchema),
@@ -224,7 +226,7 @@ export async function createRepoWorktree(
   worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
 ): Promise<RepoMutationExecResult> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/repo/create-worktree',
     { cwd, workspaceRuntimeId, ...input, worktreeBootstrap },
     decodeWith(RepoMutationExecResultResponseSchema),
@@ -254,7 +256,7 @@ export async function deleteRepoBranch(
   options?: { force?: boolean; deleteUpstream?: boolean },
   signal?: AbortSignal,
 ): Promise<RepoMutationExecResult> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/repo/delete-branch',
     { cwd, workspaceRuntimeId, branch, force: options?.force, deleteUpstream: options?.deleteUpstream },
     decodeWith(RepoMutationExecResultResponseSchema),
@@ -277,7 +279,7 @@ export async function removeRepoWorktree(
   },
   signal?: AbortSignal,
 ): Promise<RepoMutationExecResult> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/repo/remove-worktree',
     { cwd, workspaceRuntimeId, ...options },
     decodeWith(RepoMutationExecResultResponseSchema),
@@ -320,7 +322,7 @@ export async function openRepoUrl(
 }
 
 export async function setBackgroundSyncRepos(targets: GitBackgroundSyncTarget[], signal?: AbortSignal): Promise<void> {
-  await postServerJson(
+  await postServerCommandJson(
     '/api/repo/background-sync-repos',
     {
       clientId: readClientPageId(),

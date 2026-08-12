@@ -66,7 +66,7 @@ const WorkspacePaneRuntimeCloseResultSchema = v.variant('ok', [
         terminalSessionId: v.pipe(v.string(), v.minLength(1)),
       }),
     ]),
-    paneTabsSnapshot: WorkspacePaneTabsSnapshotSchema,
+    paneTabsSnapshot: v.nullable(WorkspacePaneTabsSnapshotSchema),
   }),
   v.strictObject({
     ok: v.literal(false),
@@ -91,10 +91,7 @@ export function normalizeWorkspacePaneRuntimeCloseInput(value: unknown): Workspa
   return target && target.kind !== 'git-branch' ? { ...parsed.output, target: { target } } : null
 }
 
-export function normalizeWorkspacePaneRuntimeOpenResult(
-  value: unknown,
-  expectedTarget?: TerminalExecutionTarget,
-): WorkspacePaneRuntimeOpenResult | null {
+export function normalizeWorkspacePaneRuntimeOpenResult(value: unknown): WorkspacePaneRuntimeOpenResult | null {
   const parsed = v.safeParse(WorkspacePaneRuntimeOpenResultEnvelopeSchema, value)
   if (!parsed.success) return null
   if (!parsed.output.ok) return parsed.output
@@ -107,8 +104,6 @@ export function normalizeWorkspacePaneRuntimeOpenResult(
   if (owners.length !== 1) return null
   const owner = owners[0]
   if (!owner || owner.target.kind === 'git-branch' || owner.target.kind !== runtime.presentation.kind) return null
-  if (expectedTarget && runtimeWorkspacePaneTargetKey(owner.target) !== runtimeWorkspacePaneTargetKey(expectedTarget))
-    return null
   return { ...parsed.output, runtime, paneTabsSnapshot }
 }
 
@@ -116,6 +111,7 @@ export function normalizeWorkspacePaneRuntimeCloseResult(value: unknown): Worksp
   const parsed = v.safeParse(WorkspacePaneRuntimeCloseResultSchema, value)
   if (!parsed.success) return null
   if (!parsed.output.ok) return parsed.output
+  if (parsed.output.paneTabsSnapshot === null) return parsed.output
   const paneTabsSnapshot = normalizeWorkspacePaneTabsSnapshot(parsed.output.paneTabsSnapshot)
   if (!paneTabsSnapshot) return null
   const closedTerminalSessionId = parsed.output.runtime.terminalSessionId
@@ -123,4 +119,24 @@ export function normalizeWorkspacePaneRuntimeCloseResult(value: unknown): Worksp
     entry.tabs.some((tab) => isWorkspacePaneRuntimeTabEntry(tab) && tab.runtimeSessionId === closedTerminalSessionId),
   )
   return stillOwned ? null : { ...parsed.output, paneTabsSnapshot }
+}
+
+export function workspacePaneRuntimeOpenResultMatchesRequest(
+  result: WorkspacePaneRuntimeOpenResult,
+  expectedTarget: TerminalExecutionTarget,
+): boolean {
+  if (!result.ok) return true
+  const owner = result.paneTabsSnapshot.entries.find((entry) =>
+    entry.tabs.some(
+      (tab) => isWorkspacePaneRuntimeTabEntry(tab) && tab.runtimeSessionId === result.runtime.terminalSessionId,
+    ),
+  )
+  return !!owner && runtimeWorkspacePaneTargetKey(owner.target) === runtimeWorkspacePaneTargetKey(expectedTarget)
+}
+
+export function workspacePaneRuntimeCloseResultMatchesRequest(
+  result: WorkspacePaneRuntimeCloseResult,
+  expectedTerminalSessionId: string,
+): boolean {
+  return !result.ok || result.runtime.terminalSessionId === expectedTerminalSessionId
 }

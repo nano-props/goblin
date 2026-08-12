@@ -42,10 +42,15 @@ import type {
   TerminalFilesystemTargetSnapshot,
   TerminalSnapshot,
   TerminalVirtualKey,
+  WorkspaceTerminalSessionSummary,
 } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneTabCloseOutcome } from '#/web/workspace-pane/workspace-pane-tab-close-outcome.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   terminalPresentationBranch,
+  terminalSessionBase,
   terminalSessionCoordinates,
+  type TerminalPresentation,
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
 import { terminalCreateDedupeKey } from '#/web/components/terminal/terminal-create-dedupe.ts'
@@ -56,7 +61,10 @@ import type {
 } from '#/shared/workspace-pane-runtime.ts'
 import { workspacePaneRuntimeClient } from '#/web/workspace-pane/workspace-pane-runtime-client.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
-import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import {
+  workspacePaneTabsAfterSnapshotCommit,
+  writeCanonicalWorkspacePaneTabsSnapshot,
+} from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { createTerminalWriteFailureReporter } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
 import { terminalDescriptorFilesystemTargetKey } from '#/web/components/terminal/terminal-descriptor.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -120,7 +128,7 @@ interface TerminalRuntimeBindingIdentity {
 
 interface TerminalCloseOperation {
   binding: TerminalRuntimeBindingIdentity
-  promise: Promise<boolean>
+  promise: Promise<WorkspacePaneTabCloseOutcome>
 }
 
 function terminalRuntimeBindingKey(binding: TerminalRuntimeBindingIdentity): string {
@@ -169,6 +177,8 @@ export class TerminalSessionProjection {
   private readonly snapshotCache = new Map<string, TerminalSnapshot>()
   private readonly filesystemTargetSnapshotCache = new Map<string, TerminalFilesystemTargetSnapshot>()
   private readonly filesystemTargetListeners = new Map<string, Set<() => void>>()
+  private readonly workspaceTerminalSessionsCache = new Map<WorkspaceId, WorkspaceTerminalSessionSummary[]>()
+  private readonly workspaceTerminalSessionsListeners = new Map<WorkspaceId, Set<() => void>>()
   private readonly workspaceBellCountListeners = new Map<WorkspaceId, Set<() => void>>()
   // Selector publication cache only. The unread bell source of truth
   // stays in `bellState`; this stores the last count delivered to
@@ -237,6 +247,8 @@ export class TerminalSessionProjection {
     this.snapshotCache.clear()
     this.filesystemTargetSnapshotCache.clear()
     this.filesystemTargetListeners.clear()
+    this.workspaceTerminalSessionsCache.clear()
+    this.workspaceTerminalSessionsListeners.clear()
     this.workspaceBellCountListeners.clear()
     this.lastPublishedWorkspaceBellCount.clear()
     this.snapshotListeners.clear()
@@ -479,6 +491,69 @@ export class TerminalSessionProjection {
     return true
   }
 
+  private applyCreateProjection(
+    scope: WorkspaceRuntimeScope,
+    effect: TerminalProjectionEffect,
+    serverSession: ServerTerminalSessionSummary,
+    clientId: string,
+  ): TerminalPresentation | null {
+    if (effect.kind === 'none' && this.sessions.has(serverSession.terminalSessionId)) {
+      return this.hydrateExistingCreateProjection(scope, serverSession, clientId)
+    }
+    this.applyServerSessionEffect(scope, effect, serverSession, clientId)
+    return this.currentServerSessionPresentation(scope, serverSession)
+  }
+
+  private hydrateExistingCreateProjection(
+    scope: WorkspaceRuntimeScope,
+    serverSession: ServerTerminalSessionSummary,
+    clientId: string,
+  ): TerminalPresentation | null {
+    const presentation = this.currentServerSessionPresentation(scope, serverSession)
+    if (!presentation) return null
+    const session = this.sessions.get(serverSession.terminalSessionId)
+    if (!session) return null
+    const projected = projectServerTerminalSession({
+      workspaceId: scope.workspaceId,
+      workspaceRuntimeId: scope.workspaceRuntimeId,
+      serverSession,
+      clientId,
+      index: session.descriptor.index,
+    })
+    if (!projected) return null
+    session.hydrate(projected.hydrateInput, 'partial-effect')
+    if (!this.sessions.has(serverSession.terminalSessionId)) return null
+    const controllerTerminalSessionIdByFilesystemTarget = new Map<string, string>()
+    if (session.controlsTerminal()) {
+      controllerTerminalSessionIdByFilesystemTarget.set(
+        projected.terminalFilesystemTargetKey,
+        serverSession.terminalSessionId,
+      )
+    }
+    this.resolveSelectedTerminalSessionIdsForTouchedFilesystemTargets(
+      new Set([projected.terminalFilesystemTargetKey]),
+      controllerTerminalSessionIdByFilesystemTarget,
+    )
+    return session.descriptor.presentation
+  }
+
+  private currentServerSessionPresentation(
+    scope: WorkspaceRuntimeScope,
+    serverSession: ServerTerminalSessionSummary,
+  ): TerminalPresentation | null {
+    if (this.runtimeMembershipIndex.get(scope.workspaceId)?.workspaceRuntimeId !== scope.workspaceRuntimeId) return null
+    const session = this.sessions.get(serverSession.terminalSessionId)
+    if (!session) return null
+    if (session.descriptor.target.kind !== serverSession.target.kind) return null
+    const currentCoordinates = terminalSessionCoordinates(session.descriptor)
+    const expectedCoordinates = terminalSessionCoordinates(serverSession)
+    const coordinatesAreCurrent =
+      currentCoordinates.workspaceId === expectedCoordinates.workspaceId &&
+      currentCoordinates.workspaceRuntimeId === expectedCoordinates.workspaceRuntimeId &&
+      currentCoordinates.executionRootId === expectedCoordinates.executionRootId
+    return coordinatesAreCurrent ? session.descriptor.presentation : null
+  }
+
   // Phase 1: for each server session, ensure a local TerminalSession
   // exists, hydrate it with the latest server-side metadata, and track
   // which filesystem targets saw any change. Side effects: ensureSession,
@@ -666,34 +741,40 @@ export class TerminalSessionProjection {
       ...request.placement,
     })
     if (!openResult.ok) throw new Error(openResult.message)
-    writeCanonicalWorkspacePaneTabsSnapshot(
-      terminalSessionCoordinates(base).workspaceId,
-      terminalSessionCoordinates(base).workspaceRuntimeId,
+    const coordinates = terminalSessionCoordinates(base)
+    const paneTabsProjection = writeCanonicalWorkspacePaneTabsSnapshot(
+      coordinates.workspaceId,
+      coordinates.workspaceRuntimeId,
       openResult.paneTabsSnapshot,
     )
     const result = openResult.runtime
     if (!result.terminalRuntimeSessionId) throw new Error('error.terminal-create-failed')
-    let runtimeProjectionApplied = false
-    if (this.lifecycleQueues.getCreate(terminalFilesystemTargetKey) === pending) {
-      const projectedCreate = projectCreateResultForClient(base, result)
-      if (this.lifecycleQueues.getCreate(terminalFilesystemTargetKey) === pending) {
-        runtimeProjectionApplied = this.applyServerSessionEffect(
-          {
-            workspaceId: terminalSessionCoordinates(base).workspaceId,
-            workspaceRuntimeId: terminalSessionCoordinates(base).workspaceRuntimeId,
-          },
-          result.terminalProjectionEffect,
-          projectedCreate.serverSession,
-          clientId,
+    const paneTarget = workspacePaneTabsTargetFromRuntime(base.target)
+    const currentTabs = paneTarget
+      ? workspacePaneTabsAfterSnapshotCommit(
+          paneTabsProjection,
+          { ...paneTarget, workspaceRuntimeId: coordinates.workspaceRuntimeId },
+          openResult.paneTabsSnapshot,
         )
-        if (runtimeProjectionApplied) {
-          this.setPreferredSelectedTerminalSessionId(terminalFilesystemTargetKey, result.terminalSessionId)
-        }
-      }
+      : null
+    const createdTabIsCurrent =
+      currentTabs?.some((tab) => tab.type === 'terminal' && tab.runtimeSessionId === result.terminalSessionId) ?? false
+    const scope = {
+      workspaceId: coordinates.workspaceId,
+      workspaceRuntimeId: coordinates.workspaceRuntimeId,
+    }
+    const projectedCreate = createdTabIsCurrent ? projectCreateResultForClient(base, result) : null
+    const authoritativePresentation =
+      projectedCreate && this.lifecycleQueues.getCreate(terminalFilesystemTargetKey) === pending
+        ? this.applyCreateProjection(scope, result.terminalProjectionEffect, projectedCreate.serverSession, clientId)
+        : null
+    const runtimeProjectionApplied = authoritativePresentation !== null
+    if (runtimeProjectionApplied) {
+      this.setPreferredSelectedTerminalSessionId(terminalFilesystemTargetKey, result.terminalSessionId)
     }
     return {
       terminalSessionId: result.terminalSessionId,
-      presentation: result.presentation,
+      presentation: authoritativePresentation ?? result.presentation,
       resourceDisposition: result.action,
       runtimeProjectionApplied,
     }
@@ -821,6 +902,30 @@ export class TerminalSessionProjection {
     return this.subscribeToKeyedListeners(this.filesystemTargetListeners, terminalFilesystemTargetKey, listener)
   }
 
+  workspaceTerminalSessions = (workspaceId: WorkspaceId): WorkspaceTerminalSessionSummary[] => {
+    const cached = this.workspaceTerminalSessionsCache.get(workspaceId)
+    if (cached) return cached
+    const summaries: WorkspaceTerminalSessionSummary[] = []
+    for (const session of this.sessions.values()) {
+      if (terminalSessionCoordinates(session.descriptor).workspaceId !== workspaceId) continue
+      const terminalFilesystemTargetKey = terminalDescriptorFilesystemTargetKey(session.descriptor)
+      const summary = this.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey).sessions.find(
+        (candidate) => candidate.terminalSessionId === session.descriptor.terminalSessionId,
+      )
+      if (!summary) continue
+      summaries.push({
+        ...summary,
+        base: terminalSessionBase(session.descriptor.target, session.descriptor.presentation),
+      })
+    }
+    this.workspaceTerminalSessionsCache.set(workspaceId, summaries)
+    return summaries
+  }
+
+  subscribeWorkspaceTerminalSessions = (workspaceId: WorkspaceId, listener: () => void): (() => void) => {
+    return this.subscribeToKeyedListeners(this.workspaceTerminalSessionsListeners, workspaceId, listener)
+  }
+
   workspaceBellCount = (workspaceId: WorkspaceId): number => {
     let count = 0
     for (const session of this.sessions.values()) {
@@ -867,7 +972,10 @@ export class TerminalSessionProjection {
     return this.sessions.get(terminalSessionId)?.readCopyText() ?? null
   }
 
-  closeTerminalByDescriptor = async (terminalSessionId: string, base: TerminalSessionBase): Promise<boolean> => {
+  closeTerminalByDescriptor = async (
+    terminalSessionId: string,
+    base: TerminalSessionBase,
+  ): Promise<WorkspacePaneTabCloseOutcome> => {
     return await this.closeTerminalRuntimeTab(terminalSessionId, base)
   }
 
@@ -987,7 +1095,23 @@ export class TerminalSessionProjection {
       }
     }
     const workspaceId = parseTerminalFilesystemTargetKey(terminalFilesystemTargetKey)?.workspaceId
-    if (workspaceId) this.notifyWorkspaceBellCountIfChanged(workspaceId)
+    if (workspaceId) {
+      this.notifyWorkspaceTerminalSessions(workspaceId)
+      this.notifyWorkspaceBellCountIfChanged(workspaceId)
+    }
+  }
+
+  private notifyWorkspaceTerminalSessions(workspaceId: WorkspaceId): void {
+    this.workspaceTerminalSessionsCache.delete(workspaceId)
+    const listeners = this.workspaceTerminalSessionsListeners.get(workspaceId)
+    if (!listeners) return
+    for (const listener of Array.from(listeners)) {
+      try {
+        listener()
+      } catch (err) {
+        terminalSessionProviderLog.warn('workspace terminal sessions listener threw', { workspaceId, err })
+      }
+    }
   }
 
   private notifySnapshot(terminalSessionId: string): void {
@@ -1129,14 +1253,17 @@ export class TerminalSessionProjection {
     return true
   }
 
-  private async closeTerminalRuntimeTab(terminalSessionId: string, base: TerminalSessionBase): Promise<boolean> {
+  private async closeTerminalRuntimeTab(
+    terminalSessionId: string,
+    base: TerminalSessionBase,
+  ): Promise<WorkspacePaneTabCloseOutcome> {
     const binding = this.runtimeBindingForClose(terminalSessionId, base)
     const bindingKey = terminalRuntimeBindingKey(binding)
     const pending = this.closeOperationByRuntimeBindingKey.get(bindingKey)
     if (pending) return pending.promise
-    let resolve!: (value: boolean) => void
+    let resolve!: (value: WorkspacePaneTabCloseOutcome) => void
     let reject!: (error: unknown) => void
-    const promise = new Promise<boolean>((innerResolve, innerReject) => {
+    const promise = new Promise<WorkspacePaneTabCloseOutcome>((innerResolve, innerReject) => {
       resolve = innerResolve
       reject = innerReject
     })
@@ -1156,28 +1283,41 @@ export class TerminalSessionProjection {
     terminalSessionId: string,
     base: TerminalSessionBase,
     requestedBinding: TerminalRuntimeBindingIdentity,
-  ): Promise<boolean> {
-    let result: WorkspacePaneRuntimeCloseResult
-    try {
-      result = await workspacePaneRuntimeClient.close({
-        runtimeType: 'terminal',
-        sessionId: terminalSessionId,
-        target: {
-          target: base.target,
-        },
-      })
-    } catch (err) {
-      terminalSessionProviderLog.warn('terminal close failed', { terminalSessionId, err })
-      return false
-    }
-    if (!result.ok) return false
-    writeCanonicalWorkspacePaneTabsSnapshot(
-      terminalSessionCoordinates(base).workspaceId,
-      terminalSessionCoordinates(base).workspaceRuntimeId,
-      result.paneTabsSnapshot,
-    )
+  ): Promise<WorkspacePaneTabCloseOutcome> {
+    const result: WorkspacePaneRuntimeCloseResult = await workspacePaneRuntimeClient.close({
+      runtimeType: 'terminal',
+      sessionId: terminalSessionId,
+      target: {
+        target: base.target,
+      },
+    })
+    if (!result.ok) return { kind: 'not-committed', message: result.message }
+    const coordinates = terminalSessionCoordinates(base)
+    const projection = result.paneTabsSnapshot
+      ? writeCanonicalWorkspacePaneTabsSnapshot(
+          coordinates.workspaceId,
+          coordinates.workspaceRuntimeId,
+          result.paneTabsSnapshot,
+        )
+      : null
     this.applyClosedServerSessionEffect(base, result.runtime, requestedBinding)
-    return true
+    if (!result.paneTabsSnapshot) return { kind: 'committed', projection: 'failed' }
+    const target = workspacePaneTabsTargetFromRuntime(base.target)
+    const currentTabs =
+      target && projection
+        ? workspacePaneTabsAfterSnapshotCommit(
+            projection,
+            { ...target, workspaceRuntimeId: coordinates.workspaceRuntimeId },
+            result.paneTabsSnapshot,
+          )
+        : null
+    if (
+      !currentTabs ||
+      currentTabs.some((tab) => tab.type === 'terminal' && tab.runtimeSessionId === terminalSessionId)
+    ) {
+      return { kind: 'committed', projection: 'superseded' }
+    }
+    return { kind: 'committed', projection: 'applied' }
   }
 
   private applyClosedServerSessionEffect(

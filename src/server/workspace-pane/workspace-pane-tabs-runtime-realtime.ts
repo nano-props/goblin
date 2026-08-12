@@ -18,9 +18,6 @@ export function createWorkspacePaneTabsRealtimeHandlers(
     [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list](clientId, userId, input) {
       return host.listWorkspaceTabs(clientId, userId, input)
     },
-    [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace](clientId, userId, input) {
-      return host.replaceTabs(clientId, userId, input)
-    },
     [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update](clientId, userId, input) {
       return host.updateTabs(clientId, userId, input)
     },

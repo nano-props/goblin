@@ -8,7 +8,6 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export const WORKSPACE_PANE_TABS_SOCKET_ACTIONS = {
   list: 'workspace-pane-tabs.list',
-  replace: 'workspace-pane-tabs.replace',
   update: 'workspace-pane-tabs.update',
 } as const
 
@@ -70,11 +69,6 @@ export interface WorkspacePaneTabsListInput {
   workspaceRuntimeId: string
 }
 
-export interface WorkspacePaneTabsReplaceInput extends WorkspacePaneTabsListInput {
-  target: RuntimeWorkspacePaneTarget
-  tabs: WorkspacePaneTabEntry[]
-}
-
 export type WorkspacePaneTabsUpdateOperation =
   | {
       type: 'open-static'
@@ -117,14 +111,15 @@ export interface WorkspacePaneTabsSnapshot {
   entries: WorkspacePaneTabsEntry[]
 }
 
+export type WorkspacePaneTabsWriteResult =
+  { kind: 'projected'; snapshot: WorkspacePaneTabsSnapshot } | { kind: 'committed-projection-failed' }
+
 export interface WorkspacePaneTabsSocketRequestInputs {
   'workspace-pane-tabs.list': WorkspacePaneTabsListInput
-  'workspace-pane-tabs.replace': WorkspacePaneTabsReplaceInput
   'workspace-pane-tabs.update': WorkspacePaneTabsUpdateInput
 }
 
 export interface WorkspacePaneTabsSocketResponseOutputs {
   'workspace-pane-tabs.list': WorkspacePaneTabsSnapshot
-  'workspace-pane-tabs.replace': WorkspacePaneTabsSnapshot
-  'workspace-pane-tabs.update': WorkspacePaneTabsSnapshot
+  'workspace-pane-tabs.update': WorkspacePaneTabsWriteResult
 }

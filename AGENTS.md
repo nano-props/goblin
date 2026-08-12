@@ -32,6 +32,14 @@
   boundary tightening should be reviewed separately from mechanical cleanup.
   This is a readability guideline, not a destructuring ban or a static-check
   requirement.
+- Prefer expression-oriented value construction when branches only compute a
+  result: return or map each branch to a value bound with `const`, then perform
+  the side effect at one explicit commit point. Avoid declaring an outer `let`
+  solely so `if`, `try/catch`, or Promise branches can assign it. For async
+  work, map rejection to a value only when failure genuinely has that domain
+  meaning; otherwise let the error fail fast. Keep `let` when mutation or
+  accumulation is the clearest representation, and do not replace it with a
+  denser conditional or Promise chain that is harder to read.
 
 ## Engineering approach
 

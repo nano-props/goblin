@@ -7,7 +7,8 @@
 // flush from `main.ts`'s before-quit handler captures the last move
 // before exit (without it the very last drag is truncated).
 
-import { BrowserWindow, app, screen } from 'electron'
+import { BrowserWindow, app, ipcMain, screen } from 'electron'
+import type { WebFrameMain } from 'electron'
 import { loadWindowState, setWindowBounds, type WindowBounds } from '#/main/window-state.ts'
 import { attachClientSurfaceWindow, detachClientSurfaceWindow } from '#/main/client-surface.ts'
 import { plantEmbedAuthCookie } from '#/main/cookie-bootstrap.ts'
@@ -28,6 +29,13 @@ import {
 import { getTheme } from '#/main/theme.ts'
 import { clientNodeLog, windowNodeLog } from '#/node/logger.ts'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
+import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
+import {
+  CLIENT_EFFECT_INTENT_CHANNEL,
+  CLIENT_EFFECT_INTENT_CHALLENGE_CHANNEL,
+  CLIENT_EFFECT_INTENT_READY_CHANNEL,
+} from '#/shared/ipc-channels.ts'
+import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1100, height: 720 }
 const PRIMARY_WINDOW_SURFACE = {
@@ -39,6 +47,23 @@ const PRIMARY_WINDOW_SURFACE = {
 } as const
 
 let primaryWindowCreation: Promise<BrowserWindow> | null = null
+let primaryWindowDocumentGeneration = 0
+let primaryWindowIntentReadinessWired = false
+
+// Surface registration establishes IPC identity before the app loads. Intent
+// delivery is a separate document-generation boundary: actions fail directly
+// unless their exact app document is already ready.
+type PrimaryWindowDocumentOutcome = { kind: 'ready' } | { kind: 'failed'; error: Error }
+
+interface PrimaryWindowDocumentReadiness {
+  window: BrowserWindow
+  generation: number
+  navigationStarted: boolean
+  frame: WebFrameMain | null
+  result: PrimaryWindowDocumentOutcome | null
+}
+
+let primaryWindowDocumentReadiness: PrimaryWindowDocumentReadiness | null = null
 
 export function getPrimaryWindow(): BrowserWindow | null {
   return getRegisteredPrimaryWindow()
@@ -64,6 +89,142 @@ export async function activatePrimaryWindow(): Promise<BrowserWindow> {
   }
   win.focus()
   return win
+}
+
+export async function sendPrimaryWindowEffectIntent(intent: ClientEffectIntent): Promise<void> {
+  const existing = getPrimaryWindow()
+  if (existing) {
+    const readiness = primaryWindowDocumentReadinessFor(existing)
+    const activated = await activatePrimaryWindow()
+    if (activated !== existing) throw new Error('Primary window was replaced before intent delivery')
+    await deliverPrimaryWindowEffectIntent(existing, readiness, intent)
+    return
+  }
+  const expectedDocumentGeneration = primaryWindowDocumentGeneration + 1
+  const win = await activatePrimaryWindow()
+  const readiness = primaryWindowDocumentReadinessFor(win)
+  if (readiness.generation !== expectedDocumentGeneration) {
+    throw new Error(`Primary window renderer generation ${expectedDocumentGeneration} was superseded`)
+  }
+  await deliverPrimaryWindowEffectIntent(win, readiness, intent)
+}
+
+export async function sendExistingPrimaryWindowEffectIntent(intent: ClientEffectIntent): Promise<boolean> {
+  const win = getPrimaryWindow()
+  if (!win) return false
+  await deliverPrimaryWindowEffectIntent(win, primaryWindowDocumentReadinessFor(win), intent)
+  return true
+}
+
+export function reloadPrimaryWindow(): boolean {
+  const win = getPrimaryWindow()
+  if (!win) return false
+  const previousReadiness = primaryWindowDocumentReadinessFor(win)
+  win.webContents.reload()
+  if (primaryWindowDocumentReadiness === previousReadiness) beginPrimaryWindowDocument(win, false)
+  return true
+}
+
+function primaryWindowDocumentReadinessFor(win: BrowserWindow): PrimaryWindowDocumentReadiness {
+  const readiness = primaryWindowDocumentReadiness
+  if (!readiness || readiness.window !== win) throw new Error('Primary window renderer is not available')
+  return readiness
+}
+
+function deliverPrimaryWindowEffectIntent(
+  win: BrowserWindow,
+  readiness: PrimaryWindowDocumentReadiness,
+  intent: ClientEffectIntent,
+): void {
+  if (readiness.result === null) throw new Error('Primary window renderer is not ready')
+  if (readiness.result.kind === 'failed') throw readiness.result.error
+  if (primaryWindowDocumentReadiness !== readiness) {
+    throw new Error(`Primary window renderer generation ${readiness.generation} was superseded`)
+  }
+  const frame = readiness.frame
+  if (!frame || frame.detached || frame.isDestroyed() || win.isDestroyed() || win.webContents.isDestroyed()) {
+    throw new Error('Primary window renderer is not available')
+  }
+  frame.send(CLIENT_EFFECT_INTENT_CHANNEL, intent)
+}
+
+function beginPrimaryWindowDocument(win: BrowserWindow, navigationStarted: boolean): PrimaryWindowDocumentReadiness {
+  const previous = primaryWindowDocumentReadiness
+  if (previous?.result === null) {
+    settlePrimaryWindowDocument(previous, {
+      kind: 'failed',
+      error: new Error(`Primary window renderer generation ${previous.generation} was superseded`),
+    })
+  }
+  const readiness: PrimaryWindowDocumentReadiness = {
+    window: win,
+    generation: ++primaryWindowDocumentGeneration,
+    navigationStarted,
+    frame: null,
+    result: null,
+  }
+  primaryWindowDocumentReadiness = readiness
+  return readiness
+}
+
+function settlePrimaryWindowDocument(
+  readiness: PrimaryWindowDocumentReadiness,
+  outcome: PrimaryWindowDocumentOutcome,
+): void {
+  if (readiness.result !== null) return
+  readiness.result = outcome
+}
+
+function challengePrimaryWindowDocument(win: BrowserWindow): void {
+  const readiness = primaryWindowDocumentReadiness
+  if (!readiness || readiness.window !== win || readiness.result !== null) return
+  const frame = win.webContents.mainFrame
+  readiness.frame = frame
+  try {
+    frame.send(CLIENT_EFFECT_INTENT_CHALLENGE_CHANNEL, readiness.generation)
+  } catch (err) {
+    failPrimaryWindowDocument(
+      win,
+      err instanceof Error ? err : new Error('Primary window renderer readiness challenge failed'),
+    )
+  }
+}
+
+function markPrimaryWindowDocumentReady(win: BrowserWindow, frame: WebFrameMain, generation: unknown): void {
+  const readiness = primaryWindowDocumentReadiness
+  if (
+    !readiness ||
+    readiness.window !== win ||
+    readiness.frame === null ||
+    generation !== readiness.generation ||
+    frame.processId !== readiness.frame.processId ||
+    frame.routingId !== readiness.frame.routingId
+  ) {
+    return
+  }
+  settlePrimaryWindowDocument(readiness, { kind: 'ready' })
+}
+
+function wirePrimaryWindowIntentReadiness(): void {
+  if (primaryWindowIntentReadinessWired) return
+  primaryWindowIntentReadinessWired = true
+  ipcMain.on(CLIENT_EFFECT_INTENT_READY_CHANNEL, (event, generation: unknown) => {
+    const win = getPrimaryWindow()
+    if (!win || event.sender !== win.webContents || !event.senderFrame || !isTrustedIpcEvent(event)) return
+    markPrimaryWindowDocumentReady(win, event.senderFrame, generation)
+  })
+}
+
+function failPrimaryWindowDocument(win: BrowserWindow, error: Error): void {
+  const readiness = primaryWindowDocumentReadiness
+  if (!readiness || readiness.window !== win) return
+  if (readiness.result === null) {
+    settlePrimaryWindowDocument(readiness, { kind: 'failed', error })
+    return
+  }
+  if (readiness.result.kind === 'failed') return
+  const failedReadiness = beginPrimaryWindowDocument(win, true)
+  settlePrimaryWindowDocument(failedReadiness, { kind: 'failed', error })
 }
 
 /** Constrain saved bounds against current display geometry — a window
@@ -93,6 +254,7 @@ function clampToDisplay(bounds: WindowBounds): WindowBounds {
 }
 
 async function createPrimaryWindow(): Promise<BrowserWindow> {
+  wirePrimaryWindowIntentReadiness()
   const backgroundColor = windowCanvasBackground()
   const { resolved, colorTheme } = getTheme()
 
@@ -114,15 +276,36 @@ async function createPrimaryWindow(): Promise<BrowserWindow> {
     autoHideMenuBar: process.platform !== 'darwin',
     webPreferences: await createBrowserWindowWebPreferences(),
   })
-  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+  const initialDocumentReadiness = beginPrimaryWindowDocument(win, false)
+  win.webContents.on('did-start-navigation', (event) => {
+    if (!event.isMainFrame || event.isSameDocument) return
+    const current = primaryWindowDocumentReadiness
+    if (current?.window === win && !current.navigationStarted && current.result === null) {
+      current.navigationStarted = true
+      return
+    }
+    beginPrimaryWindowDocument(win, true)
+  })
+  win.webContents.on('did-stop-loading', () => {
+    challengePrimaryWindowDocument(win)
+  })
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
     if (errorCode === -3) {
       clientNodeLog.debug({ validatedURL }, 'navigation cancelled')
       return
     }
     clientNodeLog.error({ validatedURL, errorCode, errorDescription }, 'failed to load')
+    if (isMainFrame !== false) {
+      failPrimaryWindowDocument(win, new Error(`Primary window failed to load: ${errorDescription}`))
+    }
+  })
+  win.webContents.on('preload-error', (_event, preloadPath, error) => {
+    clientNodeLog.error({ preloadPath, err: error }, 'preload failed')
+    failPrimaryWindowDocument(win, new Error(`Primary window preload failed: ${error.message}`))
   })
   win.webContents.on('render-process-gone', (_event, details) => {
     clientNodeLog.error({ details }, 'process gone')
+    failPrimaryWindowDocument(win, new Error(`Primary window renderer exited: ${details.reason}`))
   })
   attachClientSurfaceWindow(win, { surface: PRIMARY_WINDOW_SURFACE })
   const { url } = createBrowserEntryUrl({ routePath: '/' })
@@ -160,12 +343,17 @@ async function createPrimaryWindow(): Promise<BrowserWindow> {
   win.on('move', persistBounds)
 
   win.on('closed', () => {
+    failPrimaryWindowDocument(win, new Error('Primary window closed before the renderer was ready'))
     detachClientSurfaceWindow(win, PRIMARY_WINDOW_SURFACE)
   })
 
   try {
     await win.loadURL(url.toString())
   } catch (err) {
+    settlePrimaryWindowDocument(initialDocumentReadiness, {
+      kind: 'failed',
+      error: err instanceof Error ? err : new Error('Primary window failed to load'),
+    })
     windowNodeLog.warn({ err }, 'failed to load app URL')
   }
   return win

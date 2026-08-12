@@ -2,8 +2,6 @@ import { computed, defineComponent } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
-import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
-import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
@@ -18,16 +16,11 @@ import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 interface AuthenticatedWorkspaceSideEffectsProps {
-  routedWorkspaceId: WorkspaceId | null
   hydratedRouteWorkspaceId: WorkspaceId | null
   currentBranchName: string | null
   currentWorkspacePaneCommandTarget: () => WorkspacePaneCommandTarget | null
   routeContext: WorkspaceNavigationRouteContext | null
   navigation: AppNavigationActions
-  closeAllOverlays: () => void
-  openWorkspacePathDialog: () => void
-  openCloneRepo: () => void
-  openRemoteWorkspace: () => void
   modalOpen: boolean
   navigateToSettingsShortcuts: () => void
   navigateToIndex: () => void
@@ -42,16 +35,11 @@ export const AuthenticatedWorkspaceSideEffects = defineComponent<AuthenticatedWo
   name: 'AuthenticatedWorkspaceSideEffects',
   inheritAttrs: false,
   props: [
-    'routedWorkspaceId',
     'hydratedRouteWorkspaceId',
     'currentBranchName',
     'currentWorkspacePaneCommandTarget',
     'routeContext',
     'navigation',
-    'closeAllOverlays',
-    'openWorkspacePathDialog',
-    'openCloneRepo',
-    'openRemoteWorkspace',
     'modalOpen',
     'navigateToSettingsShortcuts',
     'navigateToIndex',
@@ -64,18 +52,6 @@ export const AuthenticatedWorkspaceSideEffects = defineComponent<AuthenticatedWo
       currentTarget: currentWorkspacePaneCommandTarget,
       navigation: () => props.navigation,
     })
-    useClientEffectIntentRouter({
-      navigation: () => props.navigation,
-      currentWorkspaceId: () => props.hydratedRouteWorkspaceId,
-      currentWorkspacePaneCommandTarget,
-      closeAllOverlays: () => props.closeAllOverlays(),
-      openWorkspacePathDialog: () => props.openWorkspacePathDialog(),
-      openCloneRepo: () => props.openCloneRepo(),
-      openRemoteWorkspace: () => props.openRemoteWorkspace(),
-      openCreateWorktree: () => props.navigation.openCreateWorktree(),
-      isOverlayOpen: () => props.modalOpen,
-      isWorkspaceShortcutSuppressed: workspaceShortcutsSuppressed,
-    })
     useKeyboard({
       navigation: () => props.navigation,
       currentWorkspaceId: () => props.hydratedRouteWorkspaceId,
@@ -87,7 +63,6 @@ export const AuthenticatedWorkspaceSideEffects = defineComponent<AuthenticatedWo
       onExitSettings: () => props.navigateToIndex(),
       openCreateWorktree: () => props.navigation.openCreateWorktree(),
     })
-    useClientWorkspacePersistence({ routedWorkspaceId: () => props.routedWorkspaceId })
     useWorkspaceNavigationHistory({ routeContext: () => props.routeContext })
     useRepoStoreInvalidationRefresh()
     useWorkspaceRuntimeInvalidationRefresh()

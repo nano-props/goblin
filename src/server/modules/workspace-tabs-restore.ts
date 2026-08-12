@@ -1,19 +1,17 @@
 import type { RestoredWorkspaceRuntime, WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
-import { IpcError } from '#/shared/ipc-error.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 import { isRemoteWorkspaceId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { readRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
 import {
-  isCurrentWorkspaceRuntimeMembership,
+  captureWorkspaceRuntimeMembershipCapability,
   runSerializedInitialWorkspaceProbe,
+  WorkspaceRuntimeStaleError,
   workspaceProbeStateForRuntime,
-  isCurrentWorkspaceRuntime,
+  type WorkspaceRuntimeMembershipCapability,
 } from '#/server/modules/workspace-runtimes.ts'
 import { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
 import { confirmServerWorkspaceEntry, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
-import {
-  projectWorkspacePaneTabsWithMembershipGuard,
-  workspaceEntry,
-} from '#/server/modules/workspace-pane-tabs-restore.ts'
+import { restoreWorkspacePaneTabsForMemberships, workspaceEntry } from '#/server/modules/workspace-pane-tabs-restore.ts'
 import { abortableWorkspaceRestore } from '#/server/modules/workspace-restore-utils.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
@@ -40,29 +38,48 @@ export interface RestoreWorkspaceTabsInput {
 }
 
 export async function restoreWorkspaceTabs(input: RestoreWorkspaceTabsInput): Promise<WorkspaceTabsRestoreResult> {
+  try {
+    return await restoreWorkspaceTabsForCurrentMembership(input)
+  } catch (error) {
+    if (error instanceof WorkspaceRuntimeStaleError) {
+      throw new CodedError({ code: 'BAD_REQUEST', message: error.message })
+    }
+    throw error
+  }
+}
+
+async function restoreWorkspaceTabsForCurrentMembership(
+  input: RestoreWorkspaceTabsInput,
+): Promise<WorkspaceTabsRestoreResult> {
   input.signal?.throwIfAborted()
-  assertCurrentWorkspaceRuntimeMembership(input)
+  const runtimeCapability = captureWorkspaceRuntimeMembershipCapability(
+    input.userId,
+    input.workspaceId,
+    input.workspaceRuntimeId,
+    input.clientId,
+  )
   const initialWorkspace = await getServerWorkspaceState()
-  assertCurrentWorkspaceRuntimeMembership(input)
+  runtimeCapability.assertCurrent()
   const entry = workspaceEntry(initialWorkspace, input.workspaceId)
   if (!entry) throw workspaceNotInSession()
-  const workspace = await projectWorkspace(input, entry)
-  if (!workspace) throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
+  const workspace = await projectWorkspace(input, entry, runtimeCapability)
+  if (!workspace) throw new CodedError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
 
-  const projectedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
+  const projectedTabs = await restoreWorkspacePaneTabsForMemberships({
     restoreInput: input,
-    workspaces: [workspace],
+    workspaces: [{ ...workspace, runtimeCapability }],
     confirmMembership: async () => await confirmServerWorkspaceEntry(entry),
     membershipPolicy: 'transaction-authoritative',
-    assertCurrent: () => assertCurrentWorkspaceRuntimeMembership(input),
   })
   if (!projectedTabs.matched) throw workspaceNotInSession()
+  runtimeCapability.assertCurrent()
   return { workspace, snapshot: projectedTabs.snapshots[0]?.snapshot ?? null }
 }
 
 async function projectWorkspace(
   input: RestoreWorkspaceTabsInput,
   entry: WorkspaceSessionEntry,
+  runtimeCapability: WorkspaceRuntimeMembershipCapability,
 ): Promise<RestoredWorkspaceRuntime | null> {
   if (isRemoteWorkspaceId(entry.id)) {
     const lifecycle = await abortableWorkspaceRestore(
@@ -77,21 +94,14 @@ async function projectWorkspace(
           beforeCapabilityCommit: async ({ before, after }) => {
             if (!workspaceGitCleanupRequired(before, after)) return
             await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
-              userId: input.userId,
-              workspaceId: entry.id,
-              workspaceRuntimeId: input.workspaceRuntimeId,
-              assertCurrent: () => {
-                if (!isCurrentWorkspaceRuntime(input.userId, entry.id, input.workspaceRuntimeId)) {
-                  throw new Error('error.workspace-runtime-stale')
-                }
-              },
+              runtimeCapability,
             })
           },
         },
       ),
       input.signal,
     )
-    assertCurrentWorkspaceRuntimeMembership(input)
+    runtimeCapability.assertCurrent()
     if (lifecycle.kind !== 'settled') return null
     const workspaceProbe = lifecycle.workspaceProbe
     if (lifecycle.lifecycle.kind === 'failed') {
@@ -118,7 +128,7 @@ async function projectWorkspace(
       workspaceRuntimeId: input.workspaceRuntimeId,
       signal: input.signal,
     })
-    assertCurrentWorkspaceRuntimeMembership(input)
+    runtimeCapability.assertCurrent()
     return {
       entry,
       workspaceId: entry.id,
@@ -142,16 +152,13 @@ async function projectWorkspace(
       beforeCommit: async ({ before, after }) => {
         if (!workspaceGitCleanupRequired(before, after)) return
         await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
-          userId: input.userId,
-          workspaceId: entry.id,
-          workspaceRuntimeId: input.workspaceRuntimeId,
-          assertCurrent: () => assertCurrentWorkspaceRuntimeMembership(input),
+          runtimeCapability,
         })
       },
     })
-    if (!authoritativeProbe) return null
     probe = authoritativeProbe
   }
+  runtimeCapability.assertCurrent()
   if (probe.status !== 'ready') return null
   if (!workspaceGitAvailable(probe)) {
     return {
@@ -167,7 +174,7 @@ async function projectWorkspace(
     workspaceRuntimeId: input.workspaceRuntimeId,
     signal: input.signal,
   })
-  assertCurrentWorkspaceRuntimeMembership(input)
+  runtimeCapability.assertCurrent()
   return {
     entry,
     workspaceId: entry.id,
@@ -178,12 +185,6 @@ async function projectWorkspace(
   }
 }
 
-function assertCurrentWorkspaceRuntimeMembership(input: RestoreWorkspaceTabsInput): void {
-  if (isCurrentWorkspaceRuntimeMembership(input.userId, input.workspaceId, input.workspaceRuntimeId, input.clientId))
-    return
-  throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
-}
-
-function workspaceNotInSession(): IpcError {
-  return new IpcError({ code: 'NOT_FOUND', message: 'error.workspace-not-in-session' })
+function workspaceNotInSession(): CodedError {
+  return new CodedError({ code: 'NOT_FOUND', message: 'error.workspace-not-in-session' })
 }

@@ -73,11 +73,6 @@ export interface WorkspacePanePanelLabel {
   label?: string
 }
 
-export interface WorkspacePaneTabCloseInput {
-  runtimeSessionId?: string
-  closeStaticTab?: (type: WorkspacePaneStaticTabType) => boolean | void | Promise<boolean | void>
-}
-
 export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneTabType = WorkspacePaneTabType> {
   readonly type: TType
   readonly icon: LucideIcon
@@ -111,8 +106,6 @@ export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneTabTyp
   isRenderable(context: WorkspacePaneTabAvailabilityContext): boolean {
     return this.canOpen(context)
   }
-
-  abstract close(input: WorkspacePaneTabCloseInput): Promise<boolean>
 }
 
 export abstract class WorkspacePaneStaticTabProvider<
@@ -137,11 +130,6 @@ export abstract class WorkspacePaneStaticTabProvider<
 
   closeLabel(input: WorkspacePaneStaticTabMetadataInput): string {
     return input.t('workspace-pane-tabs.close-named', { name: this.label({ ...input, statusCount: 0 }) })
-  }
-
-  close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
-    if (!input.closeStaticTab) return Promise.resolve(false)
-    return Promise.resolve(input.closeStaticTab(this.type)).then((result) => result !== false)
   }
 }
 
@@ -279,10 +267,6 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneRuntimeTabPro
   override attention(input: WorkspacePaneRuntimeTabAttentionInput<'terminal'>): WorkspacePaneRuntimeTabAttention {
     if (input.view.hasBell) return { attention: true, attentionLabelKey: 'terminal.bell-unread' }
     return { attention: false }
-  }
-
-  close(_input: WorkspacePaneTabCloseInput): Promise<boolean> {
-    return Promise.resolve(false)
   }
 }
 

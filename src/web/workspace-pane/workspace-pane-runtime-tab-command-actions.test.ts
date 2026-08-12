@@ -13,7 +13,6 @@ import {
   runWorkspacePaneRuntimePrimaryAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import type { CreatedTerminalRouteRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import { createTerminalWithAdmissionForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
@@ -195,9 +194,16 @@ describe('workspace pane runtime tab command actions', () => {
         createPending: false,
       }),
       createTerminal,
-      createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
+      createTerminalWithAdmission: vi.fn(async (base) => ({
+        terminalSessionId: 'created-session',
+        presentation: base.presentation,
+        requestRole: 'leader' as const,
+        resourceDisposition: 'created' as const,
+        runtimeProjectionApplied: true,
+      })),
       selectTerminal,
       focusTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     }
 
     await expect(
@@ -247,9 +253,16 @@ describe('workspace pane runtime tab command actions', () => {
         createPending: false,
       }),
       createTerminal,
-      createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
+      createTerminalWithAdmission: vi.fn(async (base) => ({
+        terminalSessionId: 'created-session',
+        presentation: base.presentation,
+        requestRole: 'leader' as const,
+        resourceDisposition: 'created' as const,
+        runtimeProjectionApplied: true,
+      })),
       selectTerminal: vi.fn(),
       focusTerminal,
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     }
 
     await expect(
@@ -312,9 +325,16 @@ describe('workspace pane runtime tab command actions', () => {
     const bridge: TerminalSessionCommandBridge = {
       terminalFilesystemTargetSnapshot,
       createTerminal,
-      createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
+      createTerminalWithAdmission: vi.fn(async (base) => ({
+        terminalSessionId: 'created-session',
+        presentation: base.presentation,
+        requestRole: 'leader' as const,
+        resourceDisposition: 'created' as const,
+        runtimeProjectionApplied: true,
+      })),
       selectTerminal,
       focusTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     }
 
     const actionPromise = runWorkspacePaneRuntimePrimaryAction('terminal', {
@@ -365,9 +385,16 @@ describe('workspace pane runtime tab command actions', () => {
         createPending: true,
       }),
       createTerminal,
-      createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
+      createTerminalWithAdmission: vi.fn(async (base) => ({
+        terminalSessionId: 'created-session',
+        presentation: base.presentation,
+        requestRole: 'leader' as const,
+        resourceDisposition: 'created' as const,
+        runtimeProjectionApplied: true,
+      })),
       selectTerminal: vi.fn(),
       focusTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     }
 
     const pendingCreatePresentation = beginAppNavigation()
@@ -405,6 +432,7 @@ describe('workspace pane runtime tab command actions', () => {
       createTerminalWithAdmission: vi.fn(),
       selectTerminal: vi.fn(),
       focusTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     }
 
     await expect(
@@ -470,6 +498,7 @@ describe('workspace pane runtime tab command actions', () => {
       createTerminalWithAdmission,
       selectTerminal: vi.fn(),
       focusTerminal,
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
     }
 
     await expect(

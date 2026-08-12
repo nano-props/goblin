@@ -1,17 +1,16 @@
 import { computed, defineComponent } from 'vue'
-import type { VNode } from 'vue'
+import type { ComputedRef, PropType, VNode } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
-import { Toaster } from '#/web/components/ui/sonner.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspaceFilesystemInvalidationSync.ts'
-import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
+import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { createAppNavigationActions } from '#/web/app-navigation-actions.ts'
 import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { provideLayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
@@ -31,15 +30,34 @@ import {
   WorkspaceSessionRestoreError,
   WorkspaceSessionRestorePlaceholder,
 } from '#/web/components/WorkspaceSessionRestore.tsx'
-import { AppOverlays } from '#/web/components/AppOverlays.tsx'
+import { AppGlobalOverlays, WorkspaceContextOverlays } from '#/web/components/AppOverlays.tsx'
 import { AuthenticatedWorkspaceSideEffects } from '#/web/components/AuthenticatedWorkspaceSideEffects.tsx'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
+import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
+import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+
+type AppOverlayController = ReturnType<typeof useAppOverlays>
+
+interface AuthenticatedAppRuntime {
+  hydratedRouteWorkspaceId: ComputedRef<WorkspaceId | null>
+  currentBranchName: ComputedRef<string | null>
+  currentWorkspacePaneRoute: ComputedRef<ReturnType<typeof currentWorkspacePaneRouteFromContext>>
+  currentWorkspacePaneCommandTarget: () => WorkspacePaneCommandTarget | null
+  workspaceNavigationRouteContext: ComputedRef<WorkspaceNavigationRouteContext | null>
+  navigation: ComputedRef<AppNavigationActions>
+  commandWorkspaceRuntimeId: ComputedRef<string | null>
+  overlays: AppOverlayController
+  navigateToSettingsShortcuts: () => void
+  navigateToIndex: () => void
+}
 
 export const Layout = defineComponent({
   name: 'Layout',
   setup() {
     const route = useRoute()
-    useSettingsWriteErrorToast()
     useAppHistoryPresentationObserver()
 
     return () => (
@@ -56,49 +74,6 @@ const AuthenticatedAppShell = defineComponent({
   name: 'AuthenticatedAppShell',
   setup() {
     useWorkspaceFilesystemInvalidationSync()
-    const route = useRoute()
-    const routeContext = computed(() => workspaceRouteContextFromVueRoute(route))
-    const activeWorkspaceId = computed(() => {
-      const workspaceSlug = routeContext.value?.workspaceSlug
-      return workspaceSlug ? workspaceIdFromSlug(workspaceSlug) : null
-    })
-    const bootstrap = useAuthenticatedAppBootstrap({ activeWorkspaceId })
-
-    const renderShellContent = (): VNode => {
-      if (route.name === 'settings') return <AuthenticatedSettingsShell />
-
-      const bootstrapState = bootstrap.state.value
-
-      switch (bootstrapState.status) {
-        case 'restoring-workspace':
-          return <WorkspaceSessionRestorePlaceholder />
-        case 'failed':
-          return <WorkspaceSessionRestoreError state={bootstrapState} retry={bootstrap.retry} />
-        case 'ready':
-          return <AuthenticatedWorkspaceShell />
-      }
-    }
-
-    return () => <TerminalSessionProvider>{renderShellContent()}</TerminalSessionProvider>
-  },
-})
-
-const AuthenticatedSettingsShell = defineComponent({
-  name: 'AuthenticatedSettingsShell',
-  setup() {
-    return () => (
-      <div class="relative flex h-full flex-col">
-        <RouterView />
-        <Toaster position="bottom-right" closeButton />
-      </div>
-    )
-  },
-})
-
-const AuthenticatedWorkspaceShell = defineComponent({
-  name: 'AuthenticatedWorkspaceShell',
-  inheritAttrs: false,
-  setup() {
     const route = useRoute()
     const queryClient = useQueryClient()
     const overlays = useAppOverlays()
@@ -137,10 +112,28 @@ const AuthenticatedWorkspaceShell = defineComponent({
         routeNavigation,
       }),
     )
-    const workspaceDrop = useWorkspaceDrop({
-      blocked: overlays.anyOpen,
+    const currentWorkspacePaneCommandTarget = () =>
+      workspacePaneCommandTargetFromQueryCache({
+        routeContext: routeContext.value,
+        workspace: commandWorkspace.value,
+        queryClient,
+      })
+    const runtime: AuthenticatedAppRuntime = {
+      hydratedRouteWorkspaceId,
+      currentBranchName,
+      currentWorkspacePaneRoute,
+      currentWorkspacePaneCommandTarget,
+      workspaceNavigationRouteContext: computed(() =>
+        workspaceNavigationRouteContext(routeContext.value, route.fullPath),
+      ),
       navigation,
-    })
+      commandWorkspaceRuntimeId: computed(() => commandWorkspace.value?.workspaceRuntimeId ?? null),
+      overlays,
+      navigateToSettingsShortcuts: layoutRouteCallbacks.navigateToSettingsShortcuts,
+      navigateToIndex: layoutRouteCallbacks.navigateToIndex,
+    }
+    const bootstrap = useAuthenticatedAppBootstrap({ activeWorkspaceId: routedWorkspaceId })
+    useClientWorkspacePersistence({ routedWorkspaceId })
 
     provideLayoutOverlayActions({
       openWorkspacePathDialog: overlays.openWorkspacePathDialog,
@@ -149,55 +142,104 @@ const AuthenticatedWorkspaceShell = defineComponent({
       openCreateWorktree: () => navigation.value.openCreateWorktree(),
     })
 
-    const currentWorkspacePaneCommandTarget = () =>
-      workspacePaneCommandTargetFromQueryCache({
-        routeContext: routeContext.value,
-        workspace: commandWorkspace.value,
-        queryClient,
-      })
+    useClientEffectIntentRouter({
+      authenticatedBootstrapState: bootstrap.state,
+      navigation,
+      currentWorkspaceId: hydratedRouteWorkspaceId,
+      currentWorkspacePaneCommandTarget,
+      closeAllOverlays: overlays.closeAllOverlays,
+      openWorkspacePathDialog: overlays.openWorkspacePathDialog,
+      openCloneRepo: overlays.openCloneRepo,
+      openRemoteWorkspace: overlays.openRemoteWorkspace,
+      openCreateWorktree: () => navigation.value.openCreateWorktree(),
+      isOverlayOpen: () => overlays.anyOpen.value,
+      isWorkspaceShortcutSuppressed: () => overlays.anyOpen.value,
+    })
+
+    const renderShellContent = (): VNode => {
+      if (route.name === 'settings') return <AuthenticatedSettingsShell />
+
+      const bootstrapState = bootstrap.state.value
+
+      switch (bootstrapState.status) {
+        case 'restoring-workspace':
+          return <WorkspaceSessionRestorePlaceholder />
+        case 'failed':
+          return <WorkspaceSessionRestoreError state={bootstrapState} retry={bootstrap.retry} />
+        case 'ready':
+          return <AuthenticatedWorkspaceShell runtime={runtime} />
+      }
+    }
+
+    return () => (
+      <TerminalSessionProvider>
+        <AppNavigationProvider value={navigation.value}>
+          {renderShellContent()}
+          <AppGlobalOverlays overlays={overlays} />
+        </AppNavigationProvider>
+      </TerminalSessionProvider>
+    )
+  },
+})
+
+const AuthenticatedSettingsShell = defineComponent({
+  name: 'AuthenticatedSettingsShell',
+  setup() {
+    return () => (
+      <div class="relative flex h-full flex-col">
+        <RouterView />
+      </div>
+    )
+  },
+})
+
+const AuthenticatedWorkspaceShell = defineComponent<{ runtime: AuthenticatedAppRuntime }>({
+  name: 'AuthenticatedWorkspaceShell',
+  inheritAttrs: false,
+  props: {
+    runtime: { type: Object as PropType<AuthenticatedAppRuntime>, required: true },
+  },
+  setup(props) {
+    const runtime = props.runtime
+    const overlays = runtime.overlays
+    const workspaceDrop = useWorkspaceDrop({
+      blocked: overlays.anyOpen,
+      navigation: runtime.navigation,
+    })
 
     return () => {
-      const currentRouteContext = routeContext.value
-      const currentNavigation = navigation.value
+      const currentNavigation = runtime.navigation.value
       return (
         <>
           <AuthenticatedWorkspaceSideEffects
-            routedWorkspaceId={routedWorkspaceId.value}
-            hydratedRouteWorkspaceId={hydratedRouteWorkspaceId.value}
-            currentBranchName={currentBranchName.value}
-            currentWorkspacePaneCommandTarget={currentWorkspacePaneCommandTarget}
-            routeContext={workspaceNavigationRouteContext(currentRouteContext, route.fullPath)}
+            hydratedRouteWorkspaceId={runtime.hydratedRouteWorkspaceId.value}
+            currentBranchName={runtime.currentBranchName.value}
+            currentWorkspacePaneCommandTarget={runtime.currentWorkspacePaneCommandTarget}
+            routeContext={runtime.workspaceNavigationRouteContext.value}
             navigation={currentNavigation}
-            closeAllOverlays={overlays.closeAllOverlays}
-            openWorkspacePathDialog={overlays.openWorkspacePathDialog}
-            openCloneRepo={overlays.openCloneRepo}
-            openRemoteWorkspace={overlays.openRemoteWorkspace}
             modalOpen={overlays.anyOpen.value}
-            navigateToSettingsShortcuts={layoutRouteCallbacks.navigateToSettingsShortcuts}
-            navigateToIndex={layoutRouteCallbacks.navigateToIndex}
+            navigateToSettingsShortcuts={runtime.navigateToSettingsShortcuts}
+            navigateToIndex={runtime.navigateToIndex}
           />
-          <AppNavigationProvider value={currentNavigation}>
-            <AppRuntimeProjectionProvider currentWorkspaceId={hydratedRouteWorkspaceId.value}>
-              <div
-                class="relative flex h-full flex-col"
-                onDragenter={workspaceDrop.onDragEnter}
-                onDragover={workspaceDrop.onDragOver}
-                onDragleave={workspaceDrop.onDragLeave}
-                onDrop={workspaceDrop.onDrop}
-              >
-                <RouterView />
-                <AppOverlays
-                  overlays={overlays}
-                  workspaceDrop={workspaceDrop}
-                  navigation={currentNavigation}
-                  hydratedRouteWorkspaceId={hydratedRouteWorkspaceId.value}
-                  currentWorkspaceRuntimeId={commandWorkspace.value?.workspaceRuntimeId ?? null}
-                  currentBranchName={currentBranchName.value}
-                  currentWorkspacePaneRoute={currentWorkspacePaneRoute.value}
-                />
-              </div>
-            </AppRuntimeProjectionProvider>
-          </AppNavigationProvider>
+          <AppRuntimeProjectionProvider currentWorkspaceId={runtime.hydratedRouteWorkspaceId.value}>
+            <div
+              class="relative flex h-full flex-col"
+              onDragenter={workspaceDrop.onDragEnter}
+              onDragover={workspaceDrop.onDragOver}
+              onDragleave={workspaceDrop.onDragLeave}
+              onDrop={workspaceDrop.onDrop}
+            >
+              <RouterView />
+              <WorkspaceContextOverlays
+                workspaceDrop={workspaceDrop}
+                navigation={currentNavigation}
+                hydratedRouteWorkspaceId={runtime.hydratedRouteWorkspaceId.value}
+                currentWorkspaceRuntimeId={runtime.commandWorkspaceRuntimeId.value}
+                currentBranchName={runtime.currentBranchName.value}
+                currentWorkspacePaneRoute={runtime.currentWorkspacePaneRoute.value}
+              />
+            </div>
+          </AppRuntimeProjectionProvider>
         </>
       )
     }

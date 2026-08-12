@@ -1,11 +1,21 @@
 import { describe, expect, test, vi } from 'vitest'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import type { RestoredWorkspaceRuntime } from '#/shared/api-types.ts'
-import { projectWorkspacePaneTabsWithMembershipGuard } from '#/server/modules/workspace-pane-tabs-restore.ts'
+import { restoreWorkspacePaneTabsForMemberships } from '#/server/modules/workspace-pane-tabs-restore.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
+import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
+const runtimeCapability = {
+  ...testWorkspaceRuntimeEpochCapability({
+    userId: 'user-test',
+    workspaceId: WORKSPACE_ID,
+    workspaceRuntimeId: 'workspace-runtime-test',
+  }),
+  clientId: 'client-test',
+  generation: 1,
+}
 
 describe('workspace pane layout restore admission', () => {
   test('restores the workspace-root layout when the Git snapshot is unavailable', async () => {
@@ -31,13 +41,13 @@ describe('workspace pane layout restore admission', () => {
       repoSnapshot: null,
     } satisfies RestoredWorkspaceRuntime
 
-    const result = await projectWorkspacePaneTabsWithMembershipGuard({
+    const result = await restoreWorkspacePaneTabsForMemberships({
       restoreInput: {
         userId: 'user-test',
         clientId: 'client-test',
         workspacePaneTabsHost,
       },
-      workspaces: [workspace],
+      workspaces: [{ ...workspace, runtimeCapability }],
       confirmMembership,
       membershipPolicy: 'confirm-after-restore',
     })
@@ -53,12 +63,16 @@ describe('workspace pane layout restore admission', () => {
       ],
       repaired: false,
     })
-    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
-      workspaceId: WORKSPACE_ID,
-      workspaceRuntimeId: 'workspace-runtime-test',
-      expectedWorkspaceEntry: workspace.entry,
-      targets: [{ kind: 'workspace-root' }],
-    })
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith(
+      'user-test',
+      {
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: 'workspace-runtime-test',
+        expectedWorkspaceEntry: workspace.entry,
+        targets: [{ kind: 'workspace-root' }],
+      },
+      runtimeCapability,
+    )
     expect(confirmMembership).toHaveBeenCalledOnce()
   })
 })

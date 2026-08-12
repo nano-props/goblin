@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import {
   acquireWorkspaceRuntime,
   closeWorkspaceRuntimesForDurableRemoval,
+  type WorkspaceRuntimeEpochCapability,
 } from '#/server/modules/workspace-runtimes.ts'
 import {
   WORKSPACE_PANE_TABS_REALTIME_EVENTS,
@@ -33,88 +34,26 @@ import {
   workspacePaneWorktreeTarget,
 } from '#/server/test-utils/terminal-runtime.ts'
 
+function workspaceRuntimeCapability(assertCurrent: () => void = () => {}): WorkspaceRuntimeEpochCapability {
+  return {
+    userId: USER_1,
+    workspaceId: REPO_ROOT,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    isCurrent: () => {
+      try {
+        assertCurrent()
+        return true
+      } catch {
+        return false
+      }
+    },
+    assertCurrent,
+  }
+}
+
 describe('server terminal runtime workspace panes', () => {
-  test('realtime workspace pane tabs replace materializes missing terminal tabs and list returns canonical tabs', async () => {
-    const { host, shutdown } = buildRuntime()
-    const socket = appRealtimeSocket()
-    host.registerSocket('client_a', USER_1, socket)
-    const created = await createLocalWorktreeTerminal(host, 'client_a', USER_1, 'additional')
-    expect(created.ok).toBe(true)
-    if (!created.ok) return
-    await expect(
-      requestWorkspacePaneTabs(
-        host,
-        socket,
-        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
-        {
-          ...workspacePaneTabsListInput(WORKSPACE_RUNTIME_ID),
-          target: workspacePaneWorktreeTarget(WORKSPACE_RUNTIME_ID),
-          tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
-        },
-        'req_replace_workspace_tabs',
-      ),
-    ).resolves.toMatchObject({
-      entries: [
-        {
-          tabs: [
-            { type: 'status', tabId: 'workspace-pane:status' },
-            { type: 'terminal', runtimeSessionId: created.terminalSessionId },
-          ],
-        },
-      ],
-    })
-    await vi.waitFor(() => {
-      expect(
-        sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
-      ).toBe(true)
-    })
-    socket.send.mockClear()
-
-    host.handleRealtimeMessage(
-      'client_a',
-      USER_1,
-      socket,
-      JSON.stringify({
-        type: 'request',
-        requestId: 'req_list_workspace_tabs',
-        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-        input: workspacePaneTabsListInput(WORKSPACE_RUNTIME_ID),
-      }),
-    )
-
-    await vi.waitFor(() => {
-      const messages = sentSocketMessages(socket)
-      expect(
-        messages.some((message) => message.type === 'response' && message.requestId === 'req_list_workspace_tabs'),
-      ).toBe(true)
-    })
-    const response = sentSocketMessages(socket).find(
-      (message) => message.type === 'response' && message.requestId === 'req_list_workspace_tabs',
-    )
-    expect(response).toMatchObject({
-      type: 'response',
-      ok: true,
-      action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-      payload: {
-        revision: expect.any(Number),
-        entries: [
-          {
-            target: workspacePaneWorktreeTarget(WORKSPACE_RUNTIME_ID),
-            tabs: [
-              { type: 'status', tabId: 'workspace-pane:status' },
-              { type: 'terminal', runtimeSessionId: created.terminalSessionId },
-            ],
-          },
-        ],
-      },
-    })
-
-    host.unregisterSocket('client_a', USER_1, socket)
-    shutdown()
-  })
-
   test('broadcasts an accepted durable pane layout change to every active user projection', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const socketA = appRealtimeSocket()
     const socketB = appRealtimeSocket()
     host.registerSocket('client_a', USER_1, socketA)
@@ -165,7 +104,7 @@ describe('server terminal runtime workspace panes', () => {
   })
 
   test('returns created terminal sessions for SSH remote repositories', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const result = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: 'goblin+ssh://prod/srv/repo',
       workspaceRuntimeId: SSH_WORKSPACE_RUNTIME_ID,
@@ -199,7 +138,7 @@ describe('server terminal runtime workspace panes', () => {
   })
 
   test('reuses the existing terminal when reopening the same repo root', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const first = await createLocalWorktreeTerminal(host, 'client_a', USER_1, 'primary')
     expect(first.ok).toBe(true)
     if (!first.ok) return
@@ -214,7 +153,7 @@ describe('server terminal runtime workspace panes', () => {
   })
 
   test('workspace runtime close drops runtime state while preserving durable layout for the reopened epoch', async () => {
-    const { host, shutdown } = buildRuntime()
+    const { host, shutdown } = await buildRuntime()
     const first = await createLocalWorktreeTerminal(host, 'client_a', USER_1, 'primary')
     expect(first.ok).toBe(true)
     if (!first.ok) return
@@ -233,15 +172,18 @@ describe('server terminal runtime workspace panes', () => {
         'req_update_before_repo_close',
       ),
     ).resolves.toMatchObject({
-      entries: [
-        {
-          tabs: [
-            { type: 'status', tabId: 'workspace-pane:status' },
-            { type: 'terminal', runtimeSessionId: first.terminalSessionId },
-            { type: 'history', tabId: 'workspace-pane:history' },
-          ],
-        },
-      ],
+      kind: 'projected',
+      snapshot: {
+        entries: [
+          {
+            tabs: [
+              { type: 'status', tabId: 'workspace-pane:status' },
+              { type: 'terminal', runtimeSessionId: first.terminalSessionId },
+              { type: 'history', tabId: 'workspace-pane:history' },
+            ],
+          },
+        ],
+      },
     })
     socket.send.mockClear()
 
@@ -253,7 +195,7 @@ describe('server terminal runtime workspace panes', () => {
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
     const nextWorkspaceRuntimeId = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_a')
-    commitTerminalReadyProbe(USER_1, REPO_ROOT, nextWorkspaceRuntimeId)
+    await commitTerminalReadyProbe(USER_1, REPO_ROOT, nextWorkspaceRuntimeId)
 
     await expect(
       host.listSessions('client_a', USER_1, { workspaceId: REPO_ROOT, workspaceRuntimeId: nextWorkspaceRuntimeId }),
@@ -295,7 +237,7 @@ describe('server terminal runtime workspace panes', () => {
   })
 
   test('Git capability removal clears Git-scoped sessions and durable layout without replacing the runtime', async () => {
-    const { host, workspaceCapabilityTransitionHost, shutdown } = buildRuntime()
+    const { host, workspaceCapabilityTransitionHost, shutdown } = await buildRuntime()
     const created = await createLocalWorktreeTerminal(host, 'client_a', USER_1, 'primary')
     expect(created.ok).toBe(true)
     if (!created.ok) return
@@ -310,10 +252,7 @@ describe('server terminal runtime workspace panes', () => {
 
     await expect(
       workspaceCapabilityTransitionHost.commitGitCapabilityRemoval({
-        userId: USER_1,
-        workspaceId: REPO_ROOT,
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        assertCurrent: () => {},
+        runtimeCapability: workspaceRuntimeCapability(),
       }),
     ).resolves.toEqual({ kind: 'committed' })
 
@@ -325,7 +264,7 @@ describe('server terminal runtime workspace panes', () => {
   })
 
   test('Git capability cleanup preserves runtime resources when durable layout commit fails', async () => {
-    const { host, workspaceCapabilityTransitionHost, shutdown } = buildRuntime()
+    const { host, workspaceCapabilityTransitionHost, shutdown } = await buildRuntime()
     const created = await createLocalWorktreeTerminal(host, 'client_a', USER_1, 'primary')
     expect(created.ok).toBe(true)
     setTestWorkspacePaneLayout({
@@ -339,10 +278,7 @@ describe('server terminal runtime workspace panes', () => {
     setTestWorkspacePaneLayoutWriteError(new Error('layout write failed'))
 
     const result = await workspaceCapabilityTransitionHost.commitGitCapabilityRemoval({
-      userId: USER_1,
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      assertCurrent: () => {},
+      runtimeCapability: workspaceRuntimeCapability(),
     })
 
     expect(result).toEqual({ kind: 'failed-before-commit', error: testWorkspacePaneLayoutWriteError })
@@ -354,8 +290,8 @@ describe('server terminal runtime workspace panes', () => {
     shutdown()
   })
 
-  test('capability cleanup fast-fails once before its durable transaction', async () => {
-    const { workspaceCapabilityTransitionHost, shutdown } = buildRuntime()
+  test('capability cleanup rechecks currentness at its durable commit point', async () => {
+    const { workspaceCapabilityTransitionHost, shutdown } = await buildRuntime()
     setTestWorkspacePaneLayout({
       entries: [
         {
@@ -365,23 +301,22 @@ describe('server terminal runtime workspace panes', () => {
       ],
     })
     let checks = 0
-    await workspaceCapabilityTransitionHost.commitGitCapabilityRemoval({
-      userId: USER_1,
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      assertCurrent: () => {
-        checks += 1
-        if (checks > 1) throw new Error('error.workspace-runtime-stale')
-      },
-    })
+    await expect(
+      workspaceCapabilityTransitionHost.commitGitCapabilityRemoval({
+        runtimeCapability: workspaceRuntimeCapability(() => {
+          checks += 1
+          if (checks > 1) throw new Error('error.workspace-runtime-stale')
+        }),
+      }),
+    ).resolves.toEqual({ kind: 'failed-before-commit', error: expect.any(Error) })
 
-    expect(checks).toBe(1)
-    expect(testWorkspacePaneLayout).toEqual({ entries: [] })
+    expect(checks).toBe(2)
+    expect(testWorkspacePaneLayout.entries).toHaveLength(1)
     shutdown()
   })
 
   test('Git capability removal commit is idempotent', async () => {
-    const { host, workspaceCapabilityTransitionHost, shutdown } = buildRuntime()
+    const { host, workspaceCapabilityTransitionHost, shutdown } = await buildRuntime()
     const created = await createLocalWorktreeTerminal(host, 'client_a', USER_1, 'primary')
     expect(created.ok).toBe(true)
     setTestWorkspacePaneLayout({
@@ -393,10 +328,7 @@ describe('server terminal runtime workspace panes', () => {
       ],
     })
     const input = {
-      userId: USER_1,
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      assertCurrent: () => {},
+      runtimeCapability: workspaceRuntimeCapability(),
     }
 
     await expect(workspaceCapabilityTransitionHost.commitGitCapabilityRemoval(input)).resolves.toEqual({
@@ -414,12 +346,9 @@ describe('server terminal runtime workspace panes', () => {
   })
 
   test('does not schedule deferred capability effects after runtime shutdown', async () => {
-    const { workspaceCapabilityTransitionHost, shutdown } = buildRuntime()
+    const { workspaceCapabilityTransitionHost, shutdown } = await buildRuntime()
     const pending = workspaceCapabilityTransitionHost.commitGitCapabilityRemoval({
-      userId: USER_1,
-      workspaceId: REPO_ROOT,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      assertCurrent: () => {},
+      runtimeCapability: workspaceRuntimeCapability(),
     })
 
     shutdown()

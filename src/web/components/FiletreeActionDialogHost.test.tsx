@@ -12,16 +12,32 @@ import {
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { VNodeChild } from 'vue'
 import { appI18n } from '#/web/stores/i18n-vue.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 
 const dialogProps = vi.hoisted(() => ({
-  latest: { open: false, title: '', message: null as unknown },
+  latest: { open: false, title: '', message: null as unknown, onConfirm: async () => {} },
 }))
 
+const actionMocks = vi.hoisted(() => ({ trashWorkspaceFile: vi.fn(), warning: vi.fn() }))
+
+vi.mock('#/web/workspace-filesystem-client.ts', () => ({ trashWorkspaceFile: actionMocks.trashWorkspaceFile }))
+vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), warning: actionMocks.warning } }))
+
 vi.mock('#/web/components/ConfirmDialog.tsx', () => ({
-  ConfirmDialog: ({ open, title, message }: { open: boolean; title: string; message: unknown }) => {
-    dialogProps.latest = { open, title, message }
+  ConfirmDialog: ({
+    open,
+    title,
+    message,
+    onConfirm,
+  }: {
+    open: boolean
+    title: string
+    message: unknown
+    onConfirm: () => Promise<void>
+  }) => {
+    dialogProps.latest = { open, title, message, onConfirm }
     return null
   },
 }))
@@ -30,7 +46,9 @@ beforeEach(() => {
   appI18n.global.setLocaleMessage('en', { 'filetree.confirm-trash-body': 'Move to trash:' })
   appI18n.global.locale.value = 'en'
   resetFiletreeActionDialogsStore()
-  dialogProps.latest = { open: false, title: '', message: null }
+  dialogProps.latest = { open: false, title: '', message: null, onConfirm: async () => {} }
+  actionMocks.trashWorkspaceFile.mockReset()
+  actionMocks.warning.mockReset()
 })
 
 afterEach(() => {
@@ -97,6 +115,34 @@ describe('FiletreeActionDialogHost', () => {
 
     expect(filetreeActionDialogsStore.getState().trashFileConfirm).toBeNull()
     expect(dialogProps.latest.open).toBe(false)
+  })
+
+  test('closes the confirmation and directs recovery to the file tree for an uncertain trash outcome', async () => {
+    actionMocks.trashWorkspaceFile.mockRejectedValueOnce(
+      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost' }),
+    )
+    renderInJsdom(
+      <FiletreeActionDialogHost
+        currentWorkspaceId={WORKSPACE_ID}
+        currentWorkspaceRuntimeId="workspace-runtime-filetree-action-test"
+      />,
+    )
+    await flushTestUpdates(() => {
+      filetreeActionDialogsStore.getState().openTrashFileConfirm({
+        target: {
+          kind: 'workspace-root',
+          workspaceId: WORKSPACE_ID,
+          workspaceRuntimeId: 'workspace-runtime-filetree-action-test',
+        },
+        path: 'src/example.ts',
+        name: 'example.ts',
+      })
+    })
+
+    await flushTestUpdates(async () => await dialogProps.latest.onConfirm())
+
+    expect(filetreeActionDialogsStore.getState().trashFileConfirm).toBeNull()
+    expect(actionMocks.warning).toHaveBeenCalledWith('error.trash-file-outcome-uncertain')
   })
 })
 

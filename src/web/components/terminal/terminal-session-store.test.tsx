@@ -47,6 +47,8 @@ function makeReadContext(overrides: Partial<TerminalFilesystemTargetSnapshot> = 
     subscribeTerminalFilesystemTarget: () => () => {},
     workspaceBellCount: () => 0,
     subscribeWorkspaceBellCount: () => () => {},
+    workspaceTerminalSessions: () => [],
+    subscribeWorkspaceTerminalSessions: () => () => {},
     snapshot: () => EMPTY_TERMINAL_SNAPSHOT,
     subscribeSnapshot: () => () => {},
   }
@@ -79,8 +81,8 @@ function expectMissingReadProvider(composable: () => unknown): void {
     name: 'MissingTerminalStoreProviderProbe',
     setup() {
       composable()
-      return () => null
     },
+    render: () => null,
   })
   expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
 }

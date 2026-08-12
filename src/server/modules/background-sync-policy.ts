@@ -8,15 +8,21 @@ export interface RegisteredGitBackgroundSyncTarget extends GitBackgroundSyncTarg
   userId: string
 }
 
-export function backgroundSyncTargetKey(target: RegisteredGitBackgroundSyncTarget): string {
+export interface BackgroundSyncTargetIdentity {
+  userId: string
+  workspaceId: GitBackgroundSyncTarget['workspaceId']
+  workspaceRuntimeId: string
+}
+
+export function backgroundSyncTargetKey(target: BackgroundSyncTargetIdentity): string {
   return `${target.userId}\0${target.workspaceId}\0${target.workspaceRuntimeId}`
 }
 
-export function uniqueBackgroundSyncTargets(
+export function uniqueBackgroundSyncTargets<TTarget extends GitBackgroundSyncTarget>(
   userId: string,
-  targets: readonly GitBackgroundSyncTarget[],
-): RegisteredGitBackgroundSyncTarget[] {
-  const unique = new Map<string, RegisteredGitBackgroundSyncTarget>()
+  targets: readonly TTarget[],
+): Array<TTarget & { userId: string }> {
+  const unique = new Map<string, TTarget & { userId: string }>()
   for (const target of targets) {
     const registered = { userId, ...target }
     unique.set(backgroundSyncTargetKey(registered), registered)
@@ -24,17 +30,17 @@ export function uniqueBackgroundSyncTargets(
   return [...unique.values()]
 }
 
-export function uniqueRegisteredBackgroundSyncTargets(
-  targets: readonly RegisteredGitBackgroundSyncTarget[],
-): RegisteredGitBackgroundSyncTarget[] {
-  const unique = new Map<string, RegisteredGitBackgroundSyncTarget>()
+export function uniqueRegisteredBackgroundSyncTargets<TTarget extends BackgroundSyncTargetIdentity>(
+  targets: readonly TTarget[],
+): TTarget[] {
+  const unique = new Map<string, TTarget>()
   for (const target of targets) unique.set(backgroundSyncTargetKey(target), target)
   return [...unique.values()]
 }
 
 export function sameBackgroundSyncTargets(
-  current: readonly RegisteredGitBackgroundSyncTarget[],
-  next: readonly RegisteredGitBackgroundSyncTarget[],
+  current: readonly BackgroundSyncTargetIdentity[],
+  next: readonly BackgroundSyncTargetIdentity[],
 ): boolean {
   if (current.length !== next.length) return false
   const currentKeys = new Set(current.map(backgroundSyncTargetKey))

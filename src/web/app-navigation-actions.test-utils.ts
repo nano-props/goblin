@@ -2,7 +2,7 @@ import { expect, vi } from 'vitest'
 import { createAppNavigationActions as createAppNavigationActionsCore } from '#/web/app-navigation-actions.ts'
 import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type {

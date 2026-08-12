@@ -10,11 +10,22 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { LanInfo } from '#/shared/api-types.ts'
+import type { AccessTokenProjection } from '#/shared/access-token.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
+}))
+const fetchServerJsonMock = vi.hoisted(() => vi.fn())
+const accessTokenReadMock = vi.fn()
+const getAccessTokenProjectionMock = vi.fn<() => Promise<AccessTokenProjection>>(async () => ({
+  accessToken: 'active-secret',
+  activation: 'current' as const,
+}))
+const rotateAccessTokenMock = vi.fn(async () => ({
+  accessToken: 'rotated-secret',
+  activation: 'after-restart' as const,
 }))
 
 const testWindow = window as unknown as {
@@ -26,6 +37,18 @@ beforeEach(() => {
   setClientBridgeForTests(null)
   toastMocks.success.mockClear()
   toastMocks.error.mockClear()
+  rotateAccessTokenMock.mockClear()
+  getAccessTokenProjectionMock.mockReset()
+  getAccessTokenProjectionMock.mockResolvedValue({
+    accessToken: 'active-secret',
+    activation: 'current',
+  })
+  fetchServerJsonMock.mockReset()
+  accessTokenReadMock.mockReset()
+  accessTokenReadMock.mockResolvedValue({ accessToken: 'active-secret' })
+  fetchServerJsonMock.mockImplementation((path: string) =>
+    path === '/api/access-token' ? accessTokenReadMock() : Promise.reject(new Error(`unmocked request: ${path}`)),
+  )
 })
 
 afterEach(() => {
@@ -71,7 +94,6 @@ function seedElectronBootstrap() {
     getBootstrap: () => testWindow.__GOBLIN_BOOTSTRAP__ as never,
     invokeIpc: vi.fn(async () => undefined),
     abortIpc: vi.fn(async () => true),
-    onIpcEvent: vi.fn(() => () => {}),
     onEffectIntent: vi.fn(() => () => {}),
     pathForFile: () => '',
     saveClipboardFiles: vi.fn(async () => []),
@@ -101,8 +123,8 @@ function seedElectronBootstrap() {
       onSessionClosed: () => () => {},
     }),
     workspacePaneTabs: () => ({
-      replace: vi.fn(async () => ({ revision: 0, entries: [] })),
-      update: vi.fn(async () => ({ revision: 0, entries: [] })),
+      replace: vi.fn(async () => ({ kind: 'projected' as const, snapshot: { revision: 0, entries: [] } })),
+      update: vi.fn(async () => ({ kind: 'projected' as const, snapshot: { revision: 0, entries: [] } })),
       list: vi.fn(async () => ({ revision: 0, entries: [] })),
       onChanged: () => () => {},
     }),
@@ -110,7 +132,8 @@ function seedElectronBootstrap() {
       open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
       close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
     }),
-    rotateAccessToken: vi.fn(async () => ({ accessToken: 'rotated-secret' })),
+    getAccessTokenProjection: getAccessTokenProjectionMock,
+    rotateAccessToken: rotateAccessTokenMock,
   })
 }
 
@@ -135,10 +158,15 @@ function seedWebBootstrap() {
       throw new Error('Goblin bridge is unavailable in this runtime')
     }),
     abortIpc: vi.fn(async () => false),
-    onIpcEvent: vi.fn(() => () => {}),
     onEffectIntent: vi.fn(() => () => {}),
     pathForFile: () => '',
     saveClipboardFiles: vi.fn(async () => []),
+    getAccessTokenProjection: async () => {
+      throw new Error('Token projection is unavailable in this runtime')
+    },
+    rotateAccessToken: async () => {
+      throw new Error('Token rotation is unavailable in this runtime')
+    },
     host: () => null,
     appRealtime: () => ({
       kickReconnect: () => {},
@@ -165,8 +193,8 @@ function seedWebBootstrap() {
       onSessionClosed: () => () => {},
     }),
     workspacePaneTabs: () => ({
-      replace: vi.fn(async () => ({ revision: 0, entries: [] })),
-      update: vi.fn(async () => ({ revision: 0, entries: [] })),
+      replace: vi.fn(async () => ({ kind: 'projected' as const, snapshot: { revision: 0, entries: [] } })),
+      update: vi.fn(async () => ({ kind: 'projected' as const, snapshot: { revision: 0, entries: [] } })),
       list: vi.fn(async () => ({ revision: 0, entries: [] })),
       onChanged: () => () => {},
     }),
@@ -191,11 +219,81 @@ describe('WebSettings runtime parity', () => {
     expect(html).toContain('settings.lan.local-only')
   })
 
+  test('stages a rotated token without reloading the running client', async () => {
+    seedElectronBootstrap()
+    const { container } = await renderPage()
+    const rotateButton = container.querySelector<HTMLButtonElement>('[aria-label="settings.web.token-rotate"]')
+    expect(rotateButton).not.toBeNull()
+
+    await flushTestUpdates(async () => rotateButton?.click())
+
+    expect(rotateAccessTokenMock).toHaveBeenCalledOnce()
+    expect(toastMocks.success).toHaveBeenCalledWith('settings.web.token-rotated')
+    expect(container.querySelector('#settings-web-token')?.textContent).toBe('rotated-secret')
+    expect(container.textContent).toContain('settings.web.token-pending-restart-hint')
+  })
+
+  test('hydrates a persisted next-start token after the settings page remounts', async () => {
+    getAccessTokenProjectionMock.mockResolvedValueOnce({
+      accessToken: 'persisted-next-start-secret',
+      activation: 'after-restart',
+    })
+    seedElectronBootstrap()
+
+    const { container } = await renderPage()
+    await flushTestUpdates(async () => {})
+
+    expect(container.querySelector('#settings-web-token')?.textContent).toBe('persisted-next-start-secret')
+    expect(container.textContent).toContain('settings.web.token-pending-restart-hint')
+    expect(accessTokenReadMock).not.toHaveBeenCalled()
+  })
+
+  test('surfaces a failed native token projection without fabricating token state', async () => {
+    getAccessTokenProjectionMock.mockRejectedValueOnce(new Error('token file unavailable'))
+    seedElectronBootstrap()
+
+    const { container } = await renderPage()
+    await flushTestUpdates(async () => {})
+
+    expect(container.querySelector('#settings-web-token')?.textContent).toBe('…')
+    expect(toastMocks.error).toHaveBeenCalledWith('settings.web.token-read-failed')
+  })
+
+  test('does not let a late current-token read replace the staged token', async () => {
+    const currentToken = Promise.withResolvers<{ accessToken: string; activation: 'current' }>()
+    getAccessTokenProjectionMock.mockReturnValueOnce(currentToken.promise)
+    seedElectronBootstrap()
+    const { container } = await renderPage()
+    const rotateButton = container.querySelector<HTMLButtonElement>('[aria-label="settings.web.token-rotate"]')
+
+    await flushTestUpdates(async () => rotateButton?.click())
+    currentToken.resolve({ accessToken: 'active-secret', activation: 'current' })
+    await flushTestUpdates(async () => await currentToken.promise)
+
+    expect(container.querySelector('#settings-web-token')?.textContent).toBe('rotated-secret')
+    expect(container.textContent).toContain('settings.web.token-pending-restart-hint')
+  })
+
+  test('does not let a late current-token read failure clear the staged token', async () => {
+    const currentToken = Promise.withResolvers<{ accessToken: string; activation: 'current' }>()
+    getAccessTokenProjectionMock.mockReturnValueOnce(currentToken.promise)
+    seedElectronBootstrap()
+    const { container } = await renderPage()
+    const rotateButton = container.querySelector<HTMLButtonElement>('[aria-label="settings.web.token-rotate"]')
+
+    await flushTestUpdates(async () => rotateButton?.click())
+    currentToken.reject(new Error('current token read failed'))
+    await flushTestUpdates(async () => await currentToken.promise.catch(() => undefined))
+
+    expect(container.querySelector('#settings-web-token')?.textContent).toBe('rotated-secret')
+    expect(container.textContent).toContain('settings.web.token-pending-restart-hint')
+  })
+
   test('hides the Rotate token button and LAN section in the web runtime', async () => {
     // Cross-runtime parity: in `bun run serve.sh` / standalone
     // web mode, the operator owns the server lifecycle. The
-    // Rotate token action (which restarts the embedded server
-    // via main) and the LAN-enabled toggle (which changes the
+    // Rotate token action (which writes the Electron-owned next-start
+    // credential) and the LAN-enabled toggle (which changes the
     // main-owned bind address) must not surface — clicking them
     // would no-op or surface a misleading error. The web
     // settings page is intentionally read-only on those axes.
@@ -285,4 +383,8 @@ describe('WebSettings runtime parity', () => {
 
 vi.mock('vue-sonner', () => ({
   toast: toastMocks,
+}))
+
+vi.mock('#/web/lib/server-fetch.ts', () => ({
+  fetchServerJson: fetchServerJsonMock,
 }))

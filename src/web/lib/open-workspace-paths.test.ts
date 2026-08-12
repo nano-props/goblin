@@ -7,7 +7,7 @@ describe('openWorkspacePaths', () => {
   test('opens paths without per-item activation and focuses the first success', async () => {
     const openWorkspaceMembership = vi
       .fn<(path: string) => Promise<OpenWorkspaceResult>>()
-      .mockResolvedValueOnce({ ok: false, message: 'error.workspace-git-unavailable' })
+      .mockResolvedValueOnce({ ok: false, kind: 'failed', message: 'error.workspace-git-unavailable' })
       .mockResolvedValueOnce({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///tmp/workspace-b') })
       .mockResolvedValueOnce({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///tmp/workspace-c') })
     const activateWorkspace = vi.fn()
@@ -23,13 +23,19 @@ describe('openWorkspacePaths', () => {
     expect(openWorkspaceMembership).toHaveBeenNthCalledWith(1, '/tmp/a')
     expect(openWorkspaceMembership).toHaveBeenNthCalledWith(2, '/tmp/b')
     expect(openWorkspaceMembership).toHaveBeenNthCalledWith(3, '/tmp/c')
-    expect(onOpenFailed).toHaveBeenCalledWith('/tmp/a', 'error.workspace-git-unavailable')
+    expect(onOpenFailed).toHaveBeenCalledWith('/tmp/a', {
+      ok: false,
+      kind: 'failed',
+      message: 'error.workspace-git-unavailable',
+    })
     expect(activateWorkspace).toHaveBeenCalledTimes(1)
     expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/workspace-b')
   })
 
   test('does not activate anything when every path fails', async () => {
-    const openWorkspaceMembership = vi.fn().mockResolvedValue({ ok: false, message: 'error.workspace-git-unavailable' })
+    const openWorkspaceMembership = vi
+      .fn()
+      .mockResolvedValue({ ok: false, kind: 'failed', message: 'error.workspace-git-unavailable' })
     const activateWorkspace = vi.fn()
 
     const firstId = await openWorkspacePaths(['/tmp/a'], {
@@ -38,6 +44,34 @@ describe('openWorkspacePaths', () => {
     })
 
     expect(firstId).toBeNull()
+    expect(activateWorkspace).not.toHaveBeenCalled()
+  })
+
+  test('stops opening later paths after an uncertain membership write', async () => {
+    const uncertainWorkspaceId = workspaceIdForTest('goblin+file:///tmp/workspace-a')
+    const openWorkspaceMembership = vi
+      .fn<(path: string) => Promise<OpenWorkspaceResult>>()
+      .mockResolvedValueOnce({
+        ok: false,
+        kind: 'uncertain',
+        workspaceId: uncertainWorkspaceId,
+        message: 'error.operation-outcome-uncertain',
+      })
+      .mockResolvedValueOnce({ ok: true, workspaceId: workspaceIdForTest('goblin+file:///tmp/workspace-b') })
+    const activateWorkspace = vi.fn()
+    const onOpenFailed = vi.fn()
+
+    await expect(
+      openWorkspacePaths(['/tmp/a', '/tmp/b'], { openWorkspaceMembership, activateWorkspace, onOpenFailed }),
+    ).resolves.toBeNull()
+
+    expect(openWorkspaceMembership).toHaveBeenCalledOnce()
+    expect(onOpenFailed).toHaveBeenCalledWith('/tmp/a', {
+      ok: false,
+      kind: 'uncertain',
+      workspaceId: uncertainWorkspaceId,
+      message: 'error.operation-outcome-uncertain',
+    })
     expect(activateWorkspace).not.toHaveBeenCalled()
   })
 
@@ -61,7 +95,10 @@ describe('openWorkspacePaths', () => {
     expect(firstId).toBe('goblin+file:///tmp/workspace-a')
     expect(onOpenFailed).not.toHaveBeenCalled()
     await Promise.resolve()
-    expect(onPostOpenError).toHaveBeenCalledWith('/tmp/a', 'recent write failed')
+    expect(onPostOpenError).toHaveBeenCalledWith('/tmp/a', {
+      kind: 'recent-workspace',
+      message: 'recent write failed',
+    })
     expect(activateWorkspace).toHaveBeenCalledWith('goblin+file:///tmp/workspace-a')
   })
 })

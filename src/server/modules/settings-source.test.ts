@@ -11,6 +11,11 @@ import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  acquireWorkspaceRuntimeLease,
+  captureWorkspaceRuntimeMembershipCapability,
+  clearWorkspaceRuntimesForUser,
+} from '#/server/modules/workspace-runtimes.ts'
 
 let tmp: string | null = null
 let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -18,6 +23,14 @@ const REPO_A = workspaceIdForTest('goblin+file:///repo-a')
 const REPO_B = workspaceIdForTest('goblin+file:///repo-b')
 const REPO_C = workspaceIdForTest('goblin+file:///repo-c')
 const RUNTIME_USER_ID = 'settings-source-runtime-user'
+let runtimeClientSequence = 0
+
+function epochCapabilityForTest(workspaceId: WorkspaceId) {
+  runtimeClientSequence += 1
+  const clientId = `settings-source-client-${runtimeClientSequence}`
+  const lease = acquireWorkspaceRuntimeLease(RUNTIME_USER_ID, workspaceId, clientId)
+  return captureWorkspaceRuntimeMembershipCapability(RUNTIME_USER_ID, workspaceId, lease.workspaceRuntimeId, clientId)
+}
 
 async function writeWorkspacePaneLayout(
   source: { serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository },
@@ -29,6 +42,7 @@ async function writeWorkspacePaneLayout(
     workspaceId,
     expected: current.layout,
     replacement,
+    epochCapability: epochCapabilityForTest(workspaceId),
   })
   if (outcome.kind !== 'accepted') throw new Error('test workspace pane layout CAS failed')
 }
@@ -38,6 +52,8 @@ describe('settings source', () => {
     try {
       const mod = await import('#/server/modules/settings-source.ts')
       mod.resetServerSettingsSourceForTests()
+      clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
+      runtimeClientSequence = 0
     } finally {
       try {
         if (tmp) rmSync(tmp, { recursive: true, force: true })
@@ -45,7 +61,6 @@ describe('settings source', () => {
         tmp = null
         if (previousDataDir === undefined) delete process.env.GOBLIN_SERVER_DATA_DIR
         else process.env.GOBLIN_SERVER_DATA_DIR = previousDataDir
-        vi.resetModules()
       }
     }
   })
@@ -73,8 +88,7 @@ describe('settings source', () => {
     expect(await mod.getServerRecentWorkspaces()).toEqual([])
     expect(await mod.getServerWorkspaceSettings()).toEqual([])
     mod.resetServerSettingsSourceForTests()
-    vi.resetModules()
-    const reloaded = await import('#/server/modules/settings-source.ts')
+    const reloaded = mod
     expect(await reloaded.getServerFetchIntervalSec()).toBe(120)
   })
 
@@ -113,8 +127,7 @@ describe('settings source', () => {
     expect(listener).toHaveBeenCalledWith(42)
     expect(listener).toHaveBeenCalledTimes(1)
     mod.resetServerSettingsSourceForTests()
-    vi.resetModules()
-    const reloaded = await import('#/server/modules/settings-source.ts')
+    const reloaded = mod
     expect(await reloaded.getServerFetchIntervalSec()).toBe(42)
     expect(await reloaded.getUserSettings()).toMatchObject({
       lang: 'ko',
@@ -249,12 +262,11 @@ describe('settings source', () => {
     const initial = await import('#/server/modules/settings-source.ts')
     await initial.updateUserSettings({ theme: 'dark' })
     initial.resetServerSettingsSourceForTests()
-    vi.resetModules()
     const file = path.join(tmp, 'user-settings.json')
     const persisted = JSON.parse(await readFile(file, 'utf-8'))
     await writeFile(file, JSON.stringify({ ...persisted, version: 2, futureSetting: true }), 'utf-8')
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = initial
     await expect(mod.getUserSettings()).resolves.toMatchObject({ theme: 'dark' })
     const rewritten = JSON.parse(await readFile(file, 'utf-8'))
     expect(rewritten).not.toHaveProperty('version')
@@ -454,8 +466,7 @@ describe('settings source', () => {
       },
     })
     mod.resetServerSettingsSourceForTests()
-    vi.resetModules()
-    const reloaded = await import('#/server/modules/settings-source.ts')
+    const reloaded = mod
     await expect(reloaded.getServerWorkspaceState()).resolves.toMatchObject({
       workspacePaneTabsByTargetByWorkspace: {
         [REPO_A]: { [branchTargetKey(REPO_A, 'main')]: [workspacePaneStaticTabEntry('history')] },
@@ -487,6 +498,7 @@ describe('settings source', () => {
       workspaceId: REPO_A,
       expected: empty,
       replacement: history,
+      epochCapability: epochCapabilityForTest(REPO_A),
     })
     await expect(
       mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
@@ -499,6 +511,7 @@ describe('settings source', () => {
         workspaceId: REPO_A,
         expected: history,
         replacement: history,
+        epochCapability: epochCapabilityForTest(REPO_A),
       }),
     ).resolves.toMatchObject({ kind: 'accepted', changed: false })
     await expect(
@@ -506,6 +519,7 @@ describe('settings source', () => {
         workspaceId: REPO_A,
         expected: empty,
         replacement: empty,
+        epochCapability: epochCapabilityForTest(REPO_A),
       }),
     ).resolves.toMatchObject({ kind: 'conflict', snapshot: { layout: history } })
 
@@ -535,6 +549,7 @@ describe('settings source', () => {
         workspaceId: REPO_A,
         expected: { entries: [] },
         replacement,
+        epochCapability: epochCapabilityForTest(REPO_A),
       }),
     ).rejects.toBe(programmingError)
   })
@@ -553,6 +568,7 @@ describe('settings source', () => {
       mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
         workspaceId: REPO_A,
         expected: { entries: [] },
+        epochCapability: epochCapabilityForTest(REPO_A),
         replacement: {
           entries: [
             {

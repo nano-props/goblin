@@ -13,8 +13,11 @@ import type { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import type { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
-interface AppOverlaysProps {
+interface AppGlobalOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
+}
+
+interface WorkspaceContextOverlaysProps {
   workspaceDrop: ReturnType<typeof useWorkspaceDrop>
   navigation: AppNavigationActions
   hydratedRouteWorkspaceId: WorkspaceId | null
@@ -23,17 +26,9 @@ interface AppOverlaysProps {
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
 }
 
-export const AppOverlays = defineComponent<AppOverlaysProps>({
-  name: 'AppOverlays',
-  props: [
-    'overlays',
-    'workspaceDrop',
-    'navigation',
-    'hydratedRouteWorkspaceId',
-    'currentWorkspaceRuntimeId',
-    'currentBranchName',
-    'currentWorkspacePaneRoute',
-  ],
+export const AppGlobalOverlays = defineComponent<AppGlobalOverlaysProps>({
+  name: 'AppGlobalOverlays',
+  props: ['overlays'],
 
   setup(props) {
     return () => (
@@ -47,6 +42,26 @@ export const AppOverlays = defineComponent<AppOverlaysProps>({
           open={props.overlays.state.value.openRemoteWorkspace.open}
           onOpenChange={props.overlays.setOpenRemoteWorkspaceOpen}
         />
+        <Toaster position="bottom-right" closeButton />
+      </>
+    )
+  },
+})
+
+export const WorkspaceContextOverlays = defineComponent<WorkspaceContextOverlaysProps>({
+  name: 'WorkspaceContextOverlays',
+  props: [
+    'workspaceDrop',
+    'navigation',
+    'hydratedRouteWorkspaceId',
+    'currentWorkspaceRuntimeId',
+    'currentBranchName',
+    'currentWorkspacePaneRoute',
+  ],
+
+  setup(props) {
+    return () => (
+      <>
         <BranchActionDialogHost
           currentWorkspaceId={props.hydratedRouteWorkspaceId}
           currentBranchName={props.currentBranchName}
@@ -61,7 +76,6 @@ export const AppOverlays = defineComponent<AppOverlaysProps>({
           navigation={props.navigation}
         />
         <WorkspaceDropOverlay active={props.workspaceDrop.active.value} />
-        <Toaster position="bottom-right" closeButton />
       </>
     )
   },

@@ -2,7 +2,11 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
-import type { TerminalCreateResult, TerminalSessionClosedEvent } from '#/shared/terminal-types.ts'
+import type {
+  TerminalCreateSuccess,
+  TerminalSessionClosedEvent,
+  TerminalSessionSummary,
+} from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
@@ -16,6 +20,10 @@ const mocks = vi.hoisted(() => ({
   openRuntimeMock: vi.fn(),
   closeRuntimeMock: vi.fn(),
   writeWorkspaceTabsSnapshotMock: vi.fn(),
+  workspacePaneTabsAfterSnapshotCommitMock: vi.fn(
+    (_commit: string, _target: unknown, snapshot: { entries: Array<{ tabs: WorkspacePaneTabEntry[] }> }) =>
+      snapshot.entries[0]?.tabs ?? null,
+  ),
   closeMock: vi.fn(),
   listWorkspaceTabsMock: vi.fn(),
   setBadgeMock: vi.fn(),
@@ -41,6 +49,7 @@ vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
 
 vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
   writeCanonicalWorkspacePaneTabsSnapshot: mocks.writeWorkspaceTabsSnapshotMock,
+  workspacePaneTabsAfterSnapshotCommit: mocks.workspacePaneTabsAfterSnapshotCommitMock,
 }))
 
 vi.mock('#/web/client-page-id.ts', () => ({
@@ -211,8 +220,6 @@ function terminalBase() {
   }
 }
 
-type TerminalCreateSuccess = Extract<TerminalCreateResult, { ok: true }>
-
 function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): TerminalCreateSuccess {
   return {
     ok: true as const,
@@ -230,6 +237,35 @@ function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): Termi
     controller: null,
     canonicalSize: null,
     ...overrides,
+  }
+}
+
+function serverSessionFromCreateResult(
+  result: TerminalCreateSuccess,
+  overrides: {
+    terminalRuntimeGeneration?: TerminalSessionSummary['terminalRuntimeGeneration']
+    identityRevision?: TerminalSessionSummary['identityRevision']
+    phase?: TerminalSessionSummary['phase']
+    presentation?: ReturnType<typeof terminalBase>['presentation']
+  } = {},
+): TerminalSessionSummary {
+  const base = terminalBase()
+  if (base.target.kind !== 'git-worktree' || base.presentation.kind !== 'git-worktree') {
+    throw new Error('expected Git worktree terminal fixture')
+  }
+  return {
+    target: base.target,
+    presentation: overrides.presentation ?? base.presentation,
+    terminalSessionId: result.terminalSessionId,
+    terminalRuntimeSessionId: result.terminalRuntimeSessionId,
+    terminalRuntimeGeneration: overrides.terminalRuntimeGeneration ?? result.terminalRuntimeGeneration,
+    identityRevision: overrides.identityRevision ?? result.identityRevision,
+    processName: result.processName,
+    canonicalTitle: result.canonicalTitle,
+    phase: overrides.phase ?? result.phase,
+    message: result.message,
+    controller: result.controller,
+    canonicalSize: result.canonicalSize,
   }
 }
 
@@ -251,17 +287,27 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.createMock.mockReset()
     mocks.createMock.mockResolvedValue(makeCreateResult())
     mocks.openRuntimeMock.mockReset()
-    mocks.openRuntimeMock.mockImplementation(async (input: { runtimeType: 'terminal'; request: unknown }) => {
-      const runtime = await mocks.createMock(input.request)
-      return runtime.ok
-        ? {
-            ok: true as const,
-            runtimeType: 'terminal' as const,
-            runtime,
-            paneTabsSnapshot: { revision: 7, entries: [] },
-          }
-        : { ok: false as const, runtimeType: 'terminal' as const, message: runtime.message }
-    })
+    mocks.openRuntimeMock.mockImplementation(
+      async (input: { runtimeType: 'terminal'; request: { target: ReturnType<typeof terminalBase>['target'] } }) => {
+        const runtime = await mocks.createMock(input.request)
+        return runtime.ok
+          ? {
+              ok: true as const,
+              runtimeType: 'terminal' as const,
+              runtime,
+              paneTabsSnapshot: {
+                revision: 7,
+                entries: [
+                  {
+                    target: input.request.target,
+                    tabs: [{ type: 'terminal' as const, runtimeSessionId: runtime.terminalSessionId }],
+                  },
+                ],
+              },
+            }
+          : { ok: false as const, runtimeType: 'terminal' as const, message: runtime.message }
+      },
+    )
     mocks.closeMock.mockReset()
     mocks.closeMock.mockResolvedValue(true)
     mocks.closeRuntimeMock.mockReset()
@@ -271,7 +317,8 @@ describe('TerminalSessionProjection create flow', () => {
       runtime: { sessions: [] },
     })
     mocks.writeWorkspaceTabsSnapshotMock.mockReset()
-    mocks.writeWorkspaceTabsSnapshotMock.mockResolvedValue(true)
+    mocks.writeWorkspaceTabsSnapshotMock.mockReturnValue('applied')
+    mocks.workspacePaneTabsAfterSnapshotCommitMock.mockClear()
     mocks.listWorkspaceTabsMock.mockReset()
     mocks.listWorkspaceTabsMock.mockResolvedValue([])
     mocks.setBadgeMock.mockReset()
@@ -356,6 +403,161 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.openRuntimeMock).toHaveBeenCalledOnce()
     expect(mocks.writeWorkspaceTabsSnapshotMock).toHaveBeenCalledOnce()
     expect(mocks.listWorkspaceTabsMock).not.toHaveBeenCalled()
+  })
+
+  test('does not project or select a created terminal removed by a newer pane tabs snapshot', async () => {
+    mocks.writeWorkspaceTabsSnapshotMock.mockReturnValueOnce('newer-snapshot-preserved')
+    mocks.workspacePaneTabsAfterSnapshotCommitMock.mockReturnValueOnce([])
+
+    const admission = await projection.createTerminalWithAdmission(terminalBase())
+
+    expect(admission).toMatchObject({
+      terminalSessionId: 'term-111111111111111111111',
+      runtimeProjectionApplied: false,
+    })
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
+  })
+
+  test('accepts a create with the authoritative presentation from a newer terminal recovery', async () => {
+    const createResponse = Promise.withResolvers<TerminalCreateSuccess>()
+    const createResult = makeCreateResult()
+    const authoritativePresentation = {
+      kind: 'git-worktree' as const,
+      head: { kind: 'branch' as const, branchName: 'feature/recovered' },
+    }
+    mocks.createMock.mockReturnValueOnce(createResponse.promise)
+
+    const pending = projection.createTerminalWithAdmission(terminalBase())
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledOnce())
+
+    projection.reconcileServerSessionsSnapshot(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      {
+        revision: 12,
+        sessions: [
+          serverSessionFromCreateResult(createResult, {
+            terminalRuntimeGeneration: 1,
+            identityRevision: 1,
+            phase: 'open',
+            presentation: authoritativePresentation,
+          }),
+        ],
+      },
+      'client_local',
+    )
+    createResponse.resolve(createResult)
+
+    await expect(pending).resolves.toEqual({
+      terminalSessionId: createResult.terminalSessionId,
+      presentation: authoritativePresentation,
+      requestRole: 'leader',
+      resourceDisposition: 'created',
+      runtimeProjectionApplied: true,
+    })
+    const currentSession = requiredTerminalSession(projection, createResult.terminalSessionId)
+    expect(currentSession.descriptor.presentation).toEqual(authoritativePresentation)
+    expect(currentSession.currentRuntimeBinding()).toEqual({
+      terminalRuntimeSessionId: createResult.terminalRuntimeSessionId,
+      terminalRuntimeGeneration: 1,
+    })
+  })
+
+  test('does not let an unversioned reuse response overwrite a newer terminal recovery', async () => {
+    const createResponse = Promise.withResolvers<TerminalCreateSuccess>()
+    const createResult = makeCreateResult({
+      action: 'reused',
+      terminalProjectionEffect: { kind: 'none' },
+    })
+    const authoritativePresentation = {
+      kind: 'git-worktree' as const,
+      head: { kind: 'branch' as const, branchName: 'feature/recovered' },
+    }
+    mocks.createMock.mockReturnValueOnce(createResponse.promise)
+
+    const pending = projection.createTerminalWithAdmission(terminalBase())
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledOnce())
+
+    projection.reconcileServerSessionsSnapshot(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      {
+        revision: 12,
+        sessions: [
+          serverSessionFromCreateResult(createResult, {
+            terminalRuntimeGeneration: 1,
+            identityRevision: 1,
+            phase: 'open',
+            presentation: authoritativePresentation,
+          }),
+        ],
+      },
+      'client_local',
+    )
+    createResponse.resolve(createResult)
+
+    await expect(pending).resolves.toMatchObject({
+      terminalSessionId: createResult.terminalSessionId,
+      presentation: authoritativePresentation,
+      runtimeProjectionApplied: true,
+    })
+    expect(requiredTerminalSession(projection, createResult.terminalSessionId).descriptor.presentation).toEqual(
+      authoritativePresentation,
+    )
+  })
+
+  test('hydrates newer runtime metadata from an unversioned reuse response', async () => {
+    const scope = { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID }
+    const createResult = makeCreateResult({
+      action: 'reused',
+      terminalProjectionEffect: { kind: 'none' },
+      terminalRuntimeGeneration: 1,
+      identityRevision: 1,
+      phase: 'open',
+    })
+    projection.reconcileServerSessionsSnapshot(
+      scope,
+      {
+        revision: 10,
+        sessions: [
+          serverSessionFromCreateResult(createResult, {
+            terminalRuntimeGeneration: 0,
+            identityRevision: 0,
+            phase: 'opening',
+          }),
+        ],
+      },
+      'client_local',
+    )
+    mocks.createMock.mockResolvedValueOnce(createResult)
+
+    const admission = await projection.createTerminalWithAdmission(terminalBase())
+
+    expect(admission.runtimeProjectionApplied).toBe(true)
+    expect(requiredTerminalSession(projection, createResult.terminalSessionId).currentRuntimeBinding()).toEqual({
+      terminalRuntimeSessionId: createResult.terminalRuntimeSessionId,
+      terminalRuntimeGeneration: 1,
+    })
+  })
+
+  test('supersedes a create when newer terminal recovery confirms the session is missing', async () => {
+    const createResponse = Promise.withResolvers<TerminalCreateSuccess>()
+    const createResult = makeCreateResult()
+    mocks.createMock.mockReturnValueOnce(createResponse.promise)
+
+    const pending = projection.createTerminalWithAdmission(terminalBase())
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledOnce())
+
+    projection.reconcileServerSessionsSnapshot(
+      { workspaceId: REPO_ROOT, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      { revision: 12, sessions: [] },
+      'client_local',
+    )
+    createResponse.resolve(createResult)
+
+    await expect(pending).resolves.toMatchObject({
+      terminalSessionId: createResult.terminalSessionId,
+      runtimeProjectionApplied: false,
+    })
+    expect(projection.terminalFilesystemTargetSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
   test('passes a startup shell command through terminal create', async () => {
@@ -448,7 +650,12 @@ describe('TerminalSessionProjection create flow', () => {
     const firstResult = await firstCreate
     expect(mocks.writeWorkspaceTabsSnapshotMock).toHaveBeenCalledWith(REPO_ROOT, WORKSPACE_RUNTIME_ID, {
       revision: 7,
-      entries: [],
+      entries: [
+        {
+          target: base.target,
+          tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+        },
+      ],
     })
     expect(firstResult).toEqual({
       terminalSessionId: 'term-111111111111111111111',
@@ -702,6 +909,31 @@ describe('TerminalSessionProjection create flow', () => {
 
       expect(projection.workspaceBellCount(REPO_ROOT)).toBe(0)
       expect(listener).toHaveBeenCalledTimes(1)
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  test('publishes the workspace terminal list from the canonical session projection', async () => {
+    const listener = vi.fn()
+    const unsubscribe = projection.subscribeWorkspaceTerminalSessions(REPO_ROOT, listener)
+
+    try {
+      const terminalSessionId = await projection.createTerminal(terminalBase())
+
+      expect(projection.workspaceTerminalSessions(REPO_ROOT)).toEqual([
+        expect.objectContaining({
+          terminalSessionId,
+          base: terminalBase(),
+        }),
+      ])
+      expect(listener).toHaveBeenCalled()
+
+      listener.mockClear()
+      projection.handleSessionClosed(sessionClosedEvent('pty_session_1_aaaaaaaaa', 0, terminalSessionId))
+
+      expect(projection.workspaceTerminalSessions(REPO_ROOT)).toEqual([])
+      expect(listener).toHaveBeenCalled()
     } finally {
       unsubscribe()
     }

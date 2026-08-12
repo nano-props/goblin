@@ -11,7 +11,7 @@
 //     callers own loading/error display, while server success means the
 //     result is authoritative for the requested worktree.
 
-import { postServerJson } from '#/web/lib/server-fetch.ts'
+import { postServerCommandJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type { WorkspaceFileViewerResult, WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
@@ -47,9 +47,14 @@ export async function trashWorkspaceFile(
   path: string,
   options: { readonly signal?: AbortSignal } = {},
 ): Promise<ExecResult> {
-  return await postServerJson('/api/workspace/trash-file', { target, path }, decodeWith(ExecResultResponseSchema), {
-    signal: options.signal,
-  })
+  return await postServerCommandJson(
+    '/api/workspace/trash-file',
+    { target, path },
+    decodeWith(ExecResultResponseSchema),
+    {
+      signal: options.signal,
+    },
+  )
 }
 
 export async function getWorkspaceFileViewer(

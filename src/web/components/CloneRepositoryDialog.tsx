@@ -1,4 +1,5 @@
 import { computed, defineComponent, ref, watch } from 'vue'
+import { toast } from 'vue-sonner'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
 import { chooseCloneParentPath, hasNativeDirectoryPicker, homeDirectory } from '#/web/app-shell-client.ts'
 import { Button } from '#/web/components/ui/button.tsx'
@@ -11,6 +12,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { joinPath, tildify, untildify } from '#/web/lib/paths.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
+import { hasErrorCode } from '#/shared/error-code.ts'
 
 export interface CloneRepositoryInput {
   url: string
@@ -117,6 +119,11 @@ export const CloneRepositoryDialog = defineComponent<Props>({
         error.value = t(errorMessageKey)
       } catch (caught) {
         if (controller.signal.aborted) return
+        if (hasErrorCode(caught, 'OUTCOME_UNCERTAIN')) {
+          pending.value = false
+          toast.warning(t('error.clone-outcome-uncertain'))
+          return
+        }
         pending.value = false
         error.value = caught instanceof Error ? caught.message : t('error.unknown')
       }

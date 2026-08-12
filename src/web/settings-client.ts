@@ -1,10 +1,10 @@
 import { canUseGlobalShortcutSettings } from '#/web/app-shell-client.ts'
 import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
-import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
+import { fetchServerJson, postServerCommandJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   ExternalAppsSnapshot,
   GitHubCliState,
-  GlobalShortcutState,
+  SetGlobalShortcutResult,
   I18nSnapshot,
   LanInfo,
   WorkspaceSettingsState,
@@ -67,7 +67,7 @@ export async function getThemeState(): Promise<ThemeState> {
 }
 
 async function updateUserSettingsPatch(settings: Record<string, unknown>): Promise<UserSettingsUpdateResponse> {
-  const result = await postServerJson(
+  const result = await postServerCommandJson(
     '/api/settings/prefs',
     { prefs: settings },
     decodeWith(UserSettingsUpdateResponseSchema),
@@ -133,7 +133,7 @@ export async function refreshExternalAppsSnapshot(): Promise<ExternalAppsSnapsho
 }
 
 export async function addRecentWorkspace(workspace: WorkspaceSessionEntry): Promise<RecentWorkspacesUpdateResponse> {
-  const result = await postServerJson(
+  const result = await postServerCommandJson(
     '/api/settings/recent-workspaces/add',
     { workspace },
     decodeWith(
@@ -148,7 +148,7 @@ export async function addRecentWorkspace(workspace: WorkspaceSessionEntry): Prom
 }
 
 export async function clearRecentWorkspaces(): Promise<void> {
-  await postServerJson('/api/settings/recent-workspaces/clear', {}, decodeWith(OkResponseSchema))
+  await postServerCommandJson('/api/settings/recent-workspaces/clear', {}, decodeWith(OkResponseSchema))
 }
 
 /**
@@ -162,7 +162,7 @@ export async function setRecentWorkspaceExternalApp(input: {
   target: WorkspaceExternalAppTarget
   itemId: string
 }): Promise<WorkspaceSettingsState> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/settings/workspace-external-app-recent',
     {
       workspaceId: input.workspaceId,
@@ -177,7 +177,7 @@ export async function restoreServerWorkspace(
   clientId: string,
   options?: { activeWorkspaceId?: WorkspaceId | null; signal?: AbortSignal },
 ): Promise<WorkspaceRestoreResult> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/settings/workspace/restore',
     {
       clientId,
@@ -189,11 +189,11 @@ export async function restoreServerWorkspace(
 }
 
 export async function addWorkspaceEntry(entry: WorkspaceSessionEntry): Promise<void> {
-  await postServerJson('/api/settings/workspace/entries/add', { entry }, decodeWith(ServerWorkspaceStateSchema))
+  await postServerCommandJson('/api/settings/workspace/entries/add', { entry }, decodeWith(ServerWorkspaceStateSchema))
 }
 
 export async function removeWorkspaceEntry(workspaceId: WorkspaceId): Promise<void> {
-  await postServerJson(
+  await postServerCommandJson(
     '/api/settings/workspace/entries/remove',
     { workspaceId },
     decodeWith(ServerWorkspaceStateSchema),
@@ -206,7 +206,7 @@ export async function restoreWorkspaceTabs(
   workspaceRuntimeId: string,
   options?: { signal?: AbortSignal },
 ): Promise<WorkspaceTabsRestoreResult> {
-  return await postServerJson(
+  return await postServerCommandJson(
     '/api/settings/workspace/tabs/restore',
     { clientId, workspaceId, workspaceRuntimeId },
     decodeWith(WorkspaceTabsRestoreResponseSchema),
@@ -215,7 +215,7 @@ export async function restoreWorkspaceTabs(
 }
 
 export async function setSettingsFetchInterval(sec: number): Promise<number> {
-  const result = await postServerJson(
+  const result = await postServerCommandJson(
     '/api/settings/fetch-interval',
     { sec },
     decodeWith(v.strictObject({ ok: v.literal(true), fetchIntervalSec: FetchIntervalSecSchema })),
@@ -235,7 +235,7 @@ export async function setGlobalShortcutDisabled(disabled: boolean): Promise<bool
   return (await updateUserSettingsPatch({ globalShortcutDisabled: disabled })).prefs.globalShortcutDisabled
 }
 
-export async function setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState> {
+export async function setGlobalShortcut(accelerator: string): Promise<SetGlobalShortcutResult> {
   if (!canUseGlobalShortcutSettings()) throw new Error('Global shortcut unavailable')
-  return await invokeNativeIpcPath<GlobalShortcutState>('settings.setGlobalShortcut', { accelerator })
+  return await invokeNativeIpcPath<SetGlobalShortcutResult>('settings.setGlobalShortcut', { accelerator })
 }

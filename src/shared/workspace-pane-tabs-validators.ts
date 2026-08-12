@@ -1,5 +1,9 @@
 import * as v from 'valibot'
-import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
+import type {
+  WorkspacePaneTabsSnapshot,
+  WorkspacePaneTabsUpdateOperation,
+  WorkspacePaneTabsWriteResult,
+} from '#/shared/workspace-pane-tabs.ts'
 import {
   WORKSPACE_PANE_RUNTIME_TAB_TYPES,
   WORKSPACE_PANE_STATIC_TAB_IDS,
@@ -85,13 +89,6 @@ export const WorkspacePaneTabEntrySchema = v.union([
   WorkspacePaneRuntimeTabEntrySchema,
 ])
 
-export const WorkspacePaneTabsReplaceInputSchema = v.object({
-  workspaceId: WorkspaceIdSchema,
-  workspaceRuntimeId: WorkspaceRuntimeIdSchema,
-  target: RuntimeWorkspacePaneTargetSchema,
-  tabs: v.array(WorkspacePaneTabEntrySchema),
-})
-
 export const WorkspacePaneTabsUpdateOperationSchema = v.variant('type', [
   v.object({
     type: v.literal('open-static'),
@@ -123,6 +120,11 @@ export const WorkspacePaneTabsSnapshotSchema = v.strictObject({
   entries: v.array(WorkspacePaneTabsEntrySchema),
 })
 
+const WorkspacePaneTabsWriteResultSchema = v.variant('kind', [
+  v.strictObject({ kind: v.literal('projected'), snapshot: WorkspacePaneTabsSnapshotSchema }),
+  v.strictObject({ kind: v.literal('committed-projection-failed') }),
+])
+
 export function normalizeWorkspacePaneTabsSnapshot(value: unknown): WorkspacePaneTabsSnapshot | null {
   const parsed = v.safeParse(WorkspacePaneTabsSnapshotSchema, value)
   if (!parsed.success) return null
@@ -131,6 +133,14 @@ export function normalizeWorkspacePaneTabsSnapshot(value: unknown): WorkspacePan
     return target ? [{ target, tabs: entry.tabs }] : []
   })
   return entries.length === parsed.output.entries.length ? { revision: parsed.output.revision, entries } : null
+}
+
+export function normalizeWorkspacePaneTabsWriteResult(value: unknown): WorkspacePaneTabsWriteResult | null {
+  const parsed = v.safeParse(WorkspacePaneTabsWriteResultSchema, value)
+  if (!parsed.success) return null
+  if (parsed.output.kind === 'committed-projection-failed') return parsed.output
+  const snapshot = normalizeWorkspacePaneTabsSnapshot(parsed.output.snapshot)
+  return snapshot ? { kind: 'projected', snapshot } : null
 }
 
 type RuntimeWorkspacePaneTargetInput =

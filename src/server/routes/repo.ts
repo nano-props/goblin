@@ -40,14 +40,14 @@ import {
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { workspaceLocatorForPath, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
-import { IpcError } from '#/shared/ipc-error.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 import {
   requireCurrentWorkspaceRuntime,
+  requireWorkspaceRuntimeEpochCapability,
   runGitWorkspaceMutationRuntimeRequest,
   runGitWorkspaceRuntimeRequest,
 } from '#/server/modules/workspace-runtime-request.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
-import type { ServerRepoMutationHost } from '#/server/repo-mutation/repo-mutation-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT, type RepoMutationExecResult } from '#/shared/git-types.ts'
@@ -60,13 +60,12 @@ import type { RepoReadInvalidationDomain } from '#/shared/repo-read-invalidation
 
 export function createRepoRoutes(options: {
   worktreeRemovalApplication: ServerWorktreeRemovalHost
-  repoMutationApplication: ServerRepoMutationHost
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost
 }) {
   const app = createRouteApp()
   function assertGitCapability(userId: string, repoRoot: WorkspaceId, workspaceRuntimeId: string): void {
     if (!workspaceRuntimeHasGitCapability(userId, repoRoot, workspaceRuntimeId)) {
-      throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-git-unavailable' })
+      throw new CodedError({ code: 'BAD_REQUEST', message: 'error.workspace-git-unavailable' })
     }
   }
   app.post('/log', async (c) => {
@@ -179,14 +178,15 @@ export function createRepoRoutes(options: {
   })
   app.post('/fetch', async (c) => {
     const { cwd, workspaceRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
-    const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const runtimeCapability = requireWorkspaceRuntimeEpochCapability(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const { userId } = runtimeCapability
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runPublicRepoMutationRequest({
         userId,
         workspaceId: cwd,
         invalidatedDomains: ['metadata'],
-        run: () => fetchRepo(cwd, 'user', c.req.raw.signal, workspaceRuntimeId),
+        run: () => fetchRepo(cwd, runtimeCapability, 'user', c.req.raw.signal),
         label: 'fetch',
         signal: c.req.raw.signal,
       }),
@@ -198,13 +198,14 @@ export function createRepoRoutes(options: {
   })
   app.post('/pull', async (c) => {
     const { cwd, workspaceRuntimeId, branch, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
-    const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const runtimeCapability = requireWorkspaceRuntimeEpochCapability(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const { userId } = runtimeCapability
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     const result = await runRepoMutationRequest({
       userId,
       workspaceId: cwd,
       invalidatedDomains: ['metadata', 'worktree-status'],
-      run: () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal, { workspaceRuntimeId }),
+      run: () => pullRepoBranch(cwd, branch, runtimeCapability, worktreePath, c.req.raw.signal),
       label: 'pull',
       signal: c.req.raw.signal,
     })
@@ -213,14 +214,15 @@ export function createRepoRoutes(options: {
   })
   app.post('/push', async (c) => {
     const { cwd, workspaceRuntimeId, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
-    const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const runtimeCapability = requireWorkspaceRuntimeEpochCapability(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const { userId } = runtimeCapability
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runPublicRepoMutationRequest({
         userId,
         workspaceId: cwd,
         invalidatedDomains: ['metadata'],
-        run: () => pushRepoBranch(cwd, branch, c.req.raw.signal, { workspaceRuntimeId }),
+        run: () => pushRepoBranch(cwd, branch, runtimeCapability, c.req.raw.signal),
         label: 'push',
         signal: c.req.raw.signal,
       }),
@@ -231,7 +233,8 @@ export function createRepoRoutes(options: {
       REPO_PROCEDURE_SCHEMAS.createWorktree,
       c,
     )
-    const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const runtimeCapability = requireWorkspaceRuntimeEpochCapability(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const { userId } = runtimeCapability
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runPublicRepoMutationRequest({
@@ -239,10 +242,7 @@ export function createRepoRoutes(options: {
         workspaceId: cwd,
         invalidatedDomains: ['metadata', 'worktree-status'],
         run: () =>
-          createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
-            workspaceRuntimeId,
-            worktreeBootstrap,
-          }),
+          createRepoWorktree(cwd, { worktreePath, mode }, runtimeCapability, worktreeBootstrap, c.req.raw.signal),
         label: 'create-worktree',
         signal: c.req.raw.signal,
       }),
@@ -253,24 +253,16 @@ export function createRepoRoutes(options: {
       REPO_PROCEDURE_SCHEMAS.deleteBranch,
       c,
     )
-    const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const runtimeCapability = requireWorkspaceRuntimeEpochCapability(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const { userId } = runtimeCapability
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runPublicRepoMutationRequest({
         userId,
         workspaceId: cwd,
         invalidatedDomains: ['metadata'],
-        run: async () => {
-          return await options.repoMutationApplication.deleteBranch(userId, {
-            repoRoot: cwd,
-            workspaceRuntimeId,
-            branchName: branch,
-            deleteBranch: async () =>
-              await deleteRepoBranch(cwd, branch, { force, deleteUpstream }, c.req.raw.signal, {
-                workspaceRuntimeId,
-              }),
-          })
-        },
+        run: async () =>
+          await deleteRepoBranch(cwd, branch, runtimeCapability, { force, deleteUpstream }, c.req.raw.signal),
         label: 'delete-branch',
         signal: c.req.raw.signal,
       }),
@@ -279,7 +271,8 @@ export function createRepoRoutes(options: {
   app.post('/remove-worktree', async (c) => {
     const { cwd, workspaceRuntimeId, branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream } =
       await parseHttpBody(REPO_PROCEDURE_SCHEMAS.removeWorktree, c)
-    const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const runtimeCapability = requireWorkspaceRuntimeEpochCapability(userIdFromContext(c), cwd, workspaceRuntimeId)
+    const { userId } = runtimeCapability
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runPublicRepoMutationRequest({
@@ -304,8 +297,8 @@ export function createRepoRoutes(options: {
                 { branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream },
                 lifecycle,
                 physicalWorktreeCapability,
+                runtimeCapability,
                 signal,
-                { workspaceRuntimeId },
               ),
           }),
         label: 'remove-worktree',
@@ -332,12 +325,17 @@ export function createRepoRoutes(options: {
     if (targets.length === 0 && !workspaceRuntimeClientHasMemberships(userId, clientId)) {
       return c.json(await backgroundSyncResponse(userId))
     }
-    for (const target of targets) {
-      requireCurrentWorkspaceRuntime(userId, target.workspaceId, target.workspaceRuntimeId)
+    const admittedTargets = targets.map((target) => {
+      const runtimeCapability = requireWorkspaceRuntimeEpochCapability(
+        userId,
+        target.workspaceId,
+        target.workspaceRuntimeId,
+      )
       requireCurrentWorkspaceRuntimeMembership(userId, clientId, target.workspaceId, target.workspaceRuntimeId)
       assertGitCapability(userId, target.workspaceId, target.workspaceRuntimeId)
-    }
-    const admission = beginBackgroundSyncRegistration(userId, clientId, revision, targets)
+      return { ...target, runtimeCapability }
+    })
+    const admission = beginBackgroundSyncRegistration(userId, clientId, revision, admittedTargets)
     if (!admission) return c.json(await backgroundSyncResponse(userId))
     const signal = AbortSignal.any([c.req.raw.signal, admission.signal])
     try {
@@ -358,7 +356,7 @@ export function createRepoRoutes(options: {
               const snapshot = await source.getSnapshot({ signal })
               signal.throwIfAborted()
               if (snapshot?.remote.hasRemotes !== true) {
-                throw new IpcError({ code: 'BAD_REQUEST', message: 'error.no-remote-url' })
+                throw new CodedError({ code: 'BAD_REQUEST', message: 'error.no-remote-url' })
               }
             }
             for (const target of targets) {
@@ -382,7 +380,7 @@ export function createRepoRoutes(options: {
 }
 
 function requiredUserId(userId: string | null | undefined): string {
-  if (!userId) throw new IpcError({ code: 'UNAUTHORIZED', message: 'Unauthorized' })
+  if (!userId) throw new CodedError({ code: 'UNAUTHORIZED', message: 'Unauthorized' })
   return userId
 }
 
@@ -422,7 +420,7 @@ function requireCurrentWorkspaceRuntimeMembership(
   workspaceRuntimeId: string,
 ): void {
   if (!isCurrentWorkspaceRuntimeMembership(userId, workspaceId, workspaceRuntimeId, clientId)) {
-    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
+    throw new CodedError({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
   }
 }
 

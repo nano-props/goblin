@@ -3,6 +3,7 @@ import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import type {
   AppRealtimeClientMessage,
   AppRealtimeRequestAction,
+  AppRealtimeResponseMessage,
   AppRealtimeSocketServerMessage,
 } from '#/shared/app-realtime-socket.ts'
 import { normalizeTerminalClientMessage, normalizeTerminalSocketServerMessage } from '#/shared/terminal-validators.ts'
@@ -12,10 +13,10 @@ import {
   type WorkspacePaneTabsSocketAction,
 } from '#/shared/workspace-pane-tabs.ts'
 import {
+  normalizeWorkspacePaneTabsSnapshot,
+  normalizeWorkspacePaneTabsWriteResult,
   WorkspaceRuntimeIdSchema,
   WorkspacePaneTabsListInputSchema,
-  WorkspacePaneTabsReplaceInputSchema,
-  WorkspacePaneTabsSnapshotSchema,
   WorkspacePaneTabsUpdateInputSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
 import {
@@ -36,7 +37,6 @@ export const APP_REALTIME_WS_MESSAGE_LIMIT_BYTES = 1024 * 1024
 const AppRealtimeRequestIdSchema = v.pipe(v.string(), v.regex(APP_REALTIME_REQUEST_ID_RE))
 const WorkspacePaneTabsSocketActionSchema = v.picklist([
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-  WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
 ] as const)
 const WorkspacePaneRuntimeSocketActionSchema = v.picklist([
@@ -50,12 +50,6 @@ const AppRealtimeNonTerminalClientMessageSchema = v.variant('type', [
     requestId: AppRealtimeRequestIdSchema,
     action: v.literal(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list),
     input: WorkspacePaneTabsListInputSchema,
-  }),
-  v.strictObject({
-    type: v.literal('request'),
-    requestId: AppRealtimeRequestIdSchema,
-    action: v.literal(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace),
-    input: WorkspacePaneTabsReplaceInputSchema,
   }),
   v.strictObject({
     type: v.literal('request'),
@@ -107,6 +101,7 @@ const AppRealtimeNonTerminalServerMessageSchema = v.variant('type', [
     ok: v.literal(false),
     action: v.union([WorkspacePaneTabsSocketActionSchema, WorkspacePaneRuntimeSocketActionSchema]),
     error: v.string(),
+    outcome: v.optional(v.literal('indeterminate')),
   }),
   v.strictObject({
     type: v.literal('pong'),
@@ -118,7 +113,7 @@ export function normalizeAppRealtimeClientMessage(value: unknown): AppRealtimeCl
   const terminal = normalizeTerminalClientMessage(value)
   if (terminal) return terminal
   const parsed = v.safeParse(AppRealtimeNonTerminalClientMessageSchema, value)
-  return parsed.success ? (parsed.output as AppRealtimeClientMessage) : null
+  return parsed.success ? parsed.output : null
 }
 
 export function normalizeAppRealtimeSocketServerMessage(value: unknown): AppRealtimeSocketServerMessage | null {
@@ -127,62 +122,69 @@ export function normalizeAppRealtimeSocketServerMessage(value: unknown): AppReal
   const parsed = v.safeParse(AppRealtimeNonTerminalServerMessageSchema, value)
   if (!parsed.success) return null
   const message = parsed.output
-  if (message.type !== 'response' || !message.ok) return message as AppRealtimeSocketServerMessage
-  const payload = normalizeAppRealtimeResponsePayload(message.action, message.payload)
-  if (payload === null) {
+  if (message.type !== 'response' || !message.ok) return message
+  const response = normalizeAppRealtimeSuccessResponse(message)
+  if (response === null) {
+    if (message.action === WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list) {
+      return {
+        type: 'response',
+        requestId: message.requestId,
+        ok: false,
+        action: message.action,
+        error: APP_REALTIME_INVALID_RESPONSE_PAYLOAD_ERROR,
+      }
+    }
     return {
       type: 'response',
       requestId: message.requestId,
       ok: false,
       action: message.action,
       error: APP_REALTIME_INVALID_RESPONSE_PAYLOAD_ERROR,
-    } as AppRealtimeSocketServerMessage
+      outcome: 'indeterminate',
+    } satisfies AppRealtimeResponseMessage
   }
-  return { ...message, payload } as AppRealtimeSocketServerMessage
+  return response
 }
 
-function normalizeAppRealtimeResponsePayload(action: AppRealtimeRequestAction, payload: unknown): unknown | null {
-  if (isAppRealtimeWorkspacePaneTabsAction(action)) {
-    return normalizeWorkspacePaneTabsSocketResponsePayload(action, payload)
+function normalizeAppRealtimeSuccessResponse(message: {
+  type: 'response'
+  requestId: string
+  ok: true
+  action: WorkspacePaneTabsSocketAction | WorkspacePaneRuntimeSocketAction
+  payload: unknown
+}): AppRealtimeResponseMessage | null {
+  switch (message.action) {
+    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list: {
+      const payload = normalizeWorkspacePaneTabsSnapshot(message.payload)
+      return payload === null
+        ? null
+        : { type: 'response', requestId: message.requestId, ok: true, action: message.action, payload }
+    }
+    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update: {
+      const payload = normalizeWorkspacePaneTabsWriteResult(message.payload)
+      return payload === null
+        ? null
+        : { type: 'response', requestId: message.requestId, ok: true, action: message.action, payload }
+    }
+    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open: {
+      const payload = normalizeWorkspacePaneRuntimeOpenResult(message.payload)
+      return payload === null
+        ? null
+        : { type: 'response', requestId: message.requestId, ok: true, action: message.action, payload }
+    }
+    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close: {
+      const payload = normalizeWorkspacePaneRuntimeCloseResult(message.payload)
+      return payload === null
+        ? null
+        : { type: 'response', requestId: message.requestId, ok: true, action: message.action, payload }
+    }
   }
-  switch (action) {
-    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open:
-      return normalizeWorkspacePaneRuntimeOpenResult(payload)
-    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close:
-      return normalizeWorkspacePaneRuntimeCloseResult(payload)
-    default:
-      return null
-  }
-}
-
-function normalizeWorkspacePaneTabsSocketResponsePayload(
-  action: WorkspacePaneTabsSocketAction,
-  payload: unknown,
-): unknown | null {
-  switch (action) {
-    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list:
-    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace:
-    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update:
-      return normalizeWithSchema(WorkspacePaneTabsSnapshotSchema, payload)
-  }
-}
-
-function normalizeWithSchema<TSchema extends v.BaseSchema<unknown, unknown, v.BaseIssue<unknown>>>(
-  schema: TSchema,
-  value: unknown,
-): v.InferOutput<TSchema> | null {
-  const parsed = v.safeParse(schema, value)
-  return parsed.success ? parsed.output : null
 }
 
 export function isAppRealtimeWorkspacePaneTabsAction(
   action: AppRealtimeRequestAction,
 ): action is WorkspacePaneTabsSocketAction {
-  return (
-    action === WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list ||
-    action === WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace ||
-    action === WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update
-  )
+  return action === WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list || action === WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update
 }
 
 export function isAppRealtimeWorkspacePaneRuntimeAction(

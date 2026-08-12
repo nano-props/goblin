@@ -192,6 +192,7 @@ describe('OpenWorkspaceDialog', () => {
     const onClose = vi.fn()
     const onOpen = vi.fn(async (): Promise<OpenWorkspaceResult> => ({
       ok: false,
+      kind: 'failed',
       message: 'error.workspace-git-unavailable',
     }))
 

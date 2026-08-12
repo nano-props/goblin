@@ -1,4 +1,5 @@
 import { ACCESS_TOKEN_HEADER } from '#/shared/access-token.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 
 export interface EmbeddedServerRuntime {
   url: string
@@ -11,15 +12,47 @@ export async function requestEmbeddedServerJson<T>(
   decode: (value: unknown) => T,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(new URL(path, runtime.url).toString(), {
-    ...init,
-    headers: {
-      [ACCESS_TOKEN_HEADER]: runtime.accessToken,
-      ...(init?.headers ?? {}),
-    },
-  })
+  return await executeEmbeddedServerJson('query', runtime, path, decode, init)
+}
+
+type EmbeddedServerRequestKind = 'query' | 'command'
+
+async function executeEmbeddedServerJson<T>(
+  requestKind: EmbeddedServerRequestKind,
+  runtime: EmbeddedServerRuntime,
+  path: string,
+  decode: (value: unknown) => T,
+  init?: RequestInit,
+): Promise<T> {
+  let response: Response
+  try {
+    response = await fetch(new URL(path, runtime.url).toString(), {
+      ...init,
+      headers: {
+        [ACCESS_TOKEN_HEADER]: runtime.accessToken,
+        ...(init?.headers ?? {}),
+      },
+    })
+  } catch (error) {
+    if (init?.signal?.aborted) throw error
+    if (requestKind === 'query') throw error
+    throw new CodedError({
+      code: 'OUTCOME_UNCERTAIN',
+      message: 'Embedded server request outcome is uncertain',
+      cause: error,
+    })
+  }
   if (!response.ok) throw new Error(`Embedded server request failed (${response.status})`)
-  return decode(await response.json())
+  try {
+    return decode(await response.json())
+  } catch (error) {
+    if (requestKind === 'query') throw error
+    throw new CodedError({
+      code: 'OUTCOME_UNCERTAIN',
+      message: 'Embedded server returned an invalid successful response',
+      cause: error,
+    })
+  }
 }
 
 export async function postEmbeddedServerJson<T>(
@@ -29,7 +62,7 @@ export async function postEmbeddedServerJson<T>(
   decode: (value: unknown) => T,
   options?: { signal?: AbortSignal },
 ): Promise<T> {
-  return await requestEmbeddedServerJson(runtime, path, decode, {
+  return await executeEmbeddedServerJson('command', runtime, path, decode, {
     method: 'POST',
     signal: options?.signal,
     headers: {

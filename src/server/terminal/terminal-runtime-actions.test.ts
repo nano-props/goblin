@@ -3,8 +3,8 @@
 import { describe, expect, test, vi } from 'vitest'
 import {
   acquireWorkspaceRuntime,
+  captureWorkspaceRuntimeMembershipCapability,
   clearWorkspaceRuntimesForUser,
-  isCurrentWorkspaceRuntimeMembership,
   releaseWorkspaceRuntime,
 } from '#/server/modules/workspace-runtimes.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
@@ -100,7 +100,7 @@ function makeActions(
       broker,
       sessionService,
       isValidTerminalClientId: (value: unknown): value is string => value === CLIENT_ID,
-      isCurrentWorkspaceRuntimeMembership,
+      captureWorkspaceRuntimeMembershipCapability,
       worktreeOperations,
     }),
     broadcasts,

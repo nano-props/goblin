@@ -27,12 +27,13 @@ const mocks = vi.hoisted(() => {
     applyMenuRuntimeState: vi.fn(),
     template,
     win,
-    activatePrimaryWindow: vi.fn(() => Promise.resolve(win)),
     getFocusedWindow: vi.fn((): any => null),
     focusedRegisteredSurface: vi.fn((): any => null),
-    getPrimaryWindow: vi.fn((): any => null),
+    reloadPrimaryWindow: vi.fn(() => true),
     resetPrimaryWindow: vi.fn(),
-    sendClientEffectIntent: vi.fn(),
+    sendPrimaryWindowEffectIntent: vi.fn((_intent: ClientEffectIntent) => Promise.resolve()),
+    sendExistingPrimaryWindowEffectIntent: vi.fn((_intent: ClientEffectIntent) => Promise.resolve(true)),
+    showErrorBox: vi.fn(),
     buildFromTemplate: vi.fn((nextTemplate: any[]) => {
       template.splice(0, template.length, ...nextTemplate)
       return nextTemplate
@@ -50,7 +51,7 @@ vi.mock('electron', () => ({
     getFocusedWindow: mocks.getFocusedWindow,
   },
   dialog: {
-    showErrorBox: vi.fn(),
+    showErrorBox: mocks.showErrorBox,
   },
   Menu: {
     buildFromTemplate: mocks.buildFromTemplate,
@@ -62,9 +63,10 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('#/main/window.ts', () => ({
-  activatePrimaryWindow: mocks.activatePrimaryWindow,
-  getPrimaryWindow: mocks.getPrimaryWindow,
+  reloadPrimaryWindow: mocks.reloadPrimaryWindow,
   resetPrimaryWindow: mocks.resetPrimaryWindow,
+  sendPrimaryWindowEffectIntent: mocks.sendPrimaryWindowEffectIntent,
+  sendExistingPrimaryWindowEffectIntent: mocks.sendExistingPrimaryWindowEffectIntent,
 }))
 
 vi.mock('#/main/client-surface-registry.ts', () => ({
@@ -79,11 +81,6 @@ vi.mock('#/main/i18n/index.ts', () => ({
 vi.mock('#/main/menu-state.ts', () => ({
   readMenuRuntimeState: mocks.readMenuRuntimeState,
   applyMenuRuntimeState: mocks.applyMenuRuntimeState,
-}))
-
-vi.mock('#/main/client-surface-events.ts', () => ({
-  broadcastIpcEvent: vi.fn(),
-  sendClientEffectIntent: mocks.sendClientEffectIntent,
 }))
 
 vi.mock('#/main/window-security.ts', () => ({
@@ -109,33 +106,42 @@ describe('app menu actions', () => {
     mocks.template.length = 0
     mocks.appGetPath.mockImplementation((name: string) => (name === 'home' ? '/home/user' : '/data'))
     mocks.readMenuRuntimeState.mockReturnValue(defaultMenuRuntimeState())
-    mocks.getPrimaryWindow.mockReturnValue(null)
     mocks.getFocusedWindow.mockReturnValue(null)
     mocks.focusedRegisteredSurface.mockReturnValue(null)
-    mocks.activatePrimaryWindow.mockResolvedValue(mocks.win)
     const { platform } = await import('#/main/platform.ts')
     vi.spyOn(platform, 'isMacOS').mockReturnValue(true)
   })
 
-  test('activates the primary window before sending an action when no window exists', async () => {
+  test('routes an activating action through the primary window intent owner', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
     clickMenuItem('menu.file', 'menu.file.open-local-workspace')
     await expectClientIntent({ type: 'open-workspace-requested' })
 
-    expect(mocks.activatePrimaryWindow).toHaveBeenCalledTimes(1)
+    expect(mocks.sendPrimaryWindowEffectIntent).toHaveBeenCalledOnce()
   })
 
-  test('reuses an existing primary window for menu actions', async () => {
-    mocks.getPrimaryWindow.mockReturnValue(mocks.win)
+  test('keeps activating menu actions on the same intent delivery boundary when a window exists', async () => {
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
     clickMenuItem('menu.file', 'menu.file.open-local-workspace')
     await expectClientIntent({ type: 'open-workspace-requested' })
 
-    expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
+    expect(mocks.sendPrimaryWindowEffectIntent).toHaveBeenCalledOnce()
+  })
+
+  test('surfaces a failed client intent delivery for an explicit retry', async () => {
+    mocks.sendPrimaryWindowEffectIntent.mockRejectedValueOnce(new Error('renderer generation changed'))
+    const { buildAppMenu } = await import('#/main/menu.ts')
+    buildAppMenu()
+
+    clickMenuItem('menu.file', 'menu.file.open-local-workspace')
+
+    await vi.waitFor(() => {
+      expect(mocks.showErrorBox).toHaveBeenCalledWith('Goblin', 'menu.client-intent-delivery-failed')
+    })
   })
 
   test('ignores close commands when no window exists', async () => {
@@ -145,23 +151,21 @@ describe('app menu actions', () => {
     clickMenuItem('menu.file', 'menu.file.close-workspace-tab')
     clickMenuItem('menu.file', 'menu.file.close-workspace')
 
-    expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
-    expect(mocks.sendClientEffectIntent).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenCalledTimes(2))
+    expect(mocks.sendPrimaryWindowEffectIntent).not.toHaveBeenCalled()
   })
 
   test('sends close workspace tab to an existing window', async () => {
-    mocks.getPrimaryWindow.mockReturnValue(mocks.win)
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
     clickMenuItem('menu.file', 'menu.file.close-workspace-tab')
     await expectClientIntent({ type: 'workspace-pane-close-tab-requested' })
 
-    expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
+    expect(mocks.sendExistingPrimaryWindowEffectIntent).toHaveBeenCalledOnce()
   })
 
   test('sends the path dialog action from the file menu', async () => {
-    mocks.getPrimaryWindow.mockReturnValue(mocks.win)
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
@@ -402,7 +406,6 @@ describe('app menu actions', () => {
   })
 
   test('reset layout resets the primary window and dispatches the layout reset intent', async () => {
-    mocks.getPrimaryWindow.mockReturnValue(mocks.win)
     const { buildAppMenu } = await import('#/main/menu.ts')
     buildAppMenu()
 
@@ -457,6 +460,10 @@ function clickNestedMenuItem(menuLabel: string, parentItemLabel: string, itemLab
 
 async function expectClientIntent(intent: ClientEffectIntent): Promise<void> {
   await vi.waitFor(() => {
-    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, intent)
+    const deliveredIntents = [
+      ...mocks.sendPrimaryWindowEffectIntent.mock.calls,
+      ...mocks.sendExistingPrimaryWindowEffectIntent.mock.calls,
+    ].map(([deliveredIntent]) => deliveredIntent)
+    expect(deliveredIntents).toContainEqual(intent)
   })
 }

@@ -2,6 +2,7 @@ import { QueryClient, QueryObserver } from '@tanstack/query-core'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import type * as InvalidationBroker from '#/server/modules/invalidation-broker.ts'
 import { REPO_ID, mocks } from '#/server/test-utils/repo-module.ts'
+import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 
@@ -53,7 +54,15 @@ describe('background sync projection convergence', () => {
         await import('#/server/modules/background-sync.ts')
       await prepareBackgroundSync()
       const admission = beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 1, [
-        { workspaceId: REPO_ID, workspaceRuntimeId: RUNTIME_ID },
+        {
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: RUNTIME_ID,
+          runtimeCapability: testWorkspaceRuntimeEpochCapability({
+            userId: USER_ID,
+            workspaceId: REPO_ID,
+            workspaceRuntimeId: RUNTIME_ID,
+          }),
+        },
       ])
       if (!admission) throw new Error('expected background sync admission')
       expect(commitBackgroundSyncRegistration(admission)).toBe(true)

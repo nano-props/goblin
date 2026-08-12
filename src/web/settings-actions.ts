@@ -3,8 +3,7 @@
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceExternalAppTarget } from '#/shared/workspace-settings.ts'
-import { settingsLog } from '#/web/logger.ts'
-import type { GlobalShortcutState, I18nSnapshot, ThemeState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
+import type { SetGlobalShortcutResult, I18nSnapshot, ThemeState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
 import {
   addRecentWorkspace,
   clearRecentWorkspaces,
@@ -109,14 +108,16 @@ export async function setGlobalShortcutDisabled(disabled: boolean): Promise<void
   }))
 }
 
-export async function setGlobalShortcut(accelerator: string): Promise<GlobalShortcutState> {
-  const state = await setSettingsGlobalShortcut(accelerator)
-  updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({
-    ...current,
-    globalShortcut: state.accelerator,
-    globalShortcutRegistered: state.registered,
-  }))
-  return state
+export async function setGlobalShortcut(accelerator: string): Promise<SetGlobalShortcutResult> {
+  const result = await setSettingsGlobalShortcut(accelerator)
+  if (result.kind === 'projected') {
+    updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({
+      ...current,
+      globalShortcut: result.accelerator,
+      globalShortcutRegistered: result.registered,
+    }))
+  }
+  return result
 }
 
 export async function setThemePreference(pref: ThemePref): Promise<ThemeState> {
@@ -168,13 +169,4 @@ export async function setLanEnabled(enabled: boolean): Promise<void> {
   const lanEnabled = await setSettingsLanEnabled(enabled)
   updateRuntimeSettingsSnapshotCache(appQueryClient, (current) => ({ ...current, lanEnabled }))
   void appQueryClient.invalidateQueries({ queryKey: lanInfoQueryKey() })
-}
-
-export async function runSettingsAction<T>(label: string, task: () => Promise<T>): Promise<T | null> {
-  try {
-    return await task()
-  } catch (err) {
-    settingsLog.warn(`${label} failed`, { err })
-    return null
-  }
 }

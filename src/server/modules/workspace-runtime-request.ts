@@ -1,7 +1,12 @@
 import { serverNodeLog } from '#/node/logger.ts'
-import { IpcError } from '#/shared/ipc-error.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { isCurrentWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
+import {
+  captureWorkspaceRuntimeEpochCapability,
+  isCurrentWorkspaceRuntime,
+  WorkspaceRuntimeStaleError,
+  type WorkspaceRuntimeEpochCapability,
+} from '#/server/modules/workspace-runtimes.ts'
 import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { settleRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
 import { isRepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
@@ -20,11 +25,27 @@ export function requireCurrentWorkspaceRuntime(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): string {
-  if (!userId) throw new IpcError({ code: 'UNAUTHORIZED', message: 'Unauthorized' })
+  if (!userId) throw new CodedError({ code: 'UNAUTHORIZED', message: 'Unauthorized' })
   if (!isCurrentWorkspaceRuntime(userId, workspaceId, workspaceRuntimeId)) {
-    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
+    throw new CodedError({ code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' })
   }
   return userId
+}
+
+export function requireWorkspaceRuntimeEpochCapability(
+  userId: string | null | undefined,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+): WorkspaceRuntimeEpochCapability {
+  if (!userId) throw new CodedError({ code: 'UNAUTHORIZED', message: 'Unauthorized' })
+  try {
+    return captureWorkspaceRuntimeEpochCapability(userId, workspaceId, workspaceRuntimeId)
+  } catch (error) {
+    if (error instanceof WorkspaceRuntimeStaleError) {
+      throw new CodedError({ code: 'BAD_REQUEST', message: error.message })
+    }
+    throw error
+  }
 }
 
 export async function runWorkspaceRuntimeRequest<T>(input: {
@@ -94,23 +115,26 @@ async function throwRuntimeRequestError(
   error: unknown,
   remoteFailureMessage: 'error.workspace-operation-failed' | 'error.failed-read-repo',
 ): Promise<never> {
+  if (error instanceof WorkspaceRuntimeStaleError) {
+    throw new CodedError({ code: 'BAD_REQUEST', message: error.message })
+  }
   if (isWorkspaceRuntimeAdmissionClosedError(error)) {
-    throw new IpcError({ code: 'BAD_REQUEST', message: error.message })
+    throw new CodedError({ code: 'BAD_REQUEST', message: error.message })
   }
   if (isRepoMembershipReadConflictError(error)) {
-    throw new IpcError({ code: 'BAD_REQUEST', message: error.message })
+    throw new CodedError({ code: 'BAD_REQUEST', message: error.message })
   }
   if (error instanceof OperationCancelledError) throw error
   if (isRemoteWorkspaceRuntimeFailure(error)) {
     const lifecycleSettled = await settleRuntimeFailureAndStopAutomation(input.userId, input.label, error)
     workspaceRuntimeRequestLogger.warn({ err: error, label: input.label }, 'failed')
     const message = lifecycleSettled ? remoteFailureMessage : 'error.workspace-runtime-settlement-failed'
-    throw new IpcError({ code: 'BAD_REQUEST', message })
+    throw new CodedError({ code: 'BAD_REQUEST', message })
   }
   if (input.signal?.aborted) throw error
   if (isRepositoryBoundaryUnavailableError(error)) {
     workspaceRuntimeRequestLogger.warn({ err: error, label: input.label }, 'repository boundary unavailable')
-    throw new IpcError({ code: 'BAD_REQUEST', message: error.message })
+    throw new CodedError({ code: 'BAD_REQUEST', message: error.message })
   }
   workspaceRuntimeRequestLogger.warn({ err: error, label: input.label }, 'failed')
   throw error
