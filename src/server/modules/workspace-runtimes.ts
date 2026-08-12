@@ -103,7 +103,15 @@ const workspaceRuntimeClosedListeners = new Set<(event: WorkspaceRuntimeClosedEv
 const workspaceRuntimeFailedListeners = new Set<(event: WorkspaceRuntimeFailedEvent) => void>()
 const workspaceRuntimeMembershipAcquiredListeners = new Set<(event: WorkspaceRuntimeMembershipAcquiredEvent) => void>()
 const workspaceRuntimeMembershipReleasedListeners = new Set<(event: WorkspaceRuntimeMembershipReleasedEvent) => void>()
-const workspaceRuntimeAdmissionTails = new Map<string, Promise<void>>()
+interface WorkspaceRuntimeAdmissionOwner {
+  userId: string
+  workspaceId: WorkspaceId
+  clientId: string
+  revision: number
+  tail: Promise<void>
+}
+
+const workspaceRuntimeAdmissionOwners = new Map<string, WorkspaceRuntimeAdmissionOwner>()
 const workspaceRuntimeLogger = serverNodeLog.child({ tag: 'workspace-runtime' })
 
 function workspaceRuntimeStateByUser(userId: string): Map<WorkspaceId, WorkspaceRuntimeState> {
@@ -153,19 +161,49 @@ export async function withWorkspaceRuntimeAdmission<T>(
   admit: (capability: WorkspaceRuntimeAdmissionCapability) => Promise<T>,
 ): Promise<T> {
   const admissionKey = [userId, workspaceId, clientId].join('\0')
-  const predecessor = workspaceRuntimeAdmissionTails.get(admissionKey) ?? Promise.resolve()
+  let owner = workspaceRuntimeAdmissionOwners.get(admissionKey)
+  if (!owner) {
+    owner = { userId, workspaceId, clientId, revision: 0, tail: Promise.resolve() }
+    workspaceRuntimeAdmissionOwners.set(admissionKey, owner)
+  }
+  const predecessor = owner.tail
+  const acceptedRevision = owner.revision
   let releaseTurn!: () => void
   const turn = new Promise<void>((resolve) => {
     releaseTurn = resolve
   })
   const tail = predecessor.then(async () => await turn)
-  workspaceRuntimeAdmissionTails.set(admissionKey, tail)
+  owner.tail = tail
   await predecessor
   try {
+    if (owner.revision !== acceptedRevision) throw new WorkspaceRuntimeStaleError()
     return await runWorkspaceRuntimeAdmission(userId, workspaceId, clientId, admit)
   } finally {
     releaseTurn()
-    if (workspaceRuntimeAdmissionTails.get(admissionKey) === tail) workspaceRuntimeAdmissionTails.delete(admissionKey)
+    if (workspaceRuntimeAdmissionOwners.get(admissionKey) === owner && owner.tail === tail) {
+      workspaceRuntimeAdmissionOwners.delete(admissionKey)
+    }
+  }
+}
+
+function invalidateWorkspaceRuntimeAdmissions(userId: string, workspaceId: WorkspaceId, clientId: string): void {
+  const owner = workspaceRuntimeAdmissionOwners.get([userId, workspaceId, clientId].join('\0'))
+  if (owner) owner.revision += 1
+}
+
+function invalidateWorkspaceRuntimeAdmissionsForDurableRemoval(workspaceId: WorkspaceId): void {
+  for (const owner of workspaceRuntimeAdmissionOwners.values()) {
+    if (owner.workspaceId === workspaceId) owner.revision += 1
+  }
+}
+
+function invalidateWorkspaceRuntimeAdmissionsForDeclaration(
+  userId: string,
+  clientId: string,
+  desired: ReadonlySet<WorkspaceId>,
+): void {
+  for (const owner of workspaceRuntimeAdmissionOwners.values()) {
+    if (owner.userId === userId && owner.clientId === clientId && !desired.has(owner.workspaceId)) owner.revision += 1
   }
 }
 
@@ -264,6 +302,7 @@ export function releaseWorkspaceRuntime(
   if (!state || state.currentWorkspaceRuntimeId !== workspaceRuntimeId) {
     return { released: false, runtimeClosed: false }
   }
+  invalidateWorkspaceRuntimeAdmissions(userId, workspaceId, clientId)
   const releasedMembership = state.members.delete(clientId)
   const cancelledAdmission = state.pendingMembershipAdmissions.delete(clientId)
   if (!releasedMembership && !cancelledAdmission) return { released: false, runtimeClosed: false }
@@ -422,10 +461,12 @@ function releaseWorkspaceRuntimeResource(
 
 /** Durable workspace removal invalidates every runtime projected from that global entry. */
 export function closeWorkspaceRuntimesForDurableRemoval(workspaceId: WorkspaceId): number {
+  invalidateWorkspaceRuntimeAdmissionsForDurableRemoval(workspaceId)
   const closed: WorkspaceRuntimeClosedEvent[] = []
   for (const [userId, states] of workspaceRuntimesByUser) {
     const state = states.get(workspaceId)
-    if (!state?.currentWorkspaceRuntimeId) continue
+    if (!state) continue
+    if (!state.currentWorkspaceRuntimeId) continue
     const workspaceRuntimeId = stopWorkspaceRuntimeEpoch(state)
     if (workspaceRuntimeId) closed.push({ userId, workspaceId, workspaceRuntimeId })
   }
@@ -444,6 +485,7 @@ export function replaceWorkspaceRuntimeMembershipsForClient(
 ): WorkspaceRuntimeEntry[] {
   admitWorkspaceRuntimeMembershipDeclaration(clientId, workspaceIds)
   const desired = new Set(workspaceIds)
+  invalidateWorkspaceRuntimeAdmissionsForDeclaration(userId, clientId, desired)
   const states = workspaceRuntimesByUser.get(userId)
   const closed: WorkspaceRuntimeClosedEvent[] = []
   if (states) {

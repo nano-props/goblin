@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { BrowserWindowConstructorOptions } from 'electron'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { CLIENT_EFFECT_INTENT_CHALLENGE_CHANNEL, CLIENT_EFFECT_INTENT_READY_CHANNEL } from '#/shared/ipc-channels.ts'
+import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
+import { waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
 
 const mocks = vi.hoisted(() => {
   const clientIndexHtml = '<!doctype html><script type="module" src="./assets/index-testhash.js"></script>'
@@ -279,7 +281,7 @@ describe('primary window navigation boundaries', () => {
     expect(mocks.send).not.toHaveBeenCalled()
   })
 
-  test('rejects an intent until the initial app document is ready', async () => {
+  test('delivers a window-creating intent to the exact initial document once it is ready', async () => {
     const cookie = Promise.withResolvers<void>()
     mocks.cookieSetMock.mockImplementationOnce(async () => await cookie.promise)
     const { getOrCreatePrimaryWindow, sendPrimaryWindowEffectIntent } = await import('#/main/window.ts')
@@ -292,14 +294,36 @@ describe('primary window navigation boundaries', () => {
     expect(mocks.send).not.toHaveBeenCalled()
     cookie.resolve()
     await creation
-    await expect(delivery).rejects.toThrow('Primary window renderer is not ready')
     expect(mocks.send).not.toHaveBeenCalled()
     emitIntentReady()
-    await sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+    await delivery
 
     expect(mocks.send).toHaveBeenCalledWith('goblin:client-effect-intent', {
       type: 'open-workspace-requested',
     })
+  })
+
+  test('fails fast when an existing document is not ready', async () => {
+    const { getOrCreatePrimaryWindow, sendPrimaryWindowEffectIntent } = await import('#/main/window.ts')
+    await getOrCreatePrimaryWindow()
+
+    await expect(sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })).rejects.toThrow(
+      'Primary window renderer is not ready',
+    )
+    expect(mocks.send).not.toHaveBeenCalled()
+  })
+
+  test('bounds the readiness wait owned by a window-creating intent', async () => {
+    useFakeTimers()
+    const { sendPrimaryWindowEffectIntent } = await import('#/main/window.ts')
+
+    const delivery = sendPrimaryWindowEffectIntent({ type: 'open-workspace-requested' })
+    const rejection = expect(delivery).rejects.toThrow('was not ready within 30000ms')
+    await waitForMicrotaskCondition(() => mocks.loadURL.mock.calls.length === 1)
+    await advanceTimersAndFlush(30_000)
+
+    await rejection
+    expect(mocks.send).not.toHaveBeenCalled()
   })
 
   test('ignores an untrusted document readiness handshake', async () => {

@@ -38,6 +38,7 @@ import {
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 
 const DEFAULT_BOUNDS: WindowBounds = { width: 1100, height: 720 }
+const PRIMARY_WINDOW_DOCUMENT_READY_TIMEOUT_MS = 30_000
 const PRIMARY_WINDOW_SURFACE = {
   windowKey: 'primary',
   capabilities: {
@@ -51,8 +52,9 @@ let primaryWindowDocumentGeneration = 0
 let primaryWindowIntentReadinessWired = false
 
 // Surface registration establishes IPC identity before the app loads. Intent
-// delivery is a separate document-generation boundary: actions fail directly
-// unless their exact app document is already ready.
+// delivery is a separate document-generation boundary. Existing surfaces fail
+// fast unless their document is ready; an action that creates the primary
+// window may wait only for that newly-created document generation.
 type PrimaryWindowDocumentOutcome = { kind: 'ready' } | { kind: 'failed'; error: Error }
 
 interface PrimaryWindowDocumentReadiness {
@@ -61,6 +63,8 @@ interface PrimaryWindowDocumentReadiness {
   navigationStarted: boolean
   frame: WebFrameMain | null
   result: PrimaryWindowDocumentOutcome | null
+  outcome: Promise<PrimaryWindowDocumentOutcome>
+  settle: (outcome: PrimaryWindowDocumentOutcome) => void
 }
 
 let primaryWindowDocumentReadiness: PrimaryWindowDocumentReadiness | null = null
@@ -94,9 +98,11 @@ export async function activatePrimaryWindow(): Promise<BrowserWindow> {
 export async function sendPrimaryWindowEffectIntent(intent: ClientEffectIntent): Promise<void> {
   const existing = getPrimaryWindow()
   if (existing) {
+    const creating = primaryWindowCreation !== null
     const readiness = primaryWindowDocumentReadinessFor(existing)
     const activated = await activatePrimaryWindow()
     if (activated !== existing) throw new Error('Primary window was replaced before intent delivery')
+    if (creating) await awaitPrimaryWindowDocument(readiness)
     await deliverPrimaryWindowEffectIntent(existing, readiness, intent)
     return
   }
@@ -106,6 +112,7 @@ export async function sendPrimaryWindowEffectIntent(intent: ClientEffectIntent):
   if (readiness.generation !== expectedDocumentGeneration) {
     throw new Error(`Primary window renderer generation ${expectedDocumentGeneration} was superseded`)
   }
+  await awaitPrimaryWindowDocument(readiness)
   await deliverPrimaryWindowEffectIntent(win, readiness, intent)
 }
 
@@ -129,6 +136,40 @@ function primaryWindowDocumentReadinessFor(win: BrowserWindow): PrimaryWindowDoc
   const readiness = primaryWindowDocumentReadiness
   if (!readiness || readiness.window !== win) throw new Error('Primary window renderer is not available')
   return readiness
+}
+
+async function awaitPrimaryWindowDocument(readiness: PrimaryWindowDocumentReadiness): Promise<void> {
+  if (readiness.result?.kind === 'ready') return
+  if (readiness.result?.kind === 'failed') throw readiness.result.error
+  const deadline = createPrimaryWindowDocumentReadyDeadline(readiness.generation)
+  try {
+    const outcome = await Promise.race([readiness.outcome, deadline.outcome])
+    if (outcome.kind === 'failed') throw outcome.error
+  } finally {
+    deadline.dispose()
+  }
+}
+
+function createPrimaryWindowDocumentReadyDeadline(generation: number): {
+  outcome: Promise<PrimaryWindowDocumentOutcome>
+  dispose: () => void
+} {
+  const timeout = Promise.withResolvers<PrimaryWindowDocumentOutcome>()
+  const handle = setTimeout(
+    () =>
+      timeout.resolve({
+        kind: 'failed',
+        error: new Error(
+          `Primary window renderer generation ${generation} was not ready within ${PRIMARY_WINDOW_DOCUMENT_READY_TIMEOUT_MS}ms`,
+        ),
+      }),
+    PRIMARY_WINDOW_DOCUMENT_READY_TIMEOUT_MS,
+  )
+  handle.unref()
+  return {
+    outcome: timeout.promise,
+    dispose: () => clearTimeout(handle),
+  }
 }
 
 function deliverPrimaryWindowEffectIntent(
@@ -156,12 +197,15 @@ function beginPrimaryWindowDocument(win: BrowserWindow, navigationStarted: boole
       error: new Error(`Primary window renderer generation ${previous.generation} was superseded`),
     })
   }
+  const deferred = Promise.withResolvers<PrimaryWindowDocumentOutcome>()
   const readiness: PrimaryWindowDocumentReadiness = {
     window: win,
     generation: ++primaryWindowDocumentGeneration,
     navigationStarted,
     frame: null,
     result: null,
+    outcome: deferred.promise,
+    settle: deferred.resolve,
   }
   primaryWindowDocumentReadiness = readiness
   return readiness
@@ -173,6 +217,7 @@ function settlePrimaryWindowDocument(
 ): void {
   if (readiness.result !== null) return
   readiness.result = outcome
+  readiness.settle(outcome)
 }
 
 function challengePrimaryWindowDocument(win: BrowserWindow): void {

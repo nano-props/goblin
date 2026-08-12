@@ -34,7 +34,6 @@ async function executeEmbeddedServerJson<T>(
       },
     })
   } catch (error) {
-    if (init?.signal?.aborted) throw error
     if (requestKind === 'query') throw error
     throw new CodedError({
       code: 'OUTCOME_UNCERTAIN',
@@ -60,11 +59,9 @@ export async function postEmbeddedServerJson<T>(
   path: string,
   body: object,
   decode: (value: unknown) => T,
-  options?: { signal?: AbortSignal },
 ): Promise<T> {
   return await executeEmbeddedServerJson('command', runtime, path, decode, {
     method: 'POST',
-    signal: options?.signal,
     headers: {
       'content-type': 'application/json',
     },

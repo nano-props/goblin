@@ -47,11 +47,12 @@ Electron client-surface identity and renderer delivery readiness are separate
 facts. The native host registers a window early enough to authenticate renderer
 IPC, but sends a discrete client effect only after the exact application
 document generation's preload has installed its lifetime intent listener and
-acknowledged readiness to the native host. If the exact document is not ready,
-or reload, navigation replacement, renderer exit, window close, or load failure
-invalidates it, delivery rejects directly instead of waiting or forwarding the
-effect to a later document. The preload handoff then bridges that listener to
-the single client intent consumer
+acknowledged readiness to the native host. An action that creates the primary
+window may wait within a bounded lifetime for that exact new document; an
+existing document that is not ready fails fast. Reload, navigation replacement,
+renderer exit, window close, load failure, or timeout rejects delivery instead
+of forwarding the effect to a later document. The preload handoff then bridges
+that listener to the single client intent consumer
 within the same document generation.
 
 Native quit delivery is an application lifecycle signal, not an authenticated

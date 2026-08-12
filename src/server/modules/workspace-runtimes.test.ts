@@ -20,6 +20,7 @@ import {
   runSerializedWorkspaceRefresh,
   runRemoteWorkspaceLifecycle,
   workspaceRuntimeHasGitCapability,
+  withWorkspaceRuntimeAdmission,
   WorkspaceRuntimeStaleError,
 } from '#/server/modules/workspace-runtimes.ts'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
@@ -559,6 +560,96 @@ describe('workspace runtimes', () => {
       released: true,
       runtimeClosed: true,
     })
+  })
+
+  test('invalidates every admission accepted before a complete membership declaration', async () => {
+    const firstStarted = Promise.withResolvers<void>()
+    const finishFirst = Promise.withResolvers<void>()
+    const first = withWorkspaceRuntimeAdmission(USER_ID, REPO_ROOT, 'client-a', async () => {
+      firstStarted.resolve()
+      await finishFirst.promise
+      return 'first'
+    })
+    await firstStarted.promise
+
+    const runQueuedAdmission = vi.fn(async () => 'queued')
+    const queued = withWorkspaceRuntimeAdmission(USER_ID, REPO_ROOT, 'client-a', runQueuedAdmission)
+
+    expect(replaceWorkspaceRuntimeMembershipsForClient(USER_ID, 'client-a', [])).toEqual([])
+    finishFirst.resolve()
+
+    await expect(first).rejects.toThrow('error.workspace-runtime-stale')
+    await expect(queued).rejects.toThrow('error.workspace-runtime-stale')
+    expect(runQueuedAdmission).not.toHaveBeenCalled()
+    expect(listWorkspaceRuntimes(USER_ID)).toEqual([])
+
+    await expect(
+      withWorkspaceRuntimeAdmission(
+        USER_ID,
+        REPO_ROOT,
+        'client-a',
+        async ({ workspaceRuntimeId }) => workspaceRuntimeId,
+      ),
+    ).resolves.toMatch(/^workspace-runtime-/)
+    expect(listWorkspaceRuntimes(USER_ID)).toHaveLength(1)
+  })
+
+  test('invalidates an accepted admission before it can create runtime state', async () => {
+    const runAdmission = vi.fn(async () => 'opened')
+    const admission = withWorkspaceRuntimeAdmission(USER_ID, REPO_ROOT, 'client-a', runAdmission)
+
+    expect(replaceWorkspaceRuntimeMembershipsForClient(USER_ID, 'client-a', [])).toEqual([])
+
+    await expect(admission).rejects.toThrow('error.workspace-runtime-stale')
+    expect(runAdmission).not.toHaveBeenCalled()
+    expect(listWorkspaceRuntimes(USER_ID)).toEqual([])
+  })
+
+  test('invalidates queued admissions when the client releases the runtime', async () => {
+    const firstStarted = Promise.withResolvers<void>()
+    const finishFirst = Promise.withResolvers<void>()
+    const first = withWorkspaceRuntimeAdmission(USER_ID, REPO_ROOT, 'client-a', async ({ workspaceRuntimeId }) => {
+      firstStarted.resolve()
+      await finishFirst.promise
+      return workspaceRuntimeId
+    })
+    await firstStarted.promise
+    const workspaceRuntimeId = listWorkspaceRuntimes(USER_ID)[0]?.workspaceRuntimeId
+    if (!workspaceRuntimeId) throw new Error('missing pending admission runtime')
+    const runQueuedAdmission = vi.fn(async () => 'queued')
+    const queued = withWorkspaceRuntimeAdmission(USER_ID, REPO_ROOT, 'client-a', runQueuedAdmission)
+
+    expect(releaseWorkspaceRuntime(USER_ID, REPO_ROOT, workspaceRuntimeId, 'client-a')).toEqual({
+      released: true,
+      runtimeClosed: true,
+    })
+    finishFirst.resolve()
+
+    await expect(first).rejects.toThrow('error.workspace-runtime-stale')
+    await expect(queued).rejects.toThrow('error.workspace-runtime-stale')
+    expect(runQueuedAdmission).not.toHaveBeenCalled()
+    expect(listWorkspaceRuntimes(USER_ID)).toEqual([])
+  })
+
+  test('invalidates queued admissions when durable membership is removed', async () => {
+    const firstStarted = Promise.withResolvers<void>()
+    const finishFirst = Promise.withResolvers<void>()
+    const first = withWorkspaceRuntimeAdmission(USER_ID, REPO_ROOT, 'client-a', async () => {
+      firstStarted.resolve()
+      await finishFirst.promise
+      return 'first'
+    })
+    await firstStarted.promise
+    const runQueuedAdmission = vi.fn(async () => 'queued')
+    const queued = withWorkspaceRuntimeAdmission(USER_ID, REPO_ROOT, 'client-a', runQueuedAdmission)
+
+    expect(closeWorkspaceRuntimesForDurableRemoval(REPO_ROOT)).toBe(1)
+    finishFirst.resolve()
+
+    await expect(first).rejects.toThrow('error.workspace-runtime-stale')
+    await expect(queued).rejects.toThrow('error.workspace-runtime-stale')
+    expect(runQueuedAdmission).not.toHaveBeenCalled()
+    expect(listWorkspaceRuntimes(USER_ID)).toEqual([])
   })
 
   test('publishes close events only after the replacement snapshot is complete', () => {
