@@ -53,7 +53,7 @@ async function readAccessTokenProjection(): Promise<AccessTokenProjection> {
 async function rotateToken(): Promise<AccessTokenProjection> {
   const dataDir = app.getPath('userData')
   const accessToken = await rotateAccessTokenFile(dataDir)
-  return accessTokenProjection(accessToken)
+  return { accessToken, activation: 'after-restart' }
 }
 
 export function wireAccessTokenIpc(): void {

@@ -57,6 +57,20 @@ describe('access token rotation IPC', () => {
     expect(mocks.rotateAccessTokenFile).toHaveBeenCalledWith('/tmp/goblin-user-data')
   })
 
+  test('reports the committed next-start token when the running server disappears during rotation', async () => {
+    const rotation = Promise.withResolvers<string>()
+    mocks.rotateAccessTokenFile.mockReturnValueOnce(rotation.promise)
+
+    const result = mocks.handlers.get(ROTATE_ACCESS_TOKEN_CHANNEL)?.({ sender: 'trusted' })
+    mocks.runtime = null
+    rotation.resolve('next-start-token')
+
+    await expect(result).resolves.toEqual({
+      accessToken: 'next-start-token',
+      activation: 'after-restart',
+    })
+  })
+
   test('hydrates the persisted token activation relative to the running server', async () => {
     mocks.readOrCreateAccessToken.mockResolvedValueOnce('next-start-token')
 
