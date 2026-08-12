@@ -21,17 +21,21 @@ export function terminalCreateErrorKey(error: unknown): string {
 }
 
 function terminalCreateRealtimeErrorKey(error: ClientRealtimeRequestError): string {
-  if (error.kind === 'invalid-response') return 'error.operation-outcome-uncertain'
+  if (error.kind === 'app-quitting') return 'error.terminal-create-failed'
+  if (error.delivery === 'indeterminate') return 'error.operation-outcome-uncertain'
   if (error.kind === 'open-timeout') return 'error.terminal-connection-timeout'
   if (error.kind === 'timeout') return 'error.terminal-create-timeout'
-  if (error.kind === 'app-quitting') return 'error.terminal-create-failed'
   return 'error.terminal-connection-unavailable'
 }
 
 export function showTerminalCreateErrorToast(error: unknown, t: TerminalCreateTranslator): string {
   const titleKey = 'action.result-error'
   const descriptionKey = terminalCreateErrorKey(error)
-  toast.error(t(titleKey), { description: t(descriptionKey) })
+  if (descriptionKey === 'error.operation-outcome-uncertain') {
+    toast.warning(t(descriptionKey))
+  } else {
+    toast.error(t(titleKey), { description: t(descriptionKey) })
+  }
   return descriptionKey
 }
 

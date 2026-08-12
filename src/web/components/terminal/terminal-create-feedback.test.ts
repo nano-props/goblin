@@ -1,6 +1,17 @@
-import { describe, expect, test } from 'vitest'
-import { terminalCreateErrorKey } from '#/web/components/terminal/terminal-create-feedback.ts'
+import { afterEach, describe, expect, test, vi } from 'vitest'
+import {
+  showTerminalCreateErrorToast,
+  terminalCreateErrorKey,
+} from '#/web/components/terminal/terminal-create-feedback.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
+
+const toastMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
+
+vi.mock('vue-sonner', () => ({ toast: toastMocks }))
+
+afterEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('terminalCreateErrorKey', () => {
   test.each([
@@ -23,9 +34,9 @@ describe('terminalCreateErrorKey', () => {
 
   test.each([
     ['open-timeout', 'not-sent', 'error.terminal-connection-timeout'],
-    ['timeout', 'indeterminate', 'error.terminal-create-timeout'],
+    ['timeout', 'indeterminate', 'error.operation-outcome-uncertain'],
     ['send-failed', 'not-sent', 'error.terminal-connection-unavailable'],
-    ['disconnected', 'indeterminate', 'error.terminal-connection-unavailable'],
+    ['disconnected', 'indeterminate', 'error.operation-outcome-uncertain'],
     ['invalid-response', 'indeterminate', 'error.operation-outcome-uncertain'],
     ['app-quitting', 'indeterminate', 'error.terminal-create-failed'],
   ] as const)('maps structured %s failures without inspecting message text', (kind, delivery, expectedKey) => {
@@ -36,5 +47,17 @@ describe('terminalCreateErrorKey', () => {
     })
 
     expect(terminalCreateErrorKey(error)).toBe(expectedKey)
+  })
+
+  test('presents an indeterminate create outcome as a warning', () => {
+    const error = new ClientRealtimeRequestError('request timed out', {
+      kind: 'timeout',
+      delivery: 'indeterminate',
+      outageId: 1,
+    })
+
+    expect(showTerminalCreateErrorToast(error, (key) => key)).toBe('error.operation-outcome-uncertain')
+    expect(toastMocks.warning).toHaveBeenCalledWith('error.operation-outcome-uncertain')
+    expect(toastMocks.error).not.toHaveBeenCalled()
   })
 })

@@ -107,6 +107,12 @@ export async function sendPrimaryWindowEffectIntent(intent: ClientEffectIntent):
     return
   }
   const expectedDocumentGeneration = primaryWindowDocumentGeneration + 1
+  // Window creation remains owned by the shared BrowserWindow singleton and
+  // Electron's load lifecycle. Do not race or cancel `activatePrimaryWindow`
+  // from one intent: another activation may share the same creation, and the
+  // normal load failure / renderer-gone / closed events already invalidate its
+  // document. The bounded wait below begins only after creation returns and
+  // governs the separate preload readiness acknowledgement.
   const win = await activatePrimaryWindow()
   const readiness = primaryWindowDocumentReadinessFor(win)
   if (readiness.generation !== expectedDocumentGeneration) {
@@ -154,6 +160,10 @@ function createPrimaryWindowDocumentReadyDeadline(generation: number): {
   outcome: Promise<PrimaryWindowDocumentOutcome>
   dispose: () => void
 } {
+  // This deadline bounds only the exact document's preload handshake. It does
+  // not bound `BrowserWindow.loadURL()`: window loading is shared lifecycle
+  // state, while this deadline belongs to one discrete intent waiting for an
+  // already-created document generation.
   const timeout = Promise.withResolvers<PrimaryWindowDocumentOutcome>()
   const handle = setTimeout(
     () =>
