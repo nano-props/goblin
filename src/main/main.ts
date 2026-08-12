@@ -102,6 +102,11 @@ async function main(): Promise<void> {
 async function finalizeNativeHostExit(): Promise<void> {
   try {
     if (clientActivated) {
+      // Client workspace presentation is persisted continuously: Electron uses
+      // a native user-data file while browser clients use localStorage. This
+      // drain only gives the current renderer a best-effort chance to flush a
+      // final debounced projection. Authoritative server state and native exit
+      // never depend on delivery to a loading or unavailable renderer.
       const clientQuitDrain = beginClientQuitDrain()
       void sendExistingPrimaryWindowEffectIntent({ type: 'app-quitting' })
         .then((delivered) => {

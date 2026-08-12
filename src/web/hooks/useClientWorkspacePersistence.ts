@@ -89,9 +89,11 @@ export function useClientWorkspacePersistence({
     void flushLatestClientWorkspace().catch(() => {})
   }
 
-  const unsubscribeAppQuitting = subscribeAppQuitting(flushLatestClientWorkspace)
   // This is the persistence boundary: every accepted restorable-state change
   // schedules exactly one immediate or debounced write of the complete snapshot.
+  // Quit and page-lifecycle flushes below only reduce the chance of losing the
+  // final debounce window; they are not an ownership or correctness boundary.
+  const unsubscribeAppQuitting = subscribeAppQuitting(flushLatestClientWorkspace)
   watch(
     [persistenceInput, workspacePaneTabsVersion, filetreeInteractionByScope, () => toValue(routedWorkspaceId)],
     () => {

@@ -12,6 +12,11 @@ import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
 
 const CLIENT_WORKSPACE_STORAGE_KEY = 'goblin.workspace'
 
+// This is client-local restorable presentation, not authoritative workspace
+// or repository state. Browser clients own it in localStorage. Electron uses
+// the same renderer model but delegates storage to a native user-data file
+// because its embedded-server origin may change between launches.
+
 export async function readClientWorkspaceState(): Promise<ClientWorkspaceState> {
   if (readNativeBridge()) {
     // A native read failure must block boot persistence. Returning an empty
@@ -51,8 +56,6 @@ export async function writeClientWorkspaceState(state: ClientWorkspaceState): Pr
   try {
     const current = decodeCurrentClientWorkspaceState(state)
     if (native) {
-      // Electron's embedded HTTP port may change between launches, so its
-      // origin-scoped localStorage cannot own durable window state.
       await invokeNativeIpcPath('clientWorkspace.write', current)
       return
     }

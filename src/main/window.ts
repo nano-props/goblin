@@ -125,6 +125,10 @@ export async function sendPrimaryWindowEffectIntent(intent: ClientEffectIntent):
 export async function sendExistingPrimaryWindowEffectIntent(intent: ClientEffectIntent): Promise<boolean> {
   const win = getPrimaryWindow()
   if (!win) return false
+  // Existing-window delivery never waits for readiness or follows a later
+  // document generation. Callers use this for best-effort effects, including
+  // the final client-presentation flush during quit; correctness must not
+  // depend on a renderer that is loading, reloading, or being replaced.
   await deliverPrimaryWindowEffectIntent(win, primaryWindowDocumentReadinessFor(win), intent)
   return true
 }

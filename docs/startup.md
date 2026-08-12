@@ -60,7 +60,11 @@ within the same document generation.
 Native quit delivery is an application lifecycle signal, not an authenticated
 UI command. Its consumer exists for the full web entrypoint lifetime, including
 public bootstrap, authentication gates, route changes, and render fallbacks;
-ordinary client effects remain owned by the authenticated UI router.
+ordinary client effects remain owned by the authenticated UI router. Client
+workspace presentation is already persisted continuously to browser storage or
+the Electron user-data file. Quit delivery is only a bounded, best-effort chance
+to flush its final debounce window; authoritative server state and native exit
+do not depend on a loading or unavailable renderer.
 
 ## Routing
 
