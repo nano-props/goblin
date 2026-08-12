@@ -1,6 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
-import { useFakeTimers } from '#/test-utils/timers.ts'
 import { createRuntimeProjectionScopeRegistry, RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
@@ -35,17 +34,14 @@ describe('RuntimeProjectionScope', () => {
     expect(reject).not.toHaveBeenCalled()
   })
 
-  test('dispose aborts operations, cancels timers, releases subscriptions, and blocks late results', async () => {
-    useFakeTimers()
+  test('dispose aborts operations, releases subscriptions, and blocks late results', async () => {
     const deferred = Promise.withResolvers<string>()
     const publish = vi.fn()
     const reject = vi.fn()
-    const timer = vi.fn()
     const unsubscribe = vi.fn()
     const scope = new RuntimeProjectionScope(TARGET, () => true)
     let taskSignal: AbortSignal | null = null
     scope.track(unsubscribe)
-    scope.setTimer('refresh', timer, 10)
     scope.runLatest(
       'recovery',
       async (signal) => {
@@ -58,28 +54,13 @@ describe('RuntimeProjectionScope', () => {
 
     scope.dispose()
     deferred.resolve('late')
-    await vi.runAllTimersAsync()
+    await waitForNextMacrotask()
 
     expect((taskSignal as AbortSignal | null)?.aborted).toBe(true)
     expect(unsubscribe).toHaveBeenCalledOnce()
-    expect(timer).not.toHaveBeenCalled()
     expect(publish).not.toHaveBeenCalled()
     expect(reject).not.toHaveBeenCalled()
     expect(scope.commit(vi.fn())).toBe(false)
-  })
-
-  test('coalesces timers by lane', async () => {
-    useFakeTimers()
-    const first = vi.fn()
-    const second = vi.fn()
-    const scope = new RuntimeProjectionScope(TARGET, () => true)
-
-    scope.setTimer('refresh', first, 10)
-    scope.setTimer('refresh', second, 10)
-    await vi.runAllTimersAsync()
-
-    expect(first).not.toHaveBeenCalled()
-    expect(second).toHaveBeenCalledOnce()
   })
 })
 

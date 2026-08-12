@@ -11,18 +11,17 @@ interface RuntimeProjectionOperation {
   rerun: (() => void) | null
 }
 
-interface RuntimeProjectionTimer {
-  handle: ReturnType<typeof setTimeout>
-}
-
 type RuntimeProjectionDisposer = () => void
 
 export class RuntimeProjectionScope {
   readonly target: RuntimeProjectionTarget
   private readonly isTargetCurrent: (target: RuntimeProjectionTarget) => boolean
   private readonly controller = new AbortController()
+  // The scope owns current-target admission, in-flight projection work, and
+  // subscription disposal. Time-based behavior belongs to the feature that
+  // defines that duration; keeping generic timers here would add unused policy
+  // and lifetime state to every projection scope.
   private readonly operationsByLane = new Map<string, RuntimeProjectionOperation>()
-  private readonly timersByLane = new Map<string, RuntimeProjectionTimer>()
   private readonly disposers = new Set<RuntimeProjectionDisposer>()
   private nextGeneration = 1
   private active = true
@@ -85,34 +84,12 @@ export class RuntimeProjectionScope {
     return release
   }
 
-  setTimer(lane: string, callback: () => void, delayMs: number): void {
-    this.cancelTimer(lane)
-    if (!this.isActive()) return
-    const timer: RuntimeProjectionTimer = {
-      handle: setTimeout(() => {
-        if (this.timersByLane.get(lane) !== timer) return
-        this.timersByLane.delete(lane)
-        this.commit(callback)
-      }, delayMs),
-    }
-    this.timersByLane.set(lane, timer)
-  }
-
-  cancelTimer(lane: string): void {
-    const timer = this.timersByLane.get(lane)
-    if (!timer) return
-    this.timersByLane.delete(lane)
-    clearTimeout(timer.handle)
-  }
-
   dispose(): void {
     if (!this.active) return
     this.active = false
     this.controller.abort()
     for (const operation of this.operationsByLane.values()) operation.controller.abort()
     this.operationsByLane.clear()
-    for (const timer of this.timersByLane.values()) clearTimeout(timer.handle)
-    this.timersByLane.clear()
     for (const dispose of Array.from(this.disposers)) dispose()
     this.disposers.clear()
   }

@@ -6,9 +6,11 @@ import { errorJson } from '#/server/common/responses.ts'
 import { safeEqualString } from '#/server/common/timing-safe.ts'
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365
-// Constant-time padding on a miss. The token is 128-bit so brute-force
-// is academic, but the 50ms floor removes a signal that distinguishes
-// "wrong token" from "server is slow to respond at all".
+// Explicit GOBLIN_SERVER_ACCESS_TOKEN overrides are not guaranteed to have the
+// generated token's 128-bit entropy. Keep one small, uniform penalty on every
+// rejected login shape as defense in depth for sequential guessing and timing
+// differences. This is deliberately not a rate limiter and carries no counters,
+// lockout state, or retry policy.
 const LOGIN_MISS_DELAY_MS = 50
 
 export interface AuthRouteOptions {
@@ -38,8 +40,6 @@ export function createAuthRoutes({ accessToken }: AuthRouteOptions): Hono {
     try {
       body = await c.req.json()
     } catch {
-      // Constant-time floor so a malformed body doesn't shortcut the
-      // comparison timing.
       await delay(LOGIN_MISS_DELAY_MS)
       return errorJson(c, 'BAD_REQUEST', 'Invalid JSON body')
     }
