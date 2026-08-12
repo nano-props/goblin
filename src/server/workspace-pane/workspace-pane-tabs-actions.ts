@@ -43,8 +43,8 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       userId: string,
       input: WorkspacePaneTabsUpdateInput,
     ): Promise<WorkspacePaneTabsWriteResult> {
-      if (!isValidClientId(clientId)) return projectedEmptyWorkspacePaneTabs()
-      if (!validInputTarget(input)) return projectedEmptyWorkspacePaneTabs()
+      if (!isValidClientId(clientId)) throw new Error('invalid workspace pane tabs client')
+      if (!validInputTarget(input)) throw new Error('invalid workspace pane tabs target')
       const runtimeCapability = deps.captureWorkspaceRuntimeMembershipCapability(
         userId,
         input.workspaceId,
@@ -59,8 +59,8 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       userId: string,
       input: WorkspacePaneTabsListInput,
     ): Promise<WorkspacePaneTabsSnapshot> {
-      if (!isValidClientId(clientId)) return emptyWorkspacePaneTabsSnapshot()
-      if (!isValidWorkspaceLocatorInput(input?.workspaceId)) return emptyWorkspacePaneTabsSnapshot()
+      if (!isValidClientId(clientId)) throw new Error('invalid workspace pane tabs client')
+      if (!isValidWorkspaceLocatorInput(input?.workspaceId)) throw new Error('invalid workspace pane tabs target')
       const runtimeCapability = deps.captureWorkspaceRuntimeMembershipCapability(
         userId,
         input.workspaceId,
@@ -77,10 +77,6 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
   }
 }
 
-function projectedEmptyWorkspacePaneTabs(): WorkspacePaneTabsWriteResult {
-  return { kind: 'projected', snapshot: emptyWorkspacePaneTabsSnapshot() }
-}
-
 function validInputTarget(input: WorkspacePaneTabsUpdateInput): boolean {
   return Boolean(
     isValidWorkspaceLocatorInput(input?.workspaceId) &&
@@ -88,8 +84,4 @@ function validInputTarget(input: WorkspacePaneTabsUpdateInput): boolean {
     input.target.workspaceRuntimeId === input.workspaceRuntimeId &&
     restorableWorkspacePaneTargetFromRuntime(input.target),
   )
-}
-
-function emptyWorkspacePaneTabsSnapshot(): WorkspacePaneTabsSnapshot {
-  return { revision: 0, entries: [] }
 }

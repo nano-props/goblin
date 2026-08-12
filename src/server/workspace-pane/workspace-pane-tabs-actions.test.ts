@@ -130,7 +130,7 @@ describe('workspace-pane-tabs-actions', () => {
         target: runtimeTarget(),
         operation: { type: 'open-static', tabType: 'status' },
       }),
-    ).resolves.toEqual({ kind: 'projected', snapshot: { revision: 0, entries: [] } })
+    ).rejects.toThrow('invalid workspace pane tabs target')
 
     expect(sessionService.updateTabs).not.toHaveBeenCalled()
   })
@@ -216,9 +216,19 @@ describe('workspace-pane-tabs-actions', () => {
         workspaceId: REPO_ROOT,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       }),
-    ).resolves.toEqual({ revision: 0, entries: [] })
+    ).rejects.toThrow('invalid workspace pane tabs client')
+
+    await expect(
+      actions.updateTabs('not_a_client', USER_ID, {
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        target: runtimeTarget(),
+        operation: { type: 'open-static', tabType: 'status' },
+      }),
+    ).rejects.toThrow('invalid workspace pane tabs client')
 
     expect(sessionService.listWorkspaceTabs).not.toHaveBeenCalled()
+    expect(sessionService.updateTabs).not.toHaveBeenCalled()
   })
 })
 
