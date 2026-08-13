@@ -233,7 +233,6 @@ describe('useClientEffectIntentRouter', () => {
         {
           routeTarget: { kind: 'workspace-root', workspaceId },
           workspaceRuntimeId,
-          authority: { kind: 'workspace-runtime' },
         },
         { kind: 'terminal', terminalSessionId },
       )
@@ -403,7 +402,6 @@ describe('useClientEffectIntentRouter', () => {
       {
         routeTarget: { kind: 'workspace-root', workspaceId },
         workspaceRuntimeId: workspace.workspaceRuntimeId,
-        authority: { kind: 'workspace-runtime' },
       },
       { kind: 'terminal', terminalSessionId },
     )

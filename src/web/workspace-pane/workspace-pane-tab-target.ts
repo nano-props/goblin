@@ -23,17 +23,10 @@ import {
   type WorkspacePaneFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
 
-export type FilesystemWorkspacePaneTargetLease =
-  | {
-      routeTarget: Extract<WorkspacePaneTabsTarget, { kind: 'workspace-root' }>
-      workspaceRuntimeId: string
-      authority: { kind: 'workspace-runtime' }
-    }
-  | {
-      routeTarget: Extract<WorkspacePaneTabsTarget, { kind: 'git-worktree' }>
-      workspaceRuntimeId: string
-      authority: { kind: 'worktree' }
-    }
+export interface FilesystemWorkspacePaneTargetLease {
+  routeTarget: Extract<WorkspacePaneTabsTarget, { kind: 'workspace-root' | 'git-worktree' }>
+  workspaceRuntimeId: string
+}
 
 export function filesystemWorkspacePaneTargetLeaseForModel(
   model: Pick<
@@ -46,7 +39,7 @@ export function filesystemWorkspacePaneTargetLeaseForModel(
     return model.paneTarget.kind === 'workspace-root' &&
       model.branchName === null &&
       routeTarget.workspaceId === model.workspaceId
-      ? { routeTarget, workspaceRuntimeId: model.workspaceRuntimeId, authority: { kind: 'workspace-runtime' } }
+      ? { routeTarget, workspaceRuntimeId: model.workspaceRuntimeId }
       : null
   }
   if (
@@ -61,7 +54,6 @@ export function filesystemWorkspacePaneTargetLeaseForModel(
   return {
     routeTarget,
     workspaceRuntimeId: model.workspaceRuntimeId,
-    authority: { kind: 'worktree' },
   }
 }
 
@@ -72,7 +64,6 @@ export function workspaceRootPaneTargetLease(
   return {
     routeTarget: { kind: 'workspace-root', workspaceId },
     workspaceRuntimeId,
-    authority: { kind: 'workspace-runtime' },
   }
 }
 
@@ -84,7 +75,6 @@ export function gitWorktreePaneTargetLease(
   return {
     routeTarget: { kind: 'git-worktree', workspaceId, worktreePath },
     workspaceRuntimeId,
-    authority: { kind: 'worktree' },
   }
 }
 

@@ -134,7 +134,6 @@ describe('workspace pane tab controller transactions', () => {
       {
         routeTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
         workspaceRuntimeId: 'repo-runtime-1',
-        authority: { kind: 'workspace-runtime' },
       },
       { kind: 'static', tab: 'files' },
       expect.objectContaining({ navigationGeneration: expect.any(Number) }),

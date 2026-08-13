@@ -221,7 +221,11 @@ describe('workspace pane destination navigation', () => {
 
     const second = beginPresentation('feature/destination')
     await expect(
-      commitWorkspacePaneDestinationRoute(second, DESTINATION_ROUTE, testNavigation(acceptedRouteCommit())),
+      commitWorkspacePaneDestinationRoute(
+        second,
+        DESTINATION_ROUTE,
+        testNavigation(acceptedRouteCommit(), acceptedFilesystemRouteCommit()),
+      ),
     ).resolves.toEqual({ kind: 'completed', changed: true, presentation: 'router-settled' })
     firstCommit.resolve(true)
     await expect(firstWork).resolves.toEqual({ kind: 'superseded' })
@@ -386,7 +390,11 @@ function acceptedFilesystemRouteCommit() {
 
 function testNavigation(
   commitWorkspacePaneRoute: WorkspacePaneRouteCommitActions['commitWorkspacePaneRoute'],
-  commitFilesystemWorkspacePaneRoute: FilesystemWorkspacePaneRouteCommitActions['commitFilesystemWorkspacePaneRoute'] = acceptedFilesystemRouteCommit(),
+  commitFilesystemWorkspacePaneRoute: FilesystemWorkspacePaneRouteCommitActions['commitFilesystemWorkspacePaneRoute'] = vi.fn(
+    async () => {
+      throw new Error('Unexpected filesystem route commit')
+    },
+  ),
 ): FilesystemWorkspacePaneRouteCommitActions {
   return { commitWorkspacePaneRoute, commitFilesystemWorkspacePaneRoute }
 }

@@ -54,37 +54,24 @@ describe('remote Git operation state script', () => {
     expect(state.stdout).toBe('operation none\nmaterialized-branch')
   })
 
-  test('retains bisect branch authority while presenting a concurrent cherry-pick', async () => {
+  test.each([
+    ['CHERRY_PICK_HEAD', 'cherry-pick'],
+    ['MERGE_HEAD', 'merge'],
+  ] as const)('retains bisect branch authority while presenting a concurrent %s', async (marker, kind) => {
     const repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin remote concurrent operation '))
     tempDirectories.push(repoPath)
     await execa('git', ['init', '-q', repoPath])
-    const resolveGitPath = async (marker: string) => {
-      const resolved = (await execa('git', ['-C', repoPath, 'rev-parse', '--git-path', marker])).stdout
-      return path.isAbsolute(resolved) ? resolved : path.join(repoPath, resolved)
-    }
-    await writeFile(await resolveGitPath('BISECT_LOG'), 'git bisect start\n')
-    await writeFile(await resolveGitPath('BISECT_START'), 'feature/example\n')
-    await writeFile(await resolveGitPath('CHERRY_PICK_HEAD'), '1111111111111111111111111111111111111111\n')
+    await writeFile(await resolveGitPath(repoPath, 'BISECT_LOG'), 'git bisect start\n')
+    await writeFile(await resolveGitPath(repoPath, 'BISECT_START'), 'feature/example\n')
+    await writeFile(await resolveGitPath(repoPath, marker), '1111111111111111111111111111111111111111\n')
 
     const state = await execa('sh', ['-c', remoteGitOperationStateScript(repoPath, null)])
 
-    expect(state.stdout).toBe('operation cherry-pick\nmaterialized-branch feature/example')
-  })
-
-  test('retains bisect branch authority while presenting a concurrent merge', async () => {
-    const repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin remote concurrent merge '))
-    tempDirectories.push(repoPath)
-    await execa('git', ['init', '-q', repoPath])
-    const resolveGitPath = async (marker: string) => {
-      const resolved = (await execa('git', ['-C', repoPath, 'rev-parse', '--git-path', marker])).stdout
-      return path.isAbsolute(resolved) ? resolved : path.join(repoPath, resolved)
-    }
-    await writeFile(await resolveGitPath('BISECT_LOG'), 'git bisect start\n')
-    await writeFile(await resolveGitPath('BISECT_START'), 'feature/example\n')
-    await writeFile(await resolveGitPath('MERGE_HEAD'), '1111111111111111111111111111111111111111\n')
-
-    const state = await execa('sh', ['-c', remoteGitOperationStateScript(repoPath, null)])
-
-    expect(state.stdout).toBe('operation merge\nmaterialized-branch feature/example')
+    expect(state.stdout).toBe(`operation ${kind}\nmaterialized-branch feature/example`)
   })
 })
+
+async function resolveGitPath(repoPath: string, marker: string): Promise<string> {
+  const resolved = (await execa('git', ['-C', repoPath, 'rev-parse', '--git-path', marker])).stdout
+  return path.isAbsolute(resolved) ? resolved : path.join(repoPath, resolved)
+}

@@ -27,7 +27,6 @@ import {
   type RepoMutationResult,
 } from '#/server/modules/repo-mutation-impact.ts'
 import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
-import type { GitHead } from '#/shared/git-head.ts'
 import {
   deleteBranch,
   deleteUpstreamBranch,
@@ -60,7 +59,6 @@ import { getWorktreePatch } from '#/system/git/patch.ts'
 import {
   type ExecResult,
   type ExecResultRecoveryMessageKey,
-  type GitOperation,
   type LogEntry,
   type PullRequestFetchMode,
   type PullRequestInfo,
@@ -69,6 +67,7 @@ import {
   type RepoUrlTarget,
   type WorktreeInfo,
   type WorktreeStatus,
+  type WorkspacePaneTargetIdentity,
 } from '#/shared/git-types.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
 import { isValidCwd } from '#/shared/input-validation.ts'
@@ -115,16 +114,6 @@ interface BranchDeleteResult extends ExecResult {
   branchEffect: 'none' | 'may-have-changed' | 'local-delete-confirmed'
   failureExecution?: CommandExecution
 }
-
-export type WorkspacePaneTargetIdentity =
-  | { kind: 'git-branch'; branchName: string }
-  | {
-      kind: 'git-worktree'
-      worktreePath: string
-      head: GitHead
-      operation: GitOperation | null
-      materializedBranch: string | null
-    }
 
 interface RepoMembershipReadOptions {
   signal?: AbortSignal

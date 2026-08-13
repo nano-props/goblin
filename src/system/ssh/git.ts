@@ -43,6 +43,7 @@ import {
   type LogEntry,
   type RepoRemoteInfo,
   type RepoWorktreeSnapshot,
+  type WorkspacePaneTargetIdentity,
   type RepoUrlTarget,
   type WorktreeInfo,
   type WorktreeStatus,
@@ -131,16 +132,6 @@ function remoteCommandOutcome(result: RemoteCommandResult): CommandOutcome {
   return { result: remoteExecResult(result), execution: remoteCommandExecution(result) }
 }
 
-export type RemoteWorkspacePaneTargetIdentity =
-  | { kind: 'git-branch'; branchName: string }
-  | {
-      kind: 'git-worktree'
-      worktreePath: string
-      head: RepoWorktreeSnapshot['head']
-      operation: RepoWorktreeSnapshot['operation']
-      materializedBranch: RepoWorktreeSnapshot['materializedBranch']
-    }
-
 /** Authoritative remote repository projection. Transport, cancellation, and malformed output are failures. */
 export async function getRemoteSnapshot(
   target: RemoteWorkspaceTarget,
@@ -203,7 +194,7 @@ async function readRemoteRepoWorktreeSnapshots(
 export async function getRemoteWorkspacePaneTargetIdentities(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
-): Promise<RemoteWorkspacePaneTargetIdentity[]> {
+): Promise<WorkspacePaneTargetIdentity[]> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const membership = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
   const worktrees = await readRemoteRepoWorktreeSnapshots(target, membership, { signal: options.signal, run })
@@ -223,16 +214,15 @@ export async function getRemoteWorkspacePaneTargetIdentities(
     }),
   )
   return [
-    ...worktrees.map((worktree): RemoteWorkspacePaneTargetIdentity => ({
+    ...worktrees.map((worktree): WorkspacePaneTargetIdentity => ({
       kind: 'git-worktree',
       worktreePath: worktree.path,
       head: worktree.head,
-      operation: worktree.operation,
       materializedBranch: worktree.materializedBranch,
     })),
     ...branches
       .filter((branch) => !materializedBranches.has(branch))
-      .map((branch): RemoteWorkspacePaneTargetIdentity => ({ kind: 'git-branch', branchName: branch })),
+      .map((branch): WorkspacePaneTargetIdentity => ({ kind: 'git-branch', branchName: branch })),
   ]
 }
 

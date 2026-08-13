@@ -160,7 +160,6 @@ describe('workspace pane tab close action', () => {
       {
         routeTarget: WORKTREE_PANE_TARGET,
         workspaceRuntimeId: repo.workspaceRuntimeId,
-        authority: { kind: 'worktree' },
       },
       { kind: 'static', tab: 'status' },
       expect.objectContaining({
@@ -352,7 +351,6 @@ describe('workspace pane tab close action', () => {
       {
         routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
         workspaceRuntimeId: repo.workspaceRuntimeId,
-        authority: { kind: 'workspace-runtime' },
       },
       { kind: 'terminal', terminalSessionId },
       expect.objectContaining({
@@ -586,7 +584,7 @@ describe('workspace pane tab close action', () => {
       id: 'workspace-pane-tab-close-projection-failed',
     })
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      expect.objectContaining({ routeTarget: WORKTREE_PANE_TARGET, authority: { kind: 'worktree' } }),
+      expect.objectContaining({ routeTarget: WORKTREE_PANE_TARGET }),
       { kind: 'static', tab: 'status' },
       expect.objectContaining({ routePrecondition: { kind: 'exact-route', route } }),
     )
@@ -679,7 +677,6 @@ describe('workspace pane tab close action', () => {
       {
         routeTarget: WORKTREE_PANE_TARGET,
         workspaceRuntimeId: repo.workspaceRuntimeId,
-        authority: { kind: 'worktree' },
       },
       { kind: 'static', tab: 'status' },
       expect.objectContaining({

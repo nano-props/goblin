@@ -93,7 +93,6 @@ export async function commitWorkspacePaneDestinationRoute(
         {
           routeTarget: lease.routeTarget,
           workspaceRuntimeId: lease.workspaceRuntimeId,
-          authority: { kind: 'worktree' },
         },
         route,
         { ...options, navigationGeneration: presentation.generation },

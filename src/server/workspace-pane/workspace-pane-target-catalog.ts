@@ -3,25 +3,14 @@ import { workspaceRuntimeHasGitCapability } from '#/server/modules/workspace-run
 import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { GitHead } from '#/shared/git-head.ts'
-import { repoWorktreeMaterializedBranch, type GitOperation } from '#/shared/git-types.ts'
-
-type WorkspacePaneCatalogIdentity =
-  | { kind: 'git-branch'; branchName: string }
-  | {
-      kind: 'git-worktree'
-      worktreePath: string
-      head: GitHead
-      operation: GitOperation | null
-      materializedBranch: string | null
-    }
+import { repoWorktreeMaterializedBranch, type WorkspacePaneTargetIdentity } from '#/shared/git-types.ts'
 
 interface WorkspacePaneTargetCatalogDependencies {
   hasGitCapability(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
   readIdentities(
     workspaceId: WorkspaceId,
     options: { workspaceRuntimeId: string },
-  ): Promise<readonly WorkspacePaneCatalogIdentity[]>
+  ): Promise<readonly WorkspacePaneTargetIdentity[]>
 }
 
 const defaultDependencies: WorkspacePaneTargetCatalogDependencies = {

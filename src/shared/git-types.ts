@@ -20,6 +20,15 @@ export interface RepoWorktreeSnapshot {
   isLocked: boolean
 }
 
+export type WorkspacePaneTargetIdentity =
+  | { kind: 'git-branch'; branchName: string }
+  | {
+      kind: 'git-worktree'
+      worktreePath: string
+      head: RepoWorktreeSnapshot['head']
+      materializedBranch: RepoWorktreeSnapshot['materializedBranch']
+    }
+
 export interface BranchSnapshotInfo {
   name: string
   isCurrent: boolean

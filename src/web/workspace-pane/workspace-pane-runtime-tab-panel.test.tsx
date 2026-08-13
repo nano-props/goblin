@@ -160,7 +160,6 @@ describe('workspace pane runtime tab panel', () => {
           workspaceId: 'goblin+file:///repo',
           worktreePath: '/repo-worktree',
         },
-        authority: { kind: 'worktree' },
       }),
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.any(Object),

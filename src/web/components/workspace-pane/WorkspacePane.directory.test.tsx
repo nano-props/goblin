@@ -5,6 +5,7 @@ import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx'
+import type { WorkspacePaneRouteContext } from '#/web/components/workspace-pane/workspace-pane-types.ts'
 import {
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
@@ -90,6 +91,24 @@ function failWorktreeStatusQuery(workspaceId: WorkspaceId, workspaceRuntimeId: s
     status: 'error',
     error: new Error(message),
   })
+}
+
+function renderWorkspacePane(workspaceId: WorkspaceId, workspacePaneRouteContext: WorkspacePaneRouteContext) {
+  return render(
+    <VueQueryClientScope client={appQueryClient}>
+      <AppNavigationProvider value={navigation}>
+        <TerminalSessionCommandScope value={terminalCommandContext}>
+          <TerminalSessionReadScope value={terminalReadContext}>
+            <WorkspacePane
+              workspaceId={workspaceId}
+              currentBranchName={null}
+              workspacePaneRouteContext={workspacePaneRouteContext}
+            />
+          </TerminalSessionReadScope>
+        </TerminalSessionCommandScope>
+      </AppNavigationProvider>
+    </VueQueryClientScope>,
+  )
 }
 
 describe('WorkspacePane directory workspaces', () => {
@@ -321,25 +340,11 @@ describe('WorkspacePane directory workspaces', () => {
       },
     })
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                currentBranchName={null}
-                workspacePaneRouteContext={{
-                  kind: 'git-worktree',
-                  worktreePath,
-                  route: { kind: 'static', tab: 'history' },
-                }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, {
+      kind: 'git-worktree',
+      worktreePath,
+      route: { kind: 'static', tab: 'history' },
+    })
 
     expect((await screen.findByRole('tab', { name: 'tab.log' })).getAttribute('aria-selected')).toBe('true')
     const snapshot = getRepoSnapshotQueryData(workspaceId, repo.workspaceRuntimeId)
@@ -389,25 +394,11 @@ describe('WorkspacePane directory workspaces', () => {
     })
     failWorktreeStatusQuery(workspaceId, repo.workspaceRuntimeId, 'status read failed')
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                currentBranchName={null}
-                workspacePaneRouteContext={{
-                  kind: 'git-worktree',
-                  worktreePath,
-                  route: { kind: 'static', tab: 'files' },
-                }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, {
+      kind: 'git-worktree',
+      worktreePath,
+      route: { kind: 'static', tab: 'files' },
+    })
 
     expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
     expect(screen.getByRole('tabpanel', { name: 'tab.files' })).toBeTruthy()
@@ -438,25 +429,11 @@ describe('WorkspacePane directory workspaces', () => {
     })
     failWorktreeStatusQuery(workspaceId, repo.workspaceRuntimeId, 'status read failed')
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                currentBranchName={null}
-                workspacePaneRouteContext={{
-                  kind: 'git-worktree',
-                  worktreePath,
-                  route: { kind: 'static', tab: 'status' },
-                }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, {
+      kind: 'git-worktree',
+      worktreePath,
+      route: { kind: 'static', tab: 'status' },
+    })
 
     expect(await screen.findByRole('alert')).toBeTruthy()
     expect(screen.getByText('error.failed-read-repo')).toBeTruthy()
@@ -490,25 +467,11 @@ describe('WorkspacePane directory workspaces', () => {
       workspaceRuntimeId: repo.workspaceRuntimeId,
       tabs: [workspacePaneStaticTabEntry('files')],
     })
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                currentBranchName={null}
-                workspacePaneRouteContext={{
-                  kind: 'git-worktree',
-                  worktreePath,
-                  route: { kind: 'static', tab: 'files' },
-                }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, {
+      kind: 'git-worktree',
+      worktreePath,
+      route: { kind: 'static', tab: 'files' },
+    })
 
     expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
     await flushTestUpdates(() => {
@@ -551,21 +514,7 @@ describe('WorkspacePane directory workspaces', () => {
     })
     workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'history')
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                currentBranchName={null}
-                workspacePaneRouteContext={{ kind: 'git-worktree', worktreePath, route: null }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, { kind: 'git-worktree', worktreePath, route: null })
 
     expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
     await flushTestUpdates(async () => await Promise.resolve())
@@ -599,21 +548,7 @@ describe('WorkspacePane directory workspaces', () => {
     })
     workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'history')
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                currentBranchName={null}
-                workspacePaneRouteContext={{ kind: 'git-worktree', worktreePath, route: null }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, { kind: 'git-worktree', worktreePath, route: null })
 
     expect((await screen.findByRole('tab', { name: 'tab.log' })).getAttribute('aria-selected')).toBe('true')
 
@@ -670,25 +605,11 @@ describe('WorkspacePane directory workspaces', () => {
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry(tab)],
     })
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                currentBranchName={null}
-                workspacePaneRouteContext={{
-                  kind: 'git-worktree',
-                  worktreePath,
-                  route: { kind: 'static', tab },
-                }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
-    )
+    renderWorkspacePane(workspaceId, {
+      kind: 'git-worktree',
+      worktreePath,
+      route: { kind: 'static', tab },
+    })
 
     expect(await screen.findByText('workspace-route.not-found-title')).toBeTruthy()
     expect(screen.queryByText('workspace-pane-tabs.empty')).toBeNull()
@@ -813,7 +734,6 @@ describe('WorkspacePane directory workspaces', () => {
         {
           routeTarget: { kind: 'workspace-root', workspaceId },
           workspaceRuntimeId: repo.workspaceRuntimeId,
-          authority: { kind: 'workspace-runtime' },
         },
         { kind: 'static', tab: 'files' },
         presentationOptions(),

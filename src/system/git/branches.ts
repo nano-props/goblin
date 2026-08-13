@@ -11,6 +11,7 @@ import {
   type ExecResult,
   type LogEntry,
   type RepoWorktreeSnapshot,
+  type WorkspacePaneTargetIdentity,
   type WorktreeInfo,
 } from '#/shared/git-types.ts'
 import { repoWorktreeMaterializedBranch } from '#/shared/git-types.ts'
@@ -154,22 +155,12 @@ export async function getBranches(
   )
 }
 
-export type BranchWorktreeIdentity =
-  | { kind: 'git-branch'; branchName: string }
-  | {
-      kind: 'git-worktree'
-      worktreePath: string
-      head: RepoWorktreeSnapshot['head']
-      operation: RepoWorktreeSnapshot['operation']
-      materializedBranch: RepoWorktreeSnapshot['materializedBranch']
-    }
-
 /** Strict, display-free branch membership read for admission/catalog paths. */
 export async function getBranchWorktreeIdentities(
   cwd: string,
-  worktrees: ReadonlyArray<Pick<RepoWorktreeSnapshot, 'path' | 'head' | 'operation' | 'materializedBranch'>>,
+  worktrees: ReadonlyArray<Pick<RepoWorktreeSnapshot, 'path' | 'head' | 'materializedBranch'>>,
   options?: { signal?: AbortSignal },
-): Promise<BranchWorktreeIdentity[]> {
+): Promise<WorkspacePaneTargetIdentity[]> {
   const output = await git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'], {
     signal: options?.signal,
   })
@@ -185,16 +176,15 @@ export async function getBranchWorktreeIdentities(
     }),
   )
   return [
-    ...worktrees.map((worktree): BranchWorktreeIdentity => ({
+    ...worktrees.map((worktree): WorkspacePaneTargetIdentity => ({
       kind: 'git-worktree',
       worktreePath: worktree.path,
       head: worktree.head,
-      operation: worktree.operation,
       materializedBranch: worktree.materializedBranch,
     })),
     ...branches
       .filter((branch) => !materializedBranches.has(branch))
-      .map((branch): BranchWorktreeIdentity => ({ kind: 'git-branch', branchName: branch })),
+      .map((branch): WorkspacePaneTargetIdentity => ({ kind: 'git-branch', branchName: branch })),
   ]
 }
 

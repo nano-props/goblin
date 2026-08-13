@@ -12,7 +12,6 @@ describe('WorkspacePaneTargetCatalog', () => {
         kind: 'git-worktree' as const,
         worktreePath: '/repo',
         head: { kind: 'branch' as const, branchName: 'main' },
-        operation: null,
         materializedBranch: 'main',
       },
       { kind: 'git-branch' as const, branchName: 'feature/no-worktree' },
@@ -78,7 +77,6 @@ describe('WorkspacePaneTargetCatalog', () => {
           kind: 'git-worktree',
           worktreePath: '/repo',
           head: { kind: 'detached' },
-          operation: null,
           materializedBranch: null,
         },
       ],
@@ -106,7 +104,7 @@ describe('WorkspacePaneTargetCatalog', () => {
     ])
   })
 
-  test.each(['rebase', 'bisect'] as const)('retains the materialized branch for detached %s state', async (kind) => {
+  test('retains the materialized branch for a detached worktree', async () => {
     const catalog = new WorkspacePaneTargetCatalog({
       hasGitCapability: () => true,
       readIdentities: async () => [
@@ -114,7 +112,6 @@ describe('WorkspacePaneTargetCatalog', () => {
           kind: 'git-worktree',
           worktreePath: '/repo',
           head: { kind: 'detached' },
-          operation: { kind },
           materializedBranch: 'feature/in-progress',
         },
       ],

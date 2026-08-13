@@ -60,7 +60,6 @@ describe('workspace pane terminal destination navigation', () => {
           workspaceId: WORKSPACE_ID,
           worktreePath: '/workspace/feature',
         },
-        authority: { kind: 'worktree' },
       }),
       { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       expect.objectContaining({ navigationGeneration: expect.any(Number) }),
@@ -141,7 +140,6 @@ describe('workspace pane terminal destination navigation', () => {
       {
         routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/workspace/detached' },
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        authority: { kind: 'worktree' },
       },
       { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       { navigationGeneration: expect.any(Number) },
@@ -163,7 +161,6 @@ describe('workspace pane terminal destination navigation', () => {
       {
         routeTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        authority: { kind: 'workspace-runtime' },
       },
       { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       { navigationGeneration: expect.any(Number) },

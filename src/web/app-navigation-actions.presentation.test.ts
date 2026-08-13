@@ -6,7 +6,6 @@ import {
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
@@ -31,6 +30,9 @@ import {
   markRepoGitUnavailable,
   routeNavigation,
   createPendingWorktreeSnapshot,
+  installTerminalSessionCommandBridgeForTest,
+  worktreeSnapshotForSessions,
+  WORKTREE_KEY,
 } from '#/web/app-navigation-actions.test-utils.ts'
 
 beforeEach(setupAppNavigationActionsTests)
@@ -121,7 +123,6 @@ describe('createAppNavigationActions presentation', () => {
       {
         routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
         workspaceRuntimeId: repo.workspaceRuntimeId,
-        authority: { kind: 'workspace-runtime' },
       },
       { kind: 'static', tab: 'files' },
       { onAbandon },
@@ -168,7 +169,6 @@ describe('createAppNavigationActions presentation', () => {
       {
         routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
         workspaceRuntimeId: repo.workspaceRuntimeId,
-        authority: { kind: 'worktree' },
       },
       { kind: 'static', tab: 'files' },
       { onAbandon },
@@ -202,7 +202,6 @@ describe('createAppNavigationActions presentation', () => {
         {
           routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
           workspaceRuntimeId: repo.workspaceRuntimeId,
-          authority: { kind: 'workspace-runtime' },
         },
         { kind: 'static', tab: 'files' },
         { onAbandon },
@@ -384,38 +383,10 @@ describe('createAppNavigationActions presentation', () => {
         [BRANCH_NAME]: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
       },
     })
-    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
-    workspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, terminalSessionId)
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: () => ({
-        terminalFilesystemTargetKey,
-        selectedDescriptor: null,
-        sessions: [
-          {
-            type: 'terminal',
-            terminalSessionId,
-            terminalFilesystemTargetKey,
-            index: 1,
-            title: 'terminal 1',
-            phase: 'open',
-            selected: true,
-            hasBell: false,
-            hasRecentOutput: false,
-          },
-        ],
-        count: 1,
-        bellCount: 0,
-        outputActiveCount: 0,
-        createPending: false,
-      }),
-      createTerminal: vi.fn(async () => terminalSessionId),
-      createTerminalWithAdmission: vi.fn(async () => {
-        throw new Error('unexpected terminal creation')
-      }),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
-    })
+    workspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, terminalSessionId)
+    const terminalFilesystemTargetSnapshot = installTerminalSessionCommandBridgeForTest(
+      worktreeSnapshotForSessions([terminalSessionId]),
+    )
     const navigation = routeNavigation()
     navigation.openRepoWorktreeTerminal = vi.fn((_repoId, _worktreePath, _terminalSessionId, options) => {
       options?.onCommit?.()
@@ -438,6 +409,7 @@ describe('createAppNavigationActions presentation', () => {
     )
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
+    expect(terminalFilesystemTargetSnapshot).toHaveBeenCalledWith(WORKTREE_KEY)
   })
 
   test('opens the branch root while workspace pane tabs are still loading', () => {
@@ -623,16 +595,7 @@ describe('createAppNavigationActions presentation', () => {
     } satisfies WorkspaceNavigationHistoryEntry
     workspacesStore.getState().recordWorkspaceNavigation(dashboard)
     workspacesStore.getState().recordWorkspaceNavigation(worktree)
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
-      createTerminalWithAdmission: vi.fn(async () => {
-        throw new Error('unexpected terminal creation')
-      }),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
-    })
+    installTerminalSessionCommandBridgeForTest(createPendingWorktreeSnapshot())
     const peekWorkspaceNavigation = vi.fn((workspaceId: WorkspaceId, direction: 'back' | 'forward') =>
       workspacesStore.getState().peekWorkspaceNavigation(workspaceId, direction),
     )

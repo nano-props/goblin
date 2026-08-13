@@ -114,7 +114,6 @@ describe('workspace pane runtime tab create action', () => {
       {
         routeTarget: WORKTREE_ROUTE_TARGET,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        authority: { kind: 'worktree' },
       },
       { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       routeRequest,

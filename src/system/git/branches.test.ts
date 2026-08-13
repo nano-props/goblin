@@ -53,11 +53,10 @@ describe('getBranchWorktreeIdentities', () => {
 
     await expect(
       getBranchWorktreeIdentities('/repo', [
-        { path: '/repo', head: { kind: 'branch', branchName: 'main' }, operation: null, materializedBranch: 'main' },
+        { path: '/repo', head: { kind: 'branch', branchName: 'main' }, materializedBranch: 'main' },
         {
           path: '/worktrees/linked',
           head: { kind: 'branch', branchName: 'feature/linked' },
-          operation: null,
           materializedBranch: 'feature/linked',
         },
       ]),
@@ -66,14 +65,12 @@ describe('getBranchWorktreeIdentities', () => {
         kind: 'git-worktree',
         worktreePath: '/repo',
         head: { kind: 'branch', branchName: 'main' },
-        operation: null,
         materializedBranch: 'main',
       },
       {
         kind: 'git-worktree',
         worktreePath: '/worktrees/linked',
         head: { kind: 'branch', branchName: 'feature/linked' },
-        operation: null,
         materializedBranch: 'feature/linked',
       },
       { kind: 'git-branch', branchName: 'feature/free' },
@@ -91,21 +88,18 @@ describe('getBranchWorktreeIdentities', () => {
   test('keeps a detached local worktree without a branch ref', async () => {
     vi.mocked(git).mockResolvedValueOnce('')
     await expect(
-      getBranchWorktreeIdentities('/repo', [
-        { path: '/repo', head: { kind: 'detached' }, operation: null, materializedBranch: null },
-      ]),
+      getBranchWorktreeIdentities('/repo', [{ path: '/repo', head: { kind: 'detached' }, materializedBranch: null }]),
     ).resolves.toEqual([
       {
         kind: 'git-worktree',
         worktreePath: '/repo',
         head: { kind: 'detached' },
-        operation: null,
         materializedBranch: null,
       },
     ])
   })
 
-  test.each(['rebase', 'bisect'] as const)('does not expose the branch retained by detached %s', async (kind) => {
+  test('does not expose the branch retained by a detached worktree', async () => {
     vi.mocked(git).mockResolvedValueOnce('main\nfeature/in-progress\n')
 
     await expect(
@@ -113,7 +107,6 @@ describe('getBranchWorktreeIdentities', () => {
         {
           path: '/repo',
           head: { kind: 'detached' },
-          operation: { kind },
           materializedBranch: 'feature/in-progress',
         },
       ]),
@@ -122,7 +115,6 @@ describe('getBranchWorktreeIdentities', () => {
         kind: 'git-worktree',
         worktreePath: '/repo',
         head: { kind: 'detached' },
-        operation: { kind },
         materializedBranch: 'feature/in-progress',
       },
       { kind: 'git-branch', branchName: 'main' },

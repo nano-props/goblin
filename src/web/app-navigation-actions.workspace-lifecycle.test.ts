@@ -5,7 +5,6 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   REPO_ID,
@@ -22,6 +21,7 @@ import {
   createAppNavigationActions,
   routeNavigation,
   createPendingWorktreeSnapshot,
+  installTerminalSessionCommandBridgeForTest,
 } from '#/web/app-navigation-actions.test-utils.ts'
 
 beforeEach(setupAppNavigationActionsTests)
@@ -97,16 +97,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     })
     const entry = branchHistoryEntry(REPO_ID, BRANCH_NAME, 'status')
     workspacesStore.getState().recordWorkspaceNavigation(entry)
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
-      createTerminalWithAdmission: vi.fn(async () => {
-        throw new Error('unexpected terminal creation')
-      }),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
-    })
+    installTerminalSessionCommandBridgeForTest(createPendingWorktreeSnapshot())
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_A_ID,
@@ -269,16 +260,7 @@ describe('createAppNavigationActions workspace lifecycle', () => {
     })
     const entry = branchHistoryEntry(REPO_ID, BRANCH_NAME, 'status')
     workspacesStore.getState().recordWorkspaceNavigation(entry)
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
-      createTerminalWithAdmission: vi.fn(async () => {
-        throw new Error('unexpected terminal creation')
-      }),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
-    })
+    installTerminalSessionCommandBridgeForTest(createPendingWorktreeSnapshot())
     const closeWorkspace = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({

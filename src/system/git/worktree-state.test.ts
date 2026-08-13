@@ -63,24 +63,16 @@ describe('readGitWorktreeState', () => {
     })
   })
 
-  test('retains the bisected branch while presenting a concurrent cherry-pick', async () => {
+  test.each([
+    ['CHERRY_PICK_HEAD', 'cherry-pick'],
+    ['MERGE_HEAD', 'merge'],
+  ] as const)('retains the bisected branch while presenting a concurrent %s', async (marker, kind) => {
     await writeFile(await gitPath('BISECT_LOG'), 'git bisect start\n')
     await writeFile(await gitPath('BISECT_START'), 'feature/example\n')
-    await writeFile(await gitPath('CHERRY_PICK_HEAD'), '0123456789abcdef\n')
+    await writeFile(await gitPath(marker), '0123456789abcdef\n')
 
     await expect(readGitWorktreeState(repoPath)).resolves.toEqual({
-      operation: { kind: 'cherry-pick' },
-      materializedBranch: 'feature/example',
-    })
-  })
-
-  test('retains the bisected branch while presenting a concurrent merge', async () => {
-    await writeFile(await gitPath('BISECT_LOG'), 'git bisect start\n')
-    await writeFile(await gitPath('BISECT_START'), 'feature/example\n')
-    await writeFile(await gitPath('MERGE_HEAD'), '0123456789abcdef\n')
-
-    await expect(readGitWorktreeState(repoPath)).resolves.toEqual({
-      operation: { kind: 'merge' },
+      operation: { kind },
       materializedBranch: 'feature/example',
     })
   })
