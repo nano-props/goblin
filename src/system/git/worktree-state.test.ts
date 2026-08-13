@@ -38,11 +38,20 @@ describe('readGitOperation', () => {
   test.each([
     ['CHERRY_PICK_HEAD', 'cherry-pick'],
     ['REVERT_HEAD', 'revert'],
-    ['BISECT_LOG', 'bisect'],
     ['MERGE_HEAD', 'merge'],
   ] as const)('detects %s', async (marker, kind) => {
     await writeFile(await gitPath(marker), '0123456789abcdef\n')
     await expect(readGitOperation(repoPath)).resolves.toEqual({ kind })
+  })
+
+  test('reads the branch retained by an in-progress bisect', async () => {
+    await writeFile(await gitPath('BISECT_LOG'), 'git bisect start\n')
+    await writeFile(await gitPath('BISECT_START'), 'feature/example\n')
+
+    await expect(readGitOperation(repoPath)).resolves.toEqual({
+      kind: 'bisect',
+      branchName: 'feature/example',
+    })
   })
 })
 

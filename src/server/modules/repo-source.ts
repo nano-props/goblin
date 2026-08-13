@@ -60,6 +60,7 @@ import { getWorktreePatch } from '#/system/git/patch.ts'
 import {
   type ExecResult,
   type ExecResultRecoveryMessageKey,
+  type GitOperation,
   type LogEntry,
   type PullRequestFetchMode,
   type PullRequestInfo,
@@ -115,7 +116,13 @@ interface BranchDeleteResult extends ExecResult {
 }
 
 export type WorkspacePaneTargetIdentity =
-  { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
+  | { kind: 'git-branch'; branchName: string }
+  | {
+      kind: 'git-worktree'
+      worktreePath: string
+      head: GitHead
+      operation: GitOperation | null
+    }
 
 interface RepoMembershipReadOptions {
   signal?: AbortSignal
@@ -579,8 +586,9 @@ function createLocalRepoSource(
       return { branches, worktrees, current, currentHEAD, remote }
     },
     async getWorkspacePaneTargetIdentities(options) {
-      const worktrees = await readWorktreeMembership(repoId, options?.signal)
+      const membership = await readWorktreeMembership(repoId, options?.signal)
       options?.signal?.throwIfAborted()
+      const worktrees = await readRepoWorktreeSnapshots(membership, options?.signal)
       return await getBranchWorktreeIdentities(repoId, worktrees, { signal: options?.signal })
     },
     async getStatus(options) {

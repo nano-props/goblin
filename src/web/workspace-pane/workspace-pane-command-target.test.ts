@@ -80,7 +80,7 @@ describe('workspace pane command target', () => {
     expect(workspacePaneCommandCoordinates(target).branchName).toBe('feature/example')
   })
 
-  test('retains the branch route target without creating a query for a filesystem-only workspace', async () => {
+  test('rejects a branch route for a filesystem-only workspace without creating a query', async () => {
     const workspace = seedRepoShellForTest({
       id: 'goblin+file:///tmp/command-target-filesystem-workspace',
       workspaceRuntimeId: 'command-target-filesystem-runtime',
@@ -106,15 +106,11 @@ describe('workspace pane command target', () => {
       queryClient: appQueryClient,
     })
 
-    expect(target).toEqual({
-      routeTarget: { kind: 'git-branch', workspaceId: workspace.id, branchName: 'feature/example' },
-      workspacePaneRoute: { kind: 'static', tab: 'history' },
-      filesystemTarget: null,
-    })
+    expect(target).toBeNull()
     expect(appQueryClient.getQueryCache().getAll()).toHaveLength(0)
   })
 
-  test('projects a branch worktree from the accepted snapshot while a refresh is stale', async () => {
+  test('rejects a materialized branch route even while its accepted snapshot is stale', async () => {
     const workspace = seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest('feature/example', '/tmp/command-target-branch-worktree')],
       id: 'goblin+file:///tmp/command-target-branch-workspace',
@@ -129,30 +125,47 @@ describe('workspace pane command target', () => {
       workspacePaneRoute: null,
     }
 
-    const successfulBranchTarget = workspacePaneCommandTargetFromQueryCache({
-      routeContext,
-      workspace,
-      queryClient: appQueryClient,
-    })
-    expect(successfulBranchTarget?.filesystemTarget).toEqual(
-      expect.objectContaining({
-        kind: 'git-worktree',
+    expect(
+      workspacePaneCommandTargetFromQueryCache({
+        routeContext,
+        workspace,
+        queryClient: appQueryClient,
       }),
-    )
-    if (!successfulBranchTarget?.filesystemTarget) throw new Error('Missing branch filesystem target')
-    expect(workspacePaneFilesystemRootPath(successfulBranchTarget.filesystemTarget)).toBe(
-      '/tmp/command-target-branch-worktree',
-    )
+    ).toBeNull()
 
     const queryKey = repoSnapshotQueryKey(workspace.id, workspace.workspaceRuntimeId)
     const query = appQueryClient.getQueryCache().find({ queryKey, exact: true })
     if (!query) throw new Error('Missing snapshot query')
     query.setState({ ...query.state, status: 'error', error: new Error('snapshot unavailable') })
 
-    expect(workspacePaneCommandTargetFromQueryCache({ routeContext, workspace, queryClient: appQueryClient })).toEqual(
-      successfulBranchTarget,
-    )
+    expect(
+      workspacePaneCommandTargetFromQueryCache({ routeContext, workspace, queryClient: appQueryClient }),
+    ).toBeNull()
     expect(query.getObserversCount()).toBe(0)
+  })
+
+  test('admits only a branch that exists and has no materialized worktree', async () => {
+    const workspace = seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/command-target-unmaterialized-branch-workspace',
+      workspaceRuntimeId: 'command-target-unmaterialized-branch-runtime',
+      branchSnapshots: [createRepoBranch('feature/example')],
+      currentBranchName: null,
+    })
+    const branchTarget = workspacePaneCommandTargetFromQueryCache({
+      routeContext: {
+        kind: 'branch',
+        workspaceSlug: 'branch-workspace',
+        branchName: 'feature/example',
+        workspacePaneRoute: null,
+      },
+      workspace,
+      queryClient: appQueryClient,
+    })
+    expect(branchTarget).toEqual({
+      routeTarget: { kind: 'git-branch', workspaceId: workspace.id, branchName: 'feature/example' },
+      workspacePaneRoute: null,
+      filesystemTarget: null,
+    })
   })
 
   test('admits a worktree target from the accepted repository snapshot while a refresh is stale', async () => {

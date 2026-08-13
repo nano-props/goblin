@@ -2,6 +2,7 @@ import { defineComponent } from 'vue'
 import type { VNodeChild } from 'vue'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
+import { EmptyState } from '#/web/components/Layout.tsx'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
@@ -16,6 +17,7 @@ import type {
   GitWorkspacePaneShell,
   WorkspacePaneRouteContext,
 } from '#/web/components/workspace-pane/workspace-pane-types.ts'
+import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.tsx'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
@@ -32,6 +34,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { useGitWorkspacePaneRouteController } from '#/web/components/repo-workspace/git-workspace-pane-route-controller.ts'
 import { useGitWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 
 interface GitWorkspacePaneProps {
   gitWorkspace: GitWorkspacePaneShell
@@ -54,6 +57,7 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
   ],
 
   setup(props) {
+    const t = useT()
     const snapshotReadModel = useRepoSnapshotReadModel(
       () => props.gitWorkspace.id,
       () => props.gitWorkspace.workspaceRuntimeId,
@@ -123,6 +127,10 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
         () => void snapshotReadModel.refetch(),
       )
       const snapshotReadFailures = snapshotReadFailure ? [snapshotReadFailure] : []
+
+      if (props.workspacePaneRouteContext.kind === 'routed' && detail.worktree) {
+        return <EmptyState title={t('workspace-route.not-found-title')} />
+      }
 
       return (
         <section class="flex min-h-0 flex-1 flex-col bg-background">
@@ -254,27 +262,26 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
     const workspacePaneTabModel = useGitWorkspacePaneTabModel(
       () => props.repo,
       () => props.detail,
-      () => (props.workspacePaneRouteContext.kind === 'routed' ? props.workspacePaneRouteContext.route : undefined),
+      () => workspacePaneRoute(props.workspacePaneRouteContext),
     )
     useGitWorkspacePaneRouteController({
-      enabled: () => props.workspacePaneRouteContext.kind === 'routed',
+      enabled: () => workspacePaneRoute(props.workspacePaneRouteContext) !== undefined,
       workspaceId: () => props.repo.id,
       branchName: () => props.detail.branch?.name ?? null,
       worktreePath: () => props.detail.worktree?.path ?? null,
-      route: () => (props.workspacePaneRouteContext.kind === 'routed' ? props.workspacePaneRouteContext.route : null),
+      route: () => workspacePaneRoute(props.workspacePaneRouteContext) ?? null,
       model: workspacePaneTabModel,
     })
 
     return () => {
-      const workspacePaneRoute =
-        props.workspacePaneRouteContext.kind === 'routed' ? props.workspacePaneRouteContext.route : undefined
+      const currentWorkspacePaneRoute = workspacePaneRoute(props.workspacePaneRouteContext)
       return (
         <>
           <GitWorkspacePaneToolbar
             repo={props.repo}
             detail={props.detail}
             workspacePaneId={props.workspacePaneId}
-            workspacePaneRoute={workspacePaneRoute}
+            workspacePaneRoute={currentWorkspacePaneRoute}
             trafficLightOffset={props.toolbarTrafficLightOffset ?? false}
             workspacePaneTabModel={workspacePaneTabModel.value}
             onBackToBranchNavigator={props.onBackToBranchNavigator}
@@ -329,8 +336,7 @@ const GitBranchActionWorkspacePane = defineComponent<GitBranchActionWorkspacePan
       () => props.branch,
       () => branchActions,
       {
-        workspacePaneRoute: () =>
-          props.workspacePaneRouteContext.kind === 'routed' ? props.workspacePaneRouteContext.route : undefined,
+        workspacePaneRoute: () => workspacePaneRoute(props.workspacePaneRouteContext),
       },
     )
     useBranchActionShortcutRegistry(actions, () => props.shortcutsEnabled)
@@ -350,3 +356,7 @@ const GitBranchActionWorkspacePane = defineComponent<GitBranchActionWorkspacePan
     )
   },
 })
+
+function workspacePaneRoute(context: WorkspacePaneRouteContext): ParsedWorkspacePaneRoute | null | undefined {
+  return context.kind === 'routed' || context.kind === 'git-worktree' ? context.route : undefined
+}

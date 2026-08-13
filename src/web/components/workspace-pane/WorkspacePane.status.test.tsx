@@ -134,8 +134,12 @@ describe('WorkspacePane status presentation', () => {
             <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
-                currentBranchName="feature/a"
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
+                currentBranchName={null}
+                workspacePaneRouteContext={{
+                  kind: 'git-worktree',
+                  worktreePath: '/tmp/repo-workspace-container-repo-a',
+                  route: { kind: 'static', tab: 'status' },
+                }}
               />
             </TerminalSessionReadScope>
           </TerminalSessionCommandScope>
@@ -156,8 +160,12 @@ describe('WorkspacePane status presentation', () => {
               <TerminalSessionReadScope value={terminalReadContext}>
                 <WorkspacePane
                   workspaceId={REPO_ID}
-                  currentBranchName="feature/b"
-                  workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
+                  currentBranchName={null}
+                  workspacePaneRouteContext={{
+                    kind: 'git-worktree',
+                    worktreePath: '/tmp/repo-workspace-container-repo-b',
+                    route: { kind: 'static', tab: 'status' },
+                  }}
                 />
               </TerminalSessionReadScope>
             </TerminalSessionCommandScope>
@@ -182,8 +190,12 @@ describe('WorkspacePane status presentation', () => {
               <TerminalSessionReadScope value={terminalReadContext}>
                 <WorkspacePane
                   workspaceId={REPO_ID}
-                  currentBranchName="feature/a"
-                  workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
+                  currentBranchName={null}
+                  workspacePaneRouteContext={{
+                    kind: 'git-worktree',
+                    worktreePath: '/tmp/repo-workspace-container-repo-a',
+                    route: { kind: 'static', tab: 'status' },
+                  }}
                 />
               </TerminalSessionReadScope>
             </TerminalSessionCommandScope>
@@ -226,8 +238,12 @@ describe('WorkspacePane status presentation', () => {
             <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
-                currentBranchName="feature/a"
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
+                currentBranchName={null}
+                workspacePaneRouteContext={{
+                  kind: 'git-worktree',
+                  worktreePath,
+                  route: { kind: 'static', tab: 'status' },
+                }}
               />
             </TerminalSessionReadScope>
           </TerminalSessionCommandScope>
@@ -275,8 +291,12 @@ describe('WorkspacePane status presentation', () => {
             <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
-                currentBranchName="feature/stale"
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'changes' } }}
+                currentBranchName={null}
+                workspacePaneRouteContext={{
+                  kind: 'git-worktree',
+                  worktreePath,
+                  route: { kind: 'static', tab: 'changes' },
+                }}
               />
             </TerminalSessionReadScope>
           </TerminalSessionCommandScope>

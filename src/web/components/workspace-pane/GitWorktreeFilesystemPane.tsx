@@ -90,7 +90,7 @@ export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPa
               ...props.repo,
               ui: { ...props.repo.ui, currentBranchName: currentWorktree.head.branchName },
             }}
-            workspacePaneRouteContext={{ kind: 'routed', route: props.route }}
+            workspacePaneRouteContext={{ kind: 'git-worktree', worktreePath: props.worktreePath, route: props.route }}
             workspacePaneId={props.workspacePaneId}
             shortcutsEnabled
             toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
@@ -98,21 +98,7 @@ export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPa
           />
         )
       }
-      if (!statusReadModel.data.value && statusReadModel.isPending.value) {
-        return <WorkspacePaneSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
-      }
-      if (!statusReadModel.data.value && statusReadModel.isError.value) {
-        const error = statusReadModel.error.value
-        return (
-          <RepoStatusFailureView
-            messageKey={error instanceof Error ? error.message : String(error)}
-            retrying={statusReadModel.isFetching.value}
-            onRetry={() => void statusReadModel.refetch()}
-          />
-        )
-      }
       const currentWorktreeStatus = worktreeStatus.value
-      if (!currentWorktreeStatus) return <EmptyState title={t('workspace-route.not-found-title')} />
       const statusError = statusReadModel.isError.value
         ? statusReadModel.error.value instanceof Error
           ? statusReadModel.error.value.message
@@ -135,6 +121,7 @@ export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPa
             workspaceProbe={props.workspaceProbe}
             head={currentWorktree.head}
             status={currentWorktreeStatus}
+            statusPending={!statusReadModel.data.value && statusReadModel.isPending.value}
             statusError={statusError}
             statusRetrying={statusReadModel.isFetching.value}
             onRetryStatus={() => void statusReadModel.refetch()}
@@ -154,7 +141,8 @@ interface GitWorktreeFilesystemPaneReadyProps {
   workspaceRuntime: WorkspacePaneRuntimeContext
   workspaceProbe: WorkspaceGitReadyProbeState
   head: GitHead
-  status: WorktreeStatus
+  status?: WorktreeStatus
+  statusPending: boolean
   statusError: string | null
   statusRetrying: boolean
   onRetryStatus: () => void
@@ -172,6 +160,7 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
     'workspaceProbe',
     'head',
     'status',
+    'statusPending',
     'statusError',
     'statusRetrying',
     'onRetryStatus',
@@ -190,7 +179,7 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
       () => props.head,
       () => props.route,
     )
-    useFilesystemWorkspacePaneRouteController({ route: () => props.route, model })
+    const routeReconciliation = useFilesystemWorkspacePaneRouteController({ route: () => props.route, model })
     const runtimeTarget = computed(() =>
       runtimeWorkspacePaneTarget(props.target, props.workspaceRuntime.workspaceRuntimeId),
     )
@@ -211,31 +200,44 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
         selection?.kind === 'materialized-tab' && selection.materializedTab.kind === 'runtime'
           ? selection.materializedTab.sessionId
           : null
+      const routeMissing = routeReconciliation.value.kind === 'missing'
 
       return (
         <section class="flex min-h-0 flex-1 flex-col bg-background" data-testid="detached-worktree-pane">
-          {props.statusError ? (
-            <RepoStatusStaleNotice
-              messageKey={props.statusError}
-              retrying={props.statusRetrying}
-              onRetry={props.onRetryStatus}
-            />
-          ) : null}
           <WorkspacePaneTargetToolbar
             target={surfaceTarget.value}
             model={currentModel}
             workspacePaneId={props.workspacePaneId}
             workspacePaneRoute={props.route}
-            statusCount={props.status.entries.length}
+            statusCount={props.status?.entries.length}
             trafficLightOffset={props.toolbarTrafficLightOffset}
             onBackToNavigator={props.onBackToNavigator}
             staticTabAvailable={(type) => type === 'status' || type === 'files'}
           />
-          {selection?.tab === 'status' ? (
+          {routeMissing ? (
+            <EmptyState title={t('workspace-route.not-found-title')} />
+          ) : selection?.tab === 'status' ? (
             <WorkspacePanePanelFrame id={`${props.workspacePaneId}-status-panel`} label={t('tab.status')}>
-              <ScrollPane>
-                <StatusList status={[props.status]} />
-              </ScrollPane>
+              {props.status && props.statusError ? (
+                <RepoStatusStaleNotice
+                  messageKey={props.statusError}
+                  retrying={props.statusRetrying}
+                  onRetry={props.onRetryStatus}
+                />
+              ) : null}
+              {props.status ? (
+                <ScrollPane>
+                  <StatusList status={[props.status]} />
+                </ScrollPane>
+              ) : props.statusPending ? (
+                <div class="min-h-0 flex-1" aria-busy="true" />
+              ) : (
+                <RepoStatusFailureView
+                  messageKey={props.statusError ?? 'error.failed-read-repo'}
+                  retrying={props.statusRetrying}
+                  onRetry={props.onRetryStatus}
+                />
+              )}
             </WorkspacePanePanelFrame>
           ) : selection?.tab === 'files' ? (
             <WorkspacePanePanelFrame id={`${props.workspacePaneId}-files-panel`} label={t('tab.files')}>

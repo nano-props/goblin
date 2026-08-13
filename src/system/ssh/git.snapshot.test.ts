@@ -35,6 +35,8 @@ describe('remote git snapshot', () => {
           return okRemoteResult(
             'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)',
           )
+        case 'gitOperationState':
+          return okRemoteResult('none\n')
         case 'gitUpstream':
           return okRemoteResult(upstreamOutput('origin', 'feature/test'))
         default:
@@ -86,6 +88,8 @@ describe('remote git snapshot', () => {
           return okRemoteResult(
             'origin\tgit@gitlab.com:acme/project.git (fetch)\norigin\tgit@gitlab.com:acme/project.git (push)',
           )
+        case 'gitOperationState':
+          return okRemoteResult('none\n')
         default:
           return okRemoteResult('')
       }
@@ -110,22 +114,53 @@ describe('remote git snapshot', () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
       if (command.type === 'gitLocalBranches') return okRemoteResult('main\nfeature/no-worktree')
+      if (command.type === 'gitOperationState') return okRemoteResult('none\n')
       throw new Error(`unexpected command: ${command.type}`)
     })
 
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).resolves.toEqual([
-      { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'branch', branchName: 'main' } },
+      {
+        kind: 'git-worktree',
+        worktreePath: '/srv/repo',
+        head: { kind: 'branch', branchName: 'main' },
+        operation: null,
+      },
       { kind: 'git-branch', branchName: 'feature/no-worktree' },
     ])
-    expect(run).toHaveBeenCalledTimes(2)
+    expect(run).toHaveBeenCalledTimes(3)
     expect(run).toHaveBeenCalledWith({ type: 'gitLocalBranches', path: '/srv/repo' }, TARGET, {
       signal: undefined,
     })
   })
 
+  test.each([
+    ['rebase', 'rebase\nrefs/heads/feature/in-progress\n'],
+    ['bisect', 'bisect\nfeature/in-progress\n'],
+  ] as const)('does not expose the branch retained by a detached remote %s', async (kind, operationOutput) => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+      }
+      if (command.type === 'gitOperationState') return okRemoteResult(operationOutput)
+      if (command.type === 'gitLocalBranches') return okRemoteResult('main\nfeature/in-progress')
+      throw new Error(`unexpected command: ${command.type}`)
+    })
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).resolves.toEqual([
+      {
+        kind: 'git-worktree',
+        worktreePath: '/srv/repo',
+        head: { kind: 'detached' },
+        operation: { kind, branchName: 'feature/in-progress' },
+      },
+      { kind: 'git-branch', branchName: 'main' },
+    ])
+  })
+
   test('does not turn a failed authoritative remote snapshot into missing data', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'gitSnapshot') return failRemoteResult('ssh unavailable')
+      if (command.type === 'gitOperationState') return okRemoteResult('none\n')
       return command.type === 'gitWorktreeList' ? okRemoteResult(PRIMARY_WORKTREE_OUTPUT) : okRemoteResult('')
     })
 
@@ -159,7 +194,9 @@ describe('remote git snapshot', () => {
           )
         : command.type === 'gitWorktreeList'
           ? okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
-          : okRemoteResult(''),
+          : command.type === 'gitOperationState'
+            ? okRemoteResult('none\n')
+            : okRemoteResult(''),
     )
 
     await expect(getRemoteSnapshot(TARGET, { run })).resolves.toMatchObject({
@@ -219,13 +256,15 @@ describe('remote git snapshot', () => {
     const run = vi.fn<RemoteGitRunner>(async (command) =>
       command.type === 'gitWorktreeList'
         ? okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
-        : okRemoteResult(''),
+        : command.type === 'gitOperationState'
+          ? okRemoteResult('none\n')
+          : okRemoteResult(''),
     )
 
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).resolves.toEqual([
-      { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'detached' } },
+      { kind: 'git-worktree', worktreePath: '/srv/repo', head: { kind: 'detached' }, operation: null },
     ])
-    expect(run).toHaveBeenCalledTimes(2)
+    expect(run).toHaveBeenCalledTimes(3)
   })
 
   test('prefers stderr when converting remote exec failures', () => {

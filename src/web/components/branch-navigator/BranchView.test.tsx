@@ -140,6 +140,35 @@ describe('BranchView', () => {
     expect(screen.queryByText('feature/merge')).toBeNull()
   })
 
+  test.each(['rebase', 'bisect'] as const)(
+    'replaces the retained branch row with its detached %s worktree state',
+    (kind) => {
+      const branch = createRepoBranch('feature/in-progress')
+      seedRepoWithReadModelForTest({
+        id: REPO_ID,
+        branches: [branch],
+        currentBranchName: null,
+        worktrees: [
+          {
+            path: WORKTREE_PATH,
+            head: { kind: 'detached' },
+            headOid: '0123456789abcdef',
+            operation: { kind, branchName: branch.name },
+            isPrimary: false,
+            isLocked: false,
+          },
+        ],
+      })
+
+      renderBranchView()
+
+      expect(
+        screen.getByText(kind === 'rebase' ? 'worktree-state.rebase-branch' : 'worktree-state.bisect'),
+      ).toBeTruthy()
+      expect(screen.queryByText(branch.name)).toBeNull()
+    },
+  )
+
   test('opens a non-current branch status through destination navigation', async () => {
     const destination = createRepoBranch('feature/destination')
     const worktrees = [createRepoWorktreeSnapshotForTest(destination.name, WORKTREE_PATH)]

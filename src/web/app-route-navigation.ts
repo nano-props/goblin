@@ -12,6 +12,7 @@ import { returnToFromHref, routeReturnSearch, workspacePaneRouteFromBranchHref }
 import { appRouteHref, currentAppRouteHref, navigateAppRoute } from '#/web/app-router-location.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import {
   commitBranchWorkspacePaneRoute,
   commitFilesystemWorkspacePaneRoute,
@@ -328,8 +329,5 @@ function currentWorktreePathForBranch(workspaceId: WorkspaceId, branchName: stri
   const workspace = workspacesStore.getState().workspaces[workspaceId]
   if (!workspace || workspace.capability.kind !== 'git') return null
   const snapshot = getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)
-  return (
-    snapshot?.worktrees.find((worktree) => worktree.head.kind === 'branch' && worktree.head.branchName === branchName)
-      ?.path ?? null
-  )
+  return snapshot ? (repoWorktreeForBranch(snapshot.worktrees, branchName)?.path ?? null) : null
 }

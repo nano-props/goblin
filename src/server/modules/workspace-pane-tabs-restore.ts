@@ -7,6 +7,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ServerWorkspaceMatchOutcome } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type { WorkspaceRuntimeMembershipCapability } from '#/server/modules/workspace-runtimes.ts'
+import { repoWorktreeMaterializedBranch } from '#/shared/git-types.ts'
 
 interface WorkspacePaneTabsRestoreInput {
   userId: string
@@ -93,9 +94,10 @@ function workspacePaneLayoutRestoreAdmission(workspace: RestoredWorkspaceRuntime
       return target ? [target] : []
     })
     const materializedBranches = new Set(
-      workspace.repoSnapshot.worktrees.flatMap((worktree) =>
-        worktree.head.kind === 'branch' ? [worktree.head.branchName] : [],
-      ),
+      workspace.repoSnapshot.worktrees.flatMap((worktree) => {
+        const branchName = repoWorktreeMaterializedBranch(worktree)
+        return branchName ? [branchName] : []
+      }),
     )
     const branchTargets: RestorableWorkspacePaneTarget[] = workspace.repoSnapshot.branches
       .filter((branch) => !materializedBranches.has(branch.name))

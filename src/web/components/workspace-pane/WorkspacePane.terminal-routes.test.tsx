@@ -386,20 +386,18 @@ describe('WorkspacePane terminal routes', () => {
     const statusEntry = {
       workspaceId: REPO_ID,
       route: {
-        kind: 'branch' as const,
-        branchName: 'feature/a',
+        kind: 'worktree' as const,
+        worktreePath,
         workspacePaneTab: 'status' as const,
-        terminalFilesystemTargetKey,
         terminalSessionId: null,
       },
     }
     const terminalEntry = {
       workspaceId: REPO_ID,
       route: {
-        kind: 'branch' as const,
-        branchName: 'feature/a',
+        kind: 'worktree' as const,
+        worktreePath,
         workspacePaneTab: 'terminal' as const,
-        terminalFilesystemTargetKey,
         terminalSessionId: 'term-111111111111111111111',
       },
     }
@@ -453,8 +451,8 @@ describe('WorkspacePane terminal routes', () => {
             <TerminalSessionReadScope value={nextReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
-                currentBranchName="feature/a"
-                workspacePaneRouteContext={{ kind: 'routed', route: workspacePaneRoute }}
+                currentBranchName={null}
+                workspacePaneRouteContext={{ kind: 'git-worktree', worktreePath, route: workspacePaneRoute }}
               />
             </TerminalSessionReadScope>
           </TerminalSessionCommandScope>
@@ -494,6 +492,6 @@ describe('WorkspacePane terminal routes', () => {
       testNavigation.goBack(REPO_ID)
     })
 
-    expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'status', historyRestoreOptions())
+    expect(route.openRepoWorktreeTab).toHaveBeenCalledWith(REPO_ID, worktreePath, 'status', historyRestoreOptions())
   })
 })

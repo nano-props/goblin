@@ -53,15 +53,25 @@ describe('getBranchWorktreeIdentities', () => {
 
     await expect(
       getBranchWorktreeIdentities('/repo', [
-        { path: '/repo', branch: 'main', isBare: false, isPrimary: true },
-        { path: '/worktrees/linked', branch: 'feature/linked', isBare: false, isPrimary: false },
+        { path: '/repo', head: { kind: 'branch', branchName: 'main' }, operation: null },
+        {
+          path: '/worktrees/linked',
+          head: { kind: 'branch', branchName: 'feature/linked' },
+          operation: null,
+        },
       ]),
     ).resolves.toEqual([
-      { kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'branch', branchName: 'main' } },
+      {
+        kind: 'git-worktree',
+        worktreePath: '/repo',
+        head: { kind: 'branch', branchName: 'main' },
+        operation: null,
+      },
       {
         kind: 'git-worktree',
         worktreePath: '/worktrees/linked',
         head: { kind: 'branch', branchName: 'feature/linked' },
+        operation: null,
       },
       { kind: 'git-branch', branchName: 'feature/free' },
     ])
@@ -78,8 +88,30 @@ describe('getBranchWorktreeIdentities', () => {
   test('keeps a detached local worktree without a branch ref', async () => {
     vi.mocked(git).mockResolvedValueOnce('')
     await expect(
-      getBranchWorktreeIdentities('/repo', [{ path: '/repo', isBare: false, isPrimary: true }]),
-    ).resolves.toEqual([{ kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' } }])
+      getBranchWorktreeIdentities('/repo', [{ path: '/repo', head: { kind: 'detached' }, operation: null }]),
+    ).resolves.toEqual([{ kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' }, operation: null }])
+  })
+
+  test.each(['rebase', 'bisect'] as const)('does not expose the branch retained by detached %s', async (kind) => {
+    vi.mocked(git).mockResolvedValueOnce('main\nfeature/in-progress\n')
+
+    await expect(
+      getBranchWorktreeIdentities('/repo', [
+        {
+          path: '/repo',
+          head: { kind: 'detached' },
+          operation: { kind, branchName: 'feature/in-progress' },
+        },
+      ]),
+    ).resolves.toEqual([
+      {
+        kind: 'git-worktree',
+        worktreePath: '/repo',
+        head: { kind: 'detached' },
+        operation: { kind, branchName: 'feature/in-progress' },
+      },
+      { kind: 'git-branch', branchName: 'main' },
+    ])
   })
 })
 

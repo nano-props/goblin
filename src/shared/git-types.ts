@@ -11,7 +11,7 @@ export type GitOperation =
   | { kind: 'merge' }
   | { kind: 'cherry-pick' }
   | { kind: 'revert' }
-  | { kind: 'bisect' }
+  | { kind: 'bisect'; branchName: string | null }
 
 /** Complete repository worktree membership, independent of branch rows. */
 export interface RepoWorktreeSnapshot {
@@ -39,11 +39,19 @@ export interface BranchSnapshotInfo {
   mergedToDefault?: boolean
 }
 
-export function repoWorktreeForBranch(
-  worktrees: readonly RepoWorktreeSnapshot[],
+export function repoWorktreeForBranch<T extends Pick<RepoWorktreeSnapshot, 'head' | 'operation'>>(
+  worktrees: readonly T[],
   branchName: string,
-): RepoWorktreeSnapshot | undefined {
-  return worktrees.find((worktree) => worktree.head.kind === 'branch' && worktree.head.branchName === branchName)
+): T | undefined {
+  return worktrees.find((worktree) => repoWorktreeMaterializedBranch(worktree) === branchName)
+}
+
+export function repoWorktreeMaterializedBranch(
+  worktree: Pick<RepoWorktreeSnapshot, 'head' | 'operation'>,
+): string | null {
+  if (worktree.head.kind === 'branch') return worktree.head.branchName
+  const operation = worktree.operation
+  return operation?.kind === 'rebase' || operation?.kind === 'bisect' ? operation.branchName : null
 }
 
 export interface PullRequestInfo {

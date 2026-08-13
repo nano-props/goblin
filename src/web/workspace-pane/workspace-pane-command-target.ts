@@ -10,7 +10,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { GitHead } from '#/shared/git-head.ts'
-import { gitHead, gitHeadBranch } from '#/shared/git-head.ts'
+import { gitHeadBranch } from '#/shared/git-head.ts'
 import type { WorkspaceRouteContext } from '#/web/app-layout-model.ts'
 import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
@@ -50,22 +50,8 @@ export function workspacePaneCommandTargetFromQueryCache(input: {
           )
         : undefined
     const snapshot = snapshotQuery?.data?.snapshot
-    const worktreePath = snapshot
-      ? (repoWorktreeForBranch(snapshot.worktrees, routeContext.branchName)?.path ?? null)
-      : null
-    if (workspace.capability.kind === 'git' && worktreePath) {
-      return {
-        routeTarget: { kind: 'git-worktree', workspaceId: workspace.id, worktreePath },
-        workspacePaneRoute: routeContext.workspacePaneRoute,
-        filesystemTarget: gitWorktreePaneFilesystemTarget({
-          workspaceId: workspace.id,
-          workspaceRuntimeId: workspace.workspaceRuntimeId,
-          worktreePath,
-          head: gitHead(routeContext.branchName),
-          capabilities: workspace.capability.probe.capabilities,
-        }),
-      }
-    }
+    if (!snapshot?.branches.some((branch) => branch.name === routeContext.branchName)) return null
+    if (repoWorktreeForBranch(snapshot.worktrees, routeContext.branchName)) return null
     return {
       routeTarget: { kind: 'git-branch', workspaceId: workspace.id, branchName: routeContext.branchName },
       workspacePaneRoute: routeContext.workspacePaneRoute,

@@ -10,6 +10,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import type { WorkspacePaneModelTarget } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { useSyncWorkspacePaneRuntimeTabSelection } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import {
   reconcileWorkspacePaneRoute,
@@ -54,26 +55,23 @@ export function useGitWorkspacePaneRouteController(
 function useWorkspacePaneNavigationHistory({
   enabled,
   workspaceId,
-  branchName,
-  worktreePath,
   route,
   reconciliation,
+  model,
 }: {
   enabled: MaybeRefOrGetter<boolean>
   workspaceId: MaybeRefOrGetter<WorkspaceId>
-  branchName: MaybeRefOrGetter<string | null>
-  worktreePath: MaybeRefOrGetter<string | null>
   route: MaybeRefOrGetter<ParsedWorkspacePaneRouteTarget>
   reconciliation: MaybeRefOrGetter<WorkspacePaneRouteReconciliation>
+  model: MaybeRefOrGetter<WorkspacePaneTabModel>
 }): void {
   const routeContext = computed(() => {
     const historyRoute = workspacePaneRouteHistoryResolution(toValue(route) ?? null, toValue(reconciliation))
-    const currentBranchName = toValue(branchName)
-    return toValue(enabled) && currentBranchName && historyRoute.kind === 'record'
+    const currentModel = toValue(model)
+    return toValue(enabled) && historyRoute.kind === 'record'
       ? workspacePaneHistoryRouteContext({
           workspaceId: toValue(workspaceId),
-          branchName: currentBranchName,
-          worktreePath: toValue(worktreePath),
+          routeTarget: currentModel.routeTarget,
           route: historyRoute.route,
         })
       : null
@@ -85,22 +83,25 @@ function useWorkspacePaneNavigationHistory({
 
 function workspacePaneHistoryRouteContext({
   workspaceId,
-  branchName,
-  worktreePath,
+  routeTarget,
   route,
 }: {
   workspaceId: WorkspaceId
-  branchName: string
-  worktreePath: string | null
+  routeTarget: WorkspacePaneModelTarget
   route: WorkspacePaneRouteTarget
-}): WorkspaceNavigationRouteContext {
-  return {
-    kind: 'branch',
-    workspaceId,
-    branchName,
-    worktreePath,
-    workspacePaneRoute: route,
+}): WorkspaceNavigationRouteContext | null {
+  if (routeTarget.kind === 'git-worktree') {
+    return { kind: 'worktree', workspaceId, worktreePath: routeTarget.worktreePath, workspacePaneRoute: route }
   }
+  if (routeTarget.kind === 'git-branch') {
+    return {
+      kind: 'branch',
+      workspaceId,
+      branchName: routeTarget.branchName,
+      workspacePaneRoute: route,
+    }
+  }
+  return null
 }
 
 function useSyncRoutedWorkspacePaneSelection({

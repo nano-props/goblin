@@ -18,6 +18,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { gitWorktreePaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { repoWorktreeMaterializedBranch } from '#/shared/git-types.ts'
 
 interface Props {
   repoId: WorkspaceId
@@ -92,9 +93,10 @@ const BranchViewReadModel = defineComponent<BranchViewReadModelProps>({
     const branches = computed(() => {
       if (!repo.value) return []
       const operationBranches = new Set(
-        worktreeStateRows.value.flatMap((worktree) =>
-          worktree.operation && worktree.head.kind === 'branch' ? [worktree.head.branchName] : [],
-        ),
+        worktreeStateRows.value.flatMap((worktree) => {
+          const branchName = repoWorktreeMaterializedBranch(worktree)
+          return branchName ? [branchName] : []
+        }),
       )
       return visibleBranches({
         branches: repo.value.snapshot.branches,

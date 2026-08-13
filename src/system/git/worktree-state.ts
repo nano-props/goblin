@@ -7,6 +7,14 @@ import { git } from '#/system/git/git-exec.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
 
 const WORKTREE_STATE_READ_CONCURRENCY = 4
+const GIT_OPERATION_PATHS = [
+  'rebase-merge',
+  'rebase-apply',
+  'CHERRY_PICK_HEAD',
+  'REVERT_HEAD',
+  'BISECT_LOG',
+  'MERGE_HEAD',
+] as const
 
 export async function readRepoWorktreeSnapshots(
   worktrees: readonly WorktreeInfo[],
@@ -28,27 +36,14 @@ async function readRepoWorktreeSnapshot(worktree: WorktreeInfo, signal?: AbortSi
     path: worktree.path,
     head: gitHead(worktree.branch ?? null),
     headOid: worktree.headOid,
-    operation: await readGitOperationForProjection(worktree.path, signal),
+    operation: await readGitOperation(worktree.path, signal),
     isPrimary: worktree.isPrimary,
     isLocked: worktree.isLocked ?? false,
   }
 }
 
-async function readGitOperationForProjection(cwd: string, signal?: AbortSignal): Promise<GitOperation | null> {
-  try {
-    return await readGitOperation(cwd, signal)
-  } catch (error) {
-    signal?.throwIfAborted()
-    return null
-  }
-}
-
 export async function readGitOperation(cwd: string, signal?: AbortSignal): Promise<GitOperation | null> {
-  const paths = await Promise.all(
-    ['rebase-merge', 'rebase-apply', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG', 'MERGE_HEAD'].map(
-      async (gitPath) => resolveGitPath(cwd, gitPath, signal),
-    ),
-  )
+  const paths = await resolveGitPaths(cwd, signal)
   signal?.throwIfAborted()
   const [rebaseMergePath, rebaseApplyPath, cherryPickPath, revertPath, bisectPath, mergePath] = paths
   const rebasePath = (await pathExists(rebaseMergePath))
@@ -59,15 +54,23 @@ export async function readGitOperation(cwd: string, signal?: AbortSignal): Promi
   if (rebasePath) return { kind: 'rebase', branchName: await readRebaseBranchName(rebasePath) }
   if (await pathExists(cherryPickPath)) return { kind: 'cherry-pick' }
   if (await pathExists(revertPath)) return { kind: 'revert' }
-  if (await pathExists(bisectPath)) return { kind: 'bisect' }
+  if (await pathExists(bisectPath)) {
+    return { kind: 'bisect', branchName: await readBisectBranchName(path.dirname(bisectPath)) }
+  }
   if (await pathExists(mergePath)) return { kind: 'merge' }
   return null
 }
 
-async function resolveGitPath(cwd: string, gitPath: string, signal?: AbortSignal): Promise<string> {
-  const resolved = await git(cwd, ['rev-parse', '--git-path', gitPath], { signal })
-  if (!resolved) throw new Error('Git returned an empty administrative path')
-  return path.isAbsolute(resolved) ? path.normalize(resolved) : path.resolve(cwd, resolved)
+async function resolveGitPaths(cwd: string, signal?: AbortSignal): Promise<string[]> {
+  const args = ['rev-parse', ...GIT_OPERATION_PATHS.flatMap((gitPath) => ['--git-path', gitPath])]
+  const output = await git(cwd, args, { signal })
+  const resolvedPaths = output.split(/\r?\n/)
+  if (resolvedPaths.length !== GIT_OPERATION_PATHS.length || resolvedPaths.some((resolved) => !resolved)) {
+    throw new Error(`Git returned ${resolvedPaths.length} administrative paths; expected ${GIT_OPERATION_PATHS.length}`)
+  }
+  return resolvedPaths.map((resolved) =>
+    path.isAbsolute(resolved) ? path.normalize(resolved) : path.resolve(cwd, resolved),
+  )
 }
 
 async function pathExists(target: string): Promise<boolean> {
@@ -89,6 +92,21 @@ async function readRebaseBranchName(rebasePath: string): Promise<string | null> 
     if (isMissingPathError(error)) return null
     throw error
   }
+}
+
+async function readBisectBranchName(gitStateDirectory: string): Promise<string | null> {
+  try {
+    return parseOperationBranchName((await readFile(path.join(gitStateDirectory, 'BISECT_START'), 'utf8')).trim())
+  } catch (error) {
+    if (isMissingPathError(error)) return null
+    throw error
+  }
+}
+
+function parseOperationBranchName(value: string): string | null {
+  const branchName = value.startsWith('refs/heads/') ? value.slice('refs/heads/'.length) : value
+  if (/^[0-9a-f]{40,64}$/i.test(branchName)) return null
+  return isSafeBranchName(branchName) ? branchName : null
 }
 
 function isMissingPathError(error: unknown): boolean {

@@ -81,9 +81,10 @@ describe('WorkspacePane route synchronization', () => {
             <TerminalSessionReadScope value={readContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
-                currentBranchName={branchName}
+                currentBranchName={null}
                 workspacePaneRouteContext={{
-                  kind: 'routed',
+                  kind: 'git-worktree',
+                  worktreePath,
                   route: { kind: 'terminal', terminalSessionId: 'missing-session' },
                 }}
               />
@@ -125,9 +126,10 @@ describe('WorkspacePane route synchronization', () => {
             <TerminalSessionReadScope value={readContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
-                currentBranchName={branchName}
+                currentBranchName={null}
                 workspacePaneRouteContext={{
-                  kind: 'routed',
+                  kind: 'git-worktree',
+                  worktreePath,
                   route: { kind: 'terminal', terminalSessionId: missingSessionId },
                 }}
               />
@@ -196,9 +198,10 @@ describe('WorkspacePane route synchronization', () => {
             >
               <WorkspacePane
                 workspaceId={REPO_ID}
-                currentBranchName={branchName}
+                currentBranchName={null}
                 workspacePaneRouteContext={{
-                  kind: 'routed',
+                  kind: 'git-worktree',
+                  worktreePath,
                   route: { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
                 }}
               />
@@ -248,9 +251,10 @@ describe('WorkspacePane route synchronization', () => {
             >
               <WorkspacePane
                 workspaceId={REPO_ID}
-                currentBranchName={branchName}
+                currentBranchName={null}
                 workspacePaneRouteContext={{
-                  kind: 'routed',
+                  kind: 'git-worktree',
+                  worktreePath,
                   route: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
                 }}
               />
@@ -396,6 +400,42 @@ describe('WorkspacePane route synchronization', () => {
     expect(route.openRepoBranch).not.toHaveBeenCalled()
   })
 
+  test('rejects a branch URL when the branch is materialized by a worktree', async () => {
+    const branchName = 'feature/materialized-route'
+    const worktreePath = '/tmp/materialized-route-worktree'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, worktreePath)],
+      currentBranchName: branchName,
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+      },
+    })
+    const route = routeNavigation()
+
+    const { container } = render(
+      <VueQueryClientScope client={appQueryClient}>
+        <AppNavigationProvider value={navigationWithStore(route)}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
+              <WorkspacePane
+                workspaceId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'files' } }}
+              />
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
+        </AppNavigationProvider>
+      </VueQueryClientScope>,
+    )
+
+    expect(container.textContent).toContain('workspace-route.not-found-title')
+    expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]).toBeUndefined()
+    expect(route.openRepoBranch).not.toHaveBeenCalled()
+    expect(route.openRepoWorktree).not.toHaveBeenCalled()
+  })
+
   test('defers stale static route replacement while active tab close is pending', async () => {
     const branchName = 'feature/close-route-race'
     const worktreePath = '/tmp/close-route-race-worktree'
@@ -433,8 +473,12 @@ describe('WorkspacePane route synchronization', () => {
             <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
                 workspaceId={REPO_ID}
-                currentBranchName={branchName}
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'files' } }}
+                currentBranchName={null}
+                workspacePaneRouteContext={{
+                  kind: 'git-worktree',
+                  worktreePath,
+                  route: { kind: 'static', tab: 'files' },
+                }}
               />
             </TerminalSessionReadScope>
           </TerminalSessionCommandScope>
@@ -444,10 +488,9 @@ describe('WorkspacePane route synchronization', () => {
     const filesHistoryEntry = {
       workspaceId: REPO_ID,
       route: {
-        kind: 'branch' as const,
-        branchName,
+        kind: 'worktree' as const,
+        worktreePath,
         workspacePaneTab: 'files' as const,
-        terminalFilesystemTargetKey: formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath),
         terminalSessionId: null,
       },
     }
@@ -460,7 +503,7 @@ describe('WorkspacePane route synchronization', () => {
     const closePromise = runCloseWorkspacePaneTabCommand({
       workspaceId: REPO_ID,
       target: {
-        routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName },
+        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath },
         workspacePaneRoute: { kind: 'static', tab: 'files' },
         filesystemTarget: gitWorktreeFilesystemTarget(repo, worktreePath, branchName),
       },
@@ -481,12 +524,14 @@ describe('WorkspacePane route synchronization', () => {
 
     expect(route.openRepoBranch).not.toHaveBeenCalled()
     expect(route.openRepoBranchTab).not.toHaveBeenCalled()
+    expect(route.openRepoWorktree).not.toHaveBeenCalled()
+    expect(route.openRepoWorktreeTab).not.toHaveBeenCalled()
     expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(filesHistoryEntry)
 
     resolveCommit([workspacePaneStaticTabEntry('status')])
 
     await expect(closePromise).resolves.toBe(true)
-    expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status', presentationOptions())
+    expect(route.openRepoWorktreeTab).toHaveBeenCalledWith(REPO_ID, worktreePath, 'status', presentationOptions())
   })
 
   test('renders an unrenderable static URL as an empty pane without navigating', async () => {

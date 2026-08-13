@@ -10,9 +10,10 @@ import {
   type BranchSnapshotInfo,
   type ExecResult,
   type LogEntry,
+  type RepoWorktreeSnapshot,
   type WorktreeInfo,
 } from '#/shared/git-types.ts'
-import { gitHead, type GitHead } from '#/shared/git-head.ts'
+import { repoWorktreeMaterializedBranch } from '#/shared/git-types.ts'
 import { decodeGitUpstream, GIT_UPSTREAM_FORMAT, type GitUpstream } from '#/system/git/upstream.ts'
 
 export async function isGitRepo(cwd: string): Promise<boolean> {
@@ -155,12 +156,18 @@ export async function getBranches(
 }
 
 export type BranchWorktreeIdentity =
-  { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
+  | { kind: 'git-branch'; branchName: string }
+  | {
+      kind: 'git-worktree'
+      worktreePath: string
+      head: RepoWorktreeSnapshot['head']
+      operation: RepoWorktreeSnapshot['operation']
+    }
 
 /** Strict, display-free branch membership read for admission/catalog paths. */
 export async function getBranchWorktreeIdentities(
   cwd: string,
-  worktrees: readonly WorktreeInfo[],
+  worktrees: ReadonlyArray<Pick<RepoWorktreeSnapshot, 'path' | 'head' | 'operation'>>,
   options?: { signal?: AbortSignal },
 ): Promise<BranchWorktreeIdentity[]> {
   const output = await git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'], {
@@ -171,16 +178,21 @@ export async function getBranchWorktreeIdentities(
     .split('\n')
     .map((branch) => branch.trim())
     .filter(Boolean)
-  const usableWorktrees = worktrees.filter((worktree) => !worktree.isBare && !worktree.isPrunable)
-  const checkedOutBranches = new Set(usableWorktrees.flatMap((worktree) => (worktree.branch ? [worktree.branch] : [])))
+  const materializedBranches = new Set(
+    worktrees.flatMap((worktree) => {
+      const branchName = repoWorktreeMaterializedBranch(worktree)
+      return branchName ? [branchName] : []
+    }),
+  )
   return [
-    ...usableWorktrees.map((worktree): BranchWorktreeIdentity => ({
+    ...worktrees.map((worktree): BranchWorktreeIdentity => ({
       kind: 'git-worktree',
       worktreePath: worktree.path,
-      head: gitHead(worktree.branch ?? null),
+      head: worktree.head,
+      operation: worktree.operation,
     })),
     ...branches
-      .filter((branch) => !checkedOutBranches.has(branch))
+      .filter((branch) => !materializedBranches.has(branch))
       .map((branch): BranchWorktreeIdentity => ({ kind: 'git-branch', branchName: branch })),
   ]
 }

@@ -1,5 +1,5 @@
 import type { BranchViewMode, ClientWorkspaceState } from '#/shared/api-types.ts'
-import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
+import { repoWorktreeForBranch, type RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import {
   isWorkspacePaneSessionTabType,
   isWorkspacePaneStaticTabType,
@@ -43,7 +43,7 @@ interface WorkspacePaneTabsQueryWorkspaceState {
 
 interface ClientWorkspaceGitTargets {
   branches: ReadonlyArray<{ name: string }>
-  worktrees: ReadonlyArray<Pick<RepoWorktreeSnapshot, 'path' | 'head'>>
+  worktrees: ReadonlyArray<Pick<RepoWorktreeSnapshot, 'path' | 'head' | 'operation'>>
 }
 
 interface ClientWorkspaceTargetProjection {
@@ -282,9 +282,7 @@ function workspacePaneTabsTargetKeyBelongsToWorkspace(
   if (target.kind === 'branch') {
     const gitTargets = workspace.gitTargets
     if (!gitTargets?.branches.some((branch) => branch.name === target.branchName)) return null
-    const hasMaterializedWorktree = gitTargets.worktrees.some(
-      (worktree) => worktree.head.kind === 'branch' && worktree.head.branchName === target.branchName,
-    )
+    const hasMaterializedWorktree = repoWorktreeForBranch(gitTargets.worktrees, target.branchName)
     return hasMaterializedWorktree ? null : target
   }
   const worktreePath = parseCanonicalWorkspaceLocator(target.worktreeId)?.path

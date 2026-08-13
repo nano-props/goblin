@@ -34,12 +34,17 @@ export function decodeRemoteGitOperation(output: string): GitOperation | null {
   const [kind, rawBranchName, ...extra] = output.trimEnd().split('\n')
   if (extra.length > 0) throw new Error('error.failed-read-repo')
   if (kind === 'none') return null
-  if (kind === 'cherry-pick' || kind === 'revert' || kind === 'bisect' || kind === 'merge') return { kind }
-  if (kind !== 'rebase') throw new Error('error.failed-read-repo')
-  if (!rawBranchName) return { kind: 'rebase', branchName: null }
-  const branchName = rawBranchName.startsWith('refs/heads/') ? rawBranchName.slice('refs/heads/'.length) : ''
+  if (kind === 'cherry-pick' || kind === 'revert' || kind === 'merge') return { kind }
+  if (kind !== 'rebase' && kind !== 'bisect') throw new Error('error.failed-read-repo')
+  if (!rawBranchName) return { kind, branchName: null }
+  const branchName = rawBranchName.startsWith('refs/heads/')
+    ? rawBranchName.slice('refs/heads/'.length)
+    : kind === 'bisect'
+      ? rawBranchName
+      : ''
+  if (/^[0-9a-f]{40,64}$/i.test(branchName)) return { kind, branchName: null }
   if (!isSafeBranchName(branchName)) throw new Error('error.failed-read-repo')
-  return { kind: 'rebase', branchName }
+  return { kind, branchName }
 }
 
 interface SnapshotSections {

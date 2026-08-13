@@ -136,6 +136,7 @@ const hoistedMocks = vi.hoisted(() => ({
   getWorkingStatus: vi.fn(),
   getUpstream: vi.fn(),
   readWorktreeMembership: vi.fn(),
+  readRepoWorktreeSnapshots: vi.fn(),
   sampleWorktreeStatusForTarget: vi.fn(),
   isAncestor: vi.fn(),
   fetchAll: vi.fn(),
@@ -186,6 +187,10 @@ vi.mock('#/system/git/branches.ts', () => ({
 
 vi.mock('#/system/git/git-exec.ts', () => ({
   checkGitAvailable: hoistedMocks.checkGitAvailable,
+}))
+
+vi.mock('#/system/git/worktree-state.ts', () => ({
+  readRepoWorktreeSnapshots: hoistedMocks.readRepoWorktreeSnapshots,
 }))
 
 vi.mock('#/system/git/clone.ts', () => ({
@@ -369,6 +374,7 @@ beforeEach(async () => {
   hoistedMocks.getRepoName.mockResolvedValue('repo')
   hoistedMocks.getRepoRoot.mockResolvedValue('/tmp/repo')
   hoistedMocks.readWorktreeMembership.mockResolvedValue([])
+  hoistedMocks.readRepoWorktreeSnapshots.mockResolvedValue([])
   hoistedMocks.sampleWorktreeStatusForTarget.mockImplementation(async (worktree) => ({
     kind: worktree.isBare ? 'bare' : 'status',
     worktree,

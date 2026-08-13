@@ -97,6 +97,11 @@ describe('repo response schemas', () => {
     )
     expect(
       v.safeParse(RepoSnapshotResponseSchema, {
+        snapshot: { branches: [branch], worktrees: [], current: 'main', remote },
+      }).success,
+    ).toBe(false)
+    expect(
+      v.safeParse(RepoSnapshotResponseSchema, {
         snapshot: {
           branches: [{ ...branch, worktree: { path: '/workspace', isLocked: false } }],
           current: 'main',

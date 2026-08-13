@@ -36,6 +36,8 @@ import {
 } from '#/system/ssh/git-codec.ts'
 import {
   GIT_HASH_RE,
+  repoWorktreeForBranch,
+  repoWorktreeMaterializedBranch,
   type ExecResult,
   type GitRemoteInfo,
   type LogEntry,
@@ -130,7 +132,13 @@ function remoteCommandOutcome(result: RemoteCommandResult): CommandOutcome {
 }
 
 export type RemoteWorkspacePaneTargetIdentity =
-  { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
+  | { kind: 'git-branch'; branchName: string }
+  | {
+      kind: 'git-worktree'
+      worktreePath: string
+      head: RepoWorktreeSnapshot['head']
+      operation: RepoWorktreeSnapshot['operation']
+    }
 
 /** Authoritative remote repository projection. Transport, cancellation, and malformed output are failures. */
 export async function getRemoteSnapshot(
@@ -163,35 +171,21 @@ async function readRemoteRepoWorktreeSnapshots(
       if (worktree.isPrunable || !worktree.headOid) {
         throw new Error('error.failed-read-repo')
       }
-      const operation = await readRemoteGitOperationForProjection(target, worktree.path, options)
+      const result = await options.run({ type: 'gitOperationState', path: worktree.path }, target, {
+        signal: options.signal,
+      })
+      if (!result.ok || !result.stdout) throw new Error(result.message || 'error.failed-read-repo')
       return {
         path: worktree.path,
         head: gitHead(worktree.branch ?? null),
         headOid: worktree.headOid,
-        operation,
+        operation: decodeRemoteGitOperation(result.stdout),
         isPrimary: worktree.isPrimary,
         isLocked: worktree.isLocked ?? false,
       }
     },
     { signal: options.signal, abort: 'throw' },
   )
-}
-
-async function readRemoteGitOperationForProjection(
-  target: RemoteWorkspaceTarget,
-  worktreePath: string,
-  options: { signal?: AbortSignal; run: RemoteGitRunner },
-): Promise<RepoWorktreeSnapshot['operation']> {
-  try {
-    const result = await options.run({ type: 'gitOperationState', path: worktreePath }, target, {
-      signal: options.signal,
-    })
-    if (!result.ok || !result.stdout) return null
-    return decodeRemoteGitOperation(result.stdout)
-  } catch (error) {
-    options.signal?.throwIfAborted()
-    return null
-  }
 }
 
 /** Narrow identity read for workspace-pane membership. It intentionally skips
@@ -202,7 +196,8 @@ export async function getRemoteWorkspacePaneTargetIdentities(
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<RemoteWorkspacePaneTargetIdentity[]> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const worktrees = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
+  const membership = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
+  const worktrees = await readRemoteRepoWorktreeSnapshots(target, membership, { signal: options.signal, run })
   const result = await run({ type: 'gitLocalBranches', path: target.remotePath }, target, {
     signal: options.signal,
   })
@@ -212,15 +207,21 @@ export async function getRemoteWorkspacePaneTargetIdentities(
   if (branches.some((branch) => !isSafeBranchName(branch)) || new Set(branches).size !== branches.length) {
     throw new Error('error.failed-read-repo')
   }
-  const checkedOutBranches = new Set(worktrees.flatMap((worktree) => (worktree.branch ? [worktree.branch] : [])))
+  const materializedBranches = new Set(
+    worktrees.flatMap((worktree) => {
+      const branchName = repoWorktreeMaterializedBranch(worktree)
+      return branchName ? [branchName] : []
+    }),
+  )
   return [
     ...worktrees.map((worktree): RemoteWorkspacePaneTargetIdentity => ({
       kind: 'git-worktree',
       worktreePath: worktree.path,
-      head: gitHead(worktree.branch ?? null),
+      head: worktree.head,
+      operation: worktree.operation,
     })),
     ...branches
-      .filter((branch) => !checkedOutBranches.has(branch))
+      .filter((branch) => !materializedBranches.has(branch))
       .map((branch): RemoteWorkspacePaneTargetIdentity => ({ kind: 'git-branch', branchName: branch })),
   ]
 }
@@ -1003,9 +1004,7 @@ export async function deleteRemoteBranch(
   const validation = validateBranchDeletionPolicy({
     branch: input.branch,
     currentBranch: snapshot?.current,
-    isCheckedOutElsewhere: !!snapshot?.worktrees.some(
-      (worktree) => worktree.head.kind === 'branch' && worktree.head.branchName === input.branch,
-    ),
+    isCheckedOutElsewhere: !!snapshot && !!repoWorktreeForBranch(snapshot.worktrees, input.branch),
     force: shouldForce,
     mergedToCurrent: mergeFacts.mergedToCurrent,
     mergedToUpstream: mergeFacts.mergedToUpstream,

@@ -56,13 +56,6 @@ const BranchSnapshotSchema = v.strictObject({
   lastCommitMessage: v.string(),
   lastCommitDate: v.string(),
   lastCommitAuthor: v.string(),
-  worktree: v.optional(
-    v.strictObject({
-      path: v.string(),
-      isPrimary: v.boolean(),
-      isLocked: v.boolean(),
-    }),
-  ),
   mergedToDefault: v.optional(v.boolean()),
 })
 const RepoRemoteInfoSchema = v.strictObject({
@@ -82,7 +75,7 @@ const GitOperationSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('merge') }),
   v.strictObject({ kind: v.literal('cherry-pick') }),
   v.strictObject({ kind: v.literal('revert') }),
-  v.strictObject({ kind: v.literal('bisect') }),
+  v.strictObject({ kind: v.literal('bisect'), branchName: v.nullable(v.string()) }),
 ])
 const RepoSnapshotSchema = v.strictObject({
   branches: v.array(BranchSnapshotSchema),

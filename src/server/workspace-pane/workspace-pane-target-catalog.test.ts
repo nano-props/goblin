@@ -8,7 +8,12 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 describe('WorkspacePaneTargetCatalog', () => {
   test('captures only identity data for a Git runtime', async () => {
     const readIdentities = vi.fn(async () => [
-      { kind: 'git-worktree' as const, worktreePath: '/repo', head: { kind: 'branch' as const, branchName: 'main' } },
+      {
+        kind: 'git-worktree' as const,
+        worktreePath: '/repo',
+        head: { kind: 'branch' as const, branchName: 'main' },
+        operation: null,
+      },
       { kind: 'git-branch' as const, branchName: 'feature/no-worktree' },
     ])
     const catalog = new WorkspacePaneTargetCatalog({
@@ -67,7 +72,9 @@ describe('WorkspacePaneTargetCatalog', () => {
   test('retains a detached worktree even when the repository has no branch refs', async () => {
     const catalog = new WorkspacePaneTargetCatalog({
       hasGitCapability: () => true,
-      readIdentities: async () => [{ kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' } }],
+      readIdentities: async () => [
+        { kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' }, operation: null },
+      ],
     })
     await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
       {
@@ -90,5 +97,26 @@ describe('WorkspacePaneTargetCatalog', () => {
         canonicalBranch: null,
       },
     ])
+  })
+
+  test.each(['rebase', 'bisect'] as const)('retains the materialized branch for detached %s state', async (kind) => {
+    const catalog = new WorkspacePaneTargetCatalog({
+      hasGitCapability: () => true,
+      readIdentities: async () => [
+        {
+          kind: 'git-worktree',
+          worktreePath: '/repo',
+          head: { kind: 'detached' },
+          operation: { kind, branchName: 'feature/in-progress' },
+        },
+      ],
+    })
+
+    const targets = await catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')
+
+    expect(targets[1]).toMatchObject({
+      target: { kind: 'git-worktree' },
+      canonicalBranch: 'feature/in-progress',
+    })
   })
 })

@@ -3,10 +3,12 @@ import { workspaceRuntimeHasGitCapability } from '#/server/modules/workspace-run
 import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
+import type { GitHead } from '#/shared/git-head.ts'
+import { repoWorktreeMaterializedBranch, type GitOperation } from '#/shared/git-types.ts'
 
 type WorkspacePaneCatalogIdentity =
-  { kind: 'git-branch'; branchName: string } | { kind: 'git-worktree'; worktreePath: string; head: GitHead }
+  | { kind: 'git-branch'; branchName: string }
+  | { kind: 'git-worktree'; worktreePath: string; head: GitHead; operation: GitOperation | null }
 
 interface WorkspacePaneTargetCatalogDependencies {
   hasGitCapability(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
@@ -55,7 +57,7 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
                 root: workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
               },
               nativeWorktreePath: identity.worktreePath,
-              canonicalBranch: gitHeadBranch(identity.head),
+              canonicalBranch: repoWorktreeMaterializedBranch(identity),
             }
           : {
               target: {
