@@ -98,6 +98,32 @@ test('excludes bare repositories from routable worktree membership', async () =>
   await expect(readRepoWorktreeSnapshots([{ path: repoPath, isBare: true, isPrimary: true }])).resolves.toEqual([])
 })
 
+test.each(['rebase', 'bisect'] as const)(
+  'rejects an attached membership that changes to %s while operation state is read',
+  async (operation) => {
+    if (operation === 'rebase') {
+      const rebaseMergePath = await gitPath('rebase-merge')
+      await mkdir(rebaseMergePath)
+      await writeFile(path.join(rebaseMergePath, 'head-name'), 'refs/heads/main\n')
+    } else {
+      await writeFile(await gitPath('BISECT_LOG'), 'git bisect start\n')
+      await writeFile(await gitPath('BISECT_START'), 'main\n')
+    }
+
+    await expect(
+      readRepoWorktreeSnapshots([
+        {
+          path: repoPath,
+          headOid: '0123456789abcdef0123456789abcdef01234567',
+          branch: 'main',
+          isBare: false,
+          isPrimary: true,
+        },
+      ]),
+    ).rejects.toThrow('Git worktree membership changed while reading operation state')
+  },
+)
+
 async function gitPath(name: string): Promise<string> {
   const resolved = await git(repoPath, ['rev-parse', '--git-path', name])
   return path.isAbsolute(resolved) ? resolved : path.resolve(repoPath, resolved)

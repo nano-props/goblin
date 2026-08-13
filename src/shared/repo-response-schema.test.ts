@@ -173,6 +173,8 @@ describe('repo response schemas', () => {
     expect(parses([worktree])).toBe(true)
     expect(parses([{ ...worktree, materializedBranch: null }])).toBe(false)
     expect(parses([{ ...worktree, materializedBranch: 'other' }])).toBe(false)
+    expect(parses([{ ...worktree, operation: { kind: 'rebase' } }])).toBe(false)
+    expect(parses([{ ...worktree, operation: { kind: 'bisect' } }])).toBe(false)
     expect(parses([{ ...worktree, head: { kind: 'detached' }, materializedBranch: 'unsafe branch' }])).toBe(false)
     expect(
       parses([

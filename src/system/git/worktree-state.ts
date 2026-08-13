@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { readFile, stat } from 'node:fs/promises'
+import { gitOperationRequiresDetachedHead } from '#/shared/git-types.ts'
 import type { GitOperation, RepoWorktreeSnapshot, WorktreeInfo } from '#/shared/git-types.ts'
 import { gitHead } from '#/shared/git-head.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
@@ -40,6 +41,9 @@ async function readRepoWorktreeSnapshot(worktree: WorktreeInfo, signal?: AbortSi
   }
   const head = gitHead(worktree.branch ?? null)
   const state = await readGitWorktreeState(worktree.path, signal)
+  if (head.kind === 'branch' && gitOperationRequiresDetachedHead(state.operation)) {
+    throw new Error('Git worktree membership changed while reading operation state')
+  }
   return {
     path: worktree.path,
     head,

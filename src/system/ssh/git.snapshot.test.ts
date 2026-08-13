@@ -160,6 +160,23 @@ describe('remote git snapshot', () => {
   })
 
   test.each([
+    ['rebase', 'operation rebase\nmaterialized-branch refs/heads/main\n'],
+    ['bisect', 'operation bisect\nmaterialized-branch main\n'],
+  ] as const)(
+    'rejects an attached remote membership that changes to %s while operation state is read',
+    async (_, state) => {
+      const run = vi.fn<RemoteGitRunner>(async (command) => {
+        if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+        if (command.type === 'gitOperationState') return okRemoteResult(state)
+        if (command.type === 'gitLocalBranches') return okRemoteResult('main')
+        throw new Error(`unexpected command: ${command.type}`)
+      })
+
+      await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+    },
+  )
+
+  test.each([
     ['rebase', 'operation rebase\nmaterialized-branch refs/heads/feature/in-progress\n'],
     ['bisect', 'operation bisect\nmaterialized-branch feature/in-progress\n'],
   ] as const)('does not expose the branch retained by a detached remote %s', async (kind, operationOutput) => {

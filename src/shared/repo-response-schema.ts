@@ -3,6 +3,7 @@ import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import { ExecResultResponseSchema, WorktreeBootstrapSummaryResponseSchema } from '#/shared/http-response-schema.ts'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
+import { gitOperationRequiresDetachedHead } from '#/shared/git-types.ts'
 
 const StringArraySchema = v.array(v.string())
 const NullableNumberSchema = v.nullable(v.number())
@@ -109,6 +110,7 @@ function hasValidWorktreeBranchOwnership(snapshot: v.InferOutput<typeof RepoSnap
     const branchName = worktree.materializedBranch
     if (branchName !== null && (!isSafeBranchName(branchName) || materializedBranches.has(branchName))) return false
     if (worktree.head.kind === 'branch' && branchName !== worktree.head.branchName) return false
+    if (worktree.head.kind === 'branch' && gitOperationRequiresDetachedHead(worktree.operation)) return false
     if (branchName !== null) materializedBranches.add(branchName)
     return true
   })

@@ -36,6 +36,7 @@ import {
 } from '#/system/ssh/git-codec.ts'
 import {
   GIT_HASH_RE,
+  gitOperationRequiresDetachedHead,
   repoWorktreeForBranch,
   repoWorktreeMaterializedBranch,
   type ExecResult,
@@ -171,6 +172,9 @@ async function readRemoteRepoWorktreeSnapshots(
       if (!result.ok || !result.stdout) throw new Error(result.message || 'error.failed-read-repo')
       const state = decodeRemoteGitWorktreeState(result.stdout)
       const head = gitHead(worktree.branch ?? null)
+      if (head.kind === 'branch' && gitOperationRequiresDetachedHead(state.operation)) {
+        throw new Error('error.failed-read-repo')
+      }
       if (head.kind === 'branch' && state.materializedBranch !== head.branchName) {
         throw new Error('error.failed-read-repo')
       }
