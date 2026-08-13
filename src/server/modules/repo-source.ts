@@ -40,6 +40,7 @@ import {
   isAncestor,
   isGitRepo,
 } from '#/system/git/branches.ts'
+import { readRepoWorktreeSnapshots } from '#/system/git/worktree-state.ts'
 import {
   fetchAll,
   getBrowserRepoUrl,
@@ -566,13 +567,16 @@ function createLocalRepoSource(
       if (!available.ok) throw new Error(available.message)
       options?.signal?.throwIfAborted()
       const membership = await readWorktreeMembership(repoId, options?.signal)
-      const currentBranch = await getCurrentBranch(repoId, { signal: options?.signal })
+      const [currentBranch, worktrees] = await Promise.all([
+        getCurrentBranch(repoId, { signal: options?.signal }),
+        readRepoWorktreeSnapshots(membership, options?.signal),
+      ])
       const branches = await getBranches(repoId, membership, currentBranch, { signal: options?.signal })
       const current = currentBranch ?? ''
       const currentHEAD = currentBranch === null ? await getHeadHash(repoId, { signal: options?.signal }) : undefined
       const remote = await getRemoteInfo(repoId, options?.signal)
       options?.signal?.throwIfAborted()
-      return { branches, current, currentHEAD, remote }
+      return { branches, worktrees, current, currentHEAD, remote }
     },
     async getWorkspacePaneTargetIdentities(options) {
       const worktrees = await readWorktreeMembership(repoId, options?.signal)
@@ -784,7 +788,7 @@ async function createRemoteRepoSource(
     async getSnapshot(options) {
       const remoteSnapshot = await getRemoteSnapshot(target, { ...options, run })
       options?.signal?.throwIfAborted()
-      return { branches: remoteSnapshot.branches, current: remoteSnapshot.current, remote: remoteSnapshot.remote }
+      return remoteSnapshot
     },
     async getWorkspacePaneTargetIdentities(options) {
       return await getRemoteWorkspacePaneTargetIdentities(target, { ...options, run })

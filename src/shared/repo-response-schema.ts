@@ -73,8 +73,29 @@ const RepoRemoteInfoSchema = v.strictObject({
   remoteProviders: v.record(v.string(), v.picklist(['github', 'gitlab', 'external'])),
   hasGitHubRemote: v.boolean(),
 })
+const GitHeadSchema = v.variant('kind', [
+  v.strictObject({ kind: v.literal('branch'), branchName: v.string() }),
+  v.strictObject({ kind: v.literal('detached') }),
+])
+const GitOperationSchema = v.variant('kind', [
+  v.strictObject({ kind: v.literal('rebase'), branchName: v.nullable(v.string()) }),
+  v.strictObject({ kind: v.literal('merge') }),
+  v.strictObject({ kind: v.literal('cherry-pick') }),
+  v.strictObject({ kind: v.literal('revert') }),
+  v.strictObject({ kind: v.literal('bisect') }),
+])
 const RepoSnapshotSchema = v.strictObject({
   branches: v.array(BranchSnapshotSchema),
+  worktrees: v.array(
+    v.strictObject({
+      path: v.string(),
+      head: GitHeadSchema,
+      headOid: v.string(),
+      operation: v.nullable(GitOperationSchema),
+      isPrimary: v.boolean(),
+      isLocked: v.boolean(),
+    }),
+  ),
   current: v.string(),
   currentHEAD: v.optional(v.string()),
   remote: RepoRemoteInfoSchema,

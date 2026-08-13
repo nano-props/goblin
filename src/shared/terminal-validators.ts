@@ -18,7 +18,6 @@ import {
   type TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
-import { isValidBranchInput } from '#/shared/refnames.ts'
 import {
   canonicalRuntimeWorkspacePaneTarget,
   WorkspacePaneFilesystemExecutionTargetSchema,
@@ -112,19 +111,7 @@ export const TerminalCreateInputSchema = v.strictObject({
 })
 const TerminalPresentationSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('workspace-root') }),
-  v.strictObject({
-    kind: v.literal('git-worktree'),
-    head: v.variant('kind', [
-      v.strictObject({
-        kind: v.literal('branch'),
-        branchName: v.pipe(
-          v.string(),
-          v.check((value: string) => isValidBranchInput(value)),
-        ),
-      }),
-      v.strictObject({ kind: v.literal('detached') }),
-    ]),
-  }),
+  v.strictObject({ kind: v.literal('git-worktree') }),
 ])
 const TerminalSessionBaseSchema = v.pipe(
   v.strictObject({

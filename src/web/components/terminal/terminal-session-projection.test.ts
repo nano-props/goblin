@@ -30,7 +30,7 @@ describe('terminal session projection helpers', () => {
         terminalRuntimeGeneration: 1,
         identityRevision: 0,
         terminalSessionId: 'term-222222222222222222222',
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        presentation: { kind: 'git-worktree' as const },
         controller: { clientId: 'client_a', status: 'connected' },
         processName: 'zsh',
         canonicalTitle: 'shell',
@@ -45,7 +45,7 @@ describe('terminal session projection helpers', () => {
         terminalSessionId: 'term-222222222222222222222',
         index: 2,
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        presentation: { kind: 'git-worktree' as const },
       },
       terminalFilesystemTargetKey: `${REPO_ROOT}\0${REPO_ROOT}`,
       hydrateInput: {
@@ -75,7 +75,7 @@ describe('terminal session projection helpers', () => {
         terminalRuntimeGeneration: 1,
         identityRevision: 0,
         terminalSessionId: 'term-111111111111111111111',
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        presentation: { kind: 'git-worktree' as const },
         controller: { clientId: 'client_a', status: 'connected' },
         processName: 'bash',
         canonicalTitle: null,
@@ -102,7 +102,7 @@ describe('terminal session projection helpers', () => {
         terminalRuntimeGeneration: 1,
         identityRevision: 0,
         terminalSessionId: 'term-111111111111111111111',
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        presentation: { kind: 'git-worktree' as const },
         controller: null,
         processName: 'bash',
         canonicalTitle: null,
@@ -129,7 +129,6 @@ describe('terminal session projection helpers', () => {
         terminalSessionId: 'term-111111111111111111111',
         presentation: {
           kind: 'git-worktree' as const,
-          head: { kind: 'branch' as const, branchName: 'feature/restored' },
         },
         controller: null,
         processName: 'bash',
@@ -142,7 +141,6 @@ describe('terminal session projection helpers', () => {
 
     expect(projected?.descriptor.presentation).toEqual({
       kind: 'git-worktree' as const,
-      head: { kind: 'branch' as const, branchName: 'feature/restored' },
     })
   })
 
@@ -158,7 +156,7 @@ describe('terminal session projection helpers', () => {
         terminalRuntimeGeneration: 1,
         identityRevision: 0,
         terminalSessionId: 'term-111111111111111111111',
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/stale' } },
+        presentation: { kind: 'git-worktree' as const },
         controller: null,
         processName: 'bash',
         canonicalTitle: null,
@@ -170,7 +168,6 @@ describe('terminal session projection helpers', () => {
 
     expect(projected?.descriptor.presentation).toEqual({
       kind: 'git-worktree' as const,
-      head: { kind: 'branch' as const, branchName: 'feature/stale' },
     })
   })
 
@@ -203,14 +200,13 @@ describe('terminal session projection helpers', () => {
     const projected = projectCreateResultForClient(
       {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/stale' } },
+        presentation: { kind: 'git-worktree' as const },
       },
       {
         ok: true,
         action: 'created',
         presentation: {
           kind: 'git-worktree' as const,
-          head: { kind: 'branch' as const, branchName: 'feature/renamed' },
         },
         terminalSessionId: 'term-111111111111111111111',
         terminalProjectionEffect: { kind: 'delta', revision: 1 },
@@ -232,7 +228,7 @@ describe('terminal session projection helpers', () => {
       identityRevision: 0,
       terminalSessionId: 'term-111111111111111111111',
       target: RUNTIME_TARGET,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/renamed' } },
+      presentation: { kind: 'git-worktree' as const },
       controller: null,
       processName: '',
       canonicalTitle: null,
@@ -246,12 +242,12 @@ describe('terminal session projection helpers', () => {
     const projected = projectCreateResultForClient(
       {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        presentation: { kind: 'git-worktree' as const },
       },
       {
         ok: true,
         action: 'created',
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        presentation: { kind: 'git-worktree' as const },
         terminalSessionId: 'term-111111111111111111111',
         terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
@@ -271,7 +267,7 @@ describe('terminal session projection helpers', () => {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        presentation: { kind: 'git-worktree' as const },
         processName: 'new-shell',
         canonicalTitle: 'new title',
         phase: 'open',
@@ -297,12 +293,12 @@ describe('terminal session projection helpers', () => {
     const projected = projectCreateResultForClient(
       {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        presentation: { kind: 'git-worktree' as const },
       },
       {
         ok: true,
         action: 'restored',
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        presentation: { kind: 'git-worktree' as const },
         terminalSessionId: 'term-111111111111111111111',
         terminalProjectionEffect: { kind: 'delta', revision: 1 },
         terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',

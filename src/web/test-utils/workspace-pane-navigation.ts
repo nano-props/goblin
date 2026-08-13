@@ -177,6 +177,36 @@ export function observedWorkspacePaneRouteCommitForTest(
   }
 }
 
+export function observedFilesystemWorkspacePaneRouteCommitForTest(): AppNavigationActions['commitFilesystemWorkspacePaneRoute'] {
+  return vi.fn(async (target, route, commitOptions) => {
+    const observation = {
+      workspaceId: target.routeTarget.workspaceId,
+      workspaceRuntimeId: target.workspaceRuntimeId,
+      branchName: '',
+      worktreePath: target.routeTarget.kind === 'git-worktree' ? target.routeTarget.worktreePath : null,
+    }
+    const currentRoute = observedWorkspacePaneRoutes.get(workspacePaneObservationKey(observation))
+    const precondition = commitOptions?.routePrecondition
+    if (
+      (precondition?.kind === 'exact-route' &&
+        (currentRoute === undefined || !workspacePaneRoutesEqual(currentRoute, precondition.route))) ||
+      (precondition?.kind === 'current-workspace-target' && currentRoute === undefined)
+    ) {
+      commitOptions?.onAbandon?.()
+      return false
+    }
+    workspacesStore
+      .getState()
+      .setWorkspacePaneTabForTarget(
+        target.routeTarget,
+        route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null,
+      )
+    observeWorkspacePaneRouteForTest({ ...observation, route })
+    commitOptions?.onCommit?.()
+    return true
+  })
+}
+
 /** Builds a provider value whose route commit is backed by the test's observed URL projection. */
 export function observedAppNavigationActionsForTest(
   overrides: ObservedAppNavigationOverrides,
@@ -195,9 +225,15 @@ export function observedAppNavigationActionsForTest(
     showRepoBranchWorkspacePaneTab,
     showRepoBranchTerminalSession,
   }
-  if (overrides.commitWorkspacePaneRoute) return observedNavigation
+  const navigationWithFilesystemCommit = overrides.commitFilesystemWorkspacePaneRoute
+    ? observedNavigation
+    : {
+        ...observedNavigation,
+        commitFilesystemWorkspacePaneRoute: observedFilesystemWorkspacePaneRouteCommitForTest(),
+      }
+  if (overrides.commitWorkspacePaneRoute) return navigationWithFilesystemCommit
   return {
-    ...observedNavigation,
+    ...navigationWithFilesystemCommit,
     commitWorkspacePaneRoute: vi.fn(
       observedWorkspacePaneRouteCommitForTest(
         { showRepoBranchEmptyWorkspacePane, showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession },
@@ -228,7 +264,7 @@ function workspacePaneObservationKey(observation: Omit<WorkspacePaneNavigationOb
   return [
     observation.workspaceId,
     observation.workspaceRuntimeId,
-    observation.branchName,
+    observation.worktreePath ? '' : observation.branchName,
     observation.worktreePath ?? '',
   ].join('\0')
 }

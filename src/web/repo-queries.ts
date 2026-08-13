@@ -39,8 +39,14 @@ export function useRepoPullRequestsReadModel(
 export function useRepoWorktreeStatusReadModel(
   repoRoot: MaybeRefOrGetter<WorkspaceId>,
   workspaceRuntimeId: MaybeRefOrGetter<string>,
+  options: { enabled?: MaybeRefOrGetter<boolean | undefined> } = {},
 ) {
-  return useQuery(computed(() => repoWorktreeStatusQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId))))
+  return useQuery(
+    computed(() => ({
+      ...repoWorktreeStatusQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId)),
+      enabled: toValue(options.enabled) !== false,
+    })),
+  )
 }
 
 interface RepoLogOptions {

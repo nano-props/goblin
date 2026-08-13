@@ -2,6 +2,7 @@ import type { RepoSnapshot, RepoSnapshotResponse } from '#/shared/api-types.ts'
 import type { BranchSnapshotInfo, RepoRemoteInfo } from '#/shared/git-types.ts'
 import {
   createBranchSnapshot,
+  createRepoWorktreeSnapshotsForTest,
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/repo-store.ts'
@@ -64,9 +65,18 @@ export function branch(name: string, options: Partial<BranchSnapshotInfo> = {}):
 }
 
 export function repoSnapshotResponse(
-  snapshot: Omit<RepoSnapshot, 'remote'> & { remote?: RepoRemoteInfo },
+  snapshot: Omit<RepoSnapshot, 'remote' | 'worktrees'> & {
+    remote?: RepoRemoteInfo
+    worktrees?: RepoSnapshot['worktrees']
+  },
 ): RepoSnapshotResponse {
-  return { snapshot: { ...snapshot, remote: snapshot.remote ?? testRemoteInfo() } }
+  return {
+    snapshot: {
+      ...snapshot,
+      worktrees: snapshot.worktrees ?? createRepoWorktreeSnapshotsForTest(snapshot.branches),
+      remote: snapshot.remote ?? testRemoteInfo(),
+    },
+  }
 }
 
 export function seedRepo(branches: BranchSnapshotInfo[], workspaceRuntimeId = 'repo-runtime-test'): string {

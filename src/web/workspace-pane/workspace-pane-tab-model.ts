@@ -174,7 +174,7 @@ export function workspacePaneTerminalBaseForTabModel(
   if (!target) return null
   if (target.kind === 'workspace-root') return { target, presentation: { kind: 'workspace-root' } }
   if (target.kind === 'git-worktree') {
-    return { target, presentation: terminalGitWorktreePresentation(model.branchName) }
+    return { target, presentation: terminalGitWorktreePresentation() }
   }
   return null
 }

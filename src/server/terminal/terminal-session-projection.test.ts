@@ -28,7 +28,7 @@ function preparedSession() {
     message: null,
     ptyState: { kind: 'prepared' as const },
     target,
-    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/test' } },
+    presentation: { kind: 'git-worktree' as const },
   }
 }
 

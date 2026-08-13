@@ -13,12 +13,7 @@ import {
   TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
-import {
-  terminalExecutionPath,
-  terminalPresentationBranch,
-  terminalSessionCoordinates,
-  type TerminalSessionBase,
-} from '#/shared/terminal-types.ts'
+import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
@@ -425,12 +420,10 @@ describe('WorkspacePane terminal routes', () => {
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-111111111111111111111'
       const coordinates = terminalSessionCoordinates(base)
-      const branchName = terminalPresentationBranch(base.presentation)
-      if (!branchName) throw new Error('expected Git worktree terminal fixture')
+      if (base.target.kind !== 'git-worktree') throw new Error('expected Git worktree terminal fixture')
       workspacePaneTabsTestBridge.addRuntimeTab({
         workspaceId: coordinates.workspaceId,
         workspaceRuntimeId: coordinates.workspaceRuntimeId,
-        branchName,
         worktreePath: terminalExecutionPath(base.target),
         terminalSessionId,
       })
@@ -475,9 +468,9 @@ describe('WorkspacePane terminal routes', () => {
       screen.getByRole('button', { name: 'terminal.new' }).click()
       await waitForNextMacrotask()
     })
-    expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(
+    expect(route.openRepoWorktreeTerminal).toHaveBeenCalledWith(
       REPO_ID,
-      'feature/a',
+      '/tmp/repo-workspace-container-repo-a',
       'term-111111111111111111111',
       presentationOptions(),
     )

@@ -139,7 +139,6 @@ describe('workspace pane command target', () => {
     expect(successfulBranchTarget?.filesystemTarget).toEqual(
       expect.objectContaining({
         kind: 'git-worktree',
-        head: { kind: 'branch', branchName: 'feature/example' },
       }),
     )
     if (!successfulBranchTarget?.filesystemTarget) throw new Error('Missing branch filesystem target')

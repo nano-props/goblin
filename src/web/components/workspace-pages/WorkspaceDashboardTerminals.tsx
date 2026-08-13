@@ -3,8 +3,9 @@ import { computed, defineComponent, ref } from 'vue'
 import type { VNodeChild } from 'vue'
 import { toast } from 'vue-sonner'
 import { Button } from '#/web/components/ui/button.tsx'
-import { terminalExecutionPath, terminalPresentationBranch } from '#/shared/terminal-types.ts'
+import { terminalExecutionPath } from '#/shared/terminal-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
 import {
@@ -23,6 +24,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
 import { useWorkspacePaneTabsQuery } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { orderWorkspaceDashboardTerminals } from '#/web/components/workspace-pages/workspace-dashboard-terminal-order.ts'
+import { worktreePresentationLabel } from '#/web/components/branch-navigator/WorktreeStateRow.tsx'
 import {
   gitWorktreePaneTargetLease,
   workspaceRootPaneTargetLease,
@@ -63,7 +65,7 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
       orderWorkspaceDashboardTerminals({
         workspaceId: props.workspaceId,
         sessions: sessions.value,
-        branches: repoSnapshot.data.value?.snapshot.branches ?? [],
+        worktrees: repoSnapshot.data.value?.snapshot.worktrees ?? [],
         paneTabs: paneTabs.data.value,
       }),
     )
@@ -158,7 +160,7 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
 
     function renderTerminalRow(session: WorkspaceTerminalSessionSummary): VNodeChild {
       const opening = sameTerminalOpeningLease(openingTerminal.value, terminalOpeningLease(session))
-      const target = terminalTargetLabel(session, t)
+      const target = terminalTargetLabel(session, repoSnapshot.data.value?.snapshot.worktrees ?? [], t)
       const titleId = `dashboard-terminal-title-${session.terminalSessionId}`
       const detailsId = `dashboard-terminal-details-${session.terminalSessionId}`
       const statusId = `dashboard-terminal-status-${session.terminalSessionId}`
@@ -288,21 +290,21 @@ function dashboardTerminalTargetLease(
     session.base.target.workspaceId,
     session.base.target.workspaceRuntimeId,
     terminalExecutionPath(session.base.target),
-    session.base.presentation.head,
   )
 }
 
 function terminalTargetLabel(
   session: WorkspaceTerminalSessionSummary,
+  worktrees: readonly RepoWorktreeSnapshot[],
   t: DashboardTranslator,
 ): { label: string; path: string } {
   const path = terminalExecutionPath(session.base.target)
   if (session.base.target.kind === 'workspace-root') {
     return { label: t('dashboard.terminals.workspace-root'), path }
   }
-  const branch = terminalPresentationBranch(session.base.presentation)
+  const currentWorktree = worktrees.find((worktree) => worktree.path === path)
   return {
-    label: branch ?? t('dashboard.terminals.detached-worktree'),
+    label: currentWorktree ? worktreePresentationLabel(currentWorktree, t) : t('dashboard.terminals.detached-worktree'),
     path,
   }
 }

@@ -88,12 +88,19 @@ type WorkspacePaneLayoutRestoreAdmission =
 
 function workspacePaneLayoutRestoreAdmission(workspace: RestoredWorkspaceRuntime): WorkspacePaneLayoutRestoreAdmission {
   if (workspace.repoSnapshot) {
-    const gitTargets = workspace.repoSnapshot.branches.flatMap((branch) => {
-      const target: RestorableWorkspacePaneTarget | null = branch.worktree
-        ? restorableWorktreeTarget(workspace.workspaceId, branch.worktree.path)
-        : { kind: 'git-branch', branch: branch.name }
+    const worktreeTargets = workspace.repoSnapshot.worktrees.flatMap((worktree) => {
+      const target = restorableWorktreeTarget(workspace.workspaceId, worktree.path)
       return target ? [target] : []
     })
+    const materializedBranches = new Set(
+      workspace.repoSnapshot.worktrees.flatMap((worktree) =>
+        worktree.head.kind === 'branch' ? [worktree.head.branchName] : [],
+      ),
+    )
+    const branchTargets: RestorableWorkspacePaneTarget[] = workspace.repoSnapshot.branches
+      .filter((branch) => !materializedBranches.has(branch.name))
+      .map((branch) => ({ kind: 'git-branch', branch: branch.name }))
+    const gitTargets = [...worktreeTargets, ...branchTargets]
     return { kind: 'ready', targets: [{ kind: 'workspace-root' }, ...gitTargets] }
   }
   return workspace.workspaceProbe.status === 'ready'

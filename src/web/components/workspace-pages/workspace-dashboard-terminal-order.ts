@@ -1,4 +1,4 @@
-import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
+import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import { isWorkspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
@@ -12,7 +12,7 @@ import type { WorkspaceTerminalSessionSummary } from '#/web/components/terminal/
 interface WorkspaceDashboardTerminalOrderInput {
   workspaceId: WorkspaceId
   sessions: readonly WorkspaceTerminalSessionSummary[]
-  branches: readonly BranchSnapshotInfo[]
+  worktrees: readonly RepoWorktreeSnapshot[]
   paneTabs: WorkspacePaneTabsSnapshot | undefined
 }
 
@@ -30,10 +30,10 @@ interface TerminalOrder {
 export function orderWorkspaceDashboardTerminals(
   input: WorkspaceDashboardTerminalOrderInput,
 ): WorkspaceTerminalSessionSummary[] {
-  const branchRankByTarget = branchRankByTargetKey(input.workspaceId, input.branches)
+  const branchRankByTarget = worktreeRankByTargetKey(input.workspaceId, input.worktrees)
   const tabRankByTarget = terminalTabRankByTargetKey(input.paneTabs)
   const fallbackTargetRank = new Map<string, number>()
-  const firstFallbackTargetRank = input.branches.length + 1
+  const firstFallbackTargetRank = input.worktrees.length + 1
   const orderBySessionId = new Map<string, TerminalOrder>()
 
   input.sessions.forEach((session, fallbackRank) => {
@@ -68,11 +68,13 @@ export function orderWorkspaceDashboardTerminals(
   })
 }
 
-function branchRankByTargetKey(workspaceId: WorkspaceId, branches: readonly BranchSnapshotInfo[]): Map<string, number> {
+function worktreeRankByTargetKey(
+  workspaceId: WorkspaceId,
+  worktrees: readonly RepoWorktreeSnapshot[],
+): Map<string, number> {
   const ranks = new Map<string, number>()
-  branches.forEach((branch, index) => {
-    if (!branch.worktree) return
-    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, branch.worktree.path)
+  worktrees.forEach((worktree, index) => {
+    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktree.path)
     if (target) ranks.set(workspacePaneTabsTargetIdentityKey(target), index + 1)
   })
   return ranks

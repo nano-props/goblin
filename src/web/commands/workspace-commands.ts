@@ -249,10 +249,7 @@ export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
     return dispatchConfirmCloseTerminalWorkspacePaneTabAction({
       ...options,
       paneTarget,
-      worktreeHead:
-        options.confirmedTerminal.base.presentation.kind === 'git-worktree'
-          ? options.confirmedTerminal.base.presentation.head
-          : undefined,
+      worktreeHead: undefined,
     })
   } catch (error) {
     presentationEffects?.onAbandon()

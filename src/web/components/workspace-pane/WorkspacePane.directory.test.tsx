@@ -56,6 +56,17 @@ function queryObserverCount(queryKey: readonly unknown[]): number {
   return appQueryClient.getQueryCache().find({ queryKey, exact: true })?.getObserversCount() ?? 0
 }
 
+function detachedWorktreeSnapshot(path: string) {
+  return {
+    path,
+    head: { kind: 'detached' as const },
+    headOid: '1111111111111111111111111111111111111111',
+    operation: null,
+    isPrimary: false,
+    isLocked: false,
+  }
+}
+
 describe('WorkspacePane directory workspaces', () => {
   test('renders a remote non-Git workspace with canonical Status, Files, and Terminal targets', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example/srv/workspace')
@@ -226,6 +237,7 @@ describe('WorkspacePane directory workspaces', () => {
     const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
+      worktrees: [detachedWorktreeSnapshot(worktreePath)],
       currentBranchName: null,
     })
     setRepoWorktreeStatusQueryData(workspaceId, repo.workspaceRuntimeId, {
@@ -271,7 +283,12 @@ describe('WorkspacePane directory workspaces', () => {
   test('keeps a detached-worktree pane visible after a background status failure', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace/repo-stale-detached')
     const worktreePath = '/workspace/detached-stale'
-    const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
+    const repo = seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      worktrees: [detachedWorktreeSnapshot(worktreePath)],
+      currentBranchName: null,
+    })
     setRepoWorktreeStatusQueryData(workspaceId, repo.workspaceRuntimeId, {
       workspaceRuntimeId: repo.workspaceRuntimeId,
       status: [{ path: worktreePath, isMain: false, entries: [] }],
@@ -322,6 +339,7 @@ describe('WorkspacePane directory workspaces', () => {
     const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
+      worktrees: [detachedWorktreeSnapshot(worktreePath)],
       currentBranchName: null,
     })
     setRepoWorktreeStatusQueryData(workspaceId, repo.workspaceRuntimeId, {

@@ -63,6 +63,7 @@ export interface AppNavigationActions extends FilesystemWorkspacePaneRouteCommit
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   cycleWorkspace: (direction: 1 | -1) => void
   selectRepoBranch: (workspaceId: WorkspaceId, branch: string, options?: { replace?: boolean }) => boolean
+  selectRepoWorktree: (workspaceId: WorkspaceId, worktreePath: string, options?: { replace?: boolean }) => boolean
   showWorkspaceRootPaneTab: (
     workspaceId: WorkspaceId,
     presentation: WorkspaceRootPanePresentation,
@@ -151,6 +152,10 @@ export function createAppNavigationActions({
     selectRepoBranch(workspaceId, branch, options) {
       const navigationGeneration = beginAppNavigation()
       return openWorkspacePaneRoute(routeNavigation, workspaceId, branch, { ...options, navigationGeneration })
+    },
+    selectRepoWorktree(workspaceId, worktreePath, options) {
+      const navigationGeneration = beginAppNavigation()
+      return routeNavigation.openRepoWorktree(workspaceId, worktreePath, { ...options, navigationGeneration })
     },
     showWorkspaceRootPaneTab(workspaceId, presentation, options) {
       const generation = options?.navigationGeneration ?? beginAppNavigation()

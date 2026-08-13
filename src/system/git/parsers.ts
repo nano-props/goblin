@@ -49,16 +49,18 @@ export function parseBranches(
     }
   }
 
-  const worktreeMap = new Map<string, { path: string; isPrimary: boolean; isLocked: boolean }>()
-  for (const wt of worktrees) {
-    if (wt.branch) {
-      worktreeMap.set(wt.branch, {
-        path: wt.path,
-        isPrimary: wt.isPrimary,
-        isLocked: wt.isLocked ?? false,
-      })
-    }
-  }
+  const worktreeMap = new Map(
+    worktrees.flatMap((worktree) =>
+      worktree.branch
+        ? [
+            [
+              worktree.branch,
+              { path: worktree.path, isPrimary: worktree.isPrimary, isLocked: worktree.isLocked ?? false },
+            ] as const,
+          ]
+        : [],
+    ),
+  )
 
   const branches: BranchSnapshotInfo[] = []
 
@@ -97,14 +99,7 @@ export function parseBranches(
       branchInfo.trackingGone = track.includes('gone')
     }
 
-    const wtInfo = worktreeMap.get(name)
-    if (wtInfo) {
-      branchInfo.worktree = {
-        path: wtInfo.path,
-        isPrimary: wtInfo.isPrimary,
-        isLocked: wtInfo.isLocked,
-      }
-    }
+    branchInfo.worktree = worktreeMap.get(name)
 
     branches.push(branchInfo)
   }
@@ -222,11 +217,13 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
   for (const [blockIndex, block] of blocks.entries()) {
     const lines = block.split('\0')
     const worktreeLine = lines.find((line) => line.startsWith('worktree '))!
+    const headLine = lines.find((line) => line.startsWith('HEAD '))
     const branchLine = lines.find((line) => line.startsWith('branch refs/heads/'))
     const isPrunable = lines.some((line) => line === 'prunable' || line.startsWith('prunable '))
     if (isPrunable) continue
     worktrees.push({
       path: worktreeLine.slice('worktree '.length),
+      ...(headLine ? { headOid: headLine.slice('HEAD '.length) } : {}),
       ...(branchLine ? { branch: branchLine.slice('branch refs/heads/'.length) } : {}),
       isBare: lines.includes('bare'),
       isPrimary: blockIndex === 0,

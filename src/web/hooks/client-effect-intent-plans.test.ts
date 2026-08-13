@@ -2,6 +2,7 @@ import {
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
+  createRepoWorktreeSnapshotsForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { describe, expect, test } from 'vitest'
 import {
@@ -12,7 +13,7 @@ import {
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
-import type { BranchSnapshotInfo, WorktreeStatus } from '#/shared/git-types.ts'
+import type { BranchSnapshotInfo, RepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
@@ -31,10 +32,15 @@ const CURRENT_GIT_REPO = {
   },
 }
 
-function repositoryFacts(branches: BranchSnapshotInfo[], status: WorktreeStatus[] | undefined) {
+function repositoryFacts(
+  branches: BranchSnapshotInfo[],
+  status: WorktreeStatus[] | undefined,
+  worktrees: RepoWorktreeSnapshot[] = createRepoWorktreeSnapshotsForTest(branches),
+) {
   return {
     snapshot: {
       branches,
+      worktrees,
       current: 'main',
       remote: {
         remotes: [],
@@ -102,7 +108,7 @@ describe('client effect intent plans', () => {
           workspaceRuntimeId: repo.workspaceRuntimeId,
           root: workspaceIdForTest('goblin+file:///tmp/repo-feature'),
         },
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/test' } },
+        presentation: { kind: 'git-worktree' },
       },
     })
 
@@ -147,7 +153,7 @@ describe('client effect intent plans', () => {
           workspaceRuntimeId: repo.workspaceRuntimeId,
           root: repo.id,
         },
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
+        presentation: { kind: 'git-worktree' },
       },
     })
 
@@ -168,7 +174,7 @@ describe('client effect intent plans', () => {
             workspaceRuntimeId: 'workspace-runtime-test',
             root: workspaceIdForTest('goblin+file:///tmp/repo-feature'),
           },
-          presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/test' } },
+          presentation: { kind: 'git-worktree' },
         },
       },
     )
@@ -180,7 +186,20 @@ describe('client effect intent plans', () => {
     const worktreePath = '/workspace/detached'
     const plan = createTerminalBellIntentPlan(
       { id: DETACHED_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
-      repositoryFacts([], [{ path: worktreePath, isMain: false, entries: [] }]),
+      repositoryFacts(
+        [],
+        [{ path: worktreePath, isMain: false, entries: [] }],
+        [
+          {
+            path: worktreePath,
+            head: { kind: 'detached' },
+            headOid: '0123456789abcdef',
+            operation: null,
+            isPrimary: false,
+            isLocked: false,
+          },
+        ],
+      ),
       {
         type: 'terminal-bell-click',
         terminalSessionId: 'term-333333333333333333333',
@@ -191,7 +210,7 @@ describe('client effect intent plans', () => {
             workspaceRuntimeId: 'workspace-runtime-test',
             root: workspaceIdForTest('goblin+file:///workspace/detached'),
           },
-          presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+          presentation: { kind: 'git-worktree' },
         },
       },
     )
@@ -221,7 +240,7 @@ describe('client effect intent plans', () => {
             workspaceRuntimeId: 'workspace-runtime-test',
             root: workspaceIdForTest('goblin+file:///workspace/detached'),
           },
-          presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+          presentation: { kind: 'git-worktree' },
         },
       },
     )
@@ -280,7 +299,7 @@ describe('client effect intent plans', () => {
             workspaceRuntimeId: repo.workspaceRuntimeId,
             root: workspaceIdForTest('goblin+file:///tmp/repo-other'),
           },
-          presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/test' } },
+          presentation: { kind: 'git-worktree' },
         },
       },
     )

@@ -118,6 +118,16 @@ describe('restoreServerWorkspace — active-only restore', () => {
       snapshot: {
         current: 'main',
         branches: [{ name: 'main', worktree: { path: workspaceId, isPrimary: false, isLocked: false } }],
+        worktrees: [
+          {
+            path: workspaceId,
+            head: { kind: 'branch', branchName: 'main' },
+            headOid: '',
+            operation: null,
+            isPrimary: false,
+            isLocked: false,
+          },
+        ],
         remote: {
           remotes: [],
           hasRemotes: false,

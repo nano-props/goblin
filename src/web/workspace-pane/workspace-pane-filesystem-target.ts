@@ -106,6 +106,6 @@ export function workspacePaneFilesystemTerminalBase(target: WorkspacePaneFilesys
     ? { target: workspacePaneFilesystemRuntimeTarget(target), presentation: { kind: 'workspace-root' } }
     : {
         target: workspacePaneFilesystemRuntimeTarget(target),
-        presentation: { kind: 'git-worktree', head: target.head },
+        presentation: { kind: 'git-worktree' },
       }
 }

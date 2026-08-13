@@ -1,5 +1,4 @@
 import { computed, defineComponent } from 'vue'
-import { gitHead } from '#/shared/git-head.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import type { WorkspaceGitReadyProbeState } from '#/shared/workspace-runtime.ts'
 import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
@@ -12,8 +11,9 @@ import { StatusList } from '#/web/components/StatusList.tsx'
 import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
+import { GitWorkspacePane } from '#/web/components/workspace-pane/GitWorkspacePane.tsx'
 import type { GitWorkspacePaneShell } from '#/web/components/workspace-pane/workspace-pane-types.ts'
-import { useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
+import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 import { useFilesystemWorkspacePaneRouteController } from '#/web/workspace-pane/filesystem-workspace-pane-route-controller.ts'
@@ -46,16 +46,56 @@ export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPa
 
   setup(props) {
     const t = useT()
+    const snapshotReadModel = useRepoSnapshotReadModel(
+      () => props.repo.id,
+      () => props.repo.workspaceRuntimeId,
+    )
     const statusReadModel = useRepoWorktreeStatusReadModel(
       () => props.repo.id,
       () => props.repo.workspaceRuntimeId,
     )
-    const worktree = computed(() =>
+    const worktreeStatus = computed(() =>
       statusReadModel.data.value?.status.find((candidate) => candidate.path === props.worktreePath),
+    )
+    const worktree = computed(() =>
+      snapshotReadModel.data.value?.snapshot.worktrees.find((candidate) => candidate.path === props.worktreePath),
     )
     const target = computed(() => gitWorktreeWorkspacePaneTabsTarget(props.repo.id, props.worktreePath))
 
     return () => {
+      if (!snapshotReadModel.data.value && snapshotReadModel.isPending.value) {
+        return <WorkspacePaneSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
+      }
+      if (!snapshotReadModel.data.value && snapshotReadModel.isError.value) {
+        const error = snapshotReadModel.error.value
+        return (
+          <RepoStatusFailureView
+            messageKey={error instanceof Error ? error.message : String(error)}
+            retrying={snapshotReadModel.isFetching.value}
+            onRetry={() => void snapshotReadModel.refetch()}
+          />
+        )
+      }
+      const currentTarget = target.value
+      const currentWorktree = worktree.value
+      if (!currentTarget || !currentWorktree) {
+        return <EmptyState title={t('workspace-route.not-found-title')} />
+      }
+      if (currentWorktree.head.kind === 'branch') {
+        return (
+          <GitWorkspacePane
+            gitWorkspace={{
+              ...props.repo,
+              ui: { ...props.repo.ui, currentBranchName: currentWorktree.head.branchName },
+            }}
+            workspacePaneRouteContext={{ kind: 'routed', route: props.route }}
+            workspacePaneId={props.workspacePaneId}
+            shortcutsEnabled
+            toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
+            onBackToBranchNavigator={props.onBackToNavigator}
+          />
+        )
+      }
       if (!statusReadModel.data.value && statusReadModel.isPending.value) {
         return <WorkspacePaneSkeleton toolbarTrafficLightOffset={props.toolbarTrafficLightOffset} />
       }
@@ -69,11 +109,8 @@ export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPa
           />
         )
       }
-      const currentTarget = target.value
-      const currentWorktree = worktree.value
-      if (!currentTarget || !currentWorktree) {
-        return <EmptyState title={t('workspace-route.not-found-title')} />
-      }
+      const currentWorktreeStatus = worktreeStatus.value
+      if (!currentWorktreeStatus) return <EmptyState title={t('workspace-route.not-found-title')} />
       const statusError = statusReadModel.isError.value
         ? statusReadModel.error.value instanceof Error
           ? statusReadModel.error.value.message
@@ -83,8 +120,8 @@ export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPa
         <GitWorktreeFilesystemPaneReady
           workspaceRuntime={{ workspaceRuntimeId: props.repo.workspaceRuntimeId, ui: props.repo.ui }}
           workspaceProbe={props.workspaceProbe}
-          head={gitHead(currentWorktree.branch ?? null)}
-          status={currentWorktree}
+          head={currentWorktree.head}
+          status={currentWorktreeStatus}
           statusError={statusError}
           statusRetrying={statusReadModel.isFetching.value}
           onRetryStatus={() => void statusReadModel.refetch()}
@@ -198,7 +235,7 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
               target: {
                 routeTarget: props.target,
                 runtimeTarget: runtimeTarget.value,
-                presentation: { kind: 'git-worktree', head: props.head },
+                presentation: { kind: 'git-worktree' },
               },
               selectedSessionId: selectedTerminalSessionId,
               runtimeState: currentModel.runtimeTabStateByType.terminal,

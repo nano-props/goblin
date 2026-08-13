@@ -265,11 +265,9 @@ export class WorkspacePaneRuntimeApplication {
         permit,
         physicalWorktreeCapability,
         epochCapability: runtimeCapability,
-        commitAdmission: (canonicalBranch) => {
+        commitAdmission: () => {
           const presentation =
-            target.kind === 'workspace-root'
-              ? ({ kind: 'workspace-root' } as const)
-              : terminalGitWorktreePresentation(canonicalBranch)
+            target.kind === 'workspace-root' ? ({ kind: 'workspace-root' } as const) : terminalGitWorktreePresentation()
           committedRuntime = {
             ok: true,
             terminalSessionId: runtime.terminalSessionId,

@@ -264,7 +264,14 @@ describe('parseWorktrees', () => {
     const out = ['worktree /repo', 'HEAD abc1234', 'branch refs/heads/main'].join(NUL) + NUL + NUL
     const result = parseWorktrees(out)
     expect(result).toHaveLength(1)
-    expect(result[0]).toEqual({ path: '/repo', branch: 'main', isBare: false, isPrimary: true, isLocked: false })
+    expect(result[0]).toEqual({
+      path: '/repo',
+      headOid: 'abc1234',
+      branch: 'main',
+      isBare: false,
+      isPrimary: true,
+      isLocked: false,
+    })
   })
 
   test('flags locked worktrees (with or without reason)', () => {
@@ -304,7 +311,7 @@ describe('parseWorktrees', () => {
   test('accepts an absolute Windows path in authoritative porcelain output', () => {
     const out = ['worktree C:/repo', 'HEAD aaaaaaa', 'branch refs/heads/main'].join(NUL) + NUL + NUL
     expect(parseWorktrees(out)).toEqual([
-      { path: 'C:/repo', branch: 'main', isBare: false, isPrimary: true, isLocked: false },
+      { path: 'C:/repo', headOid: 'aaaaaaa', branch: 'main', isBare: false, isPrimary: true, isLocked: false },
     ])
   })
 

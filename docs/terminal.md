@@ -53,6 +53,11 @@ control transfer, not simultaneous live xterm rendering in every viewer.
   replacement boundaries.
 - Filesystem target keys group presentation and selection only; execution uses
   a validated server-owned target and runtime identity.
+- A Git terminal is identified by its stable worktree execution target. The
+  session does not cache branch or detached `HEAD` presentation. Labels and
+  navigation derive current Git state from the repository worktree snapshot,
+  so an in-progress operation cannot strand the terminal on a stale branch
+  route.
 
 There is no separate attachment identifier. One client has at most one terminal
 view for a session; cross-client control is modeled through client identity and

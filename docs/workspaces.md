@@ -20,4 +20,16 @@ Pane targets have two contracts:
 - Restorable targets contain only `workspace`, `git-branch`, or a `git-worktree` canonical locator. Their containing workspace owns the workspace ID; runtime IDs are never persisted.
 - Runtime targets bind the containing workspace ID and current server-issued runtime ID after validation.
 
+Navigation is target-first. A materialized Git worktree is addressed by its
+stable worktree locator/path even while `HEAD` changes during rebase, merge,
+cherry-pick, revert, bisect, checkout, or detached operation. A branch target
+exists only for a branch that has no materialized worktree. Selecting a checked
+out branch therefore resolves to its worktree target; it does not create a
+parallel branch route.
+
+The repository snapshot is the complete authoritative worktree projection. It
+contains every usable worktree with its current `HEAD`, object ID, operation
+state, primary/locked flags, and path. Branch-row worktree badges are derived
+from that same membership read and never authorize routing or recovery.
+
 Files and terminals may use workspace scope. Status, changes, history, pull requests, and worktree operations require Git capability. Enabling Git exposes those entry points but does not create tabs or navigate automatically.

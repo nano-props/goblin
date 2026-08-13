@@ -43,7 +43,7 @@ describe('TerminalSessionManager session lifecycle', () => {
 
     expect(() =>
       admission.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+        presentation: { kind: 'git-worktree' },
       }),
     ).toThrow('error.unavailable')
     admission.admission.publishCommittedEffects()
@@ -148,7 +148,7 @@ describe('TerminalSessionManager session lifecycle', () => {
 
     expect(() =>
       admission.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+        presentation: { kind: 'git-worktree' },
       }),
     ).toThrow('error.unavailable')
     admission.admission.publishCommittedEffects()
@@ -286,7 +286,7 @@ describe('TerminalSessionManager session lifecycle', () => {
 
     expect(() =>
       prepared.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+        presentation: { kind: 'git-worktree' },
       }),
     ).toThrow('error.workspace-runtime-stale')
     prepared.admission.abort()
@@ -322,7 +322,7 @@ describe('TerminalSessionManager session lifecycle', () => {
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
     expect(
       prepared.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+        presentation: { kind: 'git-worktree' },
       }),
     ).toMatchObject({
       action: 'created',
@@ -419,7 +419,7 @@ describe('TerminalSessionManager session lifecycle', () => {
     })
     if (!prepared.ok) throw new Error(prepared.message)
     prepared.admission.commit({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      presentation: { kind: 'git-worktree' },
     })
     prepared.admission.publishCommittedEffects()
 
@@ -451,7 +451,7 @@ describe('TerminalSessionManager session lifecycle', () => {
     })
     if (!prepared.ok) throw new Error(prepared.message)
     prepared.admission.commit({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      presentation: { kind: 'git-worktree' },
     })
     prepared.admission.publishCommittedEffects()
 
@@ -496,7 +496,7 @@ describe('TerminalSessionManager session lifecycle', () => {
     })
     if (!prepared.ok) throw new Error(prepared.message)
     prepared.admission.commit({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      presentation: { kind: 'git-worktree' },
     })
     prepared.admission.publishCommittedEffects()
 

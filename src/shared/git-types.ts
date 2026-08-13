@@ -4,6 +4,24 @@
 // other's module graph just to know what a `BranchSnapshotInfo` looks like.
 
 import type { WorktreeBootstrapSummary } from '#/shared/worktree-bootstrap-summary.ts'
+import type { GitHead } from '#/shared/git-head.ts'
+
+export type GitOperation =
+  | { kind: 'rebase'; branchName: string | null }
+  | { kind: 'merge' }
+  | { kind: 'cherry-pick' }
+  | { kind: 'revert' }
+  | { kind: 'bisect' }
+
+/** Complete repository worktree membership, independent of branch rows. */
+export interface RepoWorktreeSnapshot {
+  path: string
+  head: GitHead
+  headOid: string
+  operation: GitOperation | null
+  isPrimary: boolean
+  isLocked: boolean
+}
 
 export interface BranchSnapshotInfo {
   name: string
@@ -18,14 +36,22 @@ export interface BranchSnapshotInfo {
   lastCommitMessage: string
   lastCommitDate: string
   lastCommitAuthor: string
-  worktree?: BranchWorktreeSnapshot
+  /** Read-only branch-row projection derived atomically from authoritative worktree membership. */
+  worktree?: BranchWorktreeProjection
   mergedToDefault?: boolean
 }
 
-export interface BranchWorktreeSnapshot {
+export interface BranchWorktreeProjection {
   path: string
   isPrimary: boolean
   isLocked: boolean
+}
+
+export function repoWorktreeForBranch(
+  worktrees: readonly RepoWorktreeSnapshot[],
+  branchName: string,
+): RepoWorktreeSnapshot | undefined {
+  return worktrees.find((worktree) => worktree.head.kind === 'branch' && worktree.head.branchName === branchName)
 }
 
 export interface PullRequestInfo {
@@ -54,6 +80,8 @@ export type PullRequestFetchMode = 'summary' | 'full'
 
 export interface WorktreeInfo {
   path: string
+  /** Full object id reported by `git worktree list`; absent only in narrow test/admission fixtures. */
+  headOid?: string
   branch?: string
   isBare: boolean
   isPrimary: boolean

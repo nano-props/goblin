@@ -154,7 +154,7 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       root: WORKTREE_ROOT,
     },
-    presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+    presentation: { kind: 'git-worktree' },
     controller: null,
     processName: '',
     canonicalTitle: null,
@@ -181,7 +181,7 @@ function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureR
 function committedResult(terminalRuntimeSessionId: string): TerminalSessionAdmissionCommitResult {
   return {
     action: 'created' as const,
-    presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+    presentation: { kind: 'git-worktree' },
     terminalProjectionEffect: { kind: 'delta', revision: 7 },
     terminalRuntimeSessionId,
     terminalRuntimeGeneration: 0,

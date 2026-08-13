@@ -204,7 +204,7 @@ describe('terminal IPC', () => {
           workspaceRuntimeId: 'workspace-runtime-test',
           root: 'goblin+file:///tmp/repo',
         },
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        presentation: { kind: 'git-worktree' as const },
       },
     }
 

@@ -566,7 +566,7 @@ describe('shared terminal validators requests', () => {
       action: 'create',
       input: {
         workspaceId: 'goblin+file:///repo',
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
+        presentation: { kind: 'git-worktree' },
         worktreePath: '/repo',
         kind: 'additional',
         workspaceRuntimeId: 'repo-runtime-test',

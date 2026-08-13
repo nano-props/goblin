@@ -41,6 +41,7 @@ export type RemoteCommandKind =
   | { type: 'gitLocalBranches'; path: string }
   | { type: 'gitPatch'; path: string }
   | { type: 'gitWorktreeList'; path: string }
+  | { type: 'gitOperationState'; path: string }
   | { type: 'gitStatus'; path: string }
   | { type: 'gitLog'; path: string; branch: string; count?: number; skip?: number }
   | { type: 'gitFetchRemote'; path: string; remote: string }
@@ -374,6 +375,21 @@ function scriptForCommand(command: RemoteCommandKind): string {
       ].join('; ')
     case 'gitWorktreeList':
       return `git -C ${shellQuote(command.path)} worktree list --porcelain -z`
+    case 'gitOperationState': {
+      const repo = shellQuote(command.path)
+      return [
+        `goblin_git_path() { git -C ${repo} rev-parse --git-path "$1"; }`,
+        'goblin_rebase_merge=$(goblin_git_path rebase-merge)',
+        'goblin_rebase_apply=$(goblin_git_path rebase-apply)',
+        'if [ -d "$goblin_rebase_merge" ]; then printf \'rebase\\n\'; [ ! -f "$goblin_rebase_merge/head-name" ] || cat "$goblin_rebase_merge/head-name"; exit 0; fi',
+        'if [ -d "$goblin_rebase_apply" ]; then printf \'rebase\\n\'; [ ! -f "$goblin_rebase_apply/head-name" ] || cat "$goblin_rebase_apply/head-name"; exit 0; fi',
+        'for goblin_state in cherry-pick:CHERRY_PICK_HEAD revert:REVERT_HEAD bisect:BISECT_LOG merge:MERGE_HEAD; do',
+        '  goblin_kind=${goblin_state%%:*}; goblin_marker=${goblin_state#*:}',
+        '  [ ! -e "$(goblin_git_path "$goblin_marker")" ] || { printf \'%s\\n\' "$goblin_kind"; exit 0; }',
+        'done',
+        "printf 'none\\n'",
+      ].join('\n')
+    }
     case 'gitStatus':
       return `git -C ${shellQuote(command.path)} status --porcelain -z`
     case 'gitLog': {

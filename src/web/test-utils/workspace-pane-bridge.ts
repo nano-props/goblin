@@ -11,6 +11,7 @@ import type {
 } from '#/shared/workspace-pane-tabs.ts'
 import { workspacePaneTabsWithUpdateOperation } from '#/shared/workspace-pane-tabs-operations.ts'
 import {
+  gitWorktreeWorkspacePaneTabsTarget,
   requiredGitWorkspacePaneTabsTarget,
   runtimeWorkspacePaneTarget,
   workspacePaneTabsTargetFromRuntime,
@@ -30,7 +31,6 @@ type TestWorkspacePaneRuntimeTabInput =
   | {
       workspaceId: string
       workspaceRuntimeId: string
-      branchName: string
       worktreePath: string
       terminalSessionId: string
     }
@@ -38,16 +38,17 @@ type TestWorkspacePaneRuntimeTabInput =
 function testWorkspacePaneRuntimeTabTarget(
   input: TestWorkspacePaneRuntimeTabInput,
 ): WorkspacePaneTabsTarget & { workspaceRuntimeId: string } {
-  return 'kind' in input
-    ? input
-    : {
-        ...requiredGitWorkspacePaneTabsTarget(
-          workspaceIdForTest(input.workspaceId),
-          input.branchName,
-          input.worktreePath,
-        ),
-        workspaceRuntimeId: input.workspaceRuntimeId,
-      }
+  return 'kind' in input ? input : requiredTestWorktreeTarget(input)
+}
+
+function requiredTestWorktreeTarget(input: {
+  workspaceId: string
+  workspaceRuntimeId: string
+  worktreePath: string
+}): WorkspacePaneTabsTarget & { workspaceRuntimeId: string } {
+  const target = gitWorktreeWorkspacePaneTabsTarget(workspaceIdForTest(input.workspaceId), input.worktreePath)
+  if (!target) throw new Error('invalid test worktree target')
+  return { ...target, workspaceRuntimeId: input.workspaceRuntimeId }
 }
 
 export function installWorkspacePaneTabsTestBridge(
@@ -221,7 +222,7 @@ export function installWorkspacePaneTabsTestBridge(
             presentation:
               input.request.target.kind === 'workspace-root'
                 ? { kind: 'workspace-root' as const }
-                : terminalGitWorktreePresentation('main'),
+                : terminalGitWorktreePresentation(),
             terminalSessionId,
             terminalProjectionEffect: { kind: 'delta', revision: 1 },
             terminalRuntimeSessionId,

@@ -39,7 +39,6 @@ const PANE_TARGET = {
   kind: 'git-worktree' as const,
   workspaceId: REPO_ID,
   worktreePath: WORKTREE_PATH,
-  head: { kind: 'branch' as const, branchName: 'feature/worktree' },
 }
 
 beforeEach(() => {
@@ -165,8 +164,8 @@ describe('workspace pane tab select action', () => {
 
     await expect(openFiles).resolves.toBe(true)
     await expect(move).resolves.toBe(true)
-    expect(showTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
-    expect(showTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
+    expect(showTab).toHaveBeenCalledOnce()
+    expect(showTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'history')
   })
 })
 

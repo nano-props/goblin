@@ -9,7 +9,11 @@ import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/ty
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import {
+  getRepoSnapshotQueryData,
+  setRepoSnapshotQueryData,
+  setRepoWorktreeStatusQueryData,
+} from '#/web/repo-query-cache.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   REPO_ID,
@@ -162,16 +166,14 @@ describe('createAppNavigationActions presentation', () => {
       {
         routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
         workspaceRuntimeId: repo.workspaceRuntimeId,
-        authority: { kind: 'branch', branchName: 'feature/worktree' },
+        authority: { kind: 'worktree' },
       },
       { kind: 'static', tab: 'files' },
       { onAbandon },
     )
-    setRepoWorktreeStatusQueryData(REPO_ID, repo.workspaceRuntimeId, {
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      loadedAt: 2,
-      status: [],
-    })
+    const snapshot = getRepoSnapshotQueryData(REPO_ID, repo.workspaceRuntimeId)
+    if (!snapshot) throw new Error('expected seeded snapshot')
+    setRepoSnapshotQueryData(REPO_ID, repo.workspaceRuntimeId, { ...snapshot, worktrees: [] })
     routeCommit.resolve(true)
 
     await expect(commit).resolves.toBe(false)

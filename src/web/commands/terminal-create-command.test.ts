@@ -14,7 +14,7 @@ const BASE: TerminalSessionBase = {
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     root: canonicalWorkspaceLocator(`goblin+file://${WORKTREE_PATH}`)!,
   },
-  presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+  presentation: { kind: 'git-worktree' as const },
 }
 
 describe('terminal create command', () => {
@@ -143,7 +143,7 @@ describe('terminal create command', () => {
 function createAdmission(overrides: Partial<TerminalCreateAdmissionResult> = {}): TerminalCreateAdmissionResult {
   return {
     terminalSessionId: 'term-111111111111111111111',
-    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+    presentation: { kind: 'git-worktree' as const },
     requestRole: 'leader',
     resourceDisposition: 'created',
     runtimeProjectionApplied: true,

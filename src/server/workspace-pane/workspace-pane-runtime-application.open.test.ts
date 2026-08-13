@@ -235,7 +235,7 @@ describe('open admission', () => {
       }),
     )
     expect(runtime.admission.commit).toHaveBeenCalledWith({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: canonicalBranch } },
+      presentation: { kind: 'git-worktree' },
     })
     expect(runtime.admission.commit).toHaveBeenCalledOnce()
     expect(result).toEqual({

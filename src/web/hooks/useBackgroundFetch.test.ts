@@ -94,6 +94,7 @@ function createRepo(input: {
   })
   setRepoSnapshotQueryData(readyRepo.id, readyRepo.workspaceRuntimeId, {
     branches: [],
+    worktrees: [],
     current: '',
     remote: {
       remotes: [],

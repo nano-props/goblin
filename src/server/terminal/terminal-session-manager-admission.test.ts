@@ -71,7 +71,7 @@ describe('TerminalSessionManager admission', () => {
 
     expect(() =>
       prepared.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+        presentation: { kind: 'git-worktree' },
       }),
     ).toThrow('error.unavailable')
     expect(
@@ -102,7 +102,7 @@ describe('TerminalSessionManager admission', () => {
     expect(manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).sessions).toEqual([])
 
     prepared.admission.commit({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      presentation: { kind: 'git-worktree' },
     })
     const baseline = manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)
     const existing = manager.prepareSession(input)
@@ -135,7 +135,7 @@ describe('TerminalSessionManager admission', () => {
     if (!prepared.ok) throw new Error(prepared.message)
     expect(
       prepared.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+        presentation: { kind: 'git-worktree' },
       }),
     ).toMatchObject({
       action: 'created',
@@ -164,20 +164,18 @@ describe('TerminalSessionManager admission', () => {
     const created = manager.prepareSession(baseInput)
     if (!created.ok) throw new Error(created.message)
     created.admission.commit({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      presentation: { kind: 'git-worktree' },
     })
-    const before = manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)
-
     presenceFails = true
     const existing = manager.prepareSession(baseInput)
     if (!existing.ok) throw new Error(existing.message)
     expect(
       existing.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'renamed-branch' } },
+        presentation: { kind: 'git-worktree' },
       }),
     ).toMatchObject({
       action: 'reused',
-      terminalProjectionEffect: { kind: 'delta', revision: before.revision + 1 },
+      terminalProjectionEffect: { kind: 'none' },
     })
   })
 
@@ -214,7 +212,7 @@ describe('TerminalSessionManager admission', () => {
     const created = manager.prepareSession(input)
     if (!created.ok) throw new Error(created.message)
     created.admission.commit({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      presentation: { kind: 'git-worktree' },
     })
     created.admission.publishCommittedEffects()
     onSessionsProjectionChanged.mockClear()
@@ -229,23 +227,18 @@ describe('TerminalSessionManager admission', () => {
     if (!admitted.ok) throw new Error(admitted.message)
     const beforeRenameRevision = manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).revision
     const committed = admitted.admission.commit({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'renamed-branch' } },
+      presentation: { kind: 'git-worktree' },
     })
-    expect(committed).toMatchObject({
-      action: 'reused',
-      controller: null,
-      terminalProjectionEffect: { kind: 'delta', revision: beforeRenameRevision + 1 },
-    })
+    expect(committed).toMatchObject({ action: 'reused', controller: null, terminalProjectionEffect: { kind: 'none' } })
     const renamedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE)
-    expect(committed.terminalProjectionEffect).toEqual({ kind: 'delta', revision: renamedSnapshot.revision })
+    expect(renamedSnapshot.revision).toBe(beforeRenameRevision)
     expect(renamedSnapshot.sessions[0]?.controller).toBeNull()
     expect(onIdentity).not.toHaveBeenCalled()
     admitted.admission.publishCommittedEffects()
     expect(onIdentity).not.toHaveBeenCalled()
-    expect(onSessionsProjectionChanged).toHaveBeenCalledOnce()
+    expect(onSessionsProjectionChanged).not.toHaveBeenCalled()
     expect(renamedSnapshot.sessions[0]?.presentation).toEqual({
       kind: 'git-worktree',
-      head: { kind: 'branch', branchName: 'renamed-branch' },
     })
   })
 
@@ -261,7 +254,7 @@ describe('TerminalSessionManager admission', () => {
     const created = manager.prepareSession(input)
     if (!created.ok) throw new Error(created.message)
     created.admission.commit({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      presentation: { kind: 'git-worktree' },
     })
     const beforeReuse = manager.terminalSessionsSnapshotForUser(USER_ID, SCOPE).revision
 
@@ -269,7 +262,7 @@ describe('TerminalSessionManager admission', () => {
     if (!reused.ok) throw new Error(reused.message)
     expect(
       reused.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+        presentation: { kind: 'git-worktree' },
       }),
     ).toMatchObject({
       action: 'reused',
@@ -291,7 +284,7 @@ describe('TerminalSessionManager admission', () => {
     const created = manager.prepareSession(input)
     if (!created.ok) throw new Error(created.message)
     created.admission.commit({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      presentation: { kind: 'git-worktree' },
     })
 
     expect(

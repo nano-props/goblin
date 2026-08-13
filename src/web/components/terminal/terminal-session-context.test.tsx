@@ -34,7 +34,7 @@ function makeCommandContext(overrides: Partial<TerminalSessionContextValue> = {}
     createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     createTerminalWithAdmission: vi.fn(async () => ({
       terminalSessionId: 'term-111111111111111111111',
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+      presentation: { kind: 'git-worktree' as const },
       resourceDisposition: 'created',
       runtimeProjectionApplied: false,
       requestRole: 'leader',

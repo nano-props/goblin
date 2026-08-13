@@ -82,6 +82,7 @@ const appDataClientMocks = vi.hoisted(() => ({
       repoSnapshot: {
         current: 'main',
         branches: [],
+        worktrees: [],
         remote: {
           remotes: [],
           hasRemotes: false,
@@ -177,6 +178,7 @@ describe('settings actions', () => {
         repoSnapshot: {
           current: 'main',
           branches: [],
+          worktrees: [],
           remote: {
             remotes: [],
             hasRemotes: false,

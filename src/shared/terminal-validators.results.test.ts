@@ -17,7 +17,7 @@ describe('shared terminal validators results', () => {
     const createResult = {
       ok: true,
       action: 'created' as const,
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
+      presentation: { kind: 'git-worktree' },
       terminalSessionId: 'term-111111111111111111111',
       terminalProjectionEffect: { kind: 'delta', revision: 11 },
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -47,7 +47,7 @@ describe('shared terminal validators results', () => {
       normalizeTerminalCreateResult({
         ok: true,
         action: 'created',
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
+        presentation: { kind: 'git-worktree' },
         terminalSessionId: 'term-111111111111111111111',
         terminalProjectionEffect: { kind: 'delta', revision: 11 },
       }),
@@ -58,7 +58,7 @@ describe('shared terminal validators results', () => {
     })
   })
 
-  test('rejects terminal presentations without a canonical target-compatible branch', () => {
+  test('accepts target-only worktree presentation and rejects removed compatibility fields', () => {
     const metadata = {
       ok: true,
       action: 'created',
@@ -77,25 +77,25 @@ describe('shared terminal validators results', () => {
     expect(
       normalizeTerminalCreateResult({
         ...metadata,
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: '' } },
+        presentation: { kind: 'git-worktree' },
+      }),
+    ).toMatchObject({ presentation: { kind: 'git-worktree' } })
+    expect(
+      normalizeTerminalCreateResult({
+        ...metadata,
+        presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
       }),
     ).toBeNull()
     expect(
       normalizeTerminalCreateResult({
         ...metadata,
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: '   ' } },
+        presentation: { kind: 'git-worktree', branchName: 'main' },
       }),
     ).toBeNull()
     expect(
       normalizeTerminalCreateResult({
         ...metadata,
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'bad\0branch' } },
-      }),
-    ).toBeNull()
-    expect(
-      normalizeTerminalCreateResult({
-        ...metadata,
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
+        presentation: { kind: 'git-worktree' },
         branch: 'legacy-main',
       }),
     ).toBeNull()
@@ -107,7 +107,7 @@ describe('shared terminal validators results', () => {
       terminalRuntimeGeneration: 1,
       identityRevision: 0,
       terminalSessionId: 'term-111111111111111111111',
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
+      presentation: { kind: 'git-worktree' },
       controller: null,
       processName: 'zsh',
       canonicalTitle: null,
@@ -361,7 +361,7 @@ describe('shared terminal validators results', () => {
       runtime: {
         ok: true,
         action: 'created',
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
+        presentation: { kind: 'git-worktree' },
         terminalSessionId: 'term-111111111111111111111',
         terminalProjectionEffect: { kind: 'delta', revision: 11 },
         terminalRuntimeSessionId: 'pty_1234567890abcdef',

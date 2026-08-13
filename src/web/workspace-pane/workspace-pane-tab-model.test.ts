@@ -43,7 +43,7 @@ describe('repo workspace pane tab model', () => {
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         root: workspaceIdForTest('goblin+file:///tmp/goblin-workspace-pane-tab-model-worktree'),
       },
-      presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+      presentation: { kind: 'git-worktree' },
     })
   })
 

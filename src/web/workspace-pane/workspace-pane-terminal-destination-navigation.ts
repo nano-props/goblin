@@ -1,9 +1,5 @@
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import {
-  terminalExecutionCoordinates,
-  terminalExecutionPath,
-  terminalPresentationBranch,
-} from '#/shared/terminal-types.ts'
+import { terminalExecutionCoordinates, terminalExecutionPath } from '#/shared/terminal-types.ts'
 import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { isWorkspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
@@ -11,17 +7,12 @@ import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { appNavigationIsCurrent, beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
 import {
-  beginWorkspacePaneDestinationPresentation,
-  commitWorkspacePaneDestinationRoute,
-} from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
-import {
   tryRunWorkspacePaneAction,
   workspacePaneActionTargetFromCoordinates,
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   gitWorktreePaneTargetLease,
-  resolveWorkspacePaneDestinationTargetLease,
   workspaceRootPaneTargetLease,
   type FilesystemWorkspacePaneTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
@@ -52,57 +43,18 @@ export function commitWorkspacePaneTerminalDestination(input: {
   }
   if (input.base.presentation.kind !== 'git-worktree') return Promise.resolve({ kind: 'target-missing' })
   const worktreePath = terminalExecutionPath(input.base.target)
-  const branchName = terminalPresentationBranch(input.base.presentation)
-  if (!branchName) {
-    const target = gitWorktreePaneTargetLease(
-      coordinates.workspaceId,
-      coordinates.workspaceRuntimeId,
+  return commitFilesystemTerminalDestination({
+    navigation: input.navigation,
+    target: gitWorktreePaneTargetLease(coordinates.workspaceId, coordinates.workspaceRuntimeId, worktreePath),
+    paneTarget,
+    actionTarget: workspacePaneActionTargetFromCoordinates({
+      workspaceId: coordinates.workspaceId,
+      workspaceRuntimeId: coordinates.workspaceRuntimeId,
+      branchName: null,
       worktreePath,
-      input.base.presentation.head,
-    )
-    return commitFilesystemTerminalDestination({
-      navigation: input.navigation,
-      target,
-      paneTarget,
-      actionTarget: workspacePaneActionTargetFromCoordinates({
-        workspaceId: coordinates.workspaceId,
-        workspaceRuntimeId: coordinates.workspaceRuntimeId,
-        branchName: null,
-        worktreePath,
-      }),
-      terminalSessionId: input.terminalSessionId,
-    })
-  }
-  const branchTarget = resolveWorkspacePaneDestinationTargetLease(coordinates.workspaceId, branchName)
-  if (
-    !branchTarget ||
-    branchTarget.workspaceRuntimeId !== coordinates.workspaceRuntimeId ||
-    branchTarget.worktreePath !== worktreePath
-  ) {
-    return Promise.resolve({ kind: 'target-missing' })
-  }
-  return commitQueuedTerminalDestination(
-    workspacePaneActionTargetFromCoordinates({
-      workspaceId: branchTarget.workspaceId,
-      workspaceRuntimeId: branchTarget.workspaceRuntimeId,
-      branchName: branchTarget.branchName,
-      worktreePath: branchTarget.worktreePath,
     }),
-    () => {
-      const projectionOutcome = terminalPaneProjectionOutcome(
-        paneTarget,
-        coordinates.workspaceRuntimeId,
-        input.terminalSessionId,
-      )
-      return projectionOutcome
-        ? projectionOutcome
-        : commitWorkspacePaneDestinationRoute(
-            beginWorkspacePaneDestinationPresentation(branchTarget),
-            { kind: 'terminal', terminalSessionId: input.terminalSessionId },
-            input.navigation,
-          )
-    },
-  )
+    terminalSessionId: input.terminalSessionId,
+  })
 }
 
 function terminalPaneProjectionOutcome(

@@ -7,6 +7,7 @@ export function repoSnapshotResponseForTest(): RepoSnapshotResponse {
   return {
     snapshot: {
       branches: [],
+      worktrees: [],
       current: 'main',
       remote: {
         remotes: [],

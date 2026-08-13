@@ -73,7 +73,7 @@ describe('terminal bell state', () => {
     expect(notify).toHaveBeenCalledTimes(1)
     expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith({
       title: 'repo',
-      body: 'feature/test\nzsh',
+      body: 'zsh',
       terminalSessionId: 'term-111111111111111111111',
       session: terminalSessionBase(descriptor.target, descriptor.presentation),
     })
@@ -99,7 +99,7 @@ describe('terminal bell state', () => {
 
     expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith({
       title: 'repo',
-      body: 'feature/test\n~/Developer/goblin — npm run dev',
+      body: '~/Developer/goblin — npm run dev',
       terminalSessionId: 'term-111111111111111111111',
       session: terminalSessionBase(descriptor.target, descriptor.presentation),
     })

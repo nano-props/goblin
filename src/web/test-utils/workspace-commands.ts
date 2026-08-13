@@ -32,12 +32,7 @@ import {
   workspacePaneFilesystemRootPath,
   workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import {
-  terminalPresentationBranch,
-  terminalExecutionPath,
-  terminalSessionCoordinates,
-  type TerminalSessionBase,
-} from '#/shared/terminal-types.ts'
+import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
@@ -50,6 +45,7 @@ import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/works
 import {
   observedAppNavigationActionsForTest,
   observedWorkspacePaneRouteForTarget,
+  observeWorkspacePaneRouteForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
   type ObservedAppNavigationActionsForTest,
   type AppNavigationOverridesForTest,
@@ -68,25 +64,15 @@ interface WorkspaceCommandFixtureOptions {
 
 function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): WorkspacePaneCommandTarget {
   if (options.filesystemTarget) {
-    return options.branchName
-      ? {
-          routeTarget: {
-            kind: 'git-branch',
-            workspaceId: options.filesystemTarget.workspaceId,
-            branchName: options.branchName,
-          },
-          workspacePaneRoute: options.workspacePaneRoute,
-          filesystemTarget: options.filesystemTarget,
-        }
-      : {
-          routeTarget: {
-            kind: 'git-worktree',
-            workspaceId: options.filesystemTarget.workspaceId,
-            worktreePath: workspacePaneFilesystemRootPath(options.filesystemTarget),
-          },
-          workspacePaneRoute: options.workspacePaneRoute,
-          filesystemTarget: options.filesystemTarget,
-        }
+    return {
+      routeTarget: {
+        kind: 'git-worktree',
+        workspaceId: options.filesystemTarget.workspaceId,
+        worktreePath: workspacePaneFilesystemRootPath(options.filesystemTarget),
+      },
+      workspacePaneRoute: options.workspacePaneRoute,
+      filesystemTarget: options.filesystemTarget,
+    }
   }
   if (options.branchName) {
     const repo = options.workspaceId ? workspacesStore.getState().workspaces[options.workspaceId] : null
@@ -97,7 +83,7 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
       : null
     if (repo?.capability.kind === 'git' && branch?.worktree) {
       return {
-        routeTarget: { kind: 'git-branch', workspaceId: repo.id, branchName: options.branchName },
+        routeTarget: { kind: 'git-worktree', workspaceId: repo.id, worktreePath: branch.worktree.path },
         workspacePaneRoute: options.workspacePaneRoute,
         filesystemTarget: gitWorktreePaneFilesystemTarget({
           workspaceId: repo.id,
@@ -178,7 +164,6 @@ export const WORKTREE_PANE_TARGET = {
   kind: 'git-worktree' as const,
   workspaceId: REPO_ID,
   worktreePath: WORKTREE_PATH,
-  head: { kind: 'branch' as const, branchName: 'feature/worktree' },
 }
 export const WORKTREE_KEY = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
 export let workspacePaneTabsTestBridge: ReturnType<typeof installWorkspacePaneTabsTestBridge>
@@ -256,7 +241,7 @@ export function expectedTerminalBase(): TerminalSessionBase {
       workspaceRuntimeId: workspaceRuntimeId,
       root: canonicalWorkspaceLocator('goblin+file:///tmp/goblin-workspace-command-worktree')!,
     },
-    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature/worktree' } },
+    presentation: { kind: 'git-worktree' as const },
   }
 }
 
@@ -290,12 +275,10 @@ export function recordCreatedTerminalSelection(base: TerminalSessionBase, termin
       formatTerminalFilesystemTargetKey(coordinates.workspaceId, coordinates.executionRootId),
       terminalSessionId,
     )
-  const branchName = terminalPresentationBranch(base.presentation)
-  if (!branchName) return
+  if (base.target.kind !== 'git-worktree') return
   workspacePaneTabsTestBridge.addRuntimeTab({
     workspaceId: coordinates.workspaceId,
     workspaceRuntimeId: coordinates.workspaceRuntimeId,
-    branchName,
     worktreePath: terminalExecutionPath(base.target),
     terminalSessionId,
   })
@@ -303,12 +286,10 @@ export function recordCreatedTerminalSelection(base: TerminalSessionBase, termin
 
 export function removeTerminalFromWorkspacePaneTabsServer(base: TerminalSessionBase, terminalSessionId: string): void {
   const coordinates = terminalSessionCoordinates(base)
-  const branchName = terminalPresentationBranch(base.presentation)
-  if (!branchName) throw new Error('expected Git worktree terminal fixture')
+  if (base.target.kind !== 'git-worktree') throw new Error('expected Git worktree terminal fixture')
   workspacePaneTabsTestBridge.removeRuntimeTab({
     workspaceId: coordinates.workspaceId,
     workspaceRuntimeId: coordinates.workspaceRuntimeId,
-    branchName,
     worktreePath: terminalExecutionPath(base.target),
     terminalSessionId,
   })
@@ -350,9 +331,6 @@ export function navigationWith(
       return true
     },
     commitFilesystemWorkspacePaneRoute: async (target, route, options) => {
-      if (target.routeTarget.kind !== 'workspace-root') {
-        throw new Error('unexpected detached-worktree route commit in workspace command fixture')
-      }
       workspacesStore
         .getState()
         .setWorkspacePaneTabForTarget(
@@ -360,6 +338,15 @@ export function navigationWith(
           route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null,
         )
       options?.onCommit?.()
+      if (target.routeTarget.kind === 'git-worktree') {
+        observeWorkspacePaneRouteForTest({
+          workspaceId: target.routeTarget.workspaceId,
+          workspaceRuntimeId: target.workspaceRuntimeId,
+          branchName: '',
+          worktreePath: target.routeTarget.worktreePath,
+          route,
+        })
+      }
       return true
     },
     goBack: () => {},

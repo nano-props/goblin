@@ -86,7 +86,7 @@ export function makeDescriptor(terminalSessionId: string, index: number): Termin
     terminalSessionId,
     index,
     target: RUNTIME_TARGET,
-    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+    presentation: { kind: 'git-worktree' as const },
   }
 }
 
@@ -115,7 +115,7 @@ export function makeServerSession(
     identityRevision: overrides.identityRevision ?? 0,
     terminalSessionId,
     target: { ...RUNTIME_TARGET, workspaceRuntimeId: overrides.workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID },
-    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+    presentation: { kind: 'git-worktree' as const },
     controller: overrides.controller ?? null,
     processName: overrides.processName ?? 'bash',
     canonicalTitle: overrides.canonicalTitle ?? null,

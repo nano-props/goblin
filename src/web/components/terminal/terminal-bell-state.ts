@@ -2,7 +2,7 @@ import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts
 import { terminalClient } from '#/web/terminal.ts'
 import type { TerminalBellPolicyEvent, TerminalDescriptor } from '#/web/components/terminal/types.ts'
 import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
-import { terminalPresentationBranch, terminalSessionBase, terminalSessionCoordinates } from '#/shared/terminal-types.ts'
+import { terminalSessionBase, terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 const BELL_NOTIFICATION_THROTTLE_MS = 5000
 
 export interface TerminalBellState {
@@ -64,9 +64,7 @@ export function createTerminalBellState(
       if (now - lastNotifiedAt < BELL_NOTIFICATION_THROTTLE_MS) return
       lastSystemNotificationAtByTerminalSessionId.set(descriptor.terminalSessionId, now)
       const workspaceName = workspaceNameFromLocator(terminalSessionCoordinates(descriptor).workspaceId)
-      const bodyParts = terminalPresentationBranch(descriptor.presentation)
-        ? [terminalPresentationBranch(descriptor.presentation)]
-        : []
+      const bodyParts: string[] = []
       const canonicalTitle = typeof event.canonicalTitle === 'string' ? event.canonicalTitle.trim() : ''
       if (canonicalTitle) bodyParts.push(canonicalTitle)
       else if (event.processName) bodyParts.push(event.processName)

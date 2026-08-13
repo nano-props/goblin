@@ -294,7 +294,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     })
     if (!prepared.ok) throw new Error(prepared.message)
     prepared.admission.commit({
-      presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+      presentation: { kind: 'git-worktree' },
     })
     prepared.admission.publishCommittedEffects()
     const attach = manager.attachSession(USER_ID, prepared.terminalRuntimeSessionId, 0, 100, 30, CLIENT_ID)
@@ -361,7 +361,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       })
       if (!prepared.ok) throw new Error(prepared.message)
       prepared.admission.commit({
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+        presentation: { kind: 'git-worktree' },
       })
     }
 

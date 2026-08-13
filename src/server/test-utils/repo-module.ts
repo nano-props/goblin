@@ -385,6 +385,7 @@ afterEach(() => {
 
 export function repoSnapshot(branch = 'main'): RepoSnapshot {
   return {
+    worktrees: [],
     branches: [
       {
         name: branch,

@@ -74,6 +74,7 @@ describe('client effect intent handlers', () => {
     })
     const d = deps(REPO_ID)
     const showRepoBranchTerminalSession = vi.mocked(d.navigation.showRepoBranchTerminalSession)
+    const commitFilesystemWorkspacePaneRoute = vi.mocked(d.navigation.commitFilesystemWorkspacePaneRoute)
     handleTerminalBellClickIntent(
       {
         type: 'terminal-bell-click',
@@ -85,15 +86,26 @@ describe('client effect intent handlers', () => {
             workspaceRuntimeId: repo.workspaceRuntimeId,
             root: workspaceIdForTest('goblin+file:///tmp/bell-worktree'),
           },
-          presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/query' } },
+          presentation: { kind: 'git-worktree' },
         },
       },
       d,
     )
 
     await vi.waitFor(() => {
-      expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'term-queryqueryqueryquery1')
+      expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          routeTarget: {
+            kind: 'git-worktree',
+            workspaceId: REPO_ID,
+            worktreePath: '/tmp/bell-worktree',
+          },
+        }),
+        { kind: 'terminal', terminalSessionId: 'term-queryqueryqueryquery1' },
+        expect.any(Object),
+      )
     })
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
   })
 
   test('surfaces a terminal bell target whose repository projection is unavailable', () => {
@@ -116,7 +128,7 @@ describe('client effect intent handlers', () => {
             workspaceRuntimeId: repo.workspaceRuntimeId,
             root: workspaceIdForTest('goblin+file:///tmp/bell-worktree'),
           },
-          presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/query' } },
+          presentation: { kind: 'git-worktree' },
         },
       },
       d,

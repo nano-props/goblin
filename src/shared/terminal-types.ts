@@ -4,7 +4,6 @@ import {
   type WorkspacePaneFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { gitHead, gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
 
 /**
  * `controllerStatus === 'connected'` while the broker reports the
@@ -43,7 +42,6 @@ export interface WorkspaceRootTerminalPresentation {
 
 export interface GitWorktreeTerminalPresentation {
   kind: 'git-worktree'
-  head: GitHead
 }
 
 export type TerminalPresentation = WorkspaceRootTerminalPresentation | GitWorktreeTerminalPresentation
@@ -99,10 +97,6 @@ export function terminalExecutionPath(target: TerminalExecutionTarget): string {
 
 export function terminalSessionCoordinates(session: Pick<TerminalSessionBase, 'target'>): TerminalExecutionCoordinates {
   return terminalExecutionCoordinates(session.target)
-}
-
-export function terminalPresentationBranch(presentation: TerminalPresentation): string | null {
-  return presentation.kind === 'git-worktree' ? gitHeadBranch(presentation.head) : null
 }
 
 export type WorkspaceRuntimeInput = WorkspaceRuntimeScope
@@ -238,11 +232,8 @@ export type TerminalRestartResult =
 
 export type TerminalCreateAction = 'created' | 'restored' | 'reused'
 
-export function terminalGitWorktreePresentation(branchName: string | null): GitWorktreeTerminalPresentation {
-  return {
-    kind: 'git-worktree',
-    head: gitHead(branchName),
-  }
+export function terminalGitWorktreePresentation(): GitWorktreeTerminalPresentation {
+  return { kind: 'git-worktree' }
 }
 
 export interface TerminalCreateSuccess extends TerminalRuntimeMetadata {

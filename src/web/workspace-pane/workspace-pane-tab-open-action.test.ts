@@ -36,6 +36,7 @@ import { setTerminalSessionCommandBridge } from '#/web/components/terminal/termi
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import {
   observeWorkspacePaneRouteForTest,
+  observedFilesystemWorkspacePaneRouteCommitForTest,
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
   type ObservedBranchRouteNavigationForTest,
@@ -924,13 +925,7 @@ function navigationWithStoreActions(
       showRepoBranchWorkspacePaneTab,
       showRepoBranchTerminalSession: () => false,
     }),
-    commitFilesystemWorkspacePaneRoute: unexpectedNavigationAction('commitFilesystemWorkspacePaneRoute'),
-  }
-}
-
-function unexpectedNavigationAction(name: string): () => never {
-  return () => {
-    throw new Error(`Unexpected workspace pane navigation action in test: ${name}`)
+    commitFilesystemWorkspacePaneRoute: observedFilesystemWorkspacePaneRouteCommitForTest(),
   }
 }
 

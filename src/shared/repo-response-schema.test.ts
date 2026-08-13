@@ -16,6 +16,7 @@ describe('repo response schemas', () => {
       v.parse(RepoSnapshotResponseSchema, {
         snapshot: {
           branches: [],
+          worktrees: [],
           current: 'main',
           remote: {
             remotes: [],

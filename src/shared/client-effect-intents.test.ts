@@ -58,7 +58,7 @@ describe('isClientEffectIntent', () => {
             workspaceId: 'goblin+file:///tmp/repo',
             workspaceRuntimeId: 'workspace-runtime-test',
           },
-          presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'main' } },
+          presentation: { kind: 'git-worktree' },
         },
       }),
     ).toBe(false)

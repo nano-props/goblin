@@ -494,7 +494,7 @@ export const descriptor: TerminalDescriptor = {
     workspaceRuntimeId: 'repo-runtime-test',
     root: requiredWorkspaceLocator('/worktree'),
   },
-  presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'feature' } },
+  presentation: { kind: 'git-worktree' as const },
 }
 
 export function resetTerminalSessionHarness() {

@@ -17,7 +17,7 @@ const terminalBase: TerminalSessionBase = {
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
   },
-  presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+  presentation: { kind: 'git-worktree' as const },
 }
 const closeTarget = terminalBase
 

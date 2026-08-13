@@ -145,6 +145,7 @@ function repo(): BranchActionRepo {
     snapshot: {
       current: 'main',
       branches: [],
+      worktrees: [],
       remote: {
         remotes: [],
         hasRemotes: true,

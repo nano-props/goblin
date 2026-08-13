@@ -56,7 +56,7 @@ const REMOTE = {
 }
 
 function snapshot(current: string): RepoSnapshotResponse {
-  return { snapshot: { branches: [], current, remote: REMOTE } }
+  return { snapshot: { branches: [], worktrees: [], current, remote: REMOTE } }
 }
 
 beforeEach(() => {

@@ -25,6 +25,7 @@ export function useAppNavigation(): AppNavigationActions {
     closeWorkspace: (...args) => source.value.closeWorkspace(...args),
     cycleWorkspace: (...args) => source.value.cycleWorkspace(...args),
     selectRepoBranch: (...args) => source.value.selectRepoBranch(...args),
+    selectRepoWorktree: (...args) => source.value.selectRepoWorktree(...args),
     showWorkspaceRootPaneTab: (...args) => source.value.showWorkspaceRootPaneTab(...args),
     commitFilesystemWorkspacePaneRoute: (...args) => source.value.commitFilesystemWorkspacePaneRoute(...args),
     commitWorkspaceRootTerminalSession: (...args) => source.value.commitWorkspaceRootTerminalSession(...args),

@@ -102,6 +102,16 @@ describe('restoreServerWorkspace', () => {
       snapshot: {
         current: 'main',
         branches: [{ name: 'main', worktree: { path: '/repo', isPrimary: false, isLocked: false } }],
+        worktrees: [
+          {
+            path: '/repo',
+            head: { kind: 'branch', branchName: 'main' },
+            headOid: '',
+            operation: null,
+            isPrimary: false,
+            isLocked: false,
+          },
+        ],
         remote: {
           remotes: [],
           hasRemotes: false,
@@ -459,6 +469,16 @@ describe('restoreServerWorkspace', () => {
         snapshot: {
           current: 'main',
           branches: [{ name: 'main', worktree: { path: '/repo', isPrimary: false, isLocked: false } }],
+          worktrees: [
+            {
+              path: '/repo',
+              head: { kind: 'branch', branchName: 'main' },
+              headOid: '',
+              operation: null,
+              isPrimary: false,
+              isLocked: false,
+            },
+          ],
           remote: {
             remotes: [],
             hasRemotes: false,

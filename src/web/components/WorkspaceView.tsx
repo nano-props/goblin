@@ -240,6 +240,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
             dashboardSelected={currentRouteView?.kind === 'dashboard'}
             newWorktreeSelected={currentRouteView?.kind === 'newWorktree'}
             currentBranchName={routeBranchName}
+            currentWorktreePath={currentRouteView?.kind === 'worktree' ? currentRouteView.worktreePath : null}
             workspaceRootSelected={gitUnavailable && currentRouteView?.kind === 'workspace-root'}
             onSelectWorkspaceRoot={
               gitUnavailable ? () => props.onOpenWorkspaceRootPane?.(currentWorkspace.id) : undefined

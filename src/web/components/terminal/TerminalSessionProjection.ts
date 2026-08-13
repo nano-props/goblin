@@ -47,7 +47,6 @@ import type {
 import type { WorkspacePaneTabCloseOutcome } from '#/web/workspace-pane/workspace-pane-tab-close-outcome.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  terminalPresentationBranch,
   terminalSessionBase,
   terminalSessionCoordinates,
   type TerminalPresentation,

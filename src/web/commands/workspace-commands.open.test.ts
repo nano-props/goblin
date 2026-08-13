@@ -126,11 +126,7 @@ describe('workspace commands open', () => {
       navigation,
     })
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-111111111111111111111',
-    )
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     // "Click the Terminal menu" is a generic entry — no insertion anchor is
     // passed, so the new terminal appends to the end of the strip.
     expect(createTerminal).toHaveBeenCalledWith(expectedTerminalBase())
@@ -176,11 +172,7 @@ describe('workspace commands open', () => {
       navigation,
     })
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-222222222222222222222',
-    )
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[WORKTREE_KEY]).toBe(
       'term-222222222222222222222',
     )
@@ -252,11 +244,7 @@ describe('workspace commands open', () => {
     expect(
       workspacePaneTabOpener(WORKTREE_PANE_TARGET, workspaceRuntimeIdForTest(), 'terminal:term-222222222222222222222'),
     ).toBe('terminal:term-111111111111111111111')
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-222222222222222222222',
-    )
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     showRepoBranchTerminalSession.mockClear()
 
     expect(
@@ -270,11 +258,7 @@ describe('workspace commands open', () => {
     ).toBe(true)
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', expectedTerminalBase())
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-111111111111111111111',
-    )
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
   })
 
@@ -355,11 +339,7 @@ describe('workspace commands open', () => {
     expect(
       workspacePaneTabOpener(WORKTREE_PANE_TARGET, workspaceRuntimeIdForTest(), 'terminal:term-222222222222222222222'),
     ).toBe('workspace-pane:status')
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-222222222222222222222',
-    )
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     showRepoBranchTerminalSession.mockClear()
     closeEvents.length = 0
 
@@ -373,8 +353,8 @@ describe('workspace commands open', () => {
     ).toBe(true)
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', expectedTerminalBase())
-    expect(closeEvents).toEqual(['close-terminal', 'navigate:status'])
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
+    expect(closeEvents).toEqual(['close-terminal'])
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
   })
@@ -605,11 +585,7 @@ describe('workspace commands open', () => {
     await expect(closePromise).resolves.toBe(true)
     await expect(terminalPromise).resolves.toBe(true)
     expect(createTerminal).toHaveBeenCalledOnce()
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-111111111111111111111',
-    )
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
   })
 
   test('select workspace pane tab by index follows the mixed tab list', async () => {
@@ -668,12 +644,8 @@ describe('workspace commands open', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-111111111111111111111',
-    )
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(selectTerminal).not.toHaveBeenCalled()
     expect(focusTerminal).toHaveBeenCalledOnce()
   })

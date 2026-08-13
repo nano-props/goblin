@@ -32,6 +32,7 @@ function repoSnapshotResponse(): RepoSnapshotResponse {
   return {
     snapshot: {
       branches: [createBranchSnapshot('main', { isCurrent: true })],
+      worktrees: [],
       current: 'main',
       remote: {
         remotes: [],

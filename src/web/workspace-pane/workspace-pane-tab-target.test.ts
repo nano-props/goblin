@@ -158,10 +158,7 @@ describe('workspace pane tab target read model', () => {
       currentBranchName: 'feature/query',
       status: [{ path: WORKTREE_PATH, branch: 'feature/query', isMain: false, entries: [] }],
     })
-    const lease = gitWorktreePaneTargetLease(REPO_ID, repo.workspaceRuntimeId, WORKTREE_PATH, {
-      kind: 'branch',
-      branchName: 'feature/query',
-    })
+    const lease = gitWorktreePaneTargetLease(REPO_ID, repo.workspaceRuntimeId, WORKTREE_PATH)
 
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(true)
 
@@ -188,10 +185,7 @@ describe('workspace pane tab target read model', () => {
       currentBranchName: 'feature/query',
       status: [{ path: WORKTREE_PATH, branch: 'feature/query', isMain: false, entries: [] }],
     })
-    const lease = gitWorktreePaneTargetLease(REPO_ID, repo.workspaceRuntimeId, WORKTREE_PATH, {
-      kind: 'branch',
-      branchName: 'feature/query',
-    })
+    const lease = gitWorktreePaneTargetLease(REPO_ID, repo.workspaceRuntimeId, WORKTREE_PATH)
     const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
 
     expect(filesystemWorkspacePaneTargetLeaseIsCurrent(lease)).toBe(true)

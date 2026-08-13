@@ -161,7 +161,7 @@ describe('workspace pane tab close action', () => {
       {
         routeTarget: WORKTREE_PANE_TARGET,
         workspaceRuntimeId: repo.workspaceRuntimeId,
-        authority: { kind: 'branch', branchName: BRANCH_NAME },
+        authority: { kind: 'worktree' },
       },
       { kind: 'static', tab: 'status' },
       expect.objectContaining({
@@ -523,7 +523,7 @@ describe('workspace pane tab close action', () => {
           terminalFilesystemTargetKey,
           index: 1,
           target: runtimeTarget,
-          presentation: { kind: 'git-worktree' as const, head: { kind: 'detached' as const } },
+          presentation: { kind: 'git-worktree' as const },
         },
         sessions: [
           {
@@ -577,7 +577,7 @@ describe('workspace pane tab close action', () => {
           terminalSessionId,
           base: {
             target: runtimeTarget,
-            presentation: { kind: 'git-worktree' as const, head: { kind: 'detached' as const } },
+            presentation: { kind: 'git-worktree' as const },
           },
         },
         presentationEffects,
@@ -589,7 +589,11 @@ describe('workspace pane tab close action', () => {
     expect(feedbackMocks.warning).toHaveBeenCalledWith('error.workspace-tabs-committed-projection-failed', {
       id: 'workspace-pane-tab-close-projection-failed',
     })
-    expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ routeTarget: WORKTREE_PANE_TARGET, authority: { kind: 'worktree' } }),
+      { kind: 'static', tab: 'status' },
+      expect.objectContaining({ routePrecondition: { kind: 'exact-route', route } }),
+    )
     expect(
       workspacePaneTabOpener(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, `terminal:${terminalSessionId}`),
     ).toBeNull()
@@ -600,6 +604,16 @@ describe('workspace pane tab close action', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
+      worktrees: [
+        {
+          path: WORKTREE_PATH,
+          head: { kind: 'detached' },
+          headOid: '1111111111111111111111111111111111111111',
+          operation: null,
+          isPrimary: false,
+          isLocked: false,
+        },
+      ],
       status: [{ path: WORKTREE_PATH, isMain: false, entries: [] }],
       currentBranchName: null,
     })
@@ -656,7 +670,7 @@ describe('workspace pane tab close action', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith(terminalSessionId, {
       target: runtimeTarget,
-      presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+      presentation: { kind: 'git-worktree' },
     })
     expect(closeTerminalByDescriptor).not.toHaveBeenCalledWith(
       terminalSessionId,
@@ -668,7 +682,7 @@ describe('workspace pane tab close action', () => {
       {
         routeTarget: WORKTREE_PANE_TARGET,
         workspaceRuntimeId: repo.workspaceRuntimeId,
-        authority: { kind: 'detached-worktree' },
+        authority: { kind: 'worktree' },
       },
       { kind: 'static', tab: 'status' },
       expect.objectContaining({

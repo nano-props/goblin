@@ -12,6 +12,7 @@ import type {
   LogEntry,
   PullRequestInfo,
   RepoRemoteInfo,
+  RepoWorktreeSnapshot,
   WorktreeStatus,
 } from '#/shared/git-types.ts'
 import type { WorkspacePaneSessionTabType, WorkspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -212,6 +213,7 @@ export interface UserSettingsUpdateResponse {
 
 export interface RepoSnapshot {
   branches: BranchSnapshotInfo[]
+  worktrees: RepoWorktreeSnapshot[]
   current: string
   /** Short commit hash when HEAD is detached (no branch checked out). */
   currentHEAD?: string

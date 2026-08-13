@@ -10,6 +10,7 @@ interface Props {
   repoId: WorkspaceId
   onSelectBranch?: (branch: string) => void
   currentBranchName?: string | null
+  currentWorktreePath?: string | null
 }
 
 export const BranchNavigator: FunctionalComponent<Props> = (props) => (
@@ -18,8 +19,9 @@ export const BranchNavigator: FunctionalComponent<Props> = (props) => (
       repoId={props.repoId}
       onSelectBranch={props.onSelectBranch}
       currentBranchName={props.currentBranchName}
+      currentWorktreePath={props.currentWorktreePath}
     />
   </ScrollArea>
 )
 
-BranchNavigator.props = ['repoId', 'onSelectBranch', 'currentBranchName']
+BranchNavigator.props = ['repoId', 'onSelectBranch', 'currentBranchName', 'currentWorktreePath']

@@ -23,6 +23,7 @@ import {
   type CommandOutcome,
 } from '#/system/command-execution.ts'
 import {
+  decodeRemoteGitOperation,
   decodeRemoteStatus,
   decodeRemoteWorktrees,
   isValidRemotePath,
@@ -39,6 +40,7 @@ import {
   type GitRemoteInfo,
   type LogEntry,
   type RepoRemoteInfo,
+  type RepoWorktreeSnapshot,
   type RepoUrlTarget,
   type WorktreeInfo,
   type WorktreeStatus,
@@ -137,15 +139,59 @@ export async function getRemoteSnapshot(
 ): Promise<RemoteRepoSnapshot> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const membership = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
-  const [result, remote] = await Promise.all([
+  const [result, remote, worktrees] = await Promise.all([
     run({ type: 'gitSnapshot', path: target.remotePath }, target, { signal: options.signal }),
     getRemoteRepoInfo(target, { signal: options.signal, run }),
+    readRemoteRepoWorktreeSnapshots(target, membership, { signal: options.signal, run }),
   ])
   options.signal?.throwIfAborted()
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   const snapshot = parseRemoteSnapshot(result.stdout, membership)
   if (!snapshot) throw new Error('error.failed-read-repo')
-  return { ...snapshot, remote }
+  return { ...snapshot, worktrees, remote }
+}
+
+async function readRemoteRepoWorktreeSnapshots(
+  target: RemoteWorkspaceTarget,
+  worktrees: readonly WorktreeInfo[],
+  options: { signal?: AbortSignal; run: RemoteGitRunner },
+): Promise<RepoWorktreeSnapshot[]> {
+  return await mapWithConcurrency(
+    worktrees.filter((worktree) => !worktree.isBare),
+    REMOTE_WORKTREE_STATUS_CONCURRENCY,
+    async (worktree) => {
+      if (worktree.isPrunable || !worktree.headOid) {
+        throw new Error('error.failed-read-repo')
+      }
+      const operation = await readRemoteGitOperationForProjection(target, worktree.path, options)
+      return {
+        path: worktree.path,
+        head: gitHead(worktree.branch ?? null),
+        headOid: worktree.headOid,
+        operation,
+        isPrimary: worktree.isPrimary,
+        isLocked: worktree.isLocked ?? false,
+      }
+    },
+    { signal: options.signal, abort: 'throw' },
+  )
+}
+
+async function readRemoteGitOperationForProjection(
+  target: RemoteWorkspaceTarget,
+  worktreePath: string,
+  options: { signal?: AbortSignal; run: RemoteGitRunner },
+): Promise<RepoWorktreeSnapshot['operation']> {
+  try {
+    const result = await options.run({ type: 'gitOperationState', path: worktreePath }, target, {
+      signal: options.signal,
+    })
+    if (!result.ok || !result.stdout) return null
+    return decodeRemoteGitOperation(result.stdout)
+  } catch (error) {
+    options.signal?.throwIfAborted()
+    return null
+  }
 }
 
 /** Narrow identity read for workspace-pane membership. It intentionally skips
@@ -957,8 +1003,8 @@ export async function deleteRemoteBranch(
   const validation = validateBranchDeletionPolicy({
     branch: input.branch,
     currentBranch: snapshot?.current,
-    isCheckedOutElsewhere: !!snapshot?.branches.some(
-      (branchInfo) => branchInfo.name === input.branch && branchInfo.worktree,
+    isCheckedOutElsewhere: !!snapshot?.worktrees.some(
+      (worktree) => worktree.head.kind === 'branch' && worktree.head.branchName === input.branch,
     ),
     force: shouldForce,
     mergedToCurrent: mergeFacts.mergedToCurrent,

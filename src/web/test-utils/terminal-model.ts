@@ -23,7 +23,7 @@ export function terminalSessionBaseForTest(input: {
       workspaceRuntimeId: input.workspaceRuntimeId,
       root: requiredWorkspaceLocator(input.worktreePath),
     },
-    presentation: terminalGitWorktreePresentation(input.branch),
+    presentation: terminalGitWorktreePresentation(),
   }
 }
 

@@ -154,7 +154,7 @@ const EMPTY_REMOTE: RepoSnapshot['remote'] = {
 
 describe('independent repository reads', () => {
   test('reads the repository snapshot without also requesting pull requests', async () => {
-    const snapshot: RepoSnapshot = { branches: [], current: 'main', remote: EMPTY_REMOTE }
+    const snapshot: RepoSnapshot = { branches: [], worktrees: [], current: 'main', remote: EMPTY_REMOTE }
     const getSnapshot = vi.fn(() => Promise.resolve(snapshot))
     const getPullRequests = vi.fn(() => Promise.resolve<PullRequestEntry[] | null>([]))
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>

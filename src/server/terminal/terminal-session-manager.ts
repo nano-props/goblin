@@ -1412,10 +1412,7 @@ function createTerminalRuntimeSessionId(): string {
 }
 
 function sameTerminalPresentation(a: TerminalPresentation | null, b: TerminalPresentation): boolean {
-  if (!a || a.kind !== b.kind) return false
-  if (a.kind === 'workspace-root') return true
-  if (b.kind !== 'git-worktree' || a.head.kind !== b.head.kind) return false
-  return a.head.kind === 'detached' || (b.head.kind === 'branch' && a.head.branchName === b.head.branchName)
+  return a?.kind === b.kind
 }
 
 function assertTerminalPresentationMatchesTarget(

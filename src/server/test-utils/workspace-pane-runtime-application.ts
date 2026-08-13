@@ -83,7 +83,7 @@ export function terminalCreateSuccess(
 
 function committedTerminalResult(
   action: 'created' | 'restored' | 'reused',
-  presentation = terminalGitWorktreePresentation(request.branch),
+  presentation = terminalGitWorktreePresentation(),
 ) {
   return {
     action,
@@ -108,7 +108,7 @@ export function publishedTerminalResult(
   return {
     ok: true,
     terminalSessionId: runtime.terminalSessionId,
-    ...committedTerminalResult('created', terminalGitWorktreePresentation(canonicalBranch)),
+    ...committedTerminalResult('created', terminalGitWorktreePresentation()),
   }
 }
 
@@ -119,7 +119,7 @@ export function terminalSession(terminalSessionId: string, terminalRuntimeSessio
     identityRevision: 0,
     terminalSessionId,
     target: request.target,
-    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: request.branch } },
+    presentation: { kind: 'git-worktree' as const },
     nativeWorktreePath: request.worktreePath,
     controller: { clientId: 'client-test', status: 'connected' as const },
     processName: 'zsh',

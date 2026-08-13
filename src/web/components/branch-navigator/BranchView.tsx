@@ -17,18 +17,20 @@ import { branchViewModeForWorkspace, visibleBranches } from '#/web/stores/worksp
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
+import { gitWorktreePaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 interface Props {
   repoId: WorkspaceId
   onSelectBranch?: (branch: string) => void
   currentBranchName?: string | null
+  currentWorktreePath?: string | null
   onAfterSelect?: (branch: string) => void
   onAfterOpenStatus?: (branch: string) => void
 }
 
 export const BranchView = defineComponent<Props>({
   name: 'BranchView',
-  props: ['repoId', 'onSelectBranch', 'currentBranchName', 'onAfterSelect', 'onAfterOpenStatus'],
+  props: ['repoId', 'onSelectBranch', 'currentBranchName', 'currentWorktreePath', 'onAfterSelect', 'onAfterOpenStatus'],
 
   setup(props) {
     const storeProjection = useStoreSelector(
@@ -59,6 +61,7 @@ export const BranchView = defineComponent<Props>({
           repo={repo.value}
           onSelectBranch={props.onSelectBranch}
           currentBranchName={props.currentBranchName}
+          currentWorktreePath={props.currentWorktreePath}
           onAfterSelect={props.onAfterSelect}
           onAfterOpenStatus={props.onAfterOpenStatus}
         />
@@ -75,19 +78,36 @@ interface BranchViewReadModelProps extends Omit<Props, 'repoId'> {
 const BranchViewReadModel = defineComponent<BranchViewReadModelProps>({
   name: 'BranchViewReadModel',
   inheritAttrs: false,
-  props: ['repo', 'onSelectBranch', 'currentBranchName', 'onAfterSelect', 'onAfterOpenStatus'],
+  props: ['repo', 'onSelectBranch', 'currentBranchName', 'currentWorktreePath', 'onAfterSelect', 'onAfterOpenStatus'],
   setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
     const { repo, snapshotReadModel, statusReadModel } = useBranchListReadModel(() => props.repo)
-    const branches = computed(() =>
-      repo.value
-        ? visibleBranches({
-            branches: repo.value.snapshot.branches,
-            viewMode: repo.value.branchViewMode,
-          })
-        : [],
+    const worktreeStateRows = computed(
+      () =>
+        repo.value?.snapshot.worktrees.filter(
+          (worktree) => worktree.head.kind === 'detached' || worktree.operation !== null,
+        ) ?? [],
     )
+    const branches = computed(() => {
+      if (!repo.value) return []
+      const operationBranches = new Set(
+        worktreeStateRows.value.flatMap((worktree) =>
+          worktree.operation && worktree.head.kind === 'branch' ? [worktree.head.branchName] : [],
+        ),
+      )
+      return visibleBranches({
+        branches: repo.value.snapshot.branches,
+        viewMode: repo.value.branchViewMode,
+      }).filter((branch) => !operationBranches.has(branch.name))
+    })
+    const highlightedBranch = computed(() => {
+      if (props.currentBranchName) return props.currentBranchName
+      const currentWorktree = repo.value?.snapshot.worktrees.find(
+        (worktree) => worktree.path === props.currentWorktreePath,
+      )
+      return currentWorktree?.head.kind === 'branch' ? currentWorktree.head.branchName : null
+    })
 
     function selectBranch(branch: string): void {
       if (props.onSelectBranch) props.onSelectBranch(branch)
@@ -104,6 +124,15 @@ const BranchViewReadModel = defineComponent<BranchViewReadModelProps>({
         navigation,
       })
       props.onAfterOpenStatus?.(branchName)
+    }
+
+    function selectWorktree(worktreePath: string): void {
+      navigation.selectRepoWorktree(props.repo.id, worktreePath)
+    }
+
+    function openWorktreeStatus(worktreePath: string): void {
+      const target = gitWorktreePaneTargetLease(props.repo.id, props.repo.workspaceRuntimeId, worktreePath)
+      void navigation.commitFilesystemWorkspacePaneRoute(target, { kind: 'static', tab: 'status' })
     }
 
     function retryStatus(): void {
@@ -155,9 +184,13 @@ const BranchViewReadModel = defineComponent<BranchViewReadModelProps>({
           <BranchList
             repo={currentRepo}
             branches={branches.value}
-            highlightedBranch={props.currentBranchName ?? null}
+            worktreeStateRows={worktreeStateRows.value}
+            highlightedBranch={highlightedBranch.value}
+            highlightedWorktreePath={props.currentWorktreePath ?? null}
             onSelectBranch={selectBranch}
             onOpenBranchStatus={openBranchStatus}
+            onSelectWorktree={selectWorktree}
+            onOpenWorktreeStatus={openWorktreeStatus}
             emptyState={<EmptyState title={t(emptyLabelKey)} />}
           />
         </>

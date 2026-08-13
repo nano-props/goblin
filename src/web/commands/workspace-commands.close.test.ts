@@ -48,7 +48,7 @@ import {
 } from '#/web/test-utils/workspace-commands.ts'
 
 describe('workspace commands close', () => {
-  test('close workspace tab command returns from files to status when files was opened from the status route', async () => {
+  test('close workspace tab command returns from files to status on the stable worktree target', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
@@ -81,7 +81,7 @@ describe('workspace commands close', () => {
     expect(workspacePaneTabOpener(WORKTREE_PANE_TARGET, workspaceRuntimeIdForTest(), 'workspace-pane:files')).toBe(
       'workspace-pane:status',
     )
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'files')
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     showRepoBranchWorkspacePaneTab.mockClear()
 
     expect(
@@ -94,7 +94,7 @@ describe('workspace commands close', () => {
       }),
     ).toBe(true)
 
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
     expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
   })
@@ -370,15 +370,11 @@ describe('workspace commands close', () => {
 
     closeResolvers[0]?.(true)
     await expect(firstClose).resolves.toBe(true)
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-222222222222222222222',
-    )
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(closeTerminalByDescriptor).toHaveBeenNthCalledWith(2, 'term-222222222222222222222', expectedTerminalBase())
     closeResolvers[1]?.(true)
     await expect(secondClose).resolves.toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
   test('close workspace tab command closes the selected terminal when it is not the first terminal', async () => {

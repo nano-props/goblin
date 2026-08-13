@@ -53,6 +53,7 @@ describe('session restore runtime ownership', () => {
       snapshot: {
         current: 'main',
         branches: [],
+        worktrees: [],
         remote: {
           remotes: [],
           hasRemotes: false,

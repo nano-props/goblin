@@ -16,7 +16,6 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { themeStore } from '#/web/stores/theme.ts'
 import { i18nStore } from '#/web/stores/i18n.ts'
@@ -33,12 +32,7 @@ import {
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { repoPresentationFromQueryForTest } from '#/web/test-utils/repo-store.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import {
-  terminalExecutionPath,
-  terminalPresentationBranch,
-  terminalSessionCoordinates,
-  type TerminalSessionBase,
-} from '#/shared/terminal-types.ts'
+import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
@@ -46,11 +40,12 @@ import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticate
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import {
   gitWorktreePaneFilesystemTarget,
+  workspacePaneFilesystemRootPath,
   type WorkspacePaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
@@ -373,14 +368,20 @@ describe('useClientEffectIntentRouter', () => {
               workspaceRuntimeId: repo.workspaceRuntimeId,
               root: workspaceIdForTest('goblin+file:///tmp/repo-feature'),
             },
-            presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/test' } },
+            presentation: { kind: 'git-worktree' },
           },
         })
     })
 
     await waitFor(() => {
-      expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'feature/test', terminalSessionId)
+      expect(commitFilesystemWorkspacePaneRouteSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          routeTarget: { kind: 'git-worktree', workspaceId: repo.id, worktreePath: '/tmp/repo-feature' },
+        }),
+        { kind: 'terminal', terminalSessionId },
+      )
     })
+    expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTabSpy).not.toHaveBeenCalled()
   })
 
@@ -480,14 +481,20 @@ describe('useClientEffectIntentRouter', () => {
               workspaceRuntimeId: repo.workspaceRuntimeId,
               root: workspaceIdForTest('goblin+file:///tmp/repo-feature'),
             },
-            presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/test' } },
+            presentation: { kind: 'git-worktree' },
           },
         })
     })
 
     await waitFor(() => {
-      expect(routeNavigationCalls).toEqual([{ repoId: repo.id, branch: 'feature/test', terminalSessionId }])
+      expect(commitFilesystemWorkspacePaneRouteSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          routeTarget: { kind: 'git-worktree', workspaceId: repo.id, worktreePath: '/tmp/repo-feature' },
+        }),
+        { kind: 'terminal', terminalSessionId },
+      )
     })
+    expect(routeNavigationCalls).toEqual([])
   })
 
   test('close-repo menu action delegates to navigation close', async () => {
@@ -716,7 +723,7 @@ describe('useClientEffectIntentRouter', () => {
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })
 
-  test('native new-terminal and close intents preserve a static route opener', async () => {
+  test('native new-terminal intent preserves a static route opener on a worktree target', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
@@ -755,13 +762,11 @@ describe('useClientEffectIntentRouter', () => {
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
       const coordinates = terminalSessionCoordinates(base)
-      const branchName = terminalPresentationBranch(base.presentation)
-      if (!branchName) throw new Error('expected Git worktree terminal fixture')
+      if (base.target.kind !== 'git-worktree') throw new Error('expected Git worktree terminal fixture')
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
       workspacePaneTabsTestBridge.addRuntimeTab({
         workspaceId: coordinates.workspaceId,
         workspaceRuntimeId: coordinates.workspaceRuntimeId,
-        branchName,
         worktreePath: terminalExecutionPath(base.target),
         terminalSessionId,
       })
@@ -806,7 +811,7 @@ describe('useClientEffectIntentRouter', () => {
         }
       },
     })
-    const host = renderInJsdom(<HookHost />)
+    renderInJsdom(<HookHost />)
     seedInitialObservedWorkspacePaneRouteForTest({
       workspaceId: repo.id,
       workspaceRuntimeId: repo.workspaceRuntimeId,
@@ -820,45 +825,12 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     await waitFor(() => {
-      expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'main', 'term-222222222222222222222')
-    })
-
-    currentWorkspacePaneRoute = { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' }
-    await flushTestUpdates(async () => {
-      await host.rerender(<HookHost />)
-    })
-    showRepoBranchWorkspacePaneTabSpy.mockClear()
-    showRepoBranchTerminalSessionSpy.mockClear()
-    expect(
-      workspacePaneTabTargetForBranch(repo.id, 'main', {
-        workspacePaneRoute: currentWorkspacePaneRoute,
-      })?.activeTab?.identity,
-    ).toBe('terminal:term-222222222222222222222')
-    seedInitialObservedWorkspacePaneRouteForTest({
-      workspaceId: repo.id,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      branchName: 'main',
-      worktreePath: '/tmp/repo-worktree',
-      route: { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
-    })
-
-    await flushTestUpdates(() => {
-      for (const listener of intentListeners) listener({ type: 'workspace-pane-close-tab-requested' })
-    })
-
-    await waitFor(() => {
-      expect(closeTerminalByDescriptor).toHaveBeenCalledWith(
-        'term-222222222222222222222',
-        terminalSessionBaseForTest({
-          repoRoot: repo.id,
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          branch: 'main',
-          worktreePath: '/tmp/repo-worktree',
+      expect(commitFilesystemWorkspacePaneRouteSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          routeTarget: { kind: 'git-worktree', workspaceId: repo.id, worktreePath: '/tmp/repo-worktree' },
         }),
+        { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
       )
-    })
-    await waitFor(() => {
-      expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'main', 'status')
     })
     expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
   })
@@ -981,14 +953,7 @@ const HookHost = defineComponent({
       authenticatedBootstrapState,
       navigation: () => navigation,
       currentWorkspaceId: () => currentWorkspaceId,
-      currentWorkspacePaneCommandTarget: () =>
-        currentBranchName
-          ? {
-              routeTarget: { kind: 'git-branch', workspaceId: currentWorkspaceId!, branchName: currentBranchName },
-              workspacePaneRoute: currentWorkspacePaneRoute,
-              filesystemTarget: currentFilesystemTarget?.kind === 'git-worktree' ? currentFilesystemTarget : null,
-            }
-          : null,
+      currentWorkspacePaneCommandTarget,
       closeAllOverlays,
       openWorkspacePathDialog: openWorkspacePathDialogSpy,
       openCloneRepo: openCloneRepoSpy,
@@ -1000,6 +965,26 @@ const HookHost = defineComponent({
     return () => null
   },
 })
+
+function currentWorkspacePaneCommandTarget(): WorkspacePaneCommandTarget | null {
+  if (!currentBranchName || !currentWorkspaceId) return null
+  if (currentFilesystemTarget?.kind === 'git-worktree') {
+    return {
+      routeTarget: {
+        kind: 'git-worktree',
+        workspaceId: currentWorkspaceId,
+        worktreePath: workspacePaneFilesystemRootPath(currentFilesystemTarget),
+      },
+      workspacePaneRoute: currentWorkspacePaneRoute,
+      filesystemTarget: currentFilesystemTarget,
+    }
+  }
+  return {
+    routeTarget: { kind: 'git-branch', workspaceId: currentWorkspaceId, branchName: currentBranchName },
+    workspacePaneRoute: currentWorkspacePaneRoute,
+    filesystemTarget: null,
+  }
+}
 
 function terminalFilesystemTargetSnapshot(
   terminalFilesystemTargetKey: string,
@@ -1032,7 +1017,7 @@ function terminalFilesystemTargetSnapshot(
               workspacesStore.getState().workspaces['goblin+file:///tmp/repo']?.workspaceRuntimeId ?? '',
             root: canonicalWorkspaceLocator('goblin+file:///tmp/repo-worktree')!,
           },
-          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+          presentation: { kind: 'git-worktree' as const },
         }
       : null,
     sessions,

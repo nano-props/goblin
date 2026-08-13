@@ -398,7 +398,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
         })
         return {
           terminalSessionId: 'term-111111111111111111111',
-          presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: branchName } },
+          presentation: { kind: 'git-worktree' as const },
           requestRole: 'leader' as const,
           resourceDisposition: 'created' as const,
           runtimeProjectionApplied: true,
@@ -461,11 +461,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/filetree-open',
-      'term-111111111111111111111',
-    )
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(createTerminalWithAdmission).toHaveBeenCalledWith(
       {
@@ -475,7 +471,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
           workspaceRuntimeId: repo.workspaceRuntimeId,
           root: 'goblin+file:///tmp/filetree-open-worktree',
         },
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: branchName } },
+        presentation: { kind: 'git-worktree' as const },
       },
       {
         resolveStartupShellCommand: expect.any(Function),

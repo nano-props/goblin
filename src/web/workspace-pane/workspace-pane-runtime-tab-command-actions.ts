@@ -3,7 +3,6 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   terminalExecutionCoordinates,
   terminalExecutionPath,
-  terminalPresentationBranch,
   type TerminalPresentation,
   type TerminalSessionBase,
 } from '#/shared/terminal-types.ts'
@@ -245,10 +244,10 @@ function showCreatedTerminalRuntimeTab(
   routeRequest: CreatedTerminalRouteRequest,
 ): boolean | Promise<boolean> {
   if (type !== 'terminal') return false
-  if (routeTarget.kind === 'git-worktree') {
-    if (!workspaceRuntimeId || presentation.kind !== 'git-worktree') return false
+  if (presentation.kind === 'git-worktree') {
+    if (!workspaceRuntimeId) return false
     return navigation.commitFilesystemWorkspacePaneRoute(
-      gitWorktreePaneTargetLease(workspaceId, workspaceRuntimeId, worktreePath, presentation.head),
+      gitWorktreePaneTargetLease(workspaceId, workspaceRuntimeId, worktreePath),
       { kind: 'terminal', terminalSessionId: sessionId },
       routeRequest,
     )
@@ -268,20 +267,7 @@ function showCreatedTerminalRuntimeTab(
       routeRequest,
     )
   }
-  if (presentation.kind !== 'git-worktree') return false
-  const canonicalBranch = terminalPresentationBranch(presentation)
-  if (!canonicalBranch) return false
-  const target = workspacePaneTabTargetForCreatedRuntime(workspaceId, canonicalBranch, worktreePath, {
-    workspacePaneRoute,
-  })
-  if (!target) return false
-  return commitWorkspacePaneCommittedRuntimeTargetRoute(
-    target,
-    { kind: 'terminal', terminalSessionId: sessionId },
-    navigation,
-    undefined,
-    routeRequest.navigationGeneration,
-  )
+  return false
 }
 
 async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandContext): Promise<boolean> {
@@ -357,7 +343,7 @@ function terminalCoordinatorTarget(base: TerminalSessionBase): WorkspacePaneActi
   return workspacePaneActionTargetFromCoordinates({
     workspaceId: coordinates.workspaceId,
     workspaceRuntimeId: coordinates.workspaceRuntimeId,
-    branchName: workspaceRoot ? null : terminalPresentationBranch(base.presentation),
+    branchName: null,
     worktreePath: workspaceRoot ? null : terminalExecutionPath(base.target),
   })
 }

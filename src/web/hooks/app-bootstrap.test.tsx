@@ -677,6 +677,7 @@ function restoredRuntimeForWorkspace(
         },
         repoSnapshot: {
           current: 'main',
+          worktrees: [],
           branches: [
             {
               name: 'main',

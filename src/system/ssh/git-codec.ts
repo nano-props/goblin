@@ -8,15 +8,38 @@ import {
   REMOTE_SNAPSHOT_DEFAULT_MARKER,
   type RemoteCommandResult,
 } from '#/system/ssh/commands.ts'
-import type { BranchSnapshotInfo, ExecResult, RepoRemoteInfo, WorktreeInfo } from '#/shared/git-types.ts'
+import type {
+  BranchSnapshotInfo,
+  ExecResult,
+  GitOperation,
+  RepoRemoteInfo,
+  RepoWorktreeSnapshot,
+  WorktreeInfo,
+} from '#/shared/git-types.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import { compactWorktreeBootstrapPaths, type WorktreeBootstrapSummary } from '#/shared/worktree-bootstrap-summary.ts'
 import { decodeRemoteWorktreeBootstrapRecords } from '#/system/ssh/worktree-bootstrap-protocol.ts'
 
-export interface RemoteRepoSnapshot {
+export interface RemoteRepoBaseSnapshot {
   branches: BranchSnapshotInfo[]
   current: string
   remote: RepoRemoteInfo
+}
+
+export interface RemoteRepoSnapshot extends RemoteRepoBaseSnapshot {
+  worktrees: RepoWorktreeSnapshot[]
+}
+
+export function decodeRemoteGitOperation(output: string): GitOperation | null {
+  const [kind, rawBranchName, ...extra] = output.trimEnd().split('\n')
+  if (extra.length > 0) throw new Error('error.failed-read-repo')
+  if (kind === 'none') return null
+  if (kind === 'cherry-pick' || kind === 'revert' || kind === 'bisect' || kind === 'merge') return { kind }
+  if (kind !== 'rebase') throw new Error('error.failed-read-repo')
+  if (!rawBranchName) return { kind: 'rebase', branchName: null }
+  const branchName = rawBranchName.startsWith('refs/heads/') ? rawBranchName.slice('refs/heads/'.length) : ''
+  if (!isSafeBranchName(branchName)) throw new Error('error.failed-read-repo')
+  return { kind: 'rebase', branchName }
 }
 
 interface SnapshotSections {
@@ -25,7 +48,7 @@ interface SnapshotSections {
   branches: string[]
 }
 
-export function parseRemoteSnapshot(output: string, worktrees: WorktreeInfo[] = []): RemoteRepoSnapshot | null {
+export function parseRemoteSnapshot(output: string, worktrees: WorktreeInfo[] = []): RemoteRepoBaseSnapshot | null {
   const sections = splitSnapshotSections(output)
   if (!sections) return null
   const current = singleOptionalBranchName(sections.current)

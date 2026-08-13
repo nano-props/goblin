@@ -77,7 +77,7 @@ describe('WorkspaceDashboardTerminals', () => {
             workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
             root: workspaceIdForTest('goblin+file:///workspace/feature'),
           },
-          presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/dashboard' } },
+          presentation: { kind: 'git-worktree' },
         },
         true,
       ),
@@ -133,13 +133,21 @@ describe('WorkspaceDashboardTerminals', () => {
     )
 
     await userEvent.click(screen.getByText('Build server'))
-    expect(commitWorkspacePaneRoute).toHaveBeenLastCalledWith(
-      WORKSPACE_ID,
-      'feature/dashboard',
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenLastCalledWith(
+      {
+        routeTarget: {
+          kind: 'git-worktree',
+          workspaceId: WORKSPACE_ID,
+          worktreePath: '/workspace/feature',
+        },
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        authority: { kind: 'worktree' },
+      },
       { kind: 'terminal', terminalSessionId: 'term-git-session' },
-      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+      { navigationGeneration: expect.any(Number) },
     )
-    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledOnce()
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledTimes(2)
+    expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(workspacePaneTabOpener(gitPaneTarget, WORKSPACE_RUNTIME_ID, 'terminal:term-git-session')).toBeNull()
   })
 
@@ -152,7 +160,7 @@ describe('WorkspaceDashboardTerminals', () => {
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
           root: workspaceIdForTest('goblin+file:///workspace/detached'),
         },
-        presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+        presentation: { kind: 'git-worktree' },
       }),
     ]
     seedRepoWithReadModelForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
@@ -171,7 +179,7 @@ describe('WorkspaceDashboardTerminals', () => {
           worktreePath: '/workspace/detached',
         },
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        authority: { kind: 'detached-worktree' },
+        authority: { kind: 'worktree' },
       },
       { kind: 'terminal', terminalSessionId: 'term-detached-session' },
       { navigationGeneration: expect.any(Number) },
@@ -179,7 +187,7 @@ describe('WorkspaceDashboardTerminals', () => {
     expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
-  test('fails visibly when a branch terminal target is not available yet', async () => {
+  test('opens a worktree terminal even when the branch projection is unavailable', async () => {
     const sessions = [
       terminalSummary('term-branch-session', 'Branch shell', {
         target: {
@@ -188,23 +196,32 @@ describe('WorkspaceDashboardTerminals', () => {
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
           root: workspaceIdForTest('goblin+file:///workspace/feature'),
         },
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/dashboard' } },
+        presentation: { kind: 'git-worktree' },
       }),
     ]
     seedRepoShellForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const commitWorkspacePaneRoute = vi.fn<AppNavigationActions['commitWorkspacePaneRoute']>()
 
-    renderDashboardTerminals(
-      sessions,
-      vi.fn(async () => true),
-      vi.fn(),
-      commitWorkspacePaneRoute,
-    )
+    renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute, vi.fn(), commitWorkspacePaneRoute)
     await userEvent.click(screen.getByText('Branch shell'))
 
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      {
+        routeTarget: {
+          kind: 'git-worktree',
+          workspaceId: WORKSPACE_ID,
+          worktreePath: '/workspace/feature',
+        },
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        authority: { kind: 'worktree' },
+      },
+      { kind: 'terminal', terminalSessionId: 'term-branch-session' },
+      { navigationGeneration: expect.any(Number) },
+    )
     expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
-    expect(toastMocks.error).toHaveBeenCalledWith('dashboard.terminals.open-failed')
+    expect(toastMocks.error).not.toHaveBeenCalled()
   })
 
   test('stays silent when a later navigation supersedes the branch destination', async () => {
@@ -216,7 +233,7 @@ describe('WorkspaceDashboardTerminals', () => {
           workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
           root: workspaceIdForTest('goblin+file:///workspace/feature'),
         },
-        presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: 'feature/dashboard' } },
+        presentation: { kind: 'git-worktree' },
       }),
     ]
     seedRepoWithReadModelForTest({
@@ -230,17 +247,14 @@ describe('WorkspaceDashboardTerminals', () => {
       currentBranchName: 'feature/dashboard',
     })
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
-    const commitWorkspacePaneRoute = vi.fn<AppNavigationActions['commitWorkspacePaneRoute']>(async () => true)
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
+    const commitWorkspacePaneRoute = vi.fn<AppNavigationActions['commitWorkspacePaneRoute']>()
 
-    renderDashboardTerminals(
-      sessions,
-      vi.fn(async () => true),
-      vi.fn(),
-      commitWorkspacePaneRoute,
-    )
+    renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute, vi.fn(), commitWorkspacePaneRoute)
     await userEvent.click(screen.getByText('Branch shell'))
 
-    expect(commitWorkspacePaneRoute).toHaveBeenCalledOnce()
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledOnce()
+    expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(toastMocks.error).not.toHaveBeenCalled()
   })
 

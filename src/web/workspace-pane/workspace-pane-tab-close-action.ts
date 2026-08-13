@@ -189,6 +189,12 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
 async function confirmCloseTerminalWorkspacePaneTabAction(
   options: ConfirmCloseTerminalWorkspacePaneTabActionOptions,
 ): Promise<boolean> {
+  const routeChanged =
+    options.workspacePaneRoute !== undefined &&
+    options.currentWorkspacePaneRoute !== undefined &&
+    !sameWorkspacePaneRoute(options.workspacePaneRoute, options.currentWorkspacePaneRoute)
+  const presentationEffects = routeChanged ? undefined : options.presentationEffects
+  if (routeChanged) options.presentationEffects?.onAbandon()
   const { workspaceId, navigation, targetIdentity, confirmedTerminal } = options
   const confirmed: ConfirmedWorkspacePaneRuntimeTabClose = {
     type: 'terminal',
@@ -198,7 +204,7 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
   const confirmedIdentity = targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed)
   const closeTarget = workspaceId ? resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute) : null
   if (closeTarget && workspacePaneTabTargetBlocksInteraction(closeTarget)) {
-    options.presentationEffects?.onAbandon()
+    presentationEffects?.onAbandon()
     return false
   }
   const transition = closeTarget
@@ -219,8 +225,19 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
     closingIdentity: confirmedIdentity,
     transition,
     navigation,
-    presentationEffects: options.presentationEffects,
+    presentationEffects,
   })
+}
+
+function sameWorkspacePaneRoute(
+  left: ParsedWorkspacePaneRoute | null | undefined,
+  right: ParsedWorkspacePaneRoute | null | undefined,
+): boolean {
+  if (left === undefined || right === undefined) return left === right
+  if (left === null || right === null || left.kind !== right.kind) return left === right
+  if (left.kind === 'static') return right.kind === 'static' && left.tab === right.tab
+  if (left.kind === 'terminal') return right.kind === 'terminal' && left.terminalSessionId === right.terminalSessionId
+  return right.kind === 'invalid-static' && left.tabKey === right.tabKey
 }
 
 function beginCloseWorkspacePaneTabAction(
@@ -340,15 +357,16 @@ async function completeWorkspacePaneTabClose(input: {
       input.presentationEffects?.onAbandon()
       return true
     }
-    const presentation =
-      input.target && input.transition
+    const presentation = input.target
+      ? input.transition
         ? await presentCommittedWorkspacePaneTabClose({
             target: input.target,
             closingIdentity: input.closingIdentity,
             transition: input.transition,
             navigation: input.navigation,
           })
-        : { kind: 'settled' as const }
+        : { kind: 'superseded' as const }
+      : { kind: 'settled' as const }
     if (presentation.kind === 'settled') input.presentationEffects?.onCommit()
     else input.presentationEffects?.onAbandon()
     return true

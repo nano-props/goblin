@@ -230,6 +230,7 @@ describe('settings routes', () => {
         repoSnapshot: {
           current: 'main',
           branches: [],
+          worktrees: [],
           remote: {
             remotes: [],
             hasRemotes: false,

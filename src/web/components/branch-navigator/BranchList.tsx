@@ -18,6 +18,8 @@ import type { PropType, VNodeChild } from 'vue'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
 import type { BranchListRepo } from '#/web/components/branch-navigator/use-branch-list-data.ts'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
+import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
+import { WorktreeStateRow } from '#/web/components/branch-navigator/WorktreeStateRow.tsx'
 import { BRANCH_ROW_LIST_CLASS } from '#/web/components/branch-navigator/branch-row-metrics.ts'
 
 interface Props {
@@ -25,10 +27,14 @@ interface Props {
    *  through to the empty-state slot in that case. */
   repo: BranchListRepo | null
   branches: BranchSnapshotInfo[]
+  worktreeStateRows?: RepoWorktreeSnapshot[]
   /** Name of the branch to mark as selected/highlighted in the list. */
   highlightedBranch: string | null
+  highlightedWorktreePath?: string | null
   onSelectBranch: (branch: string) => void
   onOpenBranchStatus: (branch: string) => void
+  onSelectWorktree?: (worktreePath: string) => void
+  onOpenWorktreeStatus?: (worktreePath: string) => void
   /** Rendered when `branches` is empty. */
   emptyState: VNodeChild
 }
@@ -38,9 +44,13 @@ export const BranchList = defineComponent<Props>({
   props: {
     repo: { type: Object as PropType<BranchListRepo | null>, default: null },
     branches: { type: Array as PropType<BranchSnapshotInfo[]>, required: true },
+    worktreeStateRows: { type: Array as PropType<RepoWorktreeSnapshot[]>, default: () => [] },
     highlightedBranch: { type: String, default: null },
+    highlightedWorktreePath: { type: String, default: null },
     onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
     onOpenBranchStatus: { type: Function as PropType<(branch: string) => void>, required: true },
+    onSelectWorktree: Function as PropType<(worktreePath: string) => void>,
+    onOpenWorktreeStatus: Function as PropType<(worktreePath: string) => void>,
     emptyState: { type: null, required: true },
   },
 
@@ -67,7 +77,9 @@ export const BranchList = defineComponent<Props>({
     )
 
     return () => {
-      if (props.branches.length === 0 || !props.repo) return <>{props.emptyState}</>
+      if ((props.branches.length === 0 && (props.worktreeStateRows?.length ?? 0) === 0) || !props.repo) {
+        return <>{props.emptyState}</>
+      }
 
       return (
         <ul class={BRANCH_ROW_LIST_CLASS}>
@@ -84,6 +96,17 @@ export const BranchList = defineComponent<Props>({
               onActionMenuOpenChange={(open) => {
                 actionMenuOpen.value = open ? branch.name : null
               }}
+            />
+          ))}
+          {(props.worktreeStateRows ?? []).map((worktree) => (
+            <WorktreeStateRow
+              key={worktree.path}
+              workspaceId={props.repo!.id}
+              worktree={worktree}
+              selected={props.highlightedWorktreePath === worktree.path}
+              selectedRef={selectedRef}
+              onSelect={() => props.onSelectWorktree?.(worktree.path)}
+              onOpenStatus={() => props.onOpenWorktreeStatus?.(worktree.path)}
             />
           ))}
         </ul>

@@ -45,6 +45,7 @@ const DIRECTORY_WORKSPACE_PROBE = {
 function snapshotForTest(current: string): RepoSnapshot {
   return {
     branches: [branchSnapshot(current)],
+    worktrees: [],
     current,
     remote: {
       remotes: [],

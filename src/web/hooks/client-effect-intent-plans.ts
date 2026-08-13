@@ -134,13 +134,9 @@ export function createTerminalBellIntentPlan(
     if (!repositoryFacts) return { kind: 'unavailable', reason: 'snapshot-unavailable' }
     const worktreePath = parseCanonicalWorkspaceLocator(event.session.target.root)?.path
     if (!worktreePath) return { kind: 'noop' }
-    const head = event.session.presentation.head
-    if (head.kind === 'branch') {
-      const branch = repositoryFacts.snapshot.branches.find((candidate) => candidate.name === head.branchName)
-      if (branch?.worktree?.path !== worktreePath) return { kind: 'noop' }
-      return { kind: 'show-terminal' }
-    }
-    return { kind: 'show-terminal' }
+    return repositoryFacts.snapshot.worktrees.some((worktree) => worktree.path === worktreePath)
+      ? { kind: 'show-terminal' }
+      : { kind: 'noop' }
   }
   return { kind: 'noop' }
 }

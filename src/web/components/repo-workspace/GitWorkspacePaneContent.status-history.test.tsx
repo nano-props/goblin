@@ -223,10 +223,6 @@ describe('GitWorkspacePaneContent status-history', () => {
 
   test('opens files from the status row as a new tab and returns to status when it closes', async () => {
     const worktreePath = '/tmp/status-links-worktree'
-    const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
-      workspacesStore.getState().setWorkspacePaneTab(repoId, branch, tab)
-      return true
-    })
     const showRepoBranchEmptyWorkspacePane = vi.fn(() => true)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -250,7 +246,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       ],
     })
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
-    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchEmptyWorkspacePane })
+    const navigation = navigationWith({ showRepoBranchEmptyWorkspacePane })
 
     const { container } = renderInJsdom(
       <TerminalSessionReadScope value={emptyTerminalReadContext}>
@@ -283,7 +279,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       await Promise.resolve()
     })
     await waitFor(() =>
-      expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'files'),
+      expect(preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/status-links')?.renderedTab).toBe('files'),
     )
     expect(
       workspacePaneTabOpener(
@@ -297,7 +293,6 @@ describe('GitWorkspacePaneContent status-history', () => {
       ),
     ).toBe('workspace-pane:status')
 
-    showRepoBranchWorkspacePaneTab.mockClear()
     observeWorkspacePaneRouteForTest({
       workspaceId: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
@@ -318,13 +313,12 @@ describe('GitWorkspacePaneContent status-history', () => {
         navigation,
       }),
     ).toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'status')
+    expect(preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/status-links')?.renderedTab).toBe('status')
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
   })
 
   test('opens changes from the status row', async () => {
     const worktreePath = '/tmp/status-links-worktree'
-    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
@@ -355,7 +349,7 @@ describe('GitWorkspacePaneContent status-history', () => {
             repo={gitWorkspacePaneProjection(repo)}
             detail={detail}
             workspacePaneId="workspace"
-            navigation={navigationWith({ showRepoBranchWorkspacePaneTab })}
+            navigation={navigationWith({})}
           />
         </BranchActionSurfaceProvider>
       </TerminalSessionReadScope>,
@@ -379,7 +373,7 @@ describe('GitWorkspacePaneContent status-history', () => {
       await Promise.resolve()
     })
     await waitFor(() =>
-      expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'changes'),
+      expect(preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/status-links')?.renderedTab).toBe('changes'),
     )
   })
 

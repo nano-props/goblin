@@ -94,7 +94,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     const closePromise = projection
       .closeTerminalByDescriptor(terminalSessionId, {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+        presentation: { kind: 'git-worktree' as const },
       })
       .then((result) => {
         settled = true
@@ -127,7 +127,7 @@ describe('TerminalSessionProjection reconciliation', () => {
 
     const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
       target: RUNTIME_TARGET,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      presentation: { kind: 'git-worktree' as const },
     })
     await Promise.resolve()
 
@@ -163,7 +163,7 @@ describe('TerminalSessionProjection reconciliation', () => {
 
     const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
       target: RUNTIME_TARGET,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      presentation: { kind: 'git-worktree' as const },
     })
     await Promise.resolve()
     const retirement = vi.fn()
@@ -232,7 +232,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
     const close = projection.closeTerminalByDescriptor(terminalSessionId, {
       target: RUNTIME_TARGET,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      presentation: { kind: 'git-worktree' as const },
     })
     await Promise.resolve()
 
@@ -267,7 +267,7 @@ describe('TerminalSessionProjection reconciliation', () => {
 
     const firstClose = projection.closeTerminalByDescriptor(terminalSessionId, {
       target: RUNTIME_TARGET,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      presentation: { kind: 'git-worktree' as const },
     })
     await Promise.resolve()
 
@@ -283,7 +283,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     )
     const secondClose = projection.closeTerminalByDescriptor(terminalSessionId, {
       target: { ...RUNTIME_TARGET, workspaceRuntimeId: replacementWorkspaceRuntimeId },
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      presentation: { kind: 'git-worktree' as const },
     })
     await Promise.resolve()
 
@@ -319,7 +319,7 @@ describe('TerminalSessionProjection reconciliation', () => {
 
     const closePromise = projection.closeTerminalByDescriptor(activeSessionId, {
       target: RUNTIME_TARGET,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      presentation: { kind: 'git-worktree' as const },
     })
     await Promise.resolve()
 
@@ -358,7 +358,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     await expect(
       projection.closeTerminalByDescriptor('term-111111111111111111111', {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+        presentation: { kind: 'git-worktree' as const },
       }),
     ).resolves.toEqual({ kind: 'committed', projection: 'applied' })
 
@@ -384,7 +384,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     await expect(
       projection.closeTerminalByDescriptor('term-111111111111111111111', {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+        presentation: { kind: 'git-worktree' as const },
       }),
     ).resolves.toEqual({ kind: 'committed', projection: 'superseded' })
 
@@ -408,7 +408,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     await expect(
       projection.closeTerminalByDescriptor('term-111111111111111111111', {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+        presentation: { kind: 'git-worktree' as const },
       }),
     ).resolves.toEqual({ kind: 'committed', projection: 'applied' })
   })
@@ -429,7 +429,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     await expect(
       projection.closeTerminalByDescriptor('term-111111111111111111111', {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+        presentation: { kind: 'git-worktree' as const },
       }),
     ).resolves.toEqual({ kind: 'committed', projection: 'superseded' })
   })
@@ -449,7 +449,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     await expect(
       projection.closeTerminalByDescriptor('term-111111111111111111111', {
         target: RUNTIME_TARGET,
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+        presentation: { kind: 'git-worktree' as const },
       }),
     ).resolves.toEqual({ kind: 'committed', projection: 'failed' })
 
@@ -470,11 +470,11 @@ describe('TerminalSessionProjection reconciliation', () => {
 
     const firstClose = projection.closeTerminalByDescriptor(terminalSessionId, {
       target: RUNTIME_TARGET,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      presentation: { kind: 'git-worktree' as const },
     })
     const secondClose = projection.closeTerminalByDescriptor(terminalSessionId, {
       target: RUNTIME_TARGET,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      presentation: { kind: 'git-worktree' as const },
     })
     await Promise.resolve()
 
@@ -502,7 +502,7 @@ describe('TerminalSessionProjection reconciliation', () => {
 
     const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
       target: RUNTIME_TARGET,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+      presentation: { kind: 'git-worktree' as const },
     })
     await Promise.resolve()
 
@@ -536,7 +536,7 @@ describe('TerminalSessionProjection reconciliation', () => {
     await expect(
       projection.closeTerminalByDescriptor(terminalSessionId, {
         target: { ...RUNTIME_TARGET, workspaceRuntimeId: 'repo-runtime-new' },
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH } },
+        presentation: { kind: 'git-worktree' as const },
       }),
     ).resolves.toEqual({ kind: 'not-committed' as const, message: 'error.workspace-runtime-stale' })
 

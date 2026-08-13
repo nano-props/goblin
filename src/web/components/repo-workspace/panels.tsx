@@ -57,20 +57,20 @@ export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput
     const runtimeState = input.runtimeTabStateByType[input.type]
     const branch = input.detail.branch
     if (!branch?.worktree?.path) return null
-    const branchName = branch.name
     const worktreePath = branch.worktree.path
     const tabsTarget = gitWorktreeWorkspacePaneTabsTarget(input.repo.id, worktreePath)
-    const runtimeTarget = tabsTarget ? runtimeWorkspacePaneTarget(tabsTarget, input.repo.workspaceRuntimeId) : null
-    if (!runtimeTarget || !worktreePath) return null
+    if (!tabsTarget) return null
+    const runtimeTarget = runtimeWorkspacePaneTarget(tabsTarget, input.repo.workspaceRuntimeId)
+    if (!runtimeTarget) return null
     return renderWorkspacePaneRuntimeTabPanel({
       type: input.type,
       workspacePaneId: input.workspacePaneId,
       panelLabel: input.panelLabel,
       selectedSessionId: selectedRuntimeSessionId(input.selection, input.type),
       target: {
-        routeTarget: { kind: 'git-branch', workspaceId: input.repo.id, branchName },
+        routeTarget: tabsTarget,
         runtimeTarget,
-        presentation: terminalGitWorktreePresentation(branchName),
+        presentation: terminalGitWorktreePresentation(),
       },
       runtimeState: {
         projectionPhase: runtimeState.projectionPhase,

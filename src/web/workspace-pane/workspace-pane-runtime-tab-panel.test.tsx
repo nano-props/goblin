@@ -90,7 +90,7 @@ describe('workspace pane runtime tab panel', () => {
           workspaceRuntimeId: 'repo-runtime-1',
           root: 'goblin+file:///repo-worktree',
         },
-        presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+        presentation: { kind: 'git-worktree' as const },
       },
       selectedTerminalSessionId: 'term-111111111111111111111',
       projectionPhase: 'failed',
@@ -112,7 +112,7 @@ describe('workspace pane runtime tab panel', () => {
         workspaceRuntimeId: 'repo-runtime-1',
         root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
       },
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'stale-branch' } },
+      presentation: { kind: 'git-worktree' as const },
     }
 
     await flushTestUpdates(async () => {
@@ -132,7 +132,7 @@ describe('workspace pane runtime tab panel', () => {
         {
           commitCreatedTerminalTab: (admission: {
             terminalSessionId: string
-            presentation: { kind: 'git-worktree'; head: { kind: 'branch'; branchName: string } }
+            presentation: { kind: 'git-worktree' }
             requestRole: 'leader'
             resourceDisposition: 'created'
             runtimeProjectionApplied: boolean
@@ -142,17 +142,24 @@ describe('workspace pane runtime tab panel', () => {
     >
     await commandCalls[0]?.[0].commitCreatedTerminalTab({
       terminalSessionId: 'term-111111111111111111111',
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+      presentation: { kind: 'git-worktree' as const },
       requestRole: 'leader',
       resourceDisposition: 'created',
       runtimeProjectionApplied: true,
     })
-    expect(navigation.commitWorkspacePaneRoute).toHaveBeenCalledWith(
-      'goblin+file:///repo',
-      'main',
+    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routeTarget: {
+          kind: 'git-worktree',
+          workspaceId: 'goblin+file:///repo',
+          worktreePath: '/repo-worktree',
+        },
+        authority: { kind: 'worktree' },
+      }),
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.any(Object),
     )
+    expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 })
 
@@ -177,7 +184,7 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
               workspaceRuntimeId: 'repo-runtime-1',
               root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
             },
-            presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+            presentation: { kind: 'git-worktree' as const },
           },
           selectedSessionId: 'term-111111111111111111111',
           runtimeState: {

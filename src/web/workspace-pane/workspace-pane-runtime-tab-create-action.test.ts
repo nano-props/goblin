@@ -38,7 +38,7 @@ const BASE: TerminalSessionBase = {
     workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
     root: canonicalWorkspaceLocator('goblin+file:///tmp/workspace-pane-runtime-create-worktree')!,
   },
-  presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } },
+  presentation: { kind: 'git-worktree' as const },
 }
 const PANE_TARGET = workspacePaneTabsTargetFromRuntime(BASE.target)!
 const BRANCH_ROUTE_TARGET = {
@@ -86,7 +86,7 @@ describe('workspace pane runtime tab create action', () => {
     const routeRequest = createdTerminalRouteRequest(WORKTREE_ROUTE_TARGET)
     const detachedBase: TerminalSessionBase = {
       ...BASE,
-      presentation: { kind: 'git-worktree', head: { kind: 'detached' } },
+      presentation: { kind: 'git-worktree' },
     }
 
     await expect(
@@ -109,7 +109,7 @@ describe('workspace pane runtime tab create action', () => {
       {
         routeTarget: WORKTREE_ROUTE_TARGET,
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        authority: { kind: 'detached-worktree' },
+        authority: { kind: 'worktree' },
       },
       { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       routeRequest,
@@ -207,7 +207,6 @@ describe('workspace pane runtime tab create action', () => {
       TERMINAL_SESSION_ID,
       {
         kind: 'git-worktree' as const,
-        head: { kind: 'branch', branchName: BRANCH_NAME },
       },
       expect.objectContaining({
         navigationGeneration: expect.any(Number),
@@ -423,7 +422,6 @@ describe('workspace pane runtime tab create action', () => {
 
     expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID, {
       kind: 'git-worktree' as const,
-      head: { kind: 'branch', branchName: BRANCH_NAME },
     })
   })
 
@@ -553,7 +551,7 @@ function committedCreateCommandResult(): TerminalCreateCommandResult {
 function createAdmission(): TerminalCreateLeaderAdmissionResult {
   return {
     terminalSessionId: TERMINAL_SESSION_ID,
-    presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: BRANCH_NAME } },
+    presentation: { kind: 'git-worktree' as const },
     requestRole: 'leader',
     resourceDisposition: 'created',
     runtimeProjectionApplied: true,

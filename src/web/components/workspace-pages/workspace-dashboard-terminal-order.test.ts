@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
+import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceTerminalSessionSummary } from '#/web/components/terminal/types.ts'
@@ -51,7 +51,7 @@ describe('workspace dashboard terminal order', () => {
       orderWorkspaceDashboardTerminals({
         workspaceId: WORKSPACE_ID,
         sessions,
-        branches: [branch('branch/first', FIRST_WORKTREE_PATH), branch('branch/second', SECOND_WORKTREE_PATH)],
+        worktrees: [worktree('branch/first', FIRST_WORKTREE_PATH), worktree('branch/second', SECOND_WORKTREE_PATH)],
         paneTabs,
       }).map(({ terminalSessionId }) => terminalSessionId),
     ).toEqual(['root-a', 'root-b', 'first-a', 'first-b', 'second-a'])
@@ -68,25 +68,21 @@ describe('workspace dashboard terminal order', () => {
       orderWorkspaceDashboardTerminals({
         workspaceId: WORKSPACE_ID,
         sessions,
-        branches: [],
+        worktrees: [],
         paneTabs: undefined,
       }).map(({ terminalSessionId }) => terminalSessionId),
     ).toEqual(['detached-a', 'detached-b', 'unknown'])
   })
 })
 
-function branch(name: string, worktreePath: string): BranchSnapshotInfo {
+function worktree(name: string, worktreePath: string): RepoWorktreeSnapshot {
   return {
-    name,
-    isCurrent: false,
-    ahead: 0,
-    behind: 0,
-    lastCommitHash: '0123456789abcdef',
-    lastCommitShortHash: '0123456',
-    lastCommitMessage: 'Test commit',
-    lastCommitDate: '2026-01-01T00:00:00.000Z',
-    lastCommitAuthor: 'Test User',
-    worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+    path: worktreePath,
+    head: { kind: 'branch', branchName: name },
+    headOid: '0123456789abcdef',
+    operation: null,
+    isPrimary: false,
+    isLocked: false,
   }
 }
 
@@ -104,10 +100,7 @@ function session(
 ): WorkspaceTerminalSessionSummary {
   return summary(terminalSessionId, {
     target: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, workspaceRuntimeId: RUNTIME_ID, root },
-    presentation: {
-      kind: 'git-worktree',
-      head: branchName ? { kind: 'branch', branchName } : { kind: 'detached' },
-    },
+    presentation: { kind: 'git-worktree' },
   })
 }
 

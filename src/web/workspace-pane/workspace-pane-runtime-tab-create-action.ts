@@ -1,7 +1,6 @@
 import {
   terminalExecutionCoordinates,
   terminalExecutionPath,
-  terminalPresentationBranch,
   terminalSessionBase,
   type TerminalPresentation,
   type TerminalSessionBase,
@@ -189,36 +188,18 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
       routeRequest,
     )
   }
-  if (routeTarget.kind === 'git-worktree') {
-    if (base.presentation.kind !== 'git-worktree') return false
+  if (base.presentation.kind === 'git-worktree') {
     return navigation.commitFilesystemWorkspacePaneRoute(
       gitWorktreePaneTargetLease(
         coordinates.workspaceId,
         coordinates.workspaceRuntimeId,
         terminalExecutionPath(base.target),
-        base.presentation.head,
       ),
       { kind: 'terminal', terminalSessionId },
       routeRequest,
     )
   }
-  if (routeTarget.kind !== 'git-branch') return false
-  const branchName = terminalPresentationBranch(base.presentation)
-  if (!branchName) return false
-  return commitWorkspacePaneCurrentTargetRoute(
-    {
-      workspaceId: coordinates.workspaceId,
-      workspaceRuntimeId: coordinates.workspaceRuntimeId,
-      routeTarget: { ...routeTarget, branchName },
-      branchName,
-      worktreePath: terminalExecutionPath(base.target),
-      paneTarget,
-    },
-    { kind: 'terminal', terminalSessionId },
-    navigation,
-    undefined,
-    routeRequest.navigationGeneration,
-  )
+  return false
 }
 
 export async function commitCreatedTerminalWorkspacePaneRuntimeTab(

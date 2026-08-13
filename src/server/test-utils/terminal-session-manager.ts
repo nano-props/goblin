@@ -196,7 +196,7 @@ export function ensureSession(
   })
   if (!prepared.ok) return Promise.resolve(prepared)
   const committed = prepared.admission.commit({
-    presentation: { kind: 'git-worktree', head: { kind: 'branch', branchName: BRANCH_NAME } },
+    presentation: { kind: 'git-worktree' },
   })
   prepared.admission.publishCommittedEffects()
   return manager.attachSession(

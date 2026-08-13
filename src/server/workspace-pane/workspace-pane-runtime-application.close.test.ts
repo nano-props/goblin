@@ -175,7 +175,7 @@ describe('close reconciliation', () => {
     const session = {
       ...terminalSession('term-targettargettarget001', 'pty_target_aaaaaaaaaaaa'),
       target: primaryWorktreeTarget,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+      presentation: { kind: 'git-worktree' as const },
       worktreePath: '/repo',
     }
     const close = vi.fn(() => ({ kind: 'closed' as const }))
@@ -218,7 +218,7 @@ describe('close reconciliation', () => {
     const session = {
       ...terminalSession('term-targettargettarget002', 'pty_target_bbbbbbbbbbbb'),
       target: sessionTarget,
-      presentation: { kind: 'git-worktree' as const, head: { kind: 'branch' as const, branchName: 'main' } },
+      presentation: { kind: 'git-worktree' as const },
     }
     const close = vi.fn(() => ({ kind: 'closed' as const }))
     const application = createWorkspacePaneRuntimeApplication({

@@ -22,6 +22,7 @@ import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-que
 import { TerminalSessionReadScope } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 
 const mocks = vi.hoisted(() => ({
   dispatchShowWorkspacePaneStaticTabAction: vi.fn(),
@@ -114,6 +115,28 @@ describe('BranchView', () => {
 
     expect(screen.getByText('feature/worktree')).toBeTruthy()
     expect(screen.queryByText('feature/plain')).toBeNull()
+  })
+
+  test('replaces an attached branch row with its in-progress worktree state', () => {
+    const branch = createRepoBranch('feature/merge', {
+      worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
+    })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [branch],
+      currentBranchName: 'feature/merge',
+    })
+    const snapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
+    if (!snapshot) throw new Error('expected seeded snapshot')
+    setRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId, {
+      ...snapshot,
+      worktrees: snapshot.worktrees.map((worktree) => ({ ...worktree, operation: { kind: 'merge' as const } })),
+    })
+
+    renderBranchView()
+
+    expect(screen.getByText('worktree-state.merge')).toBeTruthy()
+    expect(screen.queryByText('feature/merge')).toBeNull()
   })
 
   test('opens a non-current branch status through destination navigation', async () => {

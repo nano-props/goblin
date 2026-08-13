@@ -37,6 +37,7 @@ interface WorkspaceLayoutSidebarProps {
   dashboardSelected?: boolean
   newWorktreeSelected?: boolean
   currentBranchName?: string | null
+  currentWorktreePath?: string | null
   workspaceRootSelected?: boolean
   onSelectWorkspaceRoot?: () => void
 }
@@ -56,6 +57,7 @@ export const WorkspaceLayoutSidebar = defineComponent<WorkspaceLayoutSidebarProp
     'dashboardSelected',
     'newWorktreeSelected',
     'currentBranchName',
+    'currentWorktreePath',
     'workspaceRootSelected',
     'onSelectWorkspaceRoot',
   ],
@@ -103,6 +105,7 @@ export const WorkspaceLayoutSidebar = defineComponent<WorkspaceLayoutSidebarProp
                       repoId={props.workspaceId}
                       onSelectBranch={props.onSelectBranch}
                       currentBranchName={props.currentBranchName}
+                      currentWorktreePath={props.currentWorktreePath}
                     />
                   ) : (
                     <WorkspaceRootNavigator

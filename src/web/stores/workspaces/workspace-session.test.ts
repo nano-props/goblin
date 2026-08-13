@@ -376,6 +376,7 @@ describe('repo lifecycle', () => {
         new Promise<{
           snapshot: {
             branches: BranchSnapshotInfo[]
+            worktrees: []
             current: string
             remote: {
               remotes: []
@@ -390,6 +391,7 @@ describe('repo lifecycle', () => {
             resolve({
               snapshot: {
                 ...value,
+                worktrees: [],
                 remote: {
                   remotes: [],
                   hasRemotes: false,
