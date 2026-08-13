@@ -1,7 +1,7 @@
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoMutationExecResult } from '#/shared/git-types.ts'
-import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/workspaces/branch-action-types.ts'
+import type { NonCreateRepoBranchAction, RunBranchActionOptions } from '#/web/stores/workspaces/branch-action-types.ts'
 import { isSilentBranchActionCancellation } from '#/web/stores/workspaces/branch-action-result.ts'
 
 export function isPushProtected(branch: string): boolean {
@@ -23,10 +23,10 @@ export function removeWorktreeNeedsForceConfirm(
 export async function dispatchRepoBranchAction(
   repoId: WorkspaceId,
   workspaceRuntimeId: string,
-  action: RepoBranchAction,
+  action: NonCreateRepoBranchAction,
   runBranchAction: (
     id: WorkspaceId,
-    action: RepoBranchAction,
+    action: NonCreateRepoBranchAction,
     options?: RunBranchActionOptions,
   ) => Promise<RepoMutationExecResult | null>,
   options?: {

@@ -1,7 +1,6 @@
 import { GitBranchPlus } from '@lucide/vue'
 import { computed, defineComponent, ref, watch } from 'vue'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
-import type { RepoMutationExecResult } from '#/shared/git-types.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -186,7 +185,7 @@ const GitCreateWorktreePagePane = defineComponent<GitCreateWorktreePagePaneProps
       () => snapshotReadModel.data.value?.snapshot !== undefined && bootstrapDecisionReady.value,
     )
     const showLoadingSkeleton = useLoadingVisibility(() => !pageReady.value)
-    const { runBranchAction } = workspacesStore.getState()
+    const { runCreateWorktreeAction } = workspacesStore.getState()
 
     function currentWorktreeBootstrapDecision(): WorktreeBootstrapDecision {
       return resolveWorktreeBootstrapDecision({
@@ -216,7 +215,7 @@ const GitCreateWorktreePagePane = defineComponent<GitCreateWorktreePagePaneProps
       if (branchAction.phase !== 'idle') return false
       const navigationGeneration = beginAppNavigation()
       const worktreeBootstrap = currentWorktreeBootstrapDecision()
-      const result = await runBranchAction(
+      const result = await runCreateWorktreeAction(
         repoId,
         {
           kind: 'createWorktree',
@@ -225,7 +224,7 @@ const GitCreateWorktreePagePane = defineComponent<GitCreateWorktreePagePaneProps
         },
         { workspaceRuntimeId },
       )
-      if (result?.ok) onCreated(createdWorktreePath(result), navigationGeneration)
+      if (result?.ok) onCreated(result.worktreePath, navigationGeneration)
       return false
     }
 
@@ -362,13 +361,6 @@ const CreateWorktreePageShell = defineComponent<CreateWorktreePageShellProps>({
     )
   },
 })
-
-function createdWorktreePath(result: RepoMutationExecResult): string {
-  if (!('worktreePath' in result) || typeof result.worktreePath !== 'string') {
-    throw new Error('Successful worktree creation is missing its target')
-  }
-  return result.worktreePath
-}
 
 function isBootstrapLoadForRepo(load: BootstrapLoad | null, repoId: WorkspaceId, workspaceRuntimeId: string): boolean {
   return load?.repoId === repoId && load.workspaceRuntimeId === workspaceRuntimeId

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
+  runCreateWorktreeMutationRuntimeRequest,
   runGitWorkspaceMutationRuntimeRequest,
   runGitWorkspaceRuntimeRequest,
 } from '#/server/modules/workspace-runtime-request.ts'
@@ -162,6 +163,38 @@ describe('workspace runtime request', () => {
     })
     expect(settleRemoteWorkspaceRuntimeFailureMock).toHaveBeenCalledWith('test-user', runtimeFailure)
     expect(stopBackgroundSyncRuntimeMock).not.toHaveBeenCalled()
+  })
+
+  test('preserves the canonical created worktree target through runtime failure settlement', async () => {
+    const workspaceId = workspaceIdForTest('goblin+ssh://example.test/repo')
+    const runtimeFailure = new RemoteWorkspaceRuntimeFailureError({
+      workspaceId,
+      workspaceRuntimeId: 'runtime-create-failure',
+      reason: 'unreachable',
+    })
+
+    await expect(
+      runCreateWorktreeMutationRuntimeRequest({
+        userId: 'test-user',
+        label: 'create-worktree',
+        run: async () => {
+          throw new RepoMutationRuntimeFailureError(
+            {
+              ok: true,
+              message: 'created',
+              createdWorktreePath: '/srv/repo-feature',
+              repoIdsToInvalidate: [workspaceId],
+            },
+            runtimeFailure,
+          )
+        },
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      message: 'created',
+      createdWorktreePath: '/srv/repo-feature',
+      repoIdsToInvalidate: [workspaceId],
+    })
   })
 
   test('preserves the mutation result when runtime lifecycle settlement fails', async () => {

@@ -44,6 +44,7 @@ import { CodedError } from '#/shared/coded-error.ts'
 import {
   requireCurrentWorkspaceRuntime,
   requireWorkspaceRuntimeEpochCapability,
+  runCreateWorktreeMutationRuntimeRequest,
   runGitWorkspaceMutationRuntimeRequest,
   runGitWorkspaceRuntimeRequest,
 } from '#/server/modules/workspace-runtime-request.ts'
@@ -58,7 +59,11 @@ import {
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { resolveRepoSource } from '#/server/modules/repo-source.ts'
-import { publicRepoMutationResult, type RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
+import {
+  publicRepoMutationResult,
+  type CreateWorktreeMutationResult,
+  type RepoMutationResult,
+} from '#/server/modules/repo-mutation-impact.ts'
 import { publishRepoMutationInvalidations } from '#/server/modules/repo-mutation-invalidation.ts'
 import type { RepoReadInvalidationDomain } from '#/shared/repo-read-invalidation.ts'
 
@@ -240,7 +245,7 @@ export function createRepoRoutes(options: {
     const runtimeCapability = requireWorkspaceRuntimeEpochCapability(userIdFromContext(c), cwd, workspaceRuntimeId)
     const { userId } = runtimeCapability
     assertGitCapability(userId, cwd, workspaceRuntimeId)
-    const result = await runRepoMutationRequest({
+    const result = await runCreateWorktreeMutationRequest({
       userId,
       workspaceId: cwd,
       invalidatedDomains: ['metadata', 'worktree-status'],
@@ -387,14 +392,16 @@ function requiredUserId(userId: string | null | undefined): string {
   return userId
 }
 
-interface RepoMutationRequest {
+interface RepoMutationRequest<Result extends RepoMutationResult = RepoMutationResult> {
   userId: string
   workspaceId: WorkspaceId
   invalidatedDomains: readonly RepoReadInvalidationDomain[]
-  run: () => Promise<RepoMutationResult>
+  run: () => Promise<Result>
   label: string
   signal?: AbortSignal
 }
+
+type CreateWorktreeMutationRequest = RepoMutationRequest<CreateWorktreeMutationResult>
 
 async function runRepoMutationRequest(input: RepoMutationRequest): Promise<RepoMutationResult> {
   const mutation = await runGitWorkspaceMutationRuntimeRequest(input)
@@ -408,10 +415,17 @@ async function runPublicRepoMutationRequest(input: RepoMutationRequest): Promise
   return publicRepoMutationResult(await runRepoMutationRequest(input))
 }
 
-function publicCreateWorktreeResult(result: RepoMutationResult): CreateWorktreeExecResult {
+async function runCreateWorktreeMutationRequest(
+  input: CreateWorktreeMutationRequest,
+): Promise<CreateWorktreeMutationResult> {
+  const mutation = await runCreateWorktreeMutationRuntimeRequest(input)
+  publishRepoMutationInvalidations(input.workspaceId, mutation, input.invalidatedDomains)
+  return mutation
+}
+
+function publicCreateWorktreeResult(result: CreateWorktreeMutationResult): CreateWorktreeExecResult {
   const publicResult = publicRepoMutationResult(result)
   if (!result.ok) return { ...publicResult, ok: false }
-  if (!result.createdWorktreePath) throw new Error('Successful worktree creation is missing its canonical target')
   return { ...publicResult, ok: true, worktreePath: result.createdWorktreePath }
 }
 

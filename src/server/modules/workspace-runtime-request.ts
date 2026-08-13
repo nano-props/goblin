@@ -14,7 +14,11 @@ import { isWorkspaceRuntimeAdmissionClosedError } from '#/server/modules/workspa
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 import { isRepoMembershipReadConflictError } from '#/server/modules/repo-membership-read-conflict.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
-import { appendRepoMutationRecoveryMessageKey, type RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
+import {
+  appendRepoMutationRecoveryMessageKey,
+  type CreateWorktreeMutationResult,
+  type RepoMutationResult,
+} from '#/server/modules/repo-mutation-impact.ts'
 import { stopBackgroundSyncRuntime } from '#/server/modules/background-sync.ts'
 import type { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 
@@ -72,6 +76,27 @@ export async function runGitWorkspaceMutationRuntimeRequest(input: {
   label: string
   signal?: AbortSignal
 }): Promise<RepoMutationResult> {
+  return await runGitWorkspaceMutationRuntimeRequestWith(input, (mutation) => mutation)
+}
+
+export async function runCreateWorktreeMutationRuntimeRequest(input: {
+  userId: string
+  run: () => Promise<CreateWorktreeMutationResult>
+  label: string
+  signal?: AbortSignal
+}): Promise<CreateWorktreeMutationResult> {
+  return await runGitWorkspaceMutationRuntimeRequestWith(input, createWorktreeRuntimeFailureResult)
+}
+
+async function runGitWorkspaceMutationRuntimeRequestWith<Result extends RepoMutationResult>(
+  input: {
+    userId: string
+    run: () => Promise<Result>
+    label: string
+    signal?: AbortSignal
+  },
+  runtimeFailureResult: (mutation: RepoMutationResult) => Result,
+): Promise<Result> {
   try {
     return await input.run()
   } catch (error) {
@@ -88,8 +113,16 @@ export async function runGitWorkspaceMutationRuntimeRequest(input: {
       mutation = mutationWithRuntimeSettlementRecovery(mutation)
     }
     workspaceRuntimeRequestLogger.warn({ err: error.runtimeFailure, label: input.label }, 'mutation runtime failed')
-    return mutation
+    return runtimeFailureResult(mutation)
   }
+}
+
+function createWorktreeRuntimeFailureResult(mutation: RepoMutationResult): CreateWorktreeMutationResult {
+  if (!mutation.ok) return { ...mutation, ok: false }
+  if (!mutation.createdWorktreePath) {
+    throw new Error('Successful worktree creation runtime result is missing its canonical target')
+  }
+  return { ...mutation, ok: true, createdWorktreePath: mutation.createdWorktreePath }
 }
 
 function mutationWithRuntimeSettlementRecovery(mutation: RepoMutationResult): RepoMutationResult {

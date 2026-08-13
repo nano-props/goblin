@@ -1,5 +1,6 @@
 import type { RepoSnapshot, RepoSnapshotResponse } from '#/shared/api-types.ts'
 import type { BranchSnapshotInfo, RepoRemoteInfo } from '#/shared/git-types.ts'
+import type { CreateWorktreeAction } from '#/web/stores/workspaces/branch-action-types.ts'
 import {
   createBranchSnapshot,
   resetWorkspacesStore,
@@ -18,7 +19,6 @@ export const ipcHandlers: Record<string, IpcTestHandler> = {}
 export const refreshStoreAccess = { get: workspacesStore.getState, set: workspacesStore.setState }
 
 type TestRepo = NonNullable<ReturnType<typeof workspacesStore.getState>['workspaces'][string]>
-type TestCreateWorktreeAction = Parameters<ReturnType<typeof workspacesStore.getState>['runBranchAction']>[1]
 
 export function updateRepoForTest(mutator: (repo: TestRepo) => void): void {
   workspacesStore.setState((state) => {
@@ -48,7 +48,7 @@ export function cachedRepoStatus(workspaceRuntimeId: string): WorktreeStatus[] |
   return getRepoWorktreeStatusQueryData(REPO_ID, workspaceRuntimeId, appQueryClient)?.status
 }
 
-export function createWorktreeAction(): TestCreateWorktreeAction {
+export function createWorktreeAction(): CreateWorktreeAction {
   return {
     kind: 'createWorktree',
     input: {

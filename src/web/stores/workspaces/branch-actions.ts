@@ -13,6 +13,8 @@ import {
 } from '#/web/stores/workspaces/workspace-guards.ts'
 import { repoOperation, repoLocalBranchActionScheduleGuard } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import type {
+  CreateWorktreeAction,
+  NonCreateRepoBranchAction,
   RepoBranchAction,
   RepoBranchActionKind,
   RunBranchActionOptions,
@@ -22,7 +24,7 @@ import {
   isNetworkBranchActionKind,
 } from '#/web/stores/workspaces/branch-action-scheduler.ts'
 import type { RepoEventAction, WorkspaceState, WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
-import type { RepoMutationExecResult } from '#/shared/git-types.ts'
+import type { CreateWorktreeExecResult, RepoMutationExecResult } from '#/shared/git-types.ts'
 import {
   createRepoWorktree,
   deleteRepoBranch,
@@ -159,7 +161,7 @@ function shouldSuppressBranchActionResultMessage(
 }
 
 function runBranchActionIpc(
-  action: RepoBranchAction,
+  action: NonCreateRepoBranchAction,
   repoId: WorkspaceId,
   workspaceRuntimeId: string,
   signal?: AbortSignal,
@@ -169,8 +171,6 @@ function runBranchActionIpc(
       return pullRepoBranch(repoId, workspaceRuntimeId, action.branch, action.worktreePath, signal)
     case 'push':
       return pushRepoBranch(repoId, workspaceRuntimeId, action.branch, signal)
-    case 'createWorktree':
-      return createRepoWorktree(repoId, workspaceRuntimeId, action.input, action.worktreeBootstrap, signal)
     case 'deleteBranch':
       return deleteRepoBranch(
         repoId,
@@ -198,83 +198,113 @@ function runBranchActionIpc(
 }
 
 export function createBranchActions(set: WorkspacesSet, get: WorkspacesGet) {
-  return {
-    async runBranchAction(
-      id: WorkspaceId,
-      action: RepoBranchAction,
-      options?: RunBranchActionOptions,
-    ): Promise<RepoMutationExecResult | null> {
-      const repoBefore = get().workspaces[id]
-      if (!repoBefore || !isGitWorkspace(repoBefore)) return null
-      const workspaceRuntimeId = options?.workspaceRuntimeId ?? repoBefore.workspaceRuntimeId
-      if (repoBefore.workspaceRuntimeId !== workspaceRuntimeId) return null
-      const network = isNetworkBranchAction(action)
-      const branchOperation = repoOperation(id, 'branchAction')
-      const operationalFailureReason = workspaceOperationalFailureReason(repoBefore)
-      if (operationalFailureReason) return { ok: false, message: operationalFailureReason }
-      if (!workspaceCanExecute(repoBefore)) return { ok: false, message: 'cancelled' }
-      if (branchOperation.phase === 'running' || branchOperation.phase === 'queued') {
-        // A queued pull/push can be replaced by the latest network branch action; running work cannot.
-        if (!network || branchOperation.phase !== 'queued') return { ok: false, message: 'cancelled' }
+  async function runScheduledBranchAction<Result extends RepoMutationExecResult>(
+    id: WorkspaceId,
+    action: RepoBranchAction,
+    options: RunBranchActionOptions | undefined,
+    execute: (workspaceRuntimeId: string, signal: AbortSignal) => Promise<Result>,
+    failureResult: (message: string) => Result,
+  ): Promise<Result | null> {
+    const repoBefore = get().workspaces[id]
+    if (!repoBefore || !isGitWorkspace(repoBefore)) return null
+    const workspaceRuntimeId = options?.workspaceRuntimeId ?? repoBefore.workspaceRuntimeId
+    if (repoBefore.workspaceRuntimeId !== workspaceRuntimeId) return null
+    const network = isNetworkBranchAction(action)
+    const branchOperation = repoOperation(id, 'branchAction')
+    const operationalFailureReason = workspaceOperationalFailureReason(repoBefore)
+    if (operationalFailureReason) return failureResult(operationalFailureReason)
+    if (!workspaceCanExecute(repoBefore)) return failureResult('cancelled')
+    if (branchOperation.phase === 'running' || branchOperation.phase === 'queued') {
+      // A queued pull/push can be replaced by the latest network branch action; running work cannot.
+      if (!network || branchOperation.phase !== 'queued') return failureResult('cancelled')
+    }
+    const schedule = evaluateRepoBranchActionSchedule(repoBefore, action)
+    if (schedule.blockedMessage) {
+      const result = failureResult(schedule.blockedMessage)
+      get().setLastResult(id, result, workspaceRuntimeId)
+      return result
+    }
+    const handleResult = async (result: Result) => {
+      if (!shouldSuppressBranchActionResultMessage(result, options)) {
+        get().setLastResult(id, result, workspaceRuntimeId, { action: branchActionEventAction(action) })
       }
-      const schedule = evaluateRepoBranchActionSchedule(repoBefore, action)
-      if (schedule.blockedMessage) {
-        const result = { ok: false, message: schedule.blockedMessage }
-        get().setLastResult(id, result, workspaceRuntimeId)
-        return result
-      }
-      const handleResult = async (result: RepoMutationExecResult) => {
-        if (!shouldSuppressBranchActionResultMessage(result, options)) {
-          get().setLastResult(id, result, workspaceRuntimeId, { action: branchActionEventAction(action) })
-        }
-      }
-      const handleError = (message: string) => {
-        if (message === 'cancelled') return
-        get().setLastResult(id, { ok: false, message }, workspaceRuntimeId, { action: branchActionEventAction(action) })
-      }
-      const handleStale = () => {}
-      const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
-        throwIfStale(get, id, workspaceRuntimeId)
-        ctx.setPhase('running')
-        return runBranchActionIpc(action, id, workspaceRuntimeId, signal)
-      }
+    }
+    const handleError = (message: string) => {
+      if (message === 'cancelled') return
+      get().setLastResult(id, { ok: false, message }, workspaceRuntimeId, { action: branchActionEventAction(action) })
+    }
+    const handleStale = () => {}
+    const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
+      throwIfStale(get, id, workspaceRuntimeId)
+      ctx.setPhase('running')
+      return execute(workspaceRuntimeId, signal)
+    }
 
-      if (network) {
-        return await runLatestOperation({
-          set,
-          get,
-          id,
-          workspaceRuntimeId,
-          lane: 'network',
-          operationKey: BRANCH_NETWORK_OPERATION_KEY,
-          priority: 100,
-          targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
-          task: runActionTask,
-          queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
-          queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
-          errorFromResult: branchActionErrorFromResult,
-          errorResult: branchActionErrorResult,
-          onResult: handleResult,
-          onError: handleError,
-          onStale: handleStale,
-        })
-      }
-
-      return await runExclusiveOperation({
+    if (network) {
+      return await runLatestOperation({
         set,
         get,
         id,
         workspaceRuntimeId,
-        lane: 'write',
+        lane: 'network',
+        operationKey: BRANCH_NETWORK_OPERATION_KEY,
         priority: 100,
-        targets: [branchActionTarget(action)],
-        busyResult: branchActionErrorResult('cancelled'),
+        targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
         task: runActionTask,
+        queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
+        queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
         errorFromResult: branchActionErrorFromResult,
-        errorResult: branchActionErrorResult,
+        errorResult: failureResult,
         onResult: handleResult,
         onError: handleError,
+        onStale: handleStale,
       })
+    }
+
+    return await runExclusiveOperation({
+      set,
+      get,
+      id,
+      workspaceRuntimeId,
+      lane: 'write',
+      priority: 100,
+      targets: [branchActionTarget(action)],
+      busyResult: failureResult('cancelled'),
+      task: runActionTask,
+      errorFromResult: branchActionErrorFromResult,
+      errorResult: failureResult,
+      onResult: handleResult,
+      onError: handleError,
+    })
+  }
+
+  return {
+    async runCreateWorktreeAction(
+      id: WorkspaceId,
+      action: CreateWorktreeAction,
+      options?: RunBranchActionOptions,
+    ): Promise<CreateWorktreeExecResult | null> {
+      return await runScheduledBranchAction(
+        id,
+        action,
+        options,
+        (workspaceRuntimeId, signal) =>
+          createRepoWorktree(id, workspaceRuntimeId, action.input, action.worktreeBootstrap, signal),
+        (message) => ({ ok: false, message }),
+      )
+    },
+    async runBranchAction(
+      id: WorkspaceId,
+      action: NonCreateRepoBranchAction,
+      options?: RunBranchActionOptions,
+    ): Promise<RepoMutationExecResult | null> {
+      return await runScheduledBranchAction(
+        id,
+        action,
+        options,
+        (workspaceRuntimeId, signal) => runBranchActionIpc(action, id, workspaceRuntimeId, signal),
+        branchActionErrorResult,
+      )
     },
   }
 }

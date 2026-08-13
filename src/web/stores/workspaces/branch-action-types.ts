@@ -1,10 +1,16 @@
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
 
+export type CreateWorktreeAction = {
+  kind: 'createWorktree'
+  input: CreateWorktreeInput
+  worktreeBootstrap: WorktreeBootstrapDecision
+}
+
 export type RepoBranchAction =
   | { kind: 'pull'; branch: string; worktreePath?: string }
   | { kind: 'push'; branch: string }
-  | { kind: 'createWorktree'; input: CreateWorktreeInput; worktreeBootstrap: WorktreeBootstrapDecision }
+  | CreateWorktreeAction
   | { kind: 'deleteBranch'; branch: string; force?: boolean; deleteUpstream?: boolean }
   | {
       kind: 'removeWorktree'
@@ -16,6 +22,7 @@ export type RepoBranchAction =
     }
 
 export type RepoBranchActionKind = RepoBranchAction['kind']
+export type NonCreateRepoBranchAction = Exclude<RepoBranchAction, CreateWorktreeAction>
 
 export interface RunBranchActionOptions {
   workspaceRuntimeId?: string

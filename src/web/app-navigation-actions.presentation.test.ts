@@ -18,6 +18,7 @@ import {
   setRepoWorktreeStatusQueryData,
 } from '#/web/repo-query-cache.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import {
   REPO_ID,
   OTHER_WORKSPACE_ID,
@@ -102,6 +103,71 @@ describe('createAppNavigationActions presentation', () => {
       ).toBe(commit ? 'terminal' : 'files')
     },
   )
+
+  test('falls back to Dashboard when the saved worktree target no longer exists', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [],
+      currentBranchName: BRANCH_NAME,
+    })
+    workspacesStore.getState().recordWorkspaceNavigation({
+      workspaceId: REPO_ID,
+      route: {
+        kind: 'worktree',
+        worktreePath: WORKTREE_PATH,
+        workspacePaneTab: 'files',
+        terminalSessionId: null,
+      },
+    })
+    const navigation = routeNavigation()
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: OTHER_WORKSPACE_ID,
+      workspaceOrder: [OTHER_WORKSPACE_ID, REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.activateWorkspace(REPO_ID)
+
+    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+    expect(navigation.openRepoWorktreeTab).not.toHaveBeenCalled()
+  })
+
+  test('falls back to Dashboard when a saved worktree snapshot is unavailable', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
+      currentBranchName: BRANCH_NAME,
+    })
+    workspacesStore.getState().recordWorkspaceNavigation({
+      workspaceId: REPO_ID,
+      route: {
+        kind: 'worktree',
+        worktreePath: WORKTREE_PATH,
+        workspacePaneTab: 'files',
+        terminalSessionId: null,
+      },
+    })
+    const workspace = workspacesStore.getState().workspaces[REPO_ID]
+    if (!workspace) throw new Error('missing test workspace')
+    appQueryClient.removeQueries({ queryKey: repoSnapshotQueryKey(REPO_ID, workspace.workspaceRuntimeId) })
+    const navigation = routeNavigation()
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: OTHER_WORKSPACE_ID,
+      workspaceOrder: [OTHER_WORKSPACE_ID, REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.activateWorkspace(REPO_ID)
+
+    expect(navigation.openWorkspaceDashboard).toHaveBeenCalledWith(REPO_ID, presentationOptions())
+    expect(navigation.openRepoWorktree).not.toHaveBeenCalled()
+    expect(navigation.openRepoWorktreeTab).not.toHaveBeenCalled()
+    expect(navigation.openRepoWorktreeTerminal).not.toHaveBeenCalled()
+  })
 
   test('commits a filesystem route only while its workspace runtime remains current', async () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })

@@ -71,6 +71,13 @@ async function flushAsyncWork() {
   await waitForNextMacrotask()
 }
 
+function runRepoBranchActionForTest(action: RepoBranchAction) {
+  const actions = workspacesStore.getState()
+  return action.kind === 'createWorktree'
+    ? actions.runCreateWorktreeAction(REPO_ID, action)
+    : actions.runBranchAction(REPO_ID, action)
+}
+
 beforeEach(() => {
   resetWorkspacesStore()
   seedRepoWithReadModelForTest({
@@ -653,7 +660,7 @@ describe('runBranchAction', () => {
 
       const statusWork = requestRepoSnapshotRefresh(refreshStoreAccess, REPO_ID)
       await flushAsyncWork()
-      const actionWork = workspacesStore.getState().runBranchAction(REPO_ID, action)
+      const actionWork = runRepoBranchActionForTest(action)
       await flushAsyncWork()
 
       expect(actionCalls).toBe(1)
@@ -684,7 +691,7 @@ describe('runBranchAction', () => {
         }),
     })
 
-    const work = workspacesStore.getState().runBranchAction(REPO_ID, createWorktreeAction())
+    const work = workspacesStore.getState().runCreateWorktreeAction(REPO_ID, createWorktreeAction())
     const running = workspacesStore.getState().workspaces[REPO_ID]
 
     expect(requireGitWorkspaceForTest(running).capability.git.operations.branchAction).toMatchObject({
@@ -737,7 +744,7 @@ describe('runBranchAction', () => {
           }),
       })
 
-      const work = workspacesStore.getState().runBranchAction(REPO_ID, action)
+      const work = runRepoBranchActionForTest(action)
       await flushAsyncWork()
 
       expect(
@@ -775,7 +782,7 @@ describe('runBranchAction', () => {
       'repo.createWorktree': async () => ({ ok: false, message: 'error.invalid-path' }),
     })
 
-    await workspacesStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), {
+    await workspacesStore.getState().runCreateWorktreeAction(REPO_ID, createWorktreeAction(), {
       workspaceRuntimeId: 'repo-runtime-test',
     })
 
@@ -801,7 +808,7 @@ describe('runBranchAction', () => {
       }),
     })
 
-    await workspacesStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), {
+    await workspacesStore.getState().runCreateWorktreeAction(REPO_ID, createWorktreeAction(), {
       workspaceRuntimeId: 'repo-runtime-test',
     })
 
@@ -823,7 +830,7 @@ describe('runBranchAction', () => {
 
     const result = await workspacesStore
       .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
+      .runCreateWorktreeAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
 
     expect(result).toMatchObject({
       ok: true,
@@ -838,7 +845,7 @@ describe('runBranchAction', () => {
 
     await workspacesStore
       .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
+      .runCreateWorktreeAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
 
     expect(workspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('worktrees')
   })
@@ -852,7 +859,7 @@ describe('runBranchAction', () => {
       'repo.createWorktree': async () => result,
     })
 
-    await workspacesStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), {
+    await workspacesStore.getState().runCreateWorktreeAction(REPO_ID, createWorktreeAction(), {
       workspaceRuntimeId: 'repo-runtime-test',
     })
 
@@ -875,7 +882,7 @@ describe('runBranchAction', () => {
 
     await workspacesStore
       .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
+      .runCreateWorktreeAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
 
     const repo = workspacesStore.getState().workspaces[REPO_ID]
     expect(repo?.workspaceRuntimeId).toBe('repo-runtime-test-2')

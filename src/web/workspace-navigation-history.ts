@@ -17,6 +17,7 @@ import { consumeAppHistoryPresentationAction } from '#/web/app-history-presentat
 import type { AppHistoryPresentationAction } from '#/web/app-history-presentation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; workspaceId: WorkspaceId }
@@ -269,6 +270,9 @@ export function restoreWorkspaceNavigationEntry(
       routeNavigation.openRepoNewWorktree(entry.workspaceId, { ...options, returnTo: entry.route.returnTo })
       return { kind: 'accepted' }
     case 'worktree':
+      if (!workspaceNavigationWorktreeExists(entry.workspaceId, entry.route.worktreePath)) {
+        return { kind: 'unavailable' }
+      }
       if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
         const accepted = routeNavigation.openRepoWorktreeTerminal(
           entry.workspaceId,
@@ -303,6 +307,13 @@ export function restoreWorkspaceNavigationEntry(
       )
       return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
   }
+}
+
+function workspaceNavigationWorktreeExists(workspaceId: WorkspaceId, worktreePath: string): boolean {
+  const workspace = workspacesStore.getState().workspaces[workspaceId]
+  if (!workspace || workspace.capability.kind !== 'git') return false
+  const snapshot = getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)
+  return !!snapshot?.worktrees.some((worktree) => worktree.path === worktreePath)
 }
 
 export type WorkspaceNavigationRestoreResult = { kind: 'accepted' } | { kind: 'blocked' } | { kind: 'unavailable' }

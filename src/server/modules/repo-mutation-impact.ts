@@ -9,13 +9,16 @@ import { normalizeRemoteWorkspaceRef, type RemoteWorkspaceTarget } from '#/share
 import { formatWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface RepoMutationResult extends RepoMutationExecResult {
-  /** Canonical filesystem target confirmed after a successful worktree creation. */
+  /** Canonical filesystem target confirmed by the create-worktree source boundary. */
   createdWorktreePath?: string
   /** Repo projections that must be invalidated, including uncertain or partially applied failures. */
   repoIdsToInvalidate?: readonly WorkspaceId[]
   /** Checked-out filesystem projections that must be invalidated. */
   worktreePathsToInvalidate?: readonly string[]
 }
+
+export type CreateWorktreeMutationResult =
+  (RepoMutationResult & { ok: false }) | (RepoMutationResult & { ok: true; createdWorktreePath: string })
 
 /** Append one recovery notice while preserving the server-selected order and uniqueness. */
 export function appendRepoMutationRecoveryMessageKey(

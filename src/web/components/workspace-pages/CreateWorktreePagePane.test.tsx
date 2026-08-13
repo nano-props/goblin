@@ -416,7 +416,7 @@ describe('CreateWorktreePagePane', () => {
     const onCancel = vi.fn()
     let resolveAction!: (value: CreateWorktreeExecResult) => void
     workspacesStore.setState({
-      runBranchAction: vi.fn(
+      runCreateWorktreeAction: vi.fn(
         () =>
           new Promise<CreateWorktreeExecResult>((resolve) => {
             resolveAction = resolve
@@ -456,7 +456,7 @@ describe('CreateWorktreePagePane', () => {
     const replacementOnCreated = vi.fn()
     let resolveAction!: (value: CreateWorktreeExecResult) => void
     workspacesStore.setState({
-      runBranchAction: vi.fn(
+      runCreateWorktreeAction: vi.fn(
         () =>
           new Promise<CreateWorktreeExecResult>((resolve) => {
             resolveAction = resolve
@@ -523,7 +523,12 @@ describe('CreateWorktreePagePane', () => {
 
   test('stays on the form when the action fails', async () => {
     const onCreated = vi.fn()
-    workspacesStore.setState({ runBranchAction: vi.fn(async () => ({ ok: false, message: 'error.invalid-path' })) })
+    workspacesStore.setState({
+      runCreateWorktreeAction: vi.fn(async (): Promise<CreateWorktreeExecResult> => ({
+        ok: false,
+        message: 'error.invalid-path',
+      })),
+    })
 
     const { container } = renderPane(
       <CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={onCreated} />,
@@ -538,7 +543,7 @@ describe('CreateWorktreePagePane', () => {
     })
 
     await waitFor(() => {
-      expect(workspacesStore.getState().runBranchAction).toHaveBeenCalled()
+      expect(workspacesStore.getState().runCreateWorktreeAction).toHaveBeenCalled()
     })
     expect(onCreated).not.toHaveBeenCalled()
   })

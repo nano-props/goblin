@@ -12,7 +12,11 @@ import {
   RepoMutationRuntimeFailureError,
   isRepoMutationRuntimeFailureError,
 } from '#/server/modules/repo-mutation-runtime-failure.ts'
-import { appendRepoMutationRecoveryMessageKey, type RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
+import {
+  appendRepoMutationRecoveryMessageKey,
+  type CreateWorktreeMutationResult,
+  type RepoMutationResult,
+} from '#/server/modules/repo-mutation-impact.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import {
@@ -183,7 +187,7 @@ export async function createRepoWorktree(
   runtimeCapability: WorkspaceRuntimeEpochCapability,
   worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
-): Promise<RepoMutationResult> {
+): Promise<CreateWorktreeMutationResult> {
   const repoId = toSafeWorkspaceLocator(cwd)
   if (!repoId) return { ok: false, message: 'error.invalid-arguments' }
   const normalized = normalizeCreateWorktreeInput(input)
@@ -191,7 +195,7 @@ export async function createRepoWorktree(
   if (!path.isAbsolute(normalized.worktreePath) || /[\0-\x1f\x7f]/.test(normalized.worktreePath)) {
     return { ok: false, message: 'error.invalid-path' }
   }
-  return await runRepoServerWriteOperation({
+  return await runRepoServerWriteOperation<CreateWorktreeMutationResult>({
     repoId,
     runtimeCapability,
     kind: 'create-worktree',
@@ -203,11 +207,11 @@ export async function createRepoWorktree(
           runMembershipMutation: context.runMembershipMutation,
           worktreeBootstrap,
         })
-        if (!result.ok) return result
+        if (!result.ok) return { ...result, ok: false }
         try {
           await persistWorktreeBootstrapTrustChoice(repoId, worktreeBootstrap)
         } catch (error) {
-          return worktreeFollowupFailure(result, error, 'error.worktree-created-followup-failed')
+          return { ...worktreeFollowupFailure(result, error, 'error.worktree-created-followup-failed'), ok: false }
         }
         return result
       })
