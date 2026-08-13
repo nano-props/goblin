@@ -1,4 +1,4 @@
-import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { BranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
@@ -11,7 +11,7 @@ type WorkspacePaneBranchRouteSupplementTarget = Extract<
 
 export function commitWorkspacePaneRouteSupplement(
   target: WorkspacePaneBranchRouteSupplementTarget,
-  route: WorkspacePaneRouteTarget,
+  route: BranchWorkspacePaneRouteTarget,
 ): boolean {
   const state = workspacesStore.getState()
   const { workspaceId, branchName } = target.routeTarget
@@ -21,10 +21,6 @@ export function commitWorkspacePaneRouteSupplement(
   const branchModel = getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)
   const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
   if (!branchModel || !branch || repoWorktreeForBranch(branchModel.worktrees, branchName)) return false
-  state.setWorkspacePaneTab(
-    workspaceId,
-    branchName,
-    route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
-  )
+  state.setWorkspacePaneTab(workspaceId, branchName, route?.tab ?? null)
   return true
 }
