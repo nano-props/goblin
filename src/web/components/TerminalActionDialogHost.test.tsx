@@ -54,7 +54,7 @@ describe('TerminalActionDialogHost', () => {
     await flushTestUpdates(() => {
       terminalActionDialogsStore.getState().openCloseConfirm({
         workspaceId: WORKSPACE_ID,
-        routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'main' },
+        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/repo-worktree' },
         targetIdentity: 'terminal:term-111111111111111111111',
         selectedIdentity: 'terminal:term-111111111111111111111',
         workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
