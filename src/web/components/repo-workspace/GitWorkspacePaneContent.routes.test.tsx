@@ -71,12 +71,6 @@ describe('GitWorkspacePaneContent routes', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/first-open')],
-      worktrees: [
-        createRepoWorktreeSnapshotForTest('feature/first-open', '/tmp/goblin-first-open', {
-          isPrimary: false,
-          isLocked: false,
-        }),
-      ],
       currentBranchName: 'feature/first-open',
       workspacePaneTabsByBranch: { 'feature/first-open': [staticEntry('status')] },
     })
@@ -167,16 +161,9 @@ describe('GitWorkspacePaneContent routes', () => {
   })
 
   test('does not apply a stale preference to an explicit bare branch route', async () => {
-    const worktreePath = '/tmp/hook-terminal-empty-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/hook-terminal-empty')],
-      worktrees: [
-        createRepoWorktreeSnapshotForTest('feature/hook-terminal-empty', worktreePath, {
-          isPrimary: false,
-          isLocked: false,
-        }),
-      ],
       currentBranchName: 'feature/hook-terminal-empty',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/hook-terminal-empty': [staticEntry('status')] },

@@ -43,9 +43,8 @@ export function useGitWorkspacePaneTabModel(
   gitWorkspace: MaybeRefOrGetter<Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'ui'>>,
   detail: MaybeRefOrGetter<CurrentGitWorkspacePanePresentation>,
   workspacePaneRoute: MaybeRefOrGetter<ParsedWorkspacePaneRoute | null | undefined>,
-  routeTargetKind: MaybeRefOrGetter<'branch' | 'worktree'>,
 ): ComputedRef<WorkspacePaneTabModel> {
-  const input = useGitWorkspacePaneTabModelInput(gitWorkspace, detail, workspacePaneRoute, routeTargetKind)
+  const input = useGitWorkspacePaneTabModelInput(gitWorkspace, detail, workspacePaneRoute)
   return computed(() => createWorkspacePaneTabModel(input.value))
 }
 
@@ -58,7 +57,6 @@ export function useGitWorkspacePaneTabModelInput(
   gitWorkspace: MaybeRefOrGetter<Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'ui'>>,
   detail: MaybeRefOrGetter<CurrentGitWorkspacePanePresentation>,
   workspacePaneRoute: MaybeRefOrGetter<ParsedWorkspacePaneRoute | null | undefined>,
-  routeTargetKind: MaybeRefOrGetter<'branch' | 'worktree'>,
 ): ComputedRef<WorkspacePaneTabModelInput> {
   const workspace = computed(() => toValue(gitWorkspace))
   const branchName = computed(() => toValue(detail).branch?.name ?? null)
@@ -85,10 +83,10 @@ export function useGitWorkspacePaneTabModelInput(
     const currentBranchName = branchName.value
     const currentWorktreePath = worktreePath.value
     const route = toValue(workspacePaneRoute)
-    const routedWorktree = toValue(routeTargetKind) === 'worktree'
     const target = currentBranchName
       ? requiredGitWorkspacePaneTabsTarget(currentWorkspace.id, currentBranchName, currentWorktreePath)
       : null
+    const routedWorktree = target?.kind === 'git-worktree'
     const tabEntries = workspacePaneTabsForTargetFromQueryData(
       workspacePaneTabsQuery.data.value ?? { revision: 0, entries: [] },
       target ?? {

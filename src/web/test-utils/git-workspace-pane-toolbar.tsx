@@ -184,7 +184,6 @@ const GitWorkspacePaneToolbarHarness = defineComponent<GitWorkspacePaneToolbarHa
       () => props.repo,
       () => props.detail,
       () => props.workspacePaneRoute,
-      () => (props.detail.worktree ? 'worktree' : 'branch'),
     )
     return () => (
       <GitWorkspacePaneToolbar
