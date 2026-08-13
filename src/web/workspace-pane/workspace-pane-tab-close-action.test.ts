@@ -613,7 +613,10 @@ describe('workspace pane tab close action', () => {
       ...paneTarget,
       tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId), workspacePaneStaticTabEntry('status')],
     })
-    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => ({
         terminalFilesystemTargetKey,
@@ -695,7 +698,10 @@ describe('workspace pane tab close action', () => {
       .getState()
       .setSelectedTerminal(formatTerminalFilesystemTargetKey(REPO_ID, REPO_ID), terminalSessionId)
     const terminalFilesystemTargetKey = `${REPO_ID}\0${REPO_ID}`
-    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => ({
         terminalFilesystemTargetKey,

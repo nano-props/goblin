@@ -28,7 +28,11 @@ import {
   useTerminalFilesystemTargetSessionDescriptor,
   useTerminalSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
-import type { TerminalInputWriter } from '#/web/components/terminal/types.ts'
+import type {
+  TerminalInputWriter,
+  TerminalProgressState,
+  TerminalSearchResult,
+} from '#/web/components/terminal/types.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { terminalLog } from '#/web/logger.ts'
@@ -48,6 +52,36 @@ const TERMINAL_PASTE_FILE_ERROR_KEYS = {
 function terminalPasteFileErrorKey(error: unknown): string {
   if (!(error instanceof PasteFileLimitError)) return 'terminal.paste-file-failed'
   return TERMINAL_PASTE_FILE_ERROR_KEYS[error.kind]
+}
+
+function terminalProgressVariant(progress: TerminalProgressState | null): string {
+  if (progress?.state === 2) return 'error'
+  if (progress?.state === 4) return 'warning'
+  if (progress?.state === 3) return 'indeterminate'
+  return ''
+}
+
+function terminalSearchResultLabel(
+  search: TerminalSearchResult | null | undefined,
+  searchTerm: string,
+  t: (key: string) => string,
+): string {
+  if (!search || !searchTerm) return ''
+  if (search.resultCount === 0) return t('terminal.search-no-results')
+  if (search.resultIndex < 0) return String(search.resultCount)
+  return `${search.resultIndex + 1}/${search.resultCount}`
+}
+
+function terminalStatusOverlayLabelKey(
+  phase: SessionPhase,
+  hasSessions: boolean,
+  projectionPending: boolean,
+  presentationRecovery: 'pending' | 'failed' | undefined,
+): string {
+  if (phase === 'restarting') return 'terminal.restarting'
+  if (phase === 'opening' && !hasSessions && projectionPending) return 'terminal.loading'
+  if (presentationRecovery === 'pending') return 'terminal.restoring'
+  return 'terminal.opening'
 }
 
 interface TerminalSessionViewProps {
@@ -445,17 +479,8 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
         : false
       const progress = currentSnapshot.progress ?? (fileResolutionPending ? { state: 3 as const, value: 0 } : null)
       const progressLabelKey = currentSnapshot.progress ? 'terminal.progress' : 'terminal.file-resolution-progress'
-      let progressVariant = ''
-      if (progress?.state === 2) progressVariant = 'error'
-      else if (progress?.state === 4) progressVariant = 'warning'
-      else if (progress?.state === 3) progressVariant = 'indeterminate'
-
-      let resultLabel = ''
-      if (currentSnapshot.search && searchTerm.value) {
-        if (currentSnapshot.search.resultCount === 0) resultLabel = t('terminal.search-no-results')
-        else if (currentSnapshot.search.resultIndex < 0) resultLabel = String(currentSnapshot.search.resultCount)
-        else resultLabel = `${currentSnapshot.search.resultIndex + 1}/${currentSnapshot.search.resultCount}`
-      }
+      const progressVariant = terminalProgressVariant(progress)
+      const resultLabel = terminalSearchResultLabel(currentSnapshot.search, searchTerm.value, t)
 
       const presentationRecovery = currentSnapshot.presentationRecovery
       const hideTerminalHost = readonly || (hasSessions && attaching)
@@ -480,13 +505,13 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
       const showStatusOverlay =
         (attaching && !showEmptyCta && !(currentSessionPhase === 'opening' && !hasSessions && projectionFailed)) ||
         (!showErrorChip && !attaching && presentationRecovery === 'pending' && !projectionFailed)
-      let statusOverlayLabel = t('terminal.opening')
-      if (currentSessionPhase === 'restarting') statusOverlayLabel = t('terminal.restarting')
-      else if (currentSessionPhase === 'opening' && !hasSessions && projectionPending) {
-        statusOverlayLabel = t('terminal.loading')
-      } else if (presentationRecovery === 'pending') {
-        statusOverlayLabel = t('terminal.restoring')
-      }
+      const statusOverlayLabelKey = terminalStatusOverlayLabelKey(
+        currentSessionPhase,
+        hasSessions,
+        projectionPending,
+        presentationRecovery,
+      )
+      const statusOverlayLabel = t(statusOverlayLabelKey)
       const projectionFailureLabel = props.projectionErrorMessage
         ? `${t('terminal.load-failed')} (${props.projectionErrorMessage})`
         : t('terminal.load-failed')

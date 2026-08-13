@@ -151,42 +151,42 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     | { kind: 'error'; error: string; original: unknown }
     | { kind: 'success'; result: T; error: string | null }
 
-  let outcome: Outcome
   let operationSignal: AbortSignal | null = null
-  try {
-    const scheduleOptions = {
-      priority: options.priority,
-      replaceQueuedKey:
-        options.policy === 'latest-wins' ? `${options.lane}:${options.operationKey ?? primary.key}` : undefined,
-      onQueued: () => markOperationState(options, workspaceRuntimeId, operationId, 'queued'),
-      onStart: (wasQueued: boolean) =>
-        markOperationState(options, workspaceRuntimeId, operationId, 'running', wasQueued),
+  async function executeOperation(): Promise<Outcome> {
+    try {
+      const scheduleOptions = {
+        priority: options.priority,
+        replaceQueuedKey:
+          options.policy === 'latest-wins' ? `${options.lane}:${options.operationKey ?? primary.key}` : undefined,
+        onQueued: () => markOperationState(options, workspaceRuntimeId, operationId, 'queued'),
+        onStart: (wasQueued: boolean) =>
+          markOperationState(options, workspaceRuntimeId, operationId, 'running', wasQueued),
+      }
+      const result = await scheduleRepoOperation<T>(
+        options.id,
+        options.lane,
+        async (signal) => {
+          operationSignal = signal
+          return await options.task(signal, ctx)
+        },
+        options.queuedTimeoutMs === undefined
+          ? scheduleOptions
+          : {
+              ...scheduleOptions,
+              queuedTimeoutMs: options.queuedTimeoutMs,
+              queuedTimeoutMessage: options.queuedTimeoutMessage,
+            },
+      )
+      if (!ctx.isCurrent()) return { kind: 'stale' }
+      return { kind: 'success', result, error: options.errorFromResult?.(result) ?? null }
+    } catch (err) {
+      return isExpectedRepoOperationCancellation(err, operationSignal)
+        ? { kind: 'stale' }
+        : { kind: 'error', error: err instanceof Error ? err.message : String(err), original: err }
     }
-    const result = await scheduleRepoOperation<T>(
-      options.id,
-      options.lane,
-      async (signal) => {
-        operationSignal = signal
-        return await options.task(signal, ctx)
-      },
-      options.queuedTimeoutMs === undefined
-        ? scheduleOptions
-        : {
-            ...scheduleOptions,
-            queuedTimeoutMs: options.queuedTimeoutMs,
-            queuedTimeoutMessage: options.queuedTimeoutMessage,
-          },
-    )
-    if (!ctx.isCurrent()) {
-      outcome = { kind: 'stale' }
-    } else {
-      outcome = { kind: 'success', result, error: options.errorFromResult?.(result) ?? null }
-    }
-  } catch (err) {
-    outcome = isExpectedRepoOperationCancellation(err, operationSignal)
-      ? { kind: 'stale' }
-      : { kind: 'error', error: err instanceof Error ? err.message : String(err), original: err }
   }
+
+  const outcome = await executeOperation()
 
   // Settle operation state exactly once before running side effects.
   ownedTargetKeysAtSettle = new Set(

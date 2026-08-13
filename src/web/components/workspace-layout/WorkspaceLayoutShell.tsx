@@ -18,6 +18,35 @@ interface WorkspaceLayoutShellProps {
   zenRevealSidebarPane?: VNodeChild
 }
 
+function workspaceLayoutBody(
+  props: WorkspaceLayoutShellProps,
+  singlePane: boolean,
+  sidebarCollapsed: boolean,
+  activePane: 'navigator' | 'workspace',
+): VNodeChild {
+  if (props.compact) {
+    return (
+      <CompactWorkspaceLayout
+        activePane={activePane}
+        sidebarPane={props.sidebarPane}
+        workspacePane={props.workspacePane}
+        transitionScopeKey={props.workspaceId}
+      />
+    )
+  }
+  if (singlePane) return activePane === 'workspace' ? props.workspacePane : props.sidebarPane
+  return (
+    <WorkspaceSplitLayout
+      mode="split"
+      workspacePaneSize={props.workspacePaneSize}
+      onWorkspacePaneSizeChange={props.onWorkspacePaneSizeChange}
+      sidebarCollapsed={sidebarCollapsed}
+      sidebarPane={props.sidebarPane}
+      workspacePane={props.workspacePane}
+    />
+  )
+}
+
 export const WorkspaceLayoutShell: FunctionalComponent<WorkspaceLayoutShellProps> = (props) => {
   const zenModeToggleEnabled = props.zenModeToggleEnabled ?? true
   const effectiveZenMode = zenModeToggleEnabled && props.zenMode
@@ -30,30 +59,7 @@ export const WorkspaceLayoutShell: FunctionalComponent<WorkspaceLayoutShellProps
   const zenRevealEnabled = !props.compact && behavior.sidebarCollapsed
   const activePane = props.singlePaneActivePane ?? 'navigator'
 
-  let workspaceBody: VNodeChild
-  if (props.compact) {
-    workspaceBody = (
-      <CompactWorkspaceLayout
-        activePane={activePane}
-        sidebarPane={props.sidebarPane}
-        workspacePane={props.workspacePane}
-        transitionScopeKey={props.workspaceId}
-      />
-    )
-  } else if (behavior.singlePane) {
-    workspaceBody = activePane === 'workspace' ? props.workspacePane : props.sidebarPane
-  } else {
-    workspaceBody = (
-      <WorkspaceSplitLayout
-        mode="split"
-        workspacePaneSize={props.workspacePaneSize}
-        onWorkspacePaneSizeChange={props.onWorkspacePaneSizeChange}
-        sidebarCollapsed={behavior.sidebarCollapsed}
-        sidebarPane={props.sidebarPane}
-        workspacePane={props.workspacePane}
-      />
-    )
-  }
+  const workspaceBody = workspaceLayoutBody(props, behavior.singlePane, behavior.sidebarCollapsed, activePane)
 
   return (
     <section class="relative flex min-w-0 flex-1 flex-col">

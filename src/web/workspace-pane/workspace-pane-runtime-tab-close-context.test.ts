@@ -23,7 +23,10 @@ afterEach(() => {
 
 describe('workspace pane runtime tab close context', () => {
   test('reads terminal close capability from the command bridge', async () => {
-    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
     setTerminalSessionCommandBridge(terminalCommandBridge({ closeTerminalByDescriptor }))
 
     const context = readWorkspacePaneRuntimeTabCloseContext()

@@ -37,10 +37,7 @@ describe('open workspace result feedback', () => {
 
   test('presents conclusive close rejection as an error', () => {
     expect(
-      reportCloseWorkspaceFailure(
-        { ok: false, kind: 'failed', message: 'error.workspace-close-failed' },
-        (key) => key,
-      ),
+      reportCloseWorkspaceFailure({ ok: false, kind: 'failed', message: 'error.workspace-close-failed' }, (key) => key),
     ).toBe(true)
     expect(feedbackMocks.error).toHaveBeenCalledWith('error.workspace-close-failed')
   })

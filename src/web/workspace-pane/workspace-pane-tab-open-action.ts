@@ -54,6 +54,15 @@ export interface OpenWorkspacePaneTargetStaticTabActionOptions {
   navigation: FilesystemWorkspacePaneRouteCommitActions
 }
 
+function paneTargetPresentationBranch(
+  paneTarget: WorkspacePaneTabsTarget,
+  worktreeHead: GitHead | undefined,
+): string | null {
+  if (paneTarget.kind === 'git-branch') return paneTarget.branchName
+  if (worktreeHead?.kind === 'branch') return worktreeHead.branchName
+  return null
+}
+
 /** Opens and presents a static tab as one target-scoped transaction. */
 export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
   input: OpenWorkspacePaneTargetStaticTabActionOptions,
@@ -62,12 +71,7 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
   if (!workspace || input.paneTarget.workspaceId !== input.workspaceId) return { kind: 'target-missing' }
   const workspaceRuntimeId = workspace.workspaceRuntimeId
   const worktreePath = workspacePaneTabsTargetWorktreePath(input.paneTarget)
-  let branchName: string | null = null
-  if (input.paneTarget.kind === 'git-branch') {
-    branchName = input.paneTarget.branchName
-  } else if (input.worktreeHead?.kind === 'branch') {
-    branchName = input.worktreeHead.branchName
-  }
+  const branchName = paneTargetPresentationBranch(input.paneTarget, input.worktreeHead)
   const navigationGeneration = beginAppNavigation()
   const openerIdentity = captureWorkspacePaneActiveTabIdentity(input.paneTarget, workspaceRuntimeId, {
     workspacePaneRoute: input.workspacePaneRoute,

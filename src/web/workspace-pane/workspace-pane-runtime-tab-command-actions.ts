@@ -88,6 +88,27 @@ interface WorkspacePaneRuntimeTabCommandActions {
   createNew: (context: WorkspacePaneRuntimeTabCommandContext) => Promise<boolean>
 }
 
+function existingTerminalTabTarget(
+  workspaceId: WorkspaceId,
+  routeTarget: WorkspacePaneTabsTarget,
+  filesystemTarget: WorkspacePaneFilesystemTarget | null | undefined,
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
+): WorkspacePaneTabModel | null {
+  if (routeTarget.kind === 'git-branch') {
+    return workspacePaneTabTargetForBranch(workspaceId, routeTarget.branchName, { workspacePaneRoute })
+  }
+  if (routeTarget.kind === 'workspace-root') {
+    return workspacePaneTabTargetForWorkspace(workspaceId, { workspacePaneRoute })
+  }
+  if (filesystemTarget?.kind !== 'git-worktree') return null
+  return workspacePaneTabTargetForPaneTarget({
+    paneTarget: routeTarget,
+    routeTarget,
+    workspacePaneRoute,
+    worktreeHead: filesystemTarget.head,
+  })
+}
+
 const WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE: Record<
   WorkspacePaneRuntimeTabType,
   WorkspacePaneRuntimeTabCommandActions
@@ -184,21 +205,7 @@ async function showTerminalRuntimeTab(
   routeRequest: ExistingTerminalPresentationRouteRequest,
 ): Promise<boolean> {
   if (type !== 'terminal') return abandonExistingTerminalPresentation(routeRequest)
-  let target: WorkspacePaneTabModel | null
-  if (routeTarget.kind === 'git-branch') {
-    target = workspacePaneTabTargetForBranch(workspaceId, routeTarget.branchName, { workspacePaneRoute })
-  } else if (routeTarget.kind === 'workspace-root') {
-    target = workspacePaneTabTargetForWorkspace(workspaceId, { workspacePaneRoute })
-  } else if (filesystemTarget?.kind === 'git-worktree') {
-    target = workspacePaneTabTargetForPaneTarget({
-      paneTarget: routeTarget,
-      routeTarget,
-      workspacePaneRoute,
-      worktreeHead: filesystemTarget.head,
-    })
-  } else {
-    target = null
-  }
+  const target = existingTerminalTabTarget(workspaceId, routeTarget, filesystemTarget, workspacePaneRoute)
   if (!target) return abandonExistingTerminalPresentation(routeRequest)
   if (routeTarget.kind !== 'git-branch') {
     const tab = target.tabs.find(
@@ -238,7 +245,6 @@ function showCreatedTerminalRuntimeTab(
   routeRequest: CreatedTerminalRouteRequest,
 ): boolean | Promise<boolean> {
   if (type !== 'terminal') return false
-  let target
   if (routeTarget.kind === 'git-worktree') {
     if (!workspaceRuntimeId || presentation.kind !== 'git-worktree') return false
     return navigation.commitFilesystemWorkspacePaneRoute(
@@ -249,17 +255,8 @@ function showCreatedTerminalRuntimeTab(
   }
   if (routeTarget.kind === 'workspace-root') {
     if (presentation.kind !== 'workspace-root') return false
-    target = workspacePaneTabTargetForWorkspace(workspaceId, { workspacePaneRoute })
-  } else {
-    if (presentation.kind !== 'git-worktree') return false
-    const canonicalBranch = terminalPresentationBranch(presentation)
-    if (!canonicalBranch) return false
-    target = workspacePaneTabTargetForCreatedRuntime(workspaceId, canonicalBranch, worktreePath, {
-      workspacePaneRoute,
-    })
-  }
-  if (!target) return false
-  if (routeTarget.kind === 'workspace-root') {
+    const target = workspacePaneTabTargetForWorkspace(workspaceId, { workspacePaneRoute })
+    if (!target) return false
     const tab = target.tabs.find(
       (candidate) => candidate.identity === terminalWorkspacePaneTabProvider.identity(sessionId),
     )
@@ -271,6 +268,13 @@ function showCreatedTerminalRuntimeTab(
       routeRequest,
     )
   }
+  if (presentation.kind !== 'git-worktree') return false
+  const canonicalBranch = terminalPresentationBranch(presentation)
+  if (!canonicalBranch) return false
+  const target = workspacePaneTabTargetForCreatedRuntime(workspaceId, canonicalBranch, worktreePath, {
+    workspacePaneRoute,
+  })
+  if (!target) return false
   return commitWorkspacePaneCommittedRuntimeTargetRoute(
     target,
     { kind: 'terminal', terminalSessionId: sessionId },

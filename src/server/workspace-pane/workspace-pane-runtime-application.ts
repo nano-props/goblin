@@ -319,25 +319,21 @@ export class WorkspacePaneRuntimeApplication {
     ) {
       return runtimeFailure('terminal', 'error.workspace-runtime-stale')
     }
-    let runtime: Extract<WorkspacePaneRuntimeCloseResult, { ok: true }>['runtime']
-    if (session) {
-      const close = await this.deps.terminal.close(clientId, userId, {
-        terminalRuntimeSessionId: session.terminalRuntimeSessionId,
-      })
-      if (close.kind === 'failed') return runtimeFailure('terminal', 'error.unavailable')
-      if (close.kind === 'already-closed') {
-        runtime = { action: 'already-closed', terminalSessionId }
-      } else {
-        runtime = {
-          action: 'closed',
-          terminalSessionId,
+    const close = session
+      ? await this.deps.terminal.close(clientId, userId, {
           terminalRuntimeSessionId: session.terminalRuntimeSessionId,
-          terminalRuntimeGeneration: session.terminalRuntimeGeneration,
-        }
-      }
-    } else {
-      runtime = { action: 'already-closed', terminalSessionId }
-    }
+        })
+      : null
+    if (close?.kind === 'failed') return runtimeFailure('terminal', 'error.unavailable')
+    const runtime: Extract<WorkspacePaneRuntimeCloseResult, { ok: true }>['runtime'] =
+      !session || close?.kind === 'already-closed'
+        ? { action: 'already-closed', terminalSessionId }
+        : {
+            action: 'closed',
+            terminalSessionId,
+            terminalRuntimeSessionId: session.terminalRuntimeSessionId,
+            terminalRuntimeGeneration: session.terminalRuntimeGeneration,
+          }
 
     let paneTabsSnapshot: WorkspacePaneTabsSnapshot | null
     try {

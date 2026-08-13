@@ -68,10 +68,7 @@ export function orderWorkspaceDashboardTerminals(
   })
 }
 
-function branchRankByTargetKey(
-  workspaceId: WorkspaceId,
-  branches: readonly BranchSnapshotInfo[],
-): Map<string, number> {
+function branchRankByTargetKey(workspaceId: WorkspaceId, branches: readonly BranchSnapshotInfo[]): Map<string, number> {
   const ranks = new Map<string, number>()
   branches.forEach((branch, index) => {
     if (!branch.worktree) return
@@ -81,9 +78,7 @@ function branchRankByTargetKey(
   return ranks
 }
 
-function terminalTabRankByTargetKey(
-  snapshot: WorkspacePaneTabsSnapshot | undefined,
-): Map<string, Map<string, number>> {
+function terminalTabRankByTargetKey(snapshot: WorkspacePaneTabsSnapshot | undefined): Map<string, Map<string, number>> {
   const ranks = new Map<string, Map<string, number>>()
   for (const entry of snapshot?.entries ?? []) {
     const target = workspacePaneTabsTargetFromRuntime(entry.target)

@@ -34,10 +34,7 @@ export function reportOpenWorkspaceUncertainty(
   return true
 }
 
-export function reportCloseWorkspaceFailure(
-  result: CloseWorkspaceResult,
-  t: (key: string) => string,
-): boolean {
+export function reportCloseWorkspaceFailure(result: CloseWorkspaceResult, t: (key: string) => string): boolean {
   if (result.ok) return false
   if (result.kind === 'uncertain') toast.warning(t(result.message))
   else toast.error(t(result.message))

@@ -73,7 +73,9 @@ describe('ShortcutSettings', () => {
     shortcutMocks.globalShortcutPending.value = true
     renderInJsdom(<ShortcutSettings />)
 
-    expect(screen.getByRole('switch', { name: 'settings.shortcuts-disable-global' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('switch', { name: 'settings.shortcuts-disable-global' }).hasAttribute('disabled')).toBe(
+      true,
+    )
     expect(screen.getByRole('button', { name: 'settings.global-shortcut-record' }).hasAttribute('disabled')).toBe(true)
     expect(screen.getByRole('button', { name: 'settings.global-shortcut-reset' }).hasAttribute('disabled')).toBe(true)
   })

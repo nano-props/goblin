@@ -74,8 +74,10 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
     scope.commit(() => {
       this.dependencies.beginHydration(scope.target.workspaceId, scope.target.workspaceRuntimeId)
     })
-    this.run(scope, { kind: 'minimum-revision', revision: 0 }, async () =>
-      await this.dependencies.recoverSessions(scope.target),
+    this.run(
+      scope,
+      { kind: 'minimum-revision', revision: 0 },
+      async () => await this.dependencies.recoverSessions(scope.target),
     )
   }
 

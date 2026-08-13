@@ -894,20 +894,23 @@ export async function removeRemoteWorktree(
       run,
     },
   )
-  let finalDeleteResult: RemoteBranchMutationStepResult = localDeleteResult
-  if (upstreamDeleteOutcome) {
-    const { result: upstreamDeleteResult, execution: upstreamDeleteExecution } = upstreamDeleteOutcome
-    if (upstreamDeleteResult.ok) finalDeleteResult = upstreamDeleteResult
-    else {
-      finalDeleteResult = {
-        ...upstreamDeleteResult,
-        branchEffect: 'local-delete-confirmed',
-        failureExecution: upstreamDeleteExecution,
-        failureStage: 'branch-delete',
-      }
-    }
-  }
+  const finalDeleteResult = finalRemoteBranchDeleteResult(localDeleteResult, upstreamDeleteOutcome)
   return withWorktreePathsToInvalidate(worktreeRemovedResult(finalDeleteResult), worktreePathsToInvalidate)
+}
+
+function finalRemoteBranchDeleteResult(
+  localDeleteResult: RemoteBranchMutationStepResult,
+  upstreamDeleteOutcome: CommandOutcome | null,
+): RemoteBranchMutationStepResult {
+  if (!upstreamDeleteOutcome) return localDeleteResult
+  const { result: upstreamDeleteResult, execution: upstreamDeleteExecution } = upstreamDeleteOutcome
+  if (upstreamDeleteResult.ok) return upstreamDeleteResult
+  return {
+    ...upstreamDeleteResult,
+    branchEffect: 'local-delete-confirmed',
+    failureExecution: upstreamDeleteExecution,
+    failureStage: 'branch-delete',
+  }
 }
 
 function worktreeRemovedResult(result: RemoteBranchMutationStepResult): RemoteWorktreeRemovalResult {

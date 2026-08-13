@@ -175,7 +175,10 @@ describe('workspace commands close', () => {
         'feature/worktree': [staticEntry('status'), terminalEntry('term-111111111111111111111')],
       },
     })
-    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
@@ -231,7 +234,10 @@ describe('workspace commands close', () => {
         ],
       },
     })
-    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
@@ -324,7 +330,9 @@ describe('workspace commands close', () => {
             })
             workspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, visibleSessionIds[0] ?? null)
           }
-          resolve(value ? { kind: 'committed', projection: 'applied' } : { kind: 'not-committed' as const, message: null })
+          resolve(
+            value ? { kind: 'committed', projection: 'applied' } : { kind: 'not-committed' as const, message: null },
+          )
         })
       })
     })
@@ -392,7 +400,10 @@ describe('workspace commands close', () => {
       },
     })
     workspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, 'term-222222222222222222222')
-    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithSecondTerminalSelected(),
       createTerminal: vi.fn(async () => 'term-333333333333333333333'),
@@ -712,7 +723,10 @@ describe('workspace commands close', () => {
       },
     })
     workspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, terminalSessionId)
-    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal: vi.fn(async () => terminalSessionId),

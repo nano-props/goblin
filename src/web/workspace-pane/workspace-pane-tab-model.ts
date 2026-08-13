@@ -200,18 +200,25 @@ export interface WorkspacePaneTabModelInput {
   requestedSessionIdByRuntimeType?: WorkspacePaneRequestedRuntimeSessionByType
 }
 
-export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): WorkspacePaneTabModel {
-  const worktreePath = paneTargetFilesystemPath(input.paneTarget)
-  let filesystemTarget: WorkspacePaneFilesystemExecutionTarget | null = null
+function paneTargetFilesystemExecutionTarget(
+  input: WorkspacePaneTabModelInput,
+): WorkspacePaneFilesystemExecutionTarget | null {
   if (input.paneTarget.kind === 'workspace-root') {
-    filesystemTarget = workspaceRootFilesystemExecutionTarget(input.workspaceId, input.workspaceRuntimeId)
-  } else if (input.paneTarget.kind === 'git-worktree') {
-    filesystemTarget = gitWorktreeFilesystemExecutionTarget(
+    return workspaceRootFilesystemExecutionTarget(input.workspaceId, input.workspaceRuntimeId)
+  }
+  if (input.paneTarget.kind === 'git-worktree') {
+    return gitWorktreeFilesystemExecutionTarget(
       input.workspaceId,
       input.workspaceRuntimeId,
       input.paneTarget.worktreePath,
     )
   }
+  return null
+}
+
+export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): WorkspacePaneTabModel {
+  const worktreePath = paneTargetFilesystemPath(input.paneTarget)
+  const filesystemTarget = paneTargetFilesystemExecutionTarget(input)
   const branchName = paneTargetPresentationBranch(input.paneTarget, input.worktreeHead)
   const normalizedTabEntries =
     input.paneTarget.kind === 'inactive'

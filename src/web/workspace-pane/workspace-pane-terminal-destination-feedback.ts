@@ -6,11 +6,7 @@ export function surfaceWorkspacePaneTerminalDestinationOutcome(
   outcome: WorkspacePaneActionOutcome | null,
   error?: unknown,
 ): void {
-  if (
-    outcome?.kind === 'completed' ||
-    outcome?.kind === 'already-current' ||
-    outcome?.kind === 'superseded'
-  ) {
+  if (outcome?.kind === 'completed' || outcome?.kind === 'already-current' || outcome?.kind === 'superseded') {
     return
   }
   const message = translate('dashboard.terminals.open-failed')

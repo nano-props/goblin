@@ -654,7 +654,10 @@ describe('useKeyboard', () => {
     installNativeBridgeStub()
     seedTabbedWorktreeRepoForTest('terminal')
     const createTerminal = vi.fn(async () => 'term-222222222222222222222')
-    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
     const openCreateWorktree = vi.fn()
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
@@ -685,7 +688,10 @@ describe('useKeyboard', () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     const createTerminal = vi.fn(async () => 'term-222222222222222222222')
-    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal,
@@ -713,7 +719,10 @@ describe('useKeyboard', () => {
   test('primary modifier plus w closes the selected terminal tab', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     seedTabbedWorktreeRepoForTest('terminal')
-    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),

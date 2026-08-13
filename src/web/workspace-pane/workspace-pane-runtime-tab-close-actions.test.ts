@@ -68,7 +68,10 @@ describe('workspace pane runtime tab close actions', () => {
   })
 
   test('confirms terminal runtime close through the terminal close context', async () => {
-    const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
 
     await expect(
       confirmWorkspacePaneRuntimeTabClose(

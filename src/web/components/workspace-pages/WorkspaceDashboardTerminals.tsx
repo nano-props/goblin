@@ -30,9 +30,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { clearWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
-import {
-  commitWorkspacePaneTerminalDestination,
-} from '#/web/workspace-pane/workspace-pane-terminal-destination-navigation.ts'
+import { commitWorkspacePaneTerminalDestination } from '#/web/workspace-pane/workspace-pane-terminal-destination-navigation.ts'
 import { surfaceWorkspacePaneTerminalDestinationOutcome } from '#/web/workspace-pane/workspace-pane-terminal-destination-feedback.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 
@@ -55,11 +53,9 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
     const workspace = computed(() => workspaces.value[props.workspaceId] ?? null)
     const workspaceRuntimeId = computed(() => workspace.value?.workspaceRuntimeId ?? '')
     const hasWorkspaceRuntime = computed(() => workspaceRuntimeId.value.length > 0)
-    const repoSnapshot = useRepoSnapshotReadModel(
-      () => props.workspaceId,
-      workspaceRuntimeId,
-      { enabled: computed(() => hasWorkspaceRuntime.value && workspace.value?.capability.kind === 'git') },
-    )
+    const repoSnapshot = useRepoSnapshotReadModel(() => props.workspaceId, workspaceRuntimeId, {
+      enabled: computed(() => hasWorkspaceRuntime.value && workspace.value?.capability.kind === 'git'),
+    })
     const paneTabs = useWorkspacePaneTabsQuery(() => props.workspaceId, workspaceRuntimeId, {
       enabled: hasWorkspaceRuntime,
     })
@@ -167,18 +163,14 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
       const detailsId = `dashboard-terminal-details-${session.terminalSessionId}`
       const statusId = `dashboard-terminal-status-${session.terminalSessionId}`
       const statusText = terminalStatusText(session, t)
-      let errorBadge: VNodeChild = null
-      let bellBadge: VNodeChild = null
-      let outputActivity: VNodeChild = null
-      if (session.phase === 'error') {
-        errorBadge = (
+      const errorBadge: VNodeChild =
+        session.phase === 'error' ? (
           <span class="shrink-0 text-[10px] font-medium uppercase tracking-wide text-destructive">
             {t('dashboard.terminals.error')}
           </span>
-        )
-      }
-      if (session.hasBell) bellBadge = <TerminalBellBadge count={1} />
-      if (session.hasRecentOutput) outputActivity = <TerminalOutputActivityIndicator />
+        ) : null
+      const bellBadge: VNodeChild = session.hasBell ? <TerminalBellBadge count={1} /> : null
+      const outputActivity: VNodeChild = session.hasRecentOutput ? <TerminalOutputActivityIndicator /> : null
 
       return (
         <button
