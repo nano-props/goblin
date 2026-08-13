@@ -16,7 +16,7 @@ import { onScopeDispose, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { uiTransitionStore } from '#/web/stores/ui-transition.ts'
-import { branchViewModeForWorkspace, visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
+import { branchViewModeForWorkspace } from '#/web/stores/workspaces/branch-view-mode.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchClientKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
@@ -44,6 +44,11 @@ import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
+import {
+  branchNavigatorRowMatchesIdentity,
+  branchNavigatorRows,
+  type BranchNavigatorRowIdentity,
+} from '#/web/components/branch-navigator/branch-navigator-model.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -53,6 +58,7 @@ interface Options {
   navigation: MaybeRefOrGetter<AppNavigationActions>
   currentWorkspaceId: MaybeRefOrGetter<WorkspaceId | null>
   currentBranchName?: MaybeRefOrGetter<string | null>
+  currentBranchNavigatorRowIdentity: MaybeRefOrGetter<BranchNavigatorRowIdentity | null>
   currentWorkspacePaneCommandTarget: MaybeRefOrGetter<WorkspacePaneCommandTarget | null>
   onShowHelp: () => void
   /** Returns true when workspace shortcuts should not affect the workspace view. */
@@ -120,23 +126,26 @@ function moveBranchSelection(
   input: {
     repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>
     viewMode: BranchViewMode
-    currentBranchName: string | null
+    currentRow: BranchNavigatorRowIdentity | null
   },
   direction: MoveDirection,
   navigation: AppNavigationActions,
 ): boolean {
   const branchModel = getRepoSnapshotQueryData(input.repo.id, input.repo.workspaceRuntimeId)
   if (!branchModel) return false
-  const branches = visibleBranches({
+  const rows = branchNavigatorRows({
     branches: branchModel.branches,
     worktrees: branchModel.worktrees,
     viewMode: input.viewMode,
   })
-  if (branches.length === 0) return false
-  const index = branches.findIndex((branch) => branch.name === input.currentBranchName)
-  const next = branches[nextIndex(index, branches.length, direction)]
+  if (rows.length === 0) return false
+  const currentRow = input.currentRow
+  const index = currentRow ? rows.findIndex((row) => branchNavigatorRowMatchesIdentity(row, currentRow)) : -1
+  if (currentRow && index < 0) return false
+  const next = rows[nextIndex(index, rows.length, direction)]
   if (!next) return false
-  navigation.selectRepoBranch(input.repo.id, next.name)
+  if (next.kind === 'branch') navigation.selectRepoBranch(input.repo.id, next.branch.name)
+  else navigation.selectRepoWorktree(input.repo.id, next.worktree.path)
   return true
 }
 
@@ -278,7 +287,7 @@ export function useKeyboard(options: Options) {
             {
               repo,
               viewMode: branchViewModeForWorkspace(workspacesStore.getState().branchViewModeByWorkspace, repo.id),
-              currentBranchName: toValue(options.currentBranchName) ?? null,
+              currentRow: toValue(options.currentBranchNavigatorRowIdentity),
             },
             1,
             navigation,
@@ -294,7 +303,7 @@ export function useKeyboard(options: Options) {
             {
               repo,
               viewMode: branchViewModeForWorkspace(workspacesStore.getState().branchViewModeByWorkspace, repo.id),
-              currentBranchName: toValue(options.currentBranchName) ?? null,
+              currentRow: toValue(options.currentBranchNavigatorRowIdentity),
             },
             -1,
             navigation,

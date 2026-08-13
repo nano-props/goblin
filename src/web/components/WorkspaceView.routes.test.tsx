@@ -108,21 +108,21 @@ describe('WorkspaceView branch and page routes', () => {
     expect(onOpenWorkspaceDashboard).not.toHaveBeenCalled()
   })
 
-  test('new worktree page creation replaces the form route with the created branch route', () => {
+  test('new worktree page creation replaces the form route with the created worktree route', () => {
     const onCancelRepoNewWorktree = vi.fn()
-    const onReplaceRepoBranch = vi.fn()
+    const onReplaceRepoWorktree = vi.fn()
     const { container } = render(
       <WorkspaceView
         workspaceId={REPO_ID}
         routeView={{ kind: 'newWorktree', workspaceId: REPO_ID }}
         onCancelRepoNewWorktree={onCancelRepoNewWorktree}
-        onReplaceRepoBranch={onReplaceRepoBranch}
+        onReplaceRepoWorktree={onReplaceRepoWorktree}
       />,
     )
 
     buttonByTestId(container, 'create-worktree-created')?.click()
 
-    expect(onReplaceRepoBranch).toHaveBeenCalledWith(REPO_ID, 'feature/new-worktree', 1)
+    expect(onReplaceRepoWorktree).toHaveBeenCalledWith(REPO_ID, '/tmp/new-worktree', 1)
     expect(onCancelRepoNewWorktree).not.toHaveBeenCalled()
   })
 

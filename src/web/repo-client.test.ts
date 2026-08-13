@@ -306,6 +306,27 @@ describe('repo-client', () => {
     await expect(fetchRepo(workspaceId, workspaceRuntimeId)).rejects.toThrow()
   })
 
+  test('decodes the server-confirmed target from a successful worktree creation', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    mockFetch(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, message: 'created', worktreePath: '/private/tmp/repo-feature' }),
+    }))
+
+    const { createRepoWorktree } = await import('#/web/repo-client.ts')
+    await expect(
+      createRepoWorktree(
+        workspaceId,
+        workspaceRuntimeId,
+        {
+          worktreePath: '/tmp/nested/../repo-feature',
+          mode: { kind: 'newBranch', newBranch: 'feature/work', baseRef: 'main' },
+        },
+        { kind: 'skip' },
+      ),
+    ).resolves.toEqual({ ok: true, message: 'created', worktreePath: '/private/tmp/repo-feature' })
+  })
+
   test('preserves an uncertain clone outcome after the clone request watchdog fires', async () => {
     useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))

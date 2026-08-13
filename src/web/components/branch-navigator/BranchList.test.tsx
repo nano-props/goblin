@@ -5,7 +5,12 @@
 // bubble events up". We stub BranchActionsMenu and the terminal bell/output
 // hook so the suite stays focused on the list.
 
-import { createRepoBranch, createGitRepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
+import {
+  createRepoBranch,
+  createGitRepoPresentationForTest,
+  createRepoWorktreeSnapshotForTest,
+} from '#/web/test-utils/repo-store.ts'
+import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -14,7 +19,14 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { nextTick } from 'vue'
 
 vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
-  BranchActionsMenu: () => null,
+  BranchActionsMenu: (props: { open?: boolean; onOpenChange?: (open: boolean) => void }) => (
+    <button
+      type="button"
+      data-testid="branch-actions-menu"
+      data-open={props.open ? 'true' : 'false'}
+      onClick={() => props.onOpenChange?.(true)}
+    />
+  ),
 }))
 
 vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
@@ -37,7 +49,7 @@ describe('BranchList', () => {
     const { container } = renderInJsdom(
       <BranchList
         repo={repo}
-        branches={branches}
+        rows={branches.map((branch) => ({ kind: 'branch' as const, branch }))}
         highlightedBranch="main"
         onSelectBranch={onSelect}
         onOpenBranchStatus={onOpenStatus}
@@ -62,7 +74,7 @@ describe('BranchList', () => {
     const { container } = renderInJsdom(
       <BranchList
         repo={repo}
-        branches={[]}
+        rows={[]}
         highlightedBranch={null}
         onSelectBranch={onSelect}
         onOpenBranchStatus={() => {}}
@@ -82,7 +94,7 @@ describe('BranchList', () => {
     const { container } = renderInJsdom(
       <BranchList
         repo={null}
-        branches={[createRepoBranch('main')]}
+        rows={[{ kind: 'branch', branch: createRepoBranch('main') }]}
         highlightedBranch={null}
         onSelectBranch={() => {}}
         onOpenBranchStatus={() => {}}
@@ -101,7 +113,7 @@ describe('BranchList', () => {
     const { container } = renderInJsdom(
       <BranchList
         repo={repo}
-        branches={branches}
+        rows={branches.map((branch) => ({ kind: 'branch' as const, branch }))}
         highlightedBranch="fix/b"
         onSelectBranch={() => {}}
         onOpenBranchStatus={() => {}}
@@ -115,6 +127,40 @@ describe('BranchList', () => {
     expect(items[1]?.className).not.toContain('bg-selected')
   })
 
+  test('closes a branch action menu when the row changes to operation presentation', async () => {
+    const branch = createRepoBranch('feature/a')
+    const attached = createRepoWorktreeSnapshotForTest(branch.name, '/tmp/feature-a')
+    const repo = branchListRepo([branch], branch.name, [attached])
+    const props = {
+      repo,
+      highlightedBranch: null,
+      highlightedWorktreePath: attached.path,
+      onSelectBranch: () => {},
+      onOpenBranchStatus: () => {},
+      emptyState: null,
+    }
+    const { container, rerender } = renderInJsdom(
+      <BranchList {...props} rows={[{ kind: 'worktree', branch, worktree: attached }]} />,
+    )
+
+    const menu = container.querySelector('[data-testid="branch-actions-menu"]')
+    if (!(menu instanceof HTMLButtonElement)) throw new Error('missing branch actions menu')
+    menu.click()
+    await nextTick()
+    expect(menu.dataset.open).toBe('true')
+
+    const rebasing: RepoWorktreeSnapshot = {
+      ...attached,
+      head: { kind: 'detached' },
+      operation: { kind: 'rebase' },
+    }
+    await rerender(<BranchList {...props} rows={[{ kind: 'worktree', branch, worktree: rebasing }]} />)
+    expect(container.querySelector('[data-testid="branch-actions-menu"]')).toBeNull()
+
+    await rerender(<BranchList {...props} rows={[{ kind: 'worktree', branch, worktree: attached }]} />)
+    expect(container.querySelector('[data-testid="branch-actions-menu"]')?.getAttribute('data-open')).toBe('false')
+  })
+
   test('scrolls the initially highlighted row into view after its ref mounts', async () => {
     const scrollIntoView = vi.fn()
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
@@ -126,7 +172,7 @@ describe('BranchList', () => {
     const { container } = renderInJsdom(
       <BranchList
         repo={repo}
-        branches={branches}
+        rows={branches.map((branch) => ({ kind: 'branch' as const, branch }))}
         highlightedBranch="fix/b"
         onSelectBranch={() => {}}
         onOpenBranchStatus={() => {}}
@@ -142,13 +188,18 @@ describe('BranchList', () => {
   })
 })
 
-function branchListRepo(branches: ReturnType<typeof createRepoBranch>[], currentBranch: string) {
+function branchListRepo(
+  branches: ReturnType<typeof createRepoBranch>[],
+  currentBranch: string,
+  worktrees?: RepoWorktreeSnapshot[],
+) {
   return createGitRepoPresentationForTest(
     emptyWorkspace(workspaceIdForTest('goblin+file:///tmp/repo'), 'repo-runtime-test'),
     {
       branches,
       currentBranch,
       status: [],
+      worktrees,
     },
   )
 }

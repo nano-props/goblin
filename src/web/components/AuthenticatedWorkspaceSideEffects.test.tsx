@@ -54,6 +54,7 @@ describe('AuthenticatedWorkspaceSideEffects', () => {
       filesystemTarget: null,
     }
     const currentBranchName = ref('feature/first')
+    const currentBranchNavigatorRowIdentity = ref({ kind: 'branch' as const, branchName: 'feature/first' })
     const currentTarget = ref<WorkspacePaneCommandTarget | null>(firstTarget)
     const routeContext = ref<WorkspaceNavigationRouteContext | null>({
       kind: 'branch',
@@ -71,6 +72,7 @@ describe('AuthenticatedWorkspaceSideEffects', () => {
           <AuthenticatedWorkspaceSideEffects
             hydratedRouteWorkspaceId={WORKSPACE_ID}
             currentBranchName={currentBranchName.value}
+            currentBranchNavigatorRowIdentity={currentBranchNavigatorRowIdentity.value}
             currentWorkspacePaneCommandTarget={currentWorkspacePaneCommandTarget}
             routeContext={routeContext.value}
             navigation={navigation}
@@ -93,6 +95,7 @@ describe('AuthenticatedWorkspaceSideEffects', () => {
 
     await flushTestUpdates(() => {
       currentBranchName.value = 'feature/second'
+      currentBranchNavigatorRowIdentity.value = { kind: 'branch', branchName: 'feature/second' }
       currentTarget.value = secondTarget
       routeContext.value = {
         kind: 'branch',
@@ -110,6 +113,10 @@ describe('AuthenticatedWorkspaceSideEffects', () => {
     expect(sideEffectMocks.useBackgroundFetch).not.toHaveBeenCalled()
     expect(keyboardOptions.currentWorkspacePaneCommandTarget()).toEqual(secondTarget)
     expect(keyboardOptions.currentBranchName()).toBe('feature/second')
+    expect(keyboardOptions.currentBranchNavigatorRowIdentity()).toEqual({
+      kind: 'branch',
+      branchName: 'feature/second',
+    })
     expect(retirementOptions.currentTarget()).toEqual(secondTarget)
     expect(historyOptions.routeContext()).toEqual(routeContext.value)
   })

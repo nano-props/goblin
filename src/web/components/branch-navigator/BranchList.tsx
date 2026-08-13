@@ -1,12 +1,12 @@
-// Pure presentational branch list. Renders a vertical list of
-// BranchListRow entries and scrolls the highlighted row into view as
+// Pure presentational navigator list. Renders the ordered branch/worktree
+// row model and scrolls the highlighted row into view as
 // it changes. The wrapper (BranchNavigator pane) owns the data source,
 // the navigation glue, and the outer container
 // — this component owns the per-list action-menu state and the
 // scroll-into-view side effect.
 //
 // Notes on the abstraction boundary:
-//   • does NOT read the store; receives `repo` and `branches` from the parent
+//   • does NOT read the store; receives `repo` and ordered `rows` from the parent
 //   • does NOT wrap in ScrollArea (the pane owns its scroll container)
 //   • owns the per-list `actionMenuOpen` so the "row is no longer rendered
 //     ⇒ close the menu" invariant lives next to the rows that draw it
@@ -17,17 +17,15 @@ import { defineComponent, ref, watch } from 'vue'
 import type { PropType, VNodeChild } from 'vue'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
 import type { BranchListRepo } from '#/web/components/branch-navigator/use-branch-list-data.ts'
-import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
-import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import { WorktreeStateRow } from '#/web/components/branch-navigator/WorktreeStateRow.tsx'
 import { BRANCH_ROW_LIST_CLASS } from '#/web/components/branch-navigator/branch-row-metrics.ts'
+import type { BranchNavigatorRow } from '#/web/components/branch-navigator/branch-navigator-model.ts'
 
 interface Props {
   /** May be null while repo data is not loaded yet; the list falls
    *  through to the empty-state slot in that case. */
   repo: BranchListRepo | null
-  branches: BranchSnapshotInfo[]
-  worktreeStateRows?: RepoWorktreeSnapshot[]
+  rows: BranchNavigatorRow[]
   /** Name of the branch to mark as selected/highlighted in the list. */
   highlightedBranch: string | null
   highlightedWorktreePath?: string | null
@@ -35,7 +33,7 @@ interface Props {
   onOpenBranchStatus: (branch: string) => void
   onSelectWorktree?: (worktreePath: string) => void
   onOpenWorktreeStatus?: (worktreePath: string) => void
-  /** Rendered when `branches` is empty. */
+  /** Rendered when `rows` is empty. */
   emptyState: VNodeChild
 }
 
@@ -43,8 +41,7 @@ export const BranchList = defineComponent<Props>({
   name: 'BranchList',
   props: {
     repo: { type: Object as PropType<BranchListRepo | null>, default: null },
-    branches: { type: Array as PropType<BranchSnapshotInfo[]>, required: true },
-    worktreeStateRows: { type: Array as PropType<RepoWorktreeSnapshot[]>, default: () => [] },
+    rows: { type: Array as PropType<BranchNavigatorRow[]>, required: true },
     highlightedBranch: { type: String, default: null },
     highlightedWorktreePath: { type: String, default: null },
     onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
@@ -60,9 +57,16 @@ export const BranchList = defineComponent<Props>({
 
     // The menu owns an anchored overlay, so its state must end with the row.
     watch(
-      () => props.branches,
-      (branches) => {
-        if (actionMenuOpen.value && !branches.some((branch) => branch.name === actionMenuOpen.value)) {
+      () => props.rows,
+      (rows) => {
+        if (
+          actionMenuOpen.value &&
+          !rows.some(
+            (row) =>
+              row.branch?.name === actionMenuOpen.value &&
+              (row.kind === 'branch' || (row.worktree.head.kind === 'branch' && row.worktree.operation === null)),
+          )
+        ) {
           actionMenuOpen.value = null
         }
       },
@@ -77,38 +81,53 @@ export const BranchList = defineComponent<Props>({
     )
 
     return () => {
-      if ((props.branches.length === 0 && (props.worktreeStateRows?.length ?? 0) === 0) || !props.repo) {
+      if (props.rows.length === 0 || !props.repo) {
         return <>{props.emptyState}</>
       }
 
       return (
         <ul class={BRANCH_ROW_LIST_CLASS}>
-          {props.branches.map((branch) => (
-            <BranchListRow
-              key={branch.name}
-              repo={props.repo!}
-              branch={branch}
-              selected={props.highlightedBranch}
-              onSelectBranch={props.onSelectBranch}
-              onOpenBranchStatus={props.onOpenBranchStatus}
-              selectedRef={selectedRef}
-              actionMenuOpen={actionMenuOpen.value === branch.name}
-              onActionMenuOpenChange={(open) => {
-                actionMenuOpen.value = open ? branch.name : null
-              }}
-            />
-          ))}
-          {(props.worktreeStateRows ?? []).map((worktree) => (
-            <WorktreeStateRow
-              key={worktree.path}
-              workspaceId={props.repo!.id}
-              worktree={worktree}
-              selected={props.highlightedWorktreePath === worktree.path}
-              selectedRef={selectedRef}
-              onSelect={() => props.onSelectWorktree?.(worktree.path)}
-              onOpenStatus={() => props.onOpenWorktreeStatus?.(worktree.path)}
-            />
-          ))}
+          {props.rows.map((row) => {
+            if (row.kind === 'worktree' && (row.worktree.head.kind === 'detached' || row.worktree.operation)) {
+              return (
+                <WorktreeStateRow
+                  key={row.worktree.path}
+                  workspaceId={props.repo!.id}
+                  worktree={row.worktree}
+                  selected={props.highlightedWorktreePath === row.worktree.path}
+                  selectedRef={selectedRef}
+                  onSelect={() => props.onSelectWorktree?.(row.worktree.path)}
+                  onOpenStatus={() => props.onOpenWorktreeStatus?.(row.worktree.path)}
+                />
+              )
+            }
+
+            const branch = row.branch
+            if (!branch) return null
+            const worktreePath = row.kind === 'worktree' ? row.worktree.path : null
+            const selected = worktreePath
+              ? props.highlightedWorktreePath === worktreePath
+                ? branch.name
+                : null
+              : props.highlightedBranch
+            return (
+              <BranchListRow
+                key={row.kind === 'worktree' ? row.worktree.path : branch.name}
+                repo={props.repo!}
+                branch={branch}
+                selected={selected}
+                onSelectBranch={worktreePath ? () => props.onSelectWorktree?.(worktreePath) : props.onSelectBranch}
+                onOpenBranchStatus={
+                  worktreePath ? () => props.onOpenWorktreeStatus?.(worktreePath) : props.onOpenBranchStatus
+                }
+                selectedRef={selectedRef}
+                actionMenuOpen={actionMenuOpen.value === branch.name}
+                onActionMenuOpenChange={(open) => {
+                  actionMenuOpen.value = open ? branch.name : null
+                }}
+              />
+            )
+          })}
         </ul>
       )
     }

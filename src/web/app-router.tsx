@@ -285,11 +285,11 @@ export function appRouterCallbacks(routeActions: AppRouteNavigation) {
       openWorkspacePaneRoute(routeActions, workspaceId, branchName),
     onOpenRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.openRepoNewWorktree(workspaceId),
     onCancelRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.cancelRepoNewWorktree(workspaceId),
-    onReplaceRepoBranch: (
+    onReplaceRepoWorktree: (
       workspaceId: WorkspaceId,
-      branchName: string,
+      worktreePath: string,
       navigationGeneration: AppNavigationGeneration,
-    ) => routeActions.openRepoBranch(workspaceId, branchName, { replace: true, navigationGeneration }),
+    ) => routeActions.openRepoWorktree(workspaceId, worktreePath, { replace: true, navigationGeneration }),
   }
 }
 

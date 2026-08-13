@@ -152,8 +152,14 @@ export function parseStatus(output: string): StatusEntry[] {
   return entries
 }
 
+export type GitPathPlatform = 'posix' | 'win32'
+
+export function normalizeGitPath(value: string, platform: GitPathPlatform): string {
+  return platform === 'win32' ? path.win32.normalize(value.replaceAll('/', '\\')) : value
+}
+
 /** Parse and validate `git worktree list --porcelain -z`. */
-export function parseWorktrees(output: string): WorktreeInfo[] {
+export function parseWorktrees(output: string, platform: GitPathPlatform = 'posix'): WorktreeInfo[] {
   if (output.length === 0) throw new Error('Invalid worktree output')
   if (!output.endsWith('\0\0')) throw new Error('Invalid worktree output')
   const blocks = output.slice(0, -2).split('\0\0')
@@ -203,7 +209,7 @@ export function parseWorktrees(output: string): WorktreeInfo[] {
     const isPrunable = lines.some((line) => line === 'prunable' || line.startsWith('prunable '))
     if (isPrunable) continue
     worktrees.push({
-      path: worktreeLine.slice('worktree '.length),
+      path: normalizeGitPath(worktreeLine.slice('worktree '.length), platform),
       ...(headLine ? { headOid: headLine.slice('HEAD '.length) } : {}),
       ...(branchLine ? { branch: branchLine.slice('branch refs/heads/'.length) } : {}),
       isBare: lines.includes('bare'),

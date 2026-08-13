@@ -1,5 +1,10 @@
 import * as v from 'valibot'
-import { EXEC_RESULT_RECOVERY_MESSAGE_KEYS, type ExecResult, type RepoMutationExecResult } from '#/shared/git-types.ts'
+import {
+  EXEC_RESULT_RECOVERY_MESSAGE_KEYS,
+  type CreateWorktreeExecResult,
+  type ExecResult,
+  type RepoMutationExecResult,
+} from '#/shared/git-types.ts'
 
 const NonNegativeIntegerSchema = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0))
 const WorktreeBootstrapPathSummarySchema = v.strictObject({
@@ -31,6 +36,15 @@ export const RepoMutationExecResultResponseSchema = v.strictObject({
   ),
   worktreeBootstrap: v.optional(WorktreeBootstrapSummaryResponseSchema),
 }) satisfies v.GenericSchema<RepoMutationExecResult>
+
+export const CreateWorktreeExecResultResponseSchema = v.variant('ok', [
+  v.strictObject({ ...RepoMutationExecResultResponseSchema.entries, ok: v.literal(false) }),
+  v.strictObject({
+    ...RepoMutationExecResultResponseSchema.entries,
+    ok: v.literal(true),
+    worktreePath: v.string(),
+  }),
+]) satisfies v.GenericSchema<CreateWorktreeExecResult>
 
 export function decodeWith<TSchema extends v.BaseSchema<unknown, unknown, v.BaseIssue<unknown>>>(schema: TSchema) {
   return (value: unknown): v.InferOutput<TSchema> => {

@@ -1,6 +1,7 @@
 import { GitBranchPlus } from '@lucide/vue'
 import { computed, defineComponent, ref, watch } from 'vue'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
+import type { RepoMutationExecResult } from '#/shared/git-types.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -50,7 +51,7 @@ interface CreateWorktreePagePaneProps {
   compact?: boolean
   trafficLightOffset?: boolean
   onCancel: () => void
-  onCreated: (branchName: string, navigationGeneration: AppNavigationGeneration) => void
+  onCreated: (worktreePath: string, navigationGeneration: AppNavigationGeneration) => void
 }
 
 type GitCreateWorktreeWorkspace = Pick<WorkspaceState, 'id' | 'workspaceRuntimeId' | 'admission'> & {
@@ -224,7 +225,7 @@ const GitCreateWorktreePagePane = defineComponent<GitCreateWorktreePagePaneProps
         },
         { workspaceRuntimeId },
       )
-      if (result?.ok) onCreated(createWorktreeTargetBranch(request.input), navigationGeneration)
+      if (result?.ok) onCreated(createdWorktreePath(result), navigationGeneration)
       return false
     }
 
@@ -362,17 +363,11 @@ const CreateWorktreePageShell = defineComponent<CreateWorktreePageShellProps>({
   },
 })
 
-function createWorktreeTargetBranch(input: CreateWorktreeRequest['input']): string {
-  switch (input.mode.kind) {
-    case 'newBranch':
-      return input.mode.newBranch
-    case 'existingBranch':
-      return input.mode.branch
-    case 'trackRemoteBranch':
-      return input.mode.localBranch
+function createdWorktreePath(result: RepoMutationExecResult): string {
+  if (!('worktreePath' in result) || typeof result.worktreePath !== 'string') {
+    throw new Error('Successful worktree creation is missing its target')
   }
-  const exhaustive: never = input.mode
-  return exhaustive
+  return result.worktreePath
 }
 
 function isBootstrapLoadForRepo(load: BootstrapLoad | null, repoId: WorkspaceId, workspaceRuntimeId: string): boolean {

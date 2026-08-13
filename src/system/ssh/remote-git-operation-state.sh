@@ -2,11 +2,35 @@
 
 set -euo pipefail
 
-REPO_PATH=$1
-ATTACHED_BRANCH=$2
-cd -- "$REPO_PATH"
+COMMON_DIR=${1%/}
+WORKTREE_PATH=${2%/}
+IS_PRIMARY=$3
+ATTACHED_BRANCH=$4
 
-GIT_PATH_OUTPUT=$(git rev-parse \
+if [ "$IS_PRIMARY" = 1 ]; then
+  GIT_DIR=$COMMON_DIR
+elif [ "$IS_PRIMARY" = 0 ]; then
+  GIT_DIR=
+  MATCH_COUNT=0
+  for CANDIDATE_GIT_DIR in "$COMMON_DIR"/worktrees/*; do
+    [ -d "$CANDIDATE_GIT_DIR" ] || continue
+    [ -f "$CANDIDATE_GIT_DIR/gitdir" ] || continue
+    GITDIR_POINTER=$(<"$CANDIDATE_GIT_DIR/gitdir")
+    case "$GITDIR_POINTER" in
+      /*/.git) CANDIDATE_WORKTREE_PATH=${GITDIR_POINTER%/.git} ;;
+      *) continue ;;
+    esac
+    if [ "${CANDIDATE_WORKTREE_PATH%/}" = "$WORKTREE_PATH" ]; then
+      GIT_DIR=$CANDIDATE_GIT_DIR
+      MATCH_COUNT=$((MATCH_COUNT + 1))
+    fi
+  done
+  [ "$MATCH_COUNT" -eq 1 ] || exit 1
+else
+  exit 1
+fi
+
+GIT_PATH_OUTPUT=$(git --git-dir="$GIT_DIR" rev-parse \
   --git-path rebase-merge \
   --git-path rebase-apply \
   --git-path CHERRY_PICK_HEAD \

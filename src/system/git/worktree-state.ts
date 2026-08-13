@@ -1,11 +1,12 @@
 import path from 'node:path'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
 import { gitOperationRequiresDetachedHead } from '#/shared/git-types.ts'
 import type { GitOperation, RepoWorktreeSnapshot, WorktreeInfo } from '#/shared/git-types.ts'
 import { gitHead } from '#/shared/git-head.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import { git } from '#/system/git/git-exec.ts'
 import { mapWithConcurrency } from '#/system/git/concurrency.ts'
+import { resolveRepoCommonDir } from '#/system/git/branches.ts'
 
 const WORKTREE_STATE_READ_CONCURRENCY = 4
 const GIT_OPERATION_PATHS = [
@@ -24,23 +25,32 @@ interface GitWorktreeState {
 }
 
 export async function readRepoWorktreeSnapshots(
+  repoCwd: string,
   worktrees: readonly WorktreeInfo[],
   signal?: AbortSignal,
 ): Promise<RepoWorktreeSnapshot[]> {
+  const usableWorktrees = worktrees.filter((worktree) => !worktree.isBare)
+  if (usableWorktrees.length === 0) return []
+  const gitDirs = await resolveWorktreeGitDirs(repoCwd, worktrees, signal)
   return await mapWithConcurrency(
-    worktrees.filter((worktree) => !worktree.isBare),
+    usableWorktrees,
     WORKTREE_STATE_READ_CONCURRENCY,
-    async (worktree) => await readRepoWorktreeSnapshot(worktree, signal),
+    async (worktree) => await readRepoWorktreeSnapshot(repoCwd, worktree, requiredGitDir(gitDirs, worktree), signal),
     { signal, abort: 'throw' },
   )
 }
 
-async function readRepoWorktreeSnapshot(worktree: WorktreeInfo, signal?: AbortSignal): Promise<RepoWorktreeSnapshot> {
+async function readRepoWorktreeSnapshot(
+  repoCwd: string,
+  worktree: WorktreeInfo,
+  gitDir: string,
+  signal?: AbortSignal,
+): Promise<RepoWorktreeSnapshot> {
   if (worktree.isPrunable || !worktree.headOid) {
     throw new Error('Git returned an incomplete worktree identity')
   }
   const head = gitHead(worktree.branch ?? null)
-  const state = await readGitWorktreeState(worktree.path, signal)
+  const state = await readGitWorktreeState(repoCwd, gitDir, signal)
   if (head.kind === 'branch' && gitOperationRequiresDetachedHead(state.operation)) {
     throw new Error('Git worktree membership changed while reading operation state')
   }
@@ -55,8 +65,12 @@ async function readRepoWorktreeSnapshot(worktree: WorktreeInfo, signal?: AbortSi
   }
 }
 
-export async function readGitWorktreeState(cwd: string, signal?: AbortSignal): Promise<GitWorktreeState> {
-  const paths = await resolveGitPaths(cwd, signal)
+export async function readGitWorktreeState(
+  repoCwd: string,
+  gitDir: string,
+  signal?: AbortSignal,
+): Promise<GitWorktreeState> {
+  const paths = await resolveGitPaths(repoCwd, gitDir, signal)
   signal?.throwIfAborted()
   const [rebaseMergePath, rebaseApplyPath, cherryPickPath, revertPath, bisectPath, bisectStartPath, mergePath] = paths
   const rebasePath = (await pathIsDirectory(rebaseMergePath))
@@ -88,16 +102,74 @@ export async function readGitWorktreeState(cwd: string, signal?: AbortSignal): P
   }
 }
 
-async function resolveGitPaths(cwd: string, signal?: AbortSignal): Promise<string[]> {
-  const args = ['rev-parse', ...GIT_OPERATION_PATHS.flatMap((gitPath) => ['--git-path', gitPath])]
-  const output = await git(cwd, args, { signal })
+async function resolveGitPaths(repoCwd: string, gitDir: string, signal?: AbortSignal): Promise<string[]> {
+  const args = ['--git-dir', gitDir, 'rev-parse', ...GIT_OPERATION_PATHS.flatMap((gitPath) => ['--git-path', gitPath])]
+  const output = await git(repoCwd, args, { signal })
   const resolvedPaths = output.split(/\r?\n/)
   if (resolvedPaths.length !== GIT_OPERATION_PATHS.length || resolvedPaths.some((resolved) => !resolved)) {
     throw new Error(`Git returned ${resolvedPaths.length} administrative paths; expected ${GIT_OPERATION_PATHS.length}`)
   }
   return resolvedPaths.map((resolved) =>
-    path.isAbsolute(resolved) ? path.normalize(resolved) : path.resolve(cwd, resolved),
+    path.isAbsolute(resolved) ? path.normalize(resolved) : path.resolve(repoCwd, resolved),
   )
+}
+
+async function resolveWorktreeGitDirs(
+  repoCwd: string,
+  worktrees: readonly WorktreeInfo[],
+  signal?: AbortSignal,
+): Promise<Map<string, string>> {
+  const commonDir = await resolveRepoCommonDir(repoCwd, { signal })
+  signal?.throwIfAborted()
+  const primaryWorktrees = worktrees.filter((worktree) => worktree.isPrimary)
+  if (primaryWorktrees.length !== 1) throw new Error('Git returned an invalid primary worktree identity')
+  const gitDirs = new Map([[worktreePathKey(primaryWorktrees[0]!.path), commonDir]])
+  const linkedWorktrees = worktrees.filter((worktree) => !worktree.isPrimary)
+  if (linkedWorktrees.length === 0) return gitDirs
+
+  const adminRoot = path.join(commonDir, 'worktrees')
+  const entries = await readdir(adminRoot, { withFileTypes: true })
+  signal?.throwIfAborted()
+  const linkedGitDirs = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => await linkedWorktreeGitDir(path.join(adminRoot, entry.name), signal)),
+  )
+  signal?.throwIfAborted()
+  for (const candidate of linkedGitDirs) {
+    if (!candidate) continue
+    const { worktreePath, gitDir } = candidate
+    const key = worktreePathKey(worktreePath)
+    if (gitDirs.has(key)) throw new Error('Git returned duplicate worktree administrative identities')
+    gitDirs.set(key, gitDir)
+  }
+  for (const worktree of linkedWorktrees) requiredGitDir(gitDirs, worktree)
+  return gitDirs
+}
+
+async function linkedWorktreeGitDir(
+  gitDir: string,
+  signal?: AbortSignal,
+): Promise<{ worktreePath: string; gitDir: string } | null> {
+  try {
+    const pointer = (await readFile(path.join(gitDir, 'gitdir'), { encoding: 'utf8', signal })).trim()
+    return path.isAbsolute(pointer) && path.basename(pointer) === '.git'
+      ? { worktreePath: path.dirname(pointer), gitDir }
+      : null
+  } catch (error) {
+    if (isMissingPathError(error)) return null
+    throw error
+  }
+}
+
+function requiredGitDir(gitDirs: ReadonlyMap<string, string>, worktree: Pick<WorktreeInfo, 'path'>): string {
+  const gitDir = gitDirs.get(worktreePathKey(worktree.path))
+  if (!gitDir) throw new Error('Git worktree administrative identity is unavailable')
+  return gitDir
+}
+
+function worktreePathKey(worktreePath: string): string {
+  return path.resolve(worktreePath)
 }
 
 async function pathExists(target: string): Promise<boolean> {

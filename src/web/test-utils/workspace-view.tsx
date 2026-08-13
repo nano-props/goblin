@@ -145,7 +145,7 @@ vi.mock('#/web/components/workspace-pages/CreateWorktreePagePane.tsx', () => {
   const CreateWorktreePagePane: FunctionalComponent<{
     compact?: boolean
     onCancel: () => void
-    onCreated: (branchName: string, navigationGeneration: AppNavigationGeneration) => void
+    onCreated: (worktreePath: string, navigationGeneration: AppNavigationGeneration) => void
   }> = (props) => (
     <div data-testid="create-worktree-page" data-compact={props.compact ? 'true' : 'false'}>
       <button
@@ -160,8 +160,8 @@ vi.mock('#/web/components/workspace-pages/CreateWorktreePagePane.tsx', () => {
         type="button"
         data-testid="create-worktree-created"
         onClick={() => {
-          createWorktreePageMocks.created('feature/new-worktree')
-          props.onCreated('feature/new-worktree', 1)
+          createWorktreePageMocks.created('/tmp/new-worktree')
+          props.onCreated('/tmp/new-worktree', 1)
         }}
       />
     </div>

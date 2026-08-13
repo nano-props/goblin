@@ -58,9 +58,9 @@ interface WorkspaceViewProps {
   onOpenRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
   onOpenRepoNewWorktree?: (workspaceId: WorkspaceId) => void
   onCancelRepoNewWorktree?: (workspaceId: WorkspaceId) => void
-  onReplaceRepoBranch?: (
+  onReplaceRepoWorktree?: (
     workspaceId: WorkspaceId,
-    branchName: string,
+    worktreePath: string,
     navigationGeneration: AppNavigationGeneration,
   ) => void
 }
@@ -77,7 +77,7 @@ export const WorkspaceView = defineComponent<WorkspaceViewProps>({
     'onOpenRepoBranch',
     'onOpenRepoNewWorktree',
     'onCancelRepoNewWorktree',
-    'onReplaceRepoBranch',
+    'onReplaceRepoWorktree',
   ],
 
   setup(props) {
@@ -98,7 +98,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
     'onOpenRepoBranch',
     'onOpenRepoNewWorktree',
     'onCancelRepoNewWorktree',
-    'onReplaceRepoBranch',
+    'onReplaceRepoWorktree',
   ],
 
   setup(props) {
@@ -339,8 +339,8 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
                   if (props.onCancelRepoNewWorktree) props.onCancelRepoNewWorktree(currentWorkspace.id)
                   else props.onOpenWorkspaceNavigator?.(currentWorkspace.id)
                 }}
-                onCreated={(branchName, navigationGeneration) =>
-                  props.onReplaceRepoBranch?.(currentWorkspace.id, branchName, navigationGeneration)
+                onCreated={(worktreePath, navigationGeneration) =>
+                  props.onReplaceRepoWorktree?.(currentWorkspace.id, worktreePath, navigationGeneration)
                 }
               />
             )

@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import * as v from 'valibot'
-import { ExecResultResponseSchema, RepoMutationExecResultResponseSchema } from '#/shared/http-response-schema.ts'
+import {
+  CreateWorktreeExecResultResponseSchema,
+  ExecResultResponseSchema,
+  RepoMutationExecResultResponseSchema,
+} from '#/shared/http-response-schema.ts'
 import {
   RepoLogResponseSchema,
   RepoPullRequestsResponseSchema,
@@ -63,6 +67,24 @@ describe('repo response schemas', () => {
           'error.local-branch-deleted-followup-failed',
           'error.worktree-created-followup-failed',
         ],
+      }).success,
+    ).toBe(false)
+  })
+
+  test('requires a canonical path only for successful worktree creation', () => {
+    expect(
+      v.parse(CreateWorktreeExecResultResponseSchema, {
+        ok: true,
+        message: 'ok',
+        worktreePath: '/tmp/repo-worktree',
+      }),
+    ).toEqual({ ok: true, message: 'ok', worktreePath: '/tmp/repo-worktree' })
+    expect(v.safeParse(CreateWorktreeExecResultResponseSchema, { ok: true, message: 'ok' }).success).toBe(false)
+    expect(
+      v.safeParse(CreateWorktreeExecResultResponseSchema, {
+        ok: false,
+        message: 'failed',
+        worktreePath: '/tmp/repo-worktree',
       }).success,
     ).toBe(false)
   })

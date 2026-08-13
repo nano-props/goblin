@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 
-import { seedRepoWithReadModelForTest, resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
+import {
+  createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
+  seedRepoWithReadModelForTest,
+  resetWorkspacesStore,
+} from '#/web/test-utils/repo-store.ts'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -8,14 +13,17 @@ import type { HistoryState, RouteLocationRaw, RouteRecordRaw } from 'vue-router'
 
 import { useAppRouteNavigation } from '#/web/app-route-navigation.ts'
 import { observeAppHistoryNavigation, resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
-import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
+import { branchSlugFromName, workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
+import { appQueryClient } from '#/web/app-query-client.ts'
+import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/filesystem-route-navigation-workspace')
 const WORKTREE_PATH = '/tmp/filesystem-route-navigation-worktree'
+const BRANCH_NAME = 'feature/target-first'
 const TERMINAL_SESSION_ID = 'term-111111111111111111111'
 
 describe('filesystem workspace pane route navigation', () => {
@@ -108,6 +116,88 @@ describe('filesystem workspace pane route navigation', () => {
   })
 })
 
+describe('branch workspace pane target resolution', () => {
+  beforeEach(() => {
+    resetAppNavigationForTest()
+    resetWorkspacesStore()
+  })
+
+  test.each(['open', 'open-tab', 'commit'] as const)(
+    'abandons %s when the repository snapshot is unavailable',
+    async (action) => await expectBranchTargetNavigation(action, 'snapshot-unavailable', null),
+  )
+
+  test.each(['open', 'open-tab', 'commit'] as const)(
+    'abandons %s when the branch is absent from the snapshot',
+    async (action) => await expectBranchTargetNavigation(action, 'branch-absent', null),
+  )
+
+  test.each(['open', 'open-tab', 'commit'] as const)(
+    'routes %s through the materialized worktree target',
+    async (action) => await expectBranchTargetNavigation(action, 'materialized', materializedWorktreeRootHref()),
+  )
+
+  test.each(['open', 'open-tab', 'commit'] as const)(
+    'routes %s through the unmaterialized branch target',
+    async (action) => await expectBranchTargetNavigation(action, 'bare-branch', branchRootHref()),
+  )
+})
+
+type BranchTargetNavigationAction = 'open' | 'open-tab' | 'commit'
+type BranchTargetFixture = 'snapshot-unavailable' | 'branch-absent' | 'materialized' | 'bare-branch'
+
+async function expectBranchTargetNavigation(
+  action: BranchTargetNavigationAction,
+  fixture: BranchTargetFixture,
+  expectedRootHref: string | null,
+): Promise<void> {
+  const workspace = seedRepoWithReadModelForTest({
+    id: WORKSPACE_ID,
+    branches: [createRepoBranch(fixture === 'branch-absent' ? 'main' : BRANCH_NAME)],
+    worktrees: fixture === 'materialized' ? [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)] : undefined,
+    currentBranchName: fixture === 'branch-absent' ? 'main' : BRANCH_NAME,
+  })
+  if (fixture === 'snapshot-unavailable') {
+    appQueryClient.removeQueries({ queryKey: repoSnapshotQueryKey(WORKSPACE_ID, workspace.workspaceRuntimeId) })
+  }
+  const initialHref = action === 'commit' && expectedRootHref ? expectedRootHref : '/home'
+  const harness = await routeNavigationHarness(initialHref)
+  const { result } = renderComposableInJsdom(() => useAppRouteNavigation(), {
+    global: { plugins: [harness.router] },
+  })
+  const onAbandon = vi.fn()
+  const accepted = await Promise.resolve(
+    action === 'open'
+      ? result.value.openRepoBranch(WORKSPACE_ID, BRANCH_NAME, { onAbandon })
+      : action === 'open-tab'
+        ? result.value.openRepoBranchTab(WORKSPACE_ID, BRANCH_NAME, 'files', { onAbandon })
+        : result.value.commitWorkspacePaneRoute(
+            WORKSPACE_ID,
+            BRANCH_NAME,
+            { kind: 'static', tab: 'files' },
+            { onAbandon },
+          ),
+  )
+
+  expect(accepted).toBe(expectedRootHref !== null)
+  if (!expectedRootHref) {
+    expect(harness.navigate).not.toHaveBeenCalled()
+    expect(onAbandon).toHaveBeenCalledOnce()
+    return
+  }
+  const expectedHref = action === 'open' ? expectedRootHref : `${expectedRootHref}/tab/files`
+  await vi.waitFor(() => expect(harness.currentHref()).toBe(expectedHref))
+  expect(onAbandon).not.toHaveBeenCalled()
+}
+
+function materializedWorktreeRootHref(): string {
+  return filesystemRootHref({ kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH })
+}
+
+function branchRootHref(): string {
+  return `/workspace/${workspaceSlugFromId(WORKSPACE_ID)}/branch/${branchSlugFromName(BRANCH_NAME)}`
+}
+
 function filesystemRootHref(target: FilesystemWorkspacePaneTabsTarget): string {
   const workspaceSlug = workspaceSlugFromId(target.workspaceId)
   return target.kind === 'workspace-root'
@@ -154,6 +244,17 @@ async function routeNavigationHarness(initialHref: string) {
 }
 
 const filesystemTestRoutes: RouteRecordRaw[] = [
+  { path: '/home', name: 'home', component: { render: () => null } },
+  {
+    path: '/workspace/:workspaceSlug/branch/:branchSlug',
+    name: 'workspace-branch',
+    component: { render: () => null },
+  },
+  {
+    path: '/workspace/:workspaceSlug/branch/:branchSlug/tab/:tabKey',
+    name: 'workspace-branch-tab',
+    component: { render: () => null },
+  },
   { path: '/workspace/:workspaceSlug/root', name: 'workspace-root', component: { render: () => null } },
   {
     path: '/workspace/:workspaceSlug/root/tab/:tabKey',

@@ -6,7 +6,14 @@
 // from each git command.
 
 import { describe, expect, test } from 'vitest'
-import { FIELD_SEP, parseBranches, parseLog, parseStatus, parseWorktrees } from '#/system/git/parsers.ts'
+import {
+  FIELD_SEP,
+  normalizeGitPath,
+  parseBranches,
+  parseLog,
+  parseStatus,
+  parseWorktrees,
+} from '#/system/git/parsers.ts'
 
 const SEP = FIELD_SEP
 const NUL = String.fromCharCode(0)
@@ -236,6 +243,10 @@ describe('parseStatus', () => {
 })
 
 describe('parseWorktrees', () => {
+  test('normalizes Windows Git paths to the native local-domain spelling', () => {
+    expect(normalizeGitPath('C:/repo/feature', 'win32')).toBe('C:\\repo\\feature')
+  })
+
   test('rejects empty output because a Git repository always has a primary or bare worktree', () => {
     expect(() => parseWorktrees('')).toThrow('Invalid worktree output')
   })
@@ -290,8 +301,8 @@ describe('parseWorktrees', () => {
 
   test('accepts an absolute Windows path in authoritative porcelain output', () => {
     const out = ['worktree C:/repo', 'HEAD aaaaaaa', 'branch refs/heads/main'].join(NUL) + NUL + NUL
-    expect(parseWorktrees(out)).toEqual([
-      { path: 'C:/repo', headOid: 'aaaaaaa', branch: 'main', isBare: false, isPrimary: true, isLocked: false },
+    expect(parseWorktrees(out, 'win32')).toEqual([
+      { path: 'C:\\repo', headOid: 'aaaaaaa', branch: 'main', isBare: false, isPrimary: true, isLocked: false },
     ])
   })
 

@@ -46,6 +46,8 @@ describe('remote git mutations', () => {
             )
           case 'gitWorktreeList':
             return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+          case 'resolveRepoCommonDir':
+            return okRemoteResult('/srv/repo/.git\0')
           case 'gitOperationState':
             return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
           case 'gitStatus':
@@ -94,6 +96,8 @@ describe('remote git mutations', () => {
           )
         case 'gitWorktreeList':
           return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+        case 'resolveRepoCommonDir':
+          return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
           return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitUpstream':
@@ -123,6 +127,8 @@ describe('remote git mutations', () => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+        case 'resolveRepoCommonDir':
+          return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
           return okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/test\n')
         case 'gitSnapshot':
@@ -160,6 +166,8 @@ describe('remote git mutations', () => {
           )
         case 'gitWorktreeList':
           return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+        case 'resolveRepoCommonDir':
+          return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
           return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitUpstream':
@@ -220,6 +228,8 @@ describe('remote git mutations', () => {
           )
         case 'gitWorktreeList':
           return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+        case 'resolveRepoCommonDir':
+          return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
           return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitStatus':
@@ -279,6 +289,8 @@ describe('remote git mutations', () => {
             )
           case 'gitStatus':
             return okRemoteResult('')
+          case 'resolveRepoCommonDir':
+            return okRemoteResult('/srv/repo/.git\0')
           case 'gitOperationState':
             return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
           case 'gitSnapshot':
@@ -340,6 +352,8 @@ describe('remote git mutations', () => {
           return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
         case 'gitStatus':
           return okRemoteResult('')
+        case 'resolveRepoCommonDir':
+          return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
           return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitSnapshot':
@@ -397,6 +411,8 @@ describe('remote git mutations', () => {
           return okRemoteResult(worktrees)
         case 'gitStatus':
           return okRemoteResult('')
+        case 'resolveRepoCommonDir':
+          return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
           return command.path === '/srv/repo-rebase'
             ? okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/test\n')
@@ -639,6 +655,8 @@ describe('remote git mutations', () => {
             return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
           case 'gitStatus':
             return okRemoteResult('')
+          case 'resolveRepoCommonDir':
+            return okRemoteResult('/srv/repo/.git\0')
           case 'gitOperationState':
             return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
           case 'gitSnapshot':
@@ -689,6 +707,8 @@ describe('remote git mutations', () => {
           return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
         case 'gitStatus':
           return okRemoteResult('')
+        case 'resolveRepoCommonDir':
+          return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
           return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitSnapshot':
@@ -789,6 +809,8 @@ describe('remote git mutations', () => {
             return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
           case 'gitStatus':
             return okRemoteResult('')
+          case 'resolveRepoCommonDir':
+            return okRemoteResult('/srv/repo/.git\0')
           case 'gitOperationState':
             return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
           case 'gitSnapshot':

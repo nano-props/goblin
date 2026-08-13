@@ -35,6 +35,8 @@ describe('remote git network', () => {
           )
         case 'gitWorktreeList':
           return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+        case 'resolveRepoCommonDir':
+          return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
           return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitStatus':
@@ -265,6 +267,7 @@ describe('remote git network', () => {
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main'))
       }
+      if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitOperationState') {
         return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
       }

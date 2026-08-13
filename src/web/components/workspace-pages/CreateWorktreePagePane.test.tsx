@@ -15,7 +15,7 @@ import { appQueryClient } from '#/web/app-query-client.ts'
 import { getRepoOperations, getRepoSnapshot, getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
-import type { ExecResult } from '#/shared/git-types.ts'
+import type { CreateWorktreeExecResult } from '#/shared/git-types.ts'
 import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { getSettingsSnapshot } from '#/web/settings-client.ts'
@@ -411,14 +411,14 @@ describe('CreateWorktreePagePane', () => {
     })
   })
 
-  test('navigates to the created branch after the action succeeds', async () => {
+  test('reports the server-confirmed worktree path after the action succeeds', async () => {
     const onCreated = vi.fn()
     const onCancel = vi.fn()
-    let resolveAction!: (value: ExecResult) => void
+    let resolveAction!: (value: CreateWorktreeExecResult) => void
     workspacesStore.setState({
       runBranchAction: vi.fn(
         () =>
-          new Promise<ExecResult>((resolve) => {
+          new Promise<CreateWorktreeExecResult>((resolve) => {
             resolveAction = resolve
           }),
       ),
@@ -442,11 +442,11 @@ describe('CreateWorktreePagePane', () => {
     expect(onCreated).not.toHaveBeenCalled()
 
     await flushTestUpdates(async () => {
-      resolveAction({ ok: true, message: 'ok' })
+      resolveAction({ ok: true, message: 'ok', worktreePath: '/private/repo-feature' })
     })
 
     await waitFor(() => {
-      expect(onCreated).toHaveBeenCalledWith('feature/new', navigationGeneration)
+      expect(onCreated).toHaveBeenCalledWith('/private/repo-feature', navigationGeneration)
     })
     expect(onCancel).not.toHaveBeenCalled()
   })
@@ -454,11 +454,11 @@ describe('CreateWorktreePagePane', () => {
   test('retains the submitting navigation generation when creation settles after newer navigation', async () => {
     const admittedOnCreated = vi.fn()
     const replacementOnCreated = vi.fn()
-    let resolveAction!: (value: ExecResult) => void
+    let resolveAction!: (value: CreateWorktreeExecResult) => void
     workspacesStore.setState({
       runBranchAction: vi.fn(
         () =>
-          new Promise<ExecResult>((resolve) => {
+          new Promise<CreateWorktreeExecResult>((resolve) => {
             resolveAction = resolve
           }),
       ),
@@ -479,10 +479,10 @@ describe('CreateWorktreePagePane', () => {
       </VueQueryClientScope>,
     )
     await flushTestUpdates(async () => {
-      resolveAction({ ok: true, message: 'ok' })
+      resolveAction({ ok: true, message: 'ok', worktreePath: '/private/repo-feature' })
     })
 
-    await waitFor(() => expect(admittedOnCreated).toHaveBeenCalledWith('feature/new', submittingGeneration))
+    await waitFor(() => expect(admittedOnCreated).toHaveBeenCalledWith('/private/repo-feature', submittingGeneration))
     expect(replacementOnCreated).not.toHaveBeenCalled()
   })
 

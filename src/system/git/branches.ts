@@ -3,7 +3,13 @@ import { realpath } from 'node:fs/promises'
 import { omit } from 'es-toolkit'
 import { git, gitCommandResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
 import { withoutMutationCommand, type CommandOutcome } from '#/system/command-execution.ts'
-import { FOR_EACH_REF_FIELD_SEP, PRETTY_FIELD_SEP, parseBranches, parseLog } from '#/system/git/parsers.ts'
+import {
+  FOR_EACH_REF_FIELD_SEP,
+  PRETTY_FIELD_SEP,
+  normalizeGitPath,
+  parseBranches,
+  parseLog,
+} from '#/system/git/parsers.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
@@ -28,7 +34,8 @@ export async function isGitRepo(cwd: string): Promise<boolean> {
 
 export async function getRepoRoot(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   try {
-    return await git(cwd, ['rev-parse', '--show-toplevel'], { signal: options?.signal })
+    const root = await git(cwd, ['rev-parse', '--show-toplevel'], { signal: options?.signal })
+    return normalizeGitPath(root, process.platform === 'win32' ? 'win32' : 'posix')
   } catch {
     return ''
   }

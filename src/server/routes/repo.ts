@@ -50,7 +50,11 @@ import {
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
-import { DEFAULT_REPOSITORY_LOG_COUNT, type RepoMutationExecResult } from '#/shared/git-types.ts'
+import {
+  DEFAULT_REPOSITORY_LOG_COUNT,
+  type CreateWorktreeExecResult,
+  type RepoMutationExecResult,
+} from '#/shared/git-types.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import { resolveRepoSource } from '#/server/modules/repo-source.ts'
@@ -236,17 +240,16 @@ export function createRepoRoutes(options: {
     const runtimeCapability = requireWorkspaceRuntimeEpochCapability(userIdFromContext(c), cwd, workspaceRuntimeId)
     const { userId } = runtimeCapability
     assertGitCapability(userId, cwd, workspaceRuntimeId)
-    return c.json(
-      await runPublicRepoMutationRequest({
-        userId,
-        workspaceId: cwd,
-        invalidatedDomains: ['metadata', 'worktree-status'],
-        run: () =>
-          createRepoWorktree(cwd, { worktreePath, mode }, runtimeCapability, worktreeBootstrap, c.req.raw.signal),
-        label: 'create-worktree',
-        signal: c.req.raw.signal,
-      }),
-    )
+    const result = await runRepoMutationRequest({
+      userId,
+      workspaceId: cwd,
+      invalidatedDomains: ['metadata', 'worktree-status'],
+      run: () =>
+        createRepoWorktree(cwd, { worktreePath, mode }, runtimeCapability, worktreeBootstrap, c.req.raw.signal),
+      label: 'create-worktree',
+      signal: c.req.raw.signal,
+    })
+    return c.json(publicCreateWorktreeResult(result))
   })
   app.post('/delete-branch', async (c) => {
     const { cwd, workspaceRuntimeId, branch, force, deleteUpstream } = await parseHttpBody(
@@ -403,6 +406,13 @@ async function runRepoMutationRequest(input: RepoMutationRequest): Promise<RepoM
 
 async function runPublicRepoMutationRequest(input: RepoMutationRequest): Promise<RepoMutationExecResult> {
   return publicRepoMutationResult(await runRepoMutationRequest(input))
+}
+
+function publicCreateWorktreeResult(result: RepoMutationResult): CreateWorktreeExecResult {
+  const publicResult = publicRepoMutationResult(result)
+  if (!result.ok) return { ...publicResult, ok: false }
+  if (!result.createdWorktreePath) throw new Error('Successful worktree creation is missing its canonical target')
+  return { ...publicResult, ok: true, worktreePath: result.createdWorktreePath }
 }
 
 async function backgroundSyncResponse(userId: string) {

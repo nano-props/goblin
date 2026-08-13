@@ -23,11 +23,16 @@ describe('readGitWorktreeState administrative paths', () => {
     )
     const { readGitWorktreeState } = await import('#/system/git/worktree-state.ts')
 
-    await expect(readGitWorktreeState('/repo')).resolves.toEqual({ operation: null, materializedBranch: null })
+    await expect(readGitWorktreeState('/repo', '/repo/.git/worktrees/feature')).resolves.toEqual({
+      operation: null,
+      materializedBranch: null,
+    })
     expect(mocks.git).toHaveBeenCalledOnce()
     expect(mocks.git).toHaveBeenCalledWith(
       '/repo',
       [
+        '--git-dir',
+        '/repo/.git/worktrees/feature',
         'rev-parse',
         '--git-path',
         'rebase-merge',
@@ -52,13 +57,15 @@ describe('readGitWorktreeState administrative paths', () => {
     mocks.git.mockResolvedValueOnce(['.git/rebase-merge', '.git/rebase-apply', '.git/CHERRY_PICK_HEAD'].join('\n'))
     const { readGitWorktreeState } = await import('#/system/git/worktree-state.ts')
 
-    await expect(readGitWorktreeState('/repo')).rejects.toThrow('Git returned 3 administrative paths; expected 7')
+    await expect(readGitWorktreeState('/repo', '/repo/.git')).rejects.toThrow(
+      'Git returned 3 administrative paths; expected 7',
+    )
   })
 
   test('preserves Git command failures', async () => {
     mocks.git.mockRejectedValueOnce(new Error('rev-parse failed'))
     const { readGitWorktreeState } = await import('#/system/git/worktree-state.ts')
 
-    await expect(readGitWorktreeState('/repo')).rejects.toThrow('rev-parse failed')
+    await expect(readGitWorktreeState('/repo', '/repo/.git')).rejects.toThrow('rev-parse failed')
   })
 })

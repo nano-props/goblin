@@ -13,12 +13,12 @@ import type { BranchListRepoShell } from '#/web/components/branch-navigator/use-
 import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import { branchViewModeForWorkspace, visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
+import { branchViewModeForWorkspace } from '#/web/stores/workspaces/branch-view-mode.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { gitWorktreePaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { repoWorktreeMaterializedBranch } from '#/shared/git-types.ts'
+import { branchNavigatorRows } from '#/web/components/branch-navigator/branch-navigator-model.ts'
 
 interface Props {
   repoId: WorkspaceId
@@ -84,25 +84,13 @@ const BranchViewReadModel = defineComponent<BranchViewReadModelProps>({
     const t = useT()
     const navigation = useAppNavigation()
     const { repo, snapshotReadModel, statusReadModel } = useBranchListReadModel(() => props.repo)
-    const worktreeStateRows = computed(
-      () =>
-        repo.value?.snapshot.worktrees.filter(
-          (worktree) => worktree.head.kind === 'detached' || worktree.operation !== null,
-        ) ?? [],
-    )
-    const branches = computed(() => {
+    const rows = computed(() => {
       if (!repo.value) return []
-      const operationBranches = new Set(
-        worktreeStateRows.value.flatMap((worktree) => {
-          const branchName = repoWorktreeMaterializedBranch(worktree)
-          return branchName ? [branchName] : []
-        }),
-      )
-      return visibleBranches({
+      return branchNavigatorRows({
         branches: repo.value.snapshot.branches,
         worktrees: repo.value.snapshot.worktrees,
         viewMode: repo.value.branchViewMode,
-      }).filter((branch) => !operationBranches.has(branch.name))
+      })
     })
     const highlightedBranch = computed(() => {
       if (props.currentBranchName) return props.currentBranchName
@@ -186,8 +174,7 @@ const BranchViewReadModel = defineComponent<BranchViewReadModelProps>({
           <RepoReadNotice failures={readFailures} />
           <BranchList
             repo={currentRepo}
-            branches={branches.value}
-            worktreeStateRows={worktreeStateRows.value}
+            rows={rows.value}
             highlightedBranch={highlightedBranch.value}
             highlightedWorktreePath={props.currentWorktreePath ?? null}
             onSelectBranch={selectBranch}

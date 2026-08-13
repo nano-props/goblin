@@ -157,15 +157,25 @@ async function readRemoteRepoWorktreeSnapshots(
   worktrees: readonly WorktreeInfo[],
   options: { signal?: AbortSignal; run: RemoteGitRunner },
 ): Promise<RepoWorktreeSnapshot[]> {
+  const usableWorktrees = worktrees.filter((worktree) => !worktree.isBare)
+  if (usableWorktrees.length === 0) return []
+  const commonDir = await resolveRemoteRepoCommonDir(target, { signal: options.signal, run: options.run })
+  if (!commonDir) throw new Error('error.failed-read-repo')
   return await mapWithConcurrency(
-    worktrees.filter((worktree) => !worktree.isBare),
+    usableWorktrees,
     REMOTE_WORKTREE_STATUS_CONCURRENCY,
     async (worktree) => {
       if (worktree.isPrunable || !worktree.headOid) {
         throw new Error('error.failed-read-repo')
       }
       const result = await options.run(
-        { type: 'gitOperationState', path: worktree.path, attachedBranch: worktree.branch ?? null },
+        {
+          type: 'gitOperationState',
+          path: worktree.path,
+          commonDir,
+          isPrimary: worktree.isPrimary,
+          attachedBranch: worktree.branch ?? null,
+        },
         target,
         { signal: options.signal },
       )
@@ -802,6 +812,18 @@ export async function getRemoteRepoWorktreePaths(
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const worktrees = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
   return worktrees.filter((worktree) => !worktree.isBare).map((worktree) => worktree.path)
+}
+
+export async function resolveRemoteWorktreePath(
+  target: RemoteWorkspaceTarget,
+  worktreePath: string,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<string | null> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const result = await run({ type: 'revParseTopLevel', path: worktreePath }, target, { signal: options.signal })
+  if (options.signal?.aborted || !result.ok) return null
+  const canonicalPath = result.stdout.endsWith('\n') ? result.stdout.slice(0, -1) : result.stdout
+  return canonicalPath.startsWith('/') && !/[\0\r\n]/u.test(canonicalPath) ? canonicalPath : null
 }
 
 export async function resolveRemoteRepoCommonDir(

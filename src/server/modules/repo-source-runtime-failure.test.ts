@@ -172,6 +172,8 @@ describe('repo source runtime failure classification', () => {
             return okRemoteResult(
               worktreePorcelain(`worktree ${target.remotePath}\nHEAD f00ba40\nbranch refs/heads/main`),
             )
+          case 'resolveRepoCommonDir':
+            return okRemoteResult('/srv/repo/.git\0')
           case 'gitOperationState':
             return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
           case 'gitSnapshot':
@@ -251,6 +253,8 @@ describe('repo source runtime failure classification', () => {
             )
           case 'gitStatus':
             return okRemoteResult('')
+          case 'resolveRepoCommonDir':
+            return okRemoteResult('/srv/repo/.git\0')
           case 'gitOperationState':
             return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
           case 'gitSnapshot':

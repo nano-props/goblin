@@ -32,7 +32,7 @@ import {
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type {
   TerminalCreateOptions,
@@ -48,6 +48,7 @@ import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import { repoOperationsQueryKey, repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { BranchNavigatorRowIdentity } from '#/web/components/branch-navigator/branch-navigator-model.ts'
 import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import {
@@ -77,6 +78,7 @@ const FILESYSTEM_CAPABILITIES = {
 interface HookHostOptions {
   currentWorkspaceId: WorkspaceId | null
   currentBranchName: string | null
+  currentBranchNavigatorRowIdentity: BranchNavigatorRowIdentity | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   isWorkspaceShortcutSuppressed: () => boolean
   isSettingsOpen: () => boolean
@@ -265,6 +267,84 @@ describe('useKeyboard', () => {
     })
 
     expect(selectRepoBranch).toHaveBeenCalledWith(REPO_ID, 'feature/query')
+  })
+
+  test('branch navigation traverses the rendered targets across attached, rebase, and detached states', async () => {
+    const currentBranch = createRepoBranch('feature/current')
+    const nextBranch = createRepoBranch('feature/next')
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [currentBranch, nextBranch],
+      currentBranchName: currentBranch.name,
+      worktrees: [createRepoWorktreeSnapshotForTest(currentBranch.name, WORKTREE_PATH)],
+    })
+    const selectRepoBranch = vi.fn()
+    const selectRepoWorktree = vi.fn()
+    await renderHookHost({
+      currentWorkspaceId: REPO_ID,
+      currentBranchName: currentBranch.name,
+      currentBranchNavigatorRowIdentity: { kind: 'worktree', worktreePath: WORKTREE_PATH },
+      navigation: navigationWith({ selectRepoBranch, selectRepoWorktree }),
+    })
+
+    await dispatchBranchShortcut('j', 'KeyJ')
+    expect(selectRepoBranch).toHaveBeenCalledOnce()
+    expect(selectRepoBranch).toHaveBeenCalledWith(REPO_ID, nextBranch.name)
+    selectRepoBranch.mockClear()
+
+    const attachedSnapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
+    if (!attachedSnapshot) throw new Error('expected attached snapshot')
+    setRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId, {
+      ...attachedSnapshot,
+      worktrees: attachedSnapshot.worktrees.map((worktree) => ({
+        ...worktree,
+        head: { kind: 'detached' as const },
+        operation: { kind: 'rebase' as const },
+      })),
+    })
+
+    await dispatchBranchShortcut('j', 'KeyJ')
+    expect(selectRepoBranch).toHaveBeenCalledOnce()
+    expect(selectRepoBranch).toHaveBeenCalledWith(REPO_ID, nextBranch.name)
+    selectRepoBranch.mockClear()
+
+    const rebaseSnapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
+    if (!rebaseSnapshot) throw new Error('expected rebase snapshot')
+    setRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId, {
+      ...rebaseSnapshot,
+      worktrees: rebaseSnapshot.worktrees.map((worktree) => ({
+        ...worktree,
+        operation: null,
+        materializedBranch: null,
+      })),
+    })
+
+    await dispatchBranchShortcut('k', 'KeyK')
+    expect(selectRepoBranch).toHaveBeenCalledOnce()
+    expect(selectRepoBranch).toHaveBeenCalledWith(REPO_ID, nextBranch.name)
+    expect(selectRepoWorktree).not.toHaveBeenCalled()
+  })
+
+  test('branch navigation fast-fails when the authoritative snapshot is unavailable', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main'), createRepoBranch('feature/next')],
+      currentBranchName: 'main',
+    })
+    appQueryClient.removeQueries({ queryKey: repoSnapshotQueryKey(repo.id, repo.workspaceRuntimeId), exact: true })
+    const selectRepoBranch = vi.fn()
+    const selectRepoWorktree = vi.fn()
+    await renderHookHost({
+      currentWorkspaceId: REPO_ID,
+      currentBranchName: 'main',
+      navigation: navigationWith({ selectRepoBranch, selectRepoWorktree }),
+    })
+
+    const shortcut = await dispatchBranchShortcut('j', 'KeyJ')
+
+    expect(shortcut.defaultPrevented).toBe(false)
+    expect(selectRepoBranch).not.toHaveBeenCalled()
+    expect(selectRepoWorktree).not.toHaveBeenCalled()
   })
 
   test('alt-arrow navigates workspace history', async () => {
@@ -845,6 +925,15 @@ function currentTerminalPaneCommandTargetForTest(): WorkspacePaneCommandTarget {
   }
 }
 
+async function dispatchBranchShortcut(key: string, code: string): Promise<KeyboardEvent> {
+  const shortcut = keyboardEventForTest('keydown', { key, code })
+  await flushTestUpdates(async () => {
+    window.dispatchEvent(shortcut)
+    await Promise.resolve()
+  })
+  return shortcut
+}
+
 async function dispatchPrimaryShortcut(
   key: string,
   code: string,
@@ -893,6 +982,7 @@ const HookHost = defineComponent<Partial<HookHostOptions>>({
   props: [
     'currentWorkspaceId',
     'currentBranchName',
+    'currentBranchNavigatorRowIdentity',
     'currentWorkspacePaneCommandTarget',
     'isWorkspaceShortcutSuppressed',
     'isSettingsOpen',
@@ -940,6 +1030,9 @@ const HookHost = defineComponent<Partial<HookHostOptions>>({
       navigation: overrides.navigation ?? navigationWith(),
       currentWorkspaceId: overrides.currentWorkspaceId ?? null,
       currentBranchName: overrides.currentBranchName ?? null,
+      currentBranchNavigatorRowIdentity:
+        overrides.currentBranchNavigatorRowIdentity ??
+        (overrides.currentBranchName ? { kind: 'branch', branchName: overrides.currentBranchName } : null),
       currentWorkspacePaneCommandTarget: overrides.currentWorkspacePaneCommandTarget ?? defaultCommandTarget,
       onShowHelp: () => {},
       isWorkspaceShortcutSuppressed: overrides.isWorkspaceShortcutSuppressed ?? (() => false),

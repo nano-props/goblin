@@ -158,6 +158,7 @@ const hoistedMocks = vi.hoisted(() => ({
   getRemoteSnapshot: vi.fn(),
   getRemoteWorkspacePaneTargetIdentities: vi.fn(),
   resolveRemoteRepoCommonDir: vi.fn(),
+  resolveRemoteWorktreePath: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
   removeRemoteWorktree: vi.fn(),
   getServerWorkspaceSettings: vi.fn(),
@@ -273,6 +274,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   getRemoteRepoWorktreePaths: hoistedMocks.getRemoteRepoWorktreePaths,
   getRemoteWorkspacePaneTargetIdentities: hoistedMocks.getRemoteWorkspacePaneTargetIdentities,
   resolveRemoteRepoCommonDir: hoistedMocks.resolveRemoteRepoCommonDir,
+  resolveRemoteWorktreePath: hoistedMocks.resolveRemoteWorktreePath,
   getRemoteSnapshot: hoistedMocks.getRemoteSnapshot,
   getRemoteStatus: vi.fn(),
   getRemoteTrackingBranches: vi.fn(),
@@ -364,6 +366,7 @@ beforeEach(async () => {
   hoistedMocks.resolveRemoteRepoCommonDir.mockImplementation(
     async (target: { remotePath: string }) => target.remotePath,
   )
+  hoistedMocks.resolveRemoteWorktreePath.mockImplementation(async (_target, worktreePath: string) => worktreePath)
   hoistedMocks.getCurrentBranch.mockResolvedValue('main')
   hoistedMocks.resolveRepoCommonDir.mockImplementation(async (cwd: string) =>
     cwd.startsWith('/tmp/repo') ? '/tmp/repo/.git' : `${cwd}/.git`,
@@ -372,7 +375,7 @@ beforeEach(async () => {
     cwd.startsWith('/tmp/repo') ? '/tmp/repo/.git/objects' : `${cwd}/.git/objects`,
   )
   hoistedMocks.getRepoName.mockResolvedValue('repo')
-  hoistedMocks.getRepoRoot.mockResolvedValue('/tmp/repo')
+  hoistedMocks.getRepoRoot.mockImplementation(async (cwd: string) => cwd)
   hoistedMocks.readWorktreeMembership.mockResolvedValue([])
   hoistedMocks.readRepoWorktreeSnapshots.mockResolvedValue([])
   hoistedMocks.sampleWorktreeStatusForTarget.mockImplementation(async (worktree) => ({

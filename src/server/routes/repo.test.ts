@@ -625,7 +625,11 @@ describe('repo routes — worktree mutation responses', () => {
   test('returns the committed create result without a snapshot read-back', async () => {
     const app = createTestRepoRoutes()
     const workspaceRuntimeId = await openTestWorkspaceRuntime()
-    mocks.createRepoWorktree.mockResolvedValueOnce({ ok: true, message: 'created' })
+    mocks.createRepoWorktree.mockResolvedValueOnce({
+      ok: true,
+      message: 'created',
+      createdWorktreePath: '/private/tmp/repo-feature',
+    })
 
     const response = await app.request(
       new Request('http://localhost/create-worktree', {
@@ -634,7 +638,7 @@ describe('repo routes — worktree mutation responses', () => {
         body: JSON.stringify({
           cwd: WORKSPACE_ID,
           workspaceRuntimeId,
-          worktreePath: '/tmp/repo-feature',
+          worktreePath: '/tmp/nested/../repo-feature',
           mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
           worktreeBootstrap: { kind: 'skip' },
         }),
@@ -642,7 +646,11 @@ describe('repo routes — worktree mutation responses', () => {
     )
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ ok: true, message: 'created' })
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      message: 'created',
+      worktreePath: '/private/tmp/repo-feature',
+    })
     expect(mocks.readRepoSnapshot).not.toHaveBeenCalled()
   })
 

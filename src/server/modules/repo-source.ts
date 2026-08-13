@@ -35,6 +35,7 @@ import {
   getCurrentBranch,
   getHeadHash,
   getLog as getBranchLog,
+  getRepoRoot,
   getUpstream,
   isAncestor,
   isGitRepo,
@@ -82,6 +83,7 @@ import {
   getRemoteLog,
   getRemotePatch,
   getRemoteRepoWorktreePaths,
+  resolveRemoteWorktreePath,
   getRemoteWorkspacePaneTargetIdentities,
   getRemoteSnapshot,
   getRemoteStatus,
@@ -490,7 +492,7 @@ function createLocalRepoSource(
   ): Promise<ExecResult | null> {
     const current = await getCurrentBranch(gitCwd, { signal })
     const worktrees = knownWorktrees ?? (await readWorktreeMembership(gitCwd, signal))
-    const worktreeSnapshots = await readRepoWorktreeSnapshots(worktrees, signal)
+    const worktreeSnapshots = await readRepoWorktreeSnapshots(repoId, worktrees, signal)
     const ignoredPath = ignoredWorktreePath ? path.resolve(ignoredWorktreePath) : null
     const isCheckedOutElsewhere = worktreeSnapshots.some((worktree) => {
       if (repoWorktreeMaterializedBranch(worktree) !== branch) return false
@@ -568,7 +570,7 @@ function createLocalRepoSource(
       const membership = await readWorktreeMembership(repoId, options?.signal)
       const [currentBranch, worktrees] = await Promise.all([
         getCurrentBranch(repoId, { signal: options?.signal }),
-        readRepoWorktreeSnapshots(membership, options?.signal),
+        readRepoWorktreeSnapshots(repoId, membership, options?.signal),
       ])
       const branches = await getBranches(repoId, currentBranch, { signal: options?.signal })
       const current = currentBranch ?? ''
@@ -580,7 +582,7 @@ function createLocalRepoSource(
     async getWorkspacePaneTargetIdentities(options) {
       const membership = await readWorktreeMembership(repoId, options?.signal)
       options?.signal?.throwIfAborted()
-      const worktrees = await readRepoWorktreeSnapshots(membership, options?.signal)
+      const worktrees = await readRepoWorktreeSnapshots(repoId, membership, options?.signal)
       return await getBranchWorktreeIdentities(repoId, worktrees, { signal: options?.signal })
     },
     async getStatus(options) {
@@ -640,20 +642,36 @@ function createLocalRepoSource(
           return { ok: false, message: 'error.invalid-arguments' }
         }
       }
-      const createdWorkspaceId = workspaceIdForLocalWorktreePath(input.worktreePath)
-      const repoIdsToInvalidate = [
-        ...(await readLocalRepoIdsToInvalidate(repoId, signal)),
-        ...(createdWorkspaceId ? [createdWorkspaceId] : []),
-      ]
+      const existingRepoIds = await readLocalRepoIdsToInvalidate(repoId, signal)
+      const requestedWorkspaceId = workspaceIdForLocalWorktreePath(input.worktreePath)
+      const requestedRepoIds = [...existingRepoIds, ...(requestedWorkspaceId ? [requestedWorkspaceId] : [])]
       const { result: created, execution } = await options.runMembershipMutation(
         async () => await createWorktree(repoId, input, signal),
       )
       if (!created.ok) {
         const failure = worktreeCommandFailureForUser(created, execution, 'create')
-        return withCommandImpact(failure, execution, repoIdsToInvalidate)
+        return withCommandImpact(failure, execution, requestedRepoIds)
       }
-      if (options?.worktreeBootstrap?.kind !== 'run') return withRepoIdsToInvalidate(created, repoIdsToInvalidate)
-      const bootstrapped = await bootstrapWorktreeAfterCreate(repoId, input.worktreePath, {
+      const canonicalWorktreePath = await getRepoRoot(input.worktreePath, { signal })
+      if (!canonicalWorktreePath) {
+        return withRepoIdsToInvalidate(
+          worktreeCreatedFollowupFailureForUser({ ok: false, message: 'error.failed-read-repo' }),
+          requestedRepoIds,
+        )
+      }
+      const createdWorkspaceId = workspaceIdForLocalWorktreePath(canonicalWorktreePath)
+      if (!createdWorkspaceId) {
+        return withRepoIdsToInvalidate(
+          worktreeCreatedFollowupFailureForUser({ ok: false, message: 'error.invalid-path' }),
+          requestedRepoIds,
+        )
+      }
+      const repoIdsToInvalidate = [...existingRepoIds, createdWorkspaceId]
+      const createdResult = { ...created, createdWorktreePath: canonicalWorktreePath }
+      if (options?.worktreeBootstrap?.kind !== 'run') {
+        return withRepoIdsToInvalidate(createdResult, repoIdsToInvalidate)
+      }
+      const bootstrapped = await bootstrapWorktreeAfterCreate(repoId, canonicalWorktreePath, {
         signal,
         expectedConfigHash: options.worktreeBootstrap.configHash,
       })
@@ -664,7 +682,10 @@ function createLocalRepoSource(
             ...(bootstrapped.worktreeBootstrap ? { worktreeBootstrap: bootstrapped.worktreeBootstrap } : {}),
           }
         : worktreeCreatedFollowupFailureForUser(bootstrapped)
-      return withRepoIdsToInvalidate(result, repoIdsToInvalidate)
+      return withRepoIdsToInvalidate(
+        result.ok ? { ...result, createdWorktreePath: canonicalWorktreePath } : result,
+        repoIdsToInvalidate,
+      )
     },
     async deleteBranch(branch, options, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -866,14 +887,37 @@ async function createRemoteRepoSource(
           signal,
           run: membershipRun,
         })
-        const targetRepoIds = remoteWorktreeRepoIds(target, [input.worktreePath])
-        const repoIdsToInvalidate = [...existingRepoIds, ...targetRepoIds]
+        const requestedRepoIds = [...existingRepoIds, ...remoteWorktreeRepoIds(target, [input.worktreePath])]
         if (!created.ok) {
           const failure = worktreeCommandFailureForUser(created, execution, 'create')
-          return withCommandImpact(failure, execution, repoIdsToInvalidate)
+          return withCommandImpact(failure, execution, requestedRepoIds)
         }
-        if (options?.worktreeBootstrap?.kind !== 'run') return withRepoIdsToInvalidate(created, repoIdsToInvalidate)
-        const bootstrapped = await bootstrapRemoteWorktreeAfterCreate(target, input.worktreePath, {
+        const canonicalWorktreePath = await resolveRemoteWorktreePath(target, input.worktreePath, {
+          signal,
+          run: mutationRun,
+        })
+        if (!canonicalWorktreePath) {
+          return withRepoIdsToInvalidate(
+            worktreeCreatedFollowupFailureForUser({
+              ok: false,
+              message: 'error.failed-read-repo',
+            }),
+            requestedRepoIds,
+          )
+        }
+        const canonicalRepoIds = remoteWorktreeRepoIds(target, [canonicalWorktreePath])
+        if (canonicalRepoIds.length !== 1) {
+          return withRepoIdsToInvalidate(
+            worktreeCreatedFollowupFailureForUser({ ok: false, message: 'error.invalid-path' }),
+            requestedRepoIds,
+          )
+        }
+        const repoIdsToInvalidate = [...existingRepoIds, ...canonicalRepoIds]
+        const createdResult = { ...created, createdWorktreePath: canonicalWorktreePath }
+        if (options?.worktreeBootstrap?.kind !== 'run') {
+          return withRepoIdsToInvalidate(createdResult, repoIdsToInvalidate)
+        }
+        const bootstrapped = await bootstrapRemoteWorktreeAfterCreate(target, canonicalWorktreePath, {
           signal,
           run: mutationRun,
           expectedConfigHash: options.worktreeBootstrap.configHash,
@@ -885,6 +929,7 @@ async function createRemoteRepoSource(
           {
             ok: true,
             message: [created.message, bootstrapped.message].filter(Boolean).join('\n'),
+            createdWorktreePath: canonicalWorktreePath,
             ...(bootstrapped.worktreeBootstrap ? { worktreeBootstrap: bootstrapped.worktreeBootstrap } : {}),
           },
           repoIdsToInvalidate,

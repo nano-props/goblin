@@ -58,7 +58,74 @@ describe('repo worktree creation', () => {
     )
 
     expect(result).toMatchObject({ ok: true, message: 'ok' })
+    expect(result.createdWorktreePath).toBe('/tmp/repo-worktree')
     expect(result.repoIdsToInvalidate).toEqual([REPO_ID, LINKED_REPO_ID, WORKTREE_REPO_ID])
+  })
+
+  test('returns the physical created path rather than the requested spelling', async () => {
+    mocks.getRepoRoot.mockImplementation(async (input: string) =>
+      input === '/tmp/nested/../repo-worktree' ? '/tmp/repo-worktree' : input,
+    )
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepoWorktree(
+      REPO_ID,
+      {
+        worktreePath: '/tmp/nested/../repo-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      SKIP_WORKTREE_BOOTSTRAP,
+    )
+
+    expect(result).toMatchObject({ ok: true, createdWorktreePath: '/tmp/repo-worktree' })
+    expect(mocks.getRepoRoot).toHaveBeenCalledWith('/tmp/nested/../repo-worktree', { signal: undefined })
+    expect(result.repoIdsToInvalidate).toEqual([REPO_ID, WORKTREE_REPO_ID])
+  })
+
+  test('reports recovery when the created local target cannot be resolved', async () => {
+    mocks.getRepoRoot.mockImplementation(async (input: string) => {
+      if (input === '/tmp/repo-worktree') return ''
+      return input
+    })
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepoWorktree(
+      REPO_ID,
+      {
+        worktreePath: '/tmp/repo-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      SKIP_WORKTREE_BOOTSTRAP,
+    )
+
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'error.failed-read-repo',
+      recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+    })
+  })
+
+  test('reports recovery when Git returns a path outside the app locator grammar', async () => {
+    mocks.getRepoRoot.mockResolvedValueOnce('/tmp/repo\\worktree')
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepoWorktree(
+      REPO_ID,
+      {
+        worktreePath: '/tmp/repo-worktree',
+        mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+      },
+      repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
+      SKIP_WORKTREE_BOOTSTRAP,
+    )
+
+    expect(result).toMatchObject({
+      ok: false,
+      message: 'error.invalid-path',
+      recoveryMessageKeys: ['error.worktree-created-followup-failed'],
+    })
   })
 
   test('createRepoWorktree returns timeout failure and invalidates the complete possible impact scope', async () => {

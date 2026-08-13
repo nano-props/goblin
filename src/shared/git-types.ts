@@ -180,6 +180,9 @@ export interface RepoMutationExecResult extends ExecResult {
   worktreeBootstrap?: WorktreeBootstrapSummary
 }
 
+export type CreateWorktreeExecResult =
+  (RepoMutationExecResult & { ok: false }) | (RepoMutationExecResult & { ok: true; worktreePath: string })
+
 /** Branch names we treat as protected — direct push/delete/etc. require
  *  extra confirmation, and "delete branch" is forbidden outright. Shared
  *  between main (server-side enforcement in IPC handlers) and client

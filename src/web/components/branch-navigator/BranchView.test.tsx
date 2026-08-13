@@ -43,6 +43,8 @@ const navigation: AppNavigationActions = {
   closeWorkspace: vi.fn(),
   cycleWorkspace: vi.fn(),
   selectRepoBranch: vi.fn(),
+  selectRepoWorktree: vi.fn(),
+  commitFilesystemWorkspacePaneRoute: vi.fn(async () => true),
   commitWorkspacePaneRoute: vi.fn(async () => true),
   goBack: vi.fn(),
   goForward: vi.fn(),
@@ -170,7 +172,7 @@ describe('BranchView', () => {
     },
   )
 
-  test('opens a non-current branch status through destination navigation', async () => {
+  test('opens a materialized branch status through its worktree target', async () => {
     const destination = createRepoBranch('feature/destination')
     const worktrees = [createRepoWorktreeSnapshotForTest(destination.name, WORKTREE_PATH)]
     const repo = seedRepoWithReadModelForTest({
@@ -186,12 +188,35 @@ describe('BranchView', () => {
     })
 
     renderBranchView()
+    await fireEvent.click(screen.getByText('feature/destination'))
     await fireEvent.doubleClick(screen.getByText('feature/destination'))
+
+    expect(navigation.selectRepoWorktree).toHaveBeenCalledWith(REPO_ID, WORKTREE_PATH)
+    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      }),
+      { kind: 'static', tab: 'status' },
+    )
+    expect(mocks.dispatchShowWorkspacePaneStaticTabAction).not.toHaveBeenCalled()
+  })
+
+  test('opens an unmaterialized branch status through its branch target', async () => {
+    const branch = createRepoBranch('feature/destination')
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [branch],
+      currentBranchName: null,
+    })
+    seedRepoQueryDataForTest(repo, { branches: [branch], currentBranch: '' })
+
+    renderBranchView()
+    await fireEvent.doubleClick(screen.getByText(branch.name))
 
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: REPO_ID,
-        branchName: 'feature/destination',
+        branchName: branch.name,
         type: 'status',
       }),
     )

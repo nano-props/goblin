@@ -51,9 +51,9 @@ export interface AppProps {
   onOpenRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
   onOpenRepoNewWorktree?: (workspaceId: WorkspaceId) => void
   onCancelRepoNewWorktree?: (workspaceId: WorkspaceId) => void
-  onReplaceRepoBranch?: (
+  onReplaceRepoWorktree?: (
     workspaceId: WorkspaceId,
-    branchName: string,
+    worktreePath: string,
     navigationGeneration: AppNavigationGeneration,
   ) => void
 }
@@ -70,7 +70,7 @@ export const App = defineComponent<AppProps>({
     'onOpenRepoBranch',
     'onOpenRepoNewWorktree',
     'onCancelRepoNewWorktree',
-    'onReplaceRepoBranch',
+    'onReplaceRepoWorktree',
   ],
 
   setup(props) {
@@ -109,7 +109,7 @@ export const App = defineComponent<AppProps>({
                 onOpenRepoBranch={props.onOpenRepoBranch}
                 onOpenRepoNewWorktree={props.onOpenRepoNewWorktree}
                 onCancelRepoNewWorktree={props.onCancelRepoNewWorktree}
-                onReplaceRepoBranch={props.onReplaceRepoBranch}
+                onReplaceRepoWorktree={props.onReplaceRepoWorktree}
               />
             ) : !workspaceMembershipReady.value ? (
               <WorkspaceLayoutSkeleton

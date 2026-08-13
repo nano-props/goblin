@@ -3,7 +3,11 @@ import type { RouteLocationRaw, Router } from 'vue-router'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type {
+  FilesystemWorkspacePaneTabsTarget,
+  GitBranchWorkspacePaneTabsTarget,
+  GitWorktreeWorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import type {
   BranchWorkspacePaneRouteTarget,
   ParsedBranchWorkspacePaneRouteTarget,
@@ -110,23 +114,24 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
   const navigation: AppRouteNavigation = {
     workspaceSlugForId: workspaceSlugForKnownId,
     currentWorkspacePaneRoute(workspaceId, branchName) {
+      const target = currentWorkspacePaneTargetForBranch(workspaceId, branchName)
+      if (!target) return undefined
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
       if (!workspaceSlug) return undefined
-      const worktreePath = currentWorktreePathForBranch(workspaceId, branchName)
       const targetRootHref = appRouteHref(
         router,
-        worktreePath
+        target.kind === 'git-worktree'
           ? {
               name: 'workspace-worktree',
-              params: { workspaceSlug, worktreeSlug: worktreeSlugFromPath(worktreePath) },
+              params: { workspaceSlug, worktreeSlug: worktreeSlugFromPath(target.worktreePath) },
             }
           : {
               name: 'workspace-branch',
-              params: { workspaceSlug, branchSlug: branchSlugFromName(branchName) },
+              params: { workspaceSlug, branchSlug: branchSlugFromName(target.branchName) },
             },
       )
       const currentHref = currentAppRouteHref(router)
-      return worktreePath
+      return target.kind === 'git-worktree'
         ? workspacePaneRouteFromTargetHref(currentHref, targetRootHref)
         : branchWorkspacePaneRouteFromHref(currentHref, targetRootHref)
     },
@@ -184,26 +189,30 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
       return await commitFilesystemWorkspacePaneRoute({ router, workspaceSlug, paneTarget, route, options })
     },
     openRepoBranch(workspaceId, branchName, options) {
-      const worktreePath = currentWorktreePathForBranch(workspaceId, branchName)
-      if (worktreePath) return navigation.openRepoWorktree(workspaceId, worktreePath, options)
+      const target = currentWorkspacePaneTargetForBranch(workspaceId, branchName)
+      if (!target) return abandonAppRoute(options)
+      if (target.kind === 'git-worktree') return navigation.openRepoWorktree(workspaceId, target.worktreePath, options)
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
       return runRouteNavigation(
         router,
-        { name: 'workspace-branch', params: { workspaceSlug, branchSlug: branchSlugFromName(branchName) } },
+        { name: 'workspace-branch', params: { workspaceSlug, branchSlug: branchSlugFromName(target.branchName) } },
         options,
       )
     },
     openRepoBranchTab(workspaceId, branchName, tab, options) {
-      const worktreePath = currentWorktreePathForBranch(workspaceId, branchName)
-      if (worktreePath) return navigation.openRepoWorktreeTab(workspaceId, worktreePath, tab, options)
+      const target = currentWorkspacePaneTargetForBranch(workspaceId, branchName)
+      if (!target) return abandonAppRoute(options)
+      if (target.kind === 'git-worktree') {
+        return navigation.openRepoWorktreeTab(workspaceId, target.worktreePath, tab, options)
+      }
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
       return runRouteNavigation(
         router,
         {
           name: 'workspace-branch-tab',
-          params: { workspaceSlug, branchSlug: branchSlugFromName(branchName), tabKey: tab },
+          params: { workspaceSlug, branchSlug: branchSlugFromName(target.branchName), tabKey: tab },
         },
         options,
       )
@@ -242,17 +251,20 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
       )
     },
     async commitWorkspacePaneRoute(workspaceId, branchName, route, options) {
-      const worktreePath = currentWorktreePathForBranch(workspaceId, branchName)
-      if (worktreePath) {
-        return await navigation.commitFilesystemWorkspacePaneRoute(
-          { kind: 'git-worktree', workspaceId, worktreePath },
-          route,
-          options,
-        )
+      const target = currentWorkspacePaneTargetForBranch(workspaceId, branchName)
+      if (!target) return abandonAppRoute(options)
+      if (target.kind === 'git-worktree') {
+        return await navigation.commitFilesystemWorkspacePaneRoute(target, route, options)
       }
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
-      return await commitBranchWorkspacePaneRoute({ router, workspaceSlug, branchName, route, options })
+      return await commitBranchWorkspacePaneRoute({
+        router,
+        workspaceSlug,
+        branchName: target.branchName,
+        route,
+        options,
+      })
     },
     openRepoNewWorktree(workspaceId, options) {
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
@@ -310,9 +322,16 @@ function workspaceSlugForKnownId(workspaceId: WorkspaceId): string | null {
   return workspace ? workspaceSlugFromId(workspace.id) : null
 }
 
-function currentWorktreePathForBranch(workspaceId: WorkspaceId, branchName: string): string | null {
+function currentWorkspacePaneTargetForBranch(
+  workspaceId: WorkspaceId,
+  branchName: string,
+): GitBranchWorkspacePaneTabsTarget | GitWorktreeWorkspacePaneTabsTarget | null {
   const workspace = workspacesStore.getState().workspaces[workspaceId]
   if (!workspace || workspace.capability.kind !== 'git') return null
   const snapshot = getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)
-  return snapshot ? (repoWorktreeForBranch(snapshot.worktrees, branchName)?.path ?? null) : null
+  if (!snapshot?.branches.some((branch) => branch.name === branchName)) return null
+  const worktree = repoWorktreeForBranch(snapshot.worktrees, branchName)
+  return worktree
+    ? { kind: 'git-worktree', workspaceId, worktreePath: worktree.path }
+    : { kind: 'git-branch', workspaceId, branchName }
 }

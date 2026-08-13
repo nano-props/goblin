@@ -131,7 +131,11 @@ function installSuccessfulCreateWorktreeBridge(options?: { onResponse?: () => vo
   installGoblinTestBridge({
     'repo.createWorktree': async () => {
       options?.onResponse?.()
-      return { ok: true, message: 'ok' }
+      return {
+        ok: true,
+        message: 'ok',
+        worktreePath: '/private/tmp/goblin-branch-actions-test-worktree',
+      }
     },
   })
 }
@@ -627,7 +631,12 @@ describe('runBranchAction', () => {
         [ipcPath]: () => {
           actionCalls += 1
           return new Promise((resolve) => {
-            resolveAction = () => resolve({ ok: true, message: 'ok' })
+            resolveAction = () =>
+              resolve({
+                ok: true,
+                message: 'ok',
+                ...(action.kind === 'createWorktree' ? { worktreePath: action.input.worktreePath } : {}),
+              })
           })
         },
         'repo.snapshot': () => {
@@ -719,7 +728,12 @@ describe('runBranchAction', () => {
       installGoblinTestBridge({
         [ipcPath]: () =>
           new Promise((resolve) => {
-            resolveResponse = () => resolve({ ok: true, message: 'ok' })
+            resolveResponse = () =>
+              resolve({
+                ok: true,
+                message: 'ok',
+                ...(action.kind === 'createWorktree' ? { worktreePath: action.input.worktreePath } : {}),
+              })
           }),
       })
 
@@ -807,10 +821,14 @@ describe('runBranchAction', () => {
     setBranchViewModeForTest('all')
     installSuccessfulCreateWorktreeBridge()
 
-    await workspacesStore
+    const result = await workspacesStore
       .getState()
       .runBranchAction(REPO_ID, createWorktreeAction(), { workspaceRuntimeId: 'repo-runtime-test' })
 
+    expect(result).toMatchObject({
+      ok: true,
+      worktreePath: '/private/tmp/goblin-branch-actions-test-worktree',
+    })
     expect(workspacesStore.getState().branchViewModeByWorkspace?.[REPO_ID]).toBe('all')
   })
 

@@ -9,7 +9,7 @@ export async function readWorktreeMembership(cwd: string, signal?: AbortSignal):
   signal?.throwIfAborted()
   const output = await git(cwd, ['worktree', 'list', '--porcelain', '-z'], { signal })
   signal?.throwIfAborted()
-  return parseWorktrees(output)
+  return parseWorktrees(output, process.platform === 'win32' ? 'win32' : 'posix')
 }
 
 /** Plain `git worktree remove` — no `--force`. Git refuses on dirty,
