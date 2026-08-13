@@ -1,9 +1,8 @@
 import { defineComponent } from 'vue'
 import type { VNodeChild } from 'vue'
-import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalPresentation, TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
@@ -22,8 +21,7 @@ export interface WorkspacePaneRuntimeTabPanelState {
 }
 
 export interface WorkspacePaneRuntimeTabPanelTarget {
-  routeTarget: FilesystemWorkspacePaneTabsTarget
-  runtimeTarget: RuntimeWorkspacePaneTarget
+  runtimeTarget: WorkspacePaneFilesystemExecutionTarget
   presentation: TerminalPresentation
 }
 
@@ -51,7 +49,6 @@ const TerminalWorkspacePaneRuntimeTabPanel = defineComponent<WorkspacePaneRuntim
 
     const createTerminalForSlot = async (base: TerminalSessionBase) => {
       await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        routeTarget: props.target.routeTarget,
         base,
         createTerminal: createTerminalWithAdmission,
         openerIdentity: null,

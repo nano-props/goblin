@@ -940,11 +940,6 @@ function currentWorkspacePaneCommandTarget(): WorkspacePaneCommandTarget | null 
   if (!currentBranchName || !currentWorkspaceId) return null
   if (currentFilesystemTarget?.kind === 'git-worktree') {
     return {
-      routeTarget: {
-        kind: 'git-worktree',
-        workspaceId: currentWorkspaceId,
-        worktreePath: workspacePaneFilesystemRootPath(currentFilesystemTarget),
-      },
       workspacePaneRoute: currentWorkspacePaneRoute,
       filesystemTarget: currentFilesystemTarget,
     }

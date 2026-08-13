@@ -30,7 +30,7 @@ import {
 import { branchSlugFromName, workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 
 export interface AppRouteNavigationOptions<
-  Route = ParsedWorkspacePaneRouteTarget,
+  Route extends ParsedWorkspacePaneRouteTarget = ParsedWorkspacePaneRouteTarget,
 > extends AppNavigationExecutionOptions {
   routePrecondition?: { kind: 'exact-route'; route: Route } | { kind: 'current-workspace-target' }
 }

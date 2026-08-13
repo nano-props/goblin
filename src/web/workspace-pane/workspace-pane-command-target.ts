@@ -1,11 +1,10 @@
 import type { QueryClient } from '@tanstack/query-core'
 import type { ParsedBranchWorkspacePaneRouteTarget, ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   gitWorktreePaneFilesystemTarget,
-  workspacePaneFilesystemRootPath,
+  workspacePaneTabsTargetForFilesystemTarget,
   workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
@@ -24,12 +23,10 @@ type GitBranchWorkspacePaneCommandTarget = {
 
 export type FilesystemWorkspacePaneCommandTarget =
   | {
-      routeTarget: Extract<WorkspacePaneTabsTarget, { kind: 'git-worktree' }>
       workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
       filesystemTarget: Extract<WorkspacePaneFilesystemTarget, { kind: 'git-worktree' }>
     }
   | {
-      routeTarget: Extract<WorkspacePaneTabsTarget, { kind: 'workspace-root' }>
       workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
       filesystemTarget: Extract<WorkspacePaneFilesystemTarget, { kind: 'workspace-root' }>
     }
@@ -77,11 +74,6 @@ export function workspacePaneCommandTargetFromQueryCache(input: {
     )
     if (!worktree) return null
     return {
-      routeTarget: {
-        kind: 'git-worktree',
-        workspaceId: workspace.id,
-        worktreePath: routeContext.worktreePath,
-      },
       workspacePaneRoute: routeContext.workspacePaneRoute,
       filesystemTarget: gitWorktreePaneFilesystemTarget({
         workspaceId: workspace.id,
@@ -98,7 +90,6 @@ export function workspacePaneCommandTargetFromQueryCache(input: {
     (workspace.capability.kind === 'git' || workspace.capability.kind === 'filesystem')
   ) {
     return {
-      routeTarget: { kind: 'workspace-root', workspaceId: workspace.id },
       workspacePaneRoute: routeContext.workspacePaneRoute,
       filesystemTarget: workspaceRootPaneFilesystemTarget({
         workspaceId: workspace.id,
@@ -118,9 +109,9 @@ export function workspacePaneCommandCoordinates(target: WorkspacePaneCommandTarg
   filesystemTarget: WorkspacePaneFilesystemTarget | null
 } {
   return {
-    routeTarget: target.routeTarget,
+    routeTarget: workspacePaneCommandRouteTarget(target),
     branchName:
-      target.routeTarget.kind === 'git-branch'
+      target.filesystemTarget === null
         ? target.routeTarget.branchName
         : target.filesystemTarget?.kind === 'git-worktree'
           ? gitHeadBranch(target.filesystemTarget.head)
@@ -130,25 +121,14 @@ export function workspacePaneCommandCoordinates(target: WorkspacePaneCommandTarg
   }
 }
 
-export function workspacePaneCommandPaneTarget(
-  workspaceId: WorkspaceId,
-  target: WorkspacePaneCommandTarget,
-): WorkspacePaneTabsTarget {
-  if (target.filesystemTarget?.kind === 'workspace-root') {
-    return { kind: 'workspace-root', workspaceId }
-  }
-  if (target.filesystemTarget?.kind === 'git-worktree') {
-    return {
-      kind: 'git-worktree',
-      workspaceId,
-      worktreePath: workspacePaneFilesystemRootPath(target.filesystemTarget),
-    }
-  }
-  return target.routeTarget
+export function workspacePaneCommandPaneTarget(target: WorkspacePaneCommandTarget): WorkspacePaneTabsTarget {
+  return workspacePaneCommandRouteTarget(target)
 }
 
 export function workspacePaneCommandRouteTarget(target: WorkspacePaneCommandTarget): WorkspacePaneTabsTarget {
-  return target.routeTarget
+  return target.filesystemTarget === null
+    ? target.routeTarget
+    : workspacePaneTabsTargetForFilesystemTarget(target.filesystemTarget)
 }
 
 export function workspacePaneCommandWorktreeHead(target: WorkspacePaneCommandTarget): GitHead | undefined {

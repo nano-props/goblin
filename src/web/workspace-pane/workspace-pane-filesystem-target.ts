@@ -1,10 +1,15 @@
-import { terminalGitWorktreePresentation, type TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
   parseCanonicalWorkspaceLocator,
   workspaceLocatorForPath,
   type WorkspaceId,
 } from '#/shared/workspace-locator.ts'
 import type { GitHead } from '#/shared/git-head.ts'
+import type {
+  FilesystemWorkspacePaneTabsTarget,
+  GitWorktreeWorkspacePaneTabsTarget,
+  RootWorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import type {
   WorkspaceCapabilities,
   WorkspaceGitReadyProbeState,
@@ -98,6 +103,27 @@ export function workspacePaneFilesystemRootPath(target: WorkspacePaneFilesystemT
   const rootPath = parseCanonicalWorkspaceLocator(target.rootId)?.path
   if (!rootPath) throw new Error('filesystem target requires a canonical root identity')
   return rootPath
+}
+
+export function workspacePaneTabsTargetForFilesystemTarget(
+  target: Extract<WorkspacePaneFilesystemTarget, { kind: 'workspace-root' }>,
+): RootWorkspacePaneTabsTarget
+export function workspacePaneTabsTargetForFilesystemTarget(
+  target: Extract<WorkspacePaneFilesystemTarget, { kind: 'git-worktree' }>,
+): GitWorktreeWorkspacePaneTabsTarget
+export function workspacePaneTabsTargetForFilesystemTarget(
+  target: WorkspacePaneFilesystemTarget,
+): FilesystemWorkspacePaneTabsTarget
+export function workspacePaneTabsTargetForFilesystemTarget(
+  target: WorkspacePaneFilesystemTarget,
+): FilesystemWorkspacePaneTabsTarget {
+  return target.kind === 'workspace-root'
+    ? { kind: 'workspace-root', workspaceId: target.workspaceId }
+    : {
+        kind: 'git-worktree',
+        workspaceId: target.workspaceId,
+        worktreePath: workspacePaneFilesystemRootPath(target),
+      }
 }
 
 export function workspacePaneFilesystemTerminalBase(target: WorkspacePaneFilesystemTarget): TerminalSessionBase | null {

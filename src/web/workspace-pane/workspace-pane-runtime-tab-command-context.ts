@@ -1,9 +1,4 @@
-import {
-  terminalExecutionCoordinates,
-  terminalExecutionPath,
-  type TerminalPresentation,
-} from '#/shared/terminal-types.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -15,18 +10,12 @@ import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/work
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import {
-  workspacePaneTabsTargetFromRuntime,
-  type FilesystemWorkspacePaneTabsTarget,
-} from '#/shared/workspace-pane-tabs-target.ts'
-import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import type { CreatedTerminalRouteRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
 export interface WorkspacePaneRuntimeTabCommandContextInput {
-  workspaceId: WorkspaceId
-  routeTarget: FilesystemWorkspacePaneTabsTarget
   filesystemTarget: WorkspacePaneFilesystemTarget
   workspacePaneRoute: WorkspacePaneCommandRoute
   showRuntimeTab: (
@@ -38,7 +27,6 @@ export interface WorkspacePaneRuntimeTabCommandContextInput {
     type: WorkspacePaneRuntimeTabType,
     sessionId: string,
     presentation: TerminalPresentation,
-    worktreePath: string,
     routeRequest: CreatedTerminalRouteRequest,
   ) => boolean | Promise<boolean>
   terminalCreateTranslator?: TerminalCreateTranslator
@@ -74,7 +62,6 @@ function assignTerminalRuntimeTabCommandContext(
   const base = workspacePaneFilesystemTerminalBase(input.filesystemTarget)
   const paneTarget = base ? workspacePaneTabsTargetFromRuntime(base.target) : null
   context.terminal = {
-    routeTarget: input.routeTarget,
     base,
     bridge: readTerminalSessionCommandBridge(),
     openerIdentity:
@@ -86,15 +73,7 @@ function assignTerminalRuntimeTabCommandContext(
     showTerminalSession: (terminalSessionId, routeRequest) =>
       input.showRuntimeTab('terminal', terminalSessionId, routeRequest),
     showCreatedTerminalSession: (terminalSessionId, presentation, routeRequest) =>
-      base
-        ? input.showCreatedRuntimeTab(
-            'terminal',
-            terminalSessionId,
-            presentation,
-            terminalExecutionPath(base.target),
-            routeRequest,
-          )
-        : false,
+      base ? input.showCreatedRuntimeTab('terminal', terminalSessionId, presentation, routeRequest) : false,
     t: input.terminalCreateTranslator,
   }
 }

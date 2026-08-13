@@ -68,7 +68,6 @@ export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput
       panelLabel: input.panelLabel,
       selectedSessionId: selectedRuntimeSessionId(input.selection, input.type),
       target: {
-        routeTarget: tabsTarget,
         runtimeTarget,
         presentation: terminalGitWorktreePresentation(),
       },
@@ -152,7 +151,6 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
       <WorkspaceFilesystemTabPanel
-        routeTarget={{ kind: 'git-worktree', workspaceId: repo.id, worktreePath }}
         target={gitWorktreePaneFilesystemTarget({
           workspaceId: repo.id,
           workspaceRuntimeId: repo.workspaceRuntimeId,

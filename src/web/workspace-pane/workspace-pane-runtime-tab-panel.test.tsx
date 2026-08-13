@@ -178,11 +178,6 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
           workspacePaneId: 'workspace',
           panelLabel: { label: 'Terminal' },
           target: {
-            routeTarget: {
-              kind: 'git-worktree',
-              workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
-              worktreePath: '/repo-worktree',
-            },
             runtimeTarget: {
               kind: 'git-worktree' as const,
               workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,

@@ -11,6 +11,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import {
   workspacePaneCommandCoordinates,
+  workspacePaneCommandRouteTarget,
   workspacePaneCommandTargetFromQueryCache,
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
@@ -38,25 +39,20 @@ beforeEach(() => {
 describe('workspace pane command target', () => {
   test('derives the worktree branch presentation from its single Git head authority', () => {
     const target: WorkspacePaneCommandTarget = {
-      routeTarget: {
-        kind: 'git-worktree',
-        workspaceId: filesystemTarget.workspaceId,
-        worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
-      },
       workspacePaneRoute: null,
       filesystemTarget,
     }
 
     expect(workspacePaneCommandCoordinates(target).branchName).toBe('feature/example')
+    expect(workspacePaneCommandRouteTarget(target)).toEqual({
+      kind: 'git-worktree',
+      workspaceId: filesystemTarget.workspaceId,
+      worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
+    })
   })
 
   test('derives a detached presentation without a parallel nullable branch field', () => {
     const target: WorkspacePaneCommandTarget = {
-      routeTarget: {
-        kind: 'git-worktree',
-        workspaceId: filesystemTarget.workspaceId,
-        worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
-      },
       workspacePaneRoute: null,
       filesystemTarget: { ...filesystemTarget, head: { kind: 'detached' } },
     }
@@ -66,11 +62,6 @@ describe('workspace pane command target', () => {
 
   test('does not admit a contradictory worktree branch field', () => {
     const target: WorkspacePaneCommandTarget = {
-      routeTarget: {
-        kind: 'git-worktree',
-        workspaceId: filesystemTarget.workspaceId,
-        worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
-      },
       workspacePaneRoute: null,
       filesystemTarget,
       // @ts-expect-error A worktree branch is derived exclusively from filesystemTarget.head.
@@ -199,7 +190,6 @@ describe('workspace pane command target', () => {
     })
     expect(successfulWorktreeTarget).toEqual(
       expect.objectContaining({
-        routeTarget: { kind: 'git-worktree', workspaceId: workspace.id, worktreePath },
         workspacePaneRoute: { kind: 'static', tab: 'changes' },
         filesystemTarget: expect.objectContaining({
           kind: 'git-worktree',

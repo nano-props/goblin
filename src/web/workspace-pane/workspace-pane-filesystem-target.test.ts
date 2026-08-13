@@ -4,6 +4,7 @@ import {
   gitWorktreePaneFilesystemTarget,
   workspacePaneFilesystemRuntimeTarget,
   workspacePaneFilesystemRootPath,
+  workspacePaneTabsTargetForFilesystemTarget,
   workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
@@ -33,20 +34,24 @@ describe('workspace pane filesystem target', () => {
       workspaceId,
       workspaceRuntimeId: 'workspace-runtime-example',
     })
+    expect(workspacePaneTabsTargetForFilesystemTarget(target)).toEqual({ kind: 'workspace-root', workspaceId })
   })
 
   test('admits a Git worktree only when it shares the Workspace transport', () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://host-a/workspace/example')
 
-    expect(() =>
-      gitWorktreePaneFilesystemTarget({
-        workspaceId,
-        workspaceRuntimeId: 'workspace-runtime-example',
-        worktreePath: '/workspace/example-feature',
-        head: { kind: 'branch', branchName: 'feature/example' },
-        capabilities: GIT_FILESYSTEM_CAPABILITIES,
-      }),
-    ).not.toThrow()
+    const target = gitWorktreePaneFilesystemTarget({
+      workspaceId,
+      workspaceRuntimeId: 'workspace-runtime-example',
+      worktreePath: '/workspace/example-feature',
+      head: { kind: 'branch', branchName: 'feature/example' },
+      capabilities: GIT_FILESYSTEM_CAPABILITIES,
+    })
+    expect(workspacePaneTabsTargetForFilesystemTarget(target)).toEqual({
+      kind: 'git-worktree',
+      workspaceId,
+      worktreePath: '/workspace/example-feature',
+    })
     expect(() =>
       gitWorktreePaneFilesystemTarget({
         workspaceId,

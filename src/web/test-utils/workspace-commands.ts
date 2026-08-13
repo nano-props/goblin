@@ -23,14 +23,12 @@ import {
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import {
   gitWorktreePaneFilesystemTarget,
-  workspacePaneFilesystemRootPath,
   workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
@@ -50,7 +48,6 @@ import {
   seedInitialObservedWorkspacePaneRouteForTest,
   type ObservedAppNavigationActionsForTest,
   type AppNavigationOverridesForTest,
-  type WorkspacePaneNavigationObservation,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
 import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
@@ -66,11 +63,6 @@ interface WorkspaceCommandFixtureOptions {
 function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): WorkspacePaneCommandTarget {
   if (options.filesystemTarget) {
     return {
-      routeTarget: {
-        kind: 'git-worktree',
-        workspaceId: options.filesystemTarget.workspaceId,
-        worktreePath: workspacePaneFilesystemRootPath(options.filesystemTarget),
-      },
       workspacePaneRoute: options.workspacePaneRoute,
       filesystemTarget: options.filesystemTarget,
     }
@@ -91,7 +83,6 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
         : undefined
     if (repo?.capability.kind === 'git' && worktree) {
       return {
-        routeTarget: { kind: 'git-worktree', workspaceId: repo.id, worktreePath: worktree.path },
         workspacePaneRoute: options.workspacePaneRoute,
         filesystemTarget: gitWorktreePaneFilesystemTarget({
           workspaceId: repo.id,
@@ -119,7 +110,6 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
   const repo = options.workspaceId ? workspacesStore.getState().workspaces[options.workspaceId] : null
   if (!repo || repo.capability.probe.status !== 'ready') throw new Error('expected ready workspace command fixture')
   return {
-    routeTarget: { kind: 'workspace-root', workspaceId: repo.id },
     workspacePaneRoute: options.workspacePaneRoute,
     filesystemTarget: workspaceRootPaneFilesystemTarget({
       workspaceId: repo.id,

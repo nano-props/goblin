@@ -132,7 +132,6 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
         <AppNavigationProvider value={navigationWith({})}>
           <TerminalSessionCommandScope value={terminalCommandContextWith()}>
             <WorkspaceFilesystemTabPanel
-              routeTarget={{ kind: 'workspace-root', workspaceId }}
               target={workspaceRootPaneFilesystemTarget({
                 workspaceId,
                 workspaceRuntimeId,
@@ -561,7 +560,6 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
         <AppNavigationProvider value={navigationWith({ commitWorkspaceRootTerminalSession })}>
           <TerminalSessionCommandScope value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
-              routeTarget={{ kind: 'workspace-root', workspaceId }}
               target={workspaceRootPaneFilesystemTarget({
                 workspaceId,
                 workspaceRuntimeId: repo.workspaceRuntimeId,
@@ -630,7 +628,6 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
         <AppNavigationProvider value={navigationWith({})}>
           <TerminalSessionCommandScope value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
-              routeTarget={{ kind: 'workspace-root', workspaceId }}
               target={workspaceRootPaneFilesystemTarget({
                 workspaceId,
                 workspaceRuntimeId: repo.workspaceRuntimeId,

@@ -51,7 +51,6 @@ const WORKTREE_ROUTE_TARGET = {
   workspaceId: BASE.target.workspaceId,
   worktreePath: WORKTREE_PATH,
 }
-const WORKSPACE_ROOT_ROUTE_TARGET = { kind: 'workspace-root' as const, workspaceId: BASE.target.workspaceId }
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(),
@@ -83,7 +82,7 @@ afterEach(() => {
 describe('workspace pane runtime tab create action', () => {
   test('navigates a detached worktree create to its real filesystem surface', async () => {
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
-    const routeRequest = createdTerminalRouteRequest(WORKTREE_ROUTE_TARGET)
+    const routeRequest = createdTerminalRouteRequest()
     const detachedBase: TerminalSessionBase = {
       ...BASE,
       presentation: { kind: 'git-worktree' },
@@ -114,7 +113,7 @@ describe('workspace pane runtime tab create action', () => {
 
   test('commits a workspace root terminal route through navigation authority', async () => {
     const commitWorkspaceRootTerminalSession = vi.fn(async () => true)
-    const routeRequest = createdTerminalRouteRequest(WORKSPACE_ROOT_ROUTE_TARGET)
+    const routeRequest = createdTerminalRouteRequest()
     const workspaceRootBase: TerminalSessionBase = {
       target: {
         kind: 'workspace-root',
@@ -151,7 +150,6 @@ describe('workspace pane runtime tab create action', () => {
       showCreatedRuntimeTab: vi.fn(),
       t: translate,
       terminal: {
-        routeTarget: WORKTREE_ROUTE_TARGET,
         base: null,
         createTerminal: vi.fn(async () => createAdmission()),
         captureOpenerIdentity: vi.fn(() => null),
@@ -171,7 +169,6 @@ describe('workspace pane runtime tab create action', () => {
       showCreatedRuntimeTab,
       t: translate,
       terminal: {
-        routeTarget: WORKTREE_ROUTE_TARGET,
         base: BASE,
         createTerminal,
         captureOpenerIdentity,
@@ -216,7 +213,6 @@ describe('workspace pane runtime tab create action', () => {
       showCreatedRuntimeTab,
       t: translate,
       terminal: {
-        routeTarget: WORKTREE_ROUTE_TARGET,
         base: BASE,
         createTerminal: vi.fn(async () => createAdmission()),
         captureOpenerIdentity: vi.fn(() => null),
@@ -248,7 +244,6 @@ describe('workspace pane runtime tab create action', () => {
     const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
 
     const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      routeTarget: WORKTREE_ROUTE_TARGET,
       base: BASE,
       createTerminal: vi.fn(async () => createAdmission()),
       openerIdentity: null,
@@ -292,7 +287,6 @@ describe('workspace pane runtime tab create action', () => {
     const focusTerminal = vi.fn()
 
     const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      routeTarget: WORKTREE_ROUTE_TARGET,
       base: BASE,
       createTerminal: vi.fn(async () => createAdmission()),
       openerIdentity: null,
@@ -309,7 +303,6 @@ describe('workspace pane runtime tab create action', () => {
     const showCreatedTerminalTab = vi.fn(() => true)
     const focusTerminal = vi.fn()
     const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      routeTarget: WORKTREE_ROUTE_TARGET,
       base: BASE,
       createTerminal: vi.fn(async () => createAdmission()),
       openerIdentity: null,
@@ -335,7 +328,6 @@ describe('workspace pane runtime tab create action', () => {
     const heldCommand = holdTerminalCreateCommand()
     const focusTerminal = vi.fn()
     const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      routeTarget: WORKTREE_ROUTE_TARGET,
       base: BASE,
       createTerminal: vi.fn(async () => createAdmission()),
       openerIdentity: null,
@@ -360,7 +352,6 @@ describe('workspace pane runtime tab create action', () => {
     const heldCommand = holdTerminalCreateCommand()
     const focusTerminal = vi.fn()
     const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      routeTarget: WORKTREE_ROUTE_TARGET,
       base: BASE,
       createTerminal: vi.fn(async () => createAdmission()),
       openerIdentity: null,
@@ -380,7 +371,6 @@ describe('workspace pane runtime tab create action', () => {
   test('delegates creation with the exact base and route commit boundary', async () => {
     await expect(
       dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        routeTarget: WORKTREE_ROUTE_TARGET,
         base: BASE,
         createTerminal: vi.fn(async () => createAdmission()),
         openerIdentity: null,
@@ -490,7 +480,6 @@ describe('workspace pane runtime tab create action', () => {
       showCreatedRuntimeTab: vi.fn(),
       t: translate,
       terminal: {
-        routeTarget: WORKTREE_ROUTE_TARGET,
         base: BASE,
         createTerminal: vi.fn(async () => createAdmission()),
         captureOpenerIdentity: vi.fn(() => null),
@@ -508,10 +497,8 @@ function translate(key: string): string {
   return key
 }
 
-function createdTerminalRouteRequest(
-  routeTarget: CreatedTerminalRouteRequest['routeTarget'] = WORKTREE_ROUTE_TARGET,
-): CreatedTerminalRouteRequest {
-  return { navigationGeneration: beginAppNavigation(), routeTarget }
+function createdTerminalRouteRequest(): CreatedTerminalRouteRequest {
+  return { navigationGeneration: beginAppNavigation() }
 }
 
 interface HeldTerminalCreateCommandInput {

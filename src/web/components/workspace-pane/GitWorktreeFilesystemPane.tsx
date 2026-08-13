@@ -241,7 +241,7 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
             </WorkspacePanePanelFrame>
           ) : selection?.tab === 'files' ? (
             <WorkspacePanePanelFrame id={`${props.workspacePaneId}-files-panel`} label={t('tab.files')}>
-              <WorkspaceFilesystemTabPanel routeTarget={props.target} target={surfaceTarget.value} />
+              <WorkspaceFilesystemTabPanel target={surfaceTarget.value} />
             </WorkspacePanePanelFrame>
           ) : selection?.tab === 'terminal' && runtimeTarget.value ? (
             renderWorkspacePaneRuntimeTabPanel({
@@ -249,7 +249,6 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
               workspacePaneId: props.workspacePaneId,
               panelLabel: { label: t('tab.terminal') },
               target: {
-                routeTarget: props.target,
                 runtimeTarget: runtimeTarget.value,
                 presentation: { kind: 'git-worktree' },
               },

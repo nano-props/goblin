@@ -435,7 +435,6 @@ describe('client effect intent plans', () => {
         currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
         currentWorkspacePaneCommandTarget: {
-          routeTarget: { kind: 'workspace-root', workspaceId: CURRENT_DIRECTORY_REPO.id },
           workspacePaneRoute: null,
           filesystemTarget: workspaceRootPaneFilesystemTarget({
             workspaceId: CURRENT_DIRECTORY_REPO.id,
@@ -601,7 +600,6 @@ describe('client effect intent plans', () => {
         currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
         currentWorkspacePaneCommandTarget: {
-          routeTarget: { kind: 'workspace-root', workspaceId: CURRENT_DIRECTORY_REPO.id },
           workspacePaneRoute: null,
           filesystemTarget: workspaceRootPaneFilesystemTarget({
             workspaceId: CURRENT_DIRECTORY_REPO.id,

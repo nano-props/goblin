@@ -305,7 +305,6 @@ describe('GitWorkspacePaneContent status-history', () => {
       await runCloseWorkspacePaneTabCommand({
         workspaceId: REPO_ID,
         target: {
-          routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath },
           workspacePaneRoute: { kind: 'static', tab: 'files' },
           filesystemTarget: gitWorktreeFilesystemTarget(repo, worktreePath, 'feature/status-links'),
         },

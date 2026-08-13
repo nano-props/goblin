@@ -499,7 +499,6 @@ describe('WorkspacePane route synchronization', () => {
     const closePromise = runCloseWorkspacePaneTabCommand({
       workspaceId: REPO_ID,
       target: {
-        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath },
         workspacePaneRoute: { kind: 'static', tab: 'files' },
         filesystemTarget: gitWorktreeFilesystemTarget(repo, worktreePath, branchName),
       },

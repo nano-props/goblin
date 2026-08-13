@@ -29,7 +29,9 @@ import {
   type AppNavigationGeneration,
 } from '#/web/app-navigation-lifecycle.ts'
 
-export interface AppNavigationOptions<Route = ParsedWorkspacePaneRouteTarget> extends AppNavigationExecutionOptions {
+export interface AppNavigationOptions<
+  Route extends ParsedWorkspacePaneRouteTarget = ParsedWorkspacePaneRouteTarget,
+> extends AppNavigationExecutionOptions {
   routePrecondition?: { kind: 'exact-route'; route: Route } | { kind: 'current-workspace-target' }
 }
 

@@ -5,7 +5,6 @@ import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 import { workspacePaneStaticTabId } from '#/shared/workspace-pane.ts'
 import { workspacePaneFilesystemExecutionTargetKey } from '#/shared/workspace-runtime.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
-import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { FiletreeView } from '#/web/components/workspace-pane/FiletreeView.tsx'
@@ -31,7 +30,6 @@ import { showCreatedWorkspacePaneFilesystemTerminal } from '#/web/workspace-pane
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 
 interface WorkspaceFilesystemTabPanelProps {
-  routeTarget: FilesystemWorkspacePaneTabsTarget
   target: WorkspacePaneFilesystemTarget
 }
 
@@ -40,14 +38,13 @@ export const WorkspaceFilesystemTabPanel: FunctionalComponent<WorkspaceFilesyste
   return (
     <ExecutionTargetFilesystemTabPanel
       key={workspacePaneFilesystemExecutionTargetKey(executionTarget)}
-      routeTarget={props.routeTarget}
       target={props.target}
       executionTarget={executionTarget}
     />
   )
 }
 
-WorkspaceFilesystemTabPanel.props = ['routeTarget', 'target']
+WorkspaceFilesystemTabPanel.props = ['target']
 
 interface ExecutionTargetFilesystemTabPanelProps extends WorkspaceFilesystemTabPanelProps {
   executionTarget: WorkspacePaneFilesystemExecutionTarget
@@ -55,7 +52,7 @@ interface ExecutionTargetFilesystemTabPanelProps extends WorkspaceFilesystemTabP
 
 const ExecutionTargetFilesystemTabPanel = defineComponent<ExecutionTargetFilesystemTabPanelProps>({
   name: 'ExecutionTargetFilesystemTabPanel',
-  props: ['routeTarget', 'target', 'executionTarget'],
+  props: ['target', 'executionTarget'],
 
   setup(props) {
     const t = useT()
@@ -113,13 +110,11 @@ const ExecutionTargetFilesystemTabPanel = defineComponent<ExecutionTargetFilesys
       if (!pendingOpeningFileKeys.beginPending(openingFileKey)) return
       try {
         const target = props.target
-        const routeTarget = props.routeTarget
         const executionTarget = props.executionTarget
         const openerIdentity = workspacePaneStaticTabId('files')
         const base = workspacePaneFilesystemTerminalBase(target)
         if (!base) throw new Error('error.workspace-tabs-target-invalid')
         await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-          routeTarget,
           base,
           createTerminal: createTerminalWithAdmission,
           openerIdentity,

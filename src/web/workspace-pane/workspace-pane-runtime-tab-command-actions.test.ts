@@ -6,9 +6,14 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import {
+  setTerminalSessionCommandBridge,
+  type TerminalSessionCommandBridge,
+} from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
 import {
+  dispatchNewTerminalRuntimeTabAction,
+  dispatchTerminalRuntimePrimaryAction,
   runWorkspacePaneRuntimeNewAction,
   runWorkspacePaneRuntimePrimaryAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
@@ -46,7 +51,6 @@ const terminalBase = {
 const terminalPaneTargetCandidate = workspacePaneTabsTargetFromRuntime(terminalBase.target)
 if (terminalPaneTargetCandidate?.kind !== 'git-worktree') throw new Error('expected Git worktree pane target')
 const terminalPaneTarget = terminalPaneTargetCandidate
-const terminalRouteTarget = terminalPaneTarget
 const BRANCH_NAME = 'main'
 
 const terminalCoordinates = terminalSessionCoordinates(terminalBase)
@@ -124,7 +128,6 @@ describe('workspace pane runtime tab command actions', () => {
     const showCreatedRuntimeTab = vi.fn(() => true)
     const routeRequest = createdTerminalRouteRequest()
     const context = workspacePaneRuntimeTabCommandContext({
-      routeTarget: terminalRouteTarget,
       filesystemTarget: gitWorktreePaneFilesystemTarget({
         workspaceId: terminalBase.target.workspaceId,
         workspaceRuntimeId: terminalBase.target.workspaceRuntimeId,
@@ -136,7 +139,6 @@ describe('workspace pane runtime tab command actions', () => {
           git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
         },
       }),
-      workspaceId: terminalCoordinates.workspaceId,
       workspacePaneRoute: null,
       showRuntimeTab: vi.fn(() => true),
       showCreatedRuntimeTab,
@@ -154,7 +156,6 @@ describe('workspace pane runtime tab command actions', () => {
       'terminal',
       'term-111111111111111111111',
       { kind: 'git-worktree' as const },
-      terminalExecutionPath(terminalBase.target),
       routeRequest,
     )
   })
@@ -192,7 +193,6 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
-          routeTarget: terminalRouteTarget,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -251,7 +251,6 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
-          routeTarget: terminalRouteTarget,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -322,7 +321,6 @@ describe('workspace pane runtime tab command actions', () => {
 
     const actionPromise = runWorkspacePaneRuntimePrimaryAction('terminal', {
       terminal: {
-        routeTarget: terminalRouteTarget,
         base: terminalBase,
         bridge,
         openerIdentity: null,
@@ -384,7 +382,6 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
-          routeTarget: terminalRouteTarget,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -421,7 +418,6 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
-          routeTarget: terminalRouteTarget,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -483,7 +479,6 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimeNewAction('terminal', {
         terminal: {
-          routeTarget: terminalRouteTarget,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -513,7 +508,6 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
-          routeTarget: terminalRouteTarget,
           base: terminalBase,
           bridge: null,
           openerIdentity: null,
@@ -526,11 +520,62 @@ describe('workspace pane runtime tab command actions', () => {
     expect(showTerminalSession).not.toHaveBeenCalled()
   })
 
+  test.each([
+    ['primary', dispatchTerminalRuntimePrimaryAction],
+    ['new terminal', dispatchNewTerminalRuntimeTabAction],
+  ] as const)('%s command rejects a mismatched workspace target before reading runtime state', async (_name, run) => {
+    const terminalFilesystemTargetSnapshot = vi.fn<TerminalSessionCommandBridge['terminalFilesystemTargetSnapshot']>()
+    const resetBridge = setTerminalSessionCommandBridge({
+      terminalFilesystemTargetSnapshot,
+      createTerminal: vi.fn(),
+      createTerminalWithAdmission: vi.fn(),
+      selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(),
+    })
+    const commitWorkspacePaneRoute = vi.fn()
+    const commitFilesystemWorkspacePaneRoute = vi.fn()
+    const commitWorkspaceRootTerminalSession = vi.fn()
+
+    try {
+      await expect(
+        run({
+          workspaceId: canonicalWorkspaceLocator('goblin+file:///different-workspace')!,
+          target: {
+            filesystemTarget: gitWorktreePaneFilesystemTarget({
+              workspaceId: terminalBase.target.workspaceId,
+              workspaceRuntimeId: terminalBase.target.workspaceRuntimeId,
+              worktreePath: terminalExecutionPath(terminalBase.target),
+              head: { kind: 'branch', branchName: BRANCH_NAME },
+              capabilities: {
+                files: { read: true, write: true },
+                terminal: { available: true },
+                git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+              },
+            }),
+            workspacePaneRoute: null,
+          },
+          navigation: {
+            commitWorkspacePaneRoute,
+            commitFilesystemWorkspacePaneRoute,
+            commitWorkspaceRootTerminalSession,
+          },
+        }),
+      ).resolves.toBe(false)
+    } finally {
+      resetBridge()
+    }
+
+    expect(terminalFilesystemTargetSnapshot).not.toHaveBeenCalled()
+    expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(commitWorkspaceRootTerminalSession).not.toHaveBeenCalled()
+  })
+
   test('new terminal action rejects when no runtime base is available', async () => {
     await expect(
       runWorkspacePaneRuntimeNewAction('terminal', {
         terminal: {
-          routeTarget: terminalRouteTarget,
           base: null,
           bridge: null,
           openerIdentity: null,
@@ -559,5 +604,5 @@ function terminalSession(terminalSessionId: string, selected: boolean) {
 }
 
 function createdTerminalRouteRequest(): CreatedTerminalRouteRequest {
-  return { navigationGeneration: beginAppNavigation(), routeTarget: terminalRouteTarget }
+  return { navigationGeneration: beginAppNavigation() }
 }

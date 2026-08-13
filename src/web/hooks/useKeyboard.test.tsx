@@ -515,7 +515,6 @@ describe('useKeyboard', () => {
       currentWorkspaceId: REPO_ID,
       currentBranchName: null,
       currentWorkspacePaneCommandTarget: {
-        routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
         workspacePaneRoute: null,
         filesystemTarget: workspaceRootPaneFilesystemTarget({
           workspaceId: REPO_ID,
@@ -835,7 +834,6 @@ function seedTabbedWorktreeRepoForTest(preferredWorkspacePaneTab: 'status' | 'te
 
 function currentTerminalPaneCommandTargetForTest(): WorkspacePaneCommandTarget {
   return {
-    routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
     workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
     filesystemTarget: gitWorktreePaneFilesystemTarget({
       workspaceId: REPO_ID,
@@ -918,11 +916,6 @@ const HookHost = defineComponent<Partial<HookHostOptions>>({
     const defaultCommandTarget =
       repo?.capability.kind === 'git' && overrides.currentBranchName && worktree
         ? {
-            routeTarget: {
-              kind: 'git-worktree' as const,
-              workspaceId: repo.id,
-              worktreePath: worktree.path,
-            },
             workspacePaneRoute: null,
             filesystemTarget: gitWorktreePaneFilesystemTarget({
               workspaceId: repo.id,

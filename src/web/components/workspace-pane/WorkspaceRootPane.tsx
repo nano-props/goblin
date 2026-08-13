@@ -88,7 +88,7 @@ export const WorkspaceRootPane = defineComponent<WorkspaceRootPaneProps>({
             />
           ) : currentActivePanel === 'files' ? (
             <WorkspacePanePanelFrame id={`${props.workspacePaneId}-files-panel`} label={t('tab.files')}>
-              <WorkspaceFilesystemTabPanel routeTarget={target.value} target={surfaceTarget.value} />
+              <WorkspaceFilesystemTabPanel target={surfaceTarget.value} />
             </WorkspacePanePanelFrame>
           ) : currentActivePanel === 'terminal' && runtimeTarget.value ? (
             renderWorkspacePaneRuntimeTabPanel({
@@ -96,7 +96,6 @@ export const WorkspaceRootPane = defineComponent<WorkspaceRootPaneProps>({
               workspacePaneId: props.workspacePaneId,
               panelLabel: { label: t('tab.terminal') },
               target: {
-                routeTarget: target.value,
                 runtimeTarget: runtimeTarget.value,
                 presentation: { kind: 'workspace-root' },
               },
