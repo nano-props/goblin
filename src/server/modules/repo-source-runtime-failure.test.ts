@@ -232,54 +232,58 @@ describe('repo source runtime failure classification', () => {
   test('carries confirmed worktree and branch milestones from raw SSH results', async () => {
     const linkedPath = `${target.remotePath}-feature`
     const linkedWorkspaceId = workspaceIdForTest('goblin+ssh://prod/home/alice/service-feature')
-    mocks.runRemoteCommand.mockImplementation(async (_target, command: { type: string }) => {
-      switch (command.type) {
-        case 'gitWorktreeList':
-          return okRemoteResult(
-            worktreePorcelain(
+    mocks.runRemoteCommand.mockImplementation(
+      async (_target, command: { type: string; attachedBranch?: string | null }) => {
+        switch (command.type) {
+          case 'gitWorktreeList':
+            return okRemoteResult(
+              worktreePorcelain(
+                [
+                  `worktree ${target.remotePath}`,
+                  'HEAD f00ba40',
+                  'branch refs/heads/main',
+                  '',
+                  `worktree ${linkedPath}`,
+                  'HEAD ba5eba1',
+                  'branch refs/heads/feature/test',
+                ].join('\n'),
+              ),
+            )
+          case 'gitStatus':
+            return okRemoteResult('')
+          case 'gitOperationState':
+            return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
+          case 'gitSnapshot':
+            return okRemoteResult(
               [
-                `worktree ${target.remotePath}`,
-                'HEAD f00ba40',
-                'branch refs/heads/main',
+                '__GOBLIN_REMOTE_CURRENT__',
+                'value main',
+                '__GOBLIN_REMOTE_DEFAULT__',
+                'value main',
+                '__GOBLIN_REMOTE_BRANCHES__',
                 '',
-                `worktree ${linkedPath}`,
-                'HEAD ba5eba1',
-                'branch refs/heads/feature/test',
               ].join('\n'),
-            ),
-          )
-        case 'gitStatus':
-          return okRemoteResult('')
-        case 'gitSnapshot':
-          return okRemoteResult(
-            [
-              '__GOBLIN_REMOTE_CURRENT__',
-              'value main',
-              '__GOBLIN_REMOTE_DEFAULT__',
-              'value main',
-              '__GOBLIN_REMOTE_BRANCHES__',
-              '',
-            ].join('\n'),
-          )
-        case 'gitUpstream':
-          return okRemoteResult(upstreamOutput('origin', 'feature/test'))
-        case 'gitWorktreeRemove':
-          return okRemoteResult('removed worktree')
-        case 'gitBranchDelete':
-          return okRemoteResult('deleted local branch')
-        case 'gitPushDeleteBranch':
-          return {
-            ok: false,
-            stdout: '',
-            stderr: '',
-            transportStderr: 'client_loop: send disconnect: Broken pipe',
-            message: 'connection lost',
-            remoteStarted: true,
-          }
-        default:
-          throw new Error(`unexpected remote command: ${command.type}`)
-      }
-    })
+            )
+          case 'gitUpstream':
+            return okRemoteResult(upstreamOutput('origin', 'feature/test'))
+          case 'gitWorktreeRemove':
+            return okRemoteResult('removed worktree')
+          case 'gitBranchDelete':
+            return okRemoteResult('deleted local branch')
+          case 'gitPushDeleteBranch':
+            return {
+              ok: false,
+              stdout: '',
+              stderr: '',
+              transportStderr: 'client_loop: send disconnect: Broken pipe',
+              message: 'connection lost',
+              remoteStarted: true,
+            }
+          default:
+            throw new Error(`unexpected remote command: ${command.type}`)
+        }
+      },
+    )
     const { runWithRepoSource } = await import('#/server/modules/repo-source.ts')
 
     await expect(

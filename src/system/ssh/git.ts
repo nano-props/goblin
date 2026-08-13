@@ -867,6 +867,11 @@ export async function removeRemoteWorktree(
         })
       : null
   if (input.deleteBranch) {
+    const worktreeSnapshots = await readRemoteRepoWorktreeSnapshots(target, worktrees, {
+      signal: input.signal,
+      run,
+    })
+    const removedWorktreePath = path.posix.resolve(resolved.path)
     const currentBranch = await getRemoteCurrentBranch(target, {
       signal: input.signal,
       run,
@@ -885,7 +890,11 @@ export async function removeRemoteWorktree(
     const validation = validateBranchDeletionPolicy({
       branch: input.branch,
       currentBranch,
-      isCheckedOutElsewhere: worktrees.some((worktree) => worktree.branch === input.branch && worktree !== resolved),
+      isCheckedOutElsewhere: worktreeSnapshots.some(
+        (worktree) =>
+          path.posix.resolve(worktree.path) !== removedWorktreePath &&
+          repoWorktreeMaterializedBranch(worktree) === input.branch,
+      ),
       force: shouldForceDeleteBranch,
       mergedToCurrent: mergeFacts.mergedToCurrent,
       mergedToUpstream: mergeFacts.mergedToUpstream,

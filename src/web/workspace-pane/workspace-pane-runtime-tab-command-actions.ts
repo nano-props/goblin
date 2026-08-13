@@ -14,7 +14,6 @@ import type { TerminalSessionCommandBridge } from '#/web/components/terminal/ter
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
 import {
-  commitWorkspacePaneCommittedRuntimeTargetRoute,
   commitWorkspacePaneCurrentTargetRoute,
   selectWorkspacePaneControllerTab,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'

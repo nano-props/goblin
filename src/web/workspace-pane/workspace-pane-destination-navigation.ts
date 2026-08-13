@@ -1,6 +1,6 @@
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
+import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
 import { terminalWorkspacePaneTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
@@ -11,6 +11,7 @@ import {
   type AppNavigationGeneration,
 } from '#/web/app-navigation-lifecycle.ts'
 import {
+  isGitWorktreeDestinationTargetLease,
   resolveWorkspacePaneDestinationTargetLease,
   workspacePaneTargetLeaseIsCurrent,
   type WorkspacePaneDestinationTargetLease,
@@ -45,7 +46,7 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
   workspaceId: WorkspaceId
   branchName: string
   route: WorkspacePaneRouteTarget
-  navigation: WorkspacePaneRouteCommitActions
+  navigation: FilesystemWorkspacePaneRouteCommitActions
   options?: { replace?: boolean }
 }): Promise<WorkspacePaneActionOutcome> {
   const lease = resolveWorkspacePaneDestinationTargetLease(input.workspaceId, input.branchName)
@@ -55,10 +56,10 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
   }
   const admission = await tryRunWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
-      workspaceId: lease.workspaceId,
+      workspaceId: lease.routeTarget.workspaceId,
       workspaceRuntimeId: lease.workspaceRuntimeId,
-      branchName: lease.branchName,
-      worktreePath: lease.worktreePath,
+      branchName: isGitWorktreeDestinationTargetLease(lease) ? lease.canonicalBranch : lease.routeTarget.branchName,
+      worktreePath: isGitWorktreeDestinationTargetLease(lease) ? lease.routeTarget.worktreePath : null,
     }),
     () =>
       commitWorkspacePaneDestinationRoute(
@@ -81,25 +82,49 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
 export async function commitWorkspacePaneDestinationRoute(
   presentation: WorkspacePaneDestinationPresentation,
   route: WorkspacePaneRouteTarget,
-  navigation: WorkspacePaneRouteCommitActions,
+  navigation: FilesystemWorkspacePaneRouteCommitActions,
   options?: { replace?: boolean },
 ): Promise<WorkspacePaneActionOutcome> {
   if (!workspacePaneDestinationPresentationIsCurrent(presentation)) return { kind: 'superseded' }
   const { lease } = presentation
-  let accepted = false
+  if (isGitWorktreeDestinationTargetLease(lease)) {
+    try {
+      const accepted = await navigation.commitFilesystemWorkspacePaneRoute(
+        {
+          routeTarget: lease.routeTarget,
+          workspaceRuntimeId: lease.workspaceRuntimeId,
+          authority: { kind: 'worktree' },
+        },
+        route,
+        { ...options, navigationGeneration: presentation.generation },
+      )
+      if (!accepted) return { kind: 'navigation-rejected' }
+    } catch {
+      return { kind: 'navigation-rejected' }
+    }
+    return workspacePaneDestinationPresentationIsCurrent(presentation)
+      ? { kind: 'completed', changed: true, presentation: 'router-settled' }
+      : { kind: 'superseded' }
+  }
+
   let supplementCommitted = false
   try {
-    accepted = await navigation.commitWorkspacePaneRoute(lease.workspaceId, lease.branchName, route, {
-      ...options,
-      navigationGeneration: presentation.generation,
-      onCommit: () => {
-        supplementCommitted = commitWorkspacePaneRouteSupplement(lease, route)
+    const accepted = await navigation.commitWorkspacePaneRoute(
+      lease.routeTarget.workspaceId,
+      lease.routeTarget.branchName,
+      route,
+      {
+        ...options,
+        navigationGeneration: presentation.generation,
+        onCommit: () => {
+          supplementCommitted = commitWorkspacePaneRouteSupplement(lease, route)
+        },
       },
-    })
+    )
+    if (!accepted) return { kind: 'navigation-rejected' }
   } catch {
     return { kind: 'navigation-rejected' }
   }
-  if (!accepted) return { kind: 'navigation-rejected' }
   if (!workspacePaneDestinationPresentationIsCurrent(presentation)) return { kind: 'superseded' }
   if (!supplementCommitted) return { kind: 'superseded' }
   return { kind: 'completed', changed: true, presentation: 'router-settled' }
@@ -110,7 +135,7 @@ function workspacePaneDestinationRouteSupported(
   route: WorkspacePaneRouteTarget,
 ): boolean {
   if (route === null) return true
-  const availability = { hasWorktree: lease.worktreePath !== null }
+  const availability = { hasWorktree: isGitWorktreeDestinationTargetLease(lease) }
   return route.kind === 'static'
     ? workspacePaneStaticTabProvider(route.tab).canOpen(availability)
     : terminalWorkspacePaneTabProvider.canOpen(availability)

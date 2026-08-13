@@ -31,14 +31,16 @@ export function buildDashboardSummary(
   pullRequestEntries: PullRequestEntry[] | null | undefined,
 ): DashboardSummary {
   const branches = branchModel.snapshot.branches
+  const worktrees = branchModel.snapshot.worktrees
   const pullRequestsByBranch = new Map(pullRequestEntries?.map((entry) => [entry.branch, entry.pullRequest]) ?? [])
   const branchItems = branches.map((branch) => buildDashboardBranchItem(branchModel, pullRequestsByBranch, branch))
-  const worktreeBranches = branchItems.filter(
-    ({ branch }) => !!repoWorktreeForBranch(branchModel.snapshot.worktrees, branch.name),
-  )
-  const dirtyWorktreeCount = branchModel.status
-    ? worktreeBranches.filter((item) => item.dirty === true).length
-    : undefined
+  const statusByWorktreePath = branchModel.status
+    ? new Map(branchModel.status.map((status) => [status.path, status]))
+    : null
+  const dirtyWorktreeCount =
+    statusByWorktreePath && worktrees.every((worktree) => statusByWorktreePath.has(worktree.path))
+      ? worktrees.filter((worktree) => statusByWorktreePath.get(worktree.path)!.entries.length > 0).length
+      : undefined
   const aheadCount = branches.filter((branch) => branch.ahead > 0).length
   const behindCount = branches.filter((branch) => branch.behind > 0).length
   const openPullRequestCount = pullRequestEntries
@@ -55,7 +57,7 @@ export function buildDashboardSummary(
 
   return {
     branchCount: branches.length,
-    worktreeCount: worktreeBranches.length,
+    worktreeCount: worktrees.length,
     dirtyWorktreeCount,
     aheadCount,
     behindCount,

@@ -5,18 +5,17 @@ import { isEqual } from 'es-toolkit'
 import type { AppRouteNavigation, AppRouteNavigationOptions } from '#/web/app-route-navigation.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
-import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/workspaces/navigation-history-entry.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
-import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  workspacePaneRouteNavigationBlockedForBranch,
+  workspacePaneRouteNavigationBlockedForWorktree,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { consumeAppHistoryPresentationAction } from '#/web/app-history-presentation.ts'
 import type { AppHistoryPresentationAction } from '#/web/app-history-presentation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
-import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; workspaceId: WorkspaceId }
@@ -28,7 +27,6 @@ export type WorkspaceNavigationRouteContext =
       kind: 'branch'
       workspaceId: WorkspaceId
       branchName: string
-      worktreePath?: string | null
       workspacePaneRoute: WorkspacePaneRoute | null
     }
 
@@ -137,9 +135,7 @@ type WorkspaceNavigationHistoryRouteSnapshot =
       workspaceId: WorkspaceId
       kind: 'branch'
       branchName: string
-      workspacePaneTab: WorkspacePaneTabType | null
-      terminalFilesystemTargetKey: string | null
-      terminalSessionId: string | null
+      workspacePaneTab: WorkspacePaneStaticTabType | null
     }
 
 function workspaceNavigationHistoryRouteSnapshotFromContext({
@@ -172,21 +168,12 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
       }
     }
     case 'branch': {
-      const repo = workspacesStore.getState().workspaces[workspaceId]
-      const branchModel =
-        repo?.capability.kind === 'git' ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId) : null
-      const worktree = branchModel ? repoWorktreeForBranch(branchModel.worktrees, routeContext.branchName) : undefined
-      const worktreePath = routeContext.worktreePath ?? worktree?.path ?? null
-      const terminalFilesystemTargetKey = worktreePath
-        ? formatTerminalFilesystemTargetKeyForPath(workspaceId, worktreePath)
-        : null
-      const route = routeContext.workspacePaneRoute
       return {
         workspaceId,
         kind: 'branch',
         branchName: routeContext.branchName,
-        ...workspaceNavigationPaneSelection(route),
-        terminalFilesystemTargetKey,
+        workspacePaneTab:
+          routeContext.workspacePaneRoute?.kind === 'static' ? routeContext.workspacePaneRoute.tab : null,
       }
     }
   }
@@ -239,8 +226,6 @@ function workspaceNavigationHistoryEntryFromSnapshot(
           kind: 'branch',
           branchName: snapshot.branchName,
           workspacePaneTab: snapshot.workspacePaneTab,
-          terminalFilesystemTargetKey: snapshot.terminalFilesystemTargetKey,
-          terminalSessionId: snapshot.terminalSessionId,
         },
       }
   }
@@ -306,20 +291,7 @@ export function restoreWorkspaceNavigationEntry(
         ? { kind: 'accepted' }
         : { kind: 'unavailable' }
     case 'branch':
-      if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
-        const accepted = routeNavigation.openRepoBranchTerminal(
-          entry.workspaceId,
-          entry.route.branchName,
-          entry.route.terminalSessionId,
-          options,
-        )
-        return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
-      }
       if (!entry.route.workspacePaneTab) {
-        const accepted = routeNavigation.openRepoBranch(entry.workspaceId, entry.route.branchName, options)
-        return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
-      }
-      if (!isWorkspacePaneStaticTabType(entry.route.workspacePaneTab)) {
         const accepted = routeNavigation.openRepoBranch(entry.workspaceId, entry.route.branchName, options)
         return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
       }
@@ -351,16 +323,16 @@ export function workspaceNavigationHistoryRestoreBlocked(
 function workspaceNavigationEntryBlocksWorkspacePaneInteraction(
   entry: WorkspaceNavigationHistoryEntry | null,
 ): boolean {
-  if (entry?.route.kind !== 'branch') return false
-  if (!workspaceNavigationBranchEntryTargetsWorkspacePane(entry)) return false
-  return workspacePaneRouteNavigationBlockedForBranch(entry.workspaceId, entry.route.branchName)
-}
-
-function workspaceNavigationBranchEntryTargetsWorkspacePane(entry: WorkspaceNavigationHistoryEntry): boolean {
-  if (entry.route.kind !== 'branch') return false
-  if (!entry.route.workspacePaneTab) return false
-  if (entry.route.workspacePaneTab !== 'terminal') return true
-  return !!entry.route.terminalSessionId
+  if (!entry) return false
+  if (entry.route.kind === 'branch') {
+    if (!entry.route.workspacePaneTab) return false
+    return workspacePaneRouteNavigationBlockedForBranch(entry.workspaceId, entry.route.branchName)
+  }
+  if (entry.route.kind === 'worktree') {
+    if (!entry.route.workspacePaneTab) return false
+    return workspacePaneRouteNavigationBlockedForWorktree(entry.workspaceId, entry.route.worktreePath)
+  }
+  return false
 }
 
 function workspaceNavigationBrowserHistoryTraversal(

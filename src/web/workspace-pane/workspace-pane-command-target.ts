@@ -20,7 +20,7 @@ export type WorkspacePaneCommandTarget =
   | {
       routeTarget: Extract<WorkspacePaneTabsTarget, { kind: 'git-branch' }>
       workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-      filesystemTarget: Extract<WorkspacePaneFilesystemTarget, { kind: 'git-worktree' }> | null
+      filesystemTarget: null
     }
   | {
       routeTarget: Extract<WorkspacePaneTabsTarget, { kind: 'git-worktree' }>

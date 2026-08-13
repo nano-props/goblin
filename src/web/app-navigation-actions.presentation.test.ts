@@ -25,7 +25,6 @@ import {
   BRANCH_NAME,
   presentationOptions,
   WORKTREE_PATH,
-  WORKTREE_KEY,
   setupAppNavigationActionsTests,
   preferredWorkspacePaneTab,
   createAppNavigationActions,
@@ -308,8 +307,6 @@ describe('createAppNavigationActions presentation', () => {
       kind: 'branch',
       branchName: 'feature/stale',
       workspacePaneTab: null,
-      terminalFilesystemTargetKey: null,
-      terminalSessionId: null,
     },
     {
       kind: 'worktree',
@@ -595,18 +592,17 @@ describe('createAppNavigationActions presentation', () => {
       workspaceId: REPO_ID,
       route: { kind: 'dashboard' },
     } satisfies WorkspaceNavigationHistoryEntry
-    const branch = {
+    const worktree = {
       workspaceId: REPO_ID,
       route: {
-        kind: 'branch',
-        branchName: BRANCH_NAME,
+        kind: 'worktree',
+        worktreePath: WORKTREE_PATH,
         workspacePaneTab: 'status',
-        terminalFilesystemTargetKey: WORKTREE_KEY,
         terminalSessionId: null,
       },
     } satisfies WorkspaceNavigationHistoryEntry
     workspacesStore.getState().recordWorkspaceNavigation(dashboard)
-    workspacesStore.getState().recordWorkspaceNavigation(branch)
+    workspacesStore.getState().recordWorkspaceNavigation(worktree)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
@@ -634,6 +630,6 @@ describe('createAppNavigationActions presentation', () => {
 
     expect(peekWorkspaceNavigation).not.toHaveBeenCalled()
     expect(navigation.openWorkspaceDashboard).not.toHaveBeenCalled()
-    expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(branch)
+    expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]?.current).toEqual(worktree)
   })
 })

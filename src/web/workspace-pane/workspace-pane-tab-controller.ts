@@ -15,14 +15,10 @@ import {
   type WorkspacePaneTab,
   type WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import {
-  commitWorkspacePaneCommittedRuntimeRouteSupplement,
-  commitWorkspacePaneRouteSupplement,
-} from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
+import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
 import {
   filesystemWorkspacePaneTargetLeaseForModel,
   filesystemWorkspacePaneTargetLeaseIsCurrent,
-  workspacePaneCommittedRuntimeTargetIsCurrent,
   workspacePaneTargetLeaseIsCurrent,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
@@ -273,32 +269,6 @@ export async function commitWorkspacePaneCurrentTargetRoute(
   )
 }
 
-export async function commitWorkspacePaneCommittedRuntimeTargetRoute(
-  target: WorkspacePaneControllerTarget,
-  route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneRouteCommitActions,
-  options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
-  navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
-): Promise<boolean> {
-  return await commitWorkspacePaneValidatedTargetRoute(
-    target,
-    route,
-    navigation,
-    (candidate) =>
-      candidate.branchName !== null &&
-      workspacePaneCommittedRuntimeTargetIsCurrent({
-        workspaceId: candidate.workspaceId,
-        workspaceRuntimeId: candidate.workspaceRuntimeId,
-        branchName: candidate.branchName,
-        worktreePath: candidate.worktreePath,
-      }),
-    commitWorkspacePaneCommittedRuntimeRouteSupplement,
-    {},
-    options,
-    navigationGeneration,
-  )
-}
-
 async function commitWorkspacePaneValidatedTargetRoute(
   target: WorkspacePaneControllerTarget,
   route: WorkspacePaneTabControllerRoute,
@@ -329,10 +299,8 @@ async function commitWorkspacePaneValidatedTargetRoute(
       committed &&
       commitSupplement(
         {
-          workspaceId: target.workspaceId,
           workspaceRuntimeId: target.workspaceRuntimeId,
-          branchName,
-          worktreePath: target.worktreePath,
+          routeTarget: { kind: 'git-branch', workspaceId: target.workspaceId, branchName },
         },
         route,
       )
@@ -383,32 +351,18 @@ export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneC
     const lease = filesystemWorkspacePaneTargetLeaseForModel(target)
     return lease !== null && filesystemWorkspacePaneTargetLeaseIsCurrent(lease)
   }
-  if (target.branchName !== target.routeTarget.branchName) return false
-  if (target.paneTarget.kind === 'git-branch') {
-    return (
-      target.branchName === target.paneTarget.branchName &&
-      target.worktreePath === null &&
-      workspacePaneTargetLeaseIsCurrent({
-        workspaceId: target.workspaceId,
-        workspaceRuntimeId: target.workspaceRuntimeId,
-        branchName: target.paneTarget.branchName,
-        worktreePath: target.worktreePath,
-      })
-    )
+  if (
+    target.paneTarget.kind !== 'git-branch' ||
+    target.branchName !== target.routeTarget.branchName ||
+    target.paneTarget.branchName !== target.routeTarget.branchName ||
+    target.worktreePath !== null
+  ) {
+    return false
   }
-  if (target.paneTarget.kind === 'git-worktree') {
-    if (target.worktreePath !== target.paneTarget.worktreePath) return false
-    return (
-      target.branchName !== null &&
-      workspacePaneTargetLeaseIsCurrent({
-        workspaceId: target.workspaceId,
-        workspaceRuntimeId: target.workspaceRuntimeId,
-        branchName: target.branchName,
-        worktreePath: target.paneTarget.worktreePath,
-      })
-    )
-  }
-  return false
+  return workspacePaneTargetLeaseIsCurrent({
+    workspaceRuntimeId: target.workspaceRuntimeId,
+    routeTarget: target.routeTarget,
+  })
 }
 
 function workspacePaneTabControllerRouteFromParsed(

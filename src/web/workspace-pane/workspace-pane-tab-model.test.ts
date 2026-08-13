@@ -318,7 +318,7 @@ describe('repo workspace pane tab model', () => {
     const model = createWorkspacePaneTabModel({
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature/model' },
+      routeTarget: requiredGitWorkspacePaneTabsTarget(WORKSPACE_ID, 'feature/model', WORKTREE_PATH),
       paneTarget: requiredGitWorkspacePaneTabsTarget(WORKSPACE_ID, 'feature/model', WORKTREE_PATH),
       worktreeHead: { kind: 'branch', branchName: 'feature/model' },
       preferredTab: 'status',

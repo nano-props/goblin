@@ -64,6 +64,7 @@ import {
   type LogEntry,
   type PullRequestFetchMode,
   type PullRequestInfo,
+  repoWorktreeMaterializedBranch,
   type RepoMutationExecResult,
   type RepoUrlTarget,
   type WorktreeInfo,
@@ -500,10 +501,11 @@ function createLocalRepoSource(
   ): Promise<ExecResult | null> {
     const current = await getCurrentBranch(gitCwd, { signal })
     const worktrees = knownWorktrees ?? (await readWorktreeMembership(gitCwd, signal))
+    const worktreeSnapshots = await readRepoWorktreeSnapshots(worktrees, signal)
     const ignoredPath = ignoredWorktreePath ? path.resolve(ignoredWorktreePath) : null
-    const isCheckedOutElsewhere = worktrees.some((wt) => {
-      if (wt.branch !== branch) return false
-      return ignoredPath ? path.resolve(wt.path) !== ignoredPath : true
+    const isCheckedOutElsewhere = worktreeSnapshots.some((worktree) => {
+      if (repoWorktreeMaterializedBranch(worktree) !== branch) return false
+      return ignoredPath ? path.resolve(worktree.path) !== ignoredPath : true
     })
     const mergedToCurrent = !options?.force && current ? await isAncestor(gitCwd, branch, current, signal) : false
     const mergedToUpstream =

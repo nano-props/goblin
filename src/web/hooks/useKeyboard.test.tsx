@@ -841,7 +841,7 @@ function seedTabbedWorktreeRepoForTest(preferredWorkspacePaneTab: 'status' | 'te
 
 function currentTerminalPaneCommandTargetForTest(): WorkspacePaneCommandTarget {
   return {
-    routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/worktree' },
+    routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
     workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
     filesystemTarget: gitWorktreePaneFilesystemTarget({
       workspaceId: REPO_ID,

@@ -118,6 +118,32 @@ describe('remote git mutations', () => {
     )
   })
 
+  test('deleteRemoteBranch rejects a branch retained by a rebasing worktree before mutation', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+        case 'gitOperationState':
+          return okRemoteResult('operation rebase\nmaterialized-branch feature/test\n')
+        case 'gitSnapshot':
+          return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
+        case 'gitRemoteVerbose':
+          return okRemoteResult('')
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', force: true, run })
+
+    expect(result).toEqual({ ok: false, message: 'error.cannot-delete-checked-out-branch', branchEffect: 'none' })
+    expect(run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gitBranchDelete' }),
+      TARGET,
+      expect.anything(),
+    )
+  })
+
   test('deleteRemoteBranch reports an uncertain result after timeout', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command) => {
       switch (command.type) {
@@ -234,6 +260,7 @@ describe('remote git mutations', () => {
         worktreePath?: string
         branch?: string
         force?: boolean
+        attachedBranch?: string | null
       }) => {
         switch (command.type) {
           case 'gitWorktreeList':
@@ -252,6 +279,8 @@ describe('remote git mutations', () => {
             )
           case 'gitStatus':
             return okRemoteResult('')
+          case 'gitOperationState':
+            return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
           case 'gitSnapshot':
             return okRemoteResult(
               [
@@ -311,6 +340,8 @@ describe('remote git mutations', () => {
           return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
         case 'gitStatus':
           return okRemoteResult('')
+        case 'gitOperationState':
+          return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitSnapshot':
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
         case 'gitUpstream':
@@ -338,6 +369,64 @@ describe('remote git mutations', () => {
     expect(beforeRemove).not.toHaveBeenCalled()
     expect(run).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'gitWorktreeRemove' }),
+      TARGET,
+      expect.anything(),
+    )
+  })
+
+  test('removeRemoteWorktree rejects branch deletion retained by a sibling rebase before mutation', async () => {
+    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const worktrees = worktreePorcelain(
+      [
+        'worktree /srv/repo',
+        'HEAD f00ba40',
+        'branch refs/heads/main',
+        '',
+        'worktree /srv/repo-feature',
+        'HEAD ba5eba1',
+        'branch refs/heads/feature/test',
+        '',
+        'worktree /srv/repo-rebase',
+        'HEAD deadbee',
+        'detached',
+      ].join('\n'),
+    )
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(worktrees)
+        case 'gitStatus':
+          return okRemoteResult('')
+        case 'gitOperationState':
+          return command.path === '/srv/repo-rebase'
+            ? okRemoteResult('operation rebase\nmaterialized-branch feature/test\n')
+            : okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
+        case 'gitSnapshot':
+          return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove,
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      deleteBranch: true,
+      forceDeleteBranch: true,
+      run,
+    })
+
+    expect(result).toEqual({ ok: false, message: 'error.cannot-delete-checked-out-branch' })
+    expect(beforeRemove).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gitWorktreeRemove' }),
+      TARGET,
+      expect.anything(),
+    )
+    expect(run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gitBranchDelete' }),
       TARGET,
       expect.anything(),
     )
@@ -543,12 +632,15 @@ describe('remote git mutations', () => {
         worktreePath?: string
         branch?: string
         force?: boolean
+        attachedBranch?: string | null
       }) => {
         switch (command.type) {
           case 'gitWorktreeList':
             return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
           case 'gitStatus':
             return okRemoteResult('')
+          case 'gitOperationState':
+            return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
           case 'gitSnapshot':
             return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
           case 'gitIsAncestor':
@@ -591,12 +683,14 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree surfaces recovery when upstream cleanup is cancelled after removal', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string; attachedBranch?: string | null }) => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
         case 'gitStatus':
           return okRemoteResult('')
+        case 'gitOperationState':
+          return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitSnapshot':
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
         case 'gitIsAncestor':
@@ -688,12 +782,15 @@ describe('remote git mutations', () => {
         worktreePath?: string
         branch?: string
         force?: boolean
+        attachedBranch?: string | null
       }) => {
         switch (command.type) {
           case 'gitWorktreeList':
             return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
           case 'gitStatus':
             return okRemoteResult('')
+          case 'gitOperationState':
+            return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
           case 'gitSnapshot':
             return command.path === '/srv/repo'
               ? okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)

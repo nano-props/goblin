@@ -345,12 +345,8 @@ function workspacePaneCommandTargetForSurface(
     if (surface.kind !== 'git-worktree') throw new Error('git-worktree route requires a git-worktree surface')
     return { routeTarget: target, workspacePaneRoute, filesystemTarget: surface }
   }
-  if (surface.kind === 'workspace-root') throw new Error('git-branch route cannot use a workspace-root surface')
-  return {
-    routeTarget: target,
-    workspacePaneRoute,
-    filesystemTarget: surface.kind === 'git-worktree' ? surface : null,
-  }
+  if (surface.kind !== 'git-branch') throw new Error('git-branch route requires a git-branch surface')
+  return { routeTarget: target, workspacePaneRoute, filesystemTarget: null }
 }
 
 function activePendingTabIdentity(model: WorkspacePaneTabModel): string | null {

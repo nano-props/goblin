@@ -60,14 +60,21 @@ describe('workspace pane tab select action', () => {
     observeStatusRoute(target)
     const showTab = storeBackedShowTab()
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab: showTab }, { autoSeedInitialRoute: false })
+    const blocker = Promise.withResolvers<void>()
+    const blockingAction = runWorkspacePaneAction(
+      workspacePaneActionTargetFromCoordinates(target),
+      () => blocker.promise,
+    )
 
     const selectFiles = selectTab('workspace-pane:files', navigation)
     const selectHistory = selectTab('workspace-pane:history', navigation)
+    blocker.resolve()
+    await blockingAction
 
     await expect(selectFiles).resolves.toBe(false)
     await expect(selectHistory).resolves.toBe(true)
-    expect(showTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
-    expect(showTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
+    expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledOnce()
   })
 
   test('resolves each queued relative move from the route current at execution time', async () => {
@@ -89,8 +96,8 @@ describe('workspace pane tab select action', () => {
     await blockingAction
     await expect(firstMove).resolves.toBe(true)
     await expect(secondMove).resolves.toBe(true)
-    expect(showTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
-    expect(showTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
+    expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledTimes(2)
   })
 
   test.each([
@@ -165,8 +172,8 @@ describe('workspace pane tab select action', () => {
 
     await expect(openFiles).resolves.toBe(true)
     await expect(move).resolves.toBe(true)
-    expect(showTab).toHaveBeenCalledOnce()
-    expect(showTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'history')
+    expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledTimes(2)
   })
 })
 
@@ -194,7 +201,7 @@ function observeStatusRoute(target: ReturnType<typeof seedTarget>): void {
 
 function selectTab(identity: string, navigation: ObservedAppNavigationActionsForTest) {
   return dispatchSelectWorkspacePaneTabByIdentityAction({
-    routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/worktree' },
+    routeTarget: PANE_TARGET,
     paneTarget: PANE_TARGET,
     worktreeHead: { kind: 'branch', branchName: 'feature/worktree' },
     workspaceId: REPO_ID,
@@ -206,7 +213,7 @@ function selectTab(identity: string, navigation: ObservedAppNavigationActionsFor
 
 function moveTab(navigation: ObservedAppNavigationActionsForTest) {
   return dispatchMoveWorkspacePaneTabAction({
-    routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/worktree' },
+    routeTarget: PANE_TARGET,
     paneTarget: PANE_TARGET,
     worktreeHead: { kind: 'branch', branchName: 'feature/worktree' },
     workspaceId: REPO_ID,

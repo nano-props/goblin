@@ -67,8 +67,6 @@ export function branchHistoryEntry(
       kind: 'branch',
       branchName,
       workspacePaneTab,
-      terminalFilesystemTargetKey: null,
-      terminalSessionId: null,
     },
   }
 }

@@ -30,9 +30,7 @@ export function workspaceNavigationHistoryEntryEqual(
       return (
         b.route.kind === 'branch' &&
         a.route.branchName === b.route.branchName &&
-        a.route.workspacePaneTab === b.route.workspacePaneTab &&
-        a.route.terminalFilesystemTargetKey === b.route.terminalFilesystemTargetKey &&
-        a.route.terminalSessionId === b.route.terminalSessionId
+        a.route.workspacePaneTab === b.route.workspacePaneTab
       )
   }
 }
@@ -69,20 +67,11 @@ export function workspaceNavigationHistoryEntryCanReplaceCurrent(
         !b.route.terminalSessionId ||
         a.route.terminalSessionId === b.route.terminalSessionId
       )
-    case 'branch': {
-      if (
-        b.route.kind !== 'branch' ||
-        a.route.branchName !== b.route.branchName ||
-        a.route.workspacePaneTab !== b.route.workspacePaneTab
-      ) {
-        return false
-      }
-      if (a.route.workspacePaneTab !== 'terminal') return true
+    case 'branch':
       return (
-        !a.route.terminalSessionId ||
-        !b.route.terminalSessionId ||
-        a.route.terminalSessionId === b.route.terminalSessionId
+        b.route.kind === 'branch' &&
+        a.route.branchName === b.route.branchName &&
+        a.route.workspacePaneTab === b.route.workspacePaneTab
       )
-    }
   }
 }

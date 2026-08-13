@@ -27,6 +27,7 @@ import {
   recordWorkspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
+  isGitWorktreeDestinationTargetLease,
   resolveWorkspacePaneDestinationTarget,
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
@@ -148,11 +149,15 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
   const resolution = resolveWorkspacePaneDestinationTarget(workspaceId, branchName)
   if (resolution.kind !== 'ready') return { kind: 'target-missing' }
   const lease = resolution.lease
+  const canonicalBranch = isGitWorktreeDestinationTargetLease(lease)
+    ? lease.canonicalBranch
+    : lease.routeTarget.branchName
+  const worktreePath = isGitWorktreeDestinationTargetLease(lease) ? lease.routeTarget.worktreePath : null
   const provider = workspacePaneStaticTabProvider(type)
-  if (!provider.canOpen({ hasWorktree: lease.worktreePath !== null })) {
+  if (!provider.canOpen({ hasWorktree: worktreePath !== null })) {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
-  const paneTarget = requiredGitWorkspacePaneTabsTarget(workspaceId, lease.branchName, lease.worktreePath)
+  const paneTarget = lease.routeTarget
   const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, lease.workspaceRuntimeId, {
     workspacePaneRoute,
   })
@@ -160,8 +165,8 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
   const input: ResolvedWorkspacePaneStaticTabOpenInput = {
     workspaceId,
     workspaceRuntimeId: lease.workspaceRuntimeId,
-    branchName: lease.branchName,
-    worktreePath: lease.worktreePath,
+    branchName: canonicalBranch,
+    worktreePath,
     routeTarget: paneTarget,
     paneTarget,
     type,
@@ -171,10 +176,10 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
   }
   return await runWorkspacePaneAction(
     workspacePaneActionTargetFromCoordinates({
-      workspaceId: lease.workspaceId,
+      workspaceId: lease.routeTarget.workspaceId,
       workspaceRuntimeId: lease.workspaceRuntimeId,
-      branchName: lease.branchName,
-      worktreePath: lease.worktreePath,
+      branchName: canonicalBranch,
+      worktreePath,
     }),
     () =>
       openWorkspacePaneStaticTabAction(input, {

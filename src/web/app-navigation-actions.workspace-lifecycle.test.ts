@@ -382,8 +382,6 @@ describe('createAppNavigationActions workspace lifecycle', () => {
         kind: 'branch' as const,
         branchName: 'feature/test',
         workspacePaneTab: null,
-        terminalFilesystemTargetKey: null,
-        terminalSessionId: null,
       },
     }
     const traversal = historyTraversal(target)

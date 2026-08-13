@@ -1,64 +1,30 @@
-import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { workspacePaneCommittedRuntimeTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 
-export interface WorkspacePaneRouteSupplementTarget {
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
-  branchName: string
-  worktreePath: string | null
-}
+type WorkspacePaneBranchRouteSupplementTarget = Extract<
+  WorkspacePaneDestinationTargetLease,
+  { routeTarget: { kind: 'git-branch' } }
+>
 
 export function commitWorkspacePaneRouteSupplement(
-  target: WorkspacePaneRouteSupplementTarget,
+  target: WorkspacePaneBranchRouteSupplementTarget,
   route: WorkspacePaneRouteTarget,
 ): boolean {
   const state = workspacesStore.getState()
-  const workspace = state.workspaces[target.workspaceId]
+  const { workspaceId, branchName } = target.routeTarget
+  const workspace = state.workspaces[workspaceId]
   if (!workspace || workspace.capability.kind !== 'git' || workspace.workspaceRuntimeId !== target.workspaceRuntimeId)
     return false
   const branchModel = getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)
-  const branch = branchModel?.branches.find((candidate) => candidate.name === target.branchName)
-  if (
-    !branchModel ||
-    !branch ||
-    (repoWorktreeForBranch(branchModel.worktrees, target.branchName)?.path ?? null) !== target.worktreePath
-  )
-    return false
+  const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
+  if (!branchModel || !branch || repoWorktreeForBranch(branchModel.worktrees, branchName)) return false
   state.setWorkspacePaneTab(
-    target.workspaceId,
-    target.branchName,
+    workspaceId,
+    branchName,
     route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
   )
-  if (route?.kind === 'terminal' && target.worktreePath) {
-    state.setSelectedTerminal(
-      formatTerminalFilesystemTargetKeyForPath(target.workspaceId, target.worktreePath),
-      route.terminalSessionId,
-    )
-  }
-  return true
-}
-
-export function commitWorkspacePaneCommittedRuntimeRouteSupplement(
-  target: WorkspacePaneRouteSupplementTarget,
-  route: WorkspacePaneRouteTarget,
-): boolean {
-  if (!workspacePaneCommittedRuntimeTargetIsCurrent(target)) return false
-  const state = workspacesStore.getState()
-  state.setWorkspacePaneTabForTarget(
-    requiredGitWorkspacePaneTabsTarget(target.workspaceId, target.branchName, target.worktreePath),
-    route === null ? null : route.kind === 'static' ? route.tab : 'terminal',
-  )
-  if (route?.kind === 'terminal' && target.worktreePath) {
-    state.setSelectedTerminal(
-      formatTerminalFilesystemTargetKeyForPath(target.workspaceId, target.worktreePath),
-      route.terminalSessionId,
-    )
-  }
   return true
 }

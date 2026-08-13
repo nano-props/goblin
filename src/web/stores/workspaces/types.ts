@@ -7,7 +7,7 @@ import type {
   WorkspaceTabsRestoreResult,
   WorkspaceRuntimeRestoreSnapshot,
 } from '#/shared/api-types.ts'
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/workspaces/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/workspaces/operations.ts'
@@ -146,9 +146,7 @@ export type WorkspaceNavigationHistoryRoute =
   | {
       kind: 'branch'
       branchName: string
-      workspacePaneTab: WorkspacePaneTabType | null
-      terminalFilesystemTargetKey: string | null
-      terminalSessionId: string | null
+      workspacePaneTab: WorkspacePaneStaticTabType | null
     }
 
 export interface WorkspaceNavigationHistoryEntry {

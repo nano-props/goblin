@@ -97,13 +97,13 @@ describe('workspace pane tab close action', () => {
     })
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
-    const commitWorkspacePaneRoute = vi.fn(navigation.commitWorkspacePaneRoute)
-    navigation.commitWorkspacePaneRoute = commitWorkspacePaneRoute
+    const commitFilesystemWorkspacePaneRoute = vi.fn(navigation.commitFilesystemWorkspacePaneRoute)
+    navigation.commitFilesystemWorkspacePaneRoute = commitFilesystemWorkspacePaneRoute
     const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
-        routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: BRANCH_NAME },
+        routeTarget: WORKTREE_PANE_TARGET,
         paneTarget: WORKTREE_PANE_TARGET,
         worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
         workspaceId: REPO_ID,
@@ -113,13 +113,13 @@ describe('workspace pane tab close action', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(commitWorkspacePaneRoute).toHaveBeenCalledWith(
-      REPO_ID,
-      BRANCH_NAME,
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ routeTarget: WORKTREE_PANE_TARGET }),
       { kind: 'static', tab: 'status' },
       expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status')
+    expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(presentationEffects.onCommit).toHaveBeenCalledOnce()
     expect(presentationEffects.onAbandon).not.toHaveBeenCalled()
   })
@@ -433,19 +433,19 @@ describe('workspace pane tab close action', () => {
       },
     })
     const routeCommit = Promise.withResolvers<boolean>()
-    const commitWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
+    const commitFilesystemWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
     const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
     const close = dispatchCloseWorkspacePaneTabAction({
-      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: BRANCH_NAME },
+      routeTarget: WORKTREE_PANE_TARGET,
       paneTarget: WORKTREE_PANE_TARGET,
       worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
       workspaceId: REPO_ID,
       workspacePaneRoute: { kind: 'static', tab: 'files' },
-      navigation: navigationWith({ commitWorkspacePaneRoute }),
+      navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
       presentationEffects,
     })
 
-    await vi.waitFor(() => expect(commitWorkspacePaneRoute).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledOnce())
 
     routeCommit.reject(new Error('navigation failed'))
     await expect(close).resolves.toBe(true)
@@ -467,22 +467,22 @@ describe('workspace pane tab close action', () => {
         [BRANCH_NAME]: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],
       },
     })
-    const commitWorkspacePaneRoute = vi.fn(async () => false)
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => false)
     const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
-        routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: BRANCH_NAME },
+        routeTarget: WORKTREE_PANE_TARGET,
         paneTarget: WORKTREE_PANE_TARGET,
         worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
         workspaceId: REPO_ID,
         workspacePaneRoute: { kind: 'static', tab: 'files' },
-        navigation: navigationWith({ commitWorkspacePaneRoute }),
+        navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
         presentationEffects,
       }),
     ).resolves.toBe(true)
 
-    expect(commitWorkspacePaneRoute).toHaveBeenCalledOnce()
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledOnce()
     expect(presentationEffects.onCommit).not.toHaveBeenCalled()
     expect(presentationEffects.onAbandon).toHaveBeenCalledOnce()
     expect(feedbackMocks.error).not.toHaveBeenCalled()
@@ -827,7 +827,7 @@ describe('workspace pane tab close action', () => {
     })
     const navigation = navigationWith()
     const close = dispatchCloseWorkspacePaneTabAction({
-      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: BRANCH_NAME },
+      routeTarget: WORKTREE_PANE_TARGET,
       paneTarget: WORKTREE_PANE_TARGET,
       worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
       workspaceId: REPO_ID,

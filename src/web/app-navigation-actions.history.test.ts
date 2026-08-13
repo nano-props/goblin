@@ -40,8 +40,6 @@ describe('createAppNavigationActions history traversal', () => {
         kind: 'branch',
         branchName: 'feature/test',
         workspacePaneTab: null,
-        terminalFilesystemTargetKey: null,
-        terminalSessionId: null,
       },
     }
     const traversal = { ...historyTraversal(target), direction }
@@ -144,8 +142,6 @@ describe('createAppNavigationActions history traversal', () => {
         kind: 'branch',
         branchName: BRANCH_NAME,
         workspacePaneTab: null,
-        terminalFilesystemTargetKey: null,
-        terminalSessionId: null,
       },
     } satisfies WorkspaceNavigationHistoryEntry
     const dashboard = {
@@ -171,39 +167,6 @@ describe('createAppNavigationActions history traversal', () => {
 
     expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_ID, 'back')
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, historyRestoreOptions())
-  })
-
-  test('restores a malformed terminal history entry as the bare branch route', () => {
-    const navigation = routeNavigation()
-    const target = {
-      workspaceId: REPO_A_ID,
-      route: {
-        kind: 'branch' as const,
-        branchName: 'feature/test',
-        workspacePaneTab: 'terminal' as const,
-        terminalFilesystemTargetKey: 'goblin+file:///tmp/repo-a\0goblin+file:///tmp/worktree',
-        terminalSessionId: null,
-      },
-    }
-    const traversal = historyTraversal(target)
-    const peekWorkspaceNavigation = vi.fn(() => traversal)
-    const commitWorkspaceNavigation = vi.fn(() => true)
-    const actions = createAppNavigationActions({
-      currentWorkspaceId: REPO_A_ID,
-      workspaceOrder: [REPO_A_ID],
-      closeWorkspace: vi.fn(),
-      peekWorkspaceNavigation,
-      commitWorkspaceNavigation,
-      routeNavigation: navigation,
-    })
-
-    actions.goBack(REPO_A_ID)
-
-    expect(peekWorkspaceNavigation).toHaveBeenCalledWith(REPO_A_ID, 'back')
-    expect(commitWorkspaceNavigation).toHaveBeenCalledWith(traversal)
-    expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_A_ID, 'feature/test', historyRestoreOptions())
-    expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
-    expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
   test.each(['back', 'forward'] as const)(
