@@ -72,11 +72,13 @@ describe('remote git snapshot', () => {
       switch (command.type) {
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
+        case 'resolveGitWorkspacePath':
+          return okRemoteResult('/srv/repo\n')
         case 'gitSnapshot':
           return okRemoteResult(
             [
               '__GOBLIN_REMOTE_CURRENT__',
-              'value main',
+              'value stale/read',
               '__GOBLIN_REMOTE_DEFAULT__',
               'value main',
               '__GOBLIN_REMOTE_BRANCHES__',
@@ -104,6 +106,7 @@ describe('remote git snapshot', () => {
 
     const snapshot = await getRemoteSnapshot(TARGET, { run: run })
 
+    expect(snapshot.current).toBe('main')
     expect(snapshot?.remote).toMatchObject({
       hasRemotes: true,
       hasBrowserRemote: true,
@@ -133,6 +136,8 @@ describe('remote git snapshot', () => {
       switch (command.type) {
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
+        case 'resolveGitWorkspacePath':
+          return okRemoteResult('/srv/repo\n')
         case 'gitSnapshot':
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
         case 'gitWorktreeList':
@@ -156,6 +161,69 @@ describe('remote git snapshot', () => {
         materializedBranch: 'feature/in-progress',
       }),
     ])
+    expect(snapshot.current).toBe('')
+  })
+
+  test('resolves a physical source path only when its workspace spelling differs from membership', async () => {
+    const aliasTarget = { ...TARGET, remotePath: '/srv/repo-alias' }
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+        case 'resolveGitWorkspacePath':
+          return okRemoteResult('/srv/repo\n')
+        case 'resolveRepoCommonDir':
+          return okRemoteResult('/srv/repo/.git\0')
+        case 'gitOperationState':
+          return okRemoteResult('operation none\nmaterialized-branch main\n')
+        case 'gitSnapshot':
+          return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    await expect(getRemoteSnapshot(aliasTarget, { run })).resolves.toMatchObject({ current: 'main' })
+    expect(run).toHaveBeenCalledWith({ type: 'resolveGitWorkspacePath', path: '/srv/repo-alias' }, aliasTarget, {
+      signal: undefined,
+    })
+  })
+
+  test.each(['', 'relative/repo', '/srv/repo\0hidden', '/srv/repo\n/other', '/srv/missing'])(
+    'rejects a malformed or unknown resolved source workspace path %j',
+    async (sourcePath) => {
+      const aliasTarget = { ...TARGET, remotePath: '/srv/repo-alias' }
+      const run = vi.fn<RemoteGitRunner>(async (command) => {
+        if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+        if (command.type === 'resolveGitWorkspacePath') return okRemoteResult(sourcePath)
+        return okRemoteResult('')
+      })
+
+      await expect(getRemoteSnapshot(aliasTarget, { run })).rejects.toThrow('error.failed-read-repo')
+    },
+  )
+
+  test('preserves symbolic HEAD only for a bare remote source workspace', async () => {
+    const bareTarget = { ...TARGET, remotePath: '/srv/repo.git' }
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(worktreePorcelain('worktree /srv/repo.git\nbare'))
+      if (command.type === 'gitSnapshot') {
+        return okRemoteResult(
+          '__GOBLIN_REMOTE_CURRENT__\nvalue bare/main\n__GOBLIN_REMOTE_DEFAULT__\nvalue \n__GOBLIN_REMOTE_BRANCHES__\n',
+        )
+      }
+      return okRemoteResult('')
+    })
+
+    await expect(getRemoteSnapshot(bareTarget, { run })).resolves.toMatchObject({
+      current: 'bare/main',
+      worktrees: [],
+    })
+    expect(run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'resolveGitWorkspacePath' }),
+      expect.anything(),
+      expect.anything(),
+    )
   })
 
   test('reads linked worktree operation state with its own administrative identity', async () => {
@@ -163,6 +231,8 @@ describe('remote git snapshot', () => {
       switch (command.type) {
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
+        case 'resolveGitWorkspacePath':
+          return okRemoteResult('/srv/repo\n')
         case 'gitSnapshot':
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
         case 'gitWorktreeList':
@@ -469,9 +539,13 @@ describe('remote git snapshot', () => {
     '__GOBLIN_REMOTE_CURRENT__\nvalue main\nunexpected\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__',
     '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\nmain\x00abc1234',
   ])('rejects malformed authoritative snapshot envelopes', async (stdout) => {
-    const run = vi.fn<RemoteGitRunner>(async (command) =>
-      command.type === 'gitSnapshot' ? okRemoteResult(stdout) : okRemoteResult(''),
-    )
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitSnapshot') return okRemoteResult(stdout)
+      if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+      if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
+      if (command.type === 'gitOperationState') return okRemoteResult('operation none\nmaterialized-branch main\n')
+      return okRemoteResult('')
+    })
 
     await expect(getRemoteSnapshot(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
@@ -484,11 +558,15 @@ describe('remote git snapshot', () => {
           )
         : command.type === 'resolveRepoCommonDir'
           ? okRemoteResult('/srv/repo/.git\0')
-          : command.type === 'gitWorktreeList'
-            ? okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
-            : command.type === 'gitOperationState'
-              ? okRemoteResult('operation none\nmaterialized-branch main\n')
-              : okRemoteResult(''),
+          : command.type === 'resolveGitWorkspacePath'
+            ? okRemoteResult('/srv/repo\n')
+            : command.type === 'gitWorktreeList'
+              ? okRemoteResult(
+                  worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),
+                )
+              : command.type === 'gitOperationState'
+                ? okRemoteResult('operation none\nmaterialized-branch\n')
+                : okRemoteResult(''),
     )
 
     await expect(getRemoteSnapshot(TARGET, { run })).resolves.toMatchObject({
@@ -507,7 +585,11 @@ describe('remote git snapshot', () => {
       if (command.type === 'gitSnapshot') {
         return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
       }
-      return command.type === 'gitRemoteVerbose' ? okRemoteResult(remoteOutput) : okRemoteResult('')
+      if (command.type === 'gitRemoteVerbose') return okRemoteResult(remoteOutput)
+      if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+      if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
+      if (command.type === 'gitOperationState') return okRemoteResult('operation none\nmaterialized-branch main\n')
+      return okRemoteResult('')
     })
 
     await expect(getRemoteSnapshot(TARGET, { run })).rejects.toThrow('error.failed-read-repo')

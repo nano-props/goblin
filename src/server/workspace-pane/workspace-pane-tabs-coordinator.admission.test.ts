@@ -80,7 +80,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
     expect(commitAdmission).not.toHaveBeenCalled()
   })
 
-  test('commits admission with the canonical branch for an existing worktree target', async () => {
+  test('commits admission for an existing worktree target', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a',
@@ -128,7 +128,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
     )
 
     expect(admitted.admitted).toBe(true)
-    expect(commitAdmission).toHaveBeenCalledWith('feature/renamed')
+    expect(commitAdmission).toHaveBeenCalledWith()
     expect(commitAdmission).toHaveBeenCalledTimes(1)
     expect(repository.load).toHaveBeenCalledTimes(1)
     expect(repository.compareAndSwap).not.toHaveBeenCalled()
@@ -253,7 +253,6 @@ describe('workspace pane tabs coordinator admission queues', () => {
     const projection: WorkspacePaneTargetProjection = {
       target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: 'runtime-a' },
       nativeWorktreePath: '/repo',
-      canonicalBranch: null,
     }
     const commitAdmission = vi.fn()
     const coordinator = createWorkspacePaneTabsCoordinator({
@@ -298,7 +297,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
         },
       },
     })
-    expect(commitAdmission).toHaveBeenCalledWith(null)
+    expect(commitAdmission).toHaveBeenCalledWith()
   })
 
   test('commits detached worktree terminal admission without requiring a branch projection', async () => {
@@ -313,7 +312,6 @@ describe('workspace pane tabs coordinator admission queues', () => {
     const projection: WorkspacePaneTargetProjection = {
       target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId: 'runtime-a', root },
       nativeWorktreePath: '/repo/detached',
-      canonicalBranch: null,
     }
     const commitAdmission = vi.fn()
     const coordinator = createWorkspacePaneTabsCoordinator({
@@ -341,7 +339,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
     )
 
     expect(admitted).toMatchObject({ admitted: true, value: { kind: 'committed' } })
-    expect(commitAdmission).toHaveBeenCalledWith(null)
+    expect(commitAdmission).toHaveBeenCalledWith()
   })
 
   test('keeps logical workspace membership independent from its physical realpath identity', async () => {
@@ -356,7 +354,6 @@ describe('workspace pane tabs coordinator admission queues', () => {
     const projection: WorkspacePaneTargetProjection = {
       target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: 'runtime-a' },
       nativeWorktreePath: '/repo',
-      canonicalBranch: null,
     }
     const commitAdmission = vi.fn()
     const coordinator = createWorkspacePaneTabsCoordinator({
@@ -401,7 +398,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
         },
       },
     })
-    expect(commitAdmission).toHaveBeenCalledWith(null)
+    expect(commitAdmission).toHaveBeenCalledWith()
   })
 
   test('rejects placement metadata that does not belong to the runtime target', async () => {
@@ -642,7 +639,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
       },
     })
     expect(captureTargets).toHaveBeenCalledOnce()
-    expect(commitAdmission).toHaveBeenCalledWith('feature/old')
+    expect(commitAdmission).toHaveBeenCalledWith()
   })
 
   test('serializes repository reads with a later durable command', async () => {

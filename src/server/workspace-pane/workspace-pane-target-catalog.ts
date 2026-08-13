@@ -3,7 +3,7 @@ import { workspaceRuntimeHasGitCapability } from '#/server/modules/workspace-run
 import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import { repoWorktreeMaterializedBranch, type WorkspacePaneTargetIdentity } from '#/shared/git-types.ts'
+import type { WorkspacePaneTargetIdentity } from '#/shared/git-types.ts'
 
 interface WorkspacePaneTargetCatalogDependencies {
   hasGitCapability(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
@@ -36,7 +36,6 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
     const workspaceTarget: WorkspacePaneTargetProjection = {
       target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId },
       nativeWorktreePath: workspace.path,
-      canonicalBranch: null,
     }
     if (!this.dependencies.hasGitCapability(userId, workspaceId, workspaceRuntimeId)) return [workspaceTarget]
     const identities = await this.dependencies.readIdentities(workspaceId, { workspaceRuntimeId })
@@ -52,7 +51,6 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
                 root: workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
               },
               nativeWorktreePath: identity.worktreePath,
-              canonicalBranch: repoWorktreeMaterializedBranch(identity),
             }
           : {
               target: {
@@ -62,7 +60,6 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
                 branch: identity.branchName,
               },
               nativeWorktreePath: null,
-              canonicalBranch: identity.branchName,
             },
       ),
     ]

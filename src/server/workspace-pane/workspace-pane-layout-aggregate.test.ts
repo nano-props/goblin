@@ -64,12 +64,11 @@ function branchProjection(
   return {
     target: { kind: 'git-branch', workspaceId: canonicalWorkspaceId, workspaceRuntimeId, branch },
     nativeWorktreePath: null,
-    canonicalBranch: branch,
   }
 }
 
-function worktreeProjection(branch: string): WorkspacePaneLayoutValidationInput['validTargets'][number] {
-  return { target: runtimeWorktreeTarget, nativeWorktreePath: target.worktreePath, canonicalBranch: branch }
+function worktreeProjection(): WorkspacePaneLayoutValidationInput['validTargets'][number] {
+  return { target: runtimeWorktreeTarget, nativeWorktreePath: target.worktreePath }
 }
 const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')
 const runtimeIntent = {
@@ -84,8 +83,7 @@ const providers = [
     liveSessions: [
       {
         sessionId: 'term-livelivelivelivelive1',
-        target: worktreeProjection(target.branchName).target,
-        branch: target.branchName,
+        target: worktreeProjection().target,
         worktreePath: target.worktreePath,
       },
     ],
@@ -140,7 +138,7 @@ describe('workspace pane layout aggregate', () => {
     })
     const originalCas = repository.compareAndSwap
     const aggregate = aggregateFor(repository)
-    await validateTargets(aggregate, [worktreeProjection(target.branchName)])
+    await validateTargets(aggregate, [worktreeProjection()])
     let first = true
     repository.compareAndSwap = vi.fn(async (input) => {
       if (first) {
@@ -162,7 +160,7 @@ describe('workspace pane layout aggregate', () => {
       epochCapability: testEpochCapability,
       ...worktreeMutationTarget,
       operation: { type: 'open-static', tabType: 'history' },
-      validTargets: [worktreeProjection(target.branchName)],
+      validTargets: [worktreeProjection()],
       physicalWorktreeLease: physicalWorktreeAdmissionLease(
         testPhysicalWorktreeExecutionCapability(target.worktreePath),
       ),
@@ -179,7 +177,7 @@ describe('workspace pane layout aggregate', () => {
 
   test('keeps runtime target overlay, clock, and snapshot unchanged when admission fails', async () => {
     const aggregate = aggregateFor(memoryRepository())
-    const validTargets = [worktreeProjection(target.branchName)]
+    const validTargets = [worktreeProjection()]
     const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
     const baseline = await readSnapshot(aggregate, scope, validTargets, providers)
 
@@ -224,7 +222,7 @@ describe('workspace pane layout aggregate', () => {
       async (operation) =>
         await operation.snapshot({
           scope,
-          validTargets: [worktreeProjection(target.branchName)],
+          validTargets: [worktreeProjection()],
           providerSnapshots: providers,
           epochCapability: {
             ...scope,
@@ -245,7 +243,7 @@ describe('workspace pane layout aggregate', () => {
 
   test('atomically swaps the staged runtime target state after the commit callback succeeds', async () => {
     const aggregate = aggregateFor(memoryRepository())
-    const validTargets = [worktreeProjection(target.branchName)]
+    const validTargets = [worktreeProjection()]
     const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
     await readSnapshot(aggregate, scope, validTargets, providers)
 
@@ -279,7 +277,7 @@ describe('workspace pane layout aggregate', () => {
     repository.load = vi.fn(repository.load)
     repository.compareAndSwap = vi.fn(repository.compareAndSwap)
     const aggregate = aggregateFor(repository)
-    const validTargets = [worktreeProjection(target.branchName)]
+    const validTargets = [worktreeProjection()]
     const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
     const commitAdmission = vi.fn()
 
@@ -315,7 +313,7 @@ describe('workspace pane layout aggregate', () => {
 
   test('preserves an anchored runtime placement when the same intent is reapplied', async () => {
     const aggregate = aggregateFor(memoryRepository())
-    const validTargets = [worktreeProjection(target.branchName)]
+    const validTargets = [worktreeProjection()]
     const lease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
     const firstTerminal = workspacePaneRuntimeTabEntry('terminal', 'term-firstfirstfirstfirst001')
     const anchoredTerminal = workspacePaneRuntimeTabEntry('terminal', 'term-anchoranchoranchor001')
@@ -326,7 +324,6 @@ describe('workspace pane layout aggregate', () => {
         liveSessions: [firstTerminal, anchoredTerminal].map((entry) => ({
           sessionId: entry.runtimeSessionId,
           target: runtimeWorktreeTarget,
-          branch: target.branchName,
           worktreePath: target.worktreePath,
         })),
       },
@@ -371,7 +368,7 @@ describe('workspace pane layout aggregate', () => {
 
   test('preserves an existing epoch and its physical index when a replacement admission fails', async () => {
     const aggregate = aggregateFor(memoryRepository())
-    const validTargets = [worktreeProjection(target.branchName)]
+    const validTargets = [worktreeProjection()]
     const firstLease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
     const replacementLease = physicalWorktreeAdmissionLease(replacementCapability())
     await aggregate.runExclusive(scope.workspaceId, async (operation) => {
@@ -421,7 +418,7 @@ describe('workspace pane layout aggregate', () => {
     const firstLease = physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath))
     const replacementLease = physicalWorktreeAdmissionLease(replacementCapability())
     const siblingScope = { ...scope, userId: 'user-b' }
-    const validTargets = [worktreeProjection(target.branchName)]
+    const validTargets = [worktreeProjection()]
 
     for (const [epochScope, lease] of [
       [scope, firstLease],
@@ -524,26 +521,6 @@ describe('workspace pane layout aggregate', () => {
     expect(provider.entries[0]?.tabs.map(workspacePaneTabEntryIdentity)).toEqual([
       workspacePaneTabEntryIdentity(workspacePaneStaticTabEntry('history')),
     ])
-  })
-
-  test('advances the canonical clock when authoritative target metadata changes', async () => {
-    const repository = memoryRepository({
-      entries: [
-        {
-          target: { kind: 'git-worktree', root: worktreeRoot },
-          tabs: [],
-        },
-      ],
-    })
-    const aggregate = aggregateFor(repository)
-    const oldTarget = worktreeProjection('feature/old')
-    const currentTarget = worktreeProjection('feature/current')
-
-    const first = await readSnapshot(aggregate, scope, [oldTarget], [])
-    const current = await readSnapshot(aggregate, scope, [currentTarget], [])
-
-    expect(first).toMatchObject({ revision: 0, entries: [{ target: { kind: 'git-worktree' } }] })
-    expect(current).toMatchObject({ revision: 1, entries: [{ target: { kind: 'git-worktree' } }] })
   })
 
   test('does not expose unvalidated durable targets in a new epoch', async () => {
@@ -778,7 +755,7 @@ describe('workspace pane layout aggregate', () => {
       validate(aggregate, {
         ...scope,
         epochCapability: testEpochCapability,
-        validTargets: [worktreeProjection(target.branchName)],
+        validTargets: [worktreeProjection()],
         physicalTargets: [],
         expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
         providerSnapshots: [],
@@ -834,7 +811,7 @@ describe('workspace pane layout aggregate', () => {
     expect(aggregate.activeEpochs(WORKSPACE_ID)).toEqual([])
   })
 
-  test('uses current provider branch metadata for a live worktree target', async () => {
+  test('uses the validated target identity for a live worktree provider', async () => {
     const repository = memoryRepository({
       entries: [
         {
@@ -847,7 +824,7 @@ describe('workspace pane layout aggregate', () => {
     const result = await validate(aggregate, {
       ...scope,
       epochCapability: testEpochCapability,
-      validTargets: [worktreeProjection('old-branch')],
+      validTargets: [worktreeProjection()],
       physicalTargets: [],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [
@@ -857,8 +834,7 @@ describe('workspace pane layout aggregate', () => {
           liveSessions: [
             {
               sessionId: 'term-currentcurrentcurrent1',
-              target: worktreeProjection('current-branch').target,
-              branch: 'current-branch',
+              target: worktreeProjection().target,
               worktreePath: '/repo/worktree',
             },
           ],
@@ -886,7 +862,7 @@ describe('workspace pane layout aggregate', () => {
     const result = await validate(aggregate, {
       ...scope,
       epochCapability: testEpochCapability,
-      validTargets: [worktreeProjection('feature/current')],
+      validTargets: [worktreeProjection()],
       physicalTargets: [],
       expectedWorkspaceEntry: LOCAL_WORKSPACE_ENTRY,
       providerSnapshots: [],

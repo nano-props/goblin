@@ -414,7 +414,6 @@ describe('server terminal runtime operations', () => {
             root: LINKED_REPO_ROOT,
           },
           nativeWorktreePath: '/repo-linked',
-          canonicalBranch: 'feature',
         },
       ]
     }

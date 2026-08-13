@@ -43,6 +43,18 @@ export async function getRepoRoot(cwd: string, options?: { signal?: AbortSignal 
   }
 }
 
+/** Physical root of the addressed Git workspace. Bare repositories use their
+ * common directory because they have no working-tree top level. */
+export async function resolveGitWorkspacePath(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
+  const bare = await git(cwd, ['rev-parse', '--is-bare-repository'], { signal: options?.signal })
+  if (bare === 'true') return await resolveRepoCommonDir(cwd, options)
+  if (bare !== 'false') throw new Error('Git returned an invalid bare-repository state')
+  const root = await git(cwd, ['rev-parse', '--show-toplevel'], { signal: options?.signal })
+  if (!root) throw new Error('Git returned an empty workspace root')
+  const normalizedRoot = normalizeGitPath(root, process.platform === 'win32' ? 'win32' : 'posix')
+  return path.normalize(await realpath(normalizedRoot))
+}
+
 export async function resolveRepoCommonDir(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   const commonDir = await git(cwd, ['rev-parse', '--git-common-dir'], { signal: options?.signal })
   if (!commonDir) throw new Error('Git returned an empty common directory')

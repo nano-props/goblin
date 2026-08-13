@@ -83,7 +83,6 @@ describe('workspace pane tabs coordinator restore queues', () => {
         workspaceRuntimeId: 'runtime-a',
       },
       nativeWorktreePath: null,
-      canonicalBranch: null,
     }
     const coordinator = createWorkspacePaneTabsCoordinator({
       layoutAggregate: aggregateFor(repository),
@@ -247,7 +246,6 @@ describe('workspace pane tabs coordinator restore queues', () => {
                     branchName: 'main',
                     worktreePath: '/repo/worktree',
                   }).target,
-                  branch: 'main',
                   worktreePath: '/repo/worktree',
                 },
               ],
@@ -321,7 +319,6 @@ describe('workspace pane tabs coordinator restore queues', () => {
                     branchName: 'a',
                     worktreePath: '/repo/worktree-a',
                   }).target,
-                  branch: 'a',
                   worktreePath: '/repo/worktree-a',
                 },
                 ...(captureCount >= 2
@@ -333,7 +330,6 @@ describe('workspace pane tabs coordinator restore queues', () => {
                           branchName: 'c',
                           worktreePath: '/repo/worktree-c',
                         }).target,
-                        branch: 'c',
                         worktreePath: '/repo/worktree-c',
                       },
                     ]
@@ -421,7 +417,6 @@ describe('workspace pane tabs coordinator restore queues', () => {
                         branchName: 'x',
                         worktreePath: '/repo/worktree-x',
                       }).target,
-                      branch: 'x',
                       worktreePath: '/repo/worktree-x',
                     },
                   ]
@@ -494,7 +489,6 @@ describe('workspace pane tabs coordinator restore queues', () => {
                         branchName: 'x',
                         worktreePath: '/repo/worktree-x',
                       }).target,
-                      branch: 'x',
                       worktreePath: '/repo/worktree-x',
                     },
                   ]
@@ -576,7 +570,6 @@ describe('workspace pane tabs coordinator restore queues', () => {
                     branchName: 'x',
                     worktreePath: '/repo/worktree-alias',
                   }).target,
-                  branch: 'x',
                   worktreePath: '/repo/worktree-alias',
                 },
               ],

@@ -180,6 +180,24 @@ describe('remote ssh command builders', () => {
     expect(gitRootResult.stdout).toBe(admissionResult.stdout)
   })
 
+  testPosix('resolves non-bare and bare Git workspace paths physically', async () => {
+    const worktree = path.join(os.tmpdir(), `goblin-git-workspace-${process.pid}-${Date.now()}`)
+    const bare = `${worktree}-bare.git`
+    tempDirs.push(worktree, bare)
+    await execa('git', ['init', '-q', worktree])
+    await execa('git', ['init', '-q', '--bare', bare])
+
+    for (const workspacePath of [worktree, bare]) {
+      const invocation = buildRemoteCommandInvocation(targetWithPath(workspacePath), {
+        type: 'resolveGitWorkspacePath',
+        path: workspacePath,
+      })
+      await expect(execa('sh', ['-lc', invocation.script])).resolves.toMatchObject({
+        stdout: realpathSync(workspacePath),
+      })
+    }
+  })
+
   test('uses an ssh executable discovered on PATH', () => {
     const dir = path.join(os.tmpdir(), `goblin-ssh-test-${Date.now()}-${process.pid}`)
     tempDirs.push(dir)

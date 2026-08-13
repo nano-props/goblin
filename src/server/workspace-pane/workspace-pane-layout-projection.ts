@@ -20,7 +20,6 @@ import type { WorkspacePaneRuntimeTabsProviderSnapshot } from '#/server/workspac
 export interface WorkspacePaneTargetProjection {
   target: RuntimeWorkspacePaneTarget
   nativeWorktreePath: string | null
-  canonicalBranch: string | null
 }
 
 interface WorkspacePaneRuntimeScope {
@@ -119,7 +118,6 @@ function providerTargets(
         validated ?? {
           target: session.target,
           nativeWorktreePath: session.worktreePath,
-          canonicalBranch: session.branch,
         },
       )
     }

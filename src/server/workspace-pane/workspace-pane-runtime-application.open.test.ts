@@ -187,12 +187,11 @@ describe('open admission', () => {
 
   test('returns the provider result and broadcasts the committed workspace revision', async () => {
     const runtime = terminalCreateSuccess()
-    const canonicalBranch = 'feature/renamed'
     const create = vi.fn(async () => runtime)
     const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(request.worktreePath)
     const capture = vi.fn(async () => physicalWorktreeCapability)
-    const ensureRuntimeTabForSession = vi.fn(async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
-      input.commitAdmission(canonicalBranch)
+    const ensureRuntimeTabForSession = vi.fn(async (input: { commitAdmission: () => void }) => {
+      input.commitAdmission()
       return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
     })
     const broadcastWorkspaceTabsChanged = vi.fn()
@@ -241,7 +240,7 @@ describe('open admission', () => {
     expect(result).toEqual({
       ok: true,
       runtimeType: 'terminal',
-      runtime: publishedTerminalResult(runtime, canonicalBranch),
+      runtime: publishedTerminalResult(runtime),
       paneTabsSnapshot,
     })
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(

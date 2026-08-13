@@ -131,6 +131,7 @@ const hoistedMocks = vi.hoisted(() => ({
   resolveRepoObjectsDir: vi.fn(),
   getRepoName: vi.fn(),
   getRepoRoot: vi.fn(),
+  resolveGitWorkspacePath: vi.fn(),
   getRemoteInfo: vi.fn(),
   getWorkingStatus: vi.fn(),
   getUpstream: vi.fn(),
@@ -179,6 +180,7 @@ vi.mock('#/system/git/branches.ts', () => ({
   resolveRepoObjectsDir: hoistedMocks.resolveRepoObjectsDir,
   getRepoName: hoistedMocks.getRepoName,
   getRepoRoot: hoistedMocks.getRepoRoot,
+  resolveGitWorkspacePath: hoistedMocks.resolveGitWorkspacePath,
   getUpstream: hoistedMocks.getUpstream,
   isAncestor: hoistedMocks.isAncestor,
   isGitRepo: hoistedMocks.isGitRepo,
@@ -374,6 +376,7 @@ beforeEach(async () => {
   )
   hoistedMocks.getRepoName.mockResolvedValue('repo')
   hoistedMocks.getRepoRoot.mockImplementation(async (cwd: string) => cwd)
+  hoistedMocks.resolveGitWorkspacePath.mockImplementation(async (cwd: string) => cwd)
   hoistedMocks.readWorktreeMembership.mockResolvedValue([])
   hoistedMocks.readRepoWorktreeSnapshots.mockImplementation(async (_repoId, worktrees: WorktreeInfo[]) =>
     worktrees

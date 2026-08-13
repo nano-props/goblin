@@ -9,6 +9,7 @@ import {
   deleteUpstreamBranch,
   resolveRepoCommonDir,
   resolveRepoObjectsDir,
+  resolveGitWorkspacePath,
 } from '#/system/git/branches.ts'
 import { git, gitCommandResultWithOptions } from '#/system/git/git-exec.ts'
 
@@ -201,6 +202,20 @@ describe('authoritative snapshot reads', () => {
 })
 
 describe('repository common directory', () => {
+  test('resolves a non-bare workspace through its physical top level', async () => {
+    vi.mocked(git).mockResolvedValueOnce('false').mockResolvedValueOnce('/repo/worktree')
+    vi.mocked(realpath).mockResolvedValueOnce('/physical/repo/worktree')
+
+    await expect(resolveGitWorkspacePath('/repo/worktree/subdir')).resolves.toBe('/physical/repo/worktree')
+  })
+
+  test('uses the physical common directory for a bare workspace', async () => {
+    vi.mocked(git).mockResolvedValueOnce('true').mockResolvedValueOnce('.')
+    vi.mocked(realpath).mockResolvedValueOnce('/physical/repo.git')
+
+    await expect(resolveGitWorkspacePath('/repo.git')).resolves.toBe('/physical/repo.git')
+  })
+
   test('normalizes a confirmed common directory', async () => {
     vi.mocked(git).mockResolvedValueOnce('../.git')
     vi.mocked(realpath).mockResolvedValueOnce('/physical/repo/.git')

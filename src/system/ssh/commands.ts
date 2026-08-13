@@ -36,6 +36,7 @@ export type RemoteCommandKind =
   | { type: 'directoryChildren'; path: string; prefix?: string }
   | { type: 'gitDirectoryChildren'; path: string; prefix?: string }
   | { type: 'revParseTopLevel'; path: string }
+  | { type: 'resolveGitWorkspacePath'; path: string }
   | { type: 'resolvePhysicalWorktreeIdentity'; path: string }
   | { type: 'resolveRepoCommonDir'; path: string }
   | { type: 'gitSnapshot'; path: string }
@@ -337,6 +338,18 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `root=$(git -C ${shellQuote(command.path)} rev-parse --show-toplevel) || exit $?`,
         `cd "$root" && pwd -P`,
       ].join('\n')
+    case 'resolveGitWorkspacePath': {
+      const repo = shellQuote(command.path)
+      return [
+        `bare=$(git -C ${repo} rev-parse --is-bare-repository) || exit $?`,
+        'if [ "$bare" = true ]; then',
+        `  root=$(git -C ${repo} rev-parse --absolute-git-dir) || exit $?`,
+        'else',
+        `  root=$(git -C ${repo} rev-parse --show-toplevel) || exit $?`,
+        'fi',
+        `cd "$root" && pwd -P`,
+      ].join('\n')
+    }
     case 'resolvePhysicalWorktreeIdentity':
       return remotePhysicalWorktreeIdentityScript(command.path)
     case 'resolveRepoCommonDir':

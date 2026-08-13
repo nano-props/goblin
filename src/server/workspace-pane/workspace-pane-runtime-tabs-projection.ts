@@ -13,7 +13,6 @@ export interface WorkspacePaneRuntimeTabsProviderSnapshot {
 export interface WorkspacePaneRuntimeTabsProviderSnapshotSession {
   sessionId: string
   target: RuntimeWorkspacePaneTarget
-  branch: string | null
   worktreePath: string
 }
 

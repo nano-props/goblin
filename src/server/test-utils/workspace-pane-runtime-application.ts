@@ -101,10 +101,7 @@ function committedTerminalResult(
   }
 }
 
-export function publishedTerminalResult(
-  runtime: ServerTerminalCreateSuccess,
-  canonicalBranch = request.branch,
-): TerminalCreateSuccess {
+export function publishedTerminalResult(runtime: ServerTerminalCreateSuccess): TerminalCreateSuccess {
   return {
     ok: true,
     terminalSessionId: runtime.terminalSessionId,

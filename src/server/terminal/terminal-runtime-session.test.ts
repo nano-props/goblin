@@ -29,7 +29,6 @@ describe('server terminal runtime sessions', () => {
           {
             target: workspacePaneWorktreeTarget(scope.slice(scope.lastIndexOf('\0') + 1)),
             nativeWorktreePath: '/repo-linked',
-            canonicalBranch: 'feature',
           },
         ]
       },

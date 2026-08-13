@@ -322,7 +322,6 @@ export const captureTestWorkspacePaneTargets: WorkspacePaneTargetProjectionProvi
         root: repoRoot.startsWith('goblin+ssh://') ? workspaceId : LINKED_REPO_ROOT,
       },
       nativeWorktreePath,
-      canonicalBranch: 'feature',
     },
   ]
 }

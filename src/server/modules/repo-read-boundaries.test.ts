@@ -58,16 +58,38 @@ describe('getRepoSnapshot', () => {
   })
 
   test('reads git state directly without publishing invalidation', async () => {
-    mocks.readWorktreeMembership.mockResolvedValueOnce([])
     const snapshot = repoSnapshot('fresh')
+    const membership = [
+      {
+        path: '/tmp/repo',
+        branch: snapshot.current,
+        headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        isBare: false,
+        isPrimary: true,
+      },
+    ]
+    mocks.readWorktreeMembership.mockResolvedValueOnce(membership)
     mocks.getBranches.mockResolvedValueOnce(snapshot.branches)
-    mocks.getCurrentBranch.mockResolvedValueOnce(snapshot.current)
     mocks.getRemoteInfo.mockResolvedValueOnce(snapshot.remote)
 
     const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
     const result = await getRepoSnapshot(REPO_ID)
 
-    expect(result).toEqual(snapshot)
+    expect(result).toEqual({
+      ...snapshot,
+      worktrees: [
+        {
+          path: '/tmp/repo',
+          head: { kind: 'branch', branchName: 'fresh' },
+          headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          operation: null,
+          materializedBranch: 'fresh',
+          isPrimary: true,
+          isLocked: false,
+        },
+      ],
+    })
+    expect(mocks.getCurrentBranch).not.toHaveBeenCalled()
     expectNoRepoMetadataInvalidations()
   })
 
@@ -79,6 +101,18 @@ describe('getRepoSnapshot', () => {
 
     await expect(getRepoSnapshot(REPO_ID)).rejects.toThrow('git unavailable')
     expect(mocks.getRemoteInfo).not.toHaveBeenCalled()
+  })
+
+  test('reads current from symbolic HEAD only for a bare source workspace', async () => {
+    mocks.readWorktreeMembership.mockResolvedValueOnce([{ path: '/tmp/repo', isBare: true, isPrimary: true }])
+    mocks.getBranches.mockResolvedValueOnce([])
+    mocks.getCurrentBranch.mockResolvedValueOnce('bare/main')
+    mocks.getRemoteInfo.mockResolvedValueOnce(repoSnapshot().remote)
+
+    const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    await expect(getRepoSnapshot(REPO_ID)).resolves.toMatchObject({ current: 'bare/main', worktrees: [] })
+
+    expect(mocks.getCurrentBranch).toHaveBeenCalledOnce()
   })
 })
 

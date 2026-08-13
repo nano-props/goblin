@@ -337,7 +337,8 @@ export function workspacePaneRouteNavigationBlockedForBranch(workspaceId: Worksp
     branchName,
     repoWorktreeForBranch(branchModel.worktrees, branchName)?.path ?? null,
   )
-  if (workspacePaneTabsInteractionBlockedForTarget(paneTarget)) return true
+  if (workspacePaneTabsInteractionBlockedForTarget({ ...paneTarget, workspaceRuntimeId: workspace.workspaceRuntimeId }))
+    return true
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspace.id,
     workspaceRuntimeId: workspace.workspaceRuntimeId,
@@ -355,7 +356,8 @@ export function workspacePaneRouteNavigationBlockedForWorktree(
   const snapshot = getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)
   if (!snapshot?.worktrees.some((worktree) => worktree.path === worktreePath)) return false
   const paneTarget = { kind: 'git-worktree' as const, workspaceId: workspace.id, worktreePath }
-  if (workspacePaneTabsInteractionBlockedForTarget(paneTarget)) return true
+  if (workspacePaneTabsInteractionBlockedForTarget({ ...paneTarget, workspaceRuntimeId: workspace.workspaceRuntimeId }))
+    return true
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspace.id,
     workspaceRuntimeId: workspace.workspaceRuntimeId,
@@ -379,14 +381,17 @@ function preferredWorkspacePaneTabForRoute(
 
 export function workspacePaneTabTargetBlocksInteraction(model: WorkspacePaneTabModel): boolean {
   if (workspacePaneTabModelBlocksTabInteraction(model) || model.paneTarget.kind === 'inactive') return true
-  return workspacePaneTabsInteractionBlockedForTarget(model.paneTarget)
+  return workspacePaneTabsInteractionBlockedForTarget({
+    ...model.paneTarget,
+    workspaceRuntimeId: model.workspaceRuntimeId,
+  })
 }
 
 export function workspacePaneTargetBlocksInteraction(
   target: WorkspacePaneTabsTarget,
   workspaceRuntimeId: string,
 ): boolean {
-  if (workspacePaneTabsInteractionBlockedForTarget(target)) return true
+  if (workspacePaneTabsInteractionBlockedForTarget({ ...target, workspaceRuntimeId })) return true
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: target.workspaceId,
     workspaceRuntimeId,

@@ -53,13 +53,17 @@ export type WorkspacePaneTabsMutationResult = WorkspacePaneTabsMutationSuccess |
 
 export type WorkspacePaneTabsSnapshotCommit = 'applied' | 'newer-snapshot-preserved' | 'scope-rejected'
 
-type WorkspacePaneTabsInteractionTarget = WorkspacePaneTabsTarget
+type WorkspacePaneTabsInteractionTarget = WorkspacePaneTabsMutationTarget
+
+function workspacePaneTabsInteractionTargetKey(input: WorkspacePaneTabsInteractionTarget): string {
+  return `${input.workspaceRuntimeId}\0${workspacePaneTabsTargetIdentityKey(input)}`
+}
 
 function createWorkspacePaneTabsInteractionBlocker() {
   const blockedCountsByTarget = new Map<string, number>()
 
   function acquire(input: WorkspacePaneTabsInteractionTarget): () => void {
-    const key = workspacePaneTabsTargetIdentityKey(input)
+    const key = workspacePaneTabsInteractionTargetKey(input)
     blockedCountsByTarget.set(key, (blockedCountsByTarget.get(key) ?? 0) + 1)
     let released = false
     return () => {
@@ -73,7 +77,7 @@ function createWorkspacePaneTabsInteractionBlocker() {
 
   return {
     isBlocked(input: WorkspacePaneTabsInteractionTarget): boolean {
-      const key = workspacePaneTabsTargetIdentityKey(input)
+      const key = workspacePaneTabsInteractionTargetKey(input)
       return (blockedCountsByTarget.get(key) ?? 0) > 0
     },
     async run<T>(
@@ -141,7 +145,7 @@ export async function updateWorkspacePaneTabs(
   )
 }
 
-export function workspacePaneTabsInteractionBlockedForTarget(input: WorkspacePaneTabsTarget): boolean {
+export function workspacePaneTabsInteractionBlockedForTarget(input: WorkspacePaneTabsInteractionTarget): boolean {
   return workspacePaneTabsInteractionBlocker.isBlocked(input)
 }
 

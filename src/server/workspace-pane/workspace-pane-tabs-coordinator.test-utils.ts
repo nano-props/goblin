@@ -57,7 +57,6 @@ export function testRuntimeTargetProjection(target: TestWorkspacePaneTarget): Wo
     return {
       target: { kind: 'git-branch', workspaceId, workspaceRuntimeId: 'runtime-a', branch: branchName },
       nativeWorktreePath: null,
-      canonicalBranch: branchName,
     }
   }
   if (!worktreePath) throw new Error('worktree fixture required')
@@ -66,6 +65,5 @@ export function testRuntimeTargetProjection(target: TestWorkspacePaneTarget): Wo
   return {
     target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId: 'runtime-a', root },
     nativeWorktreePath: worktreePath,
-    canonicalBranch: branchName,
   }
 }

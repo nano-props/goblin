@@ -51,7 +51,6 @@ import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/work
 export interface WorkspacePaneRuntimeTabsLiveSession {
   sessionId: string
   target: RuntimeWorkspacePaneTarget
-  branch: string | null
   worktreePath: string
 }
 
@@ -91,7 +90,7 @@ export interface WorkspaceRuntimeTabPlacementInput {
   permit: PhysicalWorktreeOperationPermit
   physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   epochCapability: WorkspaceRuntimeMembershipCapability
-  commitAdmission: (canonicalBranchName: string | null) => void
+  commitAdmission: () => void
 }
 
 export interface WorkspacePaneRuntimeTabsCoordinator {
@@ -164,14 +163,10 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
       // atomic layout projection below. Re-reading this one worktree here did
       // not make Git state atomic (HEAD can change after either command), but
       // it did add a second SSH/Git round trip before PTY admission.
-      if (capturedTarget.target.kind === 'workspace-root') {
-        if (capturedTarget.canonicalBranch !== null) return { kind: 'runtime-stale' }
-      }
       const pendingProviderSnapshots = providerSnapshotsWithPendingSession(providerSnapshots, {
         type: input.runtimeType,
         sessionId: input.sessionId,
         target: capturedTarget.target,
-        branch: capturedTarget.canonicalBranch,
         worktreePath: input.worktreePath,
       })
       assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
@@ -192,7 +187,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
         },
         () => {
           this.worktreeOperations.assertPermit(physicalCapability, input.permit)
-          input.commitAdmission(capturedTarget.canonicalBranch)
+          input.commitAdmission()
         },
       )
       return { kind: 'committed', snapshot }
@@ -719,7 +714,6 @@ function requiredProjectionForRuntimeTarget(
   return {
     target: session.target,
     nativeWorktreePath: session.worktreePath,
-    canonicalBranch: session.branch,
   }
 }
 

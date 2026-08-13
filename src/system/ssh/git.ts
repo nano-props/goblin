@@ -143,6 +143,10 @@ export async function getRemoteSnapshot(
 ): Promise<RemoteRepoSnapshot> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const membership = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
+  const sourceWorktree = await resolveRemoteSnapshotSourceWorktree(target, membership, {
+    signal: options.signal,
+    run,
+  })
   const [result, remote, worktrees] = await Promise.all([
     run({ type: 'gitSnapshot', path: target.remotePath }, target, { signal: options.signal }),
     getRemoteRepoInfo(target, { signal: options.signal, run }),
@@ -152,7 +156,27 @@ export async function getRemoteSnapshot(
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   const snapshot = parseRemoteSnapshot(result.stdout)
   if (!snapshot) throw new Error('error.failed-read-repo')
-  return { ...snapshot, worktrees, remote }
+  const current = sourceWorktree.isBare ? snapshot.current : (sourceWorktree.branch ?? '')
+  return { ...snapshot, current, worktrees, remote }
+}
+
+async function resolveRemoteSnapshotSourceWorktree(
+  target: RemoteWorkspaceTarget,
+  membership: readonly WorktreeInfo[],
+  options: { signal?: AbortSignal; run: RemoteGitRunner },
+): Promise<WorktreeInfo> {
+  const direct = membership.find((worktree) => worktree.path === target.remotePath)
+  if (direct) return direct
+  const result = await options.run({ type: 'resolveGitWorkspacePath', path: target.remotePath }, target, {
+    signal: options.signal,
+  })
+  options.signal?.throwIfAborted()
+  if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
+  const sourcePath = result.stdout.endsWith('\n') ? result.stdout.slice(0, -1) : result.stdout
+  if (!isValidRemotePath(sourcePath) || /[\r\n]/u.test(sourcePath)) throw new Error('error.failed-read-repo')
+  const sourceWorktree = membership.find((worktree) => worktree.path === sourcePath)
+  if (!sourceWorktree) throw new Error('error.failed-read-repo')
+  return sourceWorktree
 }
 
 async function readRemoteRepoWorktreeSnapshots(

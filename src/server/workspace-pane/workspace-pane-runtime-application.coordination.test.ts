@@ -56,8 +56,8 @@ describe('removal coordination and failure settlement', () => {
         close: () => ({ kind: 'closed' as const }),
       },
       workspaceTabsCoordinator: runtimeTabsCoordinator({
-        ensureRuntimeTabForSession: async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
-          input.commitAdmission(request.branch)
+        ensureRuntimeTabForSession: async (input: { commitAdmission: () => void }) => {
+          input.commitAdmission()
           return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
         },
         reconcileWorktreeAdmitted: vi.fn(async () => paneTabsSnapshot),
@@ -98,10 +98,10 @@ describe('removal coordination and failure settlement', () => {
         ensureRuntimeTabForSession: async (input: {
           physicalWorktreeCapability: ReturnType<typeof testPhysicalWorktreeExecutionCapability>
           permit: PhysicalWorktreeOperationPermit
-          commitAdmission: (canonicalBranch: string) => void
+          commitAdmission: () => void
         }) => {
           worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
-          input.commitAdmission(request.branch)
+          input.commitAdmission()
           return { kind: 'committed' as const, snapshot: paneTabsSnapshot }
         },
       }),
@@ -252,8 +252,8 @@ describe('removal coordination and failure settlement', () => {
       terminalSessions: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: async () => runtime, close },
       workspaceTabsCoordinator: runtimeTabsCoordinator({
-        ensureRuntimeTabForSession: async (input: { commitAdmission: (canonicalBranch: string) => void }) => {
-          input.commitAdmission(request.branch)
+        ensureRuntimeTabForSession: async (input: { commitAdmission: () => void }) => {
+          input.commitAdmission()
           throw new Error('invariant failure after admission')
         },
       }),

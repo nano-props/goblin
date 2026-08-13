@@ -188,6 +188,34 @@ describe('updateWorkspacePaneTabs', () => {
     await expect(update).resolves.toEqual({ ok: true, projection: 'superseded' })
     expect(readTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })
+
+  test('does not let a pending mutation from an old runtime block its replacement', async () => {
+    const serverTabs = Promise.withResolvers<WorkspacePaneTabEntry[]>()
+    const requestStarted = Promise.withResolvers<void>()
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: async () => {
+        requestStarted.resolve()
+        return await serverTabs.promise
+      },
+    })
+    const update = updateWorkspacePaneTabs({
+      ...target(),
+      operation: { type: 'close-static', tabType: 'status' },
+    })
+    await requestStarted.promise
+    expect(workspacePaneTabsInteractionBlocked()).toBe(true)
+
+    seedWorkspacePaneTabsRepo(NEXT_WORKSPACE_RUNTIME_ID)
+    expect(
+      workspacePaneTabsInteractionBlockedForTarget({
+        ...target(),
+        workspaceRuntimeId: NEXT_WORKSPACE_RUNTIME_ID,
+      }),
+    ).toBe(false)
+
+    serverTabs.resolve([])
+    await update
+  })
 })
 
 function target() {

@@ -36,6 +36,7 @@ import {
   getCurrentBranch,
   getLog as getGitLog,
   getRepoRoot,
+  resolveGitWorkspacePath,
   getUpstream,
   isAncestor,
   isGitRepo,
@@ -569,12 +570,16 @@ function createLocalRepoSource(
       if (!available.ok) throw new Error(available.message)
       options?.signal?.throwIfAborted()
       const membership = await readWorktreeMembership(repoId, options?.signal)
-      const [currentBranch, worktrees, branches] = await Promise.all([
-        getCurrentBranch(repoId, { signal: options?.signal }),
+      const [sourcePath, worktrees, branches] = await Promise.all([
+        resolveGitWorkspacePath(repoId, { signal: options?.signal }),
         readRepoWorktreeSnapshots(repoId, membership, options?.signal),
         getBranches(repoId, { signal: options?.signal }),
       ])
-      const current = currentBranch ?? ''
+      const sourceWorktree = membership.find((worktree) => path.normalize(worktree.path) === sourcePath)
+      if (!sourceWorktree) throw new Error('error.failed-read-repo')
+      const current = sourceWorktree.isBare
+        ? ((await getCurrentBranch(repoId, { signal: options?.signal })) ?? '')
+        : (sourceWorktree.branch ?? '')
       const remote = await getRemoteInfo(repoId, options?.signal)
       options?.signal?.throwIfAborted()
       return { branches, worktrees, current, remote }
