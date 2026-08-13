@@ -89,7 +89,7 @@ describe('getWorkspacePaneTargetIdentities', () => {
       {
         path: '/tmp/repo',
         head: { kind: 'branch' as const, branchName: 'main' },
-        headOid: '0123456789abcdef',
+        headOid: '0123456789abcdef0123456789abcdef01234567',
         operation: null,
         isPrimary: true,
         isLocked: false,

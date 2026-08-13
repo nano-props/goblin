@@ -107,8 +107,9 @@ function StatusWorkspacePanePanel({ repo, workspacePaneId, panelLabel, detail }:
 function HistoryWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
   const branch = detail.branch
   if (!branch) return null
-  const target: RepoLogTarget = detail.worktree
-    ? { kind: 'commit', oid: detail.worktree.headOid }
+  const worktree = detail.worktree
+  const target: RepoLogTarget = worktree
+    ? { kind: 'commit', oid: requiredCommittedHeadOid(worktree.headOid) }
     : { kind: 'branch', branchName: branch.name }
   return (
     <GitHistoryPanel
@@ -119,6 +120,11 @@ function HistoryWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }
       panelLabel={panelLabel}
     />
   )
+}
+
+function requiredCommittedHeadOid(headOid: string | null): string {
+  if (headOid === null) throw new Error('A branch workspace pane requires a committed worktree HEAD')
+  return headOid
 }
 
 function ChangesWorkspacePanePanel({ detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {

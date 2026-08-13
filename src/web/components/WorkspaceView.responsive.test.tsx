@@ -140,6 +140,37 @@ describe('WorkspaceView responsive layout', () => {
     expect(container.querySelectorAll('[data-testid="git-workspace-navigator-skeleton-action"]')).toHaveLength(0)
   })
 
+  test('compact restore stub keeps a worktree route in the workspace pane', () => {
+    responsiveMocks.mode = 'compact'
+    workspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [REPO_ID]: {
+          ...state.workspaces[REPO_ID]!,
+          session: { ...state.workspaces[REPO_ID]!.session, projectionState: 'stub' },
+        },
+      },
+    }))
+
+    const { container } = render(
+      <WorkspaceView
+        workspaceId={REPO_ID}
+        routeView={{
+          kind: 'worktree',
+          workspaceId: REPO_ID,
+          worktreePath: '/tmp/repo-view-feature-a',
+          workspacePaneRoute: { kind: 'static', tab: 'status' },
+        }}
+      />,
+    )
+
+    expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
+    expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBe('true')
+    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBeNull()
+    expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
+  })
+
   test('resizing from split large-screen mode to compact shows Repo Workspace when a branch is selected', async () => {
     const { container, rerender } = render(branchWorkspaceView())
 

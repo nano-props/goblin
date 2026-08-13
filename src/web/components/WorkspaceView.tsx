@@ -200,7 +200,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
           <WorkspaceLayoutSkeleton
             singlePane={isCompact}
             singlePaneView={activeSinglePane}
-            workspacePaneState={routeBranchName ? 'content' : 'empty'}
+            workspacePaneState={routeBranchName || currentRouteView?.kind === 'worktree' ? 'content' : 'empty'}
           />
         )
       }
@@ -397,7 +397,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
 
         if (currentWorkspace.session.projectionState === 'stub') {
           const gitWorkspaceNavigatorSkeleton =
-            isCompact && routeBranchName ? undefined : <GitWorkspaceNavigatorSkeleton />
+            isCompact && workspacePaneActive.value ? undefined : <GitWorkspaceNavigatorSkeleton />
           return (
             <WorkspaceLayoutShell
               workspaceId={props.workspaceId}
@@ -410,7 +410,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
               zenRevealSidebarPane={renderSidebarPane(gitWorkspaceNavigatorSkeleton, 'none')}
               workspacePane={
                 <WorkspaceLayoutPane>
-                  {routeBranchName ? (
+                  {workspacePaneActive.value ? (
                     <WorkspacePaneSkeleton toolbarTrafficLightOffset={workspaceTrafficLightOffset} />
                   ) : (
                     <>
@@ -420,7 +420,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
                   )}
                 </WorkspaceLayoutPane>
               }
-              singlePaneActivePane={routeBranchName ? 'workspace' : 'navigator'}
+              singlePaneActivePane={workspacePaneActive.value ? 'workspace' : 'navigator'}
             />
           )
         }

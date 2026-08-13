@@ -18,7 +18,8 @@ export function gitOperationRequiresDetachedHead(operation: GitOperation | null)
 export interface RepoWorktreeSnapshot {
   path: string
   head: GitHead
-  headOid: string
+  /** Null only for an unborn attached branch, before its first commit. */
+  headOid: string | null
   operation: GitOperation | null
   materializedBranch: string | null
   isPrimary: boolean
@@ -95,8 +96,8 @@ export type PullRequestFetchMode = 'summary' | 'full'
 
 export interface WorktreeInfo {
   path: string
-  /** Full object id reported by `git worktree list`; absent only in narrow test/admission fixtures. */
-  headOid?: string
+  /** Full object id reported by `git worktree list`, or null for an unborn branch. */
+  headOid?: string | null
   branch?: string
   isBare: boolean
   isPrimary: boolean
@@ -158,11 +159,15 @@ export interface RepoRemoteInfo {
 export const GIT_OBJECT_ID_OR_PREFIX_RE = /^[0-9a-fA-F]{7,64}$/
 export const GIT_OBJECT_ID_RE = /^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/
 
+export function isFullGitObjectId(value: string): boolean {
+  return GIT_OBJECT_ID_RE.test(value) && !/^0+$/u.test(value)
+}
+
 export type RepoLogTarget = { kind: 'branch'; branchName: string } | { kind: 'commit'; oid: string }
 
 export function repoLogTargetRevision(target: RepoLogTarget): string | null {
   if (target.kind === 'branch') return isSafeBranchName(target.branchName) ? `refs/heads/${target.branchName}` : null
-  return GIT_OBJECT_ID_RE.test(target.oid) ? target.oid : null
+  return isFullGitObjectId(target.oid) ? target.oid : null
 }
 
 // These are application-level recovery notices derived from domain milestones

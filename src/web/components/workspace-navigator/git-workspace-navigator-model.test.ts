@@ -59,4 +59,17 @@ describe('gitWorkspaceNavigatorRows', () => {
       { kind: 'worktree', worktreePath: WORKTREE_PATH },
     ])
   })
+
+  test('keeps an attached worktree reachable when its branch projection is absent', () => {
+    const worktree = {
+      ...createRepoWorktreeSnapshotForTest('main', WORKTREE_PATH),
+      headOid: null,
+    }
+
+    expect(
+      gitWorkspaceNavigatorRows({ branches: [], worktrees: [worktree], viewMode: 'all' }).map(
+        gitWorkspaceNavigatorRowIdentity,
+      ),
+    ).toEqual([{ kind: 'worktree', worktreePath: WORKTREE_PATH }])
+  })
 })

@@ -350,6 +350,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test.each([
     { kind: 'branch', branchName: '../feature' },
     { kind: 'commit', oid: 'not-an-object-id' },
+    { kind: 'commit', oid: '0'.repeat(40) },
   ])('rejects an invalid repository log target at the protocol boundary', async (target) => {
     const app = createTestRepoRoutes()
     const workspaceRuntimeId = await openTestWorkspaceRuntime()

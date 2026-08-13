@@ -47,7 +47,13 @@ describe('remote git filesystem', () => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(
-            ['worktree /srv/repo-feature', 'HEAD aaaaaaa', 'branch refs/heads/feat'].join(NUL) + NUL + NUL,
+            [
+              'worktree /srv/repo-feature',
+              'HEAD aaaaaaa000000000000000000000000000000000',
+              'branch refs/heads/feat',
+            ].join(NUL) +
+              NUL +
+              NUL,
           )
         case 'gitDirectoryChildren':
           return okRemoteResult('')

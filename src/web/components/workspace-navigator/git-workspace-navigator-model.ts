@@ -31,7 +31,6 @@ export function gitWorkspaceNavigatorRows({
 
   for (const worktree of worktrees) {
     if (renderedWorktrees.has(worktree.path)) continue
-    if (worktree.head.kind === 'branch' && worktree.operation === null) continue
     rows.push({ kind: 'worktree', worktree, branch: null })
   }
 

@@ -106,7 +106,7 @@ describe('restoreServerWorkspace', () => {
           {
             path: '/repo',
             head: { kind: 'branch', branchName: 'main' },
-            headOid: '',
+            headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
             operation: null,
             materializedBranch: 'main',
             isPrimary: false,
@@ -474,7 +474,7 @@ describe('restoreServerWorkspace', () => {
             {
               path: '/repo',
               head: { kind: 'branch', branchName: 'main' },
-              headOid: '',
+              headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
               operation: null,
               materializedBranch: 'main',
               isPrimary: false,

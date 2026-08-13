@@ -17,6 +17,24 @@ interface GitHistoryPanelProps {
   panelLabel: WorkspacePanePanelLabel
 }
 
+interface EmptyGitHistoryPanelProps {
+  workspacePaneId: string
+  panelLabel: WorkspacePanePanelLabel
+}
+
+export const EmptyGitHistoryPanel = defineComponent<EmptyGitHistoryPanelProps>({
+  name: 'EmptyGitHistoryPanel',
+  props: ['workspacePaneId', 'panelLabel'],
+  setup(props) {
+    const t = useT()
+    return () => (
+      <WorkspacePanePanelFrame id={`${props.workspacePaneId}-history-panel`} {...props.panelLabel}>
+        <EmptyState title={t('log.empty')} />
+      </WorkspacePanePanelFrame>
+    )
+  },
+})
+
 export const GitHistoryPanel = defineComponent<GitHistoryPanelProps>({
   name: 'GitHistoryPanel',
   props: ['repoId', 'workspaceRuntimeId', 'target', 'workspacePaneId', 'panelLabel'],

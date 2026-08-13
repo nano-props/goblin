@@ -185,7 +185,7 @@ describe('client effect intent plans', () => {
           {
             path: worktreePath,
             head: { kind: 'detached' },
-            headOid: '0123456789abcdef',
+            headOid: '0123456789abcdef0123456789abcdef01234567',
             operation: null,
             materializedBranch: null,
             isPrimary: false,

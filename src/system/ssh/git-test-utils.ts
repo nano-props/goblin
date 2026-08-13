@@ -34,15 +34,17 @@ export function upstreamOutput(remote: string, branch: string, trackState = '=')
   return [ref, remote, `refs/heads/${branch}`, trackState].join(NUL)
 }
 
-export const PRIMARY_WORKTREE_OUTPUT = worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main')
+export const PRIMARY_WORKTREE_OUTPUT = worktreePorcelain(
+  'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/main',
+)
 export const MAIN_AND_LINKED_WORKTREES_OUTPUT = worktreePorcelain(
   [
     'worktree /srv/repo',
-    'HEAD f00ba40',
+    'HEAD f00ba40000000000000000000000000000000000',
     'branch refs/heads/main',
     '',
     'worktree /srv/repo-feature',
-    'HEAD ba5eba1',
+    'HEAD ba5eba1000000000000000000000000000000000',
     'branch refs/heads/feature/test',
   ].join('\n'),
 )

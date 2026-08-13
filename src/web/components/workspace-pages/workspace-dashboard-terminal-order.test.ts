@@ -79,7 +79,7 @@ function worktree(name: string, worktreePath: string): RepoWorktreeSnapshot {
   return {
     path: worktreePath,
     head: { kind: 'branch', branchName: name },
-    headOid: '0123456789abcdef',
+    headOid: '0123456789abcdef0123456789abcdef01234567',
     operation: null,
     materializedBranch: name,
     isPrimary: false,

@@ -40,20 +40,22 @@ export const WorktreeStatusOverview = defineComponent<WorktreeStatusOverviewProp
       const { worktree } = props
       const changeCount = props.status?.entries.length
       const operation = worktree.operation
-      const shortHeadOid = worktree.headOid.slice(0, 12)
-      const openHistoryLabel = t('worktree-status.open-history', { commit: shortHeadOid })
+      const shortHeadOid = worktree.headOid?.slice(0, 12) ?? null
+      const openHistoryLabel = shortHeadOid ? t('worktree-status.open-history', { commit: shortHeadOid }) : null
       return (
         <StatusRows>
-          <StatusRow
-            icon={<GitCommitHorizontal size={14} />}
-            label={t('branch-status.signal.commit')}
-            value={
-              <StatusLink mono aria-label={openHistoryLabel} title={openHistoryLabel} onClick={props.onOpenHistory}>
-                {shortHeadOid}
-              </StatusLink>
-            }
-            valueLayout="inline"
-          />
+          {shortHeadOid && openHistoryLabel ? (
+            <StatusRow
+              icon={<GitCommitHorizontal size={14} />}
+              label={t('branch-status.signal.commit')}
+              value={
+                <StatusLink mono aria-label={openHistoryLabel} title={openHistoryLabel} onClick={props.onOpenHistory}>
+                  {shortHeadOid}
+                </StatusLink>
+              }
+              valueLayout="inline"
+            />
+          ) : null}
           {worktree.materializedBranch ? (
             <StatusRow
               icon={<GitBranch size={14} />}

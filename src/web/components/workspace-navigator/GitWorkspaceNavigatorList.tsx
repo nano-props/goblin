@@ -88,7 +88,7 @@ export const GitWorkspaceNavigatorList = defineComponent<Props>({
       return (
         <ul class={NAVIGATOR_ROW_LIST_CLASS}>
           {props.rows.map((row) => {
-            if (row.kind === 'worktree' && (row.worktree.head.kind === 'detached' || row.worktree.operation)) {
+            if (row.kind === 'worktree' && (row.branch === null || row.worktree.operation)) {
               return (
                 <WorktreeStateRow
                   key={row.worktree.path}

@@ -122,7 +122,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
           {
             path: workspaceId,
             head: { kind: 'branch', branchName: 'main' },
-            headOid: '',
+            headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
             operation: null,
             materializedBranch: 'main',
             isPrimary: false,

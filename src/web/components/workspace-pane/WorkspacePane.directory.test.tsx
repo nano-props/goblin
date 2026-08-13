@@ -348,7 +348,7 @@ describe('WorkspacePane directory workspaces', () => {
       },
     })
 
-    renderWorkspacePane(workspaceId, {
+    const result = renderWorkspacePane(workspaceId, {
       kind: 'git-worktree',
       worktreePath,
       route: { kind: 'static', tab: 'history' },
@@ -403,6 +403,69 @@ describe('WorkspacePane directory workspaces', () => {
     )
     expect(screen.queryByText('workspace-route.not-found-title')).toBeNull()
     expect(screen.queryByText('workspace-pane-tabs.empty')).toBeNull()
+  })
+
+  test('renders an unborn worktree history as empty without requesting a commit', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace/repo-unborn')
+    const worktreePath = '/workspace/unborn'
+    const repo = seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branches: [],
+      worktrees: [
+        {
+          ...createRepoWorktreeSnapshotForTest('main', worktreePath),
+          headOid: null,
+        },
+      ],
+      currentBranchName: null,
+    })
+    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
+    if (!target) throw new Error('expected canonical unborn worktree fixture')
+    setWorkspacePaneTabsForTargetQueryData({
+      ...target,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+    })
+
+    const result = renderWorkspacePane(workspaceId, {
+      kind: 'git-worktree',
+      worktreePath,
+      route: { kind: 'static', tab: 'history' },
+    })
+
+    expect(await screen.findByRole('tabpanel', { name: 'tab.log' })).toBeTruthy()
+    expect(screen.getByText('log.empty')).toBeTruthy()
+    expect(screen.queryByText('branches.missing')).toBeNull()
+    expect(
+      appQueryClient
+        .getQueryCache()
+        .getAll()
+        .some(
+          (query) => query.queryKey[0] === 'repo-data' && query.queryKey[3] === 'log' && query.getObserversCount() > 0,
+        ),
+    ).toBe(false)
+
+    await result.rerender(
+      <VueQueryClientScope client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
+              <WorkspacePane
+                workspaceId={workspaceId}
+                currentBranchName={null}
+                workspacePaneRouteContext={{
+                  kind: 'git-worktree',
+                  worktreePath,
+                  route: { kind: 'static', tab: 'status' },
+                }}
+              />
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
+        </AppNavigationProvider>
+      </VueQueryClientScope>,
+    )
+    expect(screen.queryByText('branch-status.signal.commit')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'worktree-status.open-history' })).toBeNull()
   })
 
   test('renders detached worktree files despite an initial status failure', async () => {

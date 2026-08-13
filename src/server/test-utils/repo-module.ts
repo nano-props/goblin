@@ -383,7 +383,7 @@ beforeEach(async () => {
         head: worktree.branch
           ? { kind: 'branch' as const, branchName: worktree.branch }
           : { kind: 'detached' as const },
-        headOid: worktree.headOid ?? 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        headOid: worktree.headOid === undefined ? 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' : worktree.headOid,
         operation: null,
         materializedBranch: worktree.branch ?? null,
         isPrimary: worktree.isPrimary,
@@ -413,8 +413,8 @@ export function repoSnapshot(branch = 'main'): RepoSnapshot {
         isCurrent: true,
         ahead: 0,
         behind: 0,
-        lastCommitHash: 'hash-000000000000000000000000000000000000',
-        lastCommitShortHash: 'hash-0',
+        lastCommitHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        lastCommitShortHash: 'aaaaaaa',
         lastCommitMessage: 'commit 0',
         lastCommitDate: '2024-01-01T00:00:00.000Z',
         lastCommitAuthor: 'dev',

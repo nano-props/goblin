@@ -24,11 +24,11 @@ describe('getWorkingStatus', () => {
       .mockResolvedValueOnce(
         [
           'worktree /tmp/repo',
-          'HEAD f00ba4a',
+          'HEAD f00ba4a000000000000000000000000000000000',
           'branch refs/heads/main',
           '',
           'worktree /tmp/worktree-a',
-          'HEAD ba5eba1',
+          'HEAD ba5eba1000000000000000000000000000000000',
           'branch refs/heads/feature/a',
         ].join('\0') + '\0\0',
       )
@@ -44,11 +44,11 @@ describe('getWorkingStatus', () => {
       .mockResolvedValueOnce(
         [
           'worktree /tmp/repo',
-          'HEAD f00ba4a',
+          'HEAD f00ba4a000000000000000000000000000000000',
           'branch refs/heads/main',
           '',
           'worktree /tmp/worktree-a',
-          'HEAD ba5eba1',
+          'HEAD ba5eba1000000000000000000000000000000000',
           'branch refs/heads/feature/a',
         ].join('\0') + '\0\0',
       )
@@ -64,11 +64,11 @@ describe('getWorkingStatus', () => {
       .mockResolvedValueOnce(
         [
           'worktree /tmp/repo',
-          'HEAD f00ba4a',
+          'HEAD f00ba4a000000000000000000000000000000000',
           'branch refs/heads/main',
           '',
           'worktree /tmp/missing-worktree',
-          'HEAD ba5eba1',
+          'HEAD ba5eba1000000000000000000000000000000000',
           'branch refs/heads/stale',
           'prunable gitdir file points to non-existent location',
         ].join('\0') + '\0\0',
@@ -86,11 +86,11 @@ describe('getWorkingStatus', () => {
     const membership =
       [
         'worktree /tmp/repo',
-        'HEAD f00ba4a',
+        'HEAD f00ba4a000000000000000000000000000000000',
         'branch refs/heads/main',
         '',
         'worktree /tmp/detached-worktree',
-        'HEAD ba5eba1',
+        'HEAD ba5eba1000000000000000000000000000000000',
         'detached',
       ].join('\0') + '\0\0'
     mocks.git.mockResolvedValueOnce(membership).mockResolvedValueOnce('').mockResolvedValueOnce('?? detached.ts\0')
@@ -112,7 +112,7 @@ describe('getWorkingStatus', () => {
     const controller = new AbortController()
     mocks.git.mockImplementationOnce(async () => {
       controller.abort(new Error('status deadline'))
-      return 'worktree /tmp/repo\nHEAD f00ba4a\nbranch refs/heads/main'
+      return 'worktree /tmp/repo\nHEAD f00ba4a000000000000000000000000000000000\nbranch refs/heads/main'
     })
     const { getWorkingStatus } = await import('#/system/git/status.ts')
 

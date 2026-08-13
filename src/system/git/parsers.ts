@@ -8,7 +8,7 @@
 
 import path from 'node:path'
 import type { BranchSnapshotInfo, LogEntry, StatusEntry, WorktreeInfo } from '#/shared/git-types.ts'
-import { GIT_OBJECT_ID_OR_PREFIX_RE } from '#/shared/git-types.ts'
+import { GIT_OBJECT_ID_OR_PREFIX_RE, GIT_OBJECT_ID_RE, isFullGitObjectId } from '#/shared/git-types.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 
 /** NUL cannot occur in Git's formatted ref/log fields. */
@@ -29,7 +29,7 @@ export function parseBranches(output: string, currentBranch: string): BranchSnap
     const parts = line.split(FIELD_SEP)
     if (parts.length !== 8) throw new Error('Invalid branch snapshot row')
     const [name, hash, shortHash, , date, , upstream, track] = parts
-    if (!name || !isSafeBranchName(name) || !hash || !GIT_OBJECT_ID_OR_PREFIX_RE.test(hash)) {
+    if (!name || !isSafeBranchName(name) || !hash || !isFullGitObjectId(hash)) {
       throw new Error('Invalid branch snapshot identity')
     }
     if (
@@ -102,7 +102,7 @@ export function parseLog(output: string): LogEntry[] {
       const [hash, shortHash, refs, message, author, date] = parts
       if (
         !hash ||
-        !GIT_OBJECT_ID_OR_PREFIX_RE.test(hash) ||
+        !isFullGitObjectId(hash) ||
         !shortHash ||
         !GIT_OBJECT_ID_OR_PREFIX_RE.test(shortHash) ||
         !date ||
@@ -178,7 +178,7 @@ export function parseWorktrees(output: string, platform: GitPathPlatform = 'posi
         }
       } else if (line.startsWith('HEAD ')) {
         headCount += 1
-        if (!GIT_OBJECT_ID_OR_PREFIX_RE.test(line.slice('HEAD '.length))) throw new Error('Invalid worktree HEAD')
+        if (!GIT_OBJECT_ID_RE.test(line.slice('HEAD '.length))) throw new Error('Invalid worktree HEAD')
       } else if (line.startsWith('branch refs/heads/')) {
         stateCount += 1
         if (!isSafeBranchName(line.slice('branch refs/heads/'.length))) throw new Error('Invalid worktree branch')
@@ -210,7 +210,7 @@ export function parseWorktrees(output: string, platform: GitPathPlatform = 'posi
     if (isPrunable) continue
     worktrees.push({
       path: normalizeGitPath(worktreeLine.slice('worktree '.length), platform),
-      ...(headLine ? { headOid: headLine.slice('HEAD '.length) } : {}),
+      ...(headLine ? { headOid: gitWorktreeHeadOid(headLine.slice('HEAD '.length)) } : {}),
       ...(branchLine ? { branch: branchLine.slice('branch refs/heads/'.length) } : {}),
       isBare: lines.includes('bare'),
       isPrimary: blockIndex === 0,
@@ -218,4 +218,8 @@ export function parseWorktrees(output: string, platform: GitPathPlatform = 'posi
     })
   }
   return worktrees
+}
+
+function gitWorktreeHeadOid(value: string): string | null {
+  return /^0+$/u.test(value) ? null : value
 }

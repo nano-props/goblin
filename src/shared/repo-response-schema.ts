@@ -3,7 +3,7 @@ import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import { ExecResultResponseSchema, WorktreeBootstrapSummaryResponseSchema } from '#/shared/http-response-schema.ts'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
-import { gitOperationRequiresDetachedHead } from '#/shared/git-types.ts'
+import { GIT_OBJECT_ID_OR_PREFIX_RE, gitOperationRequiresDetachedHead, isFullGitObjectId } from '#/shared/git-types.ts'
 
 const StringArraySchema = v.array(v.string())
 const NullableNumberSchema = v.nullable(v.number())
@@ -14,8 +14,8 @@ export const CloneRepoResponseSchema = v.strictObject({
 })
 
 const LogEntrySchema = v.strictObject({
-  hash: v.string(),
-  shortHash: v.string(),
+  hash: v.pipe(v.string(), v.check(isFullGitObjectId, 'invalid Git object ID')),
+  shortHash: v.pipe(v.string(), v.regex(GIT_OBJECT_ID_OR_PREFIX_RE)),
   refs: v.string(),
   message: v.string(),
   author: v.string(),
@@ -53,8 +53,8 @@ const BranchSnapshotSchema = v.strictObject({
   trackingGone: v.optional(v.boolean()),
   ahead: v.number(),
   behind: v.number(),
-  lastCommitHash: v.string(),
-  lastCommitShortHash: v.string(),
+  lastCommitHash: v.pipe(v.string(), v.check(isFullGitObjectId, 'invalid Git object ID')),
+  lastCommitShortHash: v.pipe(v.string(), v.regex(GIT_OBJECT_ID_OR_PREFIX_RE)),
   lastCommitMessage: v.string(),
   lastCommitDate: v.string(),
   lastCommitAuthor: v.string(),
@@ -85,7 +85,7 @@ const RepoSnapshotObjectSchema = v.strictObject({
     v.strictObject({
       path: v.string(),
       head: GitHeadSchema,
-      headOid: v.string(),
+      headOid: v.nullable(v.pipe(v.string(), v.check(isFullGitObjectId, 'invalid Git object ID'))),
       operation: v.nullable(GitOperationSchema),
       materializedBranch: v.nullable(v.string()),
       isPrimary: v.boolean(),
@@ -110,6 +110,12 @@ function hasValidWorktreeBranchOwnership(snapshot: v.InferOutput<typeof RepoSnap
     if (branchName !== null && (!isSafeBranchName(branchName) || materializedBranches.has(branchName))) return false
     if (worktree.head.kind === 'branch' && branchName !== worktree.head.branchName) return false
     if (worktree.head.kind === 'branch' && gitOperationRequiresDetachedHead(worktree.operation)) return false
+    if (worktree.head.kind === 'detached' && worktree.operation === null && branchName !== null) return false
+    if (worktree.headOid === null) {
+      if (worktree.head.kind !== 'branch' || worktree.operation !== null) return false
+      const { branchName: unbornBranchName } = worktree.head
+      if (snapshot.branches.some((branch) => branch.name === unbornBranchName)) return false
+    }
     if (branchName !== null) materializedBranches.add(branchName)
     return true
   })

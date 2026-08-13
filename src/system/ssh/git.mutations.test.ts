@@ -48,12 +48,16 @@ describe('remote git mutations', () => {
                 '__GOBLIN_REMOTE_DEFAULT__',
                 'value main',
                 '__GOBLIN_REMOTE_BRANCHES__',
-                'release/1.0\x00f00ba4000000000000000000000000000000000\x00f00ba40\x00Release\x002024-01-01T00:00:00Z\x00Alice\x00origin/release/1.0\x00',
+                'release/1.0\x00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x00aaaaaaa\x00Release\x002024-01-01T00:00:00Z\x00Alice\x00origin/release/1.0\x00',
                 'feature/test\x00ba5eba1000000000000000000000000000000000\x00ba5eba1\x00Feature\x002024-01-02T00:00:00Z\x00Alice\x00\x00',
               ].join('\n'),
             )
           case 'gitWorktreeList':
-            return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+            return okRemoteResult(
+              worktreePorcelain(
+                'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/release/1.0',
+              ),
+            )
           case 'resolveRepoCommonDir':
             return okRemoteResult('/srv/repo/.git\0')
           case 'gitOperationState':
@@ -103,7 +107,11 @@ describe('remote git mutations', () => {
             ].join('\n'),
           )
         case 'gitWorktreeList':
-          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+          return okRemoteResult(
+            worktreePorcelain(
+              'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/release/1.0',
+            ),
+          )
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
@@ -134,7 +142,9 @@ describe('remote git mutations', () => {
     const run = vi.fn<RemoteGitRunner>(async (command) => {
       switch (command.type) {
         case 'gitWorktreeList':
-          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+          return okRemoteResult(
+            worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),
+          )
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
@@ -173,7 +183,11 @@ describe('remote git mutations', () => {
             ].join('\n'),
           )
         case 'gitWorktreeList':
-          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+          return okRemoteResult(
+            worktreePorcelain(
+              'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/release/1.0',
+            ),
+          )
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
@@ -230,12 +244,16 @@ describe('remote git mutations', () => {
               '__GOBLIN_REMOTE_DEFAULT__',
               'value main',
               '__GOBLIN_REMOTE_BRANCHES__',
-              'release/1.0\x00f00ba4000000000000000000000000000000000\x00f00ba40\x00Release\x002024-01-01T00:00:00Z\x00Alice\x00origin/release/1.0\x00',
+              'release/1.0\x00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x00aaaaaaa\x00Release\x002024-01-01T00:00:00Z\x00Alice\x00origin/release/1.0\x00',
               `feature/test\x00ba5eba1000000000000000000000000000000000\x00ba5eba1\x00Feature\x002024-01-02T00:00:00Z\x00Alice\x00${remote}/${upstreamBranch}\x00`,
             ].join('\n'),
           )
         case 'gitWorktreeList':
-          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+          return okRemoteResult(
+            worktreePorcelain(
+              'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/release/1.0',
+            ),
+          )
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
@@ -285,11 +303,11 @@ describe('remote git mutations', () => {
             return okRemoteResult(
               [
                 'worktree /srv/repo',
-                'HEAD f00ba40',
+                'HEAD f00ba40000000000000000000000000000000000',
                 'branch refs/heads/release/1.0',
                 '',
                 'worktree /srv/repo-feature',
-                'HEAD ba5eba1',
+                'HEAD ba5eba1000000000000000000000000000000000',
                 'branch refs/heads/feature/test',
               ].join(NUL) +
                 NUL +
@@ -401,15 +419,15 @@ describe('remote git mutations', () => {
     const worktrees = worktreePorcelain(
       [
         'worktree /srv/repo',
-        'HEAD f00ba40',
+        'HEAD f00ba40000000000000000000000000000000000',
         'branch refs/heads/main',
         '',
         'worktree /srv/repo-feature',
-        'HEAD ba5eba1',
+        'HEAD ba5eba1000000000000000000000000000000000',
         'branch refs/heads/feature/test',
         '',
         'worktree /srv/repo-rebase',
-        'HEAD deadbee',
+        'HEAD deadbee000000000000000000000000000000000',
         'detached',
       ].join('\n'),
     )
@@ -641,7 +659,11 @@ describe('remote git mutations', () => {
   test('removeRemoteWorktree rejects an equivalent path to the primary worktree', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'gitWorktreeList') {
-        return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main'))
+        return okRemoteResult(
+          worktreePorcelain(
+            'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/main',
+          ),
+        )
       }
       return okRemoteResult('')
     })
@@ -821,11 +843,11 @@ describe('remote git mutations', () => {
             worktreePorcelain(
               [
                 'worktree /srv/repo',
-                'HEAD f00ba40',
+                'HEAD f00ba40000000000000000000000000000000000',
                 'branch refs/heads/main',
                 '',
                 'worktree /srv/repo-feature',
-                'HEAD ba5eba1',
+                'HEAD ba5eba1000000000000000000000000000000000',
                 'detached',
               ].join('\n'),
             ),
@@ -875,11 +897,11 @@ describe('remote git mutations', () => {
             worktreePorcelain(
               [
                 'worktree /srv/repo',
-                'HEAD f00ba40',
+                'HEAD f00ba40000000000000000000000000000000000',
                 'branch refs/heads/main',
                 '',
                 'worktree /srv/repo-feature',
-                'HEAD ba5eba1',
+                'HEAD ba5eba1000000000000000000000000000000000',
                 'detached',
               ].join('\n'),
             ),

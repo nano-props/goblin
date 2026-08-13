@@ -35,6 +35,19 @@ describe('repo response schemas', () => {
     expect(v.parse(RepoPullRequestsResponseSchema, { pullRequests: null })).toEqual({ pullRequests: null })
   })
 
+  test.each([40, 64])('accepts a repository log entry with a %i-character object id', (length) => {
+    const entry = {
+      hash: 'a'.repeat(length),
+      shortHash: 'aaaaaaa',
+      refs: 'HEAD -> main',
+      message: 'Initial commit',
+      author: 'Example Author',
+      date: '2026-01-01T00:00:00.000Z',
+    }
+
+    expect(v.parse(RepoLogResponseSchema, [entry])).toEqual([entry])
+  })
+
   test('rejects malformed, forward-incompatible, and full-read-model mutation envelopes', () => {
     expect(
       v.parse(RepoMutationExecResultResponseSchema, {
@@ -92,6 +105,18 @@ describe('repo response schemas', () => {
   test('rejects a malformed member instead of turning a list into an empty result', () => {
     expect(v.safeParse(RepoRemoteBranchesResponseSchema, ['origin/main', 42]).success).toBe(false)
     expect(v.safeParse(RepoLogResponseSchema, [{ hash: 'abc' }]).success).toBe(false)
+    expect(
+      v.safeParse(RepoLogResponseSchema, [
+        {
+          hash: 'abcdef1',
+          shortHash: 'abcdef1',
+          refs: '',
+          message: 'message',
+          author: 'Example Author',
+          date: '2026-01-01T00:00:00.000Z',
+        },
+      ]).success,
+    ).toBe(false)
   })
 
   test('rejects legacy and partial repository snapshot shapes', () => {
@@ -100,7 +125,7 @@ describe('repo response schemas', () => {
       isCurrent: true,
       ahead: 0,
       behind: 0,
-      lastCommitHash: 'abcdef1234567890',
+      lastCommitHash: 'abcdef1234567890abcdef1234567890abcdef12',
       lastCommitShortHash: 'abcdef1',
       lastCommitMessage: 'Initial commit',
       lastCommitDate: '2026-01-01T00:00:00.000Z',
@@ -170,7 +195,7 @@ describe('repo response schemas', () => {
       isCurrent: true,
       ahead: 0,
       behind: 0,
-      lastCommitHash: 'abcdef1234567890',
+      lastCommitHash: 'abcdef1234567890abcdef1234567890abcdef12',
       lastCommitShortHash: 'abcdef1',
       lastCommitMessage: 'Initial commit',
       lastCommitDate: '2026-01-01T00:00:00.000Z',
@@ -186,22 +211,43 @@ describe('repo response schemas', () => {
     const worktree = {
       path: '/workspace',
       head: { kind: 'branch' as const, branchName: 'main' },
-      headOid: 'abcdef1234567890',
+      headOid: 'abcdef1234567890abcdef1234567890abcdef12',
       operation: null,
       materializedBranch: 'main',
       isPrimary: true,
       isLocked: false,
     }
-    const parses = (worktrees: unknown[]) =>
+    const parses = (worktrees: unknown[], branches: unknown[] = [branch]) =>
       v.safeParse(RepoSnapshotResponseSchema, {
-        snapshot: { branches: [branch], worktrees, current: 'main', remote },
+        snapshot: { branches, worktrees, current: 'main', remote },
       }).success
 
     expect(parses([worktree])).toBe(true)
+    expect(parses([{ ...worktree, headOid: 'a'.repeat(64) }])).toBe(true)
+    expect(parses([{ ...worktree, headOid: null }], [])).toBe(true)
+    expect(parses([{ ...worktree, headOid: null }], [{ ...branch, name: 'other', isCurrent: false }])).toBe(true)
+    expect(parses([{ ...worktree, headOid: null }])).toBe(false)
+    expect(parses([{ ...worktree, headOid: '0'.repeat(40) }])).toBe(false)
+    expect(parses([{ ...worktree, headOid: '0'.repeat(64) }])).toBe(false)
+    expect(parses([{ ...worktree, headOid: 'abcdef1' }])).toBe(false)
+    expect(parses([{ ...worktree, headOid: 'not-an-object-id' }])).toBe(false)
+    expect(parses([{ ...worktree, head: { kind: 'detached' }, headOid: null, materializedBranch: null }])).toBe(false)
+    expect(parses([{ ...worktree, headOid: null, operation: { kind: 'bisect' } }])).toBe(false)
     expect(parses([{ ...worktree, materializedBranch: null }])).toBe(false)
     expect(parses([{ ...worktree, materializedBranch: 'other' }])).toBe(false)
     expect(parses([{ ...worktree, operation: { kind: 'rebase' } }])).toBe(false)
     expect(parses([{ ...worktree, operation: { kind: 'bisect' } }])).toBe(true)
+    expect(parses([{ ...worktree, head: { kind: 'detached' }, operation: null }])).toBe(false)
+    expect(
+      v.safeParse(RepoSnapshotResponseSchema, {
+        snapshot: {
+          branches: [{ ...branch, lastCommitHash: 'abcdef1' }],
+          worktrees: [worktree],
+          current: 'main',
+          remote,
+        },
+      }).success,
+    ).toBe(false)
     expect(parses([{ ...worktree, head: { kind: 'detached' }, materializedBranch: 'unsafe branch' }])).toBe(false)
     expect(
       parses([

@@ -46,13 +46,16 @@ async function readRepoWorktreeSnapshot(
   gitDir: string,
   signal?: AbortSignal,
 ): Promise<RepoWorktreeSnapshot> {
-  if (worktree.isPrunable || !worktree.headOid) {
+  if (worktree.isPrunable || worktree.headOid === undefined) {
     throw new Error('Git returned an incomplete worktree identity')
   }
   const head = gitHead(worktree.branch ?? null)
   const state = await readGitWorktreeState(repoCwd, gitDir, signal)
   if (head.kind === 'branch' && gitOperationRequiresDetachedHead(state.operation)) {
     throw new Error('Git worktree membership changed while reading operation state')
+  }
+  if (worktree.headOid === null && (head.kind !== 'branch' || state.operation !== null)) {
+    throw new Error('Git returned an invalid unborn worktree identity')
   }
   return {
     path: worktree.path,
@@ -98,7 +101,8 @@ export async function readGitWorktreeState(
             : null
   return {
     operation,
-    materializedBranch: rebaseBranch ?? (bisectActive ? await readBisectBranchName(bisectStartPath) : null),
+    materializedBranch:
+      rebaseBranch ?? (bisectActive ? await readBisectBranchName(repoCwd, gitDir, bisectStartPath, signal) : null),
   }
 }
 
@@ -153,9 +157,8 @@ async function linkedWorktreeGitDir(
 ): Promise<{ worktreePath: string; gitDir: string } | null> {
   try {
     const pointer = (await readFile(path.join(gitDir, 'gitdir'), { encoding: 'utf8', signal })).trim()
-    return path.isAbsolute(pointer) && path.basename(pointer) === '.git'
-      ? { worktreePath: path.dirname(pointer), gitDir }
-      : null
+    const resolvedPointer = path.isAbsolute(pointer) ? path.normalize(pointer) : path.resolve(gitDir, pointer)
+    return path.basename(resolvedPointer) === '.git' ? { worktreePath: path.dirname(resolvedPointer), gitDir } : null
   } catch (error) {
     if (isMissingPathError(error)) return null
     throw error
@@ -194,27 +197,35 @@ async function pathIsDirectory(target: string): Promise<boolean> {
 async function readRebaseBranchName(rebasePath: string): Promise<string | null> {
   try {
     const value = (await readFile(path.join(rebasePath, 'head-name'), 'utf8')).trim()
-    const branchName = value.startsWith('refs/heads/') ? value.slice('refs/heads/'.length) : ''
-    return isSafeBranchName(branchName) ? branchName : null
+    if (!value.startsWith('refs/heads/')) return null
+    const branchName = value.slice('refs/heads/'.length)
+    if (!isSafeBranchName(branchName)) throw new Error('Invalid rebase head-name')
+    return branchName
   } catch (error) {
     if (isMissingPathError(error)) return null
     throw error
   }
 }
 
-async function readBisectBranchName(bisectStartPath: string): Promise<string | null> {
+async function readBisectBranchName(
+  repoCwd: string,
+  gitDir: string,
+  bisectStartPath: string,
+  signal?: AbortSignal,
+): Promise<string | null> {
   try {
-    return parseOperationBranchName((await readFile(bisectStartPath, 'utf8')).trim())
+    const value = (await readFile(bisectStartPath, 'utf8')).trim()
+    const branchName = value.startsWith('refs/heads/') ? value.slice('refs/heads/'.length) : value
+    if (!isSafeBranchName(branchName)) return null
+    const refName = `refs/heads/${branchName}`
+    const matchedRef = await git(repoCwd, ['--git-dir', gitDir, 'for-each-ref', '--format=%(refname)', '--', refName], {
+      signal,
+    })
+    return matchedRef === refName ? branchName : null
   } catch (error) {
     if (isMissingPathError(error)) return null
     throw error
   }
-}
-
-function parseOperationBranchName(value: string): string | null {
-  const branchName = value.startsWith('refs/heads/') ? value.slice('refs/heads/'.length) : value
-  if (/^[0-9a-f]{40,64}$/i.test(branchName)) return null
-  return isSafeBranchName(branchName) ? branchName : null
 }
 
 function isMissingPathError(error: unknown): boolean {

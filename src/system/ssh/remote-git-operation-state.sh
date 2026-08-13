@@ -7,6 +7,31 @@ WORKTREE_PATH=${2%/}
 IS_PRIMARY=$3
 ATTACHED_BRANCH=$4
 
+lexical_absolute_path() {
+  local INPUT=$1
+  local COMPONENT
+  local RESULT=
+  local -a COMPONENTS
+
+  [[ "$INPUT" == /* ]] || return 1
+  IFS=/ read -r -a COMPONENTS <<<"$INPUT"
+  for COMPONENT in "${COMPONENTS[@]}"; do
+    case "$COMPONENT" in
+      ''|.) ;;
+      ..)
+        [ -n "$RESULT" ] || return 1
+        if [[ "$RESULT" == */* ]]; then
+          RESULT=${RESULT%/*}
+        else
+          RESULT=
+        fi
+        ;;
+      *) RESULT=$RESULT/$COMPONENT ;;
+    esac
+  done
+  printf '%s\n' "${RESULT:-/}"
+}
+
 if [ "$IS_PRIMARY" = 1 ]; then
   GIT_DIR=$COMMON_DIR
 elif [ "$IS_PRIMARY" = 0 ]; then
@@ -17,7 +42,11 @@ elif [ "$IS_PRIMARY" = 0 ]; then
     [ -f "$CANDIDATE_GIT_DIR/gitdir" ] || continue
     GITDIR_POINTER=$(<"$CANDIDATE_GIT_DIR/gitdir")
     case "$GITDIR_POINTER" in
-      /*/.git) CANDIDATE_WORKTREE_PATH=${GITDIR_POINTER%/.git} ;;
+      /*) RESOLVED_GITDIR_POINTER=$(lexical_absolute_path "$GITDIR_POINTER") ;;
+      *) RESOLVED_GITDIR_POINTER=$(lexical_absolute_path "$CANDIDATE_GIT_DIR/$GITDIR_POINTER") ;;
+    esac
+    case "$RESOLVED_GITDIR_POINTER" in
+      /*/.git) CANDIDATE_WORKTREE_PATH=${RESOLVED_GITDIR_POINTER%/.git} ;;
       *) continue ;;
     esac
     if [ "${CANDIDATE_WORKTREE_PATH%/}" = "$WORKTREE_PATH" ]; then
@@ -84,11 +113,22 @@ if [ -z "$MATERIALIZED_BRANCH" ] && [ -n "$REBASE_DIRECTORY" ] && [ -f "$REBASE_
   fi
 fi
 if [ -z "$MATERIALIZED_BRANCH" ] && [ -e "$BISECT_LOG" ] && [ -f "$BISECT_START" ]; then
-  MATERIALIZED_BRANCH=$(<"$BISECT_START")
-  if [ "$MATERIALIZED_BRANCH" = 'detached HEAD' ] || [[ "$MATERIALIZED_BRANCH" =~ ^[0-9a-fA-F]{40,64}$ ]]; then
-    MATERIALIZED_BRANCH=
-  elif [ "$OPERATION" = rebase ] && [[ "$MATERIALIZED_BRANCH" != refs/heads/* ]]; then
-    MATERIALIZED_BRANCH=refs/heads/$MATERIALIZED_BRANCH
+  BISECT_BRANCH=$(<"$BISECT_START")
+  if [[ "$BISECT_BRANCH" == refs/heads/* ]]; then
+    BISECT_BRANCH=${BISECT_BRANCH#refs/heads/}
+  fi
+  if [ "$BISECT_BRANCH" != 'detached HEAD' ]; then
+    if git check-ref-format --branch "$BISECT_BRANCH" >/dev/null 2>&1; then
+      BISECT_REF="refs/heads/$BISECT_BRANCH"
+      MATCHED_BISECT_REF=$(git --git-dir="$GIT_DIR" for-each-ref --format='%(refname)' -- "$BISECT_REF")
+      if [ "$MATCHED_BISECT_REF" = "$BISECT_REF" ]; then
+        if [ "$OPERATION" = rebase ]; then
+          MATERIALIZED_BRANCH=refs/heads/$BISECT_BRANCH
+        else
+          MATERIALIZED_BRANCH=$BISECT_BRANCH
+        fi
+      fi
+    fi
   fi
 fi
 

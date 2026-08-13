@@ -167,7 +167,7 @@ async function readRemoteRepoWorktreeSnapshots(
     usableWorktrees,
     REMOTE_WORKTREE_STATUS_CONCURRENCY,
     async (worktree) => {
-      if (worktree.isPrunable || !worktree.headOid) {
+      if (worktree.isPrunable || worktree.headOid === undefined) {
         throw new Error('error.failed-read-repo')
       }
       const result = await options.run(
@@ -188,6 +188,9 @@ async function readRemoteRepoWorktreeSnapshots(
         throw new Error('error.failed-read-repo')
       }
       if (head.kind === 'branch' && state.materializedBranch !== head.branchName) {
+        throw new Error('error.failed-read-repo')
+      }
+      if (worktree.headOid === null && (head.kind !== 'branch' || state.operation !== null)) {
         throw new Error('error.failed-read-repo')
       }
       return {

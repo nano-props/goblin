@@ -8,7 +8,7 @@ import * as v from 'valibot'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
 import { isValidBranchInput } from '#/shared/refnames.ts'
 import { WorkspaceFilesystemPathSchema } from '#/shared/workspace-filesystem-schema.ts'
-import { GIT_OBJECT_ID_OR_PREFIX_RE, GIT_OBJECT_ID_RE } from '#/shared/git-types.ts'
+import { GIT_OBJECT_ID_OR_PREFIX_RE, isFullGitObjectId } from '#/shared/git-types.ts'
 import {
   parseWorkspaceExternalAppRecentKey,
   WORKSPACE_EXTERNAL_APP_IDS,
@@ -207,7 +207,10 @@ export const REPO_PROCEDURE_SCHEMAS = {
           v.check((branch) => isValidBranchInput(branch), 'invalid branch'),
         ),
       }),
-      v.strictObject({ kind: v.literal('commit'), oid: v.pipe(v.string(), v.regex(GIT_OBJECT_ID_RE)) }),
+      v.strictObject({
+        kind: v.literal('commit'),
+        oid: v.pipe(v.string(), v.check(isFullGitObjectId, 'invalid Git object ID')),
+      }),
     ]),
     count: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(200))),
     skip: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(100_000))),

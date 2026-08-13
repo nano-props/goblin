@@ -154,7 +154,7 @@ describe('GitWorkspaceNavigatorView', () => {
           {
             path: WORKTREE_PATH,
             head: { kind: 'detached' },
-            headOid: '0123456789abcdef',
+            headOid: '0123456789abcdef0123456789abcdef01234567',
             operation: { kind },
             materializedBranch: branch.name,
             isPrimary: false,
@@ -210,7 +210,7 @@ describe('GitWorkspaceNavigatorView', () => {
         {
           path: WORKTREE_PATH,
           head: { kind: 'detached' },
-          headOid: '0123456789abcdef',
+          headOid: '0123456789abcdef0123456789abcdef01234567',
           operation: null,
           materializedBranch: null,
           isPrimary: false,

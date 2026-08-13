@@ -80,11 +80,15 @@ describe('remote git snapshot', () => {
               '__GOBLIN_REMOTE_DEFAULT__',
               'value main',
               '__GOBLIN_REMOTE_BRANCHES__',
-              'main\x00f00ba4000000000000000000000000000000000\x00f00ba40\x00Initial commit\x002024-01-01T00:00:00Z\x00Alice\x00origin/main\x00',
+              'main\x00f00ba40000000000000000000000000000000000\x00f00ba40\x00Initial commit\x002024-01-01T00:00:00Z\x00Alice\x00origin/main\x00',
             ].join('\n'),
           )
         case 'gitWorktreeList':
-          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main'))
+          return okRemoteResult(
+            worktreePorcelain(
+              'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/main',
+            ),
+          )
         case 'gitStatus':
           throw new Error('snapshot must not read status')
         case 'gitRemoteVerbose':
@@ -132,7 +136,9 @@ describe('remote git snapshot', () => {
         case 'gitSnapshot':
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
         case 'gitWorktreeList':
-          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+          return okRemoteResult(
+            worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),
+          )
         case 'gitOperationState':
           return okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/in-progress\n')
         default:
@@ -163,8 +169,8 @@ describe('remote git snapshot', () => {
           return okRemoteResult(
             worktreePorcelain(
               [
-                'worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main',
-                'worktree /srv/portable\nHEAD f00ba41\nbranch refs/heads/portable\nlocked portable',
+                'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/main',
+                'worktree /srv/portable\nHEAD f00ba41000000000000000000000000000000000\nbranch refs/heads/portable\nlocked portable',
               ].join('\n\n'),
             ),
           )
@@ -264,7 +270,9 @@ describe('remote git snapshot', () => {
     const run = vi.fn<RemoteGitRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
-        return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+        return okRemoteResult(
+          worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),
+        )
       }
       if (command.type === 'gitOperationState') return okRemoteResult(operationOutput)
       if (command.type === 'gitLocalBranches') return okRemoteResult('main\nfeature/in-progress')
@@ -282,11 +290,13 @@ describe('remote git snapshot', () => {
     ])
   })
 
-  test('keeps a detached-HEAD remote rebase authoritative without inventing a branch', async () => {
+  test('rejects a detached-HEAD display value in the remote state protocol', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
-        return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+        return okRemoteResult(
+          worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),
+        )
       }
       if (command.type === 'gitOperationState') {
         return okRemoteResult('operation rebase\nmaterialized-branch detached HEAD\n')
@@ -295,22 +305,16 @@ describe('remote git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).resolves.toEqual([
-      {
-        kind: 'git-worktree',
-        worktreePath: '/srv/repo',
-        head: { kind: 'detached' },
-        materializedBranch: null,
-      },
-      { kind: 'git-branch', branchName: 'main' },
-    ])
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('rejects a plain branch name from the remote rebase protocol', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
-        return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+        return okRemoteResult(
+          worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),
+        )
       }
       if (command.type === 'gitOperationState') {
         return okRemoteResult('operation rebase\nmaterialized-branch feature/in-progress\n')
@@ -322,11 +326,31 @@ describe('remote git snapshot', () => {
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
+  test('rejects an empty branch ref from the remote rebase protocol', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult(
+          worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),
+        )
+      }
+      if (command.type === 'gitOperationState') {
+        return okRemoteResult('operation rebase\nmaterialized-branch refs/heads/\n')
+      }
+      if (command.type === 'gitLocalBranches') return okRemoteResult('main')
+      throw new Error(`unexpected command: ${command.type}`)
+    })
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+  })
+
   test('retains a remote bisect branch while presenting a concurrent cherry-pick', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
-        return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+        return okRemoteResult(
+          worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),
+        )
       }
       if (command.type === 'gitOperationState') {
         return okRemoteResult('operation cherry-pick\nmaterialized-branch feature/in-progress\n')
@@ -455,14 +479,14 @@ describe('remote git snapshot', () => {
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).rejects.toThrow('worktree list failed')
   })
 
-  test('returns detached worktree identity for an unborn repository', async () => {
+  test('returns an attached worktree identity without a commit for an unborn repository', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command) =>
       command.type === 'gitWorktreeList'
-        ? okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+        ? okRemoteResult(worktreePorcelain(`worktree /srv/repo\nHEAD ${'0'.repeat(40)}\nbranch refs/heads/main`))
         : command.type === 'resolveRepoCommonDir'
           ? okRemoteResult('/srv/repo/.git\0')
           : command.type === 'gitOperationState'
-            ? okRemoteResult('operation none\nmaterialized-branch\n')
+            ? okRemoteResult('operation none\nmaterialized-branch main\n')
             : okRemoteResult(''),
     )
 
@@ -470,11 +494,28 @@ describe('remote git snapshot', () => {
       {
         kind: 'git-worktree',
         worktreePath: '/srv/repo',
-        head: { kind: 'detached' },
-        materializedBranch: null,
+        head: { kind: 'branch', branchName: 'main' },
+        materializedBranch: 'main',
       },
     ])
     expect(run).toHaveBeenCalledTimes(4)
+  })
+
+  test.each([
+    ['detached', 'operation none\nmaterialized-branch\n'],
+    ['branch refs/heads/main', 'operation merge\nmaterialized-branch main\n'],
+  ])('rejects an invalid unborn remote worktree with %s state', async (membershipState, operationState) => {
+    const run = vi.fn<RemoteGitRunner>(async (command) =>
+      command.type === 'gitWorktreeList'
+        ? okRemoteResult(worktreePorcelain(`worktree /srv/repo\nHEAD ${'0'.repeat(40)}\n${membershipState}`))
+        : command.type === 'resolveRepoCommonDir'
+          ? okRemoteResult('/srv/repo/.git\0')
+          : command.type === 'gitOperationState'
+            ? okRemoteResult(operationState)
+            : okRemoteResult(''),
+    )
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('prefers stderr when converting remote exec failures', () => {

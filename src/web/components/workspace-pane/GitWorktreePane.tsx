@@ -16,7 +16,7 @@ import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/Wor
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
 import { WorktreeStatusOverview } from '#/web/components/workspace-pane/WorktreeStatusOverview.tsx'
-import { GitHistoryPanel } from '#/web/components/repo-workspace/GitHistoryPanel.tsx'
+import { EmptyGitHistoryPanel, GitHistoryPanel } from '#/web/components/repo-workspace/GitHistoryPanel.tsx'
 import { GitWorkspacePane } from '#/web/components/workspace-pane/GitWorkspacePane.tsx'
 import type { GitWorkspacePaneShell } from '#/web/components/workspace-pane/workspace-pane-types.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
@@ -90,12 +90,16 @@ export const GitWorktreePane = defineComponent<GitWorktreePaneProps>({
       if (!currentTarget || !currentWorktree) {
         return <EmptyState title={t('workspace-route.not-found-title')} />
       }
-      if (currentWorktree.head.kind === 'branch' && currentWorktree.operation === null) {
+      const attachedBranchName = currentWorktree.head.kind === 'branch' ? currentWorktree.head.branchName : null
+      const attachedBranch = attachedBranchName
+        ? snapshotReadModel.data.value?.snapshot.branches.find((branch) => branch.name === attachedBranchName)
+        : null
+      if (attachedBranch && currentWorktree.operation === null) {
         return (
           <GitWorkspacePane
             gitWorkspace={{
               ...props.repo,
-              ui: { ...props.repo.ui, currentBranchName: currentWorktree.head.branchName },
+              ui: { ...props.repo.ui, currentBranchName: attachedBranch.name },
             }}
             workspacePaneRouteContext={{ kind: 'git-worktree', worktreePath: props.worktreePath, route: props.route }}
             workspacePaneId={props.workspacePaneId}
@@ -289,13 +293,17 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
               )}
             </WorkspacePanePanelFrame>
           ) : selection?.tab === 'history' ? (
-            <GitHistoryPanel
-              repoId={props.target.workspaceId}
-              workspaceRuntimeId={props.workspaceRuntime.workspaceRuntimeId}
-              target={{ kind: 'commit', oid: props.worktree.headOid }}
-              workspacePaneId={props.workspacePaneId}
-              panelLabel={{ label: t('tab.log') }}
-            />
+            props.worktree.headOid ? (
+              <GitHistoryPanel
+                repoId={props.target.workspaceId}
+                workspaceRuntimeId={props.workspaceRuntime.workspaceRuntimeId}
+                target={{ kind: 'commit', oid: props.worktree.headOid }}
+                workspacePaneId={props.workspacePaneId}
+                panelLabel={{ label: t('tab.log') }}
+              />
+            ) : (
+              <EmptyGitHistoryPanel workspacePaneId={props.workspacePaneId} panelLabel={{ label: t('tab.log') }} />
+            )
           ) : selection?.tab === 'files' ? (
             <WorkspacePanePanelFrame id={`${props.workspacePaneId}-files-panel`} label={t('tab.files')}>
               <WorkspaceFilesystemTabPanel target={surfaceTarget.value} />

@@ -126,7 +126,9 @@ describe('repo source runtime failure classification', () => {
           return okRemoteResult(`${target.remotePath}/.git\0`)
         case 'gitWorktreeList':
           return okRemoteResult(
-            worktreePorcelain(`worktree ${target.remotePath}\nHEAD f00ba40\nbranch refs/heads/main`),
+            worktreePorcelain(
+              `worktree ${target.remotePath}\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/main`,
+            ),
           )
         case 'gitRemoteVerbose':
           return okRemoteResult(
@@ -172,7 +174,9 @@ describe('repo source runtime failure classification', () => {
         switch (command.type) {
           case 'gitWorktreeList':
             return okRemoteResult(
-              worktreePorcelain(`worktree ${target.remotePath}\nHEAD f00ba40\nbranch refs/heads/main`),
+              worktreePorcelain(
+                `worktree ${target.remotePath}\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/main`,
+              ),
             )
           case 'resolveRepoCommonDir':
             return okRemoteResult('/srv/repo/.git\0')
@@ -244,11 +248,11 @@ describe('repo source runtime failure classification', () => {
               worktreePorcelain(
                 [
                   `worktree ${target.remotePath}`,
-                  'HEAD f00ba40',
+                  'HEAD f00ba40000000000000000000000000000000000',
                   'branch refs/heads/main',
                   '',
                   `worktree ${linkedPath}`,
-                  'HEAD ba5eba1',
+                  'HEAD ba5eba1000000000000000000000000000000000',
                   'branch refs/heads/feature/test',
                 ].join('\n'),
               ),

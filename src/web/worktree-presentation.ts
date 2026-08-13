@@ -17,7 +17,7 @@ export function worktreeOperationKey(operation: GitOperation): (typeof WORKTREE_
 export function worktreePresentationLabel(worktree: RepoWorktreeSnapshot, t: WorktreePresentationTranslator): string {
   if (worktree.head.kind === 'branch' && !worktree.operation) return worktree.head.branchName
   const operation = worktree.operation
-  if (!operation) return worktree.headOid.slice(0, 7)
+  if (!operation) return worktree.headOid?.slice(0, 7) ?? worktree.path
   if (operation.kind === 'rebase') {
     return worktree.materializedBranch
       ? t('worktree-state.rebase-branch', { branch: worktree.materializedBranch })

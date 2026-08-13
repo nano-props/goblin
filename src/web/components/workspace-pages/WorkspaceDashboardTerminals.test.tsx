@@ -166,7 +166,7 @@ describe('WorkspaceDashboardTerminals', () => {
         {
           path: '/workspace/detached',
           head: { kind: 'detached' },
-          headOid: '1234567890abcdef',
+          headOid: '1234567890abcdef1234567890abcdef12345678',
           operation: null,
           materializedBranch: null,
           isPrimary: false,
@@ -226,7 +226,7 @@ describe('WorkspaceDashboardTerminals', () => {
     expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
-  test('opens a worktree terminal even when the branch projection is unavailable', async () => {
+  test('keeps a worktree terminal visible but disabled while snapshot authority is unavailable', async () => {
     const sessions = [
       terminalSummary('term-branch-session', 'Branch shell', {
         target: {
@@ -247,20 +247,11 @@ describe('WorkspaceDashboardTerminals', () => {
     expect(screen.getByText('dashboard.terminals.worktree-unknown')).toBeTruthy()
     expect(screen.queryByText('1234567')).toBeNull()
     expect(screen.queryByText('dashboard.terminals.detached-worktree')).toBeNull()
-    await userEvent.click(screen.getByText('Branch shell'))
+    const row = screen.getByRole('button', { name: /Branch shell/ }) as HTMLButtonElement
+    expect(row.disabled).toBe(true)
+    await userEvent.click(row)
 
-    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      {
-        routeTarget: {
-          kind: 'git-worktree',
-          workspaceId: WORKSPACE_ID,
-          worktreePath: '/workspace/feature',
-        },
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      },
-      { kind: 'terminal', terminalSessionId: 'term-branch-session' },
-      { navigationGeneration: expect.any(Number) },
-    )
+    expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(toastMocks.error).not.toHaveBeenCalled()
   })

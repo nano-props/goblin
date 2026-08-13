@@ -75,6 +75,7 @@ describe('remote Git operation state script', () => {
     const repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin remote concurrent operation '))
     tempDirectories.push(repoPath)
     await execa('git', ['init', '-q', repoPath])
+    await createBranch(repoPath, 'feature/example')
     await writeFile(await resolveGitPath(repoPath, 'BISECT_LOG'), 'git bisect start\n')
     await writeFile(await resolveGitPath(repoPath, 'BISECT_START'), 'feature/example\n')
     await writeFile(await resolveGitPath(repoPath, marker), '1111111111111111111111111111111111111111\n')
@@ -90,6 +91,7 @@ describe('remote Git operation state script', () => {
       const repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin remote rebase bisect '))
       tempDirectories.push(repoPath)
       await execa('git', ['init', '-q', repoPath])
+      await createBranch(repoPath, 'feature/example')
       const rebaseMergePath = await resolveGitPath(repoPath, 'rebase-merge')
       await mkdir(rebaseMergePath)
       if (headName !== null) await writeFile(path.join(rebaseMergePath, 'head-name'), `${headName}\n`)
@@ -102,32 +104,65 @@ describe('remote Git operation state script', () => {
     },
   )
 
-  test('reads a locked linked worktree from its administrative directory while its path is offline', async () => {
-    const parent = await mkdtemp(path.join(os.tmpdir(), 'goblin remote locked worktree '))
-    tempDirectories.push(parent)
-    const repoPath = path.join(parent, 'repo')
-    const linkedPath = path.join(parent, 'portable')
-    const offlinePath = path.join(parent, 'portable-offline')
-    await execa('git', ['init', '-q', '--initial-branch=main', repoPath])
-    await execa('git', ['-C', repoPath, 'config', 'user.email', 'example@example.invalid'])
-    await execa('git', ['-C', repoPath, 'config', 'user.name', 'Example'])
-    await writeFile(path.join(repoPath, 'file.txt'), 'initial\n')
-    await execa('git', ['-C', repoPath, 'add', 'file.txt'])
-    await execa('git', ['-C', repoPath, 'commit', '-qm', 'initial'])
-    await execa('git', ['-C', repoPath, 'worktree', 'add', '-qb', 'portable', linkedPath])
-    await execa('git', ['-C', repoPath, 'worktree', 'lock', '--reason', 'portable', linkedPath])
-    const linkedGitDir = (await execa('git', ['-C', linkedPath, 'rev-parse', '--absolute-git-dir'])).stdout
-    await writeFile(path.join(linkedGitDir, 'MERGE_HEAD'), '0'.repeat(40))
-    const canonicalLinkedPath = await realpath(linkedPath)
-    await rename(linkedPath, offlinePath)
+  test('keeps a hexadecimal branch name as bisect ownership when the ref exists', async () => {
+    const repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin remote hexadecimal branch '))
+    tempDirectories.push(repoPath)
+    await execa('git', ['init', '-q', repoPath])
+    const branchName = 'a'.repeat(41)
+    await createBranch(repoPath, branchName)
+    await writeFile(await resolveGitPath(repoPath, 'BISECT_LOG'), 'git bisect start\n')
+    await writeFile(await resolveGitPath(repoPath, 'BISECT_START'), `${branchName}\n`)
 
-    const state = await execa('sh', [
-      '-c',
-      remoteGitOperationStateScript(path.join(repoPath, '.git'), canonicalLinkedPath, false, 'portable'),
-    ])
+    const state = await execa('sh', ['-c', primaryOperationStateScript(repoPath)])
 
-    expect(state.stdout).toBe('operation merge\nmaterialized-branch portable')
+    expect(state.stdout).toBe(`operation bisect\nmaterialized-branch ${branchName}`)
   })
+
+  test('does not infer a bisect branch from a detached object id', async () => {
+    const repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin remote detached bisect '))
+    tempDirectories.push(repoPath)
+    await execa('git', ['init', '-q', repoPath])
+    await writeFile(await resolveGitPath(repoPath, 'BISECT_LOG'), 'git bisect start\n')
+    await writeFile(await resolveGitPath(repoPath, 'BISECT_START'), `${'a'.repeat(40)}\n`)
+
+    const state = await execa('sh', ['-c', primaryOperationStateScript(repoPath)])
+
+    expect(state.stdout).toBe('operation bisect\nmaterialized-branch')
+  })
+
+  test.each([
+    ['absolute', []],
+    ['relative', ['--relative-paths']],
+  ] as const)(
+    'reads linked bisect ownership through a %s administrative pointer while its path is offline',
+    async (_, flags) => {
+      const parent = await mkdtemp(path.join(os.tmpdir(), 'goblin remote locked worktree '))
+      tempDirectories.push(parent)
+      const repoPath = path.join(parent, 'repo')
+      const linkedPath = path.join(parent, 'portable')
+      const offlinePath = path.join(parent, 'portable-offline')
+      await execa('git', ['init', '-q', '--initial-branch=main', repoPath])
+      await execa('git', ['-C', repoPath, 'config', 'user.email', 'example@example.invalid'])
+      await execa('git', ['-C', repoPath, 'config', 'user.name', 'Example'])
+      await writeFile(path.join(repoPath, 'file.txt'), 'initial\n')
+      await execa('git', ['-C', repoPath, 'add', 'file.txt'])
+      await execa('git', ['-C', repoPath, 'commit', '-qm', 'initial'])
+      await execa('git', ['-C', repoPath, 'worktree', 'add', ...flags, '-qb', 'portable', linkedPath])
+      await execa('git', ['-C', repoPath, 'worktree', 'lock', '--reason', 'portable', linkedPath])
+      const linkedGitDir = (await execa('git', ['-C', linkedPath, 'rev-parse', '--absolute-git-dir'])).stdout
+      await writeFile(path.join(linkedGitDir, 'BISECT_LOG'), 'git bisect start\n')
+      await writeFile(path.join(linkedGitDir, 'BISECT_START'), 'portable\n')
+      const canonicalLinkedPath = await realpath(linkedPath)
+      await rename(linkedPath, offlinePath)
+
+      const state = await execa('sh', [
+        '-c',
+        remoteGitOperationStateScript(await realpath(path.join(repoPath, '.git')), canonicalLinkedPath, false, null),
+      ])
+
+      expect(state.stdout).toBe('operation bisect\nmaterialized-branch portable')
+    },
+  )
 })
 
 async function resolveGitPath(repoPath: string, marker: string): Promise<string> {
@@ -137,4 +172,13 @@ async function resolveGitPath(repoPath: string, marker: string): Promise<string>
 
 function primaryOperationStateScript(repoPath: string): string {
   return remoteGitOperationStateScript(path.join(repoPath, '.git'), repoPath, true, null)
+}
+
+async function createBranch(repoPath: string, branchName: string): Promise<void> {
+  await execa('git', ['-C', repoPath, 'config', 'user.email', 'example@example.invalid'])
+  await execa('git', ['-C', repoPath, 'config', 'user.name', 'Example'])
+  await writeFile(path.join(repoPath, 'tracked.txt'), 'tracked\n')
+  await execa('git', ['-C', repoPath, 'add', 'tracked.txt'])
+  await execa('git', ['-C', repoPath, 'commit', '-qm', 'initial'])
+  await execa('git', ['-C', repoPath, 'branch', branchName])
 }

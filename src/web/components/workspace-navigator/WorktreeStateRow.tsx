@@ -43,7 +43,7 @@ export const WorktreeStateRow = defineComponent<WorktreeStateRowProps>({
 
     return () => {
       const label = worktreePresentationLabel(props.worktree, t)
-      const shortHead = props.worktree.headOid.slice(0, 7)
+      const shortHead = props.worktree.headOid?.slice(0, 7) ?? ''
       const metadata = props.worktree.operation ? `${shortHead} · ${props.worktree.path}` : props.worktree.path
       return (
         <NavigatorRow

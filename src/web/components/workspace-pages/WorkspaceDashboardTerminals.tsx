@@ -78,7 +78,9 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
     async function openTerminal(session: WorkspaceTerminalSessionSummary): Promise<void> {
       const pending = terminalOpeningLease(session)
       if (sameTerminalOpeningScope(openingTerminal.value, pending)) return
-      if (dashboardTerminalWorktreeUnavailable(session, repoSnapshot.data.value?.snapshot.worktrees)) return
+      if (dashboardTerminalTargetAvailability(session, repoSnapshot.data.value?.snapshot.worktrees) !== 'available') {
+        return
+      }
       if (hydration.value.phase === 'failed') {
         toast.warning(t('dashboard.terminals.stale'))
         return
@@ -163,7 +165,7 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
       const opening = sameTerminalOpeningLease(openingTerminal.value, terminalOpeningLease(session))
       const worktrees = repoSnapshot.data.value?.snapshot.worktrees
       const target = terminalTargetLabel(session, worktrees, t)
-      const unavailable = dashboardTerminalWorktreeUnavailable(session, worktrees)
+      const availability = dashboardTerminalTargetAvailability(session, worktrees)
       const titleId = `dashboard-terminal-title-${session.terminalSessionId}`
       const detailsId = `dashboard-terminal-details-${session.terminalSessionId}`
       const statusId = `dashboard-terminal-status-${session.terminalSessionId}`
@@ -188,7 +190,10 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
           aria-labelledby={titleId}
           aria-describedby={`${detailsId} ${statusId}`}
           aria-busy={opening || undefined}
-          disabled={unavailable || sameTerminalOpeningScope(openingTerminal.value, terminalOpeningLease(session))}
+          disabled={
+            availability !== 'available' ||
+            sameTerminalOpeningScope(openingTerminal.value, terminalOpeningLease(session))
+          }
           onClick={() => void openTerminal(session)}
         >
           <span class="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/35 text-muted-foreground">
@@ -296,13 +301,17 @@ function dashboardTerminalTargetLease(
   )
 }
 
-function dashboardTerminalWorktreeUnavailable(
+type DashboardTerminalTargetAvailability = 'available' | 'unknown' | 'unavailable'
+
+function dashboardTerminalTargetAvailability(
   session: WorkspaceTerminalSessionSummary,
   worktrees: readonly RepoWorktreeSnapshot[] | undefined,
-): boolean {
-  if (!worktrees || session.base.target.kind === 'workspace-root') return false
+): DashboardTerminalTargetAvailability {
+  if (session.base.target.kind === 'workspace-root') return 'available'
+  if (session.base.presentation.kind !== 'git-worktree') return 'unavailable'
+  if (!worktrees) return 'unknown'
   const worktreePath = terminalExecutionPath(session.base.target)
-  return !worktrees.some((worktree) => worktree.path === worktreePath)
+  return worktrees.some((worktree) => worktree.path === worktreePath) ? 'available' : 'unavailable'
 }
 
 function terminalTargetLabel(

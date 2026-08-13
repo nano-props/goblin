@@ -7,11 +7,11 @@ describe('remote Git status and patch admission', () => {
   const worktreeListOutput =
     [
       'worktree /srv/repo',
-      'HEAD f00ba40',
+      'HEAD f00ba40000000000000000000000000000000000',
       'branch refs/heads/main',
       '',
       'worktree /srv/repo-feature',
-      'HEAD ba5eba1',
+      'HEAD ba5eba1000000000000000000000000000000000',
       'branch refs/heads/feature/test',
     ].join(NUL) +
     NUL +
@@ -21,11 +21,11 @@ describe('remote Git status and patch admission', () => {
     const detachedOutput =
       [
         'worktree /srv/repo',
-        'HEAD f00ba40',
+        'HEAD f00ba40000000000000000000000000000000000',
         'branch refs/heads/main',
         '',
         'worktree /srv/repo-detached',
-        'HEAD ba5eba1',
+        'HEAD ba5eba1000000000000000000000000000000000',
         'detached',
       ].join(NUL) +
       NUL +
@@ -81,7 +81,10 @@ describe('remote Git status and patch admission', () => {
   })
 
   test('shares status admission with remote patch enumeration', async () => {
-    const oneWorktreeOutput = ['worktree /srv/repo', 'HEAD f00ba40', 'branch refs/heads/main'].join(NUL) + NUL + NUL
+    const oneWorktreeOutput =
+      ['worktree /srv/repo', 'HEAD f00ba40000000000000000000000000000000000', 'branch refs/heads/main'].join(NUL) +
+      NUL +
+      NUL
     const statusCompletions: Array<PromiseWithResolvers<RemoteCommandResult>> = []
     const run = vi.fn<RemoteGitRunner>(async (command) => {
       if (command.type === 'gitWorktreeList') return okRemoteResult(oneWorktreeOutput)
@@ -115,7 +118,7 @@ describe('remote Git status and patch admission', () => {
       Array.from({ length: 20 }, (_, index) =>
         [
           `worktree /srv/repo-${index}`,
-          `HEAD ${String(index).padStart(7, '0')}`,
+          `HEAD ${String(index).padStart(40, '0')}`,
           `branch refs/heads/feature/${index}`,
         ].join(NUL),
       ).join(NUL + NUL) +
@@ -192,7 +195,10 @@ describe('remote Git status and patch admission', () => {
   })
 
   test('keeps a cancelled running probe admitted until the SSH task settles', async () => {
-    const oneWorktreeOutput = ['worktree /srv/repo', 'HEAD f00ba40', 'branch refs/heads/main'].join(NUL) + NUL + NUL
+    const oneWorktreeOutput =
+      ['worktree /srv/repo', 'HEAD f00ba40000000000000000000000000000000000', 'branch refs/heads/main'].join(NUL) +
+      NUL +
+      NUL
     const controller = new AbortController()
     const completions: Array<PromiseWithResolvers<RemoteCommandResult>> = []
     let startedStatusReads = 0

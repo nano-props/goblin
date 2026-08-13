@@ -265,7 +265,11 @@ describe('remote git network', () => {
         return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
       }
       if (command.type === 'gitWorktreeList') {
-        return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/main'))
+        return okRemoteResult(
+          worktreePorcelain(
+            'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/main',
+          ),
+        )
       }
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitOperationState') {

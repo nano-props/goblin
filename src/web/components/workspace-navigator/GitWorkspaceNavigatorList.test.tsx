@@ -106,6 +106,34 @@ describe('GitWorkspaceNavigatorList', () => {
     expect(container.querySelector('[data-testid="empty"]')?.textContent).toBe('repo not loaded')
   })
 
+  test('renders an unborn attached worktree without a branch row', () => {
+    const worktree: RepoWorktreeSnapshot = {
+      ...createRepoWorktreeSnapshotForTest('main', '/tmp/repo'),
+      headOid: null,
+    }
+    const repo = gitWorkspaceNavigatorRepo([], 'main', [worktree])
+    const onSelectWorktree = vi.fn()
+
+    const { container } = renderInJsdom(
+      <GitWorkspaceNavigatorList
+        repo={repo}
+        rows={[{ kind: 'worktree', branch: null, worktree }]}
+        highlightedBranch={null}
+        highlightedWorktreePath={worktree.path}
+        onSelectBranch={() => {}}
+        onOpenBranchStatus={() => {}}
+        onSelectWorktree={onSelectWorktree}
+        emptyState={null}
+      />,
+    )
+
+    const row = container.querySelector('li')
+    expect(row).not.toBeNull()
+    expect(row?.textContent).toContain('main')
+    row?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(onSelectWorktree).toHaveBeenCalledWith(worktree.path)
+  })
+
   test('highlights the row whose name matches highlightedBranch', () => {
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
     const repo = gitWorkspaceNavigatorRepo(branches, 'main')
