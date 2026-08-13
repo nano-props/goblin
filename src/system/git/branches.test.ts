@@ -53,11 +53,12 @@ describe('getBranchWorktreeIdentities', () => {
 
     await expect(
       getBranchWorktreeIdentities('/repo', [
-        { path: '/repo', head: { kind: 'branch', branchName: 'main' }, operation: null },
+        { path: '/repo', head: { kind: 'branch', branchName: 'main' }, operation: null, materializedBranch: 'main' },
         {
           path: '/worktrees/linked',
           head: { kind: 'branch', branchName: 'feature/linked' },
           operation: null,
+          materializedBranch: 'feature/linked',
         },
       ]),
     ).resolves.toEqual([
@@ -66,12 +67,14 @@ describe('getBranchWorktreeIdentities', () => {
         worktreePath: '/repo',
         head: { kind: 'branch', branchName: 'main' },
         operation: null,
+        materializedBranch: 'main',
       },
       {
         kind: 'git-worktree',
         worktreePath: '/worktrees/linked',
         head: { kind: 'branch', branchName: 'feature/linked' },
         operation: null,
+        materializedBranch: 'feature/linked',
       },
       { kind: 'git-branch', branchName: 'feature/free' },
     ])
@@ -88,8 +91,18 @@ describe('getBranchWorktreeIdentities', () => {
   test('keeps a detached local worktree without a branch ref', async () => {
     vi.mocked(git).mockResolvedValueOnce('')
     await expect(
-      getBranchWorktreeIdentities('/repo', [{ path: '/repo', head: { kind: 'detached' }, operation: null }]),
-    ).resolves.toEqual([{ kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' }, operation: null }])
+      getBranchWorktreeIdentities('/repo', [
+        { path: '/repo', head: { kind: 'detached' }, operation: null, materializedBranch: null },
+      ]),
+    ).resolves.toEqual([
+      {
+        kind: 'git-worktree',
+        worktreePath: '/repo',
+        head: { kind: 'detached' },
+        operation: null,
+        materializedBranch: null,
+      },
+    ])
   })
 
   test.each(['rebase', 'bisect'] as const)('does not expose the branch retained by detached %s', async (kind) => {
@@ -100,7 +113,8 @@ describe('getBranchWorktreeIdentities', () => {
         {
           path: '/repo',
           head: { kind: 'detached' },
-          operation: { kind, branchName: 'feature/in-progress' },
+          operation: { kind },
+          materializedBranch: 'feature/in-progress',
         },
       ]),
     ).resolves.toEqual([
@@ -108,7 +122,8 @@ describe('getBranchWorktreeIdentities', () => {
         kind: 'git-worktree',
         worktreePath: '/repo',
         head: { kind: 'detached' },
-        operation: { kind, branchName: 'feature/in-progress' },
+        operation: { kind },
+        materializedBranch: 'feature/in-progress',
       },
       { kind: 'git-branch', branchName: 'main' },
     ])
@@ -133,7 +148,7 @@ describe('authoritative snapshot reads', () => {
       return ''
     })
 
-    await expect(getBranches('/repo', [], 'main')).rejects.toThrow('branch read failed')
+    await expect(getBranches('/repo', 'main')).rejects.toThrow('branch read failed')
   })
 })
 

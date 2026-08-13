@@ -122,6 +122,7 @@ export type WorkspacePaneTargetIdentity =
       worktreePath: string
       head: GitHead
       operation: GitOperation | null
+      materializedBranch: string | null
     }
 
 interface RepoMembershipReadOptions {
@@ -578,7 +579,7 @@ function createLocalRepoSource(
         getCurrentBranch(repoId, { signal: options?.signal }),
         readRepoWorktreeSnapshots(membership, options?.signal),
       ])
-      const branches = await getBranches(repoId, membership, currentBranch, { signal: options?.signal })
+      const branches = await getBranches(repoId, currentBranch, { signal: options?.signal })
       const current = currentBranch ?? ''
       const currentHEAD = currentBranch === null ? await getHeadHash(repoId, { signal: options?.signal }) : undefined
       const remote = await getRemoteInfo(repoId, options?.signal)

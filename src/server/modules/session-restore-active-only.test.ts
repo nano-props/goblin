@@ -117,13 +117,14 @@ describe('restoreServerWorkspace — active-only restore', () => {
     mocks.readRepoSnapshot.mockImplementation(async (workspaceId: string) => ({
       snapshot: {
         current: 'main',
-        branches: [{ name: 'main', worktree: { path: workspaceId, isPrimary: false, isLocked: false } }],
+        branches: [{ name: 'main' }],
         worktrees: [
           {
             path: workspaceId,
             head: { kind: 'branch', branchName: 'main' },
             headOid: '',
             operation: null,
+            materializedBranch: 'main',
             isPrimary: false,
             isLocked: false,
           },

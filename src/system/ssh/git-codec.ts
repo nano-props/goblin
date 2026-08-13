@@ -30,21 +30,36 @@ export interface RemoteRepoSnapshot extends RemoteRepoBaseSnapshot {
   worktrees: RepoWorktreeSnapshot[]
 }
 
-export function decodeRemoteGitOperation(output: string): GitOperation | null {
-  const [kind, rawBranchName, ...extra] = output.trimEnd().split('\n')
-  if (extra.length > 0) throw new Error('error.failed-read-repo')
+export interface RemoteGitWorktreeState {
+  operation: GitOperation | null
+  materializedBranch: string | null
+}
+
+export function decodeRemoteGitWorktreeState(output: string): RemoteGitWorktreeState {
+  const [operationRecord, branchRecord, ...extra] = output.trimEnd().split('\n')
+  if (
+    extra.length > 0 ||
+    !operationRecord?.startsWith('operation ') ||
+    (branchRecord !== 'materialized-branch' && !branchRecord?.startsWith('materialized-branch '))
+  ) {
+    throw new Error('error.failed-read-repo')
+  }
+  const kind = operationRecord.slice('operation '.length)
+  const operation = decodeGitOperationKind(kind)
+  const rawBranchName = branchRecord === 'materialized-branch' ? '' : branchRecord.slice('materialized-branch '.length)
+  const branchName = rawBranchName.startsWith('refs/heads/') ? rawBranchName.slice('refs/heads/'.length) : rawBranchName
+  const materializedBranch =
+    !branchName || branchName === 'detached HEAD' || /^[0-9a-f]{40,64}$/i.test(branchName) ? null : branchName
+  if (materializedBranch && !isSafeBranchName(materializedBranch)) throw new Error('error.failed-read-repo')
+  return { operation, materializedBranch }
+}
+
+function decodeGitOperationKind(kind: string): GitOperation | null {
   if (kind === 'none') return null
-  if (kind === 'cherry-pick' || kind === 'revert' || kind === 'merge') return { kind }
-  if (kind !== 'rebase' && kind !== 'bisect') throw new Error('error.failed-read-repo')
-  if (!rawBranchName) return { kind, branchName: null }
-  const branchName = rawBranchName.startsWith('refs/heads/')
-    ? rawBranchName.slice('refs/heads/'.length)
-    : kind === 'bisect'
-      ? rawBranchName
-      : ''
-  if (/^[0-9a-f]{40,64}$/i.test(branchName)) return { kind, branchName: null }
-  if (!isSafeBranchName(branchName)) throw new Error('error.failed-read-repo')
-  return { kind, branchName }
+  if (kind === 'rebase' || kind === 'cherry-pick' || kind === 'revert' || kind === 'bisect' || kind === 'merge') {
+    return { kind }
+  }
+  throw new Error('error.failed-read-repo')
 }
 
 interface SnapshotSections {
@@ -53,7 +68,7 @@ interface SnapshotSections {
   branches: string[]
 }
 
-export function parseRemoteSnapshot(output: string, worktrees: WorktreeInfo[] = []): RemoteRepoBaseSnapshot | null {
+export function parseRemoteSnapshot(output: string): RemoteRepoBaseSnapshot | null {
   const sections = splitSnapshotSections(output)
   if (!sections) return null
   const current = singleOptionalBranchName(sections.current)

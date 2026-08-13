@@ -170,6 +170,7 @@ describe('WorkspaceDashboardTerminals', () => {
           head: { kind: 'detached' },
           headOid: '1234567890abcdef',
           operation: null,
+          materializedBranch: null,
           isPrimary: false,
           isLocked: false,
         },
@@ -199,7 +200,7 @@ describe('WorkspaceDashboardTerminals', () => {
     expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
-  test('reports a terminal target as unavailable when an authoritative snapshot no longer contains it', () => {
+  test('disables a terminal target when an authoritative snapshot no longer contains it', async () => {
     const sessions = [
       terminalSummary('term-missing-session', 'Missing worktree shell', {
         target: {
@@ -214,14 +215,18 @@ describe('WorkspaceDashboardTerminals', () => {
     seedRepoWithReadModelForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
 
-    renderDashboardTerminals(
-      sessions,
-      vi.fn(async () => true),
-    )
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
+    const commitWorkspacePaneRoute = vi.fn<AppNavigationActions['commitWorkspacePaneRoute']>()
+    renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute, vi.fn(), commitWorkspacePaneRoute)
 
     expect(screen.getByText('dashboard.terminals.worktree-unavailable')).toBeTruthy()
     expect(screen.queryByText('worktree-state.detached')).toBeNull()
     expect(screen.queryByText('dashboard.terminals.detached-worktree')).toBeNull()
+    const row = screen.getByRole('button', { name: /Missing worktree shell/ }) as HTMLButtonElement
+    expect(row.disabled).toBe(true)
+    await userEvent.click(row)
+    expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
   test('opens a worktree terminal even when the branch projection is unavailable', async () => {

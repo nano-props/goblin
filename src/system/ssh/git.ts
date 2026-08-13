@@ -23,7 +23,7 @@ import {
   type CommandOutcome,
 } from '#/system/command-execution.ts'
 import {
-  decodeRemoteGitOperation,
+  decodeRemoteGitWorktreeState,
   decodeRemoteStatus,
   decodeRemoteWorktrees,
   isValidRemotePath,
@@ -138,6 +138,7 @@ export type RemoteWorkspacePaneTargetIdentity =
       worktreePath: string
       head: RepoWorktreeSnapshot['head']
       operation: RepoWorktreeSnapshot['operation']
+      materializedBranch: RepoWorktreeSnapshot['materializedBranch']
     }
 
 /** Authoritative remote repository projection. Transport, cancellation, and malformed output are failures. */
@@ -154,7 +155,7 @@ export async function getRemoteSnapshot(
   ])
   options.signal?.throwIfAborted()
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
-  const snapshot = parseRemoteSnapshot(result.stdout, membership)
+  const snapshot = parseRemoteSnapshot(result.stdout)
   if (!snapshot) throw new Error('error.failed-read-repo')
   return { ...snapshot, worktrees, remote }
 }
@@ -171,15 +172,23 @@ async function readRemoteRepoWorktreeSnapshots(
       if (worktree.isPrunable || !worktree.headOid) {
         throw new Error('error.failed-read-repo')
       }
-      const result = await options.run({ type: 'gitOperationState', path: worktree.path }, target, {
-        signal: options.signal,
-      })
+      const result = await options.run(
+        { type: 'gitOperationState', path: worktree.path, attachedBranch: worktree.branch ?? null },
+        target,
+        { signal: options.signal },
+      )
       if (!result.ok || !result.stdout) throw new Error(result.message || 'error.failed-read-repo')
+      const state = decodeRemoteGitWorktreeState(result.stdout)
+      const head = gitHead(worktree.branch ?? null)
+      if (head.kind === 'branch' && state.materializedBranch !== head.branchName) {
+        throw new Error('error.failed-read-repo')
+      }
       return {
         path: worktree.path,
-        head: gitHead(worktree.branch ?? null),
+        head,
         headOid: worktree.headOid,
-        operation: decodeRemoteGitOperation(result.stdout),
+        operation: state.operation,
+        materializedBranch: state.materializedBranch,
         isPrimary: worktree.isPrimary,
         isLocked: worktree.isLocked ?? false,
       }
@@ -219,6 +228,7 @@ export async function getRemoteWorkspacePaneTargetIdentities(
       worktreePath: worktree.path,
       head: worktree.head,
       operation: worktree.operation,
+      materializedBranch: worktree.materializedBranch,
     })),
     ...branches
       .filter((branch) => !materializedBranches.has(branch))

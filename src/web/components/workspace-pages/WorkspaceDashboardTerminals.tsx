@@ -78,6 +78,7 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
     async function openTerminal(session: WorkspaceTerminalSessionSummary): Promise<void> {
       const pending = terminalOpeningLease(session)
       if (sameTerminalOpeningScope(openingTerminal.value, pending)) return
+      if (dashboardTerminalWorktreeUnavailable(session, repoSnapshot.data.value?.snapshot.worktrees)) return
       if (hydration.value.phase === 'failed') {
         toast.warning(t('dashboard.terminals.stale'))
         return
@@ -160,7 +161,9 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
 
     function renderTerminalRow(session: WorkspaceTerminalSessionSummary): VNodeChild {
       const opening = sameTerminalOpeningLease(openingTerminal.value, terminalOpeningLease(session))
-      const target = terminalTargetLabel(session, repoSnapshot.data.value?.snapshot.worktrees, t)
+      const worktrees = repoSnapshot.data.value?.snapshot.worktrees
+      const target = terminalTargetLabel(session, worktrees, t)
+      const unavailable = dashboardTerminalWorktreeUnavailable(session, worktrees)
       const titleId = `dashboard-terminal-title-${session.terminalSessionId}`
       const detailsId = `dashboard-terminal-details-${session.terminalSessionId}`
       const statusId = `dashboard-terminal-status-${session.terminalSessionId}`
@@ -185,7 +188,7 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
           aria-labelledby={titleId}
           aria-describedby={`${detailsId} ${statusId}`}
           aria-busy={opening || undefined}
-          disabled={sameTerminalOpeningScope(openingTerminal.value, terminalOpeningLease(session))}
+          disabled={unavailable || sameTerminalOpeningScope(openingTerminal.value, terminalOpeningLease(session))}
           onClick={() => void openTerminal(session)}
         >
           <span class="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/35 text-muted-foreground">
@@ -291,6 +294,15 @@ function dashboardTerminalTargetLease(
     session.base.target.workspaceRuntimeId,
     terminalExecutionPath(session.base.target),
   )
+}
+
+function dashboardTerminalWorktreeUnavailable(
+  session: WorkspaceTerminalSessionSummary,
+  worktrees: readonly RepoWorktreeSnapshot[] | undefined,
+): boolean {
+  if (!worktrees || session.base.target.kind === 'workspace-root') return false
+  const worktreePath = terminalExecutionPath(session.base.target)
+  return !worktrees.some((worktree) => worktree.path === worktreePath)
 }
 
 function terminalTargetLabel(

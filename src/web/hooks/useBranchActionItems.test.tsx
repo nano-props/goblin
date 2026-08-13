@@ -153,6 +153,7 @@ function repo(branch: BranchSnapshotInfo, withWorktree: boolean): BranchActionRe
               head: { kind: 'branch', branchName: branch.name },
               headOid: 'a'.repeat(40),
               operation: null,
+              materializedBranch: branch.name,
               isPrimary: false,
               isLocked: false,
             },

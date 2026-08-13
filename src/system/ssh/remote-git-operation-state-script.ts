@@ -8,6 +8,6 @@ function loadRemoteGitOperationStateScript(): string {
   return cachedScript
 }
 
-export function remoteGitOperationStateScript(repoPath: string): string {
-  return `exec bash -c ${shellQuote(loadRemoteGitOperationStateScript())} -- ${shellQuote(repoPath)}`
+export function remoteGitOperationStateScript(repoPath: string, attachedBranch: string | null): string {
+  return `exec bash -c ${shellQuote(loadRemoteGitOperationStateScript())} -- ${shellQuote(repoPath)} ${shellQuote(attachedBranch ?? '')}`
 }

@@ -137,6 +137,51 @@ describe('repo response schemas', () => {
     ).toBe(false)
   })
 
+  test('rejects invalid worktree branch ownership', () => {
+    const branch = {
+      name: 'main',
+      isCurrent: true,
+      ahead: 0,
+      behind: 0,
+      lastCommitHash: 'abcdef1234567890',
+      lastCommitShortHash: 'abcdef1',
+      lastCommitMessage: 'Initial commit',
+      lastCommitDate: '2026-01-01T00:00:00.000Z',
+      lastCommitAuthor: 'Example Author',
+    }
+    const remote = {
+      remotes: [],
+      hasRemotes: false,
+      hasBrowserRemote: false,
+      remoteProviders: {},
+      hasGitHubRemote: false,
+    }
+    const worktree = {
+      path: '/workspace',
+      head: { kind: 'branch' as const, branchName: 'main' },
+      headOid: 'abcdef1234567890',
+      operation: null,
+      materializedBranch: 'main',
+      isPrimary: true,
+      isLocked: false,
+    }
+    const parses = (worktrees: unknown[]) =>
+      v.safeParse(RepoSnapshotResponseSchema, {
+        snapshot: { branches: [branch], worktrees, current: 'main', remote },
+      }).success
+
+    expect(parses([worktree])).toBe(true)
+    expect(parses([{ ...worktree, materializedBranch: null }])).toBe(false)
+    expect(parses([{ ...worktree, materializedBranch: 'other' }])).toBe(false)
+    expect(parses([{ ...worktree, head: { kind: 'detached' }, materializedBranch: 'unsafe branch' }])).toBe(false)
+    expect(
+      parses([
+        worktree,
+        { ...worktree, path: '/workspace/linked', head: { kind: 'detached' }, materializedBranch: 'main' },
+      ]),
+    ).toBe(false)
+  })
+
   test('rejects extra pull-request response fields', () => {
     expect(v.safeParse(RepoPullRequestsResponseSchema, { pullRequests: [], requested: ['main'] }).success).toBe(false)
   })

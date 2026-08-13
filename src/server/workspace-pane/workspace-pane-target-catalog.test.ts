@@ -13,6 +13,7 @@ describe('WorkspacePaneTargetCatalog', () => {
         worktreePath: '/repo',
         head: { kind: 'branch' as const, branchName: 'main' },
         operation: null,
+        materializedBranch: 'main',
       },
       { kind: 'git-branch' as const, branchName: 'feature/no-worktree' },
     ])
@@ -73,7 +74,13 @@ describe('WorkspacePaneTargetCatalog', () => {
     const catalog = new WorkspacePaneTargetCatalog({
       hasGitCapability: () => true,
       readIdentities: async () => [
-        { kind: 'git-worktree', worktreePath: '/repo', head: { kind: 'detached' }, operation: null },
+        {
+          kind: 'git-worktree',
+          worktreePath: '/repo',
+          head: { kind: 'detached' },
+          operation: null,
+          materializedBranch: null,
+        },
       ],
     })
     await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
@@ -107,7 +114,8 @@ describe('WorkspacePaneTargetCatalog', () => {
           kind: 'git-worktree',
           worktreePath: '/repo',
           head: { kind: 'detached' },
-          operation: { kind, branchName: 'feature/in-progress' },
+          operation: { kind },
+          materializedBranch: 'feature/in-progress',
         },
       ],
     })

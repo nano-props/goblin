@@ -35,7 +35,7 @@ import {
   workspacePaneTabItems,
 } from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import type { WorkspacePaneModelTarget, WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import type { WorkspacePaneTabsReorderMutationInput } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
@@ -325,7 +325,7 @@ function tabsMutationInput(
 }
 
 function requiredWorkspacePaneModelTarget(
-  target: WorkspacePaneTabModel['routeTarget'],
+  target: WorkspacePaneModelTarget,
   role: 'route' | 'persistence',
 ): WorkspacePaneTabsTarget {
   if (target.kind === 'inactive') throw new Error(`inactive workspace pane has no ${role} target`)

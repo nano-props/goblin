@@ -179,6 +179,7 @@ describe('workspace pane command target', () => {
           head: { kind: 'branch', branchName: 'feature/status' },
           headOid: '1111111111111111111111111111111111111111',
           operation: null,
+          materializedBranch: 'feature/status',
           isPrimary: false,
           isLocked: false,
         },

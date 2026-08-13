@@ -187,6 +187,7 @@ describe('client effect intent plans', () => {
             head: { kind: 'detached' },
             headOid: '0123456789abcdef',
             operation: null,
+            materializedBranch: null,
             isPrimary: false,
             isLocked: false,
           },

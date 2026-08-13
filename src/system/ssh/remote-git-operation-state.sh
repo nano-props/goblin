@@ -3,6 +3,7 @@
 set -euo pipefail
 
 REPO_PATH=$1
+ATTACHED_BRANCH=$2
 cd -- "$REPO_PATH"
 
 GIT_PATH_OUTPUT=$(git rev-parse \
@@ -30,37 +31,37 @@ BISECT_LOG=${GIT_PATHS[4]}
 BISECT_START=${GIT_PATHS[5]}
 MERGE_HEAD=${GIT_PATHS[6]}
 
+REBASE_DIRECTORY=
 if [ -d "$REBASE_MERGE" ]; then
-  printf 'rebase\n'
-  [ ! -f "$REBASE_MERGE/head-name" ] || cat "$REBASE_MERGE/head-name"
-  exit 0
+  REBASE_DIRECTORY=$REBASE_MERGE
+elif [ -d "$REBASE_APPLY" ]; then
+  REBASE_DIRECTORY=$REBASE_APPLY
 fi
 
-if [ -d "$REBASE_APPLY" ]; then
-  printf 'rebase\n'
-  [ ! -f "$REBASE_APPLY/head-name" ] || cat "$REBASE_APPLY/head-name"
-  exit 0
+if [ -n "$REBASE_DIRECTORY" ]; then
+  OPERATION=rebase
+elif [ -e "$CHERRY_PICK_HEAD" ]; then
+  OPERATION=cherry-pick
+elif [ -e "$REVERT_HEAD" ]; then
+  OPERATION=revert
+elif [ -e "$MERGE_HEAD" ]; then
+  OPERATION=merge
+elif [ -e "$BISECT_LOG" ]; then
+  OPERATION=bisect
+else
+  OPERATION=none
 fi
 
-if [ -e "$CHERRY_PICK_HEAD" ]; then
-  printf 'cherry-pick\n'
-  exit 0
+MATERIALIZED_BRANCH=$ATTACHED_BRANCH
+if [ -z "$MATERIALIZED_BRANCH" ] && [ -n "$REBASE_DIRECTORY" ] && [ -f "$REBASE_DIRECTORY/head-name" ]; then
+  MATERIALIZED_BRANCH=$(<"$REBASE_DIRECTORY/head-name")
+elif [ -z "$MATERIALIZED_BRANCH" ] && [ -e "$BISECT_LOG" ] && [ -f "$BISECT_START" ]; then
+  MATERIALIZED_BRANCH=$(<"$BISECT_START")
 fi
 
-if [ -e "$REVERT_HEAD" ]; then
-  printf 'revert\n'
-  exit 0
+printf 'operation %s\n' "$OPERATION"
+if [ -n "$MATERIALIZED_BRANCH" ]; then
+  printf 'materialized-branch %s\n' "$MATERIALIZED_BRANCH"
+else
+  printf 'materialized-branch\n'
 fi
-
-if [ -e "$BISECT_LOG" ]; then
-  printf 'bisect\n'
-  [ ! -f "$BISECT_START" ] || cat "$BISECT_START"
-  exit 0
-fi
-
-if [ -e "$MERGE_HEAD" ]; then
-  printf 'merge\n'
-  exit 0
-fi
-
-printf 'none\n'

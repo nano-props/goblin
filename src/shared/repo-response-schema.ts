@@ -2,6 +2,7 @@ import * as v from 'valibot'
 import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import { ExecResultResponseSchema, WorktreeBootstrapSummaryResponseSchema } from '#/shared/http-response-schema.ts'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
+import { isSafeBranchName } from '#/shared/refnames.ts'
 
 const StringArraySchema = v.array(v.string())
 const NullableNumberSchema = v.nullable(v.number())
@@ -71,13 +72,13 @@ const GitHeadSchema = v.variant('kind', [
   v.strictObject({ kind: v.literal('detached') }),
 ])
 const GitOperationSchema = v.variant('kind', [
-  v.strictObject({ kind: v.literal('rebase'), branchName: v.nullable(v.string()) }),
+  v.strictObject({ kind: v.literal('rebase') }),
   v.strictObject({ kind: v.literal('merge') }),
   v.strictObject({ kind: v.literal('cherry-pick') }),
   v.strictObject({ kind: v.literal('revert') }),
-  v.strictObject({ kind: v.literal('bisect'), branchName: v.nullable(v.string()) }),
+  v.strictObject({ kind: v.literal('bisect') }),
 ])
-const RepoSnapshotSchema = v.strictObject({
+const RepoSnapshotObjectSchema = v.strictObject({
   branches: v.array(BranchSnapshotSchema),
   worktrees: v.array(
     v.strictObject({
@@ -85,6 +86,7 @@ const RepoSnapshotSchema = v.strictObject({
       head: GitHeadSchema,
       headOid: v.string(),
       operation: v.nullable(GitOperationSchema),
+      materializedBranch: v.nullable(v.string()),
       isPrimary: v.boolean(),
       isLocked: v.boolean(),
     }),
@@ -93,9 +95,24 @@ const RepoSnapshotSchema = v.strictObject({
   currentHEAD: v.optional(v.string()),
   remote: RepoRemoteInfoSchema,
 })
+const RepoSnapshotSchema = v.pipe(
+  RepoSnapshotObjectSchema,
+  v.check(hasValidWorktreeBranchOwnership, 'invalid worktree branch ownership'),
+)
 export const RepoSnapshotResponseSchema = v.strictObject({
   snapshot: RepoSnapshotSchema,
 })
+
+function hasValidWorktreeBranchOwnership(snapshot: v.InferOutput<typeof RepoSnapshotObjectSchema>): boolean {
+  const materializedBranches = new Set<string>()
+  return snapshot.worktrees.every((worktree) => {
+    const branchName = worktree.materializedBranch
+    if (branchName !== null && (!isSafeBranchName(branchName) || materializedBranches.has(branchName))) return false
+    if (worktree.head.kind === 'branch' && branchName !== worktree.head.branchName) return false
+    if (branchName !== null) materializedBranches.add(branchName)
+    return true
+  })
+}
 export const RepoPullRequestsResponseSchema = v.strictObject({
   pullRequests: v.nullable(v.array(v.strictObject({ branch: v.string(), pullRequest: PullRequestSchema }))),
 })

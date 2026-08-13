@@ -43,7 +43,7 @@ interface WorkspacePaneTabsQueryWorkspaceState {
 
 interface ClientWorkspaceGitTargets {
   branches: ReadonlyArray<{ name: string }>
-  worktrees: ReadonlyArray<Pick<RepoWorktreeSnapshot, 'path' | 'head' | 'operation'>>
+  worktrees: ReadonlyArray<Pick<RepoWorktreeSnapshot, 'path' | 'head' | 'materializedBranch'>>
 }
 
 interface ClientWorkspaceTargetProjection {

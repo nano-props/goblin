@@ -162,6 +162,7 @@ export function createRepoWorktreeSnapshotForTest(
     head: { kind: 'branch', branchName },
     headOid: '',
     operation: null,
+    materializedBranch: branchName,
     isPrimary: false,
     isLocked: false,
     ...options,

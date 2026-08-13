@@ -606,6 +606,7 @@ describe('workspace pane tab close action', () => {
           head: { kind: 'detached' },
           headOid: '1111111111111111111111111111111111111111',
           operation: null,
+          materializedBranch: null,
           isPrimary: false,
           isLocked: false,
         },

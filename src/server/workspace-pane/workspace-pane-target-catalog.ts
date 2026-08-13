@@ -8,7 +8,13 @@ import { repoWorktreeMaterializedBranch, type GitOperation } from '#/shared/git-
 
 type WorkspacePaneCatalogIdentity =
   | { kind: 'git-branch'; branchName: string }
-  | { kind: 'git-worktree'; worktreePath: string; head: GitHead; operation: GitOperation | null }
+  | {
+      kind: 'git-worktree'
+      worktreePath: string
+      head: GitHead
+      operation: GitOperation | null
+      materializedBranch: string | null
+    }
 
 interface WorkspacePaneTargetCatalogDependencies {
   hasGitCapability(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean

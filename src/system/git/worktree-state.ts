@@ -13,8 +13,14 @@ const GIT_OPERATION_PATHS = [
   'CHERRY_PICK_HEAD',
   'REVERT_HEAD',
   'BISECT_LOG',
+  'BISECT_START',
   'MERGE_HEAD',
 ] as const
+
+interface GitWorktreeState {
+  operation: GitOperation | null
+  materializedBranch: string | null
+}
 
 export async function readRepoWorktreeSnapshots(
   worktrees: readonly WorktreeInfo[],
@@ -32,33 +38,50 @@ async function readRepoWorktreeSnapshot(worktree: WorktreeInfo, signal?: AbortSi
   if (worktree.isPrunable || !worktree.headOid) {
     throw new Error('Git returned an incomplete worktree identity')
   }
+  const head = gitHead(worktree.branch ?? null)
+  const state = await readGitWorktreeState(worktree.path, signal)
   return {
     path: worktree.path,
-    head: gitHead(worktree.branch ?? null),
+    head,
     headOid: worktree.headOid,
-    operation: await readGitOperation(worktree.path, signal),
+    operation: state.operation,
+    materializedBranch: head.kind === 'branch' ? head.branchName : state.materializedBranch,
     isPrimary: worktree.isPrimary,
     isLocked: worktree.isLocked ?? false,
   }
 }
 
-export async function readGitOperation(cwd: string, signal?: AbortSignal): Promise<GitOperation | null> {
+export async function readGitWorktreeState(cwd: string, signal?: AbortSignal): Promise<GitWorktreeState> {
   const paths = await resolveGitPaths(cwd, signal)
   signal?.throwIfAborted()
-  const [rebaseMergePath, rebaseApplyPath, cherryPickPath, revertPath, bisectPath, mergePath] = paths
+  const [rebaseMergePath, rebaseApplyPath, cherryPickPath, revertPath, bisectPath, bisectStartPath, mergePath] = paths
   const rebasePath = (await pathExists(rebaseMergePath))
     ? rebaseMergePath
     : (await pathExists(rebaseApplyPath))
       ? rebaseApplyPath
       : null
-  if (rebasePath) return { kind: 'rebase', branchName: await readRebaseBranchName(rebasePath) }
-  if (await pathExists(cherryPickPath)) return { kind: 'cherry-pick' }
-  if (await pathExists(revertPath)) return { kind: 'revert' }
-  if (await pathExists(bisectPath)) {
-    return { kind: 'bisect', branchName: await readBisectBranchName(path.dirname(bisectPath)) }
+  const [rebaseBranch, bisectActive, cherryPickActive, revertActive, mergeActive] = await Promise.all([
+    rebasePath ? readRebaseBranchName(rebasePath) : null,
+    pathExists(bisectPath),
+    pathExists(cherryPickPath),
+    pathExists(revertPath),
+    pathExists(mergePath),
+  ])
+  const operation: GitOperation | null = rebasePath
+    ? { kind: 'rebase' }
+    : cherryPickActive
+      ? { kind: 'cherry-pick' }
+      : revertActive
+        ? { kind: 'revert' }
+        : mergeActive
+          ? { kind: 'merge' }
+          : bisectActive
+            ? { kind: 'bisect' }
+            : null
+  return {
+    operation,
+    materializedBranch: rebaseBranch ?? (bisectActive ? await readBisectBranchName(bisectStartPath) : null),
   }
-  if (await pathExists(mergePath)) return { kind: 'merge' }
-  return null
 }
 
 async function resolveGitPaths(cwd: string, signal?: AbortSignal): Promise<string[]> {
@@ -94,9 +117,9 @@ async function readRebaseBranchName(rebasePath: string): Promise<string | null> 
   }
 }
 
-async function readBisectBranchName(gitStateDirectory: string): Promise<string | null> {
+async function readBisectBranchName(bisectStartPath: string): Promise<string | null> {
   try {
-    return parseOperationBranchName((await readFile(path.join(gitStateDirectory, 'BISECT_START'), 'utf8')).trim())
+    return parseOperationBranchName((await readFile(bisectStartPath, 'utf8')).trim())
   } catch (error) {
     if (isMissingPathError(error)) return null
     throw error

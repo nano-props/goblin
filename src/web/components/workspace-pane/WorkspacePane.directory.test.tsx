@@ -71,6 +71,7 @@ function detachedWorktreeSnapshot(path: string) {
     head: { kind: 'detached' as const },
     headOid: '1111111111111111111111111111111111111111',
     operation: null,
+    materializedBranch: null,
     isPrimary: false,
     isLocked: false,
   }
@@ -351,7 +352,8 @@ describe('WorkspacePane directory workspaces', () => {
             path: worktreePath,
             head: { kind: 'detached' },
             headOid: '2222222222222222222222222222222222222222',
-            operation: { kind: 'rebase', branchName },
+            operation: { kind: 'rebase' },
+            materializedBranch: branchName,
             isPrimary: false,
             isLocked: false,
           },

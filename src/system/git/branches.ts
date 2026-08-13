@@ -127,7 +127,6 @@ async function getMergedBranchNames(
 /** Authoritative branch projection read. Optional display enrichments may degrade, but membership may not. */
 export async function getBranches(
   cwd: string,
-  worktrees: WorktreeInfo[] | undefined,
   currentBranch: string | null,
   options?: { signal?: AbortSignal },
 ): Promise<BranchSnapshotInfo[]> {
@@ -162,12 +161,13 @@ export type BranchWorktreeIdentity =
       worktreePath: string
       head: RepoWorktreeSnapshot['head']
       operation: RepoWorktreeSnapshot['operation']
+      materializedBranch: RepoWorktreeSnapshot['materializedBranch']
     }
 
 /** Strict, display-free branch membership read for admission/catalog paths. */
 export async function getBranchWorktreeIdentities(
   cwd: string,
-  worktrees: ReadonlyArray<Pick<RepoWorktreeSnapshot, 'path' | 'head' | 'operation'>>,
+  worktrees: ReadonlyArray<Pick<RepoWorktreeSnapshot, 'path' | 'head' | 'operation' | 'materializedBranch'>>,
   options?: { signal?: AbortSignal },
 ): Promise<BranchWorktreeIdentity[]> {
   const output = await git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'], {
@@ -190,6 +190,7 @@ export async function getBranchWorktreeIdentities(
       worktreePath: worktree.path,
       head: worktree.head,
       operation: worktree.operation,
+      materializedBranch: worktree.materializedBranch,
     })),
     ...branches
       .filter((branch) => !materializedBranches.has(branch))

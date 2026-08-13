@@ -82,8 +82,8 @@ export function worktreePresentationLabel(worktree: RepoWorktreeSnapshot, t: Tra
   const operation = worktree.operation
   if (!operation) return t('worktree-state.detached')
   if (operation.kind === 'rebase') {
-    return operation.branchName
-      ? t('worktree-state.rebase-branch', { branch: operation.branchName })
+    return worktree.materializedBranch
+      ? t('worktree-state.rebase-branch', { branch: worktree.materializedBranch })
       : t('worktree-state.rebase')
   }
   const operationKey = WORKTREE_OPERATION_KEYS[operation.kind]

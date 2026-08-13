@@ -7,11 +7,7 @@ import type { WorktreeBootstrapSummary } from '#/shared/worktree-bootstrap-summa
 import type { GitHead } from '#/shared/git-head.ts'
 
 export type GitOperation =
-  | { kind: 'rebase'; branchName: string | null }
-  | { kind: 'merge' }
-  | { kind: 'cherry-pick' }
-  | { kind: 'revert' }
-  | { kind: 'bisect'; branchName: string | null }
+  { kind: 'rebase' } | { kind: 'merge' } | { kind: 'cherry-pick' } | { kind: 'revert' } | { kind: 'bisect' }
 
 /** Complete repository worktree membership, independent of branch rows. */
 export interface RepoWorktreeSnapshot {
@@ -19,6 +15,7 @@ export interface RepoWorktreeSnapshot {
   head: GitHead
   headOid: string
   operation: GitOperation | null
+  materializedBranch: string | null
   isPrimary: boolean
   isLocked: boolean
 }
@@ -39,7 +36,7 @@ export interface BranchSnapshotInfo {
   mergedToDefault?: boolean
 }
 
-export function repoWorktreeForBranch<T extends Pick<RepoWorktreeSnapshot, 'head' | 'operation'>>(
+export function repoWorktreeForBranch<T extends Pick<RepoWorktreeSnapshot, 'head' | 'materializedBranch'>>(
   worktrees: readonly T[],
   branchName: string,
 ): T | undefined {
@@ -47,11 +44,15 @@ export function repoWorktreeForBranch<T extends Pick<RepoWorktreeSnapshot, 'head
 }
 
 export function repoWorktreeMaterializedBranch(
-  worktree: Pick<RepoWorktreeSnapshot, 'head' | 'operation'>,
+  worktree: Pick<RepoWorktreeSnapshot, 'head' | 'materializedBranch'>,
 ): string | null {
-  if (worktree.head.kind === 'branch') return worktree.head.branchName
-  const operation = worktree.operation
-  return operation?.kind === 'rebase' || operation?.kind === 'bisect' ? operation.branchName : null
+  if (worktree.head.kind === 'branch') {
+    if (worktree.materializedBranch !== worktree.head.branchName) {
+      throw new Error('Attached worktree materialized branch does not match HEAD')
+    }
+    return worktree.head.branchName
+  }
+  return worktree.materializedBranch
 }
 
 export interface PullRequestInfo {

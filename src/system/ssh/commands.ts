@@ -42,7 +42,7 @@ export type RemoteCommandKind =
   | { type: 'gitLocalBranches'; path: string }
   | { type: 'gitPatch'; path: string }
   | { type: 'gitWorktreeList'; path: string }
-  | { type: 'gitOperationState'; path: string }
+  | { type: 'gitOperationState'; path: string; attachedBranch: string | null }
   | { type: 'gitStatus'; path: string }
   | { type: 'gitLog'; path: string; branch: string; count?: number; skip?: number }
   | { type: 'gitFetchRemote'; path: string; remote: string }
@@ -377,7 +377,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
     case 'gitWorktreeList':
       return `git -C ${shellQuote(command.path)} worktree list --porcelain -z`
     case 'gitOperationState':
-      return remoteGitOperationStateScript(command.path)
+      return remoteGitOperationStateScript(command.path, command.attachedBranch)
     case 'gitStatus':
       return `git -C ${shellQuote(command.path)} status --porcelain -z`
     case 'gitLog': {

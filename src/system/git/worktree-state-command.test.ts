@@ -8,7 +8,7 @@ beforeEach(() => {
   mocks.git.mockReset()
 })
 
-describe('readGitOperation administrative paths', () => {
+describe('readGitWorktreeState administrative paths', () => {
   test('resolves every operation marker with one Git invocation', async () => {
     mocks.git.mockResolvedValueOnce(
       [
@@ -17,12 +17,13 @@ describe('readGitOperation administrative paths', () => {
         '.git/CHERRY_PICK_HEAD',
         '.git/REVERT_HEAD',
         '.git/BISECT_LOG',
+        '.git/BISECT_START',
         '.git/MERGE_HEAD',
       ].join('\n'),
     )
-    const { readGitOperation } = await import('#/system/git/worktree-state.ts')
+    const { readGitWorktreeState } = await import('#/system/git/worktree-state.ts')
 
-    await expect(readGitOperation('/repo')).resolves.toBeNull()
+    await expect(readGitWorktreeState('/repo')).resolves.toEqual({ operation: null, materializedBranch: null })
     expect(mocks.git).toHaveBeenCalledOnce()
     expect(mocks.git).toHaveBeenCalledWith(
       '/repo',
@@ -39,6 +40,8 @@ describe('readGitOperation administrative paths', () => {
         '--git-path',
         'BISECT_LOG',
         '--git-path',
+        'BISECT_START',
+        '--git-path',
         'MERGE_HEAD',
       ],
       { signal: undefined },
@@ -47,15 +50,15 @@ describe('readGitOperation administrative paths', () => {
 
   test('rejects incomplete administrative path output', async () => {
     mocks.git.mockResolvedValueOnce(['.git/rebase-merge', '.git/rebase-apply', '.git/CHERRY_PICK_HEAD'].join('\n'))
-    const { readGitOperation } = await import('#/system/git/worktree-state.ts')
+    const { readGitWorktreeState } = await import('#/system/git/worktree-state.ts')
 
-    await expect(readGitOperation('/repo')).rejects.toThrow('Git returned 3 administrative paths; expected 6')
+    await expect(readGitWorktreeState('/repo')).rejects.toThrow('Git returned 3 administrative paths; expected 7')
   })
 
   test('preserves Git command failures', async () => {
     mocks.git.mockRejectedValueOnce(new Error('rev-parse failed'))
-    const { readGitOperation } = await import('#/system/git/worktree-state.ts')
+    const { readGitWorktreeState } = await import('#/system/git/worktree-state.ts')
 
-    await expect(readGitOperation('/repo')).rejects.toThrow('rev-parse failed')
+    await expect(readGitWorktreeState('/repo')).rejects.toThrow('rev-parse failed')
   })
 })
