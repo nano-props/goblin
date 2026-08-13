@@ -66,7 +66,7 @@ export interface WorkspacePaneRuntimeTabCommandContext {
 }
 
 export interface WorkspacePaneTerminalRuntimeCommandOptions {
-  workspaceId: WorkspaceId | null
+  currentWorkspaceId: WorkspaceId | null
   target: FilesystemWorkspacePaneCommandTarget
   navigation: FilesystemWorkspacePaneRouteCommitActions & CreatedTerminalNavigation
   t?: TerminalCreateTranslator
@@ -107,7 +107,8 @@ const WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE: Record<
 export async function dispatchTerminalRuntimePrimaryAction(
   options: WorkspacePaneTerminalRuntimeCommandOptions,
 ): Promise<boolean> {
-  if (!options.workspaceId || options.workspaceId !== options.target.filesystemTarget.workspaceId) return false
+  const currentWorkspaceId = options.currentWorkspaceId
+  if (!currentWorkspaceId || currentWorkspaceId !== options.target.filesystemTarget.workspaceId) return false
   const context = terminalRuntimeTabActionContext(options)
   return await runWorkspacePaneRuntimePrimaryAction('terminal', context)
 }
@@ -115,7 +116,8 @@ export async function dispatchTerminalRuntimePrimaryAction(
 export async function dispatchNewTerminalRuntimeTabAction(
   options: WorkspacePaneTerminalRuntimeCommandOptions,
 ): Promise<boolean> {
-  if (!options.workspaceId || options.workspaceId !== options.target.filesystemTarget.workspaceId) return false
+  const currentWorkspaceId = options.currentWorkspaceId
+  if (!currentWorkspaceId || currentWorkspaceId !== options.target.filesystemTarget.workspaceId) return false
   const context = terminalRuntimeTabActionContext(options)
   return await runWorkspacePaneRuntimeNewAction('terminal', context)
 }

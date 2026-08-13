@@ -540,7 +540,7 @@ describe('workspace pane runtime tab command actions', () => {
     try {
       await expect(
         run({
-          workspaceId: canonicalWorkspaceLocator('goblin+file:///different-workspace')!,
+          currentWorkspaceId: canonicalWorkspaceLocator('goblin+file:///different-workspace')!,
           target: {
             filesystemTarget: gitWorktreePaneFilesystemTarget({
               workspaceId: terminalBase.target.workspaceId,

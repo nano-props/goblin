@@ -162,7 +162,7 @@ export async function runTerminalPrimaryActionCommand(options: TerminalPrimaryAc
   if (!workspacePaneCommandTargetHasFilesystem(target)) return false
   return await dispatchTerminalRuntimePrimaryAction({
     target,
-    workspaceId: options.workspaceId,
+    currentWorkspaceId: options.workspaceId,
     navigation: options.navigation,
     t: options.t,
   })
@@ -173,7 +173,7 @@ export async function runNewTerminalTabCommand(options: NewTerminalTabCommandOpt
   if (!workspacePaneCommandTargetHasFilesystem(target)) return false
   return await dispatchNewTerminalRuntimeTabAction({
     target,
-    workspaceId: options.workspaceId,
+    currentWorkspaceId: options.workspaceId,
     navigation: options.navigation,
     t: options.t,
   })
