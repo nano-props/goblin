@@ -12,6 +12,15 @@ afterEach(async () => {
 })
 
 describe('remote Git operation state script', () => {
+  test('fails when Git cannot resolve administrative paths', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'goblin remote operation failure '))
+    tempDirectories.push(directory)
+
+    const result = await execa('sh', ['-c', remoteGitOperationStateScript(directory, null)], { reject: false })
+
+    expect(result.exitCode).not.toBe(0)
+  })
+
   test('reads operation markers from a safely quoted repository path', async () => {
     const parent = await mkdtemp(path.join(os.tmpdir(), 'goblin remote operation '))
     tempDirectories.push(parent)

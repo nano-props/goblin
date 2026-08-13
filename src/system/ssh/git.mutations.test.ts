@@ -24,7 +24,13 @@ import {
 describe('remote git mutations', () => {
   test('deleteRemoteBranch allows safe delete when branch is merged into current HEAD without upstream', async () => {
     const run = vi.fn<RemoteGitRunner>(
-      async (command: { type: string; ancestor?: string; descendant?: string; branch?: string }) => {
+      async (command: {
+        type: string
+        ancestor?: string
+        descendant?: string
+        branch?: string
+        attachedBranch?: string | null
+      }) => {
         switch (command.type) {
           case 'gitSnapshot':
             return okRemoteResult(
@@ -40,6 +46,8 @@ describe('remote git mutations', () => {
             )
           case 'gitWorktreeList':
             return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+          case 'gitOperationState':
+            return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
           case 'gitStatus':
             return okRemoteResult('')
           case 'gitRemoteVerbose':
@@ -86,6 +94,8 @@ describe('remote git mutations', () => {
           )
         case 'gitWorktreeList':
           return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+        case 'gitOperationState':
+          return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitUpstream':
           return okRemoteResult(upstreamOutput('origin', 'feature/test', ''))
         case 'gitIsAncestor':
@@ -124,6 +134,8 @@ describe('remote git mutations', () => {
           )
         case 'gitWorktreeList':
           return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+        case 'gitOperationState':
+          return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitUpstream':
           return okRemoteResult(NUL.repeat(3))
         case 'gitIsAncestor':
@@ -166,7 +178,7 @@ describe('remote git mutations', () => {
       },
     },
   ] as const)('deleteRemoteBranch $name', async ({ remote, upstreamBranch, pushResult, expected }) => {
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command: { type: string; attachedBranch?: string | null }) => {
       switch (command.type) {
         case 'gitSnapshot':
           return okRemoteResult(
@@ -182,6 +194,8 @@ describe('remote git mutations', () => {
           )
         case 'gitWorktreeList':
           return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\nbranch refs/heads/release/1.0'))
+        case 'gitOperationState':
+          return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitStatus':
           return okRemoteResult('')
         case 'gitIsAncestor':
