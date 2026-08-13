@@ -10,7 +10,7 @@ import { setTerminalSessionCommandBridge } from '#/web/components/terminal/termi
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
-import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import {
@@ -370,6 +370,74 @@ describe('createAppNavigationActions presentation', () => {
       presentationOptions({ replace: true }),
     )
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
+  })
+
+  test('selects a materialized branch through its active worktree terminal route', () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
+      currentBranchName: BRANCH_NAME,
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        [BRANCH_NAME]: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+      },
+    })
+    const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, WORKTREE_PATH)
+    workspacesStore.getState().setSelectedTerminal(terminalFilesystemTargetKey, terminalSessionId)
+    setTerminalSessionCommandBridge({
+      terminalFilesystemTargetSnapshot: () => ({
+        terminalFilesystemTargetKey,
+        selectedDescriptor: null,
+        sessions: [
+          {
+            type: 'terminal',
+            terminalSessionId,
+            terminalFilesystemTargetKey,
+            index: 1,
+            title: 'terminal 1',
+            phase: 'open',
+            selected: true,
+            hasBell: false,
+            hasRecentOutput: false,
+          },
+        ],
+        count: 1,
+        bellCount: 0,
+        outputActiveCount: 0,
+        createPending: false,
+      }),
+      createTerminal: vi.fn(async () => terminalSessionId),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
+      selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
+    })
+    const navigation = routeNavigation()
+    navigation.openRepoWorktreeTerminal = vi.fn((_repoId, _worktreePath, _terminalSessionId, options) => {
+      options?.onCommit?.()
+      return true
+    })
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.selectRepoBranch(REPO_ID, BRANCH_NAME, { replace: true })
+
+    expect(navigation.openRepoWorktreeTerminal).toHaveBeenCalledWith(
+      REPO_ID,
+      WORKTREE_PATH,
+      terminalSessionId,
+      presentationOptions({ replace: true }),
+    )
+    expect(navigation.openRepoBranch).not.toHaveBeenCalled()
+    expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
   })
 
   test('opens the branch root while workspace pane tabs are still loading', () => {
