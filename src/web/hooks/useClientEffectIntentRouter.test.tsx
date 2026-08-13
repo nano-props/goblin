@@ -938,6 +938,8 @@ const HookHost = defineComponent({
 
 function currentWorkspacePaneCommandTarget(): WorkspacePaneCommandTarget | null {
   if (!currentBranchName || !currentWorkspaceId) return null
+  const workspace = workspacesStore.getState().workspaces[currentWorkspaceId]
+  if (!workspace) return null
   if (currentFilesystemTarget?.kind === 'git-worktree') {
     return {
       workspacePaneRoute: currentWorkspacePaneRoute,
@@ -949,6 +951,7 @@ function currentWorkspacePaneCommandTarget(): WorkspacePaneCommandTarget | null 
   }
   return {
     routeTarget: { kind: 'git-branch', workspaceId: currentWorkspaceId, branchName: currentBranchName },
+    workspaceRuntimeId: workspace.workspaceRuntimeId,
     workspacePaneRoute: currentWorkspacePaneRoute,
     filesystemTarget: null,
   }

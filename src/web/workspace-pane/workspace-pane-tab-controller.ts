@@ -85,7 +85,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   if (!fromRoute) return null
   const toRoute = input.nextEntry ? workspacePaneControllerRouteForEntry(input.nextEntry) : null
   if (toRoute === undefined) return null
-  if (input.target.routeTarget.kind === 'inactive') return null
+  if (!workspacePaneTabControllerTargetIsCurrent(input.target)) return null
   const navigationGeneration = input.navigationGeneration ?? beginAppNavigation()
   const target: WorkspacePaneControllerTarget = {
     workspaceId: input.target.workspaceId,
@@ -118,8 +118,17 @@ export async function selectWorkspacePaneControllerTab(
   navigation: FilesystemWorkspacePaneRouteCommitActions,
   options: SelectWorkspacePaneControllerTabOptions = {},
 ): Promise<boolean> {
-  const navigationGeneration = options.navigationGeneration ?? beginAppNavigation()
   const providedFocusEffects = options.focusEffects
+  if (!workspacePaneTabControllerTargetIsCurrent(target) || tab.kind === 'pending') {
+    providedFocusEffects?.onAbandon()
+    return false
+  }
+  const route = workspacePaneControllerRouteForTab(tab)
+  if (route === undefined) {
+    providedFocusEffects?.onAbandon()
+    return false
+  }
+  const navigationGeneration = options.navigationGeneration ?? beginAppNavigation()
   if (!appNavigationIsCurrent(navigationGeneration)) {
     providedFocusEffects?.onAbandon()
     return false
@@ -128,15 +137,6 @@ export async function selectWorkspacePaneControllerTab(
     isWorkspacePaneRuntimeTab(tab) && tab.runtimeType === 'terminal'
       ? (providedFocusEffects ?? claimTerminalPresentationFocus(navigationGeneration, tab.sessionId))
       : null
-  if (!workspacePaneTabControllerTargetIsCurrent(target) || tab.kind === 'pending') {
-    focusEffects?.onAbandon()
-    return false
-  }
-  const route = workspacePaneControllerRouteForTab(tab)
-  if (route === undefined) {
-    focusEffects?.onAbandon()
-    return false
-  }
   return await commitWorkspacePaneControllerTargetRoute(
     target,
     route,
@@ -151,25 +151,23 @@ export async function selectWorkspacePaneControllerTabEntry(
   target: WorkspacePaneTabModel,
   entry: WorkspacePaneTabEntry,
   navigation: FilesystemWorkspacePaneRouteCommitActions,
-  navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
+  navigationGeneration?: AppNavigationGeneration,
 ): Promise<boolean> {
-  if (!appNavigationIsCurrent(navigationGeneration)) return false
   const materialized = target.tabs.find((tab) => tab.identity === workspacePaneTabEntryIdentity(entry))
   if (materialized) {
     return await selectWorkspacePaneControllerTab(target, materialized, navigation, { navigationGeneration })
   }
   if (!isWorkspacePaneRuntimeTabEntry(entry) || entry.type !== 'terminal') return false
-  const focusEffects = claimTerminalPresentationFocus(navigationGeneration, entry.runtimeSessionId)
-  if (!workspacePaneTabControllerTargetIsCurrent(target)) {
-    focusEffects?.onAbandon()
-    return false
-  }
+  if (!workspacePaneTabControllerTargetIsCurrent(target)) return false
+  const admittedNavigationGeneration = navigationGeneration ?? beginAppNavigation()
+  if (!appNavigationIsCurrent(admittedNavigationGeneration)) return false
+  const focusEffects = claimTerminalPresentationFocus(admittedNavigationGeneration, entry.runtimeSessionId)
   return await commitWorkspacePaneControllerTargetRoute(
     target,
     { kind: 'terminal', terminalSessionId: entry.runtimeSessionId },
     navigation,
     focusEffects ?? undefined,
-    navigationGeneration,
+    admittedNavigationGeneration,
   )
 }
 
@@ -264,8 +262,12 @@ export async function commitWorkspacePaneCurrentTargetRoute(
   route: BranchWorkspacePaneRouteTarget,
   navigation: WorkspacePaneRouteCommitActions,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
-  navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
+  navigationGeneration?: AppNavigationGeneration,
 ): Promise<boolean> {
+  if (!target.branchName || !workspacePaneTabControllerTargetIsCurrent(target)) {
+    options?.onAbandon?.()
+    return false
+  }
   return await commitWorkspacePaneValidatedTargetRoute(
     target,
     route,
@@ -274,7 +276,7 @@ export async function commitWorkspacePaneCurrentTargetRoute(
     commitWorkspacePaneRouteSupplement,
     { routePrecondition: { kind: 'current-workspace-target' } },
     options,
-    navigationGeneration,
+    navigationGeneration ?? beginAppNavigation(),
   )
 }
 
@@ -333,8 +335,12 @@ export async function commitWorkspacePaneExactTargetRoute(
   route: BranchWorkspacePaneRouteTarget,
   navigation: WorkspacePaneRouteCommitActions,
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
-  navigationGeneration: AppNavigationGeneration = beginAppNavigation(),
+  navigationGeneration?: AppNavigationGeneration,
 ): Promise<boolean> {
+  if (!target.branchName || !workspacePaneTabControllerTargetIsCurrent(target)) {
+    options?.onAbandon?.()
+    return false
+  }
   return await commitWorkspacePaneValidatedTargetRoute(
     target,
     route,
@@ -343,7 +349,7 @@ export async function commitWorkspacePaneExactTargetRoute(
     commitWorkspacePaneRouteSupplement,
     { routePrecondition: fromRoute === undefined ? undefined : { kind: 'exact-route', route: fromRoute } },
     options,
-    navigationGeneration,
+    navigationGeneration ?? beginAppNavigation(),
   )
 }
 

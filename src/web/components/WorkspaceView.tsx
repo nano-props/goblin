@@ -33,6 +33,8 @@ import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { uiTransitionStore } from '#/web/stores/ui-transition.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { gitWorkspaceCanExecute, isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { gitBranchPaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 interface WorkspaceProjectionRestoreController {
   state: WorkspaceProjectionPromotionViewState
@@ -55,7 +57,6 @@ interface WorkspaceViewProps {
   onOpenWorkspaceNavigator?: (workspaceId: WorkspaceId) => void
   onOpenWorkspaceRootPane?: (workspaceId: WorkspaceId) => void
   onOpenWorkspaceDashboard?: (workspaceId: WorkspaceId) => void
-  onOpenRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
   onOpenRepoNewWorktree?: (workspaceId: WorkspaceId) => void
   onCancelRepoNewWorktree?: (workspaceId: WorkspaceId) => void
   onReplaceRepoWorktree?: (
@@ -74,7 +75,6 @@ export const WorkspaceView = defineComponent<WorkspaceViewProps>({
     'onOpenWorkspaceNavigator',
     'onOpenWorkspaceRootPane',
     'onOpenWorkspaceDashboard',
-    'onOpenRepoBranch',
     'onOpenRepoNewWorktree',
     'onCancelRepoNewWorktree',
     'onReplaceRepoWorktree',
@@ -95,13 +95,13 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
     'onOpenWorkspaceNavigator',
     'onOpenWorkspaceRootPane',
     'onOpenWorkspaceDashboard',
-    'onOpenRepoBranch',
     'onOpenRepoNewWorktree',
     'onCancelRepoNewWorktree',
     'onReplaceRepoWorktree',
   ],
 
   setup(props) {
+    const navigation = useAppNavigation()
     const uiMode = useResponsiveUiMode()
     const compact = computed(() => uiMode.value === 'compact')
     const view = useStoreSelector(
@@ -213,7 +213,10 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
       const zenModeCollapsed = !isCompact && currentView.zenMode && workspacePaneActive.value
       const workspaceTrafficLightOffset = zenModeCollapsed
       const sidebarSelectBranch = currentRouteView
-        ? (branchName: string) => props.onOpenRepoBranch?.(currentWorkspace.id, branchName)
+        ? (branchName: string) =>
+            navigation.selectRepoBranch(
+              gitBranchPaneTargetLease(currentWorkspace.id, currentWorkspace.workspaceRuntimeId, branchName),
+            )
         : undefined
       const sidebarCreateWorktree = currentRouteView
         ? () => props.onOpenRepoNewWorktree?.(currentWorkspace.id)
@@ -299,7 +302,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
                 onOpenWorkspaceRoot={
                   openWorkspaceRootPane ? () => openWorkspaceRootPane(currentWorkspace.id) : undefined
                 }
-                onSelectBranch={(branchName) => props.onOpenRepoBranch?.(currentWorkspace.id, branchName)}
+                onSelectBranch={sidebarSelectBranch}
               />
             )
           case 'workspace-root':

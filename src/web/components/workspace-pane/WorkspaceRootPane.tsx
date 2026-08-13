@@ -51,6 +51,7 @@ export const WorkspaceRootPane = defineComponent<WorkspaceRootPaneProps>({
     const openFilesTab = () => {
       void dispatchOpenWorkspacePaneTargetStaticTabAction({
         workspaceId: props.workspace.id,
+        workspaceRuntimeId: props.workspace.workspaceRuntimeId,
         routeTarget: target.value,
         paneTarget: target.value,
         type: 'files',

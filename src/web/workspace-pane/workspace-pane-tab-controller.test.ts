@@ -33,7 +33,7 @@ import type {
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
+import { beginAppNavigation, currentAppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
@@ -53,6 +53,30 @@ describe('workspace pane tab controller transactions', () => {
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
     })
+  })
+
+  test('rejects a stale target before starting selection or close navigation', async () => {
+    const target = workspacePaneTarget()
+    workspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [WORKSPACE_ID]: { ...state.workspaces[WORKSPACE_ID]!, workspaceRuntimeId: 'repo-runtime-replaced' },
+      },
+    }))
+    const generation = currentAppNavigationGeneration()
+
+    await expect(selectWorkspacePaneControllerTab(target, staticTab('status'), controllerNavigation({}))).resolves.toBe(
+      false,
+    )
+    expect(
+      beginWorkspacePaneCloseActiveTabPresentationLease({
+        target,
+        closingEntry: workspacePaneStaticTabEntry('files'),
+        nextEntry: workspacePaneStaticTabEntry('status'),
+        workspacePaneRoute: SOURCE_ROUTE,
+      }),
+    ).toBeNull()
+    expect(currentAppNavigationGeneration()).toBe(generation)
   })
 
   test('commits an exact target route without feature observation', async () => {

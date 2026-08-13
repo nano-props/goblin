@@ -572,6 +572,63 @@ describe('workspace pane runtime tab command actions', () => {
     expect(commitWorkspaceRootTerminalSession).not.toHaveBeenCalled()
   })
 
+  test.each([
+    ['primary', dispatchTerminalRuntimePrimaryAction],
+    ['new terminal', dispatchNewTerminalRuntimeTabAction],
+  ] as const)('%s command rejects a stale runtime before reading terminal state', async (_name, run) => {
+    const repo = seedRepoWithReadModelForTest({
+      id: terminalBase.target.workspaceId,
+      workspaceRuntimeId: terminalBase.target.workspaceRuntimeId,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      currentBranchName: BRANCH_NAME,
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, terminalExecutionPath(terminalBase.target))],
+    })
+    workspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [repo.id]: { ...state.workspaces[repo.id]!, workspaceRuntimeId: 'repo-runtime-replaced' },
+      },
+    }))
+    const terminalFilesystemTargetSnapshot = vi.fn()
+    const resetBridge = setTerminalSessionCommandBridge({
+      terminalFilesystemTargetSnapshot,
+      createTerminal: vi.fn(),
+      createTerminalWithAdmission: vi.fn(),
+      selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(),
+      closeTerminalByDescriptor: vi.fn(),
+    })
+    try {
+      await expect(
+        run({
+          currentWorkspaceId: repo.id,
+          target: {
+            filesystemTarget: gitWorktreePaneFilesystemTarget({
+              workspaceId: repo.id,
+              workspaceRuntimeId: repo.workspaceRuntimeId,
+              worktreePath: terminalExecutionPath(terminalBase.target),
+              head: { kind: 'branch', branchName: BRANCH_NAME },
+              capabilities: {
+                files: { read: true, write: true },
+                terminal: { available: true },
+                git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+              },
+            }),
+            workspacePaneRoute: null,
+          },
+          navigation: {
+            commitWorkspacePaneRoute: vi.fn(),
+            commitFilesystemWorkspacePaneRoute: vi.fn(),
+            commitWorkspaceRootTerminalSession: vi.fn(),
+          },
+        }),
+      ).resolves.toBe(false)
+    } finally {
+      resetBridge()
+    }
+    expect(terminalFilesystemTargetSnapshot).not.toHaveBeenCalled()
+  })
+
   test('new terminal action rejects when no runtime base is available', async () => {
     await expect(
       runWorkspacePaneRuntimeNewAction('terminal', {

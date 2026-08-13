@@ -1,7 +1,7 @@
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoWorkspacePaneRouteNavigation } from '#/web/app-route-navigation.ts'
-import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
   createWorkspacePaneTabModel,
@@ -87,9 +87,11 @@ export function openWorkspacePaneRoute(
 ): boolean {
   const resolution = resolveWorkspacePaneRoute(repoId, branchName)
   if (resolution.kind === 'missing') return false
+  if (resolution.kind === 'unavailable' && resolution.reason === 'snapshot-unavailable') return false
+  const navigationGeneration = options?.navigationGeneration ?? beginAppNavigation()
+  const navigationOptions = { ...options, navigationGeneration }
   if (resolution.kind === 'unavailable') {
-    if (resolution.reason === 'snapshot-unavailable') return false
-    return openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, null, options)
+    return openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, null, navigationOptions)
   }
   if (resolution.route?.kind === 'terminal') {
     return resolution.target.kind === 'git-worktree'
@@ -97,9 +99,9 @@ export function openWorkspacePaneRoute(
           repoId,
           resolution.target.worktreePath,
           resolution.route.terminalSessionId,
-          options,
+          navigationOptions,
         )
       : false
   }
-  return openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, resolution.route, options)
+  return openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, resolution.route, navigationOptions)
 }

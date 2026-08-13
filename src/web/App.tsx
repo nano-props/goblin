@@ -48,7 +48,6 @@ export interface AppProps {
   onOpenWorkspaceNavigator?: (workspaceId: WorkspaceId) => void
   onOpenWorkspaceRootPane?: (workspaceId: WorkspaceId) => void
   onOpenWorkspaceDashboard?: (workspaceId: WorkspaceId) => void
-  onOpenRepoBranch?: (workspaceId: WorkspaceId, branchName: string) => void
   onOpenRepoNewWorktree?: (workspaceId: WorkspaceId) => void
   onCancelRepoNewWorktree?: (workspaceId: WorkspaceId) => void
   onReplaceRepoWorktree?: (
@@ -67,7 +66,6 @@ export const App = defineComponent<AppProps>({
     'onOpenWorkspaceNavigator',
     'onOpenWorkspaceRootPane',
     'onOpenWorkspaceDashboard',
-    'onOpenRepoBranch',
     'onOpenRepoNewWorktree',
     'onCancelRepoNewWorktree',
     'onReplaceRepoWorktree',
@@ -106,7 +104,6 @@ export const App = defineComponent<AppProps>({
                 onOpenWorkspaceNavigator={props.onOpenWorkspaceNavigator}
                 onOpenWorkspaceRootPane={props.onOpenWorkspaceRootPane}
                 onOpenWorkspaceDashboard={props.onOpenWorkspaceDashboard}
-                onOpenRepoBranch={props.onOpenRepoBranch}
                 onOpenRepoNewWorktree={props.onOpenRepoNewWorktree}
                 onCancelRepoNewWorktree={props.onCancelRepoNewWorktree}
                 onReplaceRepoWorktree={props.onReplaceRepoWorktree}

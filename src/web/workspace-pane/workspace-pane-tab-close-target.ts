@@ -8,6 +8,7 @@ import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-targe
 export function resolveCloseWorkspacePaneTarget(
   input: {
     workspaceId: WorkspaceId | null
+    workspaceRuntimeId: string
     routeTarget: WorkspacePaneTabsTarget
     paneTarget: WorkspacePaneTabsTarget
     worktreeHead?: GitHead
@@ -15,12 +16,13 @@ export function resolveCloseWorkspacePaneTarget(
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ): WorkspacePaneTabModel | null {
   if (!input.workspaceId) return null
-  return workspacePaneTabTargetForPaneTarget({
+  const target = workspacePaneTabTargetForPaneTarget({
     paneTarget: input.paneTarget,
     routeTarget: input.routeTarget,
     workspacePaneRoute,
     worktreeHead: input.worktreeHead,
   })
+  return target?.workspaceRuntimeId === input.workspaceRuntimeId ? target : null
 }
 
 export function workspacePaneTabsTargetForClose(target: WorkspacePaneTabModel): WorkspacePaneTabsTarget {

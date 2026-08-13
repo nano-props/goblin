@@ -138,6 +138,7 @@ describe('workspace commands close', () => {
     const unexpected = new Error('simulated command coordinate failure')
     const target: WorkspacePaneCommandTarget = {
       routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/failure' },
+      workspaceRuntimeId: 'repo-runtime-failure',
       workspacePaneRoute: undefined,
       get filesystemTarget(): null {
         throw unexpected

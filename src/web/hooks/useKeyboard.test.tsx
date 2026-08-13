@@ -266,7 +266,10 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(selectRepoBranch).toHaveBeenCalledWith(REPO_ID, 'feature/query')
+    expect(selectRepoBranch).toHaveBeenCalledWith({
+      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/query' },
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+    })
   })
 
   test('branch navigation traverses the rendered targets across attached, rebase, and detached states', async () => {
@@ -289,7 +292,10 @@ describe('useKeyboard', () => {
 
     await dispatchBranchShortcut('j', 'KeyJ')
     expect(selectRepoBranch).toHaveBeenCalledOnce()
-    expect(selectRepoBranch).toHaveBeenCalledWith(REPO_ID, nextBranch.name)
+    expect(selectRepoBranch).toHaveBeenCalledWith({
+      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: nextBranch.name },
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+    })
     selectRepoBranch.mockClear()
 
     const attachedSnapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
@@ -305,7 +311,10 @@ describe('useKeyboard', () => {
 
     await dispatchBranchShortcut('j', 'KeyJ')
     expect(selectRepoBranch).toHaveBeenCalledOnce()
-    expect(selectRepoBranch).toHaveBeenCalledWith(REPO_ID, nextBranch.name)
+    expect(selectRepoBranch).toHaveBeenCalledWith({
+      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: nextBranch.name },
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+    })
     selectRepoBranch.mockClear()
 
     const rebaseSnapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
@@ -321,7 +330,10 @@ describe('useKeyboard', () => {
 
     await dispatchBranchShortcut('k', 'KeyK')
     expect(selectRepoBranch).toHaveBeenCalledOnce()
-    expect(selectRepoBranch).toHaveBeenCalledWith(REPO_ID, nextBranch.name)
+    expect(selectRepoBranch).toHaveBeenCalledWith({
+      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: nextBranch.name },
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+    })
     expect(selectRepoWorktree).not.toHaveBeenCalled()
   })
 
@@ -345,6 +357,42 @@ describe('useKeyboard', () => {
     expect(shortcut.defaultPrevented).toBe(false)
     expect(selectRepoBranch).not.toHaveBeenCalled()
     expect(selectRepoWorktree).not.toHaveBeenCalled()
+  })
+
+  test('branch navigation selects a detached worktree with its runtime lease', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+      worktrees: [
+        {
+          path: WORKTREE_PATH,
+          head: { kind: 'detached' },
+          headOid: '0123456789abcdef0123456789abcdef01234567',
+          operation: null,
+          materializedBranch: null,
+          isPrimary: false,
+          isLocked: false,
+        },
+      ],
+    })
+    const selectRepoBranch = vi.fn()
+    const selectRepoWorktree = vi.fn()
+    await renderHookHost({
+      currentWorkspaceId: REPO_ID,
+      currentBranchName: 'main',
+      currentGitWorkspaceNavigatorRowIdentity: { kind: 'branch', branchName: 'main' },
+      navigation: navigationWith({ selectRepoBranch, selectRepoWorktree }),
+    })
+
+    await dispatchBranchShortcut('j', 'KeyJ')
+
+    expect(selectRepoWorktree).toHaveBeenCalledOnce()
+    expect(selectRepoWorktree).toHaveBeenCalledWith({
+      routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+    })
+    expect(selectRepoBranch).not.toHaveBeenCalled()
   })
 
   test('alt-arrow navigates workspace history', async () => {
@@ -1022,6 +1070,7 @@ const HookHost = defineComponent<Partial<HookHostOptions>>({
                 workspaceId: repo?.id ?? REPO_ID,
                 branchName: overrides.currentBranchName,
               },
+              workspaceRuntimeId: repo?.workspaceRuntimeId ?? workspaceRuntimeIdForTest(),
               workspacePaneRoute: null,
               filesystemTarget: null,
             }

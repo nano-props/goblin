@@ -230,19 +230,21 @@ describe('client effect intent handlers', () => {
 })
 
 function deps(currentWorkspaceId: WorkspaceId | null, currentBranchName = 'feature/worktree') {
+  const currentWorkspace = currentWorkspaceId
+    ? (workspacesStore.getState().workspaces[currentWorkspaceId] ?? null)
+    : null
   return {
     navigation: navigationWithStoreActions(),
-    currentWorkspace: currentWorkspaceId ? (workspacesStore.getState().workspaces[currentWorkspaceId] ?? null) : null,
-    terminalBellWorkspace: currentWorkspaceId
-      ? (workspacesStore.getState().workspaces[currentWorkspaceId] ?? null)
-      : null,
-    currentWorkspacePaneCommandTarget: currentWorkspaceId
+    currentWorkspace,
+    terminalBellWorkspace: currentWorkspace,
+    currentWorkspacePaneCommandTarget: currentWorkspace
       ? {
           routeTarget: {
             kind: 'git-branch' as const,
-            workspaceId: workspaceIdForTest(currentWorkspaceId),
+            workspaceId: currentWorkspace.id,
             branchName: currentBranchName,
           },
+          workspaceRuntimeId: currentWorkspace.workspaceRuntimeId,
           workspacePaneRoute: null,
           filesystemTarget: null,
         }

@@ -197,6 +197,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       if (isPendingWorkspacePaneTabItem(item)) return
       void dispatchSelectWorkspacePaneTabByIdentityAction({
         workspaceId: props.target.workspaceId,
+        workspaceRuntimeId: props.target.workspaceRuntimeId,
         routeTarget: routeTarget.value,
         paneTarget: persistenceTarget.value,
         worktreeHead: worktreeHead.value,
@@ -356,7 +357,12 @@ function workspacePaneCommandTargetForSurface(
   }
   if (surface.kind !== 'git-branch') throw new Error('git-branch route requires a git-branch surface')
   if (workspacePaneRoute?.kind === 'terminal') throw new Error('git-branch route cannot present a runtime tab')
-  return { routeTarget: target, workspacePaneRoute, filesystemTarget: null }
+  return {
+    workspaceRuntimeId: surface.workspaceRuntimeId,
+    routeTarget: target,
+    workspacePaneRoute,
+    filesystemTarget: null,
+  }
 }
 
 function activePendingTabIdentity(model: WorkspacePaneTabModel): string | null {

@@ -20,6 +20,7 @@ import {
   type FilesystemWorkspacePaneTabsTarget,
   type GitBranchWorkspacePaneTabsTarget,
   type GitWorktreeWorkspacePaneTabsTarget,
+  type RootWorkspacePaneTabsTarget,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { GitHead } from '#/shared/git-head.ts'
@@ -30,10 +31,22 @@ import {
   type WorkspacePaneFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
 
-export interface FilesystemWorkspacePaneTargetLease {
-  routeTarget: FilesystemWorkspacePaneTabsTarget
+export interface WorkspaceRootPaneTargetLease {
+  routeTarget: RootWorkspacePaneTabsTarget
   workspaceRuntimeId: string
 }
+
+export interface GitWorktreePaneTargetLease {
+  routeTarget: GitWorktreeWorkspacePaneTabsTarget
+  workspaceRuntimeId: string
+}
+
+export interface GitBranchPaneTargetLease {
+  routeTarget: GitBranchWorkspacePaneTabsTarget
+  workspaceRuntimeId: string
+}
+
+export type FilesystemWorkspacePaneTargetLease = WorkspaceRootPaneTargetLease | GitWorktreePaneTargetLease
 
 export interface FilesystemWorkspacePaneTargetLeaseSource {
   workspaceId: WorkspaceId
@@ -73,7 +86,7 @@ export function filesystemWorkspacePaneTargetLeaseForModel(
 export function workspaceRootPaneTargetLease(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
-): FilesystemWorkspacePaneTargetLease {
+): WorkspaceRootPaneTargetLease {
   return {
     routeTarget: { kind: 'workspace-root', workspaceId },
     workspaceRuntimeId,
@@ -84,11 +97,29 @@ export function gitWorktreePaneTargetLease(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   worktreePath: string,
-): FilesystemWorkspacePaneTargetLease {
+): GitWorktreePaneTargetLease {
   return {
     routeTarget: { kind: 'git-worktree', workspaceId, worktreePath },
     workspaceRuntimeId,
   }
+}
+
+export function gitBranchPaneTargetLease(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  branchName: string,
+): GitBranchPaneTargetLease {
+  return {
+    routeTarget: { kind: 'git-branch', workspaceId, branchName },
+    workspaceRuntimeId,
+  }
+}
+
+export function gitBranchPaneTargetLeaseOwnerIsCurrent(lease: GitBranchPaneTargetLease): boolean {
+  return (
+    workspacesStore.getState().workspaces[lease.routeTarget.workspaceId]?.workspaceRuntimeId ===
+    lease.workspaceRuntimeId
+  )
 }
 
 export function filesystemWorkspacePaneTargetLeaseIsCurrent(lease: FilesystemWorkspacePaneTargetLease): boolean {
@@ -133,11 +164,6 @@ function filesystemExecutionTargetForPaneTarget(
   return null
 }
 
-export interface GitBranchWorkspacePaneDestinationTargetLease {
-  workspaceRuntimeId: string
-  routeTarget: GitBranchWorkspacePaneTabsTarget
-}
-
 export interface GitWorktreeWorkspacePaneDestinationTargetLease {
   workspaceRuntimeId: string
   routeTarget: GitWorktreeWorkspacePaneTabsTarget
@@ -145,7 +171,7 @@ export interface GitWorktreeWorkspacePaneDestinationTargetLease {
 }
 
 export type WorkspacePaneDestinationTargetLease =
-  GitBranchWorkspacePaneDestinationTargetLease | GitWorktreeWorkspacePaneDestinationTargetLease
+  GitBranchPaneTargetLease | GitWorktreeWorkspacePaneDestinationTargetLease
 
 export function isGitWorktreeDestinationTargetLease(
   lease: WorkspacePaneDestinationTargetLease,
@@ -354,4 +380,17 @@ function preferredWorkspacePaneTabForRoute(
 export function workspacePaneTabTargetBlocksInteraction(model: WorkspacePaneTabModel): boolean {
   if (workspacePaneTabModelBlocksTabInteraction(model) || model.paneTarget.kind === 'inactive') return true
   return workspacePaneTabsInteractionBlockedForTarget(model.paneTarget)
+}
+
+export function workspacePaneTargetBlocksInteraction(
+  target: WorkspacePaneTabsTarget,
+  workspaceRuntimeId: string,
+): boolean {
+  if (workspacePaneTabsInteractionBlockedForTarget(target)) return true
+  const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
+    workspaceId: target.workspaceId,
+    workspaceRuntimeId,
+    filesystemTarget: filesystemExecutionTargetForPaneTarget(target, workspaceRuntimeId),
+  })
+  return Object.values(runtimeProjection.runtimeTabStateByType).some((state) => state.createPending)
 }

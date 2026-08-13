@@ -73,6 +73,7 @@ export function useBranchActionItems(
     const openStaticWorkspacePaneTab = (type: WorkspacePaneBranchTabType | WorkspacePaneStaticTabType) => {
       void dispatchShowWorkspacePaneStaticTabAction({
         workspaceId: currentRepo.id,
+        workspaceRuntimeId: currentRepo.workspaceRuntimeId,
         branchName: currentBranch.name,
         type,
         workspacePaneRoute: toValue(options.workspacePaneRoute),

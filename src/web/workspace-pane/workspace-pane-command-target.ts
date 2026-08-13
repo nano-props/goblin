@@ -20,6 +20,7 @@ import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 
 type GitBranchWorkspacePaneCommandTarget = {
+  workspaceRuntimeId: string
   routeTarget: Extract<WorkspacePaneTabsTarget, { kind: 'git-branch' }>
   workspacePaneRoute: ParsedBranchWorkspacePaneRouteTarget | undefined
   filesystemTarget: null
@@ -63,6 +64,7 @@ export function workspacePaneCommandTargetFromQueryCache(input: {
     if (!snapshot?.branches.some((branch) => branch.name === routeContext.branchName)) return null
     if (repoWorktreeForBranch(snapshot.worktrees, routeContext.branchName)) return null
     return {
+      workspaceRuntimeId: workspace.workspaceRuntimeId,
       routeTarget: { kind: 'git-branch', workspaceId: workspace.id, branchName: routeContext.branchName },
       workspacePaneRoute: routeContext.workspacePaneRoute,
       filesystemTarget: null,
@@ -137,4 +139,8 @@ export function workspacePaneCommandRouteTarget(target: WorkspacePaneCommandTarg
 
 export function workspacePaneCommandWorktreeHead(target: WorkspacePaneCommandTarget): GitHead | undefined {
   return target.filesystemTarget?.kind === 'git-worktree' ? target.filesystemTarget.head : undefined
+}
+
+export function workspacePaneCommandRuntimeId(target: WorkspacePaneCommandTarget): string {
+  return target.filesystemTarget === null ? target.workspaceRuntimeId : target.filesystemTarget.workspaceRuntimeId
 }

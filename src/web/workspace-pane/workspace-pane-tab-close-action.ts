@@ -22,11 +22,15 @@ import {
   type ConfirmedWorkspacePaneRuntimeTabClose,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 import {
+  filesystemWorkspacePaneTargetLeaseIsCurrent,
+  gitWorktreePaneTargetLease,
+  workspaceRootPaneTargetLease,
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { terminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 import type { WorkspacePaneRuntimeTabCloseConfirmRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
@@ -55,6 +59,7 @@ import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-reque
 
 export interface CloseWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
+  workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   routeTarget: WorkspacePaneTabsTarget
   paneTarget: WorkspacePaneTabsTarget
@@ -174,7 +179,7 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
     const base = ownedOptions.confirmedTerminal.base
     const coordinates = terminalExecutionCoordinates(base.target)
     const queueWorkspaceId = ownedOptions.workspaceId ?? coordinates.workspaceId
-    if (queueWorkspaceId !== coordinates.workspaceId) {
+    if (queueWorkspaceId !== coordinates.workspaceId || !runtimeFilesystemTargetIsCurrent(base.target)) {
       presentationEffects?.onAbandon()
       return false
     }
@@ -186,9 +191,25 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
   }
 }
 
+function runtimeFilesystemTargetIsCurrent(target: TerminalSessionBase['target']): boolean {
+  const paneTarget = workspacePaneTabsTargetFromRuntime(target)
+  if (!paneTarget) return false
+  return paneTarget.kind === 'workspace-root'
+    ? filesystemWorkspacePaneTargetLeaseIsCurrent(
+        workspaceRootPaneTargetLease(paneTarget.workspaceId, target.workspaceRuntimeId),
+      )
+    : filesystemWorkspacePaneTargetLeaseIsCurrent(
+        gitWorktreePaneTargetLease(paneTarget.workspaceId, target.workspaceRuntimeId, paneTarget.worktreePath),
+      )
+}
+
 async function confirmCloseTerminalWorkspacePaneTabAction(
   options: ConfirmCloseTerminalWorkspacePaneTabActionOptions,
 ): Promise<boolean> {
+  if (!runtimeFilesystemTargetIsCurrent(options.confirmedTerminal.base.target)) {
+    options.presentationEffects?.onAbandon()
+    return false
+  }
   const routeChanged =
     options.workspacePaneRoute !== undefined &&
     options.currentWorkspacePaneRoute !== undefined &&

@@ -154,6 +154,7 @@ describe('workspace pane command target', () => {
     })
     expect(branchTarget).toEqual({
       routeTarget: { kind: 'git-branch', workspaceId: workspace.id, branchName: 'feature/example' },
+      workspaceRuntimeId: workspace.workspaceRuntimeId,
       workspacePaneRoute: null,
       filesystemTarget: null,
     })

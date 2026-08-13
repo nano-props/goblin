@@ -216,6 +216,7 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
       const openStaticTab = (type: 'changes' | 'history') => {
         void dispatchOpenWorkspacePaneTargetStaticTabAction({
           workspaceId: props.target.workspaceId,
+          workspaceRuntimeId: props.workspaceRuntime.workspaceRuntimeId,
           routeTarget: props.target,
           paneTarget: props.target,
           worktreeHead: props.worktree.head,

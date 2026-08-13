@@ -17,7 +17,7 @@ import { branchViewModeForWorkspace } from '#/web/stores/workspaces/branch-view-
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
-import { gitWorktreePaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { gitBranchPaneTargetLease, gitWorktreePaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { gitWorkspaceNavigatorRows } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 
 interface Props {
@@ -102,13 +102,14 @@ const GitWorkspaceNavigatorViewReadModel = defineComponent<GitWorkspaceNavigator
 
     function selectBranch(branch: string): void {
       if (props.onSelectBranch) props.onSelectBranch(branch)
-      else navigation.selectRepoBranch(props.repo.id, branch)
+      else navigation.selectRepoBranch(gitBranchPaneTargetLease(props.repo.id, props.repo.workspaceRuntimeId, branch))
       props.onAfterSelect?.(branch)
     }
 
     function openBranchStatus(branchName: string): void {
       void dispatchShowWorkspacePaneStaticTabAction({
         workspaceId: props.repo.id,
+        workspaceRuntimeId: props.repo.workspaceRuntimeId,
         branchName,
         type: 'status',
         workspacePaneRoute: undefined,
@@ -118,7 +119,9 @@ const GitWorkspaceNavigatorViewReadModel = defineComponent<GitWorkspaceNavigator
     }
 
     function selectWorktree(worktreePath: string): void {
-      navigation.selectRepoWorktree(props.repo.id, worktreePath)
+      navigation.selectRepoWorktree(
+        gitWorktreePaneTargetLease(props.repo.id, props.repo.workspaceRuntimeId, worktreePath),
+      )
     }
 
     function openWorktreeStatus(worktreePath: string): void {

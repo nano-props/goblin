@@ -35,6 +35,7 @@ export interface WorkspacePaneTabClosePresentationEffects {
 
 export interface RetiredTerminalWorkspacePaneTabPresentationOptions {
   workspaceId: WorkspaceId
+  workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   routeTarget: WorkspacePaneTabsTarget
   paneTarget: WorkspacePaneTabsTarget

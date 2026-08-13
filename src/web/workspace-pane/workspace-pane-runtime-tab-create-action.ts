@@ -16,7 +16,11 @@ import {
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalCreateOptions, TerminalFocusRequest } from '#/web/components/terminal/types.ts'
-import { gitWorktreePaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  filesystemWorkspacePaneTargetLeaseIsCurrent,
+  gitWorktreePaneTargetLease,
+  workspaceRootPaneTargetLease,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   workspacePaneActionTargetFromFilesystemTarget,
   runWorkspacePaneAction,
@@ -125,37 +129,37 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
   if (!workspacePaneTabsTargetFromRuntime(base.target)) {
     throw new Error('terminal base requires a canonical filesystem pane target')
   }
+  if (!terminalCreateTargetIsCurrent(base)) return staleTerminalCreateResult()
   const target = terminalWorkspacePaneCoordinatorTarget(base)
   const navigationGeneration = beginAppNavigation()
   let ownedFocusLease = claimTerminalAutoFocus(navigationGeneration)
   try {
-    return await runWorkspacePaneAction(
-      target,
-      async () =>
-        await runCreateTerminalTabCommand({
-          base,
-          createTerminal: options.createTerminal,
-          options: options.options,
-          insertAfterIdentity: options.insertAfterIdentity,
-          t: options.t,
-          logMessage: options.logMessage,
-          commitCreatedTerminalTab: async (admission) =>
-            await commitCreatedTerminalWorkspacePaneRuntimeTab({
-              base,
-              admission,
-              openerIdentity: options.openerIdentity,
-              showCreatedTerminalTab: async (terminalSessionId, presentation) => {
-                const accepted = await options.showCreatedTerminalTab(terminalSessionId, presentation, {
-                  navigationGeneration,
-                })
-                if (accepted) ownedFocusLease?.commit(terminalSessionId, options.focusTerminal)
-                else ownedFocusLease?.release()
-                ownedFocusLease = null
-                return accepted
-              },
-            }),
-        }),
-    )
+    return await runWorkspacePaneAction(target, async () => {
+      if (!terminalCreateTargetIsCurrent(base)) return staleTerminalCreateResult()
+      return await runCreateTerminalTabCommand({
+        base,
+        createTerminal: options.createTerminal,
+        options: options.options,
+        insertAfterIdentity: options.insertAfterIdentity,
+        t: options.t,
+        logMessage: options.logMessage,
+        commitCreatedTerminalTab: async (admission) =>
+          await commitCreatedTerminalWorkspacePaneRuntimeTab({
+            base,
+            admission,
+            openerIdentity: options.openerIdentity,
+            showCreatedTerminalTab: async (terminalSessionId, presentation) => {
+              const accepted = await options.showCreatedTerminalTab(terminalSessionId, presentation, {
+                navigationGeneration,
+              })
+              if (accepted) ownedFocusLease?.commit(terminalSessionId, options.focusTerminal)
+              else ownedFocusLease?.release()
+              ownedFocusLease = null
+              return accepted
+            },
+          }),
+      })
+    })
   } finally {
     ownedFocusLease?.release()
   }
@@ -199,7 +203,7 @@ export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
 ): Promise<TerminalCreatedTabCommitResult> {
   const canonicalBase = terminalSessionBase(options.base.target, options.admission.presentation)
   const canonicalOptions = { ...options, base: canonicalBase }
-  if (!options.admission.runtimeProjectionApplied || !terminalCreateTargetRuntimeIsCurrent(canonicalOptions.base)) {
+  if (!options.admission.runtimeProjectionApplied || !terminalCreateTargetIsCurrent(canonicalOptions.base)) {
     return { status: 'superseded' }
   }
   recordCreatedTerminalWorkspacePaneRuntimeTabOpener(canonicalOptions)
@@ -231,11 +235,29 @@ function terminalWorkspacePaneCoordinatorTarget(base: TerminalSessionBase) {
   return workspacePaneActionTargetFromFilesystemTarget(base.target)
 }
 
-function terminalCreateTargetRuntimeIsCurrent(base: TerminalSessionBase): boolean {
+function terminalCreateTargetIsCurrent(base: TerminalSessionBase): boolean {
   const coordinates = terminalExecutionCoordinates(base.target)
-  return (
-    currentWorkspaceRuntimeId(workspacesStore.getState(), coordinates.workspaceId) === coordinates.workspaceRuntimeId
-  )
+  if (
+    currentWorkspaceRuntimeId(workspacesStore.getState(), coordinates.workspaceId) !== coordinates.workspaceRuntimeId
+  ) {
+    return false
+  }
+  return base.target.kind === 'workspace-root'
+    ? filesystemWorkspacePaneTargetLeaseIsCurrent(
+        workspaceRootPaneTargetLease(coordinates.workspaceId, coordinates.workspaceRuntimeId),
+      )
+    : filesystemWorkspacePaneTargetLeaseIsCurrent(
+        gitWorktreePaneTargetLease(
+          coordinates.workspaceId,
+          coordinates.workspaceRuntimeId,
+          terminalExecutionPath(base.target),
+        ),
+      )
+}
+
+function staleTerminalCreateResult(): TerminalCreateCommandResult {
+  const error = new Error('error.workspace-runtime-stale')
+  return { ok: false, error, messageKey: 'error.terminal-create-failed' }
 }
 
 function terminalRuntimeTabCreateAction(

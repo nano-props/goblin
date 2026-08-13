@@ -26,6 +26,11 @@ import {
   resetAppNavigationForTest,
 } from '#/web/app-navigation-lifecycle.ts'
 import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
+import {
+  resetWorkspacePaneActionQueueForTest,
+  runWorkspacePaneAction,
+  workspacePaneActionTargetFromFilesystemTarget,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import type {
   TerminalCreateCommandResult,
   TerminalCreatedTabCommitResult,
@@ -61,6 +66,7 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 }))
 
 beforeEach(() => {
+  resetWorkspacePaneActionQueueForTest()
   resetTerminalAutoFocusForTest()
   resetAppNavigationForTest()
   resetWorkspacesStore()
@@ -74,6 +80,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  resetWorkspacePaneActionQueueForTest()
   resetTerminalAutoFocusForTest()
   resetWorkspacesStore()
   document.body.replaceChildren()
@@ -322,6 +329,30 @@ describe('workspace pane runtime tab create action', () => {
 
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
     expect(focusTerminal).not.toHaveBeenCalled()
+  })
+
+  test('does not create after a queued target runtime is replaced', async () => {
+    const blocker = Promise.withResolvers<void>()
+    const blockingAction = runWorkspacePaneAction(
+      workspacePaneActionTargetFromFilesystemTarget(BASE.target),
+      () => blocker.promise,
+    )
+    const createTerminal = vi.fn(async () => createAdmission())
+    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+      base: BASE,
+      createTerminal,
+      openerIdentity: null,
+      showCreatedTerminalTab: vi.fn(() => true),
+      focusTerminal: vi.fn(),
+    })
+
+    seedCurrentWorkspaceRuntime('repo-runtime-replacement')
+    blocker.resolve()
+    await blockingAction
+
+    await expect(dispatch).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
+    expect(createTerminal).not.toHaveBeenCalled()
   })
 
   test('releases automatic focus when navigation rejects the created route', async () => {

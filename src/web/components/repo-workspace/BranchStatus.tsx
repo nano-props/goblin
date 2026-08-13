@@ -177,6 +177,7 @@ export const BranchStatus = defineComponent<Props>({
           if (!branchName || (type !== 'history' && !worktreePath)) return
           void dispatchOpenWorkspacePaneStaticTabAction({
             workspaceId: detail.workspaceId,
+            workspaceRuntimeId: props.workspaceRuntimeId,
             branchName,
             worktreePath,
             type,

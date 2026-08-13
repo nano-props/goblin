@@ -64,6 +64,7 @@ const GIT_WORKSPACE_ID = CURRENT_GIT_REPO.id
 const DETACHED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace/example-repo')
 const MAIN_COMMAND_TARGET = {
   routeTarget: { kind: 'git-branch' as const, workspaceId: GIT_WORKSPACE_ID, branchName: 'main' },
+  workspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
   workspacePaneRoute: null,
   filesystemTarget: null,
 }

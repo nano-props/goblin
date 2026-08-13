@@ -23,7 +23,6 @@ import {
 import type { RuntimeCoherentWorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
-import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
 
 const AppRouteView = defineComponent({
   name: 'AppRouteView',
@@ -281,8 +280,6 @@ export function appRouterCallbacks(routeActions: AppRouteNavigation) {
     onOpenWorkspaceNavigator: (workspaceId: WorkspaceId) => routeActions.openWorkspaceNavigator(workspaceId),
     onOpenWorkspaceRootPane: (workspaceId: WorkspaceId) => routeActions.openWorkspaceRootPane(workspaceId),
     onOpenWorkspaceDashboard: (workspaceId: WorkspaceId) => routeActions.openWorkspaceDashboard(workspaceId),
-    onOpenRepoBranch: (workspaceId: WorkspaceId, branchName: string) =>
-      openWorkspacePaneRoute(routeActions, workspaceId, branchName),
     onOpenRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.openRepoNewWorktree(workspaceId),
     onCancelRepoNewWorktree: (workspaceId: WorkspaceId) => routeActions.cancelRepoNewWorktree(workspaceId),
     onReplaceRepoWorktree: (

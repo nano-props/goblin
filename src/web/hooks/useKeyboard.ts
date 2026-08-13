@@ -24,6 +24,7 @@ import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
 import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { BranchViewMode } from '#/shared/api-types.ts'
+import { gitBranchPaneTargetLease, gitWorktreePaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
 import { keyboardRuntimeStateFromStore } from '#/web/stores/workspaces/selector-state.ts'
 import {
@@ -49,7 +50,6 @@ import {
   gitWorkspaceNavigatorRows,
   type GitWorkspaceNavigatorRowIdentity,
 } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
-
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
   'button,a,input,textarea,select,[role="button"],[role="tab"],[role="menuitem"],[data-interactive]'
@@ -144,8 +144,14 @@ function moveGitWorkspaceNavigatorSelection(
   if (currentRow && index < 0) return false
   const next = rows[nextIndex(index, rows.length, direction)]
   if (!next) return false
-  if (next.kind === 'branch') navigation.selectRepoBranch(input.repo.id, next.branch.name)
-  else navigation.selectRepoWorktree(input.repo.id, next.worktree.path)
+  if (next.kind === 'branch') {
+    navigation.selectRepoBranch(
+      gitBranchPaneTargetLease(input.repo.id, input.repo.workspaceRuntimeId, next.branch.name),
+    )
+  } else
+    navigation.selectRepoWorktree(
+      gitWorktreePaneTargetLease(input.repo.id, input.repo.workspaceRuntimeId, next.worktree.path),
+    )
   return true
 }
 

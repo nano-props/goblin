@@ -20,9 +20,11 @@ import {
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
+  filesystemWorkspacePaneTargetLeaseIsCurrent,
   workspacePaneTabTargetForPaneTarget,
   workspacePaneTabTargetForWorkspace,
   gitWorktreePaneTargetLease,
+  workspaceRootPaneTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import {
@@ -83,15 +85,17 @@ function existingTerminalTabTarget(
 ): WorkspacePaneTabModel | null {
   const routeTarget = workspacePaneTabsTargetForFilesystemTarget(filesystemTarget)
   if (routeTarget.kind === 'workspace-root') {
-    return workspacePaneTabTargetForWorkspace(filesystemTarget.workspaceId, { workspacePaneRoute })
+    const target = workspacePaneTabTargetForWorkspace(filesystemTarget.workspaceId, { workspacePaneRoute })
+    return target?.workspaceRuntimeId === filesystemTarget.workspaceRuntimeId ? target : null
   }
   if (filesystemTarget.kind !== 'git-worktree') return null
-  return workspacePaneTabTargetForPaneTarget({
+  const target = workspacePaneTabTargetForPaneTarget({
     paneTarget: routeTarget,
     routeTarget,
     workspacePaneRoute,
     worktreeHead: filesystemTarget.head,
   })
+  return target?.workspaceRuntimeId === filesystemTarget.workspaceRuntimeId ? target : null
 }
 
 const WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE: Record<
@@ -109,6 +113,7 @@ export async function dispatchTerminalRuntimePrimaryAction(
 ): Promise<boolean> {
   const currentWorkspaceId = options.currentWorkspaceId
   if (!currentWorkspaceId || currentWorkspaceId !== options.target.filesystemTarget.workspaceId) return false
+  if (!terminalCommandTargetIsCurrent(options.target.filesystemTarget)) return false
   const context = terminalRuntimeTabActionContext(options)
   return await runWorkspacePaneRuntimePrimaryAction('terminal', context)
 }
@@ -118,8 +123,24 @@ export async function dispatchNewTerminalRuntimeTabAction(
 ): Promise<boolean> {
   const currentWorkspaceId = options.currentWorkspaceId
   if (!currentWorkspaceId || currentWorkspaceId !== options.target.filesystemTarget.workspaceId) return false
+  if (!terminalCommandTargetIsCurrent(options.target.filesystemTarget)) return false
   const context = terminalRuntimeTabActionContext(options)
   return await runWorkspacePaneRuntimeNewAction('terminal', context)
+}
+
+function terminalCommandTargetIsCurrent(filesystemTarget: WorkspacePaneFilesystemTarget): boolean {
+  const routeTarget = workspacePaneTabsTargetForFilesystemTarget(filesystemTarget)
+  return routeTarget.kind === 'workspace-root'
+    ? filesystemWorkspacePaneTargetLeaseIsCurrent(
+        workspaceRootPaneTargetLease(routeTarget.workspaceId, filesystemTarget.workspaceRuntimeId),
+      )
+    : filesystemWorkspacePaneTargetLeaseIsCurrent(
+        gitWorktreePaneTargetLease(
+          routeTarget.workspaceId,
+          filesystemTarget.workspaceRuntimeId,
+          routeTarget.worktreePath,
+        ),
+      )
 }
 
 function terminalRuntimeTabActionContext({
@@ -214,7 +235,7 @@ function showCreatedTerminalRuntimeTab(
   if (filesystemTarget.kind === 'workspace-root') {
     if (presentation.kind !== 'workspace-root') return false
     const target = workspacePaneTabTargetForWorkspace(filesystemTarget.workspaceId, { workspacePaneRoute })
-    if (!target) return false
+    if (!target || target.workspaceRuntimeId !== filesystemTarget.workspaceRuntimeId) return false
     const tab = target.tabs.find(
       (candidate) => candidate.identity === terminalWorkspacePaneTabProvider.identity(sessionId),
     )

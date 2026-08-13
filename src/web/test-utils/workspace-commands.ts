@@ -94,10 +94,12 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
       }
     }
     if (!options.workspaceId) throw new Error('expected workspace id for branch command fixture')
+    if (!repo) throw new Error('expected workspace for branch command fixture')
     if (options.workspacePaneRoute?.kind === 'terminal') {
       throw new Error('branch command fixture cannot present a runtime tab')
     }
     return {
+      workspaceRuntimeId: repo.workspaceRuntimeId,
       routeTarget: {
         kind: 'git-branch',
         workspaceId: workspaceIdForTest(options.workspaceId),

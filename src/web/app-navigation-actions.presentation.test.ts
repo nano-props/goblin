@@ -34,7 +34,10 @@ import {
   installTerminalSessionCommandBridgeForTest,
   worktreeSnapshotForSessions,
   WORKTREE_KEY,
+  branchSelectionLease,
+  worktreeSelectionLease,
 } from '#/web/app-navigation-actions.test-utils.ts'
+import { currentAppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 
 beforeEach(setupAppNavigationActionsTests)
 
@@ -211,6 +214,36 @@ describe('createAppNavigationActions presentation', () => {
         workspaceId: REPO_ID,
       }),
     ).toBe(previousPreference)
+  })
+
+  test('rejects an invalid filesystem commit lease before starting navigation', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [],
+      currentBranchName: BRANCH_NAME,
+    })
+    const navigation = routeNavigation()
+    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const onAbandon = vi.fn()
+    const generation = currentAppNavigationGeneration()
+
+    await expect(
+      actions.commitFilesystemWorkspacePaneRoute(
+        worktreeSelectionLease(),
+        { kind: 'static', tab: 'files' },
+        { onAbandon },
+      ),
+    ).resolves.toBe(false)
+    expect(currentAppNavigationGeneration()).toBe(generation)
+    expect(onAbandon).toHaveBeenCalledOnce()
+    expect(navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
   test('abandons a committed worktree route when the authoritative worktree disappears', async () => {
@@ -426,7 +459,7 @@ describe('createAppNavigationActions presentation', () => {
       routeNavigation: navigation,
     })
 
-    actions.selectRepoBranch(REPO_ID, BRANCH_NAME, { replace: true })
+    actions.selectRepoBranch(branchSelectionLease(), { replace: true })
 
     expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(
       REPO_ID,
@@ -435,6 +468,133 @@ describe('createAppNavigationActions presentation', () => {
       presentationOptions({ replace: true }),
     )
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
+  })
+
+  test('selects an admitted worktree without rebuilding its target from coordinates', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
+      currentBranchName: BRANCH_NAME,
+    })
+    const navigation = routeNavigation()
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    expect(actions.selectRepoWorktree(worktreeSelectionLease(), { replace: true })).toBe(true)
+    expect(navigation.openRepoWorktree).toHaveBeenCalledWith(
+      REPO_ID,
+      WORKTREE_PATH,
+      presentationOptions({ replace: true }),
+    )
+  })
+
+  test('rejects a worktree selection owned by a replaced workspace runtime before starting navigation', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
+      currentBranchName: BRANCH_NAME,
+    })
+    const target = worktreeSelectionLease()
+    workspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [REPO_ID]: replaceWorkspace(repo, (draft) => {
+          draft.workspaceRuntimeId = 'replacement-runtime'
+        }),
+      },
+    }))
+    const navigation = routeNavigation()
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const generation = currentAppNavigationGeneration()
+
+    expect(actions.selectRepoWorktree(target)).toBe(false)
+    expect(currentAppNavigationGeneration()).toBe(generation)
+    expect(navigation.openRepoWorktree).not.toHaveBeenCalled()
+  })
+
+  test('rejects a worktree selection missing from the current snapshot before starting navigation', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [],
+      currentBranchName: BRANCH_NAME,
+    })
+    const navigation = routeNavigation()
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const generation = currentAppNavigationGeneration()
+
+    expect(actions.selectRepoWorktree(worktreeSelectionLease())).toBe(false)
+    expect(currentAppNavigationGeneration()).toBe(generation)
+    expect(navigation.openRepoWorktree).not.toHaveBeenCalled()
+  })
+
+  test('rejects a stale branch selection before starting navigation', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      currentBranchName: BRANCH_NAME,
+    })
+    const staleTarget = branchSelectionLease()
+    workspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [REPO_ID]: replaceWorkspace(repo, (draft) => {
+          draft.workspaceRuntimeId = 'replacement-runtime'
+        }),
+      },
+    }))
+    const navigation = routeNavigation()
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const generation = currentAppNavigationGeneration()
+
+    expect(actions.selectRepoBranch(staleTarget)).toBe(false)
+    expect(currentAppNavigationGeneration()).toBe(generation)
+    expect(navigation.openRepoBranch).not.toHaveBeenCalled()
+    expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
+    expect(navigation.openRepoWorktreeTerminal).not.toHaveBeenCalled()
+  })
+
+  test('rejects a missing branch selection before starting navigation', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      currentBranchName: BRANCH_NAME,
+    })
+    const navigation = routeNavigation()
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const generation = currentAppNavigationGeneration()
+
+    expect(actions.selectRepoBranch(branchSelectionLease('feature/missing'))).toBe(false)
+    expect(currentAppNavigationGeneration()).toBe(generation)
+    expect(navigation.openRepoBranch).not.toHaveBeenCalled()
+    expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
+    expect(navigation.openRepoWorktreeTerminal).not.toHaveBeenCalled()
   })
 
   test('selects a materialized branch through its active worktree terminal route', () => {
@@ -465,7 +625,7 @@ describe('createAppNavigationActions presentation', () => {
       routeNavigation: navigation,
     })
 
-    actions.selectRepoBranch(REPO_ID, BRANCH_NAME, { replace: true })
+    actions.selectRepoBranch(branchSelectionLease(), { replace: true })
 
     expect(navigation.openRepoWorktreeTerminal).toHaveBeenCalledWith(
       REPO_ID,
@@ -494,7 +654,7 @@ describe('createAppNavigationActions presentation', () => {
       routeNavigation: navigation,
     })
 
-    actions.selectRepoBranch(REPO_ID, BRANCH_NAME, { replace: true })
+    actions.selectRepoBranch(branchSelectionLease(), { replace: true })
 
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, presentationOptions({ replace: true }))
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
@@ -526,7 +686,7 @@ describe('createAppNavigationActions presentation', () => {
       routeNavigation: navigation,
     })
 
-    actions.selectRepoBranch(REPO_ID, BRANCH_NAME)
+    actions.selectRepoBranch(branchSelectionLease())
 
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, presentationOptions())
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
@@ -551,7 +711,7 @@ describe('createAppNavigationActions presentation', () => {
       routeNavigation: navigation,
     })
 
-    actions.selectRepoBranch(REPO_ID, BRANCH_NAME)
+    actions.selectRepoBranch(branchSelectionLease())
 
     expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status', presentationOptions())
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
@@ -576,7 +736,7 @@ describe('createAppNavigationActions presentation', () => {
       routeNavigation: navigation,
     })
 
-    actions.selectRepoBranch(REPO_ID, BRANCH_NAME)
+    actions.selectRepoBranch(branchSelectionLease())
 
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, presentationOptions())
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()

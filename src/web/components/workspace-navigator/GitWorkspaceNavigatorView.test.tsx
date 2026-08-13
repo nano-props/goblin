@@ -191,7 +191,11 @@ describe('GitWorkspaceNavigatorView', () => {
     await fireEvent.click(screen.getByText('feature/destination'))
     await fireEvent.doubleClick(screen.getByText('feature/destination'))
 
-    expect(navigation.selectRepoWorktree).toHaveBeenCalledWith(REPO_ID, WORKTREE_PATH)
+    expect(navigation.selectRepoWorktree).toHaveBeenCalledOnce()
+    expect(navigation.selectRepoWorktree).toHaveBeenCalledWith({
+      routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+    })
     expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
       expect.objectContaining({
         routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
@@ -241,7 +245,14 @@ describe('GitWorkspaceNavigatorView', () => {
     seedRepoQueryDataForTest(repo, { branches: [branch], currentBranch: '' })
 
     renderGitWorkspaceNavigatorView()
+    await fireEvent.click(screen.getByText(branch.name))
     await fireEvent.doubleClick(screen.getByText(branch.name))
+
+    expect(navigation.selectRepoBranch).toHaveBeenCalledOnce()
+    expect(navigation.selectRepoBranch).toHaveBeenCalledWith({
+      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: branch.name },
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+    })
 
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({

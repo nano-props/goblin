@@ -29,6 +29,7 @@ import {
   workspacePaneCommandCoordinates,
   workspacePaneCommandPaneTarget,
   workspacePaneCommandRouteTarget,
+  workspacePaneCommandRuntimeId,
   workspacePaneCommandTargetHasFilesystem,
   workspacePaneCommandWorktreeHead,
   type WorkspacePaneCommandTarget,
@@ -130,6 +131,7 @@ async function showWorkspacePaneTabCommand({
   if (isWorkspacePaneStaticTabProvider(provider)) {
     const outcome = await dispatchOpenWorkspacePaneTargetStaticTabAction({
       workspaceId,
+      workspaceRuntimeId: workspacePaneCommandRuntimeId(target),
       routeTarget: workspacePaneCommandRouteTarget(target),
       paneTarget: workspacePaneCommandPaneTarget(target),
       worktreeHead: workspacePaneCommandWorktreeHead(target),
@@ -188,6 +190,7 @@ export async function runCloseWorkspacePaneTabCommand(options: CloseWorkspacePan
   try {
     return dispatchCloseWorkspacePaneTabAction({
       ...options,
+      workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
       ...workspacePaneCommandCoordinates(options.target),
       routeTarget: workspacePaneCommandRouteTarget(options.target),
       paneTarget: workspacePaneCommandPaneTarget(options.target),
@@ -210,6 +213,7 @@ export async function runCloseCurrentWorkspacePaneTabCommand(
   try {
     return dispatchCloseCurrentWorkspacePaneTabAction({
       ...options,
+      workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
       ...workspacePaneCommandCoordinates(options.target),
       routeTarget: workspacePaneCommandRouteTarget(options.target),
       paneTarget: workspacePaneCommandPaneTarget(options.target),
@@ -233,6 +237,7 @@ export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
     }
     return dispatchConfirmCloseTerminalWorkspacePaneTabAction({
       ...options,
+      workspaceRuntimeId: options.confirmedTerminal.base.target.workspaceRuntimeId,
       paneTarget,
       worktreeHead: undefined,
     })
@@ -248,6 +253,7 @@ export function runRetiredTerminalWorkspacePaneTabPresentationCommand(
   const routeTarget = workspacePaneCommandRouteTarget(options.target)
   return dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
     ...options,
+    workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
     workspaceId: routeTarget.workspaceId,
     ...workspacePaneCommandCoordinates(options.target),
     routeTarget,
@@ -262,6 +268,7 @@ export async function runSelectWorkspacePaneTabByIndexCommand(
   if (!options.workspaceId) return false
   return await dispatchSelectWorkspacePaneTabByIndexAction({
     ...options,
+    workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
     routeTarget: workspacePaneCommandRouteTarget(options.target),
     paneTarget: workspacePaneCommandPaneTarget(options.target),
     worktreeHead: workspacePaneCommandWorktreeHead(options.target),
@@ -273,6 +280,7 @@ export async function runMoveWorkspacePaneTabCommand(options: MoveWorkspacePaneT
   if (!options.workspaceId) return false
   return await dispatchMoveWorkspacePaneTabAction({
     ...options,
+    workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
     routeTarget: workspacePaneCommandRouteTarget(options.target),
     paneTarget: workspacePaneCommandPaneTarget(options.target),
     worktreeHead: workspacePaneCommandWorktreeHead(options.target),

@@ -502,7 +502,6 @@ describe('app route callback facades', () => {
     routerCallbacks.onRouteSettingsPageChange('general')
     routerCallbacks.onOpenWorkspaceNavigator(ROUTE_WORKSPACE_ID)
     routerCallbacks.onOpenWorkspaceDashboard(ROUTE_WORKSPACE_ID)
-    routerCallbacks.onOpenRepoBranch(ROUTE_WORKSPACE_ID, 'main')
     routerCallbacks.onOpenRepoNewWorktree(ROUTE_WORKSPACE_ID)
     routerCallbacks.onCancelRepoNewWorktree(ROUTE_WORKSPACE_ID)
     routerCallbacks.onReplaceRepoWorktree(ROUTE_WORKSPACE_ID, '/tmp/main-worktree', 1)
