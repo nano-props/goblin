@@ -458,6 +458,26 @@ describe('workspace route context derivation', () => {
       ]),
     ).toEqual({ kind: 'empty', workspaceSlug: 'L3JlcG8' })
   })
+
+  test('does not admit terminal parameters into a bare branch route context', async () => {
+    expect(
+      workspaceRouteContextFromMatches([
+        {
+          routeId: '/workspace/$workspaceSlug/branch/$branchSlug',
+          params: { workspaceSlug: 'L3JlcG8', branchSlug: 'ZmVhdHVyZS9h' },
+        },
+        {
+          routeId: '/workspace/$workspaceSlug/branch/$branchSlug/terminal/$terminalSessionId',
+          params: { terminalSessionId: 'term-111111111111111111111' },
+        },
+      ]),
+    ).toEqual({
+      kind: 'branch',
+      workspaceSlug: 'L3JlcG8',
+      branchName: 'feature/a',
+      workspacePaneRoute: null,
+    })
+  })
 })
 
 describe('app route callback facades', () => {

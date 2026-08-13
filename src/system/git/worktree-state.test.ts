@@ -38,6 +38,22 @@ describe('readGitWorktreeState', () => {
     })
   })
 
+  test.each([null, 'plain/branch', 'detached HEAD'])(
+    'falls back to bisect branch authority when rebase head-name is %s',
+    async (headName) => {
+      const rebaseMergePath = await gitPath('rebase-merge')
+      await mkdir(rebaseMergePath)
+      if (headName !== null) await writeFile(path.join(rebaseMergePath, 'head-name'), `${headName}\n`)
+      await writeFile(await gitPath('BISECT_LOG'), 'git bisect start\n')
+      await writeFile(await gitPath('BISECT_START'), 'feature/example\n')
+
+      await expect(readGitWorktreeState(repoPath)).resolves.toEqual({
+        operation: { kind: 'rebase' },
+        materializedBranch: 'feature/example',
+      })
+    },
+  )
+
   test.each(['rebase-merge', 'rebase-apply'])('ignores a non-directory %s marker', async (marker) => {
     await writeFile(await gitPath(marker), 'not a rebase directory\n')
 

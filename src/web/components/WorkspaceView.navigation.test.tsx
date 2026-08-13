@@ -26,6 +26,8 @@ import {
 } from '#/web/test-utils/workspace-view.tsx'
 
 describe('WorkspaceView workspace navigation and restore', () => {
+  const worktreePath = '/tmp/repo-view-feature-a'
+
   test('keeps workspace pane scroll memory across a dashboard round trip', async () => {
     workspacePaneMocks.scrollMemoryProbe = true
     const result = render(branchWorkspaceView())
@@ -49,9 +51,9 @@ describe('WorkspaceView workspace navigation and restore', () => {
     const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoMetadataQueries')
     const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const terminalRoute = {
-      kind: 'branch' as const,
+      kind: 'worktree' as const,
       workspaceId: REPO_ID,
-      branchName: 'feature/a',
+      worktreePath,
       workspacePaneRoute: { kind: 'terminal' as const, terminalSessionId: 'term-test-1' },
     }
     const result = render(<WorkspaceView workspaceId={REPO_ID} routeView={terminalRoute} />)
@@ -61,9 +63,9 @@ describe('WorkspaceView workspace navigation and restore', () => {
         <WorkspaceView
           workspaceId={REPO_ID}
           routeView={{
-            kind: 'branch',
+            kind: 'worktree',
             workspaceId: REPO_ID,
-            branchName: 'feature/a',
+            worktreePath,
             workspacePaneRoute: { kind: 'static', tab: 'status' },
           }}
         />,
@@ -80,9 +82,9 @@ describe('WorkspaceView workspace navigation and restore', () => {
     const invalidateSnapshot = vi.spyOn(repoDataQuery, 'invalidateRepoMetadataQueries')
     const invalidateStatus = vi.spyOn(repoDataQuery, 'invalidateRepoWorktreeStatusQueries')
     const terminalRoute = {
-      kind: 'branch' as const,
+      kind: 'worktree' as const,
       workspaceId: REPO_ID,
-      branchName: 'feature/a',
+      worktreePath,
       workspacePaneRoute: { kind: 'terminal' as const, terminalSessionId: 'term-test-1' },
     }
     const result = render(<WorkspaceView workspaceId={REPO_ID} routeView={terminalRoute} />)
@@ -92,9 +94,9 @@ describe('WorkspaceView workspace navigation and restore', () => {
         <WorkspaceView
           workspaceId={REPO_ID}
           routeView={{
-            kind: 'branch',
+            kind: 'worktree',
             workspaceId: REPO_ID,
-            branchName: 'feature/a',
+            worktreePath,
             workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-test-2' },
           }}
         />,
@@ -126,9 +128,9 @@ describe('WorkspaceView workspace navigation and restore', () => {
       <WorkspaceView
         workspaceId={REPO_ID}
         routeView={{
-          kind: 'branch',
+          kind: 'worktree',
           workspaceId: REPO_ID,
-          branchName: 'feature/a',
+          worktreePath,
           workspacePaneRoute: { kind: 'static', tab: 'history' },
         }}
       />,
@@ -166,9 +168,9 @@ describe('WorkspaceView workspace navigation and restore', () => {
       <WorkspaceView
         workspaceId={REPO_ID}
         routeView={{
-          kind: 'branch',
+          kind: 'worktree',
           workspaceId: REPO_ID,
-          branchName: 'feature/a',
+          worktreePath,
           workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-test-1' },
         }}
       />,

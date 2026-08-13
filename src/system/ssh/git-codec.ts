@@ -47,6 +47,9 @@ export function decodeRemoteGitWorktreeState(output: string): RemoteGitWorktreeS
   const kind = operationRecord.slice('operation '.length)
   const operation = decodeGitOperationKind(kind)
   const rawBranchName = branchRecord === 'materialized-branch' ? '' : branchRecord.slice('materialized-branch '.length)
+  if (operation?.kind === 'rebase' && rawBranchName && rawBranchName !== 'detached HEAD') {
+    if (!rawBranchName.startsWith('refs/heads/')) throw new Error('error.failed-read-repo')
+  }
   const branchName = rawBranchName.startsWith('refs/heads/') ? rawBranchName.slice('refs/heads/'.length) : rawBranchName
   const materializedBranch =
     !branchName || branchName === 'detached HEAD' || /^[0-9a-f]{40,64}$/i.test(branchName) ? null : branchName

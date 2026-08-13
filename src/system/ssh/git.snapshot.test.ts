@@ -118,7 +118,7 @@ describe('remote git snapshot', () => {
         case 'gitWorktreeList':
           return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
         case 'gitOperationState':
-          return okRemoteResult('operation rebase\nmaterialized-branch feature/in-progress\n')
+          return okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/in-progress\n')
         default:
           return okRemoteResult('')
       }
@@ -204,6 +204,21 @@ describe('remote git snapshot', () => {
       },
       { kind: 'git-branch', branchName: 'main' },
     ])
+  })
+
+  test('rejects a plain branch name from the remote rebase protocol', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+      }
+      if (command.type === 'gitOperationState') {
+        return okRemoteResult('operation rebase\nmaterialized-branch feature/in-progress\n')
+      }
+      if (command.type === 'gitLocalBranches') return okRemoteResult('main\nfeature/in-progress')
+      throw new Error(`unexpected command: ${command.type}`)
+    })
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('retains a remote bisect branch while presenting a concurrent cherry-pick', async () => {

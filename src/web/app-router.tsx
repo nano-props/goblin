@@ -8,7 +8,7 @@ import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import { createAppHistoryPresentationHistory } from '#/web/app-history-presentation.ts'
 import { App } from '#/web/App.tsx'
-import type { ParsedWorkspacePaneRoute, WorkspaceRouteView } from '#/web/App.tsx'
+import type { ParsedBranchWorkspacePaneRouteTarget, ParsedWorkspacePaneRoute, WorkspaceRouteView } from '#/web/App.tsx'
 import { Layout } from '#/web/Layout.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { useAppRouteNavigation } from '#/web/app-route-navigation.ts'
@@ -257,7 +257,7 @@ export function workspaceRouteViewFromChildRoute(
   return { kind: 'empty', workspaceId }
 }
 
-function workspacePaneStaticRouteFromTabKey(tabKey: string | null | undefined): ParsedWorkspacePaneRoute | null {
+function workspacePaneStaticRouteFromTabKey(tabKey: string | null | undefined): ParsedBranchWorkspacePaneRouteTarget {
   if (!tabKey) return null
   if (isWorkspacePaneStaticTabType(tabKey)) return { kind: 'static', tab: tabKey }
   return { kind: 'invalid-static', tabKey }

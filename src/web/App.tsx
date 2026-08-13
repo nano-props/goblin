@@ -27,7 +27,7 @@ export type WorkspaceRouteView =
       kind: 'branch'
       workspaceId: WorkspaceId
       branchName: string
-      workspacePaneRoute: ParsedWorkspacePaneRoute | null
+      workspacePaneRoute: ParsedBranchWorkspacePaneRouteTarget
     }
   | { kind: 'newWorktree'; workspaceId: WorkspaceId }
 
@@ -38,6 +38,8 @@ export type WorkspacePaneRouteTarget = WorkspacePaneRoute | null
 export type BranchWorkspacePaneRouteTarget = Extract<WorkspacePaneRoute, { kind: 'static' }> | null
 export type ParsedWorkspacePaneRoute = WorkspacePaneRoute | { kind: 'invalid-static'; tabKey: string }
 export type ParsedWorkspacePaneRouteTarget = ParsedWorkspacePaneRoute | null
+export type ParsedBranchWorkspacePaneRouteTarget =
+  BranchWorkspacePaneRouteTarget | Extract<ParsedWorkspacePaneRoute, { kind: 'invalid-static' }>
 
 export interface AppProps {
   routeSettingsPage?: SettingsPage | null

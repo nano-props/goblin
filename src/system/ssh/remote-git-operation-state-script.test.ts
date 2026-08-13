@@ -69,6 +69,24 @@ describe('remote Git operation state script', () => {
 
     expect(state.stdout).toBe(`operation ${kind}\nmaterialized-branch feature/example`)
   })
+
+  test.each([null, 'plain/branch', 'detached HEAD'])(
+    'falls back to bisect branch authority when rebase head-name is %s',
+    async (headName) => {
+      const repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin remote rebase bisect '))
+      tempDirectories.push(repoPath)
+      await execa('git', ['init', '-q', repoPath])
+      const rebaseMergePath = await resolveGitPath(repoPath, 'rebase-merge')
+      await mkdir(rebaseMergePath)
+      if (headName !== null) await writeFile(path.join(rebaseMergePath, 'head-name'), `${headName}\n`)
+      await writeFile(await resolveGitPath(repoPath, 'BISECT_LOG'), 'git bisect start\n')
+      await writeFile(await resolveGitPath(repoPath, 'BISECT_START'), 'feature/example\n')
+
+      const state = await execa('sh', ['-c', remoteGitOperationStateScript(repoPath, null)])
+
+      expect(state.stdout).toBe('operation rebase\nmaterialized-branch refs/heads/feature/example')
+    },
+  )
 })
 
 async function resolveGitPath(repoPath: string, marker: string): Promise<string> {

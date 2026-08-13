@@ -1,6 +1,7 @@
 import type { RouteLocationRaw, Router } from 'vue-router'
 import type {
   BranchWorkspacePaneRouteTarget,
+  ParsedBranchWorkspacePaneRouteTarget,
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
 } from '#/web/App.tsx'
@@ -11,9 +12,6 @@ import { parsedWorkspacePaneRouteFromTargetHref } from '#/web/app-route-href.ts'
 import type { AppRouteNavigationOptions, FilesystemWorkspacePaneRouteTarget } from '#/web/app-route-navigation.ts'
 import { appRouteHref, currentAppRouteHref, navigateAppRoute } from '#/web/app-router-location.ts'
 import { branchSlugFromName, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
-
-type ParsedBranchWorkspacePaneRouteTarget =
-  BranchWorkspacePaneRouteTarget | Extract<ParsedWorkspacePaneRouteTarget, { kind: 'invalid-static' }>
 
 export async function commitFilesystemWorkspacePaneRoute(input: {
   router: Router

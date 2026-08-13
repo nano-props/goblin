@@ -1,7 +1,11 @@
 import { computed, toValue, watch } from 'vue'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type {
+  BranchWorkspacePaneRouteTarget,
+  ParsedWorkspacePaneRouteTarget,
+  WorkspacePaneRouteTarget,
+} from '#/web/App.tsx'
 import {
   useWorkspaceNavigationHistory,
   type WorkspaceNavigationRouteContext,
@@ -94,11 +98,13 @@ function workspacePaneHistoryRouteContext({
     return { kind: 'worktree', workspaceId, worktreePath: routeTarget.worktreePath, workspacePaneRoute: route }
   }
   if (routeTarget.kind === 'git-branch') {
+    if (route?.kind === 'terminal') throw new Error('branch history cannot record runtime tabs')
+    const branchRoute: BranchWorkspacePaneRouteTarget = route
     return {
       kind: 'branch',
       workspaceId,
       branchName: routeTarget.branchName,
-      workspacePaneRoute: route,
+      workspacePaneRoute: branchRoute,
     }
   }
   return null

@@ -7,7 +7,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/workspaces/navigation-history-entry.ts'
-import type { WorkspacePaneRoute } from '#/web/App.tsx'
+import type { BranchWorkspacePaneRouteTarget, WorkspacePaneRoute } from '#/web/App.tsx'
 import {
   workspacePaneRouteNavigationBlockedForBranch,
   workspacePaneRouteNavigationBlockedForWorktree,
@@ -27,7 +27,7 @@ export type WorkspaceNavigationRouteContext =
       kind: 'branch'
       workspaceId: WorkspaceId
       branchName: string
-      workspacePaneRoute: WorkspacePaneRoute | null
+      workspacePaneRoute: BranchWorkspacePaneRouteTarget
     }
 
 interface WorkspaceNavigationHistoryOptions {
@@ -172,8 +172,7 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
         workspaceId,
         kind: 'branch',
         branchName: routeContext.branchName,
-        workspacePaneTab:
-          routeContext.workspacePaneRoute?.kind === 'static' ? routeContext.workspacePaneRoute.tab : null,
+        workspacePaneTab: routeContext.workspacePaneRoute?.tab ?? null,
       }
     }
   }

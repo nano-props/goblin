@@ -449,7 +449,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
 
 function workspaceRouteViewIsTerminal(routeView: WorkspaceRouteView | null): boolean {
   return (
-    (routeView?.kind === 'branch' || routeView?.kind === 'worktree' || routeView?.kind === 'workspace-root') &&
+    (routeView?.kind === 'worktree' || routeView?.kind === 'workspace-root') &&
     routeView.workspacePaneRoute?.kind === 'terminal'
   )
 }

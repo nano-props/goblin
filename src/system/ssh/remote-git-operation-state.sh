@@ -54,9 +54,18 @@ fi
 
 MATERIALIZED_BRANCH=$ATTACHED_BRANCH
 if [ -z "$MATERIALIZED_BRANCH" ] && [ -n "$REBASE_DIRECTORY" ] && [ -f "$REBASE_DIRECTORY/head-name" ]; then
-  MATERIALIZED_BRANCH=$(<"$REBASE_DIRECTORY/head-name")
-elif [ -z "$MATERIALIZED_BRANCH" ] && [ -e "$BISECT_LOG" ] && [ -f "$BISECT_START" ]; then
+  REBASE_HEAD_NAME=$(<"$REBASE_DIRECTORY/head-name")
+  if [[ "$REBASE_HEAD_NAME" == refs/heads/* ]]; then
+    MATERIALIZED_BRANCH=$REBASE_HEAD_NAME
+  fi
+fi
+if [ -z "$MATERIALIZED_BRANCH" ] && [ -e "$BISECT_LOG" ] && [ -f "$BISECT_START" ]; then
   MATERIALIZED_BRANCH=$(<"$BISECT_START")
+  if [ "$MATERIALIZED_BRANCH" = 'detached HEAD' ] || [[ "$MATERIALIZED_BRANCH" =~ ^[0-9a-fA-F]{40,64}$ ]]; then
+    MATERIALIZED_BRANCH=
+  elif [ "$OPERATION" = rebase ] && [[ "$MATERIALIZED_BRANCH" != refs/heads/* ]]; then
+    MATERIALIZED_BRANCH=refs/heads/$MATERIALIZED_BRANCH
+  fi
 fi
 
 printf 'operation %s\n' "$OPERATION"

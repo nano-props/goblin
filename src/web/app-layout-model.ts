@@ -1,5 +1,5 @@
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedBranchWorkspacePaneRouteTarget, ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import { returnToFromHref } from '#/web/app-route-href.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
@@ -9,7 +9,12 @@ import type { RouteLocationNormalizedLoaded } from 'vue-router'
 export type WorkspaceRouteContext =
   | { kind: 'empty' | 'dashboard' | 'newWorktree'; workspaceSlug: string }
   | { kind: 'workspace-root'; workspaceSlug: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
-  | { kind: 'branch'; workspaceSlug: string; branchName: string; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
+  | {
+      kind: 'branch'
+      workspaceSlug: string
+      branchName: string
+      workspacePaneRoute: ParsedBranchWorkspacePaneRouteTarget
+    }
   | {
       kind: 'worktree'
       workspaceSlug: string
@@ -52,7 +57,7 @@ export function workspaceRouteContextFromMatches(
           kind: 'branch',
           workspaceSlug,
           branchName,
-          workspacePaneRoute: workspacePaneRouteFromMatches(matches),
+          workspacePaneRoute: workspacePaneStaticRouteFromMatches(matches),
         }
       : { kind: 'empty', workspaceSlug }
   }
@@ -81,7 +86,7 @@ export function workspaceRouteContextFromVueRoute(route: RouteLocationNormalized
   if (branchSlug) {
     const branchName = branchNameFromSlug(branchSlug)
     return branchName
-      ? { kind: 'branch', workspaceSlug, branchName, workspacePaneRoute: workspacePaneRouteFromVueRoute(route) }
+      ? { kind: 'branch', workspaceSlug, branchName, workspacePaneRoute: workspacePaneStaticRouteFromVueRoute(route) }
       : { kind: 'empty', workspaceSlug }
   }
 
@@ -130,10 +135,28 @@ function workspacePaneRouteFromMatches(
   return isWorkspacePaneStaticTabType(tabKey) ? { kind: 'static', tab: tabKey } : { kind: 'invalid-static', tabKey }
 }
 
+function workspacePaneStaticRouteFromMatches(
+  matches: Array<{ routeId: string; params: Record<string, string> }>,
+): ParsedBranchWorkspacePaneRouteTarget {
+  const tabMatch = [...matches].reverse().find((match) => typeof match.params.tabKey === 'string')
+  return workspacePaneStaticRouteFromTabKey(tabMatch?.params.tabKey)
+}
+
 function workspacePaneRouteFromVueRoute(route: RouteLocationNormalizedLoaded): ParsedWorkspacePaneRoute | null {
   const terminalSessionId = routeStringParam(route.params.terminalSessionId)
   if (terminalSessionId) return { kind: 'terminal', terminalSessionId }
   const tabKey = routeStringParam(route.params.tabKey)
+  if (!tabKey) return null
+  return isWorkspacePaneStaticTabType(tabKey) ? { kind: 'static', tab: tabKey } : { kind: 'invalid-static', tabKey }
+}
+
+function workspacePaneStaticRouteFromVueRoute(
+  route: RouteLocationNormalizedLoaded,
+): ParsedBranchWorkspacePaneRouteTarget {
+  return workspacePaneStaticRouteFromTabKey(routeStringParam(route.params.tabKey))
+}
+
+function workspacePaneStaticRouteFromTabKey(tabKey: string | null | undefined): ParsedBranchWorkspacePaneRouteTarget {
   if (!tabKey) return null
   return isWorkspacePaneStaticTabType(tabKey) ? { kind: 'static', tab: tabKey } : { kind: 'invalid-static', tabKey }
 }

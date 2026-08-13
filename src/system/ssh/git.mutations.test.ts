@@ -124,7 +124,7 @@ describe('remote git mutations', () => {
         case 'gitWorktreeList':
           return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
         case 'gitOperationState':
-          return okRemoteResult('operation rebase\nmaterialized-branch feature/test\n')
+          return okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/test\n')
         case 'gitSnapshot':
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
         case 'gitRemoteVerbose':
@@ -399,7 +399,7 @@ describe('remote git mutations', () => {
           return okRemoteResult('')
         case 'gitOperationState':
           return command.path === '/srv/repo-rebase'
-            ? okRemoteResult('operation rebase\nmaterialized-branch feature/test\n')
+            ? okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/test\n')
             : okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
         case 'gitSnapshot':
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
