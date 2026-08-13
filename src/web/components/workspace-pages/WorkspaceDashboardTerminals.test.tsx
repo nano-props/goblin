@@ -179,7 +179,7 @@ describe('WorkspaceDashboardTerminals', () => {
     const commitWorkspacePaneRoute = vi.fn<AppNavigationActions['commitWorkspacePaneRoute']>()
 
     renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute, vi.fn(), commitWorkspacePaneRoute)
-    expect(screen.getByText('worktree-state.detached')).toBeTruthy()
+    expect(screen.getByText('1234567')).toBeTruthy()
     await userEvent.click(screen.getByText('Detached shell'))
 
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
@@ -217,7 +217,7 @@ describe('WorkspaceDashboardTerminals', () => {
     renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute, vi.fn(), commitWorkspacePaneRoute)
 
     expect(screen.getByText('dashboard.terminals.worktree-unavailable')).toBeTruthy()
-    expect(screen.queryByText('worktree-state.detached')).toBeNull()
+    expect(screen.queryByText('1234567')).toBeNull()
     expect(screen.queryByText('dashboard.terminals.detached-worktree')).toBeNull()
     const row = screen.getByRole('button', { name: /Missing worktree shell/ }) as HTMLButtonElement
     expect(row.disabled).toBe(true)
@@ -245,7 +245,7 @@ describe('WorkspaceDashboardTerminals', () => {
 
     renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute, vi.fn(), commitWorkspacePaneRoute)
     expect(screen.getByText('dashboard.terminals.worktree-unknown')).toBeTruthy()
-    expect(screen.queryByText('worktree-state.detached')).toBeNull()
+    expect(screen.queryByText('1234567')).toBeNull()
     expect(screen.queryByText('dashboard.terminals.detached-worktree')).toBeNull()
     await userEvent.click(screen.getByText('Branch shell'))
 

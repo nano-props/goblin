@@ -201,6 +201,36 @@ describe('BranchView', () => {
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).not.toHaveBeenCalled()
   })
 
+  test('opens a detached worktree status through its canonical worktree target', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: null,
+      worktrees: [
+        {
+          path: WORKTREE_PATH,
+          head: { kind: 'detached' },
+          headOid: '0123456789abcdef',
+          operation: null,
+          materializedBranch: null,
+          isPrimary: false,
+          isLocked: false,
+        },
+      ],
+    })
+
+    renderBranchView()
+    await fireEvent.doubleClick(screen.getByText('0123456'))
+
+    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      }),
+      { kind: 'static', tab: 'status' },
+    )
+    expect(mocks.dispatchShowWorkspacePaneStaticTabAction).not.toHaveBeenCalled()
+  })
+
   test('opens an unmaterialized branch status through its branch target', async () => {
     const branch = createRepoBranch('feature/destination')
     const repo = seedRepoWithReadModelForTest({

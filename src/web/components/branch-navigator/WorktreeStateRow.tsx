@@ -43,25 +43,30 @@ export const WorktreeStateRow = defineComponent<WorktreeStateRowProps>({
     return () => {
       const label = worktreePresentationLabel(props.worktree, t)
       const shortHead = props.worktree.headOid.slice(0, 7)
+      const metadata = props.worktree.operation ? `${shortHead} · ${props.worktree.path}` : props.worktree.path
       return (
         <NavigatorRow
           rowRef={props.selected ? props.selectedRef : undefined}
           selected={props.selected}
           onClick={props.onSelect}
           onDblclick={props.onOpenStatus}
-          contentClass="gap-2"
           content={
-            <>
-              <GitCommitHorizontal size={15} class="shrink-0 text-warning" />
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-sm font-medium" title={label}>
+            <div class="flex min-w-0 items-center gap-1.5" title={`${label}, ${metadata}`}>
+              <span class="flex w-4 shrink-0 items-center justify-center">
+                <GitCommitHorizontal size={14} class="text-warning" aria-hidden="true" />
+              </span>
+              <span class="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                <span class="shrink-0 truncate text-[13px] font-normal leading-5" title={label}>
                   {label}
                 </span>
-                <span class="block truncate text-[10px] text-muted-foreground" title={props.worktree.path}>
-                  {shortHead} · {props.worktree.path}
+                <span
+                  class="min-w-0 truncate whitespace-nowrap text-xs text-muted-foreground"
+                  title={props.worktree.path}
+                >
+                  {metadata}
                 </span>
               </span>
-            </>
+            </div>
           }
           actions={
             <span class="flex items-center gap-1">
@@ -80,7 +85,7 @@ type Translator = (key: string, params?: Record<string, string | number>) => str
 export function worktreePresentationLabel(worktree: RepoWorktreeSnapshot, t: Translator): string {
   if (worktree.head.kind === 'branch' && !worktree.operation) return worktree.head.branchName
   const operation = worktree.operation
-  if (!operation) return t('worktree-state.detached')
+  if (!operation) return worktree.headOid.slice(0, 7)
   if (operation.kind === 'rebase') {
     return worktree.materializedBranch
       ? t('worktree-state.rebase-branch', { branch: worktree.materializedBranch })

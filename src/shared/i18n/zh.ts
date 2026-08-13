@@ -236,7 +236,6 @@ export const zh: Record<DictKey, string> = {
   'dashboard.terminals.workspace-root': '工作区',
   'dashboard.terminals.worktree-unknown': '工作树状态未知',
   'dashboard.terminals.worktree-unavailable': '工作树不可用',
-  'worktree-state.detached': '分离 HEAD',
   'worktree-state.rebase': '正在变基',
   'worktree-state.rebase-branch': '正在变基 {branch}',
   'worktree-state.merge': '正在合并',

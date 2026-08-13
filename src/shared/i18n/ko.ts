@@ -242,7 +242,6 @@ export const ko: Record<DictKey, string> = {
   'dashboard.terminals.workspace-root': '워크스페이스',
   'dashboard.terminals.worktree-unknown': 'worktree 상태를 알 수 없음',
   'dashboard.terminals.worktree-unavailable': 'worktree를 사용할 수 없음',
-  'worktree-state.detached': '분리된 HEAD',
   'worktree-state.rebase': '리베이스 진행 중',
   'worktree-state.rebase-branch': '{branch} 리베이스 중',
   'worktree-state.merge': '병합 진행 중',

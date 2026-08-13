@@ -252,7 +252,6 @@ export const ja: Record<DictKey, string> = {
   'dashboard.terminals.workspace-root': 'ワークスペース',
   'dashboard.terminals.worktree-unknown': 'ワークツリーの状態は不明です',
   'dashboard.terminals.worktree-unavailable': 'ワークツリーを利用できません',
-  'worktree-state.detached': 'デタッチされた HEAD',
   'worktree-state.rebase': 'リベース中',
   'worktree-state.rebase-branch': '{branch} をリベース中',
   'worktree-state.merge': 'マージ中',

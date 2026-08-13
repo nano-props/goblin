@@ -252,7 +252,6 @@ export const en = {
   'dashboard.terminals.workspace-root': 'Workspace',
   'dashboard.terminals.worktree-unknown': 'Worktree state unknown',
   'dashboard.terminals.worktree-unavailable': 'Worktree unavailable',
-  'worktree-state.detached': 'Detached HEAD',
   'worktree-state.rebase': 'Rebase in progress',
   'worktree-state.rebase-branch': 'Rebasing {branch}',
   'worktree-state.merge': 'Merge in progress',
