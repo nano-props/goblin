@@ -110,6 +110,32 @@ describe('remote git snapshot', () => {
     )
   })
 
+  test('includes detached operation state in remote worktree snapshots', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      switch (command.type) {
+        case 'gitSnapshot':
+          return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
+        case 'gitWorktreeList':
+          return okRemoteResult(worktreePorcelain('worktree /srv/repo\nHEAD f00ba40\ndetached'))
+        case 'gitOperationState':
+          return okRemoteResult('operation rebase\nmaterialized-branch feature/in-progress\n')
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    const snapshot = await getRemoteSnapshot(TARGET, { run })
+
+    expect(snapshot.worktrees).toEqual([
+      expect.objectContaining({
+        path: '/srv/repo',
+        head: { kind: 'detached' },
+        operation: { kind: 'rebase' },
+        materializedBranch: 'feature/in-progress',
+      }),
+    ])
+  })
+
   test('reads remote workspace-pane identity without status or remote display commands', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
       if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
