@@ -3,6 +3,7 @@ import {
   seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -140,13 +141,10 @@ describe('workspace pane destination navigation', () => {
     })
     await routeNavigation.started
     seedRepoQueryDataForTest(repo, {
-      branches: [
-        createRepoBranch('feature/current', {
-          worktree: { path: CURRENT_WORKTREE, isPrimary: false, isLocked: false },
-        }),
-        createRepoBranch('feature/destination', {
-          worktree: { path: '/tmp/goblin-replaced-worktree', isPrimary: false, isLocked: false },
-        }),
+      branches: [createRepoBranch('feature/current'), createRepoBranch('feature/destination')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/current', CURRENT_WORKTREE),
+        createRepoWorktreeSnapshotForTest('feature/destination', '/tmp/goblin-replaced-worktree'),
       ],
       currentBranch: 'feature/current',
     })
@@ -358,17 +356,18 @@ function seedNoWorktreeRepo() {
 }
 
 function seedDestinationRepo() {
-  const current = createRepoBranch('feature/current', {
-    worktree: { path: CURRENT_WORKTREE, isPrimary: false, isLocked: false },
-  })
-  const destination = createRepoBranch('feature/destination', {
-    worktree: { path: DESTINATION_WORKTREE, isPrimary: false, isLocked: false },
-  })
+  const current = createRepoBranch('feature/current')
+  const destination = createRepoBranch('feature/destination')
+  const worktrees = [
+    createRepoWorktreeSnapshotForTest(current.name, CURRENT_WORKTREE),
+    createRepoWorktreeSnapshotForTest(destination.name, DESTINATION_WORKTREE),
+  ]
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [current, destination],
+    worktrees,
     currentBranchName: current.name,
   })
-  seedRepoQueryDataForTest(repo, { branches: [current, destination], currentBranch: current.name })
+  seedRepoQueryDataForTest(repo, { branches: [current, destination], worktrees, currentBranch: current.name })
   return repo
 }

@@ -2,6 +2,7 @@ import {
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
@@ -18,21 +19,25 @@ import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import { restoreFiletreeViewStateFromSession } from '#/web/filetree-session-state.ts'
+import {
+  filetreeInteractionScopeKey,
+  filetreeInteractionStore,
+  resetFiletreeInteractionStore,
+} from '#/web/stores/workspaces/filetree-interaction-state.ts'
 
 describe('restorable-workspace-state', () => {
   beforeEach(() => {
     resetWorkspacesStore()
+    resetFiletreeInteractionStore()
   })
 
   test('maps restorable workspace state into ClientWorkspaceState', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: '/tmp/worktree', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', '/tmp/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
@@ -121,7 +126,7 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('drops target-scoped state for worktrees absent from the authoritative branch projection', () => {
+  test('drops target-scoped state for worktrees absent from authoritative worktree membership', () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       branchSnapshots: [createBranchSnapshot('main')],
@@ -155,16 +160,175 @@ describe('restorable-workspace-state', () => {
     })
   })
 
+  test('rejects a branch target after that branch materializes as a worktree', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [createBranchSnapshot('feature/materialized')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/materialized', '/tmp/materialized-worktree')],
+      currentBranchName: 'feature/materialized',
+    })
+    const staleBranchTargetKey = workspacePaneTabsTargetIdentityKey({
+      kind: 'git-branch',
+      workspaceId: repo.id,
+      branchName: 'feature/materialized',
+    })
+    repo.ui.preferredWorkspacePaneTabByTarget[staleBranchTargetKey] = 'history'
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'git-branch',
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      branchName: 'feature/materialized',
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+
+    expect(
+      clientWorkspaceStateFromRestorableWorkspaceState({
+        workspaces: { [repo.id]: repo },
+        restorableWorkspaceState: {
+          workspaceOrder: [repo.id],
+          restoredWorkspaceId: repo.id,
+          zenMode: false,
+          workspacePaneSize: 55,
+          branchViewModeByWorkspace: {},
+          selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+        },
+      }).preferredWorkspacePaneTabByTargetByWorkspace,
+    ).toEqual({})
+  })
+
+  test('persists and restores detached and rebasing worktree session state from worktree membership', () => {
+    const detachedPath = '/tmp/detached-worktree'
+    const rebasingPath = '/tmp/rebasing-worktree'
+    const detachedTargetKey = worktreeTargetKey('goblin+file:///tmp/repo', detachedPath)
+    const rebasingTargetKey = worktreeTargetKey('goblin+file:///tmp/repo', rebasingPath)
+    const repo = seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [createBranchSnapshot('main')],
+      currentBranchName: 'main',
+      worktrees: [
+        {
+          path: detachedPath,
+          head: { kind: 'detached' },
+          headOid: '1111111111111111111111111111111111111111',
+          operation: null,
+          isPrimary: false,
+          isLocked: false,
+        },
+        {
+          path: rebasingPath,
+          head: { kind: 'detached' },
+          headOid: '2222222222222222222222222222222222222222',
+          operation: { kind: 'rebase', branchName: 'feature/rebase' },
+          isPrimary: false,
+          isLocked: false,
+        },
+      ],
+    })
+    repo.ui.preferredWorkspacePaneTabByTarget[detachedTargetKey] = 'files'
+    repo.ui.preferredWorkspacePaneTabByTarget[rebasingTargetKey] = 'terminal'
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'git-worktree',
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      worktreePath: detachedPath,
+      tabs: [workspacePaneStaticTabEntry('files')],
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'git-worktree',
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      worktreePath: rebasingPath,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    const detachedTerminalTargetKey = formatTerminalFilesystemTargetKey(
+      repo.id,
+      workspaceIdForTest('goblin+file:///tmp/detached-worktree'),
+    )
+    const rebasingTerminalTargetKey = formatTerminalFilesystemTargetKey(
+      repo.id,
+      workspaceIdForTest('goblin+file:///tmp/rebasing-worktree'),
+    )
+
+    const persisted = clientWorkspaceStateFromRestorableWorkspaceState({
+      workspaces: { [repo.id]: repo },
+      restorableWorkspaceState: {
+        workspaceOrder: [repo.id],
+        restoredWorkspaceId: repo.id,
+        zenMode: false,
+        workspacePaneSize: 55,
+        branchViewModeByWorkspace: {},
+        selectedTerminalSessionIdByTerminalFilesystemTarget: {
+          [detachedTerminalTargetKey]: 'term-detached00000000000',
+          [rebasingTerminalTargetKey]: 'term-rebasing00000000000',
+        },
+      },
+      filetreeInteractionByScope: {
+        [filetreeInteractionScopeKey(repo.id, detachedPath)]: {
+          selectedKeys: ['detached.ts'],
+          expandedKeys: ['src'],
+          topVisibleRowIndex: 12,
+        },
+        [filetreeInteractionScopeKey(repo.id, rebasingPath)]: {
+          selectedKeys: ['rebasing.ts'],
+          expandedKeys: ['packages'],
+          topVisibleRowIndex: 34,
+        },
+      },
+    })
+
+    expect(persisted.preferredWorkspacePaneTabByTargetByWorkspace[repo.id]).toEqual({
+      [detachedTargetKey]: 'files',
+      [rebasingTargetKey]: 'terminal',
+    })
+    expect(persisted.selectedTerminalSessionIdByTerminalFilesystemTarget).toEqual({
+      [detachedTerminalTargetKey]: 'term-detached00000000000',
+      [rebasingTerminalTargetKey]: 'term-rebasing00000000000',
+    })
+    expect(persisted.filetreeViewStateByFilesystemTargetByWorkspace[repo.id]).toEqual({
+      'goblin+file:///tmp/detached-worktree': {
+        selectedKeys: ['detached.ts'],
+        expandedKeys: ['src'],
+        topVisibleRowIndex: 12,
+      },
+      'goblin+file:///tmp/rebasing-worktree': {
+        selectedKeys: ['rebasing.ts'],
+        expandedKeys: ['packages'],
+        topVisibleRowIndex: 34,
+      },
+    })
+
+    const restored = restoreRestorableWorkspaceStateFromClientWorkspace(persisted)
+    expect(restored.preferredWorkspacePaneTabByTargetByWorkspace[repo.id]).toEqual({
+      [detachedTargetKey]: 'files',
+      [rebasingTargetKey]: 'terminal',
+    })
+    expect(restored.selectedTerminalSessionIdByTerminalFilesystemTarget).toEqual({
+      [detachedTerminalTargetKey]: 'term-detached00000000000',
+      [rebasingTerminalTargetKey]: 'term-rebasing00000000000',
+    })
+
+    restoreFiletreeViewStateFromSession(persisted.filetreeViewStateByFilesystemTargetByWorkspace)
+    expect(filetreeInteractionStore.getState().interactionByScope).toMatchObject({
+      [filetreeInteractionScopeKey(repo.id, detachedPath)]: {
+        selectedKeys: ['detached.ts'],
+        expandedKeys: ['src'],
+        topVisibleRowIndex: 12,
+      },
+      [filetreeInteractionScopeKey(repo.id, rebasingPath)]: {
+        selectedKeys: ['rebasing.ts'],
+        expandedKeys: ['packages'],
+        topVisibleRowIndex: 34,
+      },
+    })
+  })
+
   test('preserves target-scoped baseline state for restore stub Workspaces', () => {
     const activeTargetKey = worktreeTargetKey('goblin+file:///tmp/repo-a', '/tmp/active-worktree')
     const stubTargetKey = worktreeTargetKey('goblin+file:///tmp/repo-b', '/tmp/stub-worktree')
     const activeRepo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo-a',
-      branchSnapshots: [
-        createBranchSnapshot('feature/active', {
-          worktree: { path: '/tmp/active-worktree', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/active')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/active', '/tmp/active-worktree')],
       currentBranchName: 'feature/active',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -242,11 +406,8 @@ describe('restorable-workspace-state', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: '/tmp/worktree', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', '/tmp/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'changes',
       workspacePaneTabsByBranch: {
@@ -275,11 +436,8 @@ describe('restorable-workspace-state', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: '/tmp/worktree', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', '/tmp/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: null,
       workspacePaneTabsByBranch: {
@@ -308,11 +466,8 @@ describe('restorable-workspace-state', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: '/tmp/worktree', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', '/tmp/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: {
@@ -366,11 +521,8 @@ describe('restorable-workspace-state', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: '/tmp/worktree', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', '/tmp/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -399,11 +551,8 @@ describe('restorable-workspace-state', () => {
     const targetKey = worktreeTargetKey('goblin+file:///tmp/repo', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: '/tmp/worktree', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', '/tmp/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -431,11 +580,8 @@ describe('restorable-workspace-state', () => {
   test('persists file tree view state into session state', () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: '/tmp/worktree', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', '/tmp/worktree')],
       currentBranchName: 'feature/worktree',
     })
 

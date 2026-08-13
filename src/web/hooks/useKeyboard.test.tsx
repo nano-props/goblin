@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  createRepoWorktreeSnapshotForTest,
   resetWorkspacesStore,
   seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
@@ -812,8 +813,9 @@ function renderHookHost(overrides: Partial<HookHostOptions> = {}) {
 function seedCurrentWorktreeRepoForTest() {
   return seedRepoWithReadModelForTest({
     id: REPO_ID,
-    branches: [
-      createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+    branches: [createRepoBranch('feature/worktree')],
+    worktrees: [
+      createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH, { isPrimary: false, isLocked: false }),
     ],
     currentBranchName: 'feature/worktree',
   })
@@ -822,8 +824,9 @@ function seedCurrentWorktreeRepoForTest() {
 function seedTabbedWorktreeRepoForTest(preferredWorkspacePaneTab: 'status' | 'terminal') {
   return seedRepoWithReadModelForTest({
     id: REPO_ID,
-    branches: [
-      createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+    branches: [createRepoBranch('feature/worktree')],
+    worktrees: [
+      createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH, { isPrimary: false, isLocked: false }),
     ],
     currentBranchName: 'feature/worktree',
     preferredWorkspacePaneTab,

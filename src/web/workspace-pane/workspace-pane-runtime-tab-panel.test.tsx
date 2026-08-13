@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 
-import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
+import {
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
@@ -55,7 +60,8 @@ beforeEach(() => {
   seedRepoWithReadModelForTest({
     id: 'goblin+file:///repo',
     workspaceRuntimeId: 'repo-runtime-1',
-    branches: [createRepoBranch('main', { worktree: { path: '/repo-worktree', isPrimary: false, isLocked: false } })],
+    branches: [createRepoBranch('main')],
+    worktrees: [createRepoWorktreeSnapshotForTest('main', '/repo-worktree')],
     currentBranchName: 'main',
   })
   observeWorkspacePaneRouteForTest({

@@ -4,6 +4,7 @@ import {
   seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { describe, expect, test, vi } from 'vitest'
 import '#/web/test-utils/workspace-commands.ts'
@@ -52,9 +53,8 @@ describe('workspace commands open', () => {
       preferredWorkspacePaneTab: 'status',
     })
     seedRepoQueryDataForTest(repo, {
-      branches: [
-        createBranchSnapshot('feature/query', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createBranchSnapshot('feature/query')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/query', WORKTREE_PATH)],
       currentBranch: 'feature/query',
     })
     const showRepoBranchWorkspacePaneTab = vi.fn((workspaceId, branch, tab) => {
@@ -78,12 +78,9 @@ describe('workspace commands open', () => {
 
   test('terminal primary action opens the terminal tab and creates the first terminal when missing', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: { 'feature/worktree': [staticEntry('status')] },
@@ -134,12 +131,9 @@ describe('workspace commands open', () => {
 
   test('new terminal tab command creates another terminal even when one already exists', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -183,12 +177,9 @@ describe('workspace commands open', () => {
 
   test('new terminal tab command preserves a terminal opener across routed close-back', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
@@ -264,12 +255,9 @@ describe('workspace commands open', () => {
 
   test('new terminal tab command preserves a static route opener across routed close-back', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -361,12 +349,9 @@ describe('workspace commands open', () => {
 
   test('new terminal tab command keeps a reused terminal id in its existing tab position', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -411,12 +396,9 @@ describe('workspace commands open', () => {
 
   test('new terminal tab command catches create failures and shows feedback', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -460,12 +442,9 @@ describe('workspace commands open', () => {
 
   test('new terminal tab command does not show feedback when create is canceled', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -508,12 +487,9 @@ describe('workspace commands open', () => {
 
   test('new terminal command queues behind an in-flight static close on the same target', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'changes',
       workspacePaneTabsByBranch: {
@@ -590,12 +566,9 @@ describe('workspace commands open', () => {
 
   test('select workspace pane tab by index follows the mixed tab list', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {

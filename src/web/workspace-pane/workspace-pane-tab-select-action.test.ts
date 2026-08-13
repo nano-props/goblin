@@ -2,6 +2,7 @@ import {
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
@@ -172,11 +173,8 @@ describe('workspace pane tab select action', () => {
 function seedTarget(tabTypes: WorkspacePaneStaticTabType[]) {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
-    branchSnapshots: [
-      createBranchSnapshot('feature/worktree', {
-        worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-      }),
-    ],
+    branchSnapshots: [createBranchSnapshot('feature/worktree')],
+    worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
     currentBranchName: 'feature/worktree',
     workspacePaneTabsByBranch: {
       'feature/worktree': tabTypes.map(workspacePaneStaticTabEntry),

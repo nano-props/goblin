@@ -4,15 +4,14 @@ import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { REPO_ID, branch, ipcHandlers, resetRefreshTest, seedRepo } from '#/web/stores/workspaces/refresh-test-utils.ts'
+import { createRepoWorktreeSnapshotForTest } from '#/web/test-utils/repo-store.ts'
 
 beforeEach(resetRefreshTest)
 
 describe('independent worktree status refresh', () => {
   test('updates status without replacing the accepted repository snapshot', async () => {
-    const workspaceRuntimeId = seedRepo([
-      branch('feature/a', {
-        worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
-      }),
+    const workspaceRuntimeId = seedRepo([branch('feature/a')], undefined, [
+      createRepoWorktreeSnapshotForTest('feature/a', '/tmp/worktree-a'),
     ])
     const snapshotBefore = getRepoSnapshotQueryData(REPO_ID, workspaceRuntimeId)
     ipcHandlers['repo.worktreeStatus'] = () => ({

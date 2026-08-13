@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 
-import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
+import {
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
@@ -601,7 +606,8 @@ function RuntimeProbe({ currentWorkspaceId }: { currentWorkspaceId: WorkspaceId 
 function seedCurrentRepo() {
   return seedRepoWithReadModelForTest({
     id: REPO_ID,
-    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } })],
+    branches: [createRepoBranch(BRANCH_NAME)],
+    worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
     currentBranchName: BRANCH_NAME,
     preferredWorkspacePaneTab: 'terminal',
   })
@@ -611,11 +617,8 @@ function seedSecondRepo() {
   const current = workspacesStore.getState()
   const secondRepo = seedRepoWithReadModelForTest({
     id: workspaceIdForTest('goblin+file:///tmp/goblin-runtime-provider-repo-2'),
-    branches: [
-      createRepoBranch('feature/other', {
-        worktree: { path: '/tmp/goblin-runtime-provider-worktree-2', isPrimary: false, isLocked: false },
-      }),
-    ],
+    branches: [createRepoBranch('feature/other')],
+    worktrees: [createRepoWorktreeSnapshotForTest('feature/other', '/tmp/goblin-runtime-provider-worktree-2')],
     currentBranchName: 'feature/other',
     preferredWorkspacePaneTab: 'terminal',
     workspaceRuntimeId: 'repo-runtime-second',

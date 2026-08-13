@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  createRepoWorktreeSnapshotForTest,
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
@@ -35,9 +36,8 @@ describe('useClientWorkspacePersistence', () => {
   test('persists client-owned workspace state without canonical tabs', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a', isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/a')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/a', '/tmp/a', { isPrimary: false, isLocked: false })],
       currentBranchName: 'feature/a',
     })
     workspacesStore.setState({
@@ -93,10 +93,9 @@ describe('useClientWorkspacePersistence', () => {
     if (!worktreeId) throw new Error('expected a canonical worktree locator fixture')
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
-        }),
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/worktree', worktreePath, { isPrimary: false, isLocked: false }),
       ],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'history',
@@ -144,9 +143,8 @@ describe('useClientWorkspacePersistence', () => {
   test('does not persist before workspace restore converges', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a', isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/a')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/a', '/tmp/a', { isPrimary: false, isLocked: false })],
       currentBranchName: 'feature/a',
     })
     workspacesStore.setState({
@@ -164,9 +162,8 @@ describe('useClientWorkspacePersistence', () => {
     useFakeTimers()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a', isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/a')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/a', '/tmp/a', { isPrimary: false, isLocked: false })],
       currentBranchName: 'feature/a',
     })
     workspacesStore.setState({
@@ -209,9 +206,8 @@ describe('useClientWorkspacePersistence', () => {
     useFakeTimers()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a', isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/a')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/a', '/tmp/a', { isPrimary: false, isLocked: false })],
       currentBranchName: 'feature/a',
     })
     workspacesStore.setState({
@@ -241,9 +237,8 @@ describe('useClientWorkspacePersistence', () => {
     useFakeTimers()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a', isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/a')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/a', '/tmp/a', { isPrimary: false, isLocked: false })],
       currentBranchName: 'feature/a',
     })
     workspacesStore.setState({
@@ -280,9 +275,8 @@ describe('useClientWorkspacePersistence', () => {
   test('consumes background persistence failures', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a', isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/a')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/a', '/tmp/a', { isPrimary: false, isLocked: false })],
       currentBranchName: 'feature/a',
     })
     workspacesStore.setState({
@@ -303,9 +297,8 @@ describe('useClientWorkspacePersistence', () => {
   test('persists A-B-A transitions while the B write is still pending', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
-      branchSnapshots: [
-        createBranchSnapshot('feature/a', { worktree: { path: '/tmp/a', isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot('feature/a')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/a', '/tmp/a', { isPrimary: false, isLocked: false })],
       currentBranchName: 'feature/a',
     })
     workspacesStore.setState({

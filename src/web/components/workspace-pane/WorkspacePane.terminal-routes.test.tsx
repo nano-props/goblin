@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import {
+  createBranchSnapshot,
+  createRepoWorktreeSnapshotForTest,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { screen, waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
@@ -365,12 +369,11 @@ describe('WorkspacePane terminal routes', () => {
 
   test('records workspace history when creating a terminal from the status tab', async () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-a'
-    const branch = createBranchSnapshot('feature/a', {
-      worktree: { path: worktreePath, isPrimary: false, isLocked: false },
-    })
+    const branch = createBranchSnapshot('feature/a')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, worktreePath)],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {

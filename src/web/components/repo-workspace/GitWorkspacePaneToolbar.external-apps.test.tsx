@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import {
+  createRepoWorktreeSnapshotForTest,
+  seedRepoWithReadModelForTest,
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
 import { waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
@@ -147,10 +151,9 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
   test('opens a detached worktree through its filesystem execution target', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH, { isPrimary: false, isLocked: false }),
       ],
     })
     const projection = gitWorkspacePaneProjection(repo)
@@ -377,10 +380,9 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     const preferenceWrite = Promise.withResolvers<void>()
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH, { isPrimary: false, isLocked: false }),
       ],
     })
     const queryClient = seededQueryClientWithWorkspaceSettings([])
@@ -429,10 +431,9 @@ describe('GitWorkspacePaneToolbar external-apps', () => {
     const nextWorktreePath = '/tmp/goblin-repo-workspace-toolbar-worktree-next'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH, { isPrimary: false, isLocked: false }),
       ],
     })
     const queryClient = seededQueryClientWithWorkspaceSettings([

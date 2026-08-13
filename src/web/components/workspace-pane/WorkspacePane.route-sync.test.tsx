@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import {
+  createRepoWorktreeSnapshotForTest,
+  seedRepoWithReadModelForTest,
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
 import { waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
@@ -55,9 +59,8 @@ describe('WorkspacePane route synchronization', () => {
     const branchName = 'feature/a'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, worktreePath, { isPrimary: false, isLocked: false })],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
@@ -103,9 +106,8 @@ describe('WorkspacePane route synchronization', () => {
     const missingSessionId = 'term-222222222222222222222'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, worktreePath, { isPrimary: false, isLocked: false })],
       currentBranchName: branchName,
       workspacePaneTabsByBranch: {
         [branchName]: [workspacePaneRuntimeTabEntry('terminal', retainedSessionId)],
@@ -166,9 +168,8 @@ describe('WorkspacePane route synchronization', () => {
     const branchName = 'feature/a'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, worktreePath, { isPrimary: false, isLocked: false })],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
@@ -220,9 +221,8 @@ describe('WorkspacePane route synchronization', () => {
     const branchName = 'feature/a'
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, worktreePath, { isPrimary: false, isLocked: false })],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
@@ -360,9 +360,11 @@ describe('WorkspacePane route synchronization', () => {
     const branchName = 'feature/inactive-route'
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot(branchName, {
-          worktree: { path: '/tmp/repo-workspace-inactive-worktree', isPrimary: false, isLocked: false },
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest(branchName, '/tmp/repo-workspace-inactive-worktree', {
+          isPrimary: false,
+          isLocked: false,
         }),
       ],
       currentBranchName: branchName,
@@ -400,9 +402,8 @@ describe('WorkspacePane route synchronization', () => {
     const route = routeNavigation()
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, worktreePath, { isPrimary: false, isLocked: false })],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {

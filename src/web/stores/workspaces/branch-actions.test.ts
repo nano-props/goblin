@@ -4,6 +4,7 @@ import {
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
@@ -137,12 +138,11 @@ function installSuccessfulCreateWorktreeBridge(options?: { onResponse?: () => vo
 
 describe('branch action capabilities', () => {
   test('gates remote-only actions when a repo transitions to local-only', async () => {
-    const branch = createRepoBranch('feature/local', {
-      worktree: { path: '/tmp/goblin-branch-actions-test-worktree', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/local')
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, '/tmp/goblin-branch-actions-test-worktree')],
       remote: {
         remotes: [testRemote('origin')],
         hasRemotes: true,
@@ -179,21 +179,14 @@ describe('branch action capabilities', () => {
   })
 
   test('uses canonical worktree state to gate primary worktree removal', () => {
-    const branch = createRepoBranch('feature/main-worktree', {
-      worktree: { path: REPO_WORKTREE_PATH, isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/main-worktree')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
-      branchSnapshots: [
-        createBranchSnapshot('feature/main-worktree', {
-          worktree: { path: REPO_WORKTREE_PATH, isPrimary: true, isLocked: false },
-        }),
-      ],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, REPO_WORKTREE_PATH, { isPrimary: true })],
       currentBranch: 'main',
     })
 
-    expect(branch.worktree).toEqual({ path: REPO_WORKTREE_PATH, isPrimary: false, isLocked: false })
     const authoritativeBranch = repoGitPresentationForTest(repo).snapshot.branches[0]!
     expect(getBranchActionCapabilities(repoGitPresentationForTest(repo), authoritativeBranch)).toMatchObject({
       canRemoveWorktree: false,
@@ -203,12 +196,11 @@ describe('branch action capabilities', () => {
   test('allows removing the current branch when it belongs to a linked worktree', () => {
     const worktreePath = '/tmp/goblin-current-linked-worktree'
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/goblin-current-linked-worktree')
-    const branch = createRepoBranch('feature/current-linked', {
-      worktree: { path: worktreePath, isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/current-linked')
     const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, worktreePath)],
       currentBranch: 'feature/current-linked',
     })
 
@@ -219,9 +211,7 @@ describe('branch action capabilities', () => {
   })
 
   test('allows terminal and editor actions for remote worktrees', async () => {
-    const branch = createRepoBranch('feature/remote', {
-      worktree: { path: '/srv/repo-feature', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/remote')
     const target = normalizeRemoteTarget({
       alias: 'example',
       host: 'example.com',
@@ -233,6 +223,7 @@ describe('branch action capabilities', () => {
     seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, '/srv/repo-feature')],
       remoteLifecycle: { kind: 'ready', target: target! },
       remote: {
         remotes: [testRemote('origin')],
@@ -879,12 +870,8 @@ describe('runBranchAction', () => {
       'repo.deleteBranch': async () => ({ ok: true, message: 'ok' }),
       'repo.snapshot': async () =>
         repoSnapshotResponse({
-          branches: [
-            createBranchSnapshot('feature/a'),
-            createBranchSnapshot('feature/new', {
-              worktree: { path: '/tmp/goblin-branch-actions-test-worktree', isPrimary: false, isLocked: false },
-            }),
-          ],
+          branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/new')],
+          worktrees: [createRepoWorktreeSnapshotForTest('feature/new', '/tmp/goblin-branch-actions-test-worktree')],
           current: 'feature/a',
         }),
     })

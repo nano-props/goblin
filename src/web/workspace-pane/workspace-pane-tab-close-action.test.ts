@@ -5,6 +5,7 @@ import {
   seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -85,10 +86,9 @@ afterEach(() => {
 describe('workspace pane tab close action', () => {
   test('commits active close-back route through command-owned navigation', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -126,10 +126,9 @@ describe('workspace pane tab close action', () => {
 
   test('keeps a branch-headed worktree close in the worktree route family', async () => {
     const repo = seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
       status: [{ path: WORKTREE_PATH, branch: BRANCH_NAME, isMain: false, entries: [] }],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'files',
@@ -424,10 +423,9 @@ describe('workspace pane tab close action', () => {
 
   test('reports lifecycle success and clears the transition when close-back navigation rejects', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -460,10 +458,9 @@ describe('workspace pane tab close action', () => {
 
   test('abandons superseded close presentation without reporting the committed close as failed', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -495,10 +492,9 @@ describe('workspace pane tab close action', () => {
   test('preserves the authoritative close when a detached terminal commits without a current projection', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
       currentBranchName: BRANCH_NAME,
       workspacePaneTabsByBranch: {
         [BRANCH_NAME]: [
@@ -802,10 +798,9 @@ describe('workspace pane tab close action', () => {
 
   test('does not let a late close from an old runtime navigate or clear the replacement runtime opener', async () => {
     const repo = seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
       currentBranchName: BRANCH_NAME,
       workspacePaneTabsByBranch: {
         [BRANCH_NAME]: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],
@@ -849,9 +844,8 @@ describe('workspace pane tab close action', () => {
       },
     }))
     seedRepoQueryDataForTest(replacementRepo, {
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranch: BRANCH_NAME,
     })
     setWorkspacePaneTabsForTargetQueryData({

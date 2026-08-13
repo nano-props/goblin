@@ -14,7 +14,11 @@ import {
   responsiveMocks,
   staticEntry,
 } from '#/web/test-utils/git-workspace-pane-content.tsx'
-import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import {
+  createRepoWorktreeSnapshotForTest,
+  seedRepoWithReadModelForTest,
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
 import { screen } from '@testing-library/vue'
 import { describe, expect, test, vi } from 'vitest'
 import { BranchActionSurfaceProvider } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
@@ -66,9 +70,11 @@ describe('GitWorkspacePaneContent routes', () => {
   test('renders an empty pane on an explicit bare branch route without a saved preference', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/first-open', {
-          worktree: { path: '/tmp/goblin-first-open', isPrimary: false, isLocked: false },
+      branchSnapshots: [createBranchSnapshot('feature/first-open')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/first-open', '/tmp/goblin-first-open', {
+          isPrimary: false,
+          isLocked: false,
         }),
       ],
       currentBranchName: 'feature/first-open',
@@ -164,9 +170,11 @@ describe('GitWorkspacePaneContent routes', () => {
     const worktreePath = '/tmp/hook-terminal-empty-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/hook-terminal-empty', {
-          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+      branchSnapshots: [createBranchSnapshot('feature/hook-terminal-empty')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/hook-terminal-empty', worktreePath, {
+          isPrimary: false,
+          isLocked: false,
         }),
       ],
       currentBranchName: 'feature/hook-terminal-empty',
@@ -198,9 +206,11 @@ describe('GitWorkspacePaneContent routes', () => {
     const worktreePath = '/tmp/terminal-empty-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/terminal-empty', {
-          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+      branchSnapshots: [createBranchSnapshot('feature/terminal-empty')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/terminal-empty', worktreePath, {
+          isPrimary: false,
+          isLocked: false,
         }),
       ],
       currentBranchName: 'feature/terminal-empty',

@@ -20,6 +20,7 @@ import type {
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
+  createRepoWorktreeSnapshotForTest,
   createRepoBranch,
   repoPresentationFromQueryForTest,
   resetWorkspacesStore,
@@ -89,12 +90,9 @@ function setupRepo() {
     branches: [
       createRepoBranch('main'),
       createRepoBranch('feature/x', { tracking: 'origin/feature/x', trackingGone: false }),
-      createRepoBranch('feature/y', {
-        tracking: 'origin/feature/y',
-        trackingGone: false,
-        worktree: { path: '/tmp/y', isPrimary: false, isLocked: false },
-      }),
+      createRepoBranch('feature/y', { tracking: 'origin/feature/y', trackingGone: false }),
     ],
+    worktrees: [createRepoWorktreeSnapshotForTest('feature/y', '/tmp/y', { isPrimary: false, isLocked: false })],
     currentBranchName: 'main',
   })
 }

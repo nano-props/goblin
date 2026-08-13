@@ -1,4 +1,9 @@
-import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
+import {
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalCreateLeaderAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
@@ -566,7 +571,8 @@ function seedCurrentWorkspaceRuntime(workspaceRuntimeId: string): void {
   seedRepoWithReadModelForTest({
     id: REPO_ROOT,
     workspaceRuntimeId,
-    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } })],
+    branches: [createRepoBranch(BRANCH_NAME)],
+    worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
     currentBranchName: BRANCH_NAME,
   })
 }

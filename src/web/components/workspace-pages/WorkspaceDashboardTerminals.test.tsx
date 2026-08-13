@@ -21,6 +21,7 @@ import {
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import {
   createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
   resetWorkspacesStore,
   seedRepoShellForTest,
   seedRepoWithReadModelForTest,
@@ -85,11 +86,8 @@ describe('WorkspaceDashboardTerminals', () => {
     seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branches: [
-        createRepoBranch('feature/dashboard', {
-          worktree: { path: '/workspace/feature', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branches: [createRepoBranch('feature/dashboard')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/dashboard', '/workspace/feature')],
       currentBranchName: 'feature/dashboard',
     })
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
@@ -163,12 +161,26 @@ describe('WorkspaceDashboardTerminals', () => {
         presentation: { kind: 'git-worktree' },
       }),
     ]
-    seedRepoWithReadModelForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+    seedRepoWithReadModelForTest({
+      id: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      worktrees: [
+        {
+          path: '/workspace/detached',
+          head: { kind: 'detached' },
+          headOid: '1234567890abcdef',
+          operation: null,
+          isPrimary: false,
+          isLocked: false,
+        },
+      ],
+    })
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const commitWorkspacePaneRoute = vi.fn<AppNavigationActions['commitWorkspacePaneRoute']>()
 
     renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute, vi.fn(), commitWorkspacePaneRoute)
+    expect(screen.getByText('worktree-state.detached')).toBeTruthy()
     await userEvent.click(screen.getByText('Detached shell'))
 
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
@@ -185,6 +197,31 @@ describe('WorkspaceDashboardTerminals', () => {
       { navigationGeneration: expect.any(Number) },
     )
     expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
+  })
+
+  test('reports a terminal target as unavailable when an authoritative snapshot no longer contains it', () => {
+    const sessions = [
+      terminalSummary('term-missing-session', 'Missing worktree shell', {
+        target: {
+          kind: 'git-worktree',
+          workspaceId: WORKSPACE_ID,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          root: workspaceIdForTest('goblin+file:///workspace/missing'),
+        },
+        presentation: { kind: 'git-worktree' },
+      }),
+    ]
+    seedRepoWithReadModelForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+    terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
+
+    renderDashboardTerminals(
+      sessions,
+      vi.fn(async () => true),
+    )
+
+    expect(screen.getByText('dashboard.terminals.worktree-unavailable')).toBeTruthy()
+    expect(screen.queryByText('worktree-state.detached')).toBeNull()
+    expect(screen.queryByText('dashboard.terminals.detached-worktree')).toBeNull()
   })
 
   test('opens a worktree terminal even when the branch projection is unavailable', async () => {
@@ -205,6 +242,9 @@ describe('WorkspaceDashboardTerminals', () => {
     const commitWorkspacePaneRoute = vi.fn<AppNavigationActions['commitWorkspacePaneRoute']>()
 
     renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute, vi.fn(), commitWorkspacePaneRoute)
+    expect(screen.getByText('dashboard.terminals.worktree-unknown')).toBeTruthy()
+    expect(screen.queryByText('worktree-state.detached')).toBeNull()
+    expect(screen.queryByText('dashboard.terminals.detached-worktree')).toBeNull()
     await userEvent.click(screen.getByText('Branch shell'))
 
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
@@ -239,11 +279,8 @@ describe('WorkspaceDashboardTerminals', () => {
     seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branches: [
-        createRepoBranch('feature/dashboard', {
-          worktree: { path: '/workspace/feature', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branches: [createRepoBranch('feature/dashboard')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/dashboard', '/workspace/feature')],
       currentBranchName: 'feature/dashboard',
     })
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)

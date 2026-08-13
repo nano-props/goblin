@@ -160,7 +160,7 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
 
     function renderTerminalRow(session: WorkspaceTerminalSessionSummary): VNodeChild {
       const opening = sameTerminalOpeningLease(openingTerminal.value, terminalOpeningLease(session))
-      const target = terminalTargetLabel(session, repoSnapshot.data.value?.snapshot.worktrees ?? [], t)
+      const target = terminalTargetLabel(session, repoSnapshot.data.value?.snapshot.worktrees, t)
       const titleId = `dashboard-terminal-title-${session.terminalSessionId}`
       const detailsId = `dashboard-terminal-details-${session.terminalSessionId}`
       const statusId = `dashboard-terminal-status-${session.terminalSessionId}`
@@ -295,16 +295,19 @@ function dashboardTerminalTargetLease(
 
 function terminalTargetLabel(
   session: WorkspaceTerminalSessionSummary,
-  worktrees: readonly RepoWorktreeSnapshot[],
+  worktrees: readonly RepoWorktreeSnapshot[] | undefined,
   t: DashboardTranslator,
 ): { label: string; path: string } {
   const path = terminalExecutionPath(session.base.target)
   if (session.base.target.kind === 'workspace-root') {
     return { label: t('dashboard.terminals.workspace-root'), path }
   }
+  if (!worktrees) return { label: t('dashboard.terminals.worktree-unknown'), path }
   const currentWorktree = worktrees.find((worktree) => worktree.path === path)
   return {
-    label: currentWorktree ? worktreePresentationLabel(currentWorktree, t) : t('dashboard.terminals.detached-worktree'),
+    label: currentWorktree
+      ? worktreePresentationLabel(currentWorktree, t)
+      : t('dashboard.terminals.worktree-unavailable'),
     path,
   }
 }

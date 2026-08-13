@@ -5,6 +5,7 @@ import {
   seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createPullRequest,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { screen } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
@@ -110,15 +111,15 @@ describe('WorkspacePane status presentation', () => {
   })
 
   test('keeps the workspace tab strip mounted and restores scroll position by branch', async () => {
-    const branchA = createBranchSnapshot('feature/a', {
-      worktree: { path: '/tmp/repo-workspace-container-repo-a', isPrimary: false, isLocked: false },
-    })
-    const branchB = createBranchSnapshot('feature/b', {
-      worktree: { path: '/tmp/repo-workspace-container-repo-b', isPrimary: false, isLocked: false },
-    })
+    const branchA = createBranchSnapshot('feature/a')
+    const branchB = createBranchSnapshot('feature/b')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [branchA, branchB],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest(branchA.name, '/tmp/repo-workspace-container-repo-a'),
+        createRepoWorktreeSnapshotForTest(branchB.name, '/tmp/repo-workspace-container-repo-b'),
+      ],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -197,12 +198,11 @@ describe('WorkspacePane status presentation', () => {
 
   test('uses the TanStack Query status read model for workspace presentation when available', async () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-a'
-    const branch = createBranchSnapshot('feature/a', {
-      worktree: { path: worktreePath, isPrimary: false, isLocked: false },
-    })
+    const branch = createBranchSnapshot('feature/a')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, worktreePath)],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -213,6 +213,7 @@ describe('WorkspacePane status presentation', () => {
     seedRepoQueryDataForTest(repo, {
       branches: [branch],
       currentBranch: 'feature/a',
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, worktreePath)],
       status: [
         { path: worktreePath, branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
       ],
@@ -239,12 +240,11 @@ describe('WorkspacePane status presentation', () => {
 
   test('keeps the last accepted status visible with one notice when snapshot and status refreshes fail', async () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-stale'
-    const branch = createBranchSnapshot('feature/stale', {
-      worktree: { path: worktreePath, isPrimary: false, isLocked: false },
-    })
+    const branch = createBranchSnapshot('feature/stale')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, worktreePath)],
       currentBranchName: 'feature/stale',
       preferredWorkspacePaneTab: 'changes',
       workspacePaneTabsByBranch: {

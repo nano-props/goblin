@@ -1,4 +1,8 @@
-import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
+import {
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -146,9 +150,8 @@ describe('createAppNavigationActions presentation', () => {
   test('abandons a committed worktree route when the authoritative worktree disappears', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       status: [{ path: WORKTREE_PATH, branch: 'feature/worktree', isMain: false, entries: [] }],
       currentBranchName: 'feature/worktree',
     })
@@ -345,9 +348,8 @@ describe('createAppNavigationActions presentation', () => {
   test('selects branches by resolving the branch workspace pane route', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -376,9 +378,8 @@ describe('createAppNavigationActions presentation', () => {
   test('opens the branch root while workspace pane tabs are still loading', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })
@@ -400,9 +401,8 @@ describe('createAppNavigationActions presentation', () => {
   test('opens the branch root when workspace pane tab restoration failed', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })
@@ -434,9 +434,8 @@ describe('createAppNavigationActions presentation', () => {
   test('selects branches by falling back when the preferred workspace pane tab is stale', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: {
@@ -460,9 +459,8 @@ describe('createAppNavigationActions presentation', () => {
   test('selects branches with an intentional empty workspace pane route', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: null,
       workspacePaneTabsByBranch: {
@@ -487,9 +485,8 @@ describe('createAppNavigationActions presentation', () => {
   test('keeps command-owned route commits free of workspace pane supplements', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })
@@ -533,9 +530,8 @@ describe('createAppNavigationActions presentation', () => {
   test('does not commit route supplements when operation-owned navigation settles', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
@@ -566,9 +562,8 @@ describe('createAppNavigationActions presentation', () => {
   test('forwards operation abandonment to the route owner', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
     })
     const navigation = routeNavigation()
@@ -591,9 +586,8 @@ describe('createAppNavigationActions presentation', () => {
   test('blocks workspace history restore before mutating history while terminal creation is pending', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })

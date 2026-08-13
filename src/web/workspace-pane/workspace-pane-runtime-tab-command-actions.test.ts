@@ -1,4 +1,9 @@
-import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
+import {
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -94,13 +99,10 @@ describe('workspace pane runtime tab command actions', () => {
   test('preserves a Git worktree target while pane tabs are still pending', () => {
     const branchName = terminalRouteTarget.branchName
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, terminalExecutionPath(terminalBase.target))],
       id: terminalCoordinates.workspaceId,
       workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
-      branches: [
-        createRepoBranch(branchName, {
-          worktree: { path: terminalExecutionPath(terminalBase.target), isPrimary: false, isLocked: false },
-        }),
-      ],
+      branches: [createRepoBranch(branchName)],
       currentBranchName: branchName,
     })
 
@@ -114,13 +116,10 @@ describe('workspace pane runtime tab command actions', () => {
   test('routes a committed create with its canonical admission branch', async () => {
     const branchName = terminalRouteTarget.branchName
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, terminalExecutionPath(terminalBase.target))],
       id: terminalCoordinates.workspaceId,
       workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
-      branches: [
-        createRepoBranch(branchName, {
-          worktree: { path: terminalExecutionPath(terminalBase.target), isPrimary: false, isLocked: false },
-        }),
-      ],
+      branches: [createRepoBranch(branchName)],
       currentBranchName: branchName,
     })
     const showCreatedRuntimeTab = vi.fn(() => true)
@@ -450,13 +449,10 @@ describe('workspace pane runtime tab command actions', () => {
   test('new terminal action joins a pending duplicate create through terminal ownership', async () => {
     const branchName = terminalRouteTarget.branchName
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, terminalExecutionPath(terminalBase.target))],
       id: terminalCoordinates.workspaceId,
       workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
-      branches: [
-        createRepoBranch(branchName, {
-          worktree: { path: terminalExecutionPath(terminalBase.target), isPrimary: false, isLocked: false },
-        }),
-      ],
+      branches: [createRepoBranch(branchName)],
       currentBranchName: branchName,
     })
     const createTerminal = vi.fn(async () => 'created-session')

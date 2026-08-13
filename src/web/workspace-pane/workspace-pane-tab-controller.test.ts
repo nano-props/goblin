@@ -3,6 +3,7 @@ import {
   seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
@@ -45,11 +46,10 @@ describe('workspace pane tab controller transactions', () => {
     appQueryClient.clear()
     resetWorkspacesStore()
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/a', '/worktree-a')],
       id: WORKSPACE_ID,
       workspaceRuntimeId: 'repo-runtime-1',
-      branches: [
-        createRepoBranch('feature/a', { worktree: { path: '/worktree-a', isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch('feature/a')],
       status: [{ path: '/worktree-a', branch: 'feature/a', isMain: false, entries: [] }],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
@@ -393,9 +393,8 @@ describe('workspace pane tab controller transactions', () => {
     )
     const repo = workspacesStore.getState().workspaces[WORKSPACE_ID]!
     seedRepoQueryDataForTest(repo, {
-      branches: [
-        createRepoBranch('feature/a', { worktree: { path: '/worktree-b', isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch('feature/a')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/a', '/worktree-b')],
       currentBranch: 'feature/a',
       status: [],
     })

@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 
-import { resetWorkspacesStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
+import {
+  resetWorkspacesStore,
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -227,7 +232,8 @@ function seedWorkspacePaneTabsRepo(workspaceRuntimeId: string): void {
   seedRepoWithReadModelForTest({
     id: REPO_ROOT,
     workspaceRuntimeId,
-    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } })],
+    branches: [createRepoBranch(BRANCH_NAME)],
+    worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
     currentBranchName: BRANCH_NAME,
   })
 }

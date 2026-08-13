@@ -1,4 +1,8 @@
-import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
+import {
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -86,9 +90,8 @@ describe('createAppNavigationActions workspace lifecycle', () => {
   test('does not replace a blocked repo history restore with the dashboard', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })
@@ -259,9 +262,8 @@ describe('createAppNavigationActions workspace lifecycle', () => {
   test('closes the current repo into the next repo dashboard when its history restore is blocked', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })

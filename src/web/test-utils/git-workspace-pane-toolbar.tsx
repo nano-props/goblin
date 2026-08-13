@@ -2,6 +2,7 @@ import {
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { defineComponent } from 'vue'
@@ -315,14 +316,12 @@ export function renderToolbar(options: {
   }
 } {
   const branchName = options.worktree === false ? 'feature/no-worktree' : 'feature/worktree'
-  const branch = createBranchSnapshot(
-    branchName,
-    options.worktree === false ? {} : { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } },
-  )
+  const branch = createBranchSnapshot(branchName)
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     workspaceRuntimeId: options.workspaceRuntimeId,
     branchSnapshots: [branch],
+    worktrees: options.worktree === false ? [] : [createRepoWorktreeSnapshotForTest(branchName, WORKTREE_PATH)],
     currentBranchName: branchName,
     preferredWorkspacePaneTab: options.preferredWorkspacePaneTab ?? 'status',
     workspacePaneTabsByBranch:
@@ -488,13 +487,12 @@ export function renderToolbar(options: {
   )
 
   const rerenderWorktreePath = async (worktreePath: string) => {
-    const nextBranch = createBranchSnapshot(branchName, {
-      worktree: { path: worktreePath, isPrimary: false, isLocked: false },
-    })
+    const nextBranch = createBranchSnapshot(branchName)
     const nextRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       workspaceRuntimeId: repo.workspaceRuntimeId,
       branchSnapshots: [nextBranch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, worktreePath)],
       currentBranchName: branchName,
       preferredWorkspacePaneTab,
     })

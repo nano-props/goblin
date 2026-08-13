@@ -4,6 +4,7 @@ import {
   seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -51,12 +52,9 @@ describe('client effect intent handlers', () => {
       currentBranchName: 'feature/query',
     })
     seedRepoQueryDataForTest(repo, {
-      branches: [
-        createRepoBranch('feature/query', {
-          worktree: { path: '/tmp/bell-worktree', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branches: [createRepoBranch('feature/query')],
       currentBranch: 'feature/query',
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/query', '/tmp/bell-worktree')],
     })
     appQueryClient.setQueryData(workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId), {
       revision: 1,

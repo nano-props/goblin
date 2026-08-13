@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  createRepoWorktreeSnapshotForTest,
   repoPresentationFromQueryForTest,
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
@@ -29,8 +30,9 @@ describe('branch action dispatch', () => {
   test('remove worktree submits one server application command without client-side resource cleanup', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      branches: [createRepoBranch('feature/worktree')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH, { isPrimary: false, isLocked: false }),
       ],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
@@ -74,8 +76,9 @@ describe('branch action dispatch', () => {
   test('remove worktree proceeds when no workspace tabs are open', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      branches: [createRepoBranch('feature/worktree')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH, { isPrimary: false, isLocked: false }),
       ],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
@@ -100,8 +103,9 @@ describe('branch action dispatch', () => {
   test('returns a cancelled result when it carries confirmed recovery guidance', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
+      branches: [createRepoBranch('feature/worktree')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH, { isPrimary: false, isLocked: false }),
       ],
       currentBranchName: 'feature/worktree',
     })

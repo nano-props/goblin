@@ -6,6 +6,7 @@ import {
   seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { fireEvent, screen } from '@testing-library/vue'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
@@ -97,17 +98,18 @@ describe('BranchView', () => {
   })
 
   test('filters the query branch rows with the workspace branch view preference', async () => {
-    const worktreeBranch = createRepoBranch('feature/worktree', {
-      worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-    })
+    const worktreeBranch = createRepoBranch('feature/worktree')
+    const worktrees = [createRepoWorktreeSnapshotForTest(worktreeBranch.name, WORKTREE_PATH)]
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/plain'), worktreeBranch],
       currentBranchName: 'feature/worktree',
+      worktrees,
     })
     seedRepoQueryDataForTest(repo, {
       branches: [createRepoBranch('feature/plain'), worktreeBranch],
       currentBranch: 'feature/worktree',
+      worktrees,
     })
     workspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
@@ -118,13 +120,12 @@ describe('BranchView', () => {
   })
 
   test('replaces an attached branch row with its in-progress worktree state', () => {
-    const branch = createRepoBranch('feature/merge', {
-      worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/merge')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       currentBranchName: 'feature/merge',
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, WORKTREE_PATH)],
     })
     const snapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
     if (!snapshot) throw new Error('expected seeded snapshot')
@@ -140,17 +141,18 @@ describe('BranchView', () => {
   })
 
   test('opens a non-current branch status through destination navigation', async () => {
-    const destination = createRepoBranch('feature/destination', {
-      worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-    })
+    const destination = createRepoBranch('feature/destination')
+    const worktrees = [createRepoWorktreeSnapshotForTest(destination.name, WORKTREE_PATH)]
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/current'), destination],
       currentBranchName: 'feature/current',
+      worktrees,
     })
     seedRepoQueryDataForTest(repo, {
       branches: [createRepoBranch('feature/current'), destination],
       currentBranch: 'feature/current',
+      worktrees,
     })
 
     renderBranchView()
@@ -166,17 +168,18 @@ describe('BranchView', () => {
   })
 
   test('uses the TanStack Query status read model for branch row dirty state when available', async () => {
-    const branch = createRepoBranch('feature/dirty', {
-      worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/dirty')
+    const worktrees = [createRepoWorktreeSnapshotForTest(branch.name, WORKTREE_PATH)]
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       currentBranchName: 'feature/dirty',
+      worktrees,
     })
     seedRepoQueryDataForTest(repo, {
       branches: [branch],
       currentBranch: 'feature/dirty',
+      worktrees,
       status: [
         {
           path: WORKTREE_PATH,
@@ -199,13 +202,9 @@ describe('BranchView', () => {
       currentBranchName: 'feature/query-dirty',
     })
     seedRepoQueryDataForTest(repo, {
-      branches: [
-        createBranchSnapshot('feature/query-dirty', {
-          isCurrent: true,
-          worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false },
-        }),
-      ],
+      branches: [createBranchSnapshot('feature/query-dirty', { isCurrent: true })],
       currentBranch: 'feature/query-dirty',
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/query-dirty', WORKTREE_PATH)],
       status: [
         {
           path: WORKTREE_PATH,

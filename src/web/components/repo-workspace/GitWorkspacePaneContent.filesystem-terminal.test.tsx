@@ -16,7 +16,11 @@ import {
   terminalSession,
   workspacePaneTabsTestBridge,
 } from '#/web/test-utils/git-workspace-pane-content.tsx'
-import { seedRepoWithReadModelForTest, createBranchSnapshot } from '#/web/test-utils/repo-store.ts'
+import {
+  createRepoWorktreeSnapshotForTest,
+  seedRepoWithReadModelForTest,
+  createBranchSnapshot,
+} from '#/web/test-utils/repo-store.ts'
 import { screen, waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { QueryClient } from '@tanstack/vue-query'
@@ -67,9 +71,8 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       .mockResolvedValueOnce(filesystemTree(cleanFileNode('after.txt')))
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, worktreePath, { isPrimary: false, isLocked: false })],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },
@@ -172,9 +175,11 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/terminal-pending', {
-          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+      branchSnapshots: [createBranchSnapshot('feature/terminal-pending')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/terminal-pending', worktreePath, {
+          isPrimary: false,
+          isLocked: false,
         }),
       ],
       currentBranchName: 'feature/terminal-pending',
@@ -220,9 +225,8 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     const branchName = 'feature/terminal-pending-empty-strip'
     const seededRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, worktreePath, { isPrimary: false, isLocked: false })],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { [branchName]: [] },
@@ -261,9 +265,11 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/terminal-loading', {
-          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+      branchSnapshots: [createBranchSnapshot('feature/terminal-loading')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/terminal-loading', worktreePath, {
+          isPrimary: false,
+          isLocked: false,
         }),
       ],
       currentBranchName: 'feature/terminal-loading',
@@ -309,9 +315,11 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, worktreePath)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot('feature/terminal-reordered', {
-          worktree: { path: worktreePath, isPrimary: false, isLocked: false },
+      branchSnapshots: [createBranchSnapshot('feature/terminal-reordered')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/terminal-reordered', worktreePath, {
+          isPrimary: false,
+          isLocked: false,
         }),
       ],
       currentBranchName: 'feature/terminal-reordered',
@@ -375,9 +383,8 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
     })
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branchSnapshots: [
-        createBranchSnapshot(branchName, { worktree: { path: worktreePath, isPrimary: false, isLocked: false } }),
-      ],
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, worktreePath, { isPrimary: false, isLocked: false })],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },

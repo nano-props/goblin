@@ -5,6 +5,7 @@ import {
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
   createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import type { RepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
@@ -72,12 +73,11 @@ describe('useBranchActions', () => {
       remotePath: '/srv/repo',
     })
     expect(target).not.toBeNull()
-    const branch = createRepoBranch('feature/remote', {
-      worktree: { path: '/srv/repo-feature', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/remote')
     const repo = seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, '/srv/repo-feature')],
       remoteLifecycle: { kind: 'ready', target: target! },
       remote: {
         remotes: [
@@ -109,12 +109,11 @@ describe('useBranchActions', () => {
   })
 
   test('copyPatch reads the server patch through a mutation and writes it to the clipboard', async () => {
-    const branch = createRepoBranch('feature/local', {
-      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/local')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, '/tmp/local-feature')],
     })
     mocks.getRepoPatch.mockResolvedValue({ ok: true, message: 'diff --git a/file.ts b/file.ts' })
     const writeText = vi.fn(async () => {})
@@ -136,12 +135,11 @@ describe('useBranchActions', () => {
   })
 
   test('fails before reading a patch when the browser cannot copy an asynchronous result', async () => {
-    const branch = createRepoBranch('feature/local', {
-      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/local')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, '/tmp/local-feature')],
     })
     const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
     Reflect.deleteProperty(navigator, 'clipboard')
@@ -177,12 +175,11 @@ describe('useBranchActions', () => {
       remotePath: '/srv/repo',
     })
     expect(target).not.toBeNull()
-    const branch = createRepoBranch('feature/remote', {
-      worktree: { path: '/srv/repo-feature', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/remote')
     const repo = seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, '/srv/repo-feature')],
       remoteLifecycle: { kind: 'ready', target: target! },
       remote: {
         remotes: [
@@ -214,12 +211,11 @@ describe('useBranchActions', () => {
   })
 
   test('openTerminal uses the embedded server route for non-remote repos', async () => {
-    const branch = createRepoBranch('feature/local', {
-      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/local')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, '/tmp/local-feature')],
     })
     mocks.openWorkspaceTerminal.mockResolvedValue({ ok: true, message: '' })
 
@@ -236,12 +232,11 @@ describe('useBranchActions', () => {
   })
 
   test('reports an uncertain external app outcome as a warning without queuing an ordinary failure', async () => {
-    const branch = createRepoBranch('feature/local', {
-      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/local')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, '/tmp/local-feature')],
     })
     mocks.openWorkspaceTerminal.mockRejectedValue(
       new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'response lost' }),
@@ -258,12 +253,11 @@ describe('useBranchActions', () => {
   })
 
   test('openEditor forwards an explicit editor app for local repos', async () => {
-    const branch = createRepoBranch('feature/local', {
-      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/local')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, '/tmp/local-feature')],
     })
     mocks.openWorkspaceEditor.mockResolvedValue({ ok: true, message: '' })
 
@@ -280,12 +274,11 @@ describe('useBranchActions', () => {
   })
 
   test('openFinder uses the embedded server route for non-remote repos', async () => {
-    const branch = createRepoBranch('feature/local', {
-      worktree: { path: '/tmp/local-feature', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/local')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, '/tmp/local-feature')],
     })
     mocks.openWorkspaceInFinder.mockResolvedValue({ ok: true, message: '/tmp/local-feature' })
 
@@ -302,15 +295,15 @@ describe('useBranchActions', () => {
 
   test('clears local pending state when the branch action target changes', async () => {
     const firstOpen = Promise.withResolvers<ExecResult>()
-    const branchA = createRepoBranch('feature/a', {
-      worktree: { path: '/tmp/local-feature-a', isPrimary: false, isLocked: false },
-    })
-    const branchB = createRepoBranch('feature/b', {
-      worktree: { path: '/tmp/local-feature-b', isPrimary: false, isLocked: false },
-    })
+    const branchA = createRepoBranch('feature/a')
+    const branchB = createRepoBranch('feature/b')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branchA, branchB],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest(branchA.name, '/tmp/local-feature-a'),
+        createRepoWorktreeSnapshotForTest(branchB.name, '/tmp/local-feature-b'),
+      ],
     })
     mocks.openWorkspaceTerminal.mockReturnValue(firstOpen.promise)
 

@@ -6,6 +6,7 @@ import { appQueryClient } from '#/web/app-query-client.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import {
   createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
   resetWorkspacesStore,
   seedRepoShellForTest,
   seedRepoWithReadModelForTest,
@@ -32,13 +33,10 @@ afterEach(() => {
 describe('workspace pane terminal destination navigation', () => {
   test('uses the stable worktree route family for a current branch worktree terminal', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/navigation', '/workspace/feature')],
       id: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branches: [
-        createRepoBranch('feature/navigation', {
-          worktree: { path: '/workspace/feature', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branches: [createRepoBranch('feature/navigation')],
       currentBranchName: 'feature/navigation',
     })
     const commitWorkspacePaneRoute = committedBranchRoute()
@@ -72,13 +70,10 @@ describe('workspace pane terminal destination navigation', () => {
 
   test('rejects a branch terminal from an old runtime or moved worktree', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/navigation', '/workspace/current')],
       id: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branches: [
-        createRepoBranch('feature/navigation', {
-          worktree: { path: '/workspace/current', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branches: [createRepoBranch('feature/navigation')],
       currentBranchName: 'feature/navigation',
     })
     const commitWorkspacePaneRoute = committedBranchRoute()
@@ -105,13 +100,10 @@ describe('workspace pane terminal destination navigation', () => {
 
   test('reports a rejected worktree route without falling back to a branch route', async () => {
     seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/navigation', '/workspace/feature')],
       id: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branches: [
-        createRepoBranch('feature/navigation', {
-          worktree: { path: '/workspace/feature', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branches: [createRepoBranch('feature/navigation')],
       currentBranchName: 'feature/navigation',
     })
     const commitWorkspacePaneRoute = vi.fn<AppNavigationActions['commitWorkspacePaneRoute']>(async () => false)
@@ -242,11 +234,7 @@ describe('workspace pane terminal destination navigation', () => {
     seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      branches: [
-        createRepoBranch('feature/navigation', {
-          worktree: { path: '/workspace/feature', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branches: [createRepoBranch('feature/navigation')],
       currentBranchName: 'feature/navigation',
     })
     seedTerminalPaneTab('/workspace/feature')

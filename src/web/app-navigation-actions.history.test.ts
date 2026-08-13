@@ -1,4 +1,8 @@
-import { seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
+import {
+  seedRepoWithReadModelForTest,
+  createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -129,9 +133,8 @@ describe('createAppNavigationActions history traversal', () => {
   test('does not block bare branch history restore while tabs projection is pending', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH, isPrimary: false, isLocked: false } }),
-      ],
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       currentBranchName: BRANCH_NAME,
       preferredWorkspacePaneTab: 'status',
     })

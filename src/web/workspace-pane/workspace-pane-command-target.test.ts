@@ -4,6 +4,7 @@ import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import {
   createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
   resetWorkspacesStore,
   seedRepoShellForTest,
   seedRepoWithReadModelForTest,
@@ -115,13 +116,10 @@ describe('workspace pane command target', () => {
 
   test('projects a branch worktree from the accepted snapshot while a refresh is stale', async () => {
     const workspace = seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/example', '/tmp/command-target-branch-worktree')],
       id: 'goblin+file:///tmp/command-target-branch-workspace',
       workspaceRuntimeId: 'command-target-branch-runtime',
-      branchSnapshots: [
-        createRepoBranch('feature/example', {
-          worktree: { path: '/tmp/command-target-branch-worktree', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createRepoBranch('feature/example')],
       currentBranchName: 'feature/example',
     })
     const routeContext = {

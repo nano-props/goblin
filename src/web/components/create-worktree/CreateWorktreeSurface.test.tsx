@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 
-import { repoPresentationForTest, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/repo-store.ts'
+import {
+  createRepoBranch,
+  createRepoWorktreeSnapshotForTest,
+  repoPresentationForTest,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { cleanup, screen, waitFor } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
@@ -297,20 +302,20 @@ function createRepo(): RepoPresentationForTest {
 }
 
 function createRepoWithCreatedWorktree(): RepoPresentationForTest {
-  const branches = [
-    createRepoBranch('main'),
-    createRepoBranch('feature/base'),
-    createRepoBranch('feature/new', {
-      worktree: { path: `${WORKTREE_PATH}-feature-new`, isPrimary: false, isLocked: false },
-    }),
-  ]
+  const branches = [createRepoBranch('main'), createRepoBranch('feature/base'), createRepoBranch('feature/new')]
   const repo = seedRepoWithReadModelForTest({
     id: WORKSPACE_ID,
     workspaceRuntimeId: 'repo-runtime-test',
     branches,
     currentBranch: 'main',
+    worktrees: [createRepoWorktreeSnapshotForTest('feature/new', `${WORKTREE_PATH}-feature-new`)],
   })
-  return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [] })
+  return repoPresentationForTest(repo, {
+    currentBranch: 'main',
+    branches,
+    status: [],
+    worktrees: [createRepoWorktreeSnapshotForTest('feature/new', `${WORKTREE_PATH}-feature-new`)],
+  })
 }
 
 function createRemoteRepo(): RepoPresentationForTest {

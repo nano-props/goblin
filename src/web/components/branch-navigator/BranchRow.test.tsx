@@ -2,8 +2,7 @@
 import {
   createRepoBranch,
   createGitRepoPresentationForTest,
-  createRepoWorktreeSnapshotsForTest,
-  type BranchSnapshotFixture,
+  createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { shallowRef } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -58,9 +57,7 @@ describe('BranchRow', () => {
   test('shows the generic dirty label for dirty worktrees', async () => {
     const repo = branchRowRepo()
     markDirty(repo, 7)
-    const branch = createRepoBranch('feature/a', {
-      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
       <ul>
@@ -84,9 +81,7 @@ describe('BranchRow', () => {
   test('keeps status-derived dirty presentation unknown when status is unavailable', async () => {
     const repo = branchRowRepo()
     repo.status = undefined
-    const branch = createRepoBranch('feature/a', {
-      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
       <ul>
@@ -117,9 +112,7 @@ describe('BranchRow', () => {
         reason,
         target: 'feature/a',
       }
-      const branch = createRepoBranch('feature/a', {
-        worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
-      })
+      const branch = createRepoBranch('feature/a')
 
       const { container } = renderInJsdom(
         <ul>
@@ -152,9 +145,7 @@ describe('BranchRow', () => {
       reason: 'branch:createWorktree',
       target: 'feature/b',
     }
-    const branch = createRepoBranch('feature/a', {
-      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
       <ul>
@@ -175,9 +166,7 @@ describe('BranchRow', () => {
 
   test('shows terminal bell count badges in the action slot in non-compact mode', async () => {
     const repo = branchRowRepo()
-    const branch = createRepoBranch('feature/a', {
-      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
       <ul>
@@ -205,9 +194,7 @@ describe('BranchRow', () => {
 
   test('shows terminal output activity in the action slot in non-compact mode', async () => {
     const repo = branchRowRepo()
-    const branch = createRepoBranch('feature/a', {
-      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
       <ul>
@@ -235,9 +222,7 @@ describe('BranchRow', () => {
 
   test('hides terminal output activity when the branch row is selected in non-compact mode', async () => {
     const repo = branchRowRepo()
-    const branch = createRepoBranch('feature/a', {
-      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
       <ul>
@@ -260,9 +245,7 @@ describe('BranchRow', () => {
 
   test('gives terminal bell priority over terminal output activity', async () => {
     const repo = branchRowRepo()
-    const branch = createRepoBranch('feature/a', {
-      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
       <ul>
@@ -400,9 +383,7 @@ describe('BranchRow', () => {
     responsiveMocks.compact = true
     const repo = branchRowRepo()
     markDirty(repo, 3)
-    const branch = createRepoBranch('feature/a', {
-      worktree: { path: '/tmp/worktree-a', isPrimary: false, isLocked: false },
-    })
+    const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
       <ul>
@@ -591,8 +572,10 @@ function branchRowRepo() {
   )
 }
 
-function worktreeForFixture(branch: BranchSnapshotFixture) {
-  return createRepoWorktreeSnapshotsForTest([branch])[0]
+function worktreeForFixture(branch: ReturnType<typeof createRepoBranch>) {
+  return createRepoWorktreeSnapshotForTest(branch.name, '/tmp/worktree-a', {
+    headOid: branch.lastCommitHash,
+  })
 }
 
 function markDirty(repo: ReturnType<typeof branchRowRepo>, count: number): void {

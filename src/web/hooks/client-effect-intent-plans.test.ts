@@ -1,8 +1,8 @@
 import {
+  createRepoWorktreeSnapshotForTest,
   resetWorkspacesStore,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
-  createRepoWorktreeSnapshotsForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { describe, expect, test } from 'vitest'
 import {
@@ -35,7 +35,7 @@ const CURRENT_GIT_REPO = {
 function repositoryFacts(
   branches: BranchSnapshotInfo[],
   status: WorktreeStatus[] | undefined,
-  worktrees: RepoWorktreeSnapshot[] = createRepoWorktreeSnapshotsForTest(branches),
+  worktrees: RepoWorktreeSnapshot[] = [],
 ) {
   return {
     snapshot: {
@@ -87,14 +87,10 @@ describe('client effect intent plans', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [
-        createBranchSnapshot('main', {
-          isCurrent: true,
-          worktree: { path: '/tmp/repo-main', isPrimary: false, isLocked: false },
-        }),
-        createBranchSnapshot('feature/test', {
-          worktree: { path: '/tmp/repo-feature', isPrimary: false, isLocked: false },
-        }),
+      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true }), createBranchSnapshot('feature/test')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('main', '/tmp/repo-main', { isPrimary: false, isLocked: false }),
+        createRepoWorktreeSnapshotForTest('feature/test', '/tmp/repo-feature', { isPrimary: false, isLocked: false }),
       ],
     })
 
@@ -135,12 +131,8 @@ describe('client effect intent plans', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [
-        createBranchSnapshot('main', {
-          isCurrent: true,
-          worktree: { path: '/tmp/repo', isPrimary: false, isLocked: false },
-        }),
-      ],
+      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true })],
+      worktrees: [createRepoWorktreeSnapshotForTest('main', '/tmp/repo', { isPrimary: false, isLocked: false })],
     })
 
     const plan = createTerminalBellIntentPlan(repo, repositoryFactsForTest(repo), {
@@ -223,12 +215,9 @@ describe('client effect intent plans', () => {
     const plan = createTerminalBellIntentPlan(
       { id: DETACHED_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
       repositoryFacts(
-        [
-          createBranchSnapshot('feature/later', {
-            worktree: { path: worktreePath, isPrimary: false, isLocked: false },
-          }),
-        ],
+        [createBranchSnapshot('feature/later')],
         [{ path: worktreePath, isMain: false, entries: [] }],
+        [createRepoWorktreeSnapshotForTest('feature/later', worktreePath)],
       ),
       {
         type: 'terminal-bell-click',
@@ -272,22 +261,18 @@ describe('client effect intent plans', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [
-        createBranchSnapshot('feature/test', {
-          worktree: { path: '/tmp/repo-feature', isPrimary: false, isLocked: false },
-        }),
+      branchSnapshots: [createBranchSnapshot('feature/test')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('feature/test', '/tmp/repo-feature', { isPrimary: false, isLocked: false }),
       ],
     })
     const otherPath = '/tmp/repo-other'
     const plan = createTerminalBellIntentPlan(
       repo,
       repositoryFacts(
-        [
-          createBranchSnapshot('feature/test', {
-            worktree: { path: '/tmp/repo-feature', isPrimary: false, isLocked: false },
-          }),
-        ],
+        [createBranchSnapshot('feature/test')],
         [{ path: otherPath, isMain: false, entries: [] }],
+        [createRepoWorktreeSnapshotForTest('feature/test', '/tmp/repo-feature')],
       ),
       {
         type: 'terminal-bell-click',
