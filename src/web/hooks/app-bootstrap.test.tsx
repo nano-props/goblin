@@ -681,7 +681,6 @@ function restoredRuntimeForWorkspace(
           branches: [
             {
               name: 'main',
-              isCurrent: true,
               ahead: 0,
               behind: 0,
               lastCommitHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',

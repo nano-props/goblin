@@ -20,11 +20,11 @@ const NUL = String.fromCharCode(0)
 
 describe('parseBranches', () => {
   test('returns empty array for empty input', () => {
-    expect(parseBranches('', '')).toEqual([])
+    expect(parseBranches('')).toEqual([])
   })
 
   test('strict parsing rejects incomplete and invalid authoritative rows', () => {
-    expect(() => parseBranches(`main${SEP}abc1234`, 'main')).toThrow('Invalid branch snapshot row')
+    expect(() => parseBranches(`main${SEP}abc1234`)).toThrow('Invalid branch snapshot row')
     expect(() =>
       parseBranches(
         [
@@ -37,17 +37,13 @@ describe('parseBranches', () => {
           '',
           '',
         ].join(SEP),
-        'main',
       ),
     ).toThrow('Invalid branch snapshot identity')
     expect(() =>
-      parseBranches(['main', 'abcdef1', 'abcdef1', 'short full hash', '2026-05-20', 'A', '', ''].join(SEP), 'main'),
+      parseBranches(['main', 'abcdef1', 'abcdef1', 'short full hash', '2026-05-20', 'A', '', ''].join(SEP)),
     ).toThrow('Invalid branch snapshot identity')
     expect(() =>
-      parseBranches(
-        ['main', '0'.repeat(40), '0000000', 'invalid sentinel', '2026-05-20', 'A', '', ''].join(SEP),
-        'main',
-      ),
+      parseBranches(['main', '0'.repeat(40), '0000000', 'invalid sentinel', '2026-05-20', 'A', '', ''].join(SEP)),
     ).toThrow('Invalid branch snapshot identity')
   })
 
@@ -62,11 +58,10 @@ describe('parseBranches', () => {
       '',
       '',
     ].join(SEP)
-    const result = parseBranches(line, 'main')
+    const result = parseBranches(line)
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({
       name: 'main',
-      isCurrent: true,
       ahead: 0,
       behind: 0,
       lastCommitHash: 'abc1234000000000000000000000000000000000',
@@ -77,6 +72,21 @@ describe('parseBranches', () => {
     })
     expect(result[0]?.tracking).toBeUndefined()
     expect(result[0]?.trackingGone).toBeUndefined()
+  })
+
+  test('rejects duplicate branch identities', () => {
+    const line = [
+      'main',
+      'abc1234000000000000000000000000000000000',
+      'abc1234',
+      'initial commit',
+      '2026-05-20T10:00:00+08:00',
+      'Alice',
+      '',
+      '',
+    ].join(SEP)
+
+    expect(() => parseBranches(`${line}\n${line}`)).toThrow('Duplicate branch snapshot identity')
   })
 
   test('parses ahead/behind from track string', () => {
@@ -90,7 +100,7 @@ describe('parseBranches', () => {
       'origin/feature',
       '[ahead 3, behind 2]',
     ].join(SEP)
-    const [b] = parseBranches(line, 'main')
+    const [b] = parseBranches(line)
     expect(b?.ahead).toBe(3)
     expect(b?.behind).toBe(2)
     expect(b?.tracking).toBe('origin/feature')
@@ -108,21 +118,11 @@ describe('parseBranches', () => {
       'origin/stale',
       '[gone]',
     ].join(SEP)
-    const [b] = parseBranches(line, 'main')
+    const [b] = parseBranches(line)
     expect(b?.tracking).toBe('origin/stale')
     expect(b?.trackingGone).toBe(true)
     expect(b?.ahead).toBe(0)
     expect(b?.behind).toBe(0)
-  })
-
-  test('marks isCurrent only for the matching branch', () => {
-    const out = [
-      ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a1', '', ''].join(SEP),
-      ['dev', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'bbbbbbb', 's', '2026-05-20', 'a1', '', ''].join(SEP),
-    ].join('\n')
-    const result = parseBranches(out, 'dev')
-    expect(result.find((b) => b.name === 'main')?.isCurrent).toBe(false)
-    expect(result.find((b) => b.name === 'dev')?.isCurrent).toBe(true)
   })
 
   test('preserves SEP-free subjects with spaces and unicode', () => {
@@ -137,13 +137,13 @@ describe('parseBranches', () => {
       '',
       '',
     ].join(SEP)
-    const [b] = parseBranches(line, 'main')
+    const [b] = parseBranches(line)
     expect(b?.lastCommitMessage).toBe(subject)
   })
 
   test('accepts a full SHA-256 object id', () => {
     const line = ['main', 'a'.repeat(64), 'aaaaaaa', 'sha256', '2026-05-20', 'A', '', ''].join(SEP)
-    expect(parseBranches(line, 'main')[0]?.lastCommitHash).toBe('a'.repeat(64))
+    expect(parseBranches(line)[0]?.lastCommitHash).toBe('a'.repeat(64))
   })
 })
 
@@ -287,6 +287,23 @@ describe('parseWorktrees', () => {
       isPrimary: true,
       isLocked: false,
     })
+  })
+
+  test('rejects duplicate normalized worktree paths', () => {
+    const out =
+      [
+        'worktree /srv/repo/../same',
+        'HEAD abc1234000000000000000000000000000000000',
+        'branch refs/heads/main',
+        '',
+        'worktree /srv/same',
+        'HEAD def5678000000000000000000000000000000000',
+        'detached',
+      ].join(NUL) +
+      NUL +
+      NUL
+
+    expect(() => parseWorktrees(out)).toThrow('Duplicate worktree path')
   })
 
   test('accepts a complete SHA-256 worktree object id', () => {

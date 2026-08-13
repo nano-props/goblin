@@ -13,11 +13,7 @@ import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspa
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   gitWorktreePaneTargetLease,
-  resolveWorkspacePaneTabTargetForBranch,
-  workspacePanePreferenceTargetOptions,
-  workspacePaneTabInteractionBlockedForBranch,
-  workspacePaneTabTargetForBranch,
-  workspacePaneTabTargetForCreatedRuntime,
+  workspacePaneTabTargetForPaneTarget,
   workspacePaneTabTargetForWorkspace,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -26,6 +22,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-target-repo')
 const WORKTREE_PATH = '/tmp/workspace-pane-target-worktree'
@@ -56,44 +53,7 @@ describe('workspace pane tab target read model', () => {
     })
   })
 
-  test('marks target resolution unavailable when the repo branch read model is unavailable', async () => {
-    const repo = emptyWorkspace(REPO_ID, 'repo-runtime-workspace-pane-no-query')
-    markGitAvailable(repo)
-    workspacesStore.setState((s) => ({
-      workspaces: { ...s.workspaces, [REPO_ID]: repo },
-      workspaceOrder: [...s.workspaceOrder, REPO_ID],
-      restoredWorkspaceId: REPO_ID,
-    }))
-
-    expect(
-      resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
-    ).toEqual({
-      kind: 'unavailable',
-      reason: 'snapshot-unavailable',
-    })
-    expect(workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)).toBeNull()
-  })
-
-  test('resolves an interaction target from accepted data after a background snapshot refresh fails', () => {
-    const repo = seedRepoWithReadModelForTest({
-      worktrees: [createRepoWorktreeSnapshotForTest('feature/query', WORKTREE_PATH)],
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/query')],
-      currentBranchName: 'feature/query',
-      workspacePaneTabsByBranch: { 'feature/query': [workspacePaneStaticTabEntry('status')] },
-    })
-    const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
-    const query = appQueryClient.getQueryCache().find({ queryKey, exact: true })
-    if (!query) throw new Error('missing repo snapshot query')
-    query.setState({ ...query.state, status: 'error', error: new Error('snapshot unavailable') })
-
-    expect(appQueryClient.getQueryData(queryKey)).toBeDefined()
-    expect(
-      resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
-    ).toMatchObject({ kind: 'ready', target: { branchName: 'feature/query', worktreePath: WORKTREE_PATH } })
-  })
-
-  test('marks target resolution unavailable while workspace pane tabs projection is not ready', async () => {
+  test('does not create a target while the workspace pane tabs projection is not ready', () => {
     const repo = emptyWorkspace(REPO_ID, 'repo-runtime-workspace-pane-no-tabs')
     markGitAvailable(repo)
     workspacesStore.setState((s) => ({
@@ -107,44 +67,15 @@ describe('workspace pane tab target read model', () => {
       currentBranch: 'feature/query',
     })
     appQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
+    const paneTarget = requiredGitWorkspacePaneTabsTarget(REPO_ID, 'feature/query', WORKTREE_PATH)
     expect(
-      resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
-    ).toEqual({
-      kind: 'unavailable',
-      reason: 'workspace-pane-tabs-pending',
-    })
-    expect(workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)).toBeNull()
-    expect(
-      workspacePaneTabInteractionBlockedForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
-    ).toBe(true)
-  })
-
-  test('resolves branch targets from the TanStack Query snapshot when store branches are stale', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [],
-      currentBranchName: 'feature/query',
-      preferredWorkspacePaneTab: 'status',
-    })
-    seedRepoQueryDataForTest(repo, {
-      branches: [createRepoBranch('feature/query')],
-      worktrees: [createRepoWorktreeSnapshotForTest('feature/query', WORKTREE_PATH)],
-      currentBranch: 'feature/query',
-    })
-    appQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'git-worktree' as const,
-      workspaceId: REPO_ID,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
-
-    const target = workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)
-
-    expect(target?.branchName).toBe('feature/query')
-    expect(target?.worktreePath).toBe(WORKTREE_PATH)
-    expect(target?.renderedTab).toBe('status')
+      workspacePaneTabTargetForPaneTarget({
+        paneTarget,
+        routeTarget: paneTarget,
+        workspacePaneRoute: undefined,
+        worktreeHead: { kind: 'branch', branchName: 'feature/query' },
+      }),
+    ).toBeNull()
   })
 
   test('keeps a worktree command lease current when a background status refresh fails with accepted data', async () => {
@@ -221,18 +152,19 @@ describe('workspace pane tab target read model', () => {
       tabs: [workspacePaneStaticTabEntry('status')],
     })
 
-    const target = workspacePaneTabTargetForCreatedRuntime(
-      REPO_ID,
-      'feature/renamed',
-      WORKTREE_PATH,
-      workspacePanePreferenceTargetOptions,
-    )
+    const paneTarget = requiredGitWorkspacePaneTabsTarget(REPO_ID, 'feature/renamed', WORKTREE_PATH)
+    const target = workspacePaneTabTargetForPaneTarget({
+      paneTarget,
+      routeTarget: paneTarget,
+      workspacePaneRoute: undefined,
+      worktreeHead: { kind: 'branch', branchName: 'feature/renamed' },
+    })
 
     expect(target?.branchName).toBe('feature/renamed')
     expect(target?.worktreePath).toBe(WORKTREE_PATH)
   })
 
-  test('treats an explicit bare branch route as an empty workspace pane', () => {
+  test('treats an explicit empty worktree route as an empty workspace pane', () => {
     seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest('feature/query', WORKTREE_PATH)],
       id: REPO_ID,
@@ -244,7 +176,13 @@ describe('workspace pane tab target read model', () => {
       },
     })
 
-    const target = workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', { workspacePaneRoute: null })
+    const paneTarget = requiredGitWorkspacePaneTabsTarget(REPO_ID, 'feature/query', WORKTREE_PATH)
+    const target = workspacePaneTabTargetForPaneTarget({
+      paneTarget,
+      routeTarget: paneTarget,
+      workspacePaneRoute: null,
+      worktreeHead: { kind: 'branch', branchName: 'feature/query' },
+    })
 
     expect(target?.tabs.map((tab) => tab.identity)).toEqual(['workspace-pane:status', 'workspace-pane:history'])
     expect(target?.activeTab).toBeNull()

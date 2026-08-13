@@ -18,7 +18,7 @@ import {
   type ExecResult,
   type LogEntry,
   type RepoLogTarget,
-  type RepoWorktreeSnapshot,
+  type RepoWorktreeTargetProjection,
   type WorkspacePaneTargetIdentity,
   type WorktreeInfo,
 } from '#/shared/git-types.ts'
@@ -127,11 +127,7 @@ async function getMergedBranchNames(
 }
 
 /** Authoritative branch projection read. Optional display enrichments may degrade, but membership may not. */
-export async function getBranches(
-  cwd: string,
-  currentBranch: string | null,
-  options?: { signal?: AbortSignal },
-): Promise<BranchSnapshotInfo[]> {
+export async function getBranches(cwd: string, options?: { signal?: AbortSignal }): Promise<BranchSnapshotInfo[]> {
   const format = [
     '%(refname:short)',
     '%(objectname)',
@@ -149,7 +145,7 @@ export async function getBranches(
   options?.signal?.throwIfAborted()
   const mergedBranchNames = await getMergedBranchNames(cwd, defaultBranch, options?.signal)
   options?.signal?.throwIfAborted()
-  const branches = markDefaultBranch(parseBranches(output, currentBranch ?? ''), defaultBranch)
+  const branches = markDefaultBranch(parseBranches(output), defaultBranch)
   return prioritizeDefaultBranch(
     mergedBranchNames ? markMergedToDefault(branches, defaultBranch, mergedBranchNames) : branches,
     defaultBranch,
@@ -159,17 +155,28 @@ export async function getBranches(
 /** Strict, display-free branch membership read for admission/catalog paths. */
 export async function getBranchWorktreeIdentities(
   cwd: string,
-  worktrees: ReadonlyArray<Pick<RepoWorktreeSnapshot, 'path' | 'head' | 'materializedBranch'>>,
+  worktrees: readonly RepoWorktreeTargetProjection[],
   options?: { signal?: AbortSignal },
 ): Promise<WorkspacePaneTargetIdentity[]> {
   const output = await git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'], {
     signal: options?.signal,
   })
   options?.signal?.throwIfAborted()
-  const branches = output
-    .split('\n')
-    .map((branch) => branch.trim())
-    .filter(Boolean)
+  const branches = output ? output.split('\n') : []
+  const branchNames = new Set(branches)
+  if (branches.some((branch) => !isSafeBranchName(branch)) || branchNames.size !== branches.length) {
+    throw new Error('Git returned invalid branch identities')
+  }
+  if (
+    worktrees.some(
+      (worktree) =>
+        worktree.headOid !== null &&
+        worktree.materializedBranch !== null &&
+        !branchNames.has(worktree.materializedBranch),
+    )
+  ) {
+    throw new Error('Git worktree materialized branch is unavailable')
+  }
   const materializedBranches = new Set(
     worktrees.flatMap((worktree) => {
       const branchName = repoWorktreeMaterializedBranch(worktree)

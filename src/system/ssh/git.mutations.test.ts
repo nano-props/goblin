@@ -414,7 +414,7 @@ describe('remote git mutations', () => {
     )
   })
 
-  test('removeRemoteWorktree rejects branch deletion retained by a sibling rebase before mutation', async () => {
+  test('removeRemoteWorktree fails when concurrent reads report duplicate branch ownership', async () => {
     const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
     const worktrees = worktreePorcelain(
       [
@@ -450,17 +450,17 @@ describe('remote git mutations', () => {
       }
     })
 
-    const result = await removeRemoteWorktree(TARGET, {
-      beforeRemove,
-      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
-      branch: 'feature/test',
-      worktreePath: '/srv/repo-feature',
-      deleteBranch: true,
-      forceDeleteBranch: true,
-      run,
-    })
-
-    expect(result).toEqual({ ok: false, message: 'error.cannot-delete-checked-out-branch' })
+    await expect(
+      removeRemoteWorktree(TARGET, {
+        beforeRemove,
+        afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+        branch: 'feature/test',
+        worktreePath: '/srv/repo-feature',
+        deleteBranch: true,
+        forceDeleteBranch: true,
+        run,
+      }),
+    ).rejects.toThrow('error.failed-read-repo')
     expect(beforeRemove).not.toHaveBeenCalled()
     expect(run).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'gitWorktreeRemove' }),
@@ -551,6 +551,41 @@ describe('remote git mutations', () => {
       TARGET,
       expect.anything(),
     )
+  })
+
+  test('removeRemoteWorktree refuses a locked worktree before reading status', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      const authorityRead = attachedWorktreeAuthorityRead(command)
+      if (authorityRead) return authorityRead
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult(
+          worktreePorcelain(
+            [
+              'worktree /srv/repo',
+              'HEAD f00ba40000000000000000000000000000000000',
+              'branch refs/heads/main',
+              '',
+              'worktree /srv/repo-feature',
+              'HEAD ba5eba1000000000000000000000000000000000',
+              'branch refs/heads/feature/test',
+              'locked portable',
+            ].join('\n'),
+          ),
+        )
+      }
+      return failRemoteResult('unexpected command')
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      ...SUCCESSFUL_REMOTE_REMOVAL_LIFECYCLE,
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      deleteBranch: false,
+      run,
+    })
+
+    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-locked-worktree' })
+    expect(run).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'gitStatus' }), TARGET, expect.anything())
   })
 
   test('removeRemoteWorktree reports uncertainty and impact after a started timeout', async () => {
@@ -835,7 +870,7 @@ describe('remote git mutations', () => {
     expect(run).not.toHaveBeenCalled()
   })
 
-  test('removeRemoteWorktree admits a detached rebase worktree by its materialized branch', async () => {
+  test('removeRemoteWorktree refuses a detached rebase before status or mutation', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command) => {
       switch (command.type) {
         case 'gitWorktreeList':
@@ -858,12 +893,8 @@ describe('remote git mutations', () => {
           return command.path === '/srv/repo-feature'
             ? okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/test\n')
             : okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
-        case 'gitStatus':
-          return okRemoteResult('')
-        case 'gitWorktreeRemove':
-          return okRemoteResult('Removed worktree')
         default:
-          return okRemoteResult('')
+          return failRemoteResult('unexpected command')
       }
     })
 
@@ -875,16 +906,12 @@ describe('remote git mutations', () => {
       run,
     })
 
-    expect(result).toEqual({
-      ok: true,
-      message: 'Removed worktree',
-      worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
-      worktreeRemoved: true,
-    })
-    expect(run).toHaveBeenCalledWith(
-      { type: 'gitWorktreeRemove', path: '/srv/repo', worktreePath: '/srv/repo-feature' },
+    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-worktree-operation-in-progress' })
+    expect(run).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'gitStatus' }), TARGET, expect.anything())
+    expect(run).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'gitWorktreeRemove' }),
       TARGET,
-      { signal: undefined, timeoutMs: 300_000 },
+      expect.anything(),
     )
   })
 

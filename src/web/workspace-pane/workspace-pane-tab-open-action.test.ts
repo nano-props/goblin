@@ -161,6 +161,7 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toMatchObject({ kind: 'completed' })
 
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'files', 'history', 'changes'])
+    expect(preferredWorkspacePaneTab()).toBe('changes')
     expect(
       workspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
         'workspace-pane:changes'
@@ -232,15 +233,14 @@ describe('openWorkspacePaneTab', () => {
       },
     })
     await expect(
-      openWorkspacePaneTab({
-        workspacePaneRoute: undefined,
+      dispatchShowWorkspacePaneStaticTabAction({
         workspaceId: REPO_ID,
         branchName: 'feature/no-worktree',
-        worktreePath: null,
         type: 'changes',
+        workspacePaneRoute: undefined,
         navigation: navigationWithStoreActions(),
       }),
-    ).resolves.toBe(false)
+    ).resolves.toEqual({ kind: 'unsupported', reason: 'worktree-required' })
 
     expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
     expect(openTabsFor('feature/no-worktree')).toEqual(['status'])
@@ -268,15 +268,14 @@ describe('openWorkspacePaneTab', () => {
       route: null,
     })
     await expect(
-      openWorkspacePaneTab({
-        workspacePaneRoute: undefined,
+      dispatchShowWorkspacePaneStaticTabAction({
         workspaceId: REPO_ID,
         branchName: 'feature/no-worktree',
-        worktreePath: null,
         type: 'status',
+        workspacePaneRoute: undefined,
         navigation,
       }),
-    ).resolves.toBe(true)
+    ).resolves.toMatchObject({ kind: 'completed' })
 
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'status')
     expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')

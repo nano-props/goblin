@@ -31,7 +31,7 @@ function readyGitProbe(): WorkspaceSettledProbeState {
 function repoSnapshotResponse(): RepoSnapshotResponse {
   return {
     snapshot: {
-      branches: [createBranchSnapshot('main', { isCurrent: true })],
+      branches: [createBranchSnapshot('main')],
       worktrees: [],
       current: 'main',
       remote: {

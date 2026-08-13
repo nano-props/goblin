@@ -51,7 +51,16 @@ export interface RepoBranchWorkspacePaneRouteNavigation {
   ) => boolean
 }
 
-export interface AppRouteNavigation extends RepoBranchWorkspacePaneRouteNavigation {
+export interface RepoWorkspacePaneRouteNavigation extends RepoBranchWorkspacePaneRouteNavigation {
+  openRepoWorktreeTerminal: (
+    workspaceId: WorkspaceId,
+    worktreePath: string,
+    terminalSessionId: string,
+    options?: AppRouteNavigationOptions,
+  ) => boolean
+}
+
+export interface AppRouteNavigation extends RepoWorkspacePaneRouteNavigation {
   workspaceSlugForId: (workspaceId: WorkspaceId) => string | null
   currentWorkspacePaneRoute: (workspaceId: WorkspaceId, branchName: string) => WorkspacePaneRouteTarget | undefined
   openHome: (options?: AppRouteNavigationOptions) => void
@@ -76,12 +85,6 @@ export interface AppRouteNavigation extends RepoBranchWorkspacePaneRouteNavigati
   ) => Promise<boolean>
   openWorkspaceDashboard: (workspaceId: WorkspaceId, options?: AppRouteNavigationOptions) => void
   openRepoWorktree: (workspaceId: WorkspaceId, worktreePath: string, options?: AppRouteNavigationOptions) => boolean
-  openRepoWorktreeTerminal: (
-    workspaceId: WorkspaceId,
-    worktreePath: string,
-    terminalSessionId: string,
-    options?: AppRouteNavigationOptions,
-  ) => boolean
   openRepoWorktreeTab: (
     workspaceId: WorkspaceId,
     worktreePath: string,

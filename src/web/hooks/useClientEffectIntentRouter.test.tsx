@@ -285,7 +285,7 @@ describe('useClientEffectIntentRouter', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true })],
+      branchSnapshots: [createBranchSnapshot('main')],
       worktrees: [
         createRepoWorktreeSnapshotForTest('main', '/tmp/repo-worktree', { isPrimary: false, isLocked: false }),
       ],
@@ -319,7 +319,7 @@ describe('useClientEffectIntentRouter', () => {
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true }), createBranchSnapshot('feature/test')],
+      branchSnapshots: [createBranchSnapshot('main'), createBranchSnapshot('feature/test')],
       worktrees: [
         createRepoWorktreeSnapshotForTest('main', '/tmp/repo-main', { isPrimary: false, isLocked: false }),
         createRepoWorktreeSnapshotForTest('feature/test', '/tmp/repo-feature', { isPrimary: false, isLocked: false }),
@@ -414,7 +414,7 @@ describe('useClientEffectIntentRouter', () => {
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true }), createBranchSnapshot('feature/test')],
+      branchSnapshots: [createBranchSnapshot('main'), createBranchSnapshot('feature/test')],
       worktrees: [
         createRepoWorktreeSnapshotForTest('main', '/tmp/repo-main', { isPrimary: false, isLocked: false }),
         createRepoWorktreeSnapshotForTest('feature/test', '/tmp/repo-feature', { isPrimary: false, isLocked: false }),
@@ -477,7 +477,7 @@ describe('useClientEffectIntentRouter', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true })],
+      branchSnapshots: [createBranchSnapshot('main')],
       worktrees: [
         createRepoWorktreeSnapshotForTest('main', '/tmp/repo-worktree', { isPrimary: false, isLocked: false }),
       ],
@@ -501,7 +501,7 @@ describe('useClientEffectIntentRouter', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true })],
+      branchSnapshots: [createBranchSnapshot('main')],
       worktrees: [
         createRepoWorktreeSnapshotForTest('main', '/tmp/repo-worktree', { isPrimary: false, isLocked: false }),
       ],
@@ -523,7 +523,7 @@ describe('useClientEffectIntentRouter', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true })],
+      branchSnapshots: [createBranchSnapshot('main')],
       worktrees: [
         createRepoWorktreeSnapshotForTest('main', '/tmp/repo-worktree', { isPrimary: false, isLocked: false }),
       ],
@@ -547,7 +547,7 @@ describe('useClientEffectIntentRouter', () => {
       id: 'goblin+file:///tmp/restored-repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true })],
+      branchSnapshots: [createBranchSnapshot('main')],
       worktrees: [
         createRepoWorktreeSnapshotForTest('main', '/tmp/restored-repo-worktree', { isPrimary: false, isLocked: false }),
       ],
@@ -556,7 +556,7 @@ describe('useClientEffectIntentRouter', () => {
       id: 'goblin+file:///tmp/visible-repo',
       currentBranch: 'feature',
       currentBranchName: 'feature',
-      branchSnapshots: [createBranchSnapshot('feature', { isCurrent: true })],
+      branchSnapshots: [createBranchSnapshot('feature')],
       worktrees: [
         createRepoWorktreeSnapshotForTest('feature', '/tmp/visible-repo-worktree', {
           isPrimary: false,
@@ -658,7 +658,7 @@ describe('useClientEffectIntentRouter', () => {
       currentBranch: 'main',
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'status',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true })],
+      branchSnapshots: [createBranchSnapshot('main')],
       worktrees: [
         createRepoWorktreeSnapshotForTest('main', '/tmp/repo-worktree', { isPrimary: false, isLocked: false }),
       ],

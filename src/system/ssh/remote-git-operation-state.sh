@@ -42,9 +42,12 @@ elif [ "$IS_PRIMARY" = 0 ]; then
     [ -f "$CANDIDATE_GIT_DIR/gitdir" ] || continue
     GITDIR_POINTER=$(<"$CANDIDATE_GIT_DIR/gitdir")
     case "$GITDIR_POINTER" in
-      /*) RESOLVED_GITDIR_POINTER=$(lexical_absolute_path "$GITDIR_POINTER") ;;
-      *) RESOLVED_GITDIR_POINTER=$(lexical_absolute_path "$CANDIDATE_GIT_DIR/$GITDIR_POINTER") ;;
+      /*) GITDIR_POINTER_INPUT=$GITDIR_POINTER ;;
+      *) GITDIR_POINTER_INPUT=$CANDIDATE_GIT_DIR/$GITDIR_POINTER ;;
     esac
+    if ! RESOLVED_GITDIR_POINTER=$(lexical_absolute_path "$GITDIR_POINTER_INPUT"); then
+      continue
+    fi
     case "$RESOLVED_GITDIR_POINTER" in
       /*/.git) CANDIDATE_WORKTREE_PATH=${RESOLVED_GITDIR_POINTER%/.git} ;;
       *) continue ;;

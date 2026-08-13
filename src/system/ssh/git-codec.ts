@@ -49,6 +49,8 @@ export function decodeRemoteGitWorktreeState(output: string): RemoteGitWorktreeS
   const rawBranchName = branchRecord === 'materialized-branch' ? '' : branchRecord.slice('materialized-branch '.length)
   if (operation?.kind === 'rebase' && rawBranchName) {
     if (!rawBranchName.startsWith('refs/heads/')) throw new Error('error.failed-read-repo')
+  } else if (rawBranchName.startsWith('refs/heads/')) {
+    throw new Error('error.failed-read-repo')
   }
   const branchName = rawBranchName.startsWith('refs/heads/') ? rawBranchName.slice('refs/heads/'.length) : rawBranchName
   if (rawBranchName && !branchName) throw new Error('error.failed-read-repo')
@@ -80,7 +82,7 @@ export function parseRemoteSnapshot(output: string): RemoteRepoBaseSnapshot | nu
   const branchOutput = sections.branches.join('\n')
   let branches: BranchSnapshotInfo[]
   try {
-    branches = parseBranches(branchOutput, current)
+    branches = parseBranches(branchOutput)
   } catch {
     return null
   }

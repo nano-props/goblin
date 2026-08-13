@@ -97,7 +97,7 @@ describe('repo worktree removal', () => {
     expect(result.repoIdsToInvalidate).toEqual([WORKTREE_REPO_ID, REPO_ID])
   })
 
-  test('removeRepoWorktree admits a detached rebase worktree by its materialized branch', async () => {
+  test('removeRepoWorktree refuses a detached rebase before status or mutation', async () => {
     mocks.readWorktreeMembership.mockResolvedValueOnce([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
       { path: '/tmp/repo-worktree', isBare: false, isPrimary: false },
@@ -125,8 +125,9 @@ describe('repo worktree removal', () => {
 
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
-    expect(result).toMatchObject({ ok: true })
-    expect(mocks.removeWorktree).toHaveBeenCalledOnce()
+    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-worktree-operation-in-progress' })
+    expect(mocks.sampleWorktreeStatusForTarget).not.toHaveBeenCalled()
+    expect(mocks.removeWorktree).not.toHaveBeenCalled()
   })
 
   test('removeRepoWorktree fails before status or lifecycle when branch ownership does not match', async () => {
@@ -717,6 +718,7 @@ describe('repo worktree removal', () => {
     const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
 
     expect(result).toMatchObject({ ok: false, message: 'error.cannot-remove-locked-worktree' })
+    expect(mocks.sampleWorktreeStatusForTarget).not.toHaveBeenCalled()
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
   })
 

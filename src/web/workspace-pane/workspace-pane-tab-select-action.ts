@@ -11,8 +11,6 @@ import {
   workspacePaneTabControllerTargetIsCurrent,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
-import { dispatchWorkspacePaneDestinationRoute } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
-import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import {
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
@@ -53,13 +51,6 @@ export interface SelectWorkspacePaneTabByIdentityActionOptions {
   navigation: AppNavigationActions
   onTerminalReselect?: (terminalSessionId: string) => void
   reselect?: boolean
-}
-
-export interface ShowWorkspacePaneTerminalRouteActionOptions {
-  workspaceId: WorkspaceId | null
-  branchName: string | null
-  terminalSessionId: string
-  navigation: AppNavigationActions
 }
 
 export async function dispatchSelectWorkspacePaneTabByIndexAction(
@@ -125,18 +116,6 @@ async function selectWorkspacePaneTabByIdentityAction(
     onTerminalReselect?.(tab.sessionId)
   }
   return committed
-}
-
-export async function dispatchShowWorkspacePaneTerminalRouteAction(
-  options: ShowWorkspacePaneTerminalRouteActionOptions,
-): Promise<WorkspacePaneActionOutcome> {
-  if (!options.workspaceId || !options.branchName) return { kind: 'target-missing' }
-  return await dispatchWorkspacePaneDestinationRoute({
-    workspaceId: options.workspaceId,
-    branchName: options.branchName,
-    route: { kind: 'terminal', terminalSessionId: options.terminalSessionId },
-    navigation: options.navigation,
-  })
 }
 
 export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspacePaneTabActionOptions): Promise<boolean> {

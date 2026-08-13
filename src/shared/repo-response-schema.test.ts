@@ -122,7 +122,6 @@ describe('repo response schemas', () => {
   test('rejects legacy and partial repository snapshot shapes', () => {
     const branch = {
       name: 'main',
-      isCurrent: true,
       ahead: 0,
       behind: 0,
       lastCommitHash: 'abcdef1234567890abcdef1234567890abcdef12',
@@ -192,7 +191,6 @@ describe('repo response schemas', () => {
   test('rejects invalid worktree branch ownership', () => {
     const branch = {
       name: 'main',
-      isCurrent: true,
       ahead: 0,
       behind: 0,
       lastCommitHash: 'abcdef1234567890abcdef1234567890abcdef12',
@@ -223,9 +221,10 @@ describe('repo response schemas', () => {
       }).success
 
     expect(parses([worktree])).toBe(true)
+    expect(parses([worktree], [{ ...branch, isCurrent: true }])).toBe(false)
     expect(parses([{ ...worktree, headOid: 'a'.repeat(64) }])).toBe(true)
     expect(parses([{ ...worktree, headOid: null }], [])).toBe(true)
-    expect(parses([{ ...worktree, headOid: null }], [{ ...branch, name: 'other', isCurrent: false }])).toBe(true)
+    expect(parses([{ ...worktree, headOid: null }], [{ ...branch, name: 'other' }])).toBe(true)
     expect(parses([{ ...worktree, headOid: null }])).toBe(false)
     expect(parses([{ ...worktree, headOid: '0'.repeat(40) }])).toBe(false)
     expect(parses([{ ...worktree, headOid: '0'.repeat(64) }])).toBe(false)
@@ -237,6 +236,26 @@ describe('repo response schemas', () => {
     expect(parses([{ ...worktree, materializedBranch: 'other' }])).toBe(false)
     expect(parses([{ ...worktree, operation: { kind: 'rebase' } }])).toBe(false)
     expect(parses([{ ...worktree, operation: { kind: 'bisect' } }])).toBe(true)
+    expect(parses([worktree], [branch, { ...branch }])).toBe(false)
+    expect(
+      parses([
+        worktree,
+        {
+          ...worktree,
+          path: '/workspace/other',
+          head: { kind: 'detached' },
+          operation: { kind: 'merge' },
+          materializedBranch: null,
+          isPrimary: true,
+        },
+      ]),
+    ).toBe(false)
+    expect(parses([worktree], [{ ...branch, name: 'unsafe branch' }])).toBe(false)
+    expect(
+      v.safeParse(RepoSnapshotResponseSchema, {
+        snapshot: { branches: [branch], worktrees: [worktree], current: 'unsafe branch', remote },
+      }).success,
+    ).toBe(false)
     expect(parses([{ ...worktree, head: { kind: 'detached' }, operation: null }])).toBe(false)
     expect(
       v.safeParse(RepoSnapshotResponseSchema, {
@@ -251,8 +270,25 @@ describe('repo response schemas', () => {
     expect(parses([{ ...worktree, head: { kind: 'detached' }, materializedBranch: 'unsafe branch' }])).toBe(false)
     expect(
       parses([
+        { ...worktree, head: { kind: 'detached' }, operation: { kind: 'rebase' }, materializedBranch: 'missing' },
+      ]),
+    ).toBe(false)
+    expect(
+      parses([
         worktree,
         { ...worktree, path: '/workspace/linked', head: { kind: 'detached' }, materializedBranch: 'main' },
+      ]),
+    ).toBe(false)
+    expect(
+      parses([
+        worktree,
+        {
+          ...worktree,
+          head: { kind: 'detached' },
+          operation: { kind: 'merge' },
+          materializedBranch: null,
+          isPrimary: false,
+        },
       ]),
     ).toBe(false)
   })

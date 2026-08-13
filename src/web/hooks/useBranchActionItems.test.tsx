@@ -177,7 +177,6 @@ function repo(branch: BranchSnapshotInfo, withWorktree: boolean): BranchActionRe
 function branch(): BranchSnapshotInfo {
   return {
     name: 'feature/action-order',
-    isCurrent: false,
     ahead: 0,
     behind: 0,
     lastCommitHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',

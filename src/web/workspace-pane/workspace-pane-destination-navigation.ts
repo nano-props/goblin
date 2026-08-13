@@ -1,7 +1,5 @@
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
-import { terminalWorkspacePaneTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
 import {
@@ -12,14 +10,9 @@ import {
 } from '#/web/app-navigation-lifecycle.ts'
 import {
   isGitWorktreeDestinationTargetLease,
-  resolveWorkspacePaneDestinationTargetLease,
   workspacePaneTargetLeaseIsCurrent,
   type WorkspacePaneDestinationTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import {
-  workspacePaneActionTargetFromCoordinates,
-  tryRunWorkspacePaneAction,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 export interface WorkspacePaneDestinationPresentation {
   generation: AppNavigationGeneration
@@ -40,36 +33,6 @@ export function workspacePaneDestinationPresentationIsCurrent(
 
 export function resetWorkspacePaneDestinationPresentationForTest(): void {
   resetAppNavigationForTest()
-}
-
-export async function dispatchWorkspacePaneDestinationRoute(input: {
-  workspaceId: WorkspaceId
-  branchName: string
-  route: WorkspacePaneRouteTarget
-  navigation: FilesystemWorkspacePaneRouteCommitActions
-  options?: { replace?: boolean }
-}): Promise<WorkspacePaneActionOutcome> {
-  const lease = resolveWorkspacePaneDestinationTargetLease(input.workspaceId, input.branchName)
-  if (!lease) return { kind: 'target-missing' }
-  if (!workspacePaneDestinationRouteSupported(lease, input.route)) {
-    return { kind: 'unsupported', reason: 'worktree-required' }
-  }
-  const admission = await tryRunWorkspacePaneAction(
-    workspacePaneActionTargetFromCoordinates({
-      workspaceId: lease.routeTarget.workspaceId,
-      workspaceRuntimeId: lease.workspaceRuntimeId,
-      branchName: isGitWorktreeDestinationTargetLease(lease) ? lease.canonicalBranch : lease.routeTarget.branchName,
-      worktreePath: isGitWorktreeDestinationTargetLease(lease) ? lease.routeTarget.worktreePath : null,
-    }),
-    () =>
-      commitWorkspacePaneDestinationRoute(
-        beginWorkspacePaneDestinationPresentation(lease),
-        input.route,
-        input.navigation,
-        input.options,
-      ),
-  )
-  return admission.kind === 'busy' ? { kind: 'blocked' } : admission.result
 }
 
 /**
@@ -128,15 +91,4 @@ export async function commitWorkspacePaneDestinationRoute(
   if (!workspacePaneDestinationPresentationIsCurrent(presentation)) return { kind: 'superseded' }
   if (!supplementCommitted) return { kind: 'superseded' }
   return { kind: 'completed', changed: true, presentation: 'router-settled' }
-}
-
-function workspacePaneDestinationRouteSupported(
-  lease: WorkspacePaneDestinationTargetLease,
-  route: WorkspacePaneRouteTarget,
-): boolean {
-  if (route === null) return true
-  const availability = { hasWorktree: isGitWorktreeDestinationTargetLease(lease) }
-  return route.kind === 'static'
-    ? workspacePaneStaticTabProvider(route.tab).canOpen(availability)
-    : terminalWorkspacePaneTabProvider.canOpen(availability)
 }

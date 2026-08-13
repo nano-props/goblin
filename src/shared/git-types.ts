@@ -14,16 +14,34 @@ export function gitOperationRequiresDetachedHead(operation: GitOperation | null)
   return operation?.kind === 'rebase'
 }
 
-/** Complete repository worktree membership, independent of branch rows. */
-export interface RepoWorktreeSnapshot {
-  path: string
+/** Branch ownership carried by a worktree, independent of branch-row presentation. */
+export interface RepoWorktreeBranchOwnership {
   head: GitHead
+  materializedBranch: string | null
+}
+
+export interface RepoWorktreeTargetProjection extends RepoWorktreeBranchOwnership {
+  path: string
   /** Null only for an unborn attached branch, before its first commit. */
   headOid: string | null
+}
+
+export interface RepoWorktreeSnapshot extends RepoWorktreeTargetProjection {
   operation: GitOperation | null
-  materializedBranch: string | null
   isPrimary: boolean
   isLocked: boolean
+}
+
+export function hasUniqueRepoWorktreeMaterializedBranches(
+  worktrees: readonly Pick<RepoWorktreeSnapshot, 'materializedBranch'>[],
+): boolean {
+  const branches = new Set<string>()
+  for (const { materializedBranch } of worktrees) {
+    if (materializedBranch === null) continue
+    if (branches.has(materializedBranch)) return false
+    branches.add(materializedBranch)
+  }
+  return true
 }
 
 export type WorkspacePaneTargetIdentity =
@@ -31,13 +49,12 @@ export type WorkspacePaneTargetIdentity =
   | {
       kind: 'git-worktree'
       worktreePath: string
-      head: RepoWorktreeSnapshot['head']
-      materializedBranch: RepoWorktreeSnapshot['materializedBranch']
+      head: GitHead
+      materializedBranch: string | null
     }
 
 export interface BranchSnapshotInfo {
   name: string
-  isCurrent: boolean
   isDefault?: boolean
   tracking?: string
   trackingGone?: boolean
@@ -51,16 +68,14 @@ export interface BranchSnapshotInfo {
   mergedToDefault?: boolean
 }
 
-export function repoWorktreeForBranch<T extends Pick<RepoWorktreeSnapshot, 'head' | 'materializedBranch'>>(
+export function repoWorktreeForBranch<T extends RepoWorktreeBranchOwnership>(
   worktrees: readonly T[],
   branchName: string,
 ): T | undefined {
   return worktrees.find((worktree) => repoWorktreeMaterializedBranch(worktree) === branchName)
 }
 
-export function repoWorktreeMaterializedBranch(
-  worktree: Pick<RepoWorktreeSnapshot, 'head' | 'materializedBranch'>,
-): string | null {
+export function repoWorktreeMaterializedBranch(worktree: RepoWorktreeBranchOwnership): string | null {
   if (worktree.head.kind === 'branch') {
     if (worktree.materializedBranch !== worktree.head.branchName) {
       throw new Error('Attached worktree materialized branch does not match HEAD')

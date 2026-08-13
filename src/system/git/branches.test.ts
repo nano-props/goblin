@@ -50,14 +50,20 @@ describe('branch mutations', () => {
 
 describe('getBranchWorktreeIdentities', () => {
   test('reads strict branch identity and maps known worktree paths', async () => {
-    vi.mocked(git).mockResolvedValueOnce('main\nfeature/linked\nfeature/free\n')
+    vi.mocked(git).mockResolvedValueOnce('main\nfeature/linked\nfeature/free')
 
     await expect(
       getBranchWorktreeIdentities('/repo', [
-        { path: '/repo', head: { kind: 'branch', branchName: 'main' }, materializedBranch: 'main' },
+        {
+          path: '/repo',
+          head: { kind: 'branch', branchName: 'main' },
+          headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          materializedBranch: 'main',
+        },
         {
           path: '/worktrees/linked',
           head: { kind: 'branch', branchName: 'feature/linked' },
+          headOid: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
           materializedBranch: 'feature/linked',
         },
       ]),
@@ -86,10 +92,23 @@ describe('getBranchWorktreeIdentities', () => {
     await expect(getBranchWorktreeIdentities('/repo', [])).rejects.toThrow('git unavailable')
   })
 
+  test('rejects whitespace-normalized branch identities', async () => {
+    vi.mocked(git).mockResolvedValueOnce(' main')
+
+    await expect(getBranchWorktreeIdentities('/repo', [])).rejects.toThrow('Git returned invalid branch identities')
+  })
+
   test('keeps a detached local worktree without a branch ref', async () => {
     vi.mocked(git).mockResolvedValueOnce('')
     await expect(
-      getBranchWorktreeIdentities('/repo', [{ path: '/repo', head: { kind: 'detached' }, materializedBranch: null }]),
+      getBranchWorktreeIdentities('/repo', [
+        {
+          path: '/repo',
+          head: { kind: 'detached' },
+          headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          materializedBranch: null,
+        },
+      ]),
     ).resolves.toEqual([
       {
         kind: 'git-worktree',
@@ -101,13 +120,14 @@ describe('getBranchWorktreeIdentities', () => {
   })
 
   test('does not expose the branch retained by a detached worktree', async () => {
-    vi.mocked(git).mockResolvedValueOnce('main\nfeature/in-progress\n')
+    vi.mocked(git).mockResolvedValueOnce('main\nfeature/in-progress')
 
     await expect(
       getBranchWorktreeIdentities('/repo', [
         {
           path: '/repo',
           head: { kind: 'detached' },
+          headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           materializedBranch: 'feature/in-progress',
         },
       ]),
@@ -120,6 +140,21 @@ describe('getBranchWorktreeIdentities', () => {
       },
       { kind: 'git-branch', branchName: 'main' },
     ])
+  })
+
+  test('rejects a committed materialized branch missing from local refs', async () => {
+    vi.mocked(git).mockResolvedValueOnce('main')
+
+    await expect(
+      getBranchWorktreeIdentities('/repo', [
+        {
+          path: '/repo',
+          head: { kind: 'detached' },
+          headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          materializedBranch: 'feature/missing',
+        },
+      ]),
+    ).rejects.toThrow('Git worktree materialized branch is unavailable')
   })
 })
 
@@ -161,7 +196,7 @@ describe('authoritative snapshot reads', () => {
       return ''
     })
 
-    await expect(getBranches('/repo', 'main')).rejects.toThrow('branch read failed')
+    await expect(getBranches('/repo')).rejects.toThrow('branch read failed')
   })
 })
 

@@ -3,7 +3,12 @@ import { WorkspaceIdSchema } from '#/shared/workspace-locator-schema.ts'
 import { ExecResultResponseSchema, WorktreeBootstrapSummaryResponseSchema } from '#/shared/http-response-schema.ts'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
-import { GIT_OBJECT_ID_OR_PREFIX_RE, gitOperationRequiresDetachedHead, isFullGitObjectId } from '#/shared/git-types.ts'
+import {
+  GIT_OBJECT_ID_OR_PREFIX_RE,
+  gitOperationRequiresDetachedHead,
+  hasUniqueRepoWorktreeMaterializedBranches,
+  isFullGitObjectId,
+} from '#/shared/git-types.ts'
 
 const StringArraySchema = v.array(v.string())
 const NullableNumberSchema = v.nullable(v.number())
@@ -46,8 +51,7 @@ const PullRequestSchema = v.strictObject({
   mergeable: v.optional(v.picklist(['MERGEABLE', 'CONFLICTING', 'UNKNOWN'])),
 })
 const BranchSnapshotSchema = v.strictObject({
-  name: v.string(),
-  isCurrent: v.boolean(),
+  name: v.pipe(v.string(), v.check(isSafeBranchName)),
   isDefault: v.optional(v.boolean()),
   tracking: v.optional(v.string()),
   trackingGone: v.optional(v.boolean()),
@@ -97,17 +101,25 @@ const RepoSnapshotObjectSchema = v.strictObject({
 })
 const RepoSnapshotSchema = v.pipe(
   RepoSnapshotObjectSchema,
-  v.check(hasValidWorktreeBranchOwnership, 'invalid worktree branch ownership'),
+  v.check(hasValidWorktreeProjection, 'invalid worktree projection'),
 )
 export const RepoSnapshotResponseSchema = v.strictObject({
   snapshot: RepoSnapshotSchema,
 })
 
-function hasValidWorktreeBranchOwnership(snapshot: v.InferOutput<typeof RepoSnapshotObjectSchema>): boolean {
-  const materializedBranches = new Set<string>()
+function hasValidWorktreeProjection(snapshot: v.InferOutput<typeof RepoSnapshotObjectSchema>): boolean {
+  if (snapshot.current !== '' && !isSafeBranchName(snapshot.current)) return false
+  if (!hasUniqueRepoWorktreeMaterializedBranches(snapshot.worktrees)) return false
+  if (snapshot.worktrees.filter((worktree) => worktree.isPrimary).length > 1) return false
+  if (new Set(snapshot.branches.map((branch) => branch.name)).size !== snapshot.branches.length) return false
+  const worktreePaths = new Set<string>()
+  const branchNames = new Set(snapshot.branches.map((branch) => branch.name))
   return snapshot.worktrees.every((worktree) => {
+    if (worktreePaths.has(worktree.path)) return false
+    worktreePaths.add(worktree.path)
     const branchName = worktree.materializedBranch
-    if (branchName !== null && (!isSafeBranchName(branchName) || materializedBranches.has(branchName))) return false
+    if (branchName !== null && !isSafeBranchName(branchName)) return false
+    if (worktree.headOid !== null && branchName !== null && !branchNames.has(branchName)) return false
     if (worktree.head.kind === 'branch' && branchName !== worktree.head.branchName) return false
     if (worktree.head.kind === 'branch' && gitOperationRequiresDetachedHead(worktree.operation)) return false
     if (worktree.head.kind === 'detached' && worktree.operation === null && branchName !== null) return false
@@ -116,7 +128,6 @@ function hasValidWorktreeBranchOwnership(snapshot: v.InferOutput<typeof RepoSnap
       const { branchName: unbornBranchName } = worktree.head
       if (snapshot.branches.some((branch) => branch.name === unbornBranchName)) return false
     }
-    if (branchName !== null) materializedBranches.add(branchName)
     return true
   })
 }

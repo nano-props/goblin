@@ -10,7 +10,6 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   beginWorkspacePaneDestinationPresentation,
   commitWorkspacePaneDestinationRoute,
-  dispatchWorkspacePaneDestinationRoute,
   resetWorkspacePaneDestinationPresentationForTest,
 } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import type {
@@ -18,10 +17,6 @@ import type {
   WorkspacePaneRouteCommitActions,
 } from '#/web/app-navigation-actions.ts'
 import { resolveWorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import {
-  resetWorkspacePaneActionQueueForTest,
-  runWorkspacePaneAction,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -43,104 +38,10 @@ const DESTINATION_ROUTE = { kind: 'static' as const, tab: 'status' as const }
 beforeEach(() => {
   appQueryClient.clear()
   resetWorkspacesStore()
-  resetWorkspacePaneActionQueueForTest()
   resetWorkspacePaneDestinationPresentationForTest()
 })
 
 describe('workspace pane destination navigation', () => {
-  test('commits branch-scoped tabs for a destination without a worktree', async () => {
-    seedNoWorktreeRepo()
-    const commitWorkspacePaneRoute = acceptedRouteCommit()
-    const setWorkspacePaneTab = vi.spyOn(workspacesStore.getState(), 'setWorkspacePaneTab')
-
-    await expect(
-      dispatchWorkspacePaneDestinationRoute({
-        workspaceId: REPO_ID,
-        branchName: 'feature/no-worktree',
-        route: DESTINATION_ROUTE,
-        navigation: testNavigation(commitWorkspacePaneRoute),
-      }),
-    ).resolves.toEqual({ kind: 'completed', changed: true, presentation: 'router-settled' })
-    expect(commitWorkspacePaneRoute).toHaveBeenCalledOnce()
-    expect(setWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'status')
-  })
-
-  test('commits materialized destinations through canonical worktree navigation and persists selection', async () => {
-    seedDestinationRepo()
-    const { actions, routeNavigation } = primaryNavigationActions()
-    const setWorkspacePaneTabForTarget = vi.spyOn(workspacesStore.getState(), 'setWorkspacePaneTabForTarget')
-
-    await expect(
-      dispatchWorkspacePaneDestinationRoute({
-        workspaceId: REPO_ID,
-        branchName: 'feature/destination',
-        route: DESTINATION_ROUTE,
-        navigation: actions,
-      }),
-    ).resolves.toEqual({ kind: 'completed', changed: true, presentation: 'router-settled' })
-
-    expect(routeNavigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
-    expect(routeNavigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: DESTINATION_WORKTREE },
-      DESTINATION_ROUTE,
-      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
-    )
-    expect(setWorkspacePaneTabForTarget).toHaveBeenCalledWith(
-      { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: DESTINATION_WORKTREE },
-      'status',
-    )
-  })
-
-  test('fails fast when the destination target is already running an action', async () => {
-    const repo = seedDestinationRepo()
-    const started = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<void>()
-    const occupied = runWorkspacePaneAction(
-      {
-        kind: 'git-worktree',
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-        worktreePath: DESTINATION_WORKTREE,
-      },
-      async () => {
-        started.resolve()
-        await release.promise
-      },
-    )
-    await started.promise
-    const commitWorkspacePaneRoute = acceptedRouteCommit()
-    const currentNavigation = beginAppNavigation()
-
-    await expect(
-      dispatchWorkspacePaneDestinationRoute({
-        workspaceId: REPO_ID,
-        branchName: 'feature/destination',
-        route: DESTINATION_ROUTE,
-        navigation: testNavigation(commitWorkspacePaneRoute),
-      }),
-    ).resolves.toEqual({ kind: 'blocked' })
-    expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
-    expect(appNavigationIsCurrent(currentNavigation)).toBe(true)
-
-    release.resolve()
-    await occupied
-  })
-
-  test('rejects worktree-scoped tabs for a destination without a worktree', async () => {
-    seedNoWorktreeRepo()
-    const commitWorkspacePaneRoute = acceptedRouteCommit()
-
-    await expect(
-      dispatchWorkspacePaneDestinationRoute({
-        workspaceId: REPO_ID,
-        branchName: 'feature/no-worktree',
-        route: { kind: 'static', tab: 'changes' },
-        navigation: testNavigation(commitWorkspacePaneRoute),
-      }),
-    ).resolves.toEqual({ kind: 'unsupported', reason: 'worktree-required' })
-    expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
-  })
-
   test('rejects a stale runtime lease before route commit', async () => {
     seedDestinationRepo()
     const presentation = beginPresentation('feature/destination')
@@ -423,16 +324,6 @@ function deferredRouteCommit(completion: Promise<boolean>) {
     async (_target, _route, options) => await settle(options),
   )
   return { commit, commitFilesystem, started: started.promise }
-}
-
-function seedNoWorktreeRepo() {
-  const branch = createRepoBranch('feature/no-worktree')
-  const repo = seedRepoWithReadModelForTest({
-    id: REPO_ID,
-    branches: [branch],
-    currentBranchName: branch.name,
-  })
-  seedRepoQueryDataForTest(repo, { branches: [branch], currentBranch: branch.name })
 }
 
 function seedDestinationRepo() {

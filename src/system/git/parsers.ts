@@ -21,10 +21,11 @@ export const PRETTY_FIELD_SEP = '%x00'
  * Fields, in order: refname:short, objectname, objectname:short, subject,
  * authordate:iso-strict, authorname, upstream:short, upstream:track.
  */
-export function parseBranches(output: string, currentBranch: string): BranchSnapshotInfo[] {
+export function parseBranches(output: string): BranchSnapshotInfo[] {
   if (!output) return []
 
   const lines = output.split('\n').filter((line) => line.length > 0)
+  const branchNames = new Set<string>()
   for (const line of lines) {
     const parts = line.split(FIELD_SEP)
     if (parts.length !== 8) throw new Error('Invalid branch snapshot row')
@@ -32,6 +33,8 @@ export function parseBranches(output: string, currentBranch: string): BranchSnap
     if (!name || !isSafeBranchName(name) || !hash || !isFullGitObjectId(hash)) {
       throw new Error('Invalid branch snapshot identity')
     }
+    if (branchNames.has(name)) throw new Error('Duplicate branch snapshot identity')
+    branchNames.add(name)
     if (
       !shortHash ||
       !GIT_OBJECT_ID_OR_PREFIX_RE.test(shortHash) ||
@@ -67,7 +70,6 @@ export function parseBranches(output: string, currentBranch: string): BranchSnap
 
     const branchInfo: BranchSnapshotInfo = {
       name,
-      isCurrent: name === currentBranch,
       ahead,
       behind,
       lastCommitHash: hash,
@@ -155,7 +157,7 @@ export function parseStatus(output: string): StatusEntry[] {
 export type GitPathPlatform = 'posix' | 'win32'
 
 export function normalizeGitPath(value: string, platform: GitPathPlatform): string {
-  return platform === 'win32' ? path.win32.normalize(value.replaceAll('/', '\\')) : value
+  return platform === 'win32' ? path.win32.normalize(value.replaceAll('/', '\\')) : path.posix.normalize(value)
 }
 
 /** Parse and validate `git worktree list --porcelain -z`. */
@@ -201,6 +203,7 @@ export function parseWorktrees(output: string, platform: GitPathPlatform = 'posi
     }
   }
   const worktrees: WorktreeInfo[] = []
+  const worktreePaths = new Set<string>()
   for (const [blockIndex, block] of blocks.entries()) {
     const lines = block.split('\0')
     const worktreeLine = lines.find((line) => line.startsWith('worktree '))!
@@ -208,8 +211,11 @@ export function parseWorktrees(output: string, platform: GitPathPlatform = 'posi
     const branchLine = lines.find((line) => line.startsWith('branch refs/heads/'))
     const isPrunable = lines.some((line) => line === 'prunable' || line.startsWith('prunable '))
     if (isPrunable) continue
+    const worktreePath = normalizeGitPath(worktreeLine.slice('worktree '.length), platform)
+    if (worktreePaths.has(worktreePath)) throw new Error('Duplicate worktree path')
+    worktreePaths.add(worktreePath)
     worktrees.push({
-      path: normalizeGitPath(worktreeLine.slice('worktree '.length), platform),
+      path: worktreePath,
       ...(headLine ? { headOid: gitWorktreeHeadOid(headLine.slice('HEAD '.length)) } : {}),
       ...(branchLine ? { branch: branchLine.slice('branch refs/heads/'.length) } : {}),
       isBare: lines.includes('bare'),

@@ -1,7 +1,11 @@
 import type { QueryClient } from '@tanstack/query-core'
 import type { ParsedBranchWorkspacePaneRouteTarget, ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
-import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import type {
+  GitWorktreePaneFilesystemTarget,
+  WorkspacePaneFilesystemTarget,
+  WorkspaceRootPaneFilesystemTarget,
+} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   gitWorktreePaneFilesystemTarget,
   workspacePaneTabsTargetForFilesystemTarget,
@@ -24,11 +28,11 @@ type GitBranchWorkspacePaneCommandTarget = {
 export type FilesystemWorkspacePaneCommandTarget =
   | {
       workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-      filesystemTarget: Extract<WorkspacePaneFilesystemTarget, { kind: 'git-worktree' }>
+      filesystemTarget: GitWorktreePaneFilesystemTarget
     }
   | {
       workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-      filesystemTarget: Extract<WorkspacePaneFilesystemTarget, { kind: 'workspace-root' }>
+      filesystemTarget: WorkspaceRootPaneFilesystemTarget
     }
 
 export type WorkspacePaneCommandTarget = GitBranchWorkspacePaneCommandTarget | FilesystemWorkspacePaneCommandTarget

@@ -7,10 +7,9 @@
 // layer that maps it to argv or a shell script. Two layers of validation
 // keep a malformed payload from ever reaching `git worktree add`.
 //
-// We deliberately exclude the `detached` mode here — detached worktrees
-// have no matching `BranchSnapshotInfo`, which leaves them outside the
-// branch-oriented navigator. Reintroducing the mode
-// should be a paired change with a detached-worktree row in the list.
+// This creation flow deliberately supports branch-backed worktrees only.
+// Detached worktrees discovered from Git remain valid workspace targets,
+// but creating one is outside this command's product contract.
 
 import * as v from 'valibot'
 import { isSafeBranchName, isSafeRefName, isSafeRemoteName } from '#/shared/refnames.ts'

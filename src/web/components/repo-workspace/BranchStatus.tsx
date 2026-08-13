@@ -173,7 +173,7 @@ export const BranchStatus = defineComponent<Props>({
           const detail = props.detail
           const branchName = detail.branch?.name
           const worktreePath = detail.worktree?.path
-          // History is branch-scoped; files and changes require a concrete worktree.
+          // Files and changes require a concrete worktree; history does not.
           if (!branchName || (type !== 'history' && !worktreePath)) return
           void dispatchOpenWorkspacePaneStaticTabAction({
             workspaceId: detail.workspaceId,

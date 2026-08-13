@@ -55,7 +55,6 @@ function snapshot(worktrees: RepoWorktreeSnapshot[]): RepoSnapshot {
 function branch(name: string): BranchSnapshotInfo {
   return {
     name,
-    isCurrent: name === 'main',
     ahead: 0,
     behind: 0,
     lastCommitHash: '0123456789abcdef0123456789abcdef01234567',

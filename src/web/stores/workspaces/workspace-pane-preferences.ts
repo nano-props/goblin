@@ -3,13 +3,16 @@ import {
   type WorkspacePaneTabsTarget,
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspaceUiState } from '#/web/stores/workspaces/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 
 export const INITIAL_WORKSPACE_PANE_TAB: WorkspacePaneTabType = 'status'
+
+export interface WorkspacePanePreferenceState {
+  preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType | null>
+}
 
 interface WorkspacePaneTargetBranches {
   workspaceId: WorkspaceId
@@ -32,7 +35,7 @@ export function workspacePaneTabsTargetForRepoBranch(
 }
 
 export function preferredWorkspacePaneTabForTarget(
-  ui: Pick<WorkspaceUiState, 'preferredWorkspacePaneTabByTarget'>,
+  ui: WorkspacePanePreferenceState,
   target: WorkspacePaneTabsTarget | null | undefined,
 ): WorkspacePaneTabType | null {
   if (!target) return null
@@ -43,7 +46,7 @@ export function preferredWorkspacePaneTabForTarget(
 }
 
 export function preferredWorkspacePaneTabByTargetRecordWith(
-  ui: Pick<WorkspaceUiState, 'preferredWorkspacePaneTabByTarget'>,
+  ui: WorkspacePanePreferenceState,
   target: WorkspacePaneTabsTarget,
   view: WorkspacePaneTabType | null,
 ): Record<string, WorkspacePaneTabType | null> {

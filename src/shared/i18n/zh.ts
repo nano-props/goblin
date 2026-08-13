@@ -607,6 +607,7 @@ export const zh: Record<DictKey, string> = {
   'error.cannot-remove-main-worktree': '不能移除主工作树',
   'error.cannot-remove-dirty-worktree': '工作树有未提交的改动 — 请先提交或丢弃',
   'error.cannot-remove-locked-worktree': '工作树已锁定 — 请先解锁再移除',
+  'error.cannot-remove-worktree-operation-in-progress': '工作树正在进行 Git 操作',
   'error.cannot-remove-unpushed-worktree': '分支有未推送的提交 — 请先推送，或取消勾选"同时删除分支"',
   'error.ghostty-not-installed': '未安装 Ghostty',
   'error.terminal-not-installed': '未安装终端',

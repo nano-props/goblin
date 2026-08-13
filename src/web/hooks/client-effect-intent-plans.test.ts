@@ -87,7 +87,7 @@ describe('client effect intent plans', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true }), createBranchSnapshot('feature/test')],
+      branchSnapshots: [createBranchSnapshot('main'), createBranchSnapshot('feature/test')],
       worktrees: [
         createRepoWorktreeSnapshotForTest('main', '/tmp/repo-main', { isPrimary: false, isLocked: false }),
         createRepoWorktreeSnapshotForTest('feature/test', '/tmp/repo-feature', { isPrimary: false, isLocked: false }),
@@ -131,7 +131,7 @@ describe('client effect intent plans', () => {
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
-      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true })],
+      branchSnapshots: [createBranchSnapshot('main')],
       worktrees: [createRepoWorktreeSnapshotForTest('main', '/tmp/repo', { isPrimary: false, isLocked: false })],
     })
 

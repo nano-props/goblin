@@ -326,6 +326,82 @@ describe('remote git snapshot', () => {
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
+  test('rejects a ref-prefixed branch outside the remote rebase protocol', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
+      if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+      if (command.type === 'gitOperationState') {
+        return okRemoteResult('operation bisect\nmaterialized-branch refs/heads/main\n')
+      }
+      if (command.type === 'gitLocalBranches') return okRemoteResult('main')
+      throw new Error(`unexpected command: ${command.type}`)
+    })
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+  })
+
+  test('rejects detached ownership without an operation at the remote producer boundary', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult(
+          worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),
+        )
+      }
+      if (command.type === 'gitOperationState') return okRemoteResult('operation none\nmaterialized-branch main\n')
+      if (command.type === 'gitLocalBranches') return okRemoteResult('main')
+      throw new Error(`unexpected command: ${command.type}`)
+    })
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+  })
+
+  test('rejects duplicate materialized branches at the remote producer boundary', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult(
+          worktreePorcelain(
+            [
+              'worktree /srv/repo',
+              'HEAD f00ba40000000000000000000000000000000000',
+              'branch refs/heads/main',
+              '',
+              'worktree /srv/linked',
+              'HEAD ba5eba1000000000000000000000000000000000',
+              'branch refs/heads/main',
+            ].join('\n'),
+          ),
+        )
+      }
+      if (command.type === 'gitOperationState') {
+        return okRemoteResult('operation none\nmaterialized-branch main\n')
+      }
+      if (command.type === 'gitLocalBranches') return okRemoteResult('main')
+      throw new Error(`unexpected command: ${command.type}`)
+    })
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+  })
+
+  test('rejects a committed materialized branch missing from remote refs', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult(
+          worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),
+        )
+      }
+      if (command.type === 'gitOperationState') {
+        return okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/missing\n')
+      }
+      if (command.type === 'gitLocalBranches') return okRemoteResult('main')
+      throw new Error(`unexpected command: ${command.type}`)
+    })
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+  })
+
   test('rejects an empty branch ref from the remote rebase protocol', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')

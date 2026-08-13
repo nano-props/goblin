@@ -287,7 +287,7 @@ describe('GitWorkspaceNavigatorView', () => {
       currentBranchName: 'feature/query-dirty',
     })
     seedRepoQueryDataForTest(repo, {
-      branches: [createBranchSnapshot('feature/query-dirty', { isCurrent: true })],
+      branches: [createBranchSnapshot('feature/query-dirty')],
       currentBranch: 'feature/query-dirty',
       worktrees: [createRepoWorktreeSnapshotForTest('feature/query-dirty', WORKTREE_PATH)],
       status: [

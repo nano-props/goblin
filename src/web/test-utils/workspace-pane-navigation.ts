@@ -2,14 +2,13 @@ import { afterEach, vi } from 'vitest'
 import type { ParsedWorkspacePaneRoute, WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { AppNavigationActions, AppNavigationOptions } from '#/web/app-navigation-actions.ts'
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
-import {
-  workspacePanePreferenceTargetOptions,
-  workspacePaneTabTargetForBranch,
-} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { workspacePaneTabTargetForPaneTarget } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
+import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface ObservedBranchRouteNavigationForTest {
   showRepoBranchEmptyWorkspacePane: (
@@ -66,7 +65,7 @@ export function seedInitialObservedWorkspacePaneRouteForTest(
   if (!repoId || !repo) return false
   const branchName = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.current
   if (!branchName) return false
-  const target = workspacePaneTabTargetForBranch(repoId, branchName, workspacePanePreferenceTargetOptions)
+  const target = workspacePaneTabModelForBranchForTest(repoId, branchName)
   if (!target?.branchName) return false
   const activeTab = target.activeTab
   const route: ParsedWorkspacePaneRoute | null =
@@ -95,7 +94,7 @@ export function observedWorkspacePaneRouteCommitForTest(
     branchName: string,
     route: ParsedWorkspacePaneRoute | null,
   ): void => {
-    const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: route })
+    const target = workspacePaneTabModelForBranchForTest(repoId, branchName, route)
     if (!target?.branchName) return
     const observation = {
       workspaceId: target.workspaceId,
@@ -234,7 +233,7 @@ export function observedWorkspacePaneRouteForTarget(
   repoId: WorkspaceId,
   branchName: string,
 ): WorkspacePaneRouteTarget | undefined {
-  const target = workspacePaneTabTargetForBranch(repoId, branchName, workspacePanePreferenceTargetOptions)
+  const target = workspacePaneTabModelForBranchForTest(repoId, branchName)
   if (!target?.branchName) return undefined
   const route = observedWorkspacePaneRoutes.get(
     workspacePaneObservationKey({
@@ -245,6 +244,26 @@ export function observedWorkspacePaneRouteForTarget(
     }),
   )
   return route?.kind === 'invalid-static' ? undefined : route
+}
+
+export function workspacePaneTabModelForBranchForTest(
+  workspaceId: WorkspaceId,
+  branchName: string,
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined = undefined,
+) {
+  const workspace = workspacesStore.getState().workspaces[workspaceId]
+  if (!workspace || workspace.capability.kind !== 'git') return null
+  const snapshot = getRepoSnapshotQueryData(workspaceId, workspace.workspaceRuntimeId)
+  if (!snapshot) return null
+  const worktree = repoWorktreeForBranch(snapshot.worktrees, branchName)
+  if (!worktree && !snapshot.branches.some((branch) => branch.name === branchName)) return null
+  const paneTarget = requiredGitWorkspacePaneTabsTarget(workspaceId, branchName, worktree?.path ?? null)
+  return workspacePaneTabTargetForPaneTarget({
+    paneTarget,
+    routeTarget: paneTarget,
+    workspacePaneRoute,
+    worktreeHead: worktree?.head,
+  })
 }
 
 function workspacePaneObservationKey(observation: Omit<WorkspacePaneNavigationObservation, 'route'>): string {

@@ -569,11 +569,11 @@ function createLocalRepoSource(
       if (!available.ok) throw new Error(available.message)
       options?.signal?.throwIfAborted()
       const membership = await readWorktreeMembership(repoId, options?.signal)
-      const [currentBranch, worktrees] = await Promise.all([
+      const [currentBranch, worktrees, branches] = await Promise.all([
         getCurrentBranch(repoId, { signal: options?.signal }),
         readRepoWorktreeSnapshots(repoId, membership, options?.signal),
+        getBranches(repoId, { signal: options?.signal }),
       ])
-      const branches = await getBranches(repoId, currentBranch, { signal: options?.signal })
       const current = currentBranch ?? ''
       const remote = await getRemoteInfo(repoId, options?.signal)
       options?.signal?.throwIfAborted()
@@ -724,6 +724,12 @@ function createLocalRepoSource(
       const branchWorktree = repoWorktreeForBranch(worktreeSnapshots, input.branch)
       if (!branchWorktree || path.resolve(branchWorktree.path) !== path.resolve(removable.target.path)) {
         return { ok: false, message: 'error.worktree-not-found-for-branch' }
+      }
+      if (branchWorktree.operation !== null) {
+        return { ok: false, message: 'error.cannot-remove-worktree-operation-in-progress' }
+      }
+      if (removable.target.isLocked === true) {
+        return { ok: false, message: 'error.cannot-remove-locked-worktree' }
       }
       const targetStatus = await sampleWorktreeStatusForTarget(removable.target, signal)
       const statusAwareTarget =

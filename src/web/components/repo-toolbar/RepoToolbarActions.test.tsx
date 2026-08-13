@@ -33,7 +33,7 @@ describe('RepoToolbarActions', () => {
       currentBranchName: 'feature/query',
     })
     seedRepoQueryDataForTest(repo, {
-      branches: [createBranchSnapshot('feature/query', { isCurrent: true })],
+      branches: [createBranchSnapshot('feature/query')],
       currentBranch: 'feature/query',
     })
 

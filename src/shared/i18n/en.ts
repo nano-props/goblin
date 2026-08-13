@@ -641,6 +641,7 @@ export const en = {
   'error.cannot-remove-main-worktree': 'Cannot remove the main worktree',
   'error.cannot-remove-dirty-worktree': 'Worktree has uncommitted changes — commit or discard them first',
   'error.cannot-remove-locked-worktree': 'Worktree is locked — unlock it before removing',
+  'error.cannot-remove-worktree-operation-in-progress': 'Worktree has a Git operation in progress',
   'error.cannot-remove-unpushed-worktree': 'Branch has unpushed commits — push first, or untick "Also delete branch"',
   'error.ghostty-not-installed': 'Ghostty not installed',
   'error.terminal-not-installed': 'Terminal not installed',

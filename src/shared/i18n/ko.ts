@@ -632,6 +632,7 @@ export const ko: Record<DictKey, string> = {
   'error.cannot-remove-main-worktree': '메인 워크트리는 제거할 수 없습니다',
   'error.cannot-remove-dirty-worktree': '워크트리에 커밋되지 않은 변경 사항이 있습니다 — 먼저 커밋하거나 되돌리세요',
   'error.cannot-remove-locked-worktree': '워크트리가 잠겨 있습니다 — 먼저 잠금을 해제하세요',
+  'error.cannot-remove-worktree-operation-in-progress': '워크트리에서 Git 작업이 진행 중입니다',
   'error.cannot-remove-unpushed-worktree':
     '브랜치에 푸시되지 않은 커밋이 있습니다 — 먼저 푸시하거나 "브랜치도 함께 삭제" 항목의 체크를 해제하세요',
   'error.ghostty-not-installed': 'Ghostty가 설치되어 있지 않습니다',

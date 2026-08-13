@@ -74,7 +74,7 @@ export function getBranchActionCapabilities(
   const worktree = repoWorktreeForBranch(repo.snapshot.worktrees, branch.name)
   const isRegularBranch = !isCurrent && !worktree && !isProtected
   const changes = worktreeChanges(repo.status, worktree?.path)
-  const canRemoveWorktree = !!worktree && !worktree.isPrimary
+  const canRemoveWorktree = !!worktree && !worktree.isPrimary && !worktree.isLocked && worktree.operation === null
   const canCopyPatch = !!worktree && changes?.dirty === true
   const hasWorktree = !!worktree
   const isRemoteRepo = isRemoteWorkspaceId(repo.id)

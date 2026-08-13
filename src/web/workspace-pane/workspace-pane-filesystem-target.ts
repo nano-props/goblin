@@ -24,18 +24,20 @@ interface WorkspacePaneSurfaceTargetBase {
 
 const workspacePaneFilesystemTargetBrand: unique symbol = Symbol('WorkspacePaneFilesystemTarget')
 
-export type WorkspacePaneFilesystemTarget =
-  | (WorkspacePaneSurfaceTargetBase & {
-      kind: 'workspace-root'
-      rootId: WorkspaceId
-      readonly [workspacePaneFilesystemTargetBrand]: true
-    })
-  | (WorkspacePaneSurfaceTargetBase & {
-      kind: 'git-worktree'
-      head: GitHead
-      rootId: WorkspaceId
-      readonly [workspacePaneFilesystemTargetBrand]: true
-    })
+export interface WorkspaceRootPaneFilesystemTarget extends WorkspacePaneSurfaceTargetBase {
+  kind: 'workspace-root'
+  rootId: WorkspaceId
+  readonly [workspacePaneFilesystemTargetBrand]: true
+}
+
+export interface GitWorktreePaneFilesystemTarget extends WorkspacePaneSurfaceTargetBase {
+  kind: 'git-worktree'
+  head: GitHead
+  rootId: WorkspaceId
+  readonly [workspacePaneFilesystemTargetBrand]: true
+}
+
+export type WorkspacePaneFilesystemTarget = WorkspaceRootPaneFilesystemTarget | GitWorktreePaneFilesystemTarget
 
 export type WorkspacePaneSurfaceTarget =
   WorkspacePaneFilesystemTarget | (WorkspacePaneSurfaceTargetBase & { kind: 'git-branch'; branchName: string })
@@ -44,7 +46,7 @@ type WorkspacePaneFilesystemTargetInput = WorkspacePaneSurfaceTargetBase
 
 export function workspaceRootPaneFilesystemTarget(
   input: WorkspacePaneFilesystemTargetInput,
-): Extract<WorkspacePaneFilesystemTarget, { kind: 'workspace-root' }> {
+): WorkspaceRootPaneFilesystemTarget {
   if (!parseCanonicalWorkspaceLocator(input.workspaceId)?.path) {
     throw new Error('workspace root target requires a canonical WorkspaceId')
   }
@@ -57,7 +59,7 @@ export function gitWorktreePaneFilesystemTarget(
     worktreePath: string
     head: GitHead
   },
-): Extract<WorkspacePaneFilesystemTarget, { kind: 'git-worktree' }> {
+): GitWorktreePaneFilesystemTarget {
   const rootId = workspaceLocatorForPath(input.workspaceId, input.worktreePath)
   if (!rootId) {
     throw new Error('Git worktree target must share the Workspace transport')
@@ -74,10 +76,10 @@ export function gitWorktreePaneFilesystemTarget(
 }
 
 export function workspacePaneFilesystemRuntimeTarget(
-  target: Extract<WorkspacePaneFilesystemTarget, { kind: 'workspace-root' }>,
+  target: WorkspaceRootPaneFilesystemTarget,
 ): Extract<WorkspacePaneFilesystemExecutionTarget, { kind: 'workspace-root' }>
 export function workspacePaneFilesystemRuntimeTarget(
-  target: Extract<WorkspacePaneFilesystemTarget, { kind: 'git-worktree' }>,
+  target: GitWorktreePaneFilesystemTarget,
 ): Extract<WorkspacePaneFilesystemExecutionTarget, { kind: 'git-worktree' }>
 export function workspacePaneFilesystemRuntimeTarget(
   target: WorkspacePaneFilesystemTarget,
@@ -106,10 +108,10 @@ export function workspacePaneFilesystemRootPath(target: WorkspacePaneFilesystemT
 }
 
 export function workspacePaneTabsTargetForFilesystemTarget(
-  target: Extract<WorkspacePaneFilesystemTarget, { kind: 'workspace-root' }>,
+  target: WorkspaceRootPaneFilesystemTarget,
 ): RootWorkspacePaneTabsTarget
 export function workspacePaneTabsTargetForFilesystemTarget(
-  target: Extract<WorkspacePaneFilesystemTarget, { kind: 'git-worktree' }>,
+  target: GitWorktreePaneFilesystemTarget,
 ): GitWorktreeWorkspacePaneTabsTarget
 export function workspacePaneTabsTargetForFilesystemTarget(
   target: WorkspacePaneFilesystemTarget,

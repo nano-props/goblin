@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { readFile, readdir, stat } from 'node:fs/promises'
-import { gitOperationRequiresDetachedHead } from '#/shared/git-types.ts'
+import { gitOperationRequiresDetachedHead, hasUniqueRepoWorktreeMaterializedBranches } from '#/shared/git-types.ts'
 import type { GitOperation, RepoWorktreeSnapshot, WorktreeInfo } from '#/shared/git-types.ts'
 import { gitHead } from '#/shared/git-head.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
@@ -32,12 +32,16 @@ export async function readRepoWorktreeSnapshots(
   const usableWorktrees = worktrees.filter((worktree) => !worktree.isBare)
   if (usableWorktrees.length === 0) return []
   const gitDirs = await resolveWorktreeGitDirs(repoCwd, worktrees, signal)
-  return await mapWithConcurrency(
+  const snapshots = await mapWithConcurrency(
     usableWorktrees,
     WORKTREE_STATE_READ_CONCURRENCY,
     async (worktree) => await readRepoWorktreeSnapshot(repoCwd, worktree, requiredGitDir(gitDirs, worktree), signal),
     { signal, abort: 'throw' },
   )
+  if (!hasUniqueRepoWorktreeMaterializedBranches(snapshots)) {
+    throw new Error('Git returned duplicate materialized worktree branches')
+  }
+  return snapshots
 }
 
 async function readRepoWorktreeSnapshot(
@@ -130,6 +134,7 @@ async function resolveWorktreeGitDirs(
   const gitDirs = new Map([[worktreePathKey(primaryWorktrees[0]!.path), commonDir]])
   const linkedWorktrees = worktrees.filter((worktree) => !worktree.isPrimary)
   if (linkedWorktrees.length === 0) return gitDirs
+  const linkedWorktreeKeys = new Set(linkedWorktrees.map((worktree) => worktreePathKey(worktree.path)))
 
   const adminRoot = path.join(commonDir, 'worktrees')
   const entries = await readdir(adminRoot, { withFileTypes: true })
@@ -144,6 +149,7 @@ async function resolveWorktreeGitDirs(
     if (!candidate) continue
     const { worktreePath, gitDir } = candidate
     const key = worktreePathKey(worktreePath)
+    if (!linkedWorktreeKeys.has(key)) continue
     if (gitDirs.has(key)) throw new Error('Git returned duplicate worktree administrative identities')
     gitDirs.set(key, gitDir)
   }

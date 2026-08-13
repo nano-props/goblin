@@ -136,7 +136,6 @@ export function setWorkspaceProbeForTest(workspaceId: string, workspaceProbe: Wo
 export function createBranchSnapshot(name: string, options: Partial<BranchSnapshotInfo> = {}): BranchSnapshotInfo {
   return {
     name,
-    isCurrent: false,
     ahead: 0,
     behind: 0,
     lastCommitHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',

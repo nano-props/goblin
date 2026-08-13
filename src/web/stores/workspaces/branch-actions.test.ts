@@ -204,6 +204,19 @@ describe('branch action capabilities', () => {
     })
   })
 
+  test('does not offer removal for a locked worktree', () => {
+    const branch = createRepoBranch('feature/locked')
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [branch],
+      worktrees: [createRepoWorktreeSnapshotForTest(branch.name, REPO_WORKTREE_PATH, { isLocked: true })],
+    })
+
+    expect(getBranchActionCapabilities(repoGitPresentationForTest(repo), branch)).toMatchObject({
+      canRemoveWorktree: false,
+    })
+  })
+
   test('allows removing the current branch when it belongs to a linked worktree', () => {
     const worktreePath = '/tmp/goblin-current-linked-worktree'
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/goblin-current-linked-worktree')
@@ -220,6 +233,27 @@ describe('branch action capabilities', () => {
       isRegularBranch: false,
     })
   })
+
+  test.each(['rebase', 'merge', 'cherry-pick', 'revert', 'bisect'] as const)(
+    'does not offer worktree removal during %s',
+    (kind) => {
+      const branch = createRepoBranch('feature/operation')
+      const repo = seedRepoWithReadModelForTest({
+        id: REPO_ID,
+        branches: [branch],
+        worktrees: [
+          {
+            ...createRepoWorktreeSnapshotForTest(branch.name, REPO_WORKTREE_PATH, { operation: { kind } }),
+            ...(kind === 'rebase' ? { head: { kind: 'detached' as const } } : {}),
+          },
+        ],
+      })
+
+      expect(getBranchActionCapabilities(repoGitPresentationForTest(repo), branch)).toMatchObject({
+        canRemoveWorktree: false,
+      })
+    },
+  )
 
   test('allows terminal and editor actions for remote worktrees', async () => {
     const branch = createRepoBranch('feature/remote')

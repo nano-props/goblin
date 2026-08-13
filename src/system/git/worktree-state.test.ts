@@ -285,6 +285,52 @@ test('ignores an unrelated incomplete administrative directory outside current m
   await expect(readRepoWorktreeSnapshots(repoPath, membership)).resolves.toHaveLength(2)
 })
 
+test('ignores duplicate administrative identities outside current membership', async () => {
+  await createBranch('linked')
+  const linkedPath = `${repoPath}-linked`
+  offlineWorktreePath = linkedPath
+  await git(repoPath, ['worktree', 'add', linkedPath, 'linked'])
+  const adminRoot = path.join(repoPath, '.git', 'worktrees')
+  for (const name of ['unrelated-a', 'unrelated-b']) {
+    const unrelatedAdminDir = path.join(adminRoot, name)
+    await mkdir(unrelatedAdminDir)
+    await writeFile(path.join(unrelatedAdminDir, 'gitdir'), '/old/offline/.git\n')
+  }
+
+  const membership = await readWorktreeMembership(repoPath)
+
+  await expect(readRepoWorktreeSnapshots(repoPath, membership)).resolves.toHaveLength(2)
+})
+
+test('rejects duplicate administrative identities for a current worktree', async () => {
+  await createBranch('linked')
+  const linkedPath = `${repoPath}-linked`
+  offlineWorktreePath = linkedPath
+  await git(repoPath, ['worktree', 'add', linkedPath, 'linked'])
+  const membership = await readWorktreeMembership(repoPath)
+  const linkedMembership = membership.find((worktree) => worktree.branch === 'linked')
+  if (!linkedMembership) throw new Error('Expected linked worktree membership')
+  const duplicateAdminDir = path.join(repoPath, '.git', 'worktrees', 'duplicate')
+  await mkdir(duplicateAdminDir)
+  await writeFile(path.join(duplicateAdminDir, 'gitdir'), `${linkedMembership.path}/.git\n`)
+
+  await expect(readRepoWorktreeSnapshots(repoPath, membership)).rejects.toThrow(
+    'Git returned duplicate worktree administrative identities',
+  )
+})
+
+test('rejects duplicate materialized branches across worktree snapshots', async () => {
+  await createBranch('linked')
+  const linkedPath = `${repoPath}-linked`
+  offlineWorktreePath = linkedPath
+  await git(repoPath, ['worktree', 'add', linkedPath, 'linked'])
+  const membership = (await readWorktreeMembership(repoPath)).map((worktree) => ({ ...worktree, branch: 'main' }))
+
+  await expect(readRepoWorktreeSnapshots(repoPath, membership)).rejects.toThrow(
+    'Git returned duplicate materialized worktree branches',
+  )
+})
+
 async function readAttachedRepoWorktreeSnapshots() {
   return await readRepoWorktreeSnapshots(repoPath, [
     {

@@ -35,6 +35,67 @@ describe('remote Git operation state script', () => {
     expect(result.exitCode).not.toBe(0)
   })
 
+  test('ignores an unrelated malformed administrative pointer', async () => {
+    const parent = await mkdtemp(path.join(os.tmpdir(), 'goblin remote unrelated admin '))
+    tempDirectories.push(parent)
+    const repoPath = path.join(parent, 'repo')
+    const linkedPath = path.join(parent, 'linked')
+    await execa('git', ['init', '-q', '--initial-branch=main', repoPath])
+    await createBranch(repoPath, 'linked')
+    await execa('git', ['-C', repoPath, 'worktree', 'add', linkedPath, 'linked'])
+    const commonDir = await realpath(path.join(repoPath, '.git'))
+    const canonicalLinkedPath = await realpath(linkedPath)
+    const unrelatedAdminDir = path.join(commonDir, 'worktrees', 'unrelated')
+    await mkdir(unrelatedAdminDir)
+    await writeFile(path.join(unrelatedAdminDir, 'gitdir'), '../../../../../../../../bad/.git\n')
+
+    const state = await execa('sh', [
+      '-c',
+      remoteGitOperationStateScript(commonDir, canonicalLinkedPath, false, 'linked'),
+    ])
+
+    expect(state.stdout).toBe('operation none\nmaterialized-branch linked')
+  })
+
+  test('fails when the target worktree has only a malformed administrative pointer', async () => {
+    const repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin remote malformed admin '))
+    tempDirectories.push(repoPath)
+    await execa('git', ['init', '-q', repoPath])
+    const commonDir = await realpath(path.join(repoPath, '.git'))
+    const targetAdminDir = path.join(commonDir, 'worktrees', 'target')
+    await mkdir(targetAdminDir, { recursive: true })
+    await writeFile(path.join(targetAdminDir, 'gitdir'), '../../../../../../../../target/.git\n')
+
+    const result = await execa('sh', ['-c', remoteGitOperationStateScript(commonDir, '/target', false, null)], {
+      reject: false,
+    })
+
+    expect(result.exitCode).not.toBe(0)
+  })
+
+  test('fails when multiple administrative directories identify the target worktree', async () => {
+    const parent = await mkdtemp(path.join(os.tmpdir(), 'goblin remote duplicate admin '))
+    tempDirectories.push(parent)
+    const repoPath = path.join(parent, 'repo')
+    const linkedPath = path.join(parent, 'linked')
+    await execa('git', ['init', '-q', '--initial-branch=main', repoPath])
+    await createBranch(repoPath, 'linked')
+    await execa('git', ['-C', repoPath, 'worktree', 'add', linkedPath, 'linked'])
+    const commonDir = await realpath(path.join(repoPath, '.git'))
+    const canonicalLinkedPath = await realpath(linkedPath)
+    const duplicateAdminDir = path.join(commonDir, 'worktrees', 'duplicate')
+    await mkdir(duplicateAdminDir)
+    await writeFile(path.join(duplicateAdminDir, 'gitdir'), `${canonicalLinkedPath}/.git\n`)
+
+    const result = await execa(
+      'sh',
+      ['-c', remoteGitOperationStateScript(commonDir, canonicalLinkedPath, false, 'linked')],
+      { reject: false },
+    )
+
+    expect(result.exitCode).not.toBe(0)
+  })
+
   test('reads operation markers from a safely quoted repository path', async () => {
     const parent = await mkdtemp(path.join(os.tmpdir(), 'goblin remote operation '))
     tempDirectories.push(parent)

@@ -410,7 +410,6 @@ export function repoSnapshot(branch = 'main'): RepoSnapshot {
     branches: [
       {
         name: branch,
-        isCurrent: true,
         ahead: 0,
         behind: 0,
         lastCommitHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',

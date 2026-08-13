@@ -645,6 +645,7 @@ export const ja: Record<DictKey, string> = {
   'error.cannot-remove-main-worktree': 'メインのワークツリーは削除できません',
   'error.cannot-remove-dirty-worktree': 'ワークツリーに未コミットの変更があります — 先にコミットまたは破棄してください',
   'error.cannot-remove-locked-worktree': 'ワークツリーがロックされています — 先にロックを解除してください',
+  'error.cannot-remove-worktree-operation-in-progress': 'ワークツリーで Git 操作が進行中です',
   'error.cannot-remove-unpushed-worktree':
     'ブランチに未プッシュのコミットがあります — 先にプッシュするか、「ブランチも削除する」のチェックを外してください',
   'error.ghostty-not-installed': 'Ghostty がインストールされていません',

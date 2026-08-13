@@ -1,11 +1,7 @@
 import { computed, toValue } from 'vue'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
-import type {
-  CurrentGitWorkspacePanePresentation,
-  GitWorkspacePaneProjection,
-} from '#/web/components/repo-workspace/model.ts'
+import type { CurrentGitWorkspacePanePresentation } from '#/web/components/repo-workspace/model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspaceUiState } from '#/web/stores/workspaces/types.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import {
   createWorkspacePaneTabModel,
@@ -16,6 +12,7 @@ import {
   type WorkspacePaneTabModelInput,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
+import type { WorkspacePanePreferenceState } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import {
   useWorkspacePaneTabsQuery,
   workspacePaneTabsForTargetFromQueryData,
@@ -34,13 +31,13 @@ import {
 export interface WorkspacePaneModelWorkspace {
   id: WorkspaceId
   workspaceRuntimeId: string
-  ui: Pick<WorkspaceUiState, 'preferredWorkspacePaneTabByTarget'>
+  ui: WorkspacePanePreferenceState
 }
 
 export type WorkspacePaneRuntimeContext = Pick<WorkspacePaneModelWorkspace, 'workspaceRuntimeId' | 'ui'>
 
 export function useGitWorkspacePaneTabModel(
-  gitWorkspace: MaybeRefOrGetter<Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'ui'>>,
+  gitWorkspace: MaybeRefOrGetter<WorkspacePaneModelWorkspace>,
   detail: MaybeRefOrGetter<CurrentGitWorkspacePanePresentation>,
   workspacePaneRoute: MaybeRefOrGetter<ParsedWorkspacePaneRoute | null | undefined>,
 ): ComputedRef<WorkspacePaneTabModel> {
@@ -54,7 +51,7 @@ export function useGitWorkspacePaneTabModel(
  * projection.
  */
 export function useGitWorkspacePaneTabModelInput(
-  gitWorkspace: MaybeRefOrGetter<Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'ui'>>,
+  gitWorkspace: MaybeRefOrGetter<WorkspacePaneModelWorkspace>,
   detail: MaybeRefOrGetter<CurrentGitWorkspacePanePresentation>,
   workspacePaneRoute: MaybeRefOrGetter<ParsedWorkspacePaneRoute | null | undefined>,
 ): ComputedRef<WorkspacePaneTabModelInput> {

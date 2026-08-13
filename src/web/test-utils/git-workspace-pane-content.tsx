@@ -38,14 +38,11 @@ import {
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import {
   observedAppNavigationActionsForTest,
+  workspacePaneTabModelForBranchForTest,
   type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import {
-  workspacePanePreferenceTargetOptions,
-  workspacePaneTabTargetForBranch,
-} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import { AppNavigationProvider } from '#/web/app-navigation.tsx'
@@ -224,7 +221,7 @@ export function gitWorkspacePaneProjection(repo: WorkspaceState): GitWorkspacePa
 }
 
 export function preferenceBackedWorkspacePaneTabModel(repoId: WorkspaceId, branchName: string) {
-  const model = workspacePaneTabTargetForBranch(repoId, branchName, workspacePanePreferenceTargetOptions)
+  const model = workspacePaneTabModelForBranchForTest(repoId, branchName)
   if (!model) throw new Error('missing preference-backed workspace pane tab model')
   return model
 }

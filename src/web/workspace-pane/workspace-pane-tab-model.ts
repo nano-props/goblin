@@ -50,14 +50,6 @@ import {
 
 export type WorkspacePaneModelTarget = WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId }
 
-/** Stable identity for presentation targets; excludes projected tab/view metadata. */
-export function workspacePaneModelTargetIdentityKey(target: WorkspacePaneModelTarget): string {
-  if (target.kind === 'inactive') return `inactive\0${target.workspaceId}`
-  if (target.kind === 'workspace-root') return `workspace-root\0${target.workspaceId}`
-  if (target.kind === 'git-branch') return `git-branch\0${target.workspaceId}\0${target.branchName}`
-  return `git-worktree\0${target.workspaceId}\0${target.worktreePath}`
-}
-
 export type WorkspacePaneTabKind = 'static' | 'runtime' | 'pending'
 
 interface WorkspacePaneTabBase {

@@ -37,6 +37,7 @@ import {
 import {
   GIT_OBJECT_ID_OR_PREFIX_RE,
   gitOperationRequiresDetachedHead,
+  hasUniqueRepoWorktreeMaterializedBranches,
   repoLogTargetRevision,
   repoWorktreeForBranch,
   repoWorktreeMaterializedBranch,
@@ -163,7 +164,7 @@ async function readRemoteRepoWorktreeSnapshots(
   if (usableWorktrees.length === 0) return []
   const commonDir = await resolveRemoteRepoCommonDir(target, { signal: options.signal, run: options.run })
   if (!commonDir) throw new Error('error.failed-read-repo')
-  return await mapWithConcurrency(
+  const snapshots = await mapWithConcurrency(
     usableWorktrees,
     REMOTE_WORKTREE_STATUS_CONCURRENCY,
     async (worktree) => {
@@ -190,6 +191,9 @@ async function readRemoteRepoWorktreeSnapshots(
       if (head.kind === 'branch' && state.materializedBranch !== head.branchName) {
         throw new Error('error.failed-read-repo')
       }
+      if (head.kind === 'detached' && state.operation === null && state.materializedBranch !== null) {
+        throw new Error('error.failed-read-repo')
+      }
       if (worktree.headOid === null && (head.kind !== 'branch' || state.operation !== null)) {
         throw new Error('error.failed-read-repo')
       }
@@ -205,6 +209,8 @@ async function readRemoteRepoWorktreeSnapshots(
     },
     { signal: options.signal, abort: 'throw' },
   )
+  if (!hasUniqueRepoWorktreeMaterializedBranches(snapshots)) throw new Error('error.failed-read-repo')
+  return snapshots
 }
 
 /** Narrow identity read for workspace-pane membership. It intentionally skips
@@ -224,6 +230,17 @@ export async function getRemoteWorkspacePaneTargetIdentities(
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
   const branches = result.stdout ? result.stdout.split('\n') : []
   if (branches.some((branch) => !isSafeBranchName(branch)) || new Set(branches).size !== branches.length) {
+    throw new Error('error.failed-read-repo')
+  }
+  const branchNames = new Set(branches)
+  if (
+    worktrees.some(
+      (worktree) =>
+        worktree.headOid !== null &&
+        worktree.materializedBranch !== null &&
+        !branchNames.has(worktree.materializedBranch),
+    )
+  ) {
     throw new Error('error.failed-read-repo')
   }
   const materializedBranches = new Set(
@@ -879,6 +896,10 @@ export async function removeRemoteWorktree(
   if (!branchWorktree || path.posix.resolve(branchWorktree.path) !== resolvedPath) {
     return { ok: false, message: 'error.worktree-not-found-for-branch' }
   }
+  if (branchWorktree.operation !== null) {
+    return { ok: false, message: 'error.cannot-remove-worktree-operation-in-progress' }
+  }
+  if (resolved.isLocked === true) return { ok: false, message: 'error.cannot-remove-locked-worktree' }
   const mutationPath = resolved.path === target.remotePath && mainWorktreePath ? mainWorktreePath : target.remotePath
 
   const status = await runRemoteWorktreeStatusProbe(target, resolved.path, { signal: input.signal, run })
