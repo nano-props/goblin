@@ -55,9 +55,9 @@ export async function readGitWorktreeState(cwd: string, signal?: AbortSignal): P
   const paths = await resolveGitPaths(cwd, signal)
   signal?.throwIfAborted()
   const [rebaseMergePath, rebaseApplyPath, cherryPickPath, revertPath, bisectPath, bisectStartPath, mergePath] = paths
-  const rebasePath = (await pathExists(rebaseMergePath))
+  const rebasePath = (await pathIsDirectory(rebaseMergePath))
     ? rebaseMergePath
-    : (await pathExists(rebaseApplyPath))
+    : (await pathIsDirectory(rebaseApplyPath))
       ? rebaseApplyPath
       : null
   const [rebaseBranch, bisectActive, cherryPickActive, revertActive, mergeActive] = await Promise.all([
@@ -100,6 +100,15 @@ async function pathExists(target: string): Promise<boolean> {
   try {
     await stat(target)
     return true
+  } catch (error) {
+    if (isMissingPathError(error)) return false
+    throw error
+  }
+}
+
+async function pathIsDirectory(target: string): Promise<boolean> {
+  try {
+    return (await stat(target)).isDirectory()
   } catch (error) {
     if (isMissingPathError(error)) return false
     throw error

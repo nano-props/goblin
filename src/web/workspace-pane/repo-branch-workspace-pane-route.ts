@@ -1,6 +1,6 @@
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { RepoBranchWorkspacePaneRouteNavigation } from '#/web/app-route-navigation.ts'
+import type { AppRouteNavigation, RepoBranchWorkspacePaneRouteNavigation } from '#/web/app-route-navigation.ts'
 import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
@@ -16,6 +16,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export type WorkspacePaneRouteResolution =
   | { kind: 'missing' }
@@ -23,7 +24,7 @@ export type WorkspacePaneRouteResolution =
       kind: 'unavailable'
       reason: 'snapshot-unavailable' | 'workspace-pane-tabs-pending' | 'workspace-pane-tabs-failed'
     }
-  | { kind: 'route'; route: WorkspacePaneRoute | null }
+  | { kind: 'route'; target: WorkspacePaneTabsTarget; route: WorkspacePaneRoute | null }
 
 export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: string): WorkspacePaneRouteResolution {
   const state = workspacesStore.getState()
@@ -68,18 +69,18 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
     runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
   })
   const activeTab = model.activeTab
-  if (!activeTab) return { kind: 'route', route: null }
+  if (!activeTab) return { kind: 'route', target, route: null }
   if (isWorkspacePaneRuntimeTab(activeTab)) {
     if (activeTab.runtimeType === 'terminal') {
-      return { kind: 'route', route: { kind: 'terminal', terminalSessionId: activeTab.sessionId } }
+      return { kind: 'route', target, route: { kind: 'terminal', terminalSessionId: activeTab.sessionId } }
     }
-    return { kind: 'route', route: null }
+    return { kind: 'route', target, route: null }
   }
-  return { kind: 'route', route: { kind: 'static', tab: activeTab.type } }
+  return { kind: 'route', target, route: { kind: 'static', tab: activeTab.type } }
 }
 
 export function openWorkspacePaneRoute(
-  routeNavigation: RepoBranchWorkspacePaneRouteNavigation,
+  routeNavigation: RepoBranchWorkspacePaneRouteNavigation & Pick<AppRouteNavigation, 'openRepoWorktreeTerminal'>,
   repoId: WorkspaceId,
   branchName: string,
   options?: { replace?: boolean; navigationGeneration?: AppNavigationGeneration; onCommit?: () => void },
@@ -89,6 +90,16 @@ export function openWorkspacePaneRoute(
   if (resolution.kind === 'unavailable') {
     if (resolution.reason === 'snapshot-unavailable') return false
     return openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, null, options)
+  }
+  if (resolution.route?.kind === 'terminal') {
+    return resolution.target.kind === 'git-worktree'
+      ? routeNavigation.openRepoWorktreeTerminal(
+          repoId,
+          resolution.target.worktreePath,
+          resolution.route.terminalSessionId,
+          options,
+        )
+      : false
   }
   return openResolvedWorkspacePaneRoute(routeNavigation, repoId, branchName, resolution.route, options)
 }

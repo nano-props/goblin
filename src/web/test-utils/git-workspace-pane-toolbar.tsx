@@ -312,7 +312,6 @@ export function renderToolbar(options: {
     scrollToBottom: ReturnType<typeof vi.fn>
     closeTerminalByDescriptor: ReturnType<typeof vi.fn>
     showRepoBranchWorkspacePaneTab: ReturnType<typeof vi.fn>
-    showRepoBranchTerminalSession: ReturnType<typeof vi.fn>
   }
 } {
   const branchName = options.worktree === false ? 'feature/no-worktree' : 'feature/worktree'
@@ -417,7 +416,6 @@ export function renderToolbar(options: {
   const scrollToBottom = vi.fn()
   const closeTerminalByDescriptor = vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const }))
   const showRepoBranchWorkspacePaneTab = vi.fn(options.navigation.showRepoBranchWorkspacePaneTab)
-  const showRepoBranchTerminalSession = vi.fn(options.navigation.showRepoBranchTerminalSession)
   const commandContext: TerminalSessionContextValue = terminalSessionContextWithCreatedAdmissionForTest({
     createTerminal,
     selectTerminal,
@@ -466,7 +464,6 @@ export function renderToolbar(options: {
   const navigation = navigationWith({
     ...options.navigation,
     showRepoBranchWorkspacePaneTab,
-    showRepoBranchTerminalSession,
   })
   const { container, rerender } = renderInJsdom(
     <VueQueryClientScope client={queryClient}>
@@ -551,7 +548,6 @@ export function renderToolbar(options: {
       scrollToBottom,
       closeTerminalByDescriptor,
       showRepoBranchWorkspacePaneTab,
-      showRepoBranchTerminalSession,
     },
   }
 }
@@ -575,7 +571,6 @@ export function navigationWith(overrides: AppNavigationOverridesForTest): Observ
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
-    showRepoBranchTerminalSession: () => true,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

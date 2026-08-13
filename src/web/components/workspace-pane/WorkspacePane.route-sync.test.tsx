@@ -96,7 +96,6 @@ describe('WorkspacePane route synchronization', () => {
 
     expect(container.textContent).toContain('workspace-pane-tabs.empty')
     expect(route.openRepoBranch).not.toHaveBeenCalled()
-    expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
     expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]).toBeUndefined()
   })
 
@@ -216,7 +215,6 @@ describe('WorkspacePane route synchronization', () => {
         workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey],
       ).toBe('term-222222222222222222222')
     })
-    expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
   test('does not sync a routed terminal session before terminal projection verifies the route', async () => {
@@ -267,8 +265,6 @@ describe('WorkspacePane route synchronization', () => {
     await flushTestUpdates(async () => {
       await Promise.resolve()
     })
-
-    expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
     expect(workspacesStore.getState().navigationHistoryByWorkspace[REPO_ID]).toBeUndefined()
     expect(
       workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalFilesystemTargetKey],

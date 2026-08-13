@@ -71,7 +71,6 @@ describe('client effect intent handlers', () => {
       ],
     })
     const d = deps(REPO_ID)
-    const showRepoBranchTerminalSession = vi.mocked(d.navigation.showRepoBranchTerminalSession)
     const commitFilesystemWorkspacePaneRoute = vi.mocked(d.navigation.commitFilesystemWorkspacePaneRoute)
     handleTerminalBellClickIntent(
       {
@@ -103,7 +102,6 @@ describe('client effect intent handlers', () => {
         expect.any(Object),
       )
     })
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
   })
 
   test('surfaces a terminal bell target whose repository projection is unavailable', () => {
@@ -280,7 +278,6 @@ function navigationWithStoreActions(): ObservedAppNavigationActionsForTest {
       state.setWorkspacePaneTab(repoId, branch, tab)
       return true
     },
-    showRepoBranchTerminalSession: vi.fn(() => true),
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),

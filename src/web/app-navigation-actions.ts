@@ -1,7 +1,11 @@
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type {
+  BranchWorkspacePaneRouteTarget,
+  ParsedWorkspacePaneRouteTarget,
+  WorkspacePaneRouteTarget,
+} from '#/web/App.tsx'
 import type { FilesystemWorkspacePaneRouteTarget, AppRouteNavigation } from '#/web/app-route-navigation.ts'
 import type { CloseWorkspaceResult, WorkspaceNavigationHistoryTraversal } from '#/web/stores/workspaces/types.ts'
 import {
@@ -45,7 +49,7 @@ export interface WorkspacePaneRouteCommitActions {
   commitWorkspacePaneRoute: (
     workspaceId: WorkspaceId,
     branch: string,
-    route: WorkspacePaneRouteTarget,
+    route: BranchWorkspacePaneRouteTarget,
     options?: AppNavigationOptions,
   ) => Promise<boolean>
 }
@@ -292,7 +296,7 @@ async function commitWorkspacePaneRoute(
   routeNavigation: AppRouteNavigation,
   workspaceId: WorkspaceId,
   branchName: string,
-  route: WorkspacePaneRouteTarget,
+  route: BranchWorkspacePaneRouteTarget,
   options?: AppNavigationOptions,
 ): Promise<boolean> {
   const generation = options?.navigationGeneration ?? beginAppNavigation()

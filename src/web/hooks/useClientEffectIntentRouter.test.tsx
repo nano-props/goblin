@@ -81,7 +81,6 @@ let navigation!: ObservedAppNavigationActionsForTest
 const activateWorkspaceSpy = vi.fn()
 const closeRepoSpy = vi.fn()
 const showRepoBranchWorkspacePaneTabSpy = vi.fn()
-const showRepoBranchTerminalSessionSpy = vi.fn()
 const showWorkspaceRootPaneTabSpy = vi.fn()
 const commitFilesystemWorkspacePaneRouteSpy = vi.fn()
 const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
@@ -96,7 +95,6 @@ beforeEach(() => {
   activateWorkspaceSpy.mockClear()
   closeRepoSpy.mockClear()
   showRepoBranchWorkspacePaneTabSpy.mockClear()
-  showRepoBranchTerminalSessionSpy.mockClear()
   showWorkspaceRootPaneTabSpy.mockClear()
   commitFilesystemWorkspacePaneRouteSpy.mockClear()
   appDataClientMocks.clearRecentWorkspaceHistory.mockReset()
@@ -132,10 +130,6 @@ beforeEach(() => {
       showRepoBranchWorkspacePaneTabSpy(repoId, branch, tab)
       const state = workspacesStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
-      return true
-    },
-    showRepoBranchTerminalSession: (repoId, branch, terminalSessionId) => {
-      showRepoBranchTerminalSessionSpy(repoId, branch, terminalSessionId)
       return true
     },
     showWorkspaceRootPaneTab: (workspaceId, presentation) => {
@@ -376,7 +370,6 @@ describe('useClientEffectIntentRouter', () => {
         { kind: 'terminal', terminalSessionId },
       )
     })
-    expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTabSpy).not.toHaveBeenCalled()
   })
 
@@ -415,7 +408,6 @@ describe('useClientEffectIntentRouter', () => {
       { kind: 'terminal', terminalSessionId },
     )
     expect(showWorkspaceRootPaneTabSpy).not.toHaveBeenCalled()
-    expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
   })
 
   test('terminal bell clicks combine branch and terminal view navigation in a single route-driven action', async () => {
@@ -430,15 +422,10 @@ describe('useClientEffectIntentRouter', () => {
         createRepoWorktreeSnapshotForTest('feature/test', '/tmp/repo-feature', { isPrimary: false, isLocked: false }),
       ],
     })
-    const routeNavigationCalls: Array<{ repoId: string; branch: string; terminalSessionId: string }> = []
     navigation = {
       ...navigation,
       selectRepoBranch: vi.fn(),
       showRepoBranchEmptyWorkspacePane: () => true,
-      showRepoBranchTerminalSession: (repoId, branch, terminalSessionId) => {
-        routeNavigationCalls.push({ repoId, branch, terminalSessionId })
-        return true
-      },
     }
     navigation.commitWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
     currentWorkspaceId = repo.id
@@ -485,7 +472,6 @@ describe('useClientEffectIntentRouter', () => {
         { kind: 'terminal', terminalSessionId },
       )
     })
-    expect(routeNavigationCalls).toEqual([])
   })
 
   test('close-repo menu action delegates to navigation close', async () => {
@@ -815,7 +801,6 @@ describe('useClientEffectIntentRouter', () => {
         { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
       )
     })
-    expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
   })
 
   test('drains externally opened repo paths through the centralized intent router', async () => {

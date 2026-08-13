@@ -413,8 +413,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       },
     )
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
-    const showRepoBranchTerminalSession = vi.fn(() => true)
-    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession })
+    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
     let resolveViewer!: (value: { viewer: 'bat'; shell: 'posix'; executionRoot: string }) => void
     filetreeClientMocks.getWorkspaceFileViewer.mockImplementationOnce(
       () =>
@@ -467,8 +466,6 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       resolveViewer({ viewer: 'bat', shell: 'posix', executionRoot: worktreePath })
       await Promise.resolve()
     })
-
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(createTerminalWithAdmission).toHaveBeenCalledWith(
       {

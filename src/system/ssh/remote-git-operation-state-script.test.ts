@@ -41,6 +41,19 @@ describe('remote Git operation state script', () => {
     expect(merge.stdout).toBe('operation merge\nmaterialized-branch')
   })
 
+  test.each(['rebase-merge', 'rebase-apply'])('ignores a non-directory %s marker', async (marker) => {
+    const repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin remote rebase marker '))
+    tempDirectories.push(repoPath)
+    await execa('git', ['init', '-q', repoPath])
+    const resolved = (await execa('git', ['-C', repoPath, 'rev-parse', '--git-path', marker])).stdout
+    const markerPath = path.isAbsolute(resolved) ? resolved : path.join(repoPath, resolved)
+    await writeFile(markerPath, 'not a rebase directory\n')
+
+    const state = await execa('sh', ['-c', remoteGitOperationStateScript(repoPath, null)])
+
+    expect(state.stdout).toBe('operation none\nmaterialized-branch')
+  })
+
   test('retains bisect branch authority while presenting a concurrent cherry-pick', async () => {
     const repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin remote concurrent operation '))
     tempDirectories.push(repoPath)

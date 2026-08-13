@@ -334,9 +334,8 @@ describe('workspace commands close', () => {
       focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
-    const navigation = navigationWith({ showRepoBranchTerminalSession, showRepoBranchWorkspacePaneTab })
+    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
 
     const firstClose = runCloseCurrentWorkspacePaneTabCommand({
       workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
@@ -358,7 +357,6 @@ describe('workspace commands close', () => {
 
     closeResolvers[0]?.(true)
     await expect(firstClose).resolves.toBe(true)
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(closeTerminalByDescriptor).toHaveBeenNthCalledWith(2, 'term-222222222222222222222', expectedTerminalBase())
     closeResolvers[1]?.(true)
     await expect(secondClose).resolves.toBe(true)
@@ -478,7 +476,6 @@ describe('workspace commands close', () => {
       workspacesStore.getState().setWorkspacePaneTab(workspaceId, branch, tab)
       return true
     })
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotForSessions(visibleSessionIds),
       createTerminal,
@@ -493,7 +490,7 @@ describe('workspace commands close', () => {
       focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
-    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession })
+    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
 
     // Opens a new terminal from "status" (its opener becomes "status"), then
     // the user navigates away to "changes" before closing the terminal.

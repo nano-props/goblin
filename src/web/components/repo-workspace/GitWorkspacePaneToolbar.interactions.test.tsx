@@ -24,18 +24,15 @@ import {
 describe('GitWorkspacePaneToolbar interactions', () => {
   test('clicking the new-terminal button navigates and creates a terminal', async () => {
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const { terminalTab, mocks } = renderToolbar({
       terminalCount: 0,
-      navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
+      navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
     })
 
     await flushTestUpdates(() => {
       terminalTab.click()
     })
     await flush()
-
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(mocks.createTerminal).toHaveBeenCalledTimes(1)
   })
@@ -75,13 +72,11 @@ describe('GitWorkspacePaneToolbar interactions', () => {
 
   test('clicking a selected session tab when not in terminal panel navigates to terminal', async () => {
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const commitFilesystemWorkspacePaneRoute = acceptedFilesystemCommit()
     const { terminalTab, mocks } = renderToolbar({
       terminalCount: 2,
       navigation: navigationWith({
         showRepoBranchWorkspacePaneTab,
-        showRepoBranchTerminalSession,
         commitFilesystemWorkspacePaneRoute,
       }),
     })
@@ -95,7 +90,6 @@ describe('GitWorkspacePaneToolbar interactions', () => {
       kind: 'terminal',
       terminalSessionId: 'term-111111111111111111111',
     })
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(mocks.createTerminal).not.toHaveBeenCalled()
     expect(mocks.selectTerminal).not.toHaveBeenCalled()
@@ -103,19 +97,16 @@ describe('GitWorkspacePaneToolbar interactions', () => {
 
   test('clicking a selected session tab in terminal panel scrolls to bottom', async () => {
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const { terminalTab, mocks } = renderToolbar({
       terminalCount: 2,
       preferredWorkspacePaneTab: 'terminal',
-      navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
+      navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
     })
 
     await flushTestUpdates(() => {
       terminalTab.click()
     })
     await flush()
-
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(mocks.createTerminal).not.toHaveBeenCalled()
     expect(mocks.selectTerminal).not.toHaveBeenCalled()
@@ -124,13 +115,11 @@ describe('GitWorkspacePaneToolbar interactions', () => {
 
   test('clicking an unselected session tab navigates and selects it', async () => {
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const commitFilesystemWorkspacePaneRoute = acceptedFilesystemCommit()
     const { container: c, mocks } = renderToolbar({
       terminalCount: 2,
       navigation: navigationWith({
         showRepoBranchWorkspacePaneTab,
-        showRepoBranchTerminalSession,
         commitFilesystemWorkspacePaneRoute,
       }),
     })
@@ -149,7 +138,6 @@ describe('GitWorkspacePaneToolbar interactions', () => {
       kind: 'terminal',
       terminalSessionId: 'term-222222222222222222222',
     })
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(mocks.createTerminal).not.toHaveBeenCalled()
     expect(mocks.selectTerminal).not.toHaveBeenCalled()
@@ -220,9 +208,6 @@ describe('GitWorkspacePaneToolbar interactions', () => {
     const showRepoBranchWorkspacePaneTab = vi.fn<
       ObservedBranchRouteNavigationForTest['showRepoBranchWorkspacePaneTab']
     >(() => true)
-    const showRepoBranchTerminalSession = vi.fn<ObservedBranchRouteNavigationForTest['showRepoBranchTerminalSession']>(
-      () => true,
-    )
     const commitFilesystemWorkspacePaneRoute = acceptedFilesystemCommit()
     const { container: c } = renderToolbar({
       terminalCount: 2,
@@ -230,7 +215,6 @@ describe('GitWorkspacePaneToolbar interactions', () => {
       workspacePaneStaticTabs: ['status', 'changes'],
       navigation: navigationWith({
         showRepoBranchWorkspacePaneTab,
-        showRepoBranchTerminalSession,
         commitFilesystemWorkspacePaneRoute,
       }),
     })
@@ -265,14 +249,12 @@ describe('GitWorkspacePaneToolbar interactions', () => {
   test('skips the changes tab in keyboard navigation when it is not open', async () => {
     const user = userEvent.setup()
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const commitFilesystemWorkspacePaneRoute = acceptedFilesystemCommit()
     const { container: c } = renderToolbar({
       terminalCount: 2,
       preferredWorkspacePaneTab: 'terminal',
       navigation: navigationWith({
         showRepoBranchWorkspacePaneTab,
-        showRepoBranchTerminalSession,
         commitFilesystemWorkspacePaneRoute,
       }),
     })

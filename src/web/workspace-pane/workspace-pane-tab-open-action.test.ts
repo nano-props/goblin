@@ -904,7 +904,6 @@ function navigationWithStoreActions(
     commitWorkspacePaneRoute: observedWorkspacePaneRouteCommitForTest({
       showRepoBranchEmptyWorkspacePane: () => false,
       showRepoBranchWorkspacePaneTab,
-      showRepoBranchTerminalSession: () => false,
     }),
     commitFilesystemWorkspacePaneRoute: observedFilesystemWorkspacePaneRouteCommitForTest(),
   }

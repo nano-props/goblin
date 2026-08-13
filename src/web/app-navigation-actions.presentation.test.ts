@@ -392,7 +392,6 @@ describe('createAppNavigationActions presentation', () => {
 
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, presentationOptions({ replace: true }))
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
-    expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
   test('opens the branch root when workspace pane tab restoration failed', async () => {
@@ -425,7 +424,6 @@ describe('createAppNavigationActions presentation', () => {
 
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, presentationOptions())
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
-    expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
   test('selects branches by falling back when the preferred workspace pane tab is stale', () => {
@@ -476,52 +474,6 @@ describe('createAppNavigationActions presentation', () => {
 
     expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, presentationOptions())
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
-    expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
-  })
-
-  test('keeps command-owned route commits free of workspace pane supplements', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch(BRANCH_NAME)],
-      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
-      currentBranchName: BRANCH_NAME,
-      preferredWorkspacePaneTab: 'status',
-    })
-    setTerminalSessionCommandBridge({
-      terminalFilesystemTargetSnapshot: () => createPendingWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
-      createTerminalWithAdmission: vi.fn(async () => {
-        throw new Error('unexpected terminal creation')
-      }),
-      selectTerminal: vi.fn(),
-      focusTerminal: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'not-committed' as const, message: null })),
-    })
-    const navigation = routeNavigation()
-    navigation.commitWorkspacePaneRoute = vi.fn(async (workspaceId, branchName, route, options) => {
-      if (route?.kind !== 'terminal') return false
-      return navigation.openRepoBranchTerminal(workspaceId, branchName, route.terminalSessionId, options)
-    })
-    const actions = createAppNavigationActions({
-      currentWorkspaceId: REPO_ID,
-      workspaceOrder: [REPO_ID],
-      closeWorkspace: vi.fn(),
-      routeNavigation: navigation,
-    })
-
-    const accepted = await actions.commitWorkspacePaneRoute(REPO_ID, BRANCH_NAME, {
-      kind: 'terminal',
-      terminalSessionId: 'term-111111111111111111111',
-    })
-
-    expect(accepted).toBe(true)
-    expect(navigation.openRepoBranchTerminal).toHaveBeenCalledWith(
-      REPO_ID,
-      BRANCH_NAME,
-      'term-111111111111111111111',
-      presentationOptions(),
-    )
-    expect(preferredWorkspacePaneTab()).toBe('status')
   })
 
   test('does not commit route supplements when operation-owned navigation settles', async () => {

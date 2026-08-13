@@ -336,7 +336,6 @@ function primaryNavigationActions() {
     openWorkspaceRootPane: vi.fn(),
     openRepoBranch: vi.fn(() => true),
     openRepoBranchTab: vi.fn(() => true),
-    openRepoBranchTerminal: vi.fn(() => true),
     commitWorkspacePaneRoute: acceptedRouteCommit(),
     commitFilesystemWorkspacePaneRoute: vi.fn<AppRouteNavigation['commitFilesystemWorkspacePaneRoute']>(
       async () => true,

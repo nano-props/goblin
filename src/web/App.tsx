@@ -35,6 +35,7 @@ export type WorkspacePaneRoute =
   { kind: 'static'; tab: WorkspacePaneStaticTabType } | { kind: 'terminal'; terminalSessionId: string }
 
 export type WorkspacePaneRouteTarget = WorkspacePaneRoute | null
+export type BranchWorkspacePaneRouteTarget = Extract<WorkspacePaneRoute, { kind: 'static' }> | null
 export type ParsedWorkspacePaneRoute = WorkspacePaneRoute | { kind: 'invalid-static'; tabKey: string }
 export type ParsedWorkspacePaneRouteTarget = ParsedWorkspacePaneRoute | null
 

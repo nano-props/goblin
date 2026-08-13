@@ -213,7 +213,6 @@ function navigationWith(): AppNavigationActions {
     selectRepoBranch: vi.fn(),
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),
-    showRepoBranchTerminalSession: vi.fn(() => true),
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),

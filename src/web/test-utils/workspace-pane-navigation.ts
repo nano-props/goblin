@@ -23,12 +23,6 @@ export interface ObservedBranchRouteNavigationForTest {
     tab: Extract<WorkspacePaneRouteTarget, { kind: 'static' }>['tab'],
     options?: AppNavigationOptions,
   ) => boolean
-  showRepoBranchTerminalSession: (
-    workspaceId: WorkspaceId,
-    branchName: string,
-    terminalSessionId: string,
-    options?: AppNavigationOptions,
-  ) => boolean
 }
 
 type ObservedAppNavigationOverrides = Partial<AppNavigationActions> & ObservedBranchRouteNavigationForTest
@@ -123,8 +117,8 @@ export function observedWorkspacePaneRouteCommitForTest(
         },
       })
   }
-  const { showRepoBranchEmptyWorkspacePane, showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession } = navigation
-  if (!showRepoBranchEmptyWorkspacePane || !showRepoBranchWorkspacePaneTab || !showRepoBranchTerminalSession) {
+  const { showRepoBranchEmptyWorkspacePane, showRepoBranchWorkspacePaneTab } = navigation
+  if (!showRepoBranchEmptyWorkspacePane || !showRepoBranchWorkspacePaneTab) {
     throw new Error('Observed workspace pane route commits require branch route callbacks')
   }
   const abandonCommit = (commitOptions: AppNavigationOptions | undefined) => {
@@ -160,7 +154,6 @@ export function observedWorkspacePaneRouteCommitForTest(
       {
         openRepoBranch: showRepoBranchEmptyWorkspacePane,
         openRepoBranchTab: showRepoBranchWorkspacePaneTab,
-        openRepoBranchTerminal: showRepoBranchTerminalSession,
       },
       repoId,
       branchName,
@@ -212,18 +205,12 @@ export function observedAppNavigationActionsForTest(
   overrides: ObservedAppNavigationOverrides,
   options: ObservedWorkspacePaneRouteCommitOptions = {},
 ): ObservedAppNavigationActionsForTest {
-  const {
-    showRepoBranchEmptyWorkspacePane,
-    showRepoBranchWorkspacePaneTab,
-    showRepoBranchTerminalSession,
-    ...navigationOverrides
-  } = overrides
+  const { showRepoBranchEmptyWorkspacePane, showRepoBranchWorkspacePaneTab, ...navigationOverrides } = overrides
   const navigation = appNavigationActionsForTest(navigationOverrides)
   const observedNavigation = {
     ...navigation,
     showRepoBranchEmptyWorkspacePane,
     showRepoBranchWorkspacePaneTab,
-    showRepoBranchTerminalSession,
   }
   const navigationWithFilesystemCommit = overrides.commitFilesystemWorkspacePaneRoute
     ? observedNavigation
@@ -236,7 +223,7 @@ export function observedAppNavigationActionsForTest(
     ...navigationWithFilesystemCommit,
     commitWorkspacePaneRoute: vi.fn(
       observedWorkspacePaneRouteCommitForTest(
-        { showRepoBranchEmptyWorkspacePane, showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession },
+        { showRepoBranchEmptyWorkspacePane, showRepoBranchWorkspacePaneTab },
         options,
       ),
     ),

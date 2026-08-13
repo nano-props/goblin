@@ -1,12 +1,24 @@
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type {
+  BranchWorkspacePaneRouteTarget,
+  ParsedWorkspacePaneRouteTarget,
+  WorkspacePaneRouteTarget,
+} from '#/web/App.tsx'
 
-export function workspacePaneRouteFromBranchHref(
+export function workspacePaneRouteFromTargetHref(
+  currentHref: string,
+  targetRootHref: string,
+): WorkspacePaneRouteTarget | undefined {
+  const route = parsedWorkspacePaneRouteFromTargetHref(currentHref, targetRootHref)
+  return route?.kind === 'invalid-static' ? undefined : route
+}
+
+export function branchWorkspacePaneRouteFromHref(
   currentHref: string,
   branchRootHref: string,
-): WorkspacePaneRouteTarget | undefined {
+): BranchWorkspacePaneRouteTarget | undefined {
   const route = parsedWorkspacePaneRouteFromTargetHref(currentHref, branchRootHref)
-  return route?.kind === 'invalid-static' ? undefined : route
+  return route?.kind === 'static' || route === null ? route : undefined
 }
 
 export function parsedWorkspacePaneRouteFromTargetHref(

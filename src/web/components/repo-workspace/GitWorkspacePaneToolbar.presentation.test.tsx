@@ -200,7 +200,6 @@ describe('GitWorkspacePaneToolbar presentation', () => {
 
   test('lands on the adjacent terminal after closing the active status tab', async () => {
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
       async (_target, _route, options) => {
         options?.onCommit?.()
@@ -211,7 +210,6 @@ describe('GitWorkspacePaneToolbar presentation', () => {
       terminalCount: 1,
       navigation: navigationWith({
         showRepoBranchWorkspacePaneTab,
-        showRepoBranchTerminalSession,
         commitFilesystemWorkspacePaneRoute,
       }),
     })
@@ -232,7 +230,6 @@ describe('GitWorkspacePaneToolbar presentation', () => {
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.any(Object),
     )
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
 

@@ -1,4 +1,4 @@
-import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { BranchWorkspacePaneRouteTarget, ParsedWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
@@ -8,7 +8,8 @@ interface WorkspacePaneRouteNavigationOptions {
   navigationGeneration?: AppNavigationGeneration
   onCommit?: () => void
   onAbandon?: () => void
-  routePrecondition?: { kind: 'exact-route'; route: WorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
+  routePrecondition?:
+    { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 }
 
 export interface WorkspacePaneRouteNavigation {
@@ -19,19 +20,13 @@ export interface WorkspacePaneRouteNavigation {
     tab: WorkspacePaneStaticTabType,
     options?: WorkspacePaneRouteNavigationOptions,
   ) => boolean
-  openRepoBranchTerminal: (
-    repoId: WorkspaceId,
-    branchName: string,
-    terminalSessionId: string,
-    options?: WorkspacePaneRouteNavigationOptions,
-  ) => boolean
 }
 
 export function openResolvedWorkspacePaneRoute(
   routeNavigation: WorkspacePaneRouteNavigation,
   repoId: WorkspaceId,
   branchName: string,
-  route: WorkspacePaneRouteTarget,
+  route: BranchWorkspacePaneRouteTarget,
   options?: WorkspacePaneRouteNavigationOptions,
 ): boolean {
   if (!route) {
@@ -39,15 +34,7 @@ export function openResolvedWorkspacePaneRoute(
       ? routeNavigation.openRepoBranch(repoId, branchName)
       : routeNavigation.openRepoBranch(repoId, branchName, options)
   }
-  if (route.kind === 'static') {
-    return options === undefined
-      ? routeNavigation.openRepoBranchTab(repoId, branchName, route.tab)
-      : routeNavigation.openRepoBranchTab(repoId, branchName, route.tab, options)
-  }
-  if (route.kind === 'terminal') {
-    return options === undefined
-      ? routeNavigation.openRepoBranchTerminal(repoId, branchName, route.terminalSessionId)
-      : routeNavigation.openRepoBranchTerminal(repoId, branchName, route.terminalSessionId, options)
-  }
-  return false
+  return options === undefined
+    ? routeNavigation.openRepoBranchTab(repoId, branchName, route.tab)
+    : routeNavigation.openRepoBranchTab(repoId, branchName, route.tab, options)
 }

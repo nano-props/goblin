@@ -160,7 +160,6 @@ describe('useKeyboard', () => {
     seedTabbedWorktreeRepoForTest('status')
     const selectTerminal = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
@@ -177,7 +176,6 @@ describe('useKeyboard', () => {
       currentBranchName: 'feature/worktree',
       navigation: navigationWith({
         showRepoBranchWorkspacePaneTab,
-        showRepoBranchTerminalSession,
         commitFilesystemWorkspacePaneRoute,
       }),
     })
@@ -201,7 +199,6 @@ describe('useKeyboard', () => {
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.any(Object),
     )
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(selectTerminal).not.toHaveBeenCalled()
   })
@@ -317,7 +314,6 @@ describe('useKeyboard', () => {
     seedTabbedWorktreeRepoForTest('status')
     const selectTerminal = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
@@ -334,7 +330,6 @@ describe('useKeyboard', () => {
       currentBranchName: 'feature/worktree',
       navigation: navigationWith({
         showRepoBranchWorkspacePaneTab,
-        showRepoBranchTerminalSession,
         commitFilesystemWorkspacePaneRoute,
       }),
     })
@@ -360,7 +355,6 @@ describe('useKeyboard', () => {
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.any(Object),
     )
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(selectTerminal).not.toHaveBeenCalled()
     terminalHost.remove()
@@ -973,7 +967,6 @@ function navigationWith(overrides: AppNavigationOverridesForTest = {}): AppNavig
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
-    showRepoBranchTerminalSession: () => true,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

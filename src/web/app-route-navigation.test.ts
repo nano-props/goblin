@@ -2,10 +2,11 @@ import { describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { settleOwnedAppRouteCommit, settleAppRouteCommit } from '#/web/app-route-commit.ts'
 import {
+  branchWorkspacePaneRouteFromHref,
   returnToFromHref,
   parsedWorkspacePaneRouteFromTargetHref,
   routeReturnSearch,
-  workspacePaneRouteFromBranchHref,
+  workspacePaneRouteFromTargetHref,
 } from '#/web/app-route-href.ts'
 import { beginAppNavigation, observeAppHistoryNavigation, appNavigationState } from '#/web/app-navigation-lifecycle.ts'
 
@@ -119,10 +120,10 @@ describe('app route navigation helpers', () => {
 
     await expect(
       settleOwnedAppRouteCommit({
-        targetHref: '/workspace/example/branch/main/terminal/term-2',
-        expectedCurrentHref: '/workspace/example/branch/main/terminal/term-1',
+        targetHref: '/workspace/example/worktree/main/terminal/term-2',
+        expectedCurrentHref: '/workspace/example/worktree/main/terminal/term-1',
         navigate,
-        currentHref: () => '/workspace/example/branch/main/terminal/term-2',
+        currentHref: () => '/workspace/example/worktree/main/terminal/term-2',
         commitEffect,
         abandonEffect,
       }),
@@ -134,18 +135,20 @@ describe('app route navigation helpers', () => {
 
   test('reads the current workspace pane route only for the exact repo branch', () => {
     const branchRoot = '/workspace/example/branch/main'
-    expect(workspacePaneRouteFromBranchHref(branchRoot, branchRoot)).toBeNull()
-    expect(workspacePaneRouteFromBranchHref(`${branchRoot}/tab/files`, branchRoot)).toEqual({
+    const worktreeRoot = '/workspace/example/worktree/main'
+    expect(branchWorkspacePaneRouteFromHref(branchRoot, branchRoot)).toBeNull()
+    expect(branchWorkspacePaneRouteFromHref(`${branchRoot}/tab/files`, branchRoot)).toEqual({
       kind: 'static',
       tab: 'files',
     })
-    expect(workspacePaneRouteFromBranchHref(`${branchRoot}/terminal/term-1`, branchRoot)).toEqual({
+    expect(branchWorkspacePaneRouteFromHref(`${branchRoot}/terminal/term-1`, branchRoot)).toBeUndefined()
+    expect(workspacePaneRouteFromTargetHref(`${worktreeRoot}/terminal/term-1`, worktreeRoot)).toEqual({
       kind: 'terminal',
       terminalSessionId: 'term-1',
     })
-    expect(workspacePaneRouteFromBranchHref('/workspace/example/branch/other/tab/files', branchRoot)).toBeUndefined()
-    expect(workspacePaneRouteFromBranchHref(`${branchRoot}/tab/not-a-tab`, branchRoot)).toBeUndefined()
-    expect(workspacePaneRouteFromBranchHref(`${branchRoot}/tab/files/extra`, branchRoot)).toBeUndefined()
+    expect(branchWorkspacePaneRouteFromHref('/workspace/example/branch/other/tab/files', branchRoot)).toBeUndefined()
+    expect(branchWorkspacePaneRouteFromHref(`${branchRoot}/tab/not-a-tab`, branchRoot)).toBeUndefined()
+    expect(branchWorkspacePaneRouteFromHref(`${branchRoot}/tab/files/extra`, branchRoot)).toBeUndefined()
     expect(parsedWorkspacePaneRouteFromTargetHref(`${branchRoot}/tab/not%20a%20tab`, branchRoot)).toEqual({
       kind: 'invalid-static',
       tabKey: 'not a tab',

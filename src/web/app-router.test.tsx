@@ -288,19 +288,6 @@ describe('workspace route view derivation', () => {
       branchName: 'feature/a',
       workspacePaneRoute: { kind: 'invalid-static', tabKey: 'not-a-tab' },
     })
-    expect(
-      workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
-        dashboard: false,
-        branchSlug: 'ZmVhdHVyZS9h',
-        terminalSessionId: 'term-111111111111111111111',
-        newWorktree: false,
-      }),
-    ).toEqual({
-      kind: 'branch',
-      workspaceId: ROUTE_WORKSPACE_ID,
-      branchName: 'feature/a',
-      workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-    })
   })
 
   test('prefers a terminal child route when terminal and static params are both present', async () => {
@@ -484,7 +471,6 @@ describe('app route callback facades', () => {
       openWorkspaceRootPane: vi.fn(),
       openRepoBranch: vi.fn(() => true),
       openRepoBranchTab: vi.fn(() => true),
-      openRepoBranchTerminal: vi.fn(() => true),
       openRepoNewWorktree: vi.fn(),
       cancelRepoNewWorktree: vi.fn(),
       workspaceSlugForId: vi.fn(),

@@ -329,7 +329,6 @@ export function navigationWith(
       state.setWorkspacePaneTab(canonicalWorkspaceId, branch, tab)
       return true
     },
-    showRepoBranchTerminalSession: () => true,
     showWorkspaceRootPaneTab: (workspaceId, presentation, options) => {
       workspacesStore
         .getState()

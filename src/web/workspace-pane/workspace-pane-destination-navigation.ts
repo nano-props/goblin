@@ -107,6 +107,7 @@ export async function commitWorkspacePaneDestinationRoute(
       : { kind: 'superseded' }
   }
 
+  if (route?.kind === 'terminal') return { kind: 'unsupported', reason: 'worktree-required' }
   let supplementCommitted = false
   try {
     const accepted = await navigation.commitWorkspacePaneRoute(

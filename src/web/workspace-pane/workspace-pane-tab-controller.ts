@@ -1,4 +1,8 @@
-import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type {
+  BranchWorkspacePaneRouteTarget,
+  ParsedWorkspacePaneRouteTarget,
+  WorkspacePaneRouteTarget,
+} from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   isWorkspacePaneRuntimeTabEntry,
@@ -234,7 +238,7 @@ async function commitWorkspacePaneControllerTargetRoute(
 export async function commitWorkspacePaneControllerRoute(
   workspaceId: WorkspaceId,
   branchName: string,
-  route: WorkspacePaneTabControllerRoute,
+  route: BranchWorkspacePaneRouteTarget,
   navigation: WorkspacePaneRouteCommitActions,
   options?: {
     replace?: boolean
@@ -284,7 +288,7 @@ async function commitWorkspacePaneValidatedTargetRoute(
     return false
   }
   const branchName = target.branchName
-  if (!branchName || !targetIsCurrent(target)) {
+  if (!branchName || route?.kind === 'terminal' || !targetIsCurrent(target)) {
     options?.onAbandon?.()
     return false
   }

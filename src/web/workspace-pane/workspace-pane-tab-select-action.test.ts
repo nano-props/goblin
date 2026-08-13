@@ -250,7 +250,6 @@ function navigationWith(
       state.setWorkspacePaneTab(canonicalWorkspaceId, branch, tab)
       return true
     },
-    showRepoBranchTerminalSession: () => true,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

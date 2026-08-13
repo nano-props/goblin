@@ -344,7 +344,6 @@ export function navigationWith(overrides: AppNavigationOverridesForTest): AppNav
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
-    showRepoBranchTerminalSession: () => true,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

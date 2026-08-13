@@ -157,10 +157,6 @@ export function routeNavigation(): AppRouteNavigation {
       options?.onCommit?.()
       return true
     }),
-    openRepoBranchTerminal: vi.fn((_repoId, _branchName, _sessionId, options) => {
-      options?.onCommit?.()
-      return true
-    }),
     openRepoWorktree: vi.fn((_repoId, _worktreePath, options) => {
       options?.onCommit?.()
       return true

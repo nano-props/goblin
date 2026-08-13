@@ -38,6 +38,12 @@ describe('readGitWorktreeState', () => {
     })
   })
 
+  test.each(['rebase-merge', 'rebase-apply'])('ignores a non-directory %s marker', async (marker) => {
+    await writeFile(await gitPath(marker), 'not a rebase directory\n')
+
+    await expect(readGitWorktreeState(repoPath)).resolves.toEqual({ operation: null, materializedBranch: null })
+  })
+
   test.each([
     ['CHERRY_PICK_HEAD', 'cherry-pick'],
     ['REVERT_HEAD', 'revert'],

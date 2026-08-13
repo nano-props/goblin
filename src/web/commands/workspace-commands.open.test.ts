@@ -112,8 +112,7 @@ describe('workspace commands open', () => {
       focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const })),
     })
-    const showRepoBranchTerminalSession = vi.fn(() => true)
-    const navigation = navigationWith({ showRepoBranchTerminalSession })
+    const navigation = navigationWith({})
 
     await runTerminalPrimaryActionCommand({
       filesystemTarget: filesystemTargetForTest(),
@@ -122,8 +121,6 @@ describe('workspace commands open', () => {
       branchName: 'feature/worktree',
       navigation,
     })
-
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     // "Click the Terminal menu" is a generic entry — no insertion anchor is
     // passed, so the new terminal appends to the end of the strip.
     expect(createTerminal).toHaveBeenCalledWith(expectedTerminalBase())
@@ -155,8 +152,7 @@ describe('workspace commands open', () => {
       focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const })),
     })
-    const showRepoBranchTerminalSession = vi.fn(() => true)
-    const navigation = navigationWith({ showRepoBranchTerminalSession })
+    const navigation = navigationWith({})
 
     await runNewTerminalTabCommand({
       filesystemTarget: filesystemTargetForTest(),
@@ -165,8 +161,6 @@ describe('workspace commands open', () => {
       branchName: 'feature/worktree',
       navigation,
     })
-
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[WORKTREE_KEY]).toBe(
       'term-222222222222222222222',
     )
@@ -213,9 +207,8 @@ describe('workspace commands open', () => {
       focusTerminal: vi.fn(() => false),
       closeTerminalByDescriptor,
     })
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const showRepoBranchEmptyWorkspacePane = vi.fn(() => true)
-    const navigation = navigationWith({ showRepoBranchTerminalSession, showRepoBranchEmptyWorkspacePane })
+    const navigation = navigationWith({ showRepoBranchEmptyWorkspacePane })
 
     expect(
       await runNewTerminalTabCommand({
@@ -235,8 +228,6 @@ describe('workspace commands open', () => {
     expect(
       workspacePaneTabOpener(WORKTREE_PANE_TARGET, workspaceRuntimeIdForTest(), 'terminal:term-222222222222222222222'),
     ).toBe('terminal:term-111111111111111111111')
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
-    showRepoBranchTerminalSession.mockClear()
 
     expect(
       await runCloseWorkspacePaneTabCommand({
@@ -249,7 +240,6 @@ describe('workspace commands open', () => {
     ).toBe(true)
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', expectedTerminalBase())
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
   })
 
@@ -300,11 +290,9 @@ describe('workspace commands open', () => {
       closeEvents.push(`navigate:${tab}`)
       return true
     })
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const showRepoBranchEmptyWorkspacePane = vi.fn(() => true)
     const navigation = navigationWith({
       showRepoBranchWorkspacePaneTab,
-      showRepoBranchTerminalSession,
       showRepoBranchEmptyWorkspacePane,
     })
 
@@ -327,8 +315,6 @@ describe('workspace commands open', () => {
     expect(
       workspacePaneTabOpener(WORKTREE_PANE_TARGET, workspaceRuntimeIdForTest(), 'terminal:term-222222222222222222222'),
     ).toBe('workspace-pane:status')
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
-    showRepoBranchTerminalSession.mockClear()
     closeEvents.length = 0
 
     expect(
@@ -343,7 +329,6 @@ describe('workspace commands open', () => {
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', expectedTerminalBase())
     expect(closeEvents).toEqual(['close-terminal'])
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
   })
 
@@ -514,8 +499,7 @@ describe('workspace commands open', () => {
       terminalCreateOperationRan = true
       return 'term-111111111111111111111'
     })
-    const showRepoBranchTerminalSession = vi.fn(() => true)
-    const navigation = navigationWith({ showRepoBranchTerminalSession })
+    const navigation = navigationWith({})
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal,
@@ -554,14 +538,12 @@ describe('workspace commands open', () => {
     expect(terminalSettled).toBe(false)
     expect(createTerminal).not.toHaveBeenCalled()
     expect(terminalCreateOperationRan).toBe(false)
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
 
     resolveCommit([staticEntry('status')])
 
     await expect(closePromise).resolves.toBe(true)
     await expect(terminalPromise).resolves.toBe(true)
     expect(createTerminal).toHaveBeenCalledOnce()
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
   })
 
   test('select workspace pane tab by index follows the mixed tab list', async () => {
@@ -584,7 +566,6 @@ describe('workspace commands open', () => {
       workspacesStore.getState().setWorkspacePaneTab(workspaceId, branch, tab)
       return true
     })
-    const showRepoBranchTerminalSession = vi.fn(() => true)
     const focusTerminal = vi.fn(() => false)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => worktreeSnapshotWithTerminal(),
@@ -596,7 +577,7 @@ describe('workspace commands open', () => {
       focusTerminal,
       closeTerminalByDescriptor: vi.fn(async () => ({ kind: 'committed' as const, projection: 'applied' as const })),
     })
-    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession })
+    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
 
     await expect(
       runSelectWorkspacePaneTabByIndexCommand({
@@ -616,8 +597,6 @@ describe('workspace commands open', () => {
         navigation,
       }),
     ).resolves.toBe(true)
-
-    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(selectTerminal).not.toHaveBeenCalled()
     expect(focusTerminal).toHaveBeenCalledOnce()

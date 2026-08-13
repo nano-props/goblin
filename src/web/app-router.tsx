@@ -74,11 +74,6 @@ const appRouteChildren: RouteRecordRaw[] = [
     name: 'workspace-branch-tab',
     component: AppRouteView,
   },
-  {
-    path: 'workspace/:workspaceSlug/branch/:branchSlug/terminal/:terminalSessionId',
-    name: 'workspace-branch-terminal',
-    component: AppRouteView,
-  },
   { path: 'workspace/:workspaceSlug/worktree/new', name: 'workspace-new-worktree', component: AppRouteView },
   {
     path: 'workspace/:workspaceSlug/worktree/:worktreeSlug',
@@ -179,8 +174,6 @@ function workspaceRouteViewFromRoute(route: RouteLocationNormalized): WorkspaceR
       routeName === 'workspace-root-terminal' ? routeStringParam(route.params.terminalSessionId) : null,
     branchSlug: routeName.startsWith('workspace-branch') ? routeStringParam(route.params.branchSlug) : null,
     tabKey: routeName === 'workspace-branch-tab' ? routeStringParam(route.params.tabKey) : null,
-    terminalSessionId:
-      routeName === 'workspace-branch-terminal' ? routeStringParam(route.params.terminalSessionId) : null,
     worktreeSlug: routeName.startsWith('workspace-worktree') ? routeStringParam(route.params.worktreeSlug) : null,
     worktreeTerminalSessionId:
       routeName === 'workspace-worktree-terminal' ? routeStringParam(route.params.terminalSessionId) : null,
@@ -219,7 +212,6 @@ interface WorkspaceChildRoute {
   workspaceTerminalSessionId?: string | null
   branchSlug: string | null
   tabKey?: string | null
-  terminalSessionId?: string | null
   worktreeSlug?: string | null
   worktreeTerminalSessionId?: string | null
   worktreeTabKey?: string | null
@@ -247,7 +239,7 @@ export function workspaceRouteViewFromChildRoute(
       kind: 'branch',
       workspaceId,
       branchName,
-      workspacePaneRoute: workspacePaneRouteFromParams(childRoute.terminalSessionId, childRoute.tabKey),
+      workspacePaneRoute: workspacePaneStaticRouteFromTabKey(childRoute.tabKey),
     }
   }
   if (childRoute.newWorktree) return { kind: 'newWorktree', workspaceId }
@@ -263,6 +255,12 @@ export function workspaceRouteViewFromChildRoute(
     }
   }
   return { kind: 'empty', workspaceId }
+}
+
+function workspacePaneStaticRouteFromTabKey(tabKey: string | null | undefined): ParsedWorkspacePaneRoute | null {
+  if (!tabKey) return null
+  if (isWorkspacePaneStaticTabType(tabKey)) return { kind: 'static', tab: tabKey }
+  return { kind: 'invalid-static', tabKey }
 }
 
 function workspacePaneRouteFromParams(

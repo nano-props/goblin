@@ -4,11 +4,20 @@ import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type {
+  BranchWorkspacePaneRouteTarget,
+  ParsedWorkspacePaneRouteTarget,
+  WorkspacePaneRouteTarget,
+} from '#/web/App.tsx'
 import { appNavigationState } from '#/web/app-navigation-lifecycle.ts'
 import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import { runOwnedAppNavigation } from '#/web/app-route-commit.ts'
-import { returnToFromHref, routeReturnSearch, workspacePaneRouteFromBranchHref } from '#/web/app-route-href.ts'
+import {
+  branchWorkspacePaneRouteFromHref,
+  returnToFromHref,
+  routeReturnSearch,
+  workspacePaneRouteFromTargetHref,
+} from '#/web/app-route-href.ts'
 import { appRouteHref, currentAppRouteHref, navigateAppRoute } from '#/web/app-router-location.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
@@ -32,19 +41,12 @@ export type FilesystemWorkspacePaneRouteTarget = Extract<
   WorkspacePaneTabsTarget,
   { kind: 'workspace-root' | 'git-worktree' }
 >
-
 export interface RepoBranchWorkspacePaneRouteNavigation {
   openRepoBranch: (workspaceId: WorkspaceId, branchName: string, options?: AppRouteNavigationOptions) => boolean
   openRepoBranchTab: (
     workspaceId: WorkspaceId,
     branchName: string,
     tab: WorkspacePaneStaticTabType,
-    options?: AppRouteNavigationOptions,
-  ) => boolean
-  openRepoBranchTerminal: (
-    workspaceId: WorkspaceId,
-    branchName: string,
-    terminalSessionId: string,
     options?: AppRouteNavigationOptions,
   ) => boolean
 }
@@ -89,7 +91,7 @@ export interface AppRouteNavigation extends RepoBranchWorkspacePaneRouteNavigati
   commitWorkspacePaneRoute: (
     workspaceId: WorkspaceId,
     branchName: string,
-    route: WorkspacePaneRouteTarget,
+    route: BranchWorkspacePaneRouteTarget,
     options?: AppRouteNavigationOptions,
   ) => Promise<boolean>
   openRepoNewWorktree: (
@@ -127,7 +129,10 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
               params: { workspaceSlug, branchSlug: branchSlugFromName(branchName) },
             },
       )
-      return workspacePaneRouteFromBranchHref(currentAppRouteHref(router), targetRootHref)
+      const currentHref = currentAppRouteHref(router)
+      return worktreePath
+        ? workspacePaneRouteFromTargetHref(currentHref, targetRootHref)
+        : branchWorkspacePaneRouteFromHref(currentHref, targetRootHref)
     },
     openHome(options) {
       runRouteNavigation(router, { name: 'home' }, options)
@@ -203,22 +208,6 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
         {
           name: 'workspace-branch-tab',
           params: { workspaceSlug, branchSlug: branchSlugFromName(branchName), tabKey: tab },
-        },
-        options,
-      )
-    },
-    openRepoBranchTerminal(workspaceId, branchName, terminalSessionId, options) {
-      const worktreePath = currentWorktreePathForBranch(workspaceId, branchName)
-      if (worktreePath) {
-        return navigation.openRepoWorktreeTerminal(workspaceId, worktreePath, terminalSessionId, options)
-      }
-      const workspaceSlug = workspaceSlugForKnownId(workspaceId)
-      if (!workspaceSlug) return abandonAppRoute(options)
-      return runRouteNavigation(
-        router,
-        {
-          name: 'workspace-branch-terminal',
-          params: { workspaceSlug, branchSlug: branchSlugFromName(branchName), terminalSessionId },
         },
         options,
       )
