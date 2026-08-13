@@ -10,7 +10,7 @@ export type GitOperation =
   { kind: 'rebase' } | { kind: 'merge' } | { kind: 'cherry-pick' } | { kind: 'revert' } | { kind: 'bisect' }
 
 export function gitOperationRequiresDetachedHead(operation: GitOperation | null): boolean {
-  return operation?.kind === 'rebase' || operation?.kind === 'bisect'
+  return operation?.kind === 'rebase'
 }
 
 /** Complete repository worktree membership, independent of branch rows. */

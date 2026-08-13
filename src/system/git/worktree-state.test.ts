@@ -98,31 +98,40 @@ test('excludes bare repositories from routable worktree membership', async () =>
   await expect(readRepoWorktreeSnapshots([{ path: repoPath, isBare: true, isPrimary: true }])).resolves.toEqual([])
 })
 
-test.each(['rebase', 'bisect'] as const)(
-  'rejects an attached membership that changes to %s while operation state is read',
-  async (operation) => {
-    if (operation === 'rebase') {
-      const rebaseMergePath = await gitPath('rebase-merge')
-      await mkdir(rebaseMergePath)
-      await writeFile(path.join(rebaseMergePath, 'head-name'), 'refs/heads/main\n')
-    } else {
-      await writeFile(await gitPath('BISECT_LOG'), 'git bisect start\n')
-      await writeFile(await gitPath('BISECT_START'), 'main\n')
-    }
+test('rejects an attached membership that changes to rebase while operation state is read', async () => {
+  const rebaseMergePath = await gitPath('rebase-merge')
+  await mkdir(rebaseMergePath)
+  await writeFile(path.join(rebaseMergePath, 'head-name'), 'refs/heads/main\n')
 
-    await expect(
-      readRepoWorktreeSnapshots([
-        {
-          path: repoPath,
-          headOid: '0123456789abcdef0123456789abcdef01234567',
-          branch: 'main',
-          isBare: false,
-          isPrimary: true,
-        },
-      ]),
-    ).rejects.toThrow('Git worktree membership changed while reading operation state')
-  },
-)
+  await expect(readAttachedRepoWorktreeSnapshots()).rejects.toThrow(
+    'Git worktree membership changed while reading operation state',
+  )
+})
+
+test('accepts an attached worktree while bisect is waiting for boundary commits', async () => {
+  await writeFile(await gitPath('BISECT_LOG'), 'git bisect start\n')
+  await writeFile(await gitPath('BISECT_START'), 'main\n')
+
+  await expect(readAttachedRepoWorktreeSnapshots()).resolves.toEqual([
+    expect.objectContaining({
+      head: { kind: 'branch', branchName: 'main' },
+      operation: { kind: 'bisect' },
+      materializedBranch: 'main',
+    }),
+  ])
+})
+
+async function readAttachedRepoWorktreeSnapshots() {
+  return await readRepoWorktreeSnapshots([
+    {
+      path: repoPath,
+      headOid: '0123456789abcdef0123456789abcdef01234567',
+      branch: 'main',
+      isBare: false,
+      isPrimary: true,
+    },
+  ])
+}
 
 async function gitPath(name: string): Promise<string> {
   const resolved = await git(repoPath, ['rev-parse', '--git-path', name])

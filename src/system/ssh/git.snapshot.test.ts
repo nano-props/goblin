@@ -159,22 +159,36 @@ describe('remote git snapshot', () => {
     })
   })
 
-  test.each([
-    ['rebase', 'operation rebase\nmaterialized-branch refs/heads/main\n'],
-    ['bisect', 'operation bisect\nmaterialized-branch main\n'],
-  ] as const)(
-    'rejects an attached remote membership that changes to %s while operation state is read',
-    async (_, state) => {
-      const run = vi.fn<RemoteGitRunner>(async (command) => {
-        if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
-        if (command.type === 'gitOperationState') return okRemoteResult(state)
-        if (command.type === 'gitLocalBranches') return okRemoteResult('main')
-        throw new Error(`unexpected command: ${command.type}`)
-      })
+  test('rejects an attached remote membership that changes to rebase while operation state is read', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+      if (command.type === 'gitOperationState') {
+        return okRemoteResult('operation rebase\nmaterialized-branch refs/heads/main\n')
+      }
+      if (command.type === 'gitLocalBranches') return okRemoteResult('main')
+      throw new Error(`unexpected command: ${command.type}`)
+    })
 
-      await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
-    },
-  )
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+  })
+
+  test('accepts an attached remote worktree while bisect is waiting for boundary commits', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
+      if (command.type === 'gitOperationState') return okRemoteResult('operation bisect\nmaterialized-branch main\n')
+      if (command.type === 'gitLocalBranches') return okRemoteResult('main')
+      throw new Error(`unexpected command: ${command.type}`)
+    })
+
+    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).resolves.toEqual([
+      {
+        kind: 'git-worktree',
+        worktreePath: '/srv/repo',
+        head: { kind: 'branch', branchName: 'main' },
+        materializedBranch: 'main',
+      },
+    ])
+  })
 
   test.each([
     ['rebase', 'operation rebase\nmaterialized-branch refs/heads/feature/in-progress\n'],
