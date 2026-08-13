@@ -140,6 +140,7 @@ function useSyncRoutedWorkspacePaneSelection({
       if (!repo) return
       const target = requiredGitWorkspacePaneTabsTarget(currentWorkspaceId, currentBranchName, toValue(worktreePath))
       const currentRoute = toValue(route)
+      if (currentRoute === null && target.kind === 'git-worktree') return
       if (currentRoute?.kind === 'invalid-static') return
       const routeTab = currentRoute === null ? null : currentRoute.kind === 'static' ? currentRoute.tab : 'terminal'
       if (preferredWorkspacePaneTabForTarget(repo.ui, target) !== routeTab) {

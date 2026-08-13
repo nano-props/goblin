@@ -575,6 +575,79 @@ describe('WorkspacePane directory workspaces', () => {
     expect(workspace && preferredWorkspacePaneTabForTarget(workspace.ui, target)).toBe('history')
   })
 
+  test('preserves canonical bare-worktree preference across attached and rebase transitions', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace/repo-bare-worktree-transition')
+    const branchName = 'feature/bare-transition'
+    const worktreePath = '/workspace/bare-transition'
+    const attachedWorktree = createRepoWorktreeSnapshotForTest(branchName, worktreePath)
+    const repo = seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [attachedWorktree],
+      currentBranchName: branchName,
+    })
+    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
+    if (!target) throw new Error('expected canonical worktree fixture')
+    setWorkspacePaneTabsForTargetQueryData({
+      ...target,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('files'),
+        workspacePaneStaticTabEntry('history'),
+      ],
+    })
+    workspacesStore.getState().setWorkspacePaneTabForTarget(target, 'history')
+
+    render(
+      <VueQueryClientScope client={appQueryClient}>
+        <AppNavigationProvider value={navigation}>
+          <TerminalSessionCommandScope value={terminalCommandContext}>
+            <TerminalSessionReadScope value={terminalReadContext}>
+              <WorkspacePane
+                workspaceId={workspaceId}
+                currentBranchName={null}
+                workspacePaneRouteContext={{ kind: 'git-worktree', worktreePath, route: null }}
+              />
+            </TerminalSessionReadScope>
+          </TerminalSessionCommandScope>
+        </AppNavigationProvider>
+      </VueQueryClientScope>,
+    )
+
+    expect((await screen.findByRole('tab', { name: 'tab.log' })).getAttribute('aria-selected')).toBe('true')
+
+    const snapshot = getRepoSnapshotQueryData(workspaceId, repo.workspaceRuntimeId)
+    if (!snapshot) throw new Error('missing repository snapshot')
+    await flushTestUpdates(() => {
+      setRepoSnapshotQueryData(workspaceId, repo.workspaceRuntimeId, {
+        ...snapshot,
+        worktrees: [
+          {
+            ...attachedWorktree,
+            head: { kind: 'detached' },
+            operation: { kind: 'rebase' },
+            materializedBranch: branchName,
+          },
+        ],
+      })
+    })
+
+    expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: 'tab.log' })).toBeNull()
+    expect(screen.getByRole('tab', { name: 'tab.status' }).getAttribute('aria-selected')).toBe('true')
+    let workspace = workspacesStore.getState().workspaces[workspaceId]
+    expect(workspace && preferredWorkspacePaneTabForTarget(workspace.ui, target)).toBe('history')
+
+    await flushTestUpdates(() => {
+      setRepoSnapshotQueryData(workspaceId, repo.workspaceRuntimeId, { ...snapshot, worktrees: [attachedWorktree] })
+    })
+
+    expect((await screen.findByRole('tab', { name: 'tab.log' })).getAttribute('aria-selected')).toBe('true')
+    workspace = workspacesStore.getState().workspaces[workspaceId]
+    expect(workspace && preferredWorkspacePaneTabForTarget(workspace.ui, target)).toBe('history')
+  })
+
   test.each(['history', 'changes'] as const)('rejects an explicit %s route on a detached worktree', async (tab) => {
     const workspaceId = workspaceIdForTest(`goblin+file:///workspace/repo-detached-${tab}`)
     const worktreePath = `/workspace/detached-${tab}`

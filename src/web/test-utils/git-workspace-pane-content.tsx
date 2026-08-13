@@ -140,6 +140,7 @@ const GitWorkspacePaneContentInner = defineComponent<GitWorkspacePaneContentHarn
       () => props.repo,
       () => props.detail,
       workspacePaneRoute,
+      () => (props.workspacePaneRouteMode !== 'bare-branch' && props.detail.worktree ? 'worktree' : 'branch'),
     )
     return () => (
       <GitWorkspacePaneContent

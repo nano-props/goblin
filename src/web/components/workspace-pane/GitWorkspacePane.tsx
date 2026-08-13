@@ -263,6 +263,7 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
       () => props.repo,
       () => props.detail,
       () => workspacePaneRoute(props.workspacePaneRouteContext),
+      () => (props.workspacePaneRouteContext.kind === 'git-worktree' ? 'worktree' : 'branch'),
     )
     useGitWorkspacePaneRouteController({
       enabled: () => workspacePaneRoute(props.workspacePaneRouteContext) !== undefined,
