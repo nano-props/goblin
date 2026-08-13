@@ -13,6 +13,7 @@ import {
 } from '#/web/components/terminal/terminal-session-store.ts'
 import type { ElementRef } from '#/web/components/ui/refs.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
+import { worktreePresentationLabel } from '#/web/worktree-presentation.ts'
 
 interface WorktreeStateRowProps {
   workspaceId: WorkspaceId
@@ -79,25 +80,3 @@ export const WorktreeStateRow = defineComponent<WorktreeStateRowProps>({
     }
   },
 })
-
-type Translator = (key: string, params?: Record<string, string | number>) => string
-
-export function worktreePresentationLabel(worktree: RepoWorktreeSnapshot, t: Translator): string {
-  if (worktree.head.kind === 'branch' && !worktree.operation) return worktree.head.branchName
-  const operation = worktree.operation
-  if (!operation) return worktree.headOid.slice(0, 7)
-  if (operation.kind === 'rebase') {
-    return worktree.materializedBranch
-      ? t('worktree-state.rebase-branch', { branch: worktree.materializedBranch })
-      : t('worktree-state.rebase')
-  }
-  const operationKey = WORKTREE_OPERATION_KEYS[operation.kind]
-  return t(operationKey)
-}
-
-const WORKTREE_OPERATION_KEYS = {
-  merge: 'worktree-state.merge',
-  'cherry-pick': 'worktree-state.cherry-pick',
-  revert: 'worktree-state.revert',
-  bisect: 'worktree-state.bisect',
-} as const

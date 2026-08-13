@@ -66,6 +66,7 @@ import {
   type PullRequestInfo,
   repoWorktreeMaterializedBranch,
   type RepoMutationExecResult,
+  type RepoLogTarget,
   type RepoUrlTarget,
   type WorktreeInfo,
   type WorktreeStatus,
@@ -131,7 +132,7 @@ export interface RepoSource {
   getWorkspacePaneTargetIdentities(options?: RepoMembershipReadOptions): Promise<WorkspacePaneTargetIdentity[]>
   getStatus(options?: RepoMembershipReadOptions): Promise<WorktreeStatus[]>
   getPullRequests(scope: RepoPullRequestScope, options?: { signal?: AbortSignal }): Promise<PullRequestEntry[] | null>
-  getLog(branch: string, options?: { count?: number; skip?: number; signal?: AbortSignal }): Promise<LogEntry[]>
+  getLog(target: RepoLogTarget, options?: { count?: number; skip?: number; signal?: AbortSignal }): Promise<LogEntry[]>
   getRemoteBranches(signal?: AbortSignal): Promise<RemoteTrackingBranchIdentity[]>
   fetch(signal: AbortSignal): Promise<RepoMutationResult>
   pull(branch: string, worktreePath?: string, signal?: AbortSignal): Promise<RepoMutationResult>
@@ -601,11 +602,11 @@ function createLocalRepoSource(
       const prs = await getBranchPullRequests(repoId, branchSet, { mode, signal: options?.signal })
       return pullRequestEntries(prs)
     },
-    async getLog(branch, options) {
+    async getLog(target, options) {
       if (!isValidCwd(repoId)) return []
       const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
-      return await getBranchLog(repoId, branch, options?.count, options?.skip, { signal: options?.signal })
+      return await getBranchLog(repoId, target, options?.count, options?.skip, { signal: options?.signal })
     },
     async getRemoteBranches(signal) {
       if (!isValidCwd(repoId)) return []
@@ -831,8 +832,8 @@ async function createRemoteRepoSource(
       })
       return pullRequestEntries(prs)
     },
-    async getLog(branch, options) {
-      return await getRemoteLog(target, branch, options?.count, options?.skip, { signal: options?.signal, run })
+    async getLog(logTarget, options) {
+      return await getRemoteLog(target, logTarget, options?.count, options?.skip, { signal: options?.signal, run })
     },
     async getRemoteBranches(signal) {
       return await getSshRemoteTrackingBranches(target, { signal, run })

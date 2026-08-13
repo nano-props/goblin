@@ -223,12 +223,7 @@ export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): 
     input.paneTarget.kind === 'inactive'
       ? []
       : normalizeWorkspacePaneTabs(input.tabEntries, { hasWorktree: worktreePath !== null })
-  const tabEntries =
-    input.paneTarget.kind === 'git-worktree' && input.worktreeHead?.kind === 'detached'
-      ? normalizedTabEntries.filter(
-          (entry) => isWorkspacePaneRuntimeTabEntry(entry) || entry.type === 'status' || entry.type === 'files',
-        )
-      : normalizedTabEntries
+  const tabEntries = normalizedTabEntries
   const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({
     workspaceId: input.workspaceId,
     workspaceRuntimeId: input.workspaceRuntimeId,

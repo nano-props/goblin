@@ -35,14 +35,6 @@ function reconcileStaticWorkspacePaneRoute(
   route: Extract<ParsedWorkspacePaneRoute, { kind: 'static' }>,
   model: WorkspacePaneTabModel,
 ): WorkspacePaneRouteReconciliation {
-  if (
-    model.paneTarget.kind === 'git-worktree' &&
-    model.branchName === null &&
-    route.tab !== 'status' &&
-    route.tab !== 'files'
-  ) {
-    return { kind: 'missing' }
-  }
   const projectionState = tabEntriesProjectionReconciliation(model)
   if (projectionState) return projectionState
   if (model.tabs.some((tab) => tab.kind === 'static' && tab.type === route.tab)) return { kind: 'none' }

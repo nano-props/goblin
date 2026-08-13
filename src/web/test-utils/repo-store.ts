@@ -160,7 +160,7 @@ export function createRepoWorktreeSnapshotForTest(
   return {
     path,
     head: { kind: 'branch', branchName },
-    headOid: '',
+    headOid: '1111111111111111111111111111111111111111',
     operation: null,
     materializedBranch: branchName,
     isPrimary: false,

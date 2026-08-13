@@ -1,18 +1,17 @@
 import { FolderTree } from '@lucide/vue'
 import { defineComponent } from 'vue'
 import type { FunctionalComponent, VNodeChild } from 'vue'
-import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { RepoLogTarget } from '#/shared/git-types.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
-import { useRepoLogQuery } from '#/web/repo-queries.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
+import { GitHistoryPanel } from '#/web/components/repo-workspace/GitHistoryPanel.tsx'
 import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
 import type {
   CurrentGitWorkspacePanePresentation,
   GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
-import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { isWorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type {
@@ -21,14 +20,11 @@ import type {
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
-import { HistoryCommitGraph, HistoryCommitGraphSkeleton } from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
 import { gitHead } from '#/shared/git-head.ts'
 import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-
-const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
@@ -111,11 +107,14 @@ function StatusWorkspacePanePanel({ repo, workspacePaneId, panelLabel, detail }:
 function HistoryWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
   const branch = detail.branch
   if (!branch) return null
+  const target: RepoLogTarget = detail.worktree
+    ? { kind: 'commit', oid: detail.worktree.headOid }
+    : { kind: 'branch', branchName: branch.name }
   return (
-    <BranchHistoryTab
+    <GitHistoryPanel
       repoId={repo.id}
       workspaceRuntimeId={repo.workspaceRuntimeId}
-      branchName={branch.name}
+      target={target}
       workspacePaneId={workspacePaneId}
       panelLabel={panelLabel}
     />
@@ -174,58 +173,6 @@ const FiletreeNoWorktreeView = defineComponent({
         body={t('filetree.no-worktree-body')}
       />
     )
-  },
-})
-
-interface BranchHistoryTabProps {
-  repoId: WorkspaceId
-  workspaceRuntimeId: string
-  branchName: string
-  workspacePaneId: string
-  panelLabel: WorkspacePanePanelLabel
-}
-
-const BranchHistoryTab = defineComponent<BranchHistoryTabProps>({
-  name: 'BranchHistoryTab',
-  props: ['repoId', 'workspaceRuntimeId', 'branchName', 'workspacePaneId', 'panelLabel'],
-
-  setup(props) {
-    const t = useT()
-    const historyQuery = useRepoLogQuery(
-      () => props.repoId,
-      () => props.workspaceRuntimeId,
-      () => props.branchName,
-      { count: DEFAULT_REPOSITORY_LOG_COUNT },
-    )
-
-    return () => {
-      const entries = historyQuery.data.value ?? []
-      const queryError = historyQuery.error.value
-      const errorTitleKey = queryError instanceof Error ? queryError.message : DEFAULT_BRANCH_HISTORY_ERROR_KEY
-      return (
-        <WorkspacePanePanelFrame
-          id={`${props.workspacePaneId}-history-panel`}
-          {...props.panelLabel}
-          busy={historyQuery.isLoading.value}
-        >
-          {historyQuery.isLoading.value ? (
-            <HistoryCommitGraphSkeleton rows={8} />
-          ) : historyQuery.isError.value ? (
-            <EmptyState title={t(errorTitleKey)} />
-          ) : entries.length === 0 ? (
-            <EmptyState title={t('log.empty-for-branch', { branch: props.branchName })} />
-          ) : (
-            <ScrollPane>
-              <HistoryCommitGraph
-                repoId={props.repoId}
-                workspaceRuntimeId={props.workspaceRuntimeId}
-                entries={entries}
-              />
-            </ScrollPane>
-          )}
-        </WorkspacePanePanelFrame>
-      )
-    }
   },
 })
 

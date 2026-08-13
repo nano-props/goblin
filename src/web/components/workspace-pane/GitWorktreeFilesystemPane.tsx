@@ -1,28 +1,35 @@
 import { computed, defineComponent } from 'vue'
-import type { GitHead } from '#/shared/git-head.ts'
 import type { WorkspaceGitReadyProbeState } from '#/shared/workspace-runtime.ts'
 import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { GitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
-import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import {
+  RepoReadFailureNotice,
+  RepoStatusFailureView,
+  RepoStatusStaleNotice,
+} from '#/web/components/RepoStatusFailureView.tsx'
 import { RepoReadNotice } from '#/web/components/RepoReadNotice.tsx'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
 import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
+import { WorktreeStatusOverview } from '#/web/components/workspace-pane/WorktreeStatusOverview.tsx'
+import { GitHistoryPanel } from '#/web/components/repo-workspace/GitHistoryPanel.tsx'
 import { GitWorkspacePane } from '#/web/components/workspace-pane/GitWorkspacePane.tsx'
 import type { GitWorkspacePaneShell } from '#/web/components/workspace-pane/workspace-pane-types.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import type { WorktreeStatus } from '#/shared/git-types.ts'
+import type { RepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
 import { useFilesystemWorkspacePaneRouteController } from '#/web/workspace-pane/filesystem-workspace-pane-route-controller.ts'
 import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { useGitWorktreeWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import type { WorkspacePaneRuntimeContext } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
+import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 
 interface GitWorktreeFilesystemPaneProps {
   repo: GitWorkspacePaneShell
@@ -119,7 +126,7 @@ export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPa
           <GitWorktreeFilesystemPaneReady
             workspaceRuntime={{ workspaceRuntimeId: props.repo.workspaceRuntimeId, ui: props.repo.ui }}
             workspaceProbe={props.workspaceProbe}
-            head={currentWorktree.head}
+            worktree={currentWorktree}
             status={currentWorktreeStatus}
             statusPending={!statusReadModel.data.value && statusReadModel.isPending.value}
             statusError={statusError}
@@ -140,7 +147,7 @@ export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPa
 interface GitWorktreeFilesystemPaneReadyProps {
   workspaceRuntime: WorkspacePaneRuntimeContext
   workspaceProbe: WorkspaceGitReadyProbeState
-  head: GitHead
+  worktree: RepoWorktreeSnapshot
   status?: WorktreeStatus
   statusPending: boolean
   statusError: string | null
@@ -158,7 +165,7 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
   props: [
     'workspaceRuntime',
     'workspaceProbe',
-    'head',
+    'worktree',
     'status',
     'statusPending',
     'statusError',
@@ -173,10 +180,11 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
 
   setup(props) {
     const t = useT()
+    const navigation = useAppNavigation()
     const model = useGitWorktreeWorkspacePaneTabModel(
       () => props.workspaceRuntime,
       () => props.target,
-      () => props.head,
+      () => props.worktree.head,
       () => props.route,
     )
     const routeReconciliation = useFilesystemWorkspacePaneRouteController({ route: () => props.route, model })
@@ -188,7 +196,7 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
         workspaceId: props.target.workspaceId,
         workspaceRuntimeId: props.workspaceRuntime.workspaceRuntimeId,
         worktreePath: props.target.worktreePath,
-        head: props.head,
+        head: props.worktree.head,
         capabilities: props.workspaceProbe.capabilities,
       }),
     )
@@ -201,6 +209,17 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
           ? selection.materializedTab.sessionId
           : null
       const routeMissing = routeReconciliation.value.kind === 'missing'
+      const openStaticTab = (type: 'changes' | 'history') => {
+        void dispatchOpenWorkspacePaneTargetStaticTabAction({
+          workspaceId: props.target.workspaceId,
+          routeTarget: props.target,
+          paneTarget: props.target,
+          worktreeHead: props.worktree.head,
+          type,
+          workspacePaneRoute: props.route,
+          navigation,
+        })
+      }
 
       return (
         <section class="flex min-h-0 flex-1 flex-col bg-background" data-testid="detached-worktree-pane">
@@ -212,12 +231,42 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
             statusCount={props.status?.entries.length}
             trafficLightOffset={props.toolbarTrafficLightOffset}
             onBackToNavigator={props.onBackToNavigator}
-            staticTabAvailable={(type) => type === 'status' || type === 'files'}
+            staticTabAvailable={(type) =>
+              type === 'status' || type === 'changes' || type === 'history' || type === 'files'
+            }
           />
           {routeMissing ? (
             <EmptyState title={t('workspace-route.not-found-title')} />
           ) : selection?.tab === 'status' ? (
             <WorkspacePanePanelFrame id={`${props.workspacePaneId}-status-panel`} label={t('tab.status')}>
+              {props.statusError ? (
+                props.status ? (
+                  <RepoStatusStaleNotice
+                    messageKey={props.statusError}
+                    retrying={props.statusRetrying}
+                    onRetry={props.onRetryStatus}
+                  />
+                ) : (
+                  <RepoReadFailureNotice
+                    messageKey={props.statusError}
+                    retrying={props.statusRetrying}
+                    onRetry={props.onRetryStatus}
+                  />
+                )
+              ) : null}
+              <ScrollPane>
+                <WorktreeStatusOverview
+                  worktree={props.worktree}
+                  status={props.status}
+                  statusPending={props.statusPending}
+                  statusUnavailable={!props.status && !props.statusPending}
+                  onOpenChanges={() => openStaticTab('changes')}
+                  onOpenHistory={() => openStaticTab('history')}
+                />
+              </ScrollPane>
+            </WorkspacePanePanelFrame>
+          ) : selection?.tab === 'changes' ? (
+            <WorkspacePanePanelFrame id={`${props.workspacePaneId}-changes-panel`} label={t('tab.changes')}>
               {props.status && props.statusError ? (
                 <RepoStatusStaleNotice
                   messageKey={props.statusError}
@@ -239,6 +288,14 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
                 />
               )}
             </WorkspacePanePanelFrame>
+          ) : selection?.tab === 'history' ? (
+            <GitHistoryPanel
+              repoId={props.target.workspaceId}
+              workspaceRuntimeId={props.workspaceRuntime.workspaceRuntimeId}
+              target={{ kind: 'commit', oid: props.worktree.headOid }}
+              workspacePaneId={props.workspacePaneId}
+              panelLabel={{ label: t('tab.log') }}
+            />
           ) : selection?.tab === 'files' ? (
             <WorkspacePanePanelFrame id={`${props.workspacePaneId}-files-panel`} label={t('tab.files')}>
               <WorkspaceFilesystemTabPanel target={surfaceTarget.value} />

@@ -692,8 +692,8 @@ describe('GitWorkspacePaneContent status-history', () => {
       expect(repoClientMocks.getRepoLog).toHaveBeenCalledWith(
         REPO_ID,
         repo.workspaceRuntimeId,
-        'feature/history',
-        expect.objectContaining({ count: 100 }),
+        { kind: 'branch', branchName: 'feature/history' },
+        expect.objectContaining({ count: 100, skip: 0 }),
       ),
     )
     await waitFor(() => {

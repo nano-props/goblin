@@ -18,25 +18,30 @@ import {
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { GitHead } from '#/shared/git-head.ts'
 
 describe('repo workspace pane tab model', () => {
-  test('projects only tabs supported by a detached worktree surface and selects a valid fallback', () => {
-    const model = createWorkspacePaneTabModel({
-      workspaceId: WORKSPACE_ID,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH },
-      paneTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH },
-      worktreeHead: { kind: 'detached' },
-      preferredTab: 'history',
-      tabEntries: [staticEntry('status'), staticEntry('changes'), staticEntry('history'), staticEntry('files')],
-      runtimeTabViews: [],
-      runtimeTabStateByType: {},
-    })
+  test('preserves the same target tabs when a worktree becomes detached', () => {
+    const modelForHead = (worktreeHead: GitHead) =>
+      createWorkspacePaneTabModel({
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH },
+        paneTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH },
+        worktreeHead,
+        preferredTab: 'history',
+        tabEntries: [staticEntry('status'), staticEntry('changes'), staticEntry('history'), staticEntry('files')],
+        runtimeTabViews: [],
+        runtimeTabStateByType: {},
+      })
+    const attached = modelForHead({ kind: 'branch', branchName: 'feature/history' })
+    const detached = modelForHead({ kind: 'detached' })
 
-    expect(model.tabEntries.map((entry) => entry.type)).toEqual(['status', 'files'])
-    expect(model.tabs.map((tab) => tab.type)).toEqual(['status', 'files'])
-    expect(model.renderedTab).toBe('status')
-    expect(workspacePaneTerminalBaseForTabModel(model)).toEqual({
+    expect(detached.tabEntries).toEqual(attached.tabEntries)
+    expect(detached.tabs.map((tab) => tab.type)).toEqual(attached.tabs.map((tab) => tab.type))
+    expect(detached.tabs.map((tab) => tab.type)).toEqual(['status', 'changes', 'history', 'files'])
+    expect(detached.renderedTab).toBe('history')
+    expect(workspacePaneTerminalBaseForTabModel(detached)).toEqual({
       target: {
         kind: 'git-worktree',
         workspaceId: WORKSPACE_ID,

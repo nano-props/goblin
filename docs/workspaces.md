@@ -32,4 +32,11 @@ contains every usable worktree with its current `HEAD`, object ID, operation
 state, primary/locked flags, and path. Branch-row worktree badges are derived
 from that same membership read and never authorize routing or recovery.
 
+Every worktree target supports the same pane tab types regardless of whether
+its current `HEAD` is attached, detached, or in an operation. Status presents
+target identity and operation state; Changes presents working-tree file
+status; History walks from the snapshot's authoritative `HEAD` object ID.
+Branch-only targets use their branch ref for History and cannot open
+worktree-dependent tabs.
+
 Files and terminals may use workspace scope. Status, changes, history, pull requests, and worktree operations require Git capability. Enabling Git exposes those entry points but does not create tabs or navigate automatically.

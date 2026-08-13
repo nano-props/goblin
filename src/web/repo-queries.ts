@@ -2,6 +2,7 @@ import { computed, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import type { RepoPullRequestScope } from '#/shared/api-types.ts'
+import type { RepoLogTarget } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   repoLogQueryOptions,
@@ -58,12 +59,12 @@ interface RepoLogOptions {
 export function useRepoLogQuery(
   repoRoot: MaybeRefOrGetter<WorkspaceId>,
   workspaceRuntimeId: MaybeRefOrGetter<string>,
-  branch: MaybeRefOrGetter<string>,
+  target: MaybeRefOrGetter<RepoLogTarget>,
   options: RepoLogOptions = {},
 ) {
   return useQuery(
     computed(() =>
-      repoLogQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId), toValue(branch), {
+      repoLogQueryOptions(toValue(repoRoot), toValue(workspaceRuntimeId), toValue(target), {
         count: toValue(options.count),
         skip: toValue(options.skip),
         enabled: toValue(options.enabled),

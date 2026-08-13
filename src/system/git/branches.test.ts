@@ -4,6 +4,7 @@ import {
   getBranches,
   getBranchWorktreeIdentities,
   getCurrentBranch,
+  getLog,
   deleteBranch,
   deleteUpstreamBranch,
   resolveRepoCommonDir,
@@ -119,6 +120,26 @@ describe('getBranchWorktreeIdentities', () => {
       },
       { kind: 'git-branch', branchName: 'main' },
     ])
+  })
+})
+
+describe('getLog', () => {
+  test.each([
+    { target: { kind: 'branch' as const, branchName: 'feature/history' }, revision: 'refs/heads/feature/history' },
+    {
+      target: { kind: 'commit' as const, oid: '2222222222222222222222222222222222222222' },
+      revision: '2222222222222222222222222222222222222222',
+    },
+  ])('resolves a $target.kind target only at the Git command boundary', async ({ target, revision }) => {
+    vi.mocked(git).mockResolvedValueOnce('')
+
+    await expect(getLog('/repo', target, 20, 5)).resolves.toEqual([])
+
+    expect(git).toHaveBeenLastCalledWith(
+      '/repo',
+      expect.arrayContaining(['log', '-n', '20', '--skip', '5', revision, '--']),
+      { signal: undefined },
+    )
   })
 })
 

@@ -56,7 +56,9 @@ describe('repo source runtime failure classification', () => {
     })
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(getRepoLog(target.id, 'main', { workspaceRuntimeId: 'repo-runtime-test' })).rejects.toMatchObject({
+    await expect(
+      getRepoLog(target.id, { kind: 'branch', branchName: 'main' }, { workspaceRuntimeId: 'repo-runtime-test' }),
+    ).rejects.toMatchObject({
       name: 'RemoteWorkspaceRuntimeFailureError',
       workspaceId: target.id,
       workspaceRuntimeId: 'repo-runtime-test',
@@ -336,14 +338,16 @@ describe('repo source runtime failure classification', () => {
     })
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(getRepoLog(target.id, 'main')).rejects.toThrow('connection refused')
+    await expect(getRepoLog(target.id, { kind: 'branch', branchName: 'main' })).rejects.toThrow('connection refused')
   })
 
   test('throws a typed remote runtime failure when target resolution fails under runtime context', async () => {
     mocks.resolveRemoteTarget.mockRejectedValueOnce(new Error('error.ssh-config-changed'))
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(getRepoLog(target.id, 'main', { workspaceRuntimeId: 'repo-runtime-test' })).rejects.toMatchObject({
+    await expect(
+      getRepoLog(target.id, { kind: 'branch', branchName: 'main' }, { workspaceRuntimeId: 'repo-runtime-test' }),
+    ).rejects.toMatchObject({
       name: 'RemoteWorkspaceRuntimeFailureError',
       workspaceId: target.id,
       workspaceRuntimeId: 'repo-runtime-test',

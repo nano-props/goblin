@@ -322,7 +322,7 @@ describe('remote ssh command builders', () => {
       buildRemoteCommandInvocation(target(), {
         type: 'gitLog',
         path: '/srv/repo',
-        branch: 'main',
+        revision: 'main',
         count,
       }).script
 

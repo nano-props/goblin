@@ -37,12 +37,14 @@ import {
 import {
   GIT_HASH_RE,
   gitOperationRequiresDetachedHead,
+  repoLogTargetRevision,
   repoWorktreeForBranch,
   repoWorktreeMaterializedBranch,
   type ExecResult,
   type GitRemoteInfo,
   type LogEntry,
   type RepoRemoteInfo,
+  type RepoLogTarget,
   type RepoWorktreeSnapshot,
   type WorkspacePaneTargetIdentity,
   type RepoUrlTarget,
@@ -316,15 +318,16 @@ async function runAdmittedRemoteStatusCommand(
 }
 
 export async function getRemoteLog(
-  target: RemoteWorkspaceTarget,
-  branch: string,
+  remoteTarget: RemoteWorkspaceTarget,
+  target: RepoLogTarget,
   count?: number,
   skip?: number,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<LogEntry[]> {
-  if (!isSafeBranchName(branch)) return []
+  const revision = repoLogTargetRevision(target)
+  if (!revision) return []
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const result = await run({ type: 'gitLog', path: target.remotePath, branch, count, skip }, target, {
+  const result = await run({ type: 'gitLog', path: remoteTarget.remotePath, revision, count, skip }, remoteTarget, {
     signal: options.signal,
   })
   if (options.signal?.aborted) return []

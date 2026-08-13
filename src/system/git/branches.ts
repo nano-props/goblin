@@ -13,9 +13,11 @@ import {
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
+  repoLogTargetRevision,
   type BranchSnapshotInfo,
   type ExecResult,
   type LogEntry,
+  type RepoLogTarget,
   type RepoWorktreeSnapshot,
   type WorkspacePaneTargetIdentity,
   type WorktreeInfo,
@@ -197,13 +199,14 @@ export async function getBranchWorktreeIdentities(
 
 export async function getLog(
   cwd: string,
-  branch: string,
+  target: RepoLogTarget,
   count = DEFAULT_REPOSITORY_LOG_COUNT,
   skip = 0,
   options?: { signal?: AbortSignal },
 ): Promise<LogEntry[]> {
   if (options?.signal?.aborted) return []
-  if (!isSafeBranchName(branch)) return []
+  const revision = repoLogTargetRevision(target)
+  if (!revision) return []
   try {
     const format = ['%H', '%h', '%D', '%s', '%an', '%aI'].join(PRETTY_FIELD_SEP)
     const args = [
@@ -214,7 +217,7 @@ export async function getLog(
       String(count),
       '--skip',
       String(skip),
-      branch,
+      revision,
       '--',
     ]
     const output = await git(cwd, args, { signal: options?.signal })

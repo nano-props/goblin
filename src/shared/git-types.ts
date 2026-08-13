@@ -5,6 +5,7 @@
 
 import type { WorktreeBootstrapSummary } from '#/shared/worktree-bootstrap-summary.ts'
 import type { GitHead } from '#/shared/git-head.ts'
+import { isSafeBranchName } from '#/shared/refnames.ts'
 
 export type GitOperation =
   { kind: 'rebase' } | { kind: 'merge' } | { kind: 'cherry-pick' } | { kind: 'revert' } | { kind: 'bisect' }
@@ -155,6 +156,14 @@ export interface RepoRemoteInfo {
 }
 
 export const GIT_HASH_RE = /^[0-9a-fA-F]{7,64}$/
+export const GIT_OBJECT_ID_RE = /^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/
+
+export type RepoLogTarget = { kind: 'branch'; branchName: string } | { kind: 'commit'; oid: string }
+
+export function repoLogTargetRevision(target: RepoLogTarget): string | null {
+  if (target.kind === 'branch') return isSafeBranchName(target.branchName) ? `refs/heads/${target.branchName}` : null
+  return GIT_OBJECT_ID_RE.test(target.oid) ? target.oid : null
+}
 
 // These are application-level recovery notices derived from domain milestones
 // or lifecycle uncertainty. They never authorize cleanup, invalidation, retry,

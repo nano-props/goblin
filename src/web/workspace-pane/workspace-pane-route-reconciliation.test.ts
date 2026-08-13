@@ -190,7 +190,7 @@ describe('workspace pane route reconciliation', () => {
   })
 
   test.each(['pending', 'failed'] as const)(
-    'rejects an unsupported detached-worktree route while tab entries are %s',
+    'defers a detached-worktree History route while tab entries are %s',
     (tabEntriesProjectionPhase) => {
       const model = createWorkspacePaneTabModel({
         workspaceId: REPO_ID,
@@ -205,9 +205,28 @@ describe('workspace pane route reconciliation', () => {
         runtimeTabStateByType: { terminal: { projectionPhase: 'ready' } },
       })
 
-      expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'missing' })
+      expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({
+        kind: tabEntriesProjectionPhase === 'pending' ? 'pending' : 'unverified',
+      })
     },
   )
+
+  test('accepts a materialized Changes route for a detached worktree', () => {
+    const model = createWorkspacePaneTabModel({
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      paneTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      worktreeHead: { kind: 'detached' },
+      preferredTab: 'changes',
+      tabEntries: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
+      tabEntriesProjectionPhase: 'ready',
+      runtimeTabViews: [],
+      runtimeTabStateByType: { terminal: { projectionPhase: 'ready' } },
+    })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({ kind: 'none' })
+  })
 
   test('does not verify a materialized static route while tab-entry projection has failed', () => {
     const model = createBranchWorkspacePaneTabModel({

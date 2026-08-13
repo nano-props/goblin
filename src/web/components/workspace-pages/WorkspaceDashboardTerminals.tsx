@@ -24,7 +24,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
 import { useWorkspacePaneTabsQuery } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { orderWorkspaceDashboardTerminals } from '#/web/components/workspace-pages/workspace-dashboard-terminal-order.ts'
-import { worktreePresentationLabel } from '#/web/components/branch-navigator/WorktreeStateRow.tsx'
+import { worktreePresentationLabel } from '#/web/worktree-presentation.ts'
 import {
   gitWorktreePaneTargetLease,
   workspaceRootPaneTargetLease,

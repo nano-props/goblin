@@ -1,4 +1,5 @@
 import type { RepoPullRequestScope } from '#/shared/api-types.ts'
+import type { RepoLogTarget } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export function repoSnapshotQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {
@@ -40,11 +41,11 @@ export function repoPullRequestsQueryPrefix(repoRoot: WorkspaceId, workspaceRunt
 export function repoLogQueryKey(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  branch: string,
+  target: RepoLogTarget,
   count: number,
   skip: number,
 ) {
-  return ['repo-data', repoRoot, workspaceRuntimeId, 'log', branch, count, skip] as const
+  return ['repo-data', repoRoot, workspaceRuntimeId, 'log', target, count, skip] as const
 }
 
 export function repoRemoteBranchesQueryKey(repoRoot: WorkspaceId, workspaceRuntimeId: string) {

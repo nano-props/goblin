@@ -2,6 +2,7 @@ import type { Query } from '@tanstack/query-core'
 import type { QueryClient } from '@tanstack/query-core'
 import type { RepoPullRequestScope, RepoPullRequestsResponse } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
+import type { RepoLogTarget } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   repoLogQueryKey,
@@ -96,16 +97,16 @@ export function repoPullRequestsQueryOptions(
 export function repoLogQueryOptions(
   repoRoot: WorkspaceId,
   workspaceRuntimeId: string,
-  branch: string,
+  target: RepoLogTarget,
   options: { count?: number; skip?: number; enabled?: boolean } = {},
 ) {
   const count = options.count ?? DEFAULT_REPOSITORY_LOG_COUNT
   const skip = options.skip ?? 0
   return {
-    queryKey: repoLogQueryKey(repoRoot, workspaceRuntimeId, branch, count, skip),
+    queryKey: repoLogQueryKey(repoRoot, workspaceRuntimeId, target, count, skip),
     queryFn: ({ client }: { client: QueryClient }) =>
       fetchQueryOwnedRepoMetadataQuery(repoRoot, workspaceRuntimeId, client, () =>
-        getRepoLog(repoRoot, workspaceRuntimeId, branch, { count, skip }),
+        getRepoLog(repoRoot, workspaceRuntimeId, target, { count, skip }),
       ),
     retry: retryStaleRepoRuntimeRead,
     retryDelay: 0,

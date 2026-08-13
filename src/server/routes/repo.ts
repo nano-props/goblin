@@ -78,14 +78,14 @@ export function createRepoRoutes(options: {
     }
   }
   app.post('/log', async (c) => {
-    const { cwd, workspaceRuntimeId, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
+    const { cwd, workspaceRuntimeId, target, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
     const userId = requireCurrentWorkspaceRuntime(userIdFromContext(c), cwd, workspaceRuntimeId)
     assertGitCapability(userId, cwd, workspaceRuntimeId)
     return c.json(
       await runGitWorkspaceRuntimeRequest<RepoLogResponse>({
         userId,
         run: () =>
-          getRepoLog(cwd, branch, {
+          getRepoLog(cwd, target, {
             count: count ?? DEFAULT_REPOSITORY_LOG_COUNT,
             skip: skip ?? 0,
             signal: c.req.raw.signal,

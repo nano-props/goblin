@@ -80,7 +80,7 @@ beforeEach(() => {
 })
 
 describe('getRepoLog', () => {
-  test('reads branch history through the repo source', async () => {
+  test('reads revision history through the repo source', async () => {
     const entries: LogEntry[] = [
       {
         hash: '78c150a000000000000000000000000000000000',
@@ -98,19 +98,24 @@ describe('getRepoLog', () => {
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
 
-    await expect(getRepoLog(WORKSPACE_ID, 'feature/work', { count: 30, skip: 0, signal })).resolves.toEqual(entries)
-    expect(getLog).toHaveBeenCalledWith('feature/work', { count: 30, skip: 0, signal })
+    await expect(
+      getRepoLog(WORKSPACE_ID, { kind: 'branch', branchName: 'feature/work' }, { count: 30, skip: 0, signal }),
+    ).resolves.toEqual(entries)
+    expect(getLog).toHaveBeenCalledWith({ kind: 'branch', branchName: 'feature/work' }, { count: 30, skip: 0, signal })
   })
 
-  test('uses the shared default branch history count', async () => {
+  test('uses the shared default revision history count', async () => {
     const getLog = vi.fn(() => Promise.resolve<LogEntry[]>([]))
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getLog }))),
     )
     const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
 
-    await expect(getRepoLog(WORKSPACE_ID, 'feature/work')).resolves.toEqual([])
-    expect(getLog).toHaveBeenCalledWith('feature/work', { count: 100, skip: 0, signal: undefined })
+    await expect(getRepoLog(WORKSPACE_ID, { kind: 'branch', branchName: 'feature/work' })).resolves.toEqual([])
+    expect(getLog).toHaveBeenCalledWith(
+      { kind: 'branch', branchName: 'feature/work' },
+      { count: 100, skip: 0, signal: undefined },
+    )
   })
 })
 

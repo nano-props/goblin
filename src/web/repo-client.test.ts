@@ -485,7 +485,9 @@ describe('repo-client', () => {
       json: async () => ({ ok: false, message: 'error.failed-read-repo' }),
     }))
     const { getRepoLog } = await import('#/web/repo-client.ts')
-    await expect(getRepoLog(workspaceId, 'repo-runtime-test', 'feature/work')).rejects.toThrow('error.failed-read-repo')
+    await expect(
+      getRepoLog(workspaceId, 'repo-runtime-test', { kind: 'branch', branchName: 'feature/work' }),
+    ).rejects.toThrow('error.failed-read-repo')
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/repo/log',
       expect.objectContaining({
@@ -494,7 +496,7 @@ describe('repo-client', () => {
         body: JSON.stringify({
           cwd: workspaceId,
           workspaceRuntimeId: 'repo-runtime-test',
-          branch: 'feature/work',
+          target: { kind: 'branch', branchName: 'feature/work' },
           count: 100,
           skip: 0,
         }),

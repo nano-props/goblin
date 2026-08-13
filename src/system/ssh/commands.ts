@@ -50,7 +50,7 @@ export type RemoteCommandKind =
       attachedBranch: string | null
     }
   | { type: 'gitStatus'; path: string }
-  | { type: 'gitLog'; path: string; branch: string; count?: number; skip?: number }
+  | { type: 'gitLog'; path: string; revision: string; count?: number; skip?: number }
   | { type: 'gitFetchRemote'; path: string; remote: string }
   | { type: 'gitStatusAll'; path: string }
   | { type: 'gitDiffNoIndex'; path: string; filePath: string }
@@ -396,7 +396,7 @@ function scriptForCommand(command: RemoteCommandKind): string {
         `--format=${shellQuote(format)}`,
         `--max-count=${count}`,
         `--skip=${skip}`,
-        shellQuote(command.branch),
+        shellQuote(command.revision),
         '--',
       ].join(' ')
     }

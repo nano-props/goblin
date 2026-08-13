@@ -13,6 +13,7 @@ import type {
   ExecResult,
   LogEntry,
   RepoMutationExecResult,
+  RepoLogTarget,
   RepoUrlTarget,
 } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
@@ -84,7 +85,7 @@ export async function cloneRepository(
 export async function getRepoLog(
   cwd: WorkspaceId,
   workspaceRuntimeId: string,
-  branch: string,
+  target: RepoLogTarget,
   options?: { count?: number; skip?: number; signal?: AbortSignal },
 ): Promise<LogEntry[]> {
   const log = await postServerJson(
@@ -92,7 +93,7 @@ export async function getRepoLog(
     {
       cwd,
       workspaceRuntimeId,
-      branch,
+      target,
       count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT,
       skip: options?.skip ?? 0,
     },
