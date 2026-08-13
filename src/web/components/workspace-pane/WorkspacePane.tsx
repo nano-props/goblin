@@ -3,7 +3,7 @@ import type { FunctionalComponent } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
 import { GitWorkspacePane } from '#/web/components/workspace-pane/GitWorkspacePane.tsx'
-import { GitWorktreeFilesystemPane } from '#/web/components/workspace-pane/GitWorktreeFilesystemPane.tsx'
+import { GitWorktreePane } from '#/web/components/workspace-pane/GitWorktreePane.tsx'
 import { WorkspaceRootPane } from '#/web/components/workspace-pane/WorkspaceRootPane.tsx'
 import type {
   GitWorkspacePaneShell,
@@ -89,7 +89,7 @@ const WorkspacePaneLoaded: FunctionalComponent<WorkspacePaneLoadedProps> = (prop
   if (props.workspacePaneRouteContext.kind === 'git-worktree' && props.workspaceShell.capability.kind === 'git') {
     const repo = gitWorkspacePaneShell(props.workspaceShell, props.workspaceShell.capability)
     return (
-      <GitWorktreeFilesystemPane
+      <GitWorktreePane
         repo={repo}
         workspaceProbe={props.workspaceShell.capability.probe}
         worktreePath={props.workspacePaneRouteContext.worktreePath}

@@ -35,7 +35,7 @@ import {
   getBranches,
   getCurrentBranch,
   getHeadHash,
-  getLog as getBranchLog,
+  getLog as getGitLog,
   getRepoRoot,
   getUpstream,
   isAncestor,
@@ -606,7 +606,7 @@ function createLocalRepoSource(
       if (!isValidCwd(repoId)) return []
       const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
-      return await getBranchLog(repoId, target, options?.count, options?.skip, { signal: options?.signal })
+      return await getGitLog(repoId, target, options?.count, options?.skip, { signal: options?.signal })
     },
     async getRemoteBranches(signal) {
       if (!isValidCwd(repoId)) return []

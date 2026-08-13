@@ -325,7 +325,7 @@ describe('WorkspacePane directory workspaces', () => {
       </VueQueryClientScope>,
     )
 
-    expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
+    expect(await screen.findByTestId('worktree-pane')).toBeTruthy()
     expect(screen.getByRole('tabpanel', { name: 'tab.terminal' })).toBeTruthy()
     expect(screen.queryByText('error.failed-read-repo')).toBeNull()
   })
@@ -434,7 +434,7 @@ describe('WorkspacePane directory workspaces', () => {
       route: { kind: 'static', tab: 'files' },
     })
 
-    expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
+    expect(await screen.findByTestId('worktree-pane')).toBeTruthy()
     expect(screen.getByRole('tabpanel', { name: 'tab.files' })).toBeTruthy()
     expect(screen.queryByText('status.stale-title')).toBeNull()
     expect(screen.queryByText('error.failed-read-repo')).toBeNull()
@@ -625,7 +625,7 @@ describe('WorkspacePane directory workspaces', () => {
       route: { kind: 'static', tab: 'files' },
     })
 
-    expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
+    expect(await screen.findByTestId('worktree-pane')).toBeTruthy()
     await flushTestUpdates(() => {
       snapshotQuery.setState({
         ...snapshotQuery.state,
@@ -634,7 +634,7 @@ describe('WorkspacePane directory workspaces', () => {
       })
     })
 
-    expect(screen.getByTestId('detached-worktree-pane')).toBeTruthy()
+    expect(screen.getByTestId('worktree-pane')).toBeTruthy()
     expect(screen.getByText('status.stale-title')).toBeTruthy()
     expect(screen.getByText(/snapshot refresh failed/)).toBeTruthy()
   })
@@ -668,7 +668,7 @@ describe('WorkspacePane directory workspaces', () => {
 
     renderWorkspacePane(workspaceId, { kind: 'git-worktree', worktreePath, route: null })
 
-    expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
+    expect(await screen.findByTestId('worktree-pane')).toBeTruthy()
     await flushTestUpdates(async () => await Promise.resolve())
     expect(screen.getByRole('tab', { name: 'tab.log' }).getAttribute('aria-selected')).toBe('true')
     const workspace = workspacesStore.getState().workspaces[workspaceId]
@@ -719,7 +719,7 @@ describe('WorkspacePane directory workspaces', () => {
       })
     })
 
-    expect(await screen.findByTestId('detached-worktree-pane')).toBeTruthy()
+    expect(await screen.findByTestId('worktree-pane')).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'tab.log' }).getAttribute('aria-selected')).toBe('true')
     let workspace = workspacesStore.getState().workspaces[workspaceId]
     expect(workspace && preferredWorkspacePaneTabForTarget(workspace.ui, target)).toBe('history')

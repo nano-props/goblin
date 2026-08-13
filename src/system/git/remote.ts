@@ -1,7 +1,7 @@
 import { git, gitCommandResultWithOptions, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
 import { commandMayHaveRun, withoutMutationCommand, type CommandOutcome } from '#/system/command-execution.ts'
 import {
-  GIT_HASH_RE,
+  GIT_OBJECT_ID_OR_PREFIX_RE,
   type BrowserRemoteProvider,
   type ExecResult,
   type GitRemoteInfo,
@@ -51,7 +51,7 @@ export async function getBrowserRepoUrl(
   options?: { signal?: AbortSignal },
 ): Promise<string | null> {
   if (target.type === 'branch' && !isSafeBranchName(target.branch)) return null
-  if (target.type === 'commit' && !GIT_HASH_RE.test(target.hash)) return null
+  if (target.type === 'commit' && !GIT_OBJECT_ID_OR_PREFIX_RE.test(target.hash)) return null
   // When the caller pins a specific remote (e.g. clicking an upstream chip
   // like `origin/main`), resolve that exact remote instead of guessing from
   // the local branch's tracking config.
@@ -223,7 +223,7 @@ export function branchUrlForBrowserRemote(remote: BrowserRemote | null, branch: 
 }
 
 export function commitUrlForBrowserRemote(remote: BrowserRemote | null, hash: string): string | null {
-  if (!remote || !GIT_HASH_RE.test(hash)) return null
+  if (!remote || !GIT_OBJECT_ID_OR_PREFIX_RE.test(hash)) return null
   if (remote.provider === 'github') return `${remote.url}/commit/${hash}`
   if (remote.provider === 'gitlab') return `${remote.url}/-/commit/${hash}`
   return null

@@ -1,4 +1,4 @@
-// Single source of truth for the persistent and zen-mode branch lists.
+// Single source of truth for the persistent and zen-mode branch navigator.
 
 import { computed, defineComponent } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -7,9 +7,9 @@ import { EmptyState } from '#/web/components/Layout.tsx'
 import { RepoReadNotice } from '#/web/components/RepoReadNotice.tsx'
 import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
-import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
-import { useBranchListReadModel } from '#/web/components/branch-navigator/use-branch-list-data.ts'
-import type { BranchListRepoShell } from '#/web/components/branch-navigator/use-branch-list-data.ts'
+import { BranchNavigatorList } from '#/web/components/branch-navigator/BranchNavigatorList.tsx'
+import { useBranchNavigatorReadModel } from '#/web/components/branch-navigator/use-branch-navigator-data.ts'
+import type { BranchNavigatorRepoShell } from '#/web/components/branch-navigator/use-branch-navigator-data.ts'
 import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -29,8 +29,8 @@ interface Props {
   onAfterOpenStatus?: (branch: string) => void
 }
 
-export const BranchView = defineComponent<Props>({
-  name: 'BranchView',
+export const BranchNavigatorView = defineComponent<Props>({
+  name: 'BranchNavigatorView',
   props: ['repoId', 'onSelectBranch', 'currentBranchName', 'currentWorktreePath', 'onAfterSelect', 'onAfterOpenStatus'],
 
   setup(props) {
@@ -43,7 +43,7 @@ export const BranchView = defineComponent<Props>({
       (left, right) =>
         left.workspaces === right.workspaces && left.branchViewModeByWorkspace === right.branchViewModeByWorkspace,
     )
-    const repo = computed<BranchListRepoShell | null>(() => {
+    const repo = computed<BranchNavigatorRepoShell | null>(() => {
       const workspace = storeProjection.value.workspaces[props.repoId]
       return workspace?.capability.kind === 'git'
         ? {
@@ -58,7 +58,7 @@ export const BranchView = defineComponent<Props>({
 
     return () =>
       repo.value ? (
-        <BranchViewReadModel
+        <BranchNavigatorViewReadModel
           repo={repo.value}
           onSelectBranch={props.onSelectBranch}
           currentBranchName={props.currentBranchName}
@@ -72,18 +72,18 @@ export const BranchView = defineComponent<Props>({
   },
 })
 
-interface BranchViewReadModelProps extends Omit<Props, 'repoId'> {
-  repo: BranchListRepoShell
+interface BranchNavigatorViewReadModelProps extends Omit<Props, 'repoId'> {
+  repo: BranchNavigatorRepoShell
 }
 
-const BranchViewReadModel = defineComponent<BranchViewReadModelProps>({
-  name: 'BranchViewReadModel',
+const BranchNavigatorViewReadModel = defineComponent<BranchNavigatorViewReadModelProps>({
+  name: 'BranchNavigatorViewReadModel',
   inheritAttrs: false,
   props: ['repo', 'onSelectBranch', 'currentBranchName', 'currentWorktreePath', 'onAfterSelect', 'onAfterOpenStatus'],
   setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
-    const { repo, snapshotReadModel, statusReadModel } = useBranchListReadModel(() => props.repo)
+    const { repo, snapshotReadModel, statusReadModel } = useBranchNavigatorReadModel(() => props.repo)
     const rows = computed(() => {
       if (!repo.value) return []
       return branchNavigatorRows({
@@ -172,7 +172,7 @@ const BranchViewReadModel = defineComponent<BranchViewReadModelProps>({
       return (
         <>
           <RepoReadNotice failures={readFailures} />
-          <BranchList
+          <BranchNavigatorList
             repo={currentRepo}
             rows={rows.value}
             highlightedBranch={highlightedBranch.value}

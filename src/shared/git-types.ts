@@ -155,7 +155,7 @@ export interface RepoRemoteInfo {
   hasGitHubRemote: boolean
 }
 
-export const GIT_HASH_RE = /^[0-9a-fA-F]{7,64}$/
+export const GIT_OBJECT_ID_OR_PREFIX_RE = /^[0-9a-fA-F]{7,64}$/
 export const GIT_OBJECT_ID_RE = /^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/
 
 export type RepoLogTarget = { kind: 'branch'; branchName: string } | { kind: 'commit'; oid: string }

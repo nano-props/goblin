@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// Unit tests for the presentational BranchList. Its contract is
+// Unit tests for the presentational BranchNavigatorList. Its contract is
 // "given branches + a highlighted name + callbacks, paint rows and
 // bubble events up". We stub BranchActionsMenu and the terminal bell/output
 // hook so the suite stays focused on the list.
@@ -12,7 +12,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
+import { BranchNavigatorList } from '#/web/components/branch-navigator/BranchNavigatorList.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -39,15 +39,15 @@ afterEach(() => {
   Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
 })
 
-describe('BranchList', () => {
+describe('BranchNavigatorList', () => {
   test('renders one row per branch and forwards click/double-click', () => {
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
-    const repo = branchListRepo(branches, 'main')
+    const repo = branchNavigatorRepo(branches, 'main')
     const onSelect = vi.fn()
     const onOpenStatus = vi.fn()
 
     const { container } = renderInJsdom(
-      <BranchList
+      <BranchNavigatorList
         repo={repo}
         rows={branches.map((branch) => ({ kind: 'branch' as const, branch }))}
         highlightedBranch="main"
@@ -68,11 +68,11 @@ describe('BranchList', () => {
   })
 
   test('renders the emptyState slot when branches is empty', () => {
-    const repo = branchListRepo([], '')
+    const repo = branchNavigatorRepo([], '')
     const onSelect = vi.fn()
 
     const { container } = renderInJsdom(
-      <BranchList
+      <BranchNavigatorList
         repo={repo}
         rows={[]}
         highlightedBranch={null}
@@ -92,7 +92,7 @@ describe('BranchList', () => {
     // short-circuits — passing `branches={[]}` would exercise the
     // empty-list early-return instead.
     const { container } = renderInJsdom(
-      <BranchList
+      <BranchNavigatorList
         repo={null}
         rows={[{ kind: 'branch', branch: createRepoBranch('main') }]}
         highlightedBranch={null}
@@ -108,10 +108,10 @@ describe('BranchList', () => {
 
   test('highlights the row whose name matches highlightedBranch', () => {
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
-    const repo = branchListRepo(branches, 'main')
+    const repo = branchNavigatorRepo(branches, 'main')
 
     const { container } = renderInJsdom(
-      <BranchList
+      <BranchNavigatorList
         repo={repo}
         rows={branches.map((branch) => ({ kind: 'branch' as const, branch }))}
         highlightedBranch="fix/b"
@@ -130,7 +130,7 @@ describe('BranchList', () => {
   test('closes a branch action menu when the row changes to operation presentation', async () => {
     const branch = createRepoBranch('feature/a')
     const attached = createRepoWorktreeSnapshotForTest(branch.name, '/tmp/feature-a')
-    const repo = branchListRepo([branch], branch.name, [attached])
+    const repo = branchNavigatorRepo([branch], branch.name, [attached])
     const props = {
       repo,
       highlightedBranch: null,
@@ -140,7 +140,7 @@ describe('BranchList', () => {
       emptyState: null,
     }
     const { container, rerender } = renderInJsdom(
-      <BranchList {...props} rows={[{ kind: 'worktree', branch, worktree: attached }]} />,
+      <BranchNavigatorList {...props} rows={[{ kind: 'worktree', branch, worktree: attached }]} />,
     )
 
     const menu = container.querySelector('[data-testid="branch-actions-menu"]')
@@ -154,10 +154,10 @@ describe('BranchList', () => {
       head: { kind: 'detached' },
       operation: { kind: 'rebase' },
     }
-    await rerender(<BranchList {...props} rows={[{ kind: 'worktree', branch, worktree: rebasing }]} />)
+    await rerender(<BranchNavigatorList {...props} rows={[{ kind: 'worktree', branch, worktree: rebasing }]} />)
     expect(container.querySelector('[data-testid="branch-actions-menu"]')).toBeNull()
 
-    await rerender(<BranchList {...props} rows={[{ kind: 'worktree', branch, worktree: attached }]} />)
+    await rerender(<BranchNavigatorList {...props} rows={[{ kind: 'worktree', branch, worktree: attached }]} />)
     expect(container.querySelector('[data-testid="branch-actions-menu"]')?.getAttribute('data-open')).toBe('false')
   })
 
@@ -168,9 +168,9 @@ describe('BranchList', () => {
       value: scrollIntoView,
     })
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
-    const repo = branchListRepo(branches, 'main')
+    const repo = branchNavigatorRepo(branches, 'main')
     const { container } = renderInJsdom(
-      <BranchList
+      <BranchNavigatorList
         repo={repo}
         rows={branches.map((branch) => ({ kind: 'branch' as const, branch }))}
         highlightedBranch="fix/b"
@@ -188,7 +188,7 @@ describe('BranchList', () => {
   })
 })
 
-function branchListRepo(
+function branchNavigatorRepo(
   branches: ReturnType<typeof createRepoBranch>[],
   currentBranch: string,
   worktrees?: RepoWorktreeSnapshot[],

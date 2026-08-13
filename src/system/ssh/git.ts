@@ -35,7 +35,7 @@ import {
   type RemoteRepoSnapshot,
 } from '#/system/ssh/git-codec.ts'
 import {
-  GIT_HASH_RE,
+  GIT_OBJECT_ID_OR_PREFIX_RE,
   gitOperationRequiresDetachedHead,
   repoLogTargetRevision,
   repoWorktreeForBranch,
@@ -1097,7 +1097,7 @@ export async function getRemoteBrowserUrl(
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<string | null> {
   if (urlTarget.type === 'branch' && !isSafeBranchName(urlTarget.branch)) return null
-  if (urlTarget.type === 'commit' && !GIT_HASH_RE.test(urlTarget.hash)) return null
+  if (urlTarget.type === 'commit' && !GIT_OBJECT_ID_OR_PREFIX_RE.test(urlTarget.hash)) return null
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const branch = urlTarget.type === 'branch' ? urlTarget.branch : undefined
   const [remoteInfo, upstream] = await Promise.all([

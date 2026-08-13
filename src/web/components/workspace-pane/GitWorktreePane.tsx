@@ -31,7 +31,7 @@ import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 
-interface GitWorktreeFilesystemPaneProps {
+interface GitWorktreePaneProps {
   repo: GitWorkspacePaneShell
   workspaceProbe: WorkspaceGitReadyProbeState
   worktreePath: string
@@ -41,8 +41,8 @@ interface GitWorktreeFilesystemPaneProps {
   onBackToNavigator?: () => void
 }
 
-export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPaneProps>({
-  name: 'GitWorktreeFilesystemPane',
+export const GitWorktreePane = defineComponent<GitWorktreePaneProps>({
+  name: 'GitWorktreePane',
   props: [
     'repo',
     'workspaceProbe',
@@ -123,7 +123,7 @@ export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPa
       return (
         <>
           <RepoReadNotice failures={snapshotFailure ? [snapshotFailure] : []} />
-          <GitWorktreeFilesystemPaneReady
+          <GitWorktreePaneReady
             workspaceRuntime={{ workspaceRuntimeId: props.repo.workspaceRuntimeId, ui: props.repo.ui }}
             workspaceProbe={props.workspaceProbe}
             worktree={currentWorktree}
@@ -144,7 +144,7 @@ export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPa
   },
 })
 
-interface GitWorktreeFilesystemPaneReadyProps {
+interface GitWorktreePaneReadyProps {
   workspaceRuntime: WorkspacePaneRuntimeContext
   workspaceProbe: WorkspaceGitReadyProbeState
   worktree: RepoWorktreeSnapshot
@@ -160,8 +160,8 @@ interface GitWorktreeFilesystemPaneReadyProps {
   onBackToNavigator?: () => void
 }
 
-const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPaneReadyProps>({
-  name: 'GitWorktreeFilesystemPaneReady',
+const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
+  name: 'GitWorktreePaneReady',
   props: [
     'workspaceRuntime',
     'workspaceProbe',
@@ -222,7 +222,7 @@ const GitWorktreeFilesystemPaneReady = defineComponent<GitWorktreeFilesystemPane
       }
 
       return (
-        <section class="flex min-h-0 flex-1 flex-col bg-background" data-testid="detached-worktree-pane">
+        <section class="flex min-h-0 flex-1 flex-col bg-background" data-testid="worktree-pane">
           <WorkspacePaneTargetToolbar
             target={surfaceTarget.value}
             model={currentModel}

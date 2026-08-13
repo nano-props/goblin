@@ -1,4 +1,4 @@
-// Shared branch-list data layer for every branch navigator surface.
+// Shared data layer for every branch navigator surface.
 
 import { computed, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
@@ -13,11 +13,11 @@ import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoOperationState } from '#/web/stores/workspaces/operations.ts'
 
-export type BranchListRepo = BranchActionRepo
+export type BranchNavigatorRepo = BranchActionRepo
 
-type BranchListDataRepo = BranchListRepo & { branchViewMode: BranchViewMode }
+type BranchNavigatorDataRepo = BranchNavigatorRepo & { branchViewMode: BranchViewMode }
 
-export interface BranchListRepoShell {
+export interface BranchNavigatorRepoShell {
   id: WorkspaceId
   workspaceRuntimeId: string
   branchViewMode: BranchViewMode
@@ -25,7 +25,7 @@ export interface BranchListRepoShell {
   remoteLifecycle: BranchActionRepo['remoteLifecycle']
 }
 
-export function useBranchListReadModel(repoShell: MaybeRefOrGetter<BranchListRepoShell>) {
+export function useBranchNavigatorReadModel(repoShell: MaybeRefOrGetter<BranchNavigatorRepoShell>) {
   const operationsReadModel = useRepoOperationsReadModel(
     () => toValue(repoShell).id,
     () => toValue(repoShell).workspaceRuntimeId,
@@ -39,7 +39,7 @@ export function useBranchListReadModel(repoShell: MaybeRefOrGetter<BranchListRep
     () => toValue(repoShell).workspaceRuntimeId,
   )
 
-  const repo = computed<BranchListDataRepo | undefined>(() => {
+  const repo = computed<BranchNavigatorDataRepo | undefined>(() => {
     const shell = toValue(repoShell)
     const snapshot = snapshotReadModel.data.value?.snapshot
     if (!snapshot) return undefined

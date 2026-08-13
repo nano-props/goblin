@@ -8,7 +8,7 @@ import * as v from 'valibot'
 import { RemoteTrackingBranchIdentitySchema } from '#/shared/worktree-create.ts'
 import { isValidBranchInput } from '#/shared/refnames.ts'
 import { WorkspaceFilesystemPathSchema } from '#/shared/workspace-filesystem-schema.ts'
-import { GIT_HASH_RE, GIT_OBJECT_ID_RE } from '#/shared/git-types.ts'
+import { GIT_OBJECT_ID_OR_PREFIX_RE, GIT_OBJECT_ID_RE } from '#/shared/git-types.ts'
 import {
   parseWorkspaceExternalAppRecentKey,
   WORKSPACE_EXTERNAL_APP_IDS,
@@ -46,7 +46,7 @@ const RepoUrlTargetSchema = v.variant('type', [
     branch: v.string(),
     remote: v.optional(v.string()),
   }),
-  v.object({ type: v.literal('commit'), hash: v.pipe(v.string(), v.regex(GIT_HASH_RE)) }),
+  v.object({ type: v.literal('commit'), hash: v.pipe(v.string(), v.regex(GIT_OBJECT_ID_OR_PREFIX_RE)) }),
 ])
 const WorktreeBootstrapDecisionSchema = v.variant('kind', [
   v.object({ kind: v.literal('skip') }),

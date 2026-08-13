@@ -8,7 +8,7 @@
 
 import path from 'node:path'
 import type { BranchSnapshotInfo, LogEntry, StatusEntry, WorktreeInfo } from '#/shared/git-types.ts'
-import { GIT_HASH_RE } from '#/shared/git-types.ts'
+import { GIT_OBJECT_ID_OR_PREFIX_RE } from '#/shared/git-types.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 
 /** NUL cannot occur in Git's formatted ref/log fields. */
@@ -29,12 +29,12 @@ export function parseBranches(output: string, currentBranch: string): BranchSnap
     const parts = line.split(FIELD_SEP)
     if (parts.length !== 8) throw new Error('Invalid branch snapshot row')
     const [name, hash, shortHash, , date, , upstream, track] = parts
-    if (!name || !isSafeBranchName(name) || !hash || !GIT_HASH_RE.test(hash)) {
+    if (!name || !isSafeBranchName(name) || !hash || !GIT_OBJECT_ID_OR_PREFIX_RE.test(hash)) {
       throw new Error('Invalid branch snapshot identity')
     }
     if (
       !shortHash ||
-      !GIT_HASH_RE.test(shortHash) ||
+      !GIT_OBJECT_ID_OR_PREFIX_RE.test(shortHash) ||
       !date ||
       Number.isNaN(Date.parse(date)) ||
       (upstream !== '' && (!upstream || !isSafeBranchName(upstream))) ||
@@ -102,9 +102,9 @@ export function parseLog(output: string): LogEntry[] {
       const [hash, shortHash, refs, message, author, date] = parts
       if (
         !hash ||
-        !GIT_HASH_RE.test(hash) ||
+        !GIT_OBJECT_ID_OR_PREFIX_RE.test(hash) ||
         !shortHash ||
-        !GIT_HASH_RE.test(shortHash) ||
+        !GIT_OBJECT_ID_OR_PREFIX_RE.test(shortHash) ||
         !date ||
         Number.isNaN(Date.parse(date))
       ) {
@@ -178,7 +178,7 @@ export function parseWorktrees(output: string, platform: GitPathPlatform = 'posi
         }
       } else if (line.startsWith('HEAD ')) {
         headCount += 1
-        if (!GIT_HASH_RE.test(line.slice('HEAD '.length))) throw new Error('Invalid worktree HEAD')
+        if (!GIT_OBJECT_ID_OR_PREFIX_RE.test(line.slice('HEAD '.length))) throw new Error('Invalid worktree HEAD')
       } else if (line.startsWith('branch refs/heads/')) {
         stateCount += 1
         if (!isSafeBranchName(line.slice('branch refs/heads/'.length))) throw new Error('Invalid worktree branch')

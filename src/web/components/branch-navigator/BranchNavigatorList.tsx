@@ -16,7 +16,7 @@
 import { defineComponent, ref, watch } from 'vue'
 import type { PropType, VNodeChild } from 'vue'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
-import type { BranchListRepo } from '#/web/components/branch-navigator/use-branch-list-data.ts'
+import type { BranchNavigatorRepo } from '#/web/components/branch-navigator/use-branch-navigator-data.ts'
 import { WorktreeStateRow } from '#/web/components/branch-navigator/WorktreeStateRow.tsx'
 import { BRANCH_ROW_LIST_CLASS } from '#/web/components/branch-navigator/branch-row-metrics.ts'
 import type { BranchNavigatorRow } from '#/web/components/branch-navigator/branch-navigator-model.ts'
@@ -24,7 +24,7 @@ import type { BranchNavigatorRow } from '#/web/components/branch-navigator/branc
 interface Props {
   /** May be null while repo data is not loaded yet; the list falls
    *  through to the empty-state slot in that case. */
-  repo: BranchListRepo | null
+  repo: BranchNavigatorRepo | null
   rows: BranchNavigatorRow[]
   /** Name of the branch to mark as selected/highlighted in the list. */
   highlightedBranch: string | null
@@ -37,10 +37,10 @@ interface Props {
   emptyState: VNodeChild
 }
 
-export const BranchList = defineComponent<Props>({
-  name: 'BranchList',
+export const BranchNavigatorList = defineComponent<Props>({
+  name: 'BranchNavigatorList',
   props: {
-    repo: { type: Object as PropType<BranchListRepo | null>, default: null },
+    repo: { type: Object as PropType<BranchNavigatorRepo | null>, default: null },
     rows: { type: Array as PropType<BranchNavigatorRow[]>, required: true },
     highlightedBranch: { type: String, default: null },
     highlightedWorktreePath: { type: String, default: null },
