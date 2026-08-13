@@ -220,6 +220,14 @@ class FilesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'file
   }
 }
 
+function terminalPendingLabelKey(
+  input: WorkspacePanePendingTabMetadataInput,
+): 'terminal.load-failed' | 'terminal.opening' | 'terminal.loading' {
+  if (input.projectionPhase === 'failed') return 'terminal.load-failed'
+  if (input.createPending || input.projectionPhase === 'ready') return 'terminal.opening'
+  return 'terminal.loading'
+}
+
 export class TerminalWorkspacePaneTabProvider extends WorkspacePaneRuntimeTabProvider<'terminal'> {
   constructor() {
     super({ type: 'terminal', icon: Terminal })
@@ -257,10 +265,7 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneRuntimeTabPro
   }
 
   pendingLabel(input: WorkspacePanePendingTabMetadataInput): string {
-    let pendingLabelKey: string
-    if (input.projectionPhase === 'failed') pendingLabelKey = 'terminal.load-failed'
-    else if (input.createPending || input.projectionPhase === 'ready') pendingLabelKey = 'terminal.opening'
-    else pendingLabelKey = 'terminal.loading'
+    const pendingLabelKey = terminalPendingLabelKey(input)
     return input.t(pendingLabelKey)
   }
 

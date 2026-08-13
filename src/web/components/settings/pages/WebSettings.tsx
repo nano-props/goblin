@@ -15,18 +15,6 @@ import { decodeWith } from '#/shared/http-response-schema.ts'
 import { AccessTokenResponseSchema } from '#/shared/web-bootstrap-response-schema.ts'
 import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 
-function lanStatusKey(
-  isElectron: boolean,
-  host: string | null,
-  lanEnabled: boolean,
-): 'settings.lan.restart-hint' | 'settings.lan.local-only' | null {
-  if (!isElectron || host === null) return null
-  const lanAccessActive = !isLoopbackHost(host)
-  if (lanEnabled !== lanAccessActive) return 'settings.lan.restart-hint'
-  if (!lanAccessActive) return 'settings.lan.local-only'
-  return null
-}
-
 /**
  * Settings page for everything related to the embedded / standalone
  * server that the client talks to. Visible in both runtimes:
@@ -144,7 +132,12 @@ export const WebSettings = defineComponent({
         ? lanUrls.map((url) => `${url.replace(/\/$/, '')}/?accessToken=${encodeURIComponent(accessToken.value ?? '')}`)
         : []
       const showNetworkGroup = isElectron || lanUrls.length > 0
-      const currentLanStatusKey = lanStatusKey(isElectron, currentLanInfo ? currentLanInfo.host : null, lanEnabled)
+      let lanStatusKey: 'settings.lan.restart-hint' | 'settings.lan.local-only' | null = null
+      if (isElectron && currentLanInfo) {
+        const lanAccessActive = !isLoopbackHost(currentLanInfo.host)
+        if (lanEnabled !== lanAccessActive) lanStatusKey = 'settings.lan.restart-hint'
+        else if (!lanAccessActive) lanStatusKey = 'settings.lan.local-only'
+      }
       return (
         <>
           <SettingsGroup label={t('settings.web.server')}>
@@ -237,9 +230,7 @@ export const WebSettings = defineComponent({
                   />
                 ) : null}
               </SettingsList>
-              {currentLanStatusKey ? (
-                <div class="px-4 py-2 text-sm text-muted-foreground">{t(currentLanStatusKey)}</div>
-              ) : null}
+              {lanStatusKey ? <div class="px-4 py-2 text-sm text-muted-foreground">{t(lanStatusKey)}</div> : null}
             </SettingsGroup>
           ) : null}
 
