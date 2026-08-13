@@ -18,7 +18,7 @@ import type { PropType, VNodeChild } from 'vue'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
 import type { BranchNavigatorRepo } from '#/web/components/branch-navigator/use-branch-navigator-data.ts'
 import { WorktreeStateRow } from '#/web/components/branch-navigator/WorktreeStateRow.tsx'
-import { BRANCH_ROW_LIST_CLASS } from '#/web/components/branch-navigator/branch-row-metrics.ts'
+import { NAVIGATOR_ROW_LIST_CLASS } from '#/web/components/branch-navigator/navigator-row-metrics.ts'
 import type { BranchNavigatorRow } from '#/web/components/branch-navigator/branch-navigator-model.ts'
 
 interface Props {
@@ -86,7 +86,7 @@ export const BranchNavigatorList = defineComponent<Props>({
       }
 
       return (
-        <ul class={BRANCH_ROW_LIST_CLASS}>
+        <ul class={NAVIGATOR_ROW_LIST_CLASS}>
           {props.rows.map((row) => {
             if (row.kind === 'worktree' && (row.worktree.head.kind === 'detached' || row.worktree.operation)) {
               return (

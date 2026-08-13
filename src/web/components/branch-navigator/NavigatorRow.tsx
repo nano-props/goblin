@@ -1,9 +1,9 @@
 import type { FunctionalComponent, LiHTMLAttributes, VNodeChild } from 'vue'
 import {
-  BRANCH_ROW_ACTION_SLOT_CLASS,
-  BRANCH_ROW_CONTENT_CLASS,
-  BRANCH_ROW_GRID_CLASS,
-} from '#/web/components/branch-navigator/branch-row-metrics.ts'
+  NAVIGATOR_ROW_ACTION_SLOT_CLASS,
+  NAVIGATOR_ROW_CONTENT_CLASS,
+  NAVIGATOR_ROW_GRID_CLASS,
+} from '#/web/components/branch-navigator/navigator-row-metrics.ts'
 import type { ElementRef } from '#/web/components/ui/refs.ts'
 import { toLiVNodeRef } from '#/web/components/ui/refs.ts'
 import { cn } from '#/web/lib/cn.ts'
@@ -23,16 +23,16 @@ export const NavigatorRow: FunctionalComponent<NavigatorRowProps> = (props, { at
       {...elementAttrs}
       ref={toLiVNodeRef(props.rowRef)}
       class={cn(
-        BRANCH_ROW_GRID_CLASS,
+        NAVIGATOR_ROW_GRID_CLASS,
         'group relative cursor-pointer transition-colors duration-100',
         props.selected ? 'bg-selected text-selected-foreground hover:bg-selected' : 'hover:bg-muted',
         classValue,
       )}
     >
-      <div class={cn(BRANCH_ROW_CONTENT_CLASS, 'pointer-events-none relative z-10', props.contentClass)}>
+      <div class={cn(NAVIGATOR_ROW_CONTENT_CLASS, 'pointer-events-none relative z-10', props.contentClass)}>
         {props.content}
       </div>
-      <div class={cn(BRANCH_ROW_ACTION_SLOT_CLASS, 'pointer-events-none relative z-20')}>{props.actions}</div>
+      <div class={cn(NAVIGATOR_ROW_ACTION_SLOT_CLASS, 'pointer-events-none relative z-20')}>{props.actions}</div>
     </li>
   )
 }

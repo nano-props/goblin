@@ -8,7 +8,7 @@ import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
-import { BRANCH_ROW_ACTION_BOX_CLASS } from '#/web/components/branch-navigator/branch-row-metrics.ts'
+import { NAVIGATOR_ROW_ACTION_BOX_CLASS } from '#/web/components/branch-navigator/navigator-row-metrics.ts'
 import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
 import type { ElementRef } from '#/web/components/ui/refs.ts'
 
@@ -120,7 +120,7 @@ const BranchRowActionSlot: FunctionalComponent<BranchRowActionSlotProps> = (prop
   const showOutputActivity = props.terminalOutputActive && props.actionHidden && !showBellBadge
 
   return (
-    <div class={BRANCH_ROW_ACTION_BOX_CLASS}>
+    <div class={NAVIGATOR_ROW_ACTION_BOX_CLASS}>
       {showBellBadge && (
         <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-100 group-hover:opacity-0 group-focus-within:opacity-0">
           <TerminalBellBadge count={props.terminalBellCount} />

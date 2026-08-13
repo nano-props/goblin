@@ -7,9 +7,9 @@ import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import {
-  BRANCH_ROW_ACTION_BOX_CLASS,
-  BRANCH_ROW_LIST_CLASS,
-} from '#/web/components/branch-navigator/branch-row-metrics.ts'
+  NAVIGATOR_ROW_ACTION_BOX_CLASS,
+  NAVIGATOR_ROW_LIST_CLASS,
+} from '#/web/components/branch-navigator/navigator-row-metrics.ts'
 import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { runShowWorkspacePaneTabCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
@@ -78,7 +78,7 @@ export const WorkspaceRootNavigator = defineComponent<WorkspaceRootNavigatorProp
       const actionVisible = compact.value || menuOpen.value
       return (
         <ScrollArea class="h-full min-h-0 flex-1" data-testid="workspace-root-navigator">
-          <ul class={BRANCH_ROW_LIST_CLASS}>
+          <ul class={NAVIGATOR_ROW_LIST_CLASS}>
             <NavigatorRow
               data-testid="workspace-root-row"
               selected={props.selected}
@@ -94,7 +94,7 @@ export const WorkspaceRootNavigator = defineComponent<WorkspaceRootNavigatorProp
                 </>
               }
               actions={
-                <div class={BRANCH_ROW_ACTION_BOX_CLASS}>
+                <div class={NAVIGATOR_ROW_ACTION_BOX_CLASS}>
                   <div
                     class={cn(
                       'relative',
