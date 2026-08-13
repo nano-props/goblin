@@ -935,7 +935,11 @@ function preferredWorkspacePaneTab(repoId: string) {
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
         workspacePaneTabsTargetForRepoBranch(
-          { workspaceId: repo.id, branches: repoPresentationFromQueryForTest(repo).snapshot.branches },
+          {
+            workspaceId: repo.id,
+            branches: repoPresentationFromQueryForTest(repo).snapshot.branches,
+            worktrees: repoPresentationFromQueryForTest(repo).snapshot.worktrees,
+          },
           'main',
         ),
       )

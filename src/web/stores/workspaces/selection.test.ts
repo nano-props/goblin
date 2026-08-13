@@ -83,7 +83,10 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const branchModel = repo ? repoPresentationFromQueryForTest(repo).snapshot : null
   const target =
     repo && branchModel
-      ? workspacePaneTabsTargetForRepoBranch({ workspaceId: repo.id, branches: branchModel.branches }, branchName)
+      ? workspacePaneTabsTargetForRepoBranch(
+          { workspaceId: repo.id, branches: branchModel.branches, worktrees: branchModel.worktrees },
+          branchName,
+        )
       : null
   return workspacePaneStaticTabsFromEntries(
     target ? readWorkspacePaneTabsForTarget({ ...target, workspaceRuntimeId: repo.workspaceRuntimeId }) : [],
@@ -98,7 +101,7 @@ function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | nul
         repo.ui,
         branchModel
           ? workspacePaneTabsTargetForRepoBranch(
-              { workspaceId: repo.id, branches: branchModel.branches },
+              { workspaceId: repo.id, branches: branchModel.branches, worktrees: branchModel.worktrees },
               branchName ?? 'main',
             )
           : null,

@@ -109,26 +109,6 @@ describe('parseBranches', () => {
     expect(result.find((b) => b.name === 'dev')?.isCurrent).toBe(true)
   })
 
-  test('attaches worktree info when branch matches', () => {
-    const line = ['feat', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a', '', ''].join(
-      SEP,
-    )
-    const result = parseBranches(line, 'main', [{ path: '/wt/feat', branch: 'feat', isBare: false, isPrimary: false }])
-    expect(result[0]?.worktree?.path).toBe('/wt/feat')
-    expect(result[0]?.worktree?.isPrimary).toBe(false)
-    expect(result[0]?.worktree).not.toHaveProperty('summary')
-  })
-
-  test('attaches primary worktree marker when branch matches the main worktree', () => {
-    const line = ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'aaaaaaa', 's', '2026-05-20', 'a', '', ''].join(
-      SEP,
-    )
-    const [branch] = parseBranches(line, 'feature', [{ path: '/repo', branch: 'main', isBare: false, isPrimary: true }])
-    expect(branch?.worktree?.path).toBe('/repo')
-    expect(branch?.worktree?.isPrimary).toBe(true)
-    expect(branch?.worktree).not.toHaveProperty('summary')
-  })
-
   test('preserves SEP-free subjects with spaces and unicode', () => {
     const subject = 'feat: 添加 i18n 🎉'
     const line = [

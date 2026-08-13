@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, Diff, FolderTree, GitBranch, History, Trash2 } from '@lucide/vue'
 import { computed, toValue } from 'vue'
 import type { ComputedRef, MaybeRefOrGetter, VNodeChild } from 'vue'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
@@ -55,6 +56,7 @@ export function useBranchActionItems(
   return computed(() => {
     const currentRepo = toValue(repo)
     const currentBranch = toValue(branch)
+    const worktree = repoWorktreeForBranch(currentRepo.snapshot.worktrees, currentBranch.name)
     const { blocked, busyAction, capabilities, actions } = toValue(branchActions)
     const busy = (id: BranchActionItemId) => busyAction === id
     const phase = branchActionDisplayPhase(currentRepo, currentBranch.name)
@@ -118,7 +120,7 @@ export function useBranchActionItems(
         id: 'changes',
         label: t('tab.changes'),
         disabled: blocked,
-        visible: !!currentBranch.worktree?.path,
+        visible: !!worktree,
         icon: <Diff />,
         onSelect: () => openStaticWorkspacePaneTab('changes'),
       },
@@ -133,7 +135,7 @@ export function useBranchActionItems(
         // always present on the workspace pane strip; this menu
         // item is a discoverability shortcut for users who don't
         // notice the tab.
-        visible: !!currentBranch.worktree?.path,
+        visible: !!worktree,
         icon: <FolderTree />,
         onSelect: () => openStaticWorkspacePaneTab('files'),
       },

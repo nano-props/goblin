@@ -209,11 +209,11 @@ function applyRestoredPreferredWorkspacePaneTabs(
   const restoredPreferred =
     state.restoredClientWorkspaceBaseline?.preferredWorkspacePaneTabByTargetByWorkspace[workspaceId]
   if (!workspace || !restoredPreferred) return
-  const branchProjection = getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)?.branches
-  if (!branchProjection && workspace.capability.kind !== 'filesystem') return
+  const repoSnapshot = getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)
+  if (!repoSnapshot && workspace.capability.kind !== 'filesystem') return
   const preferredWorkspacePaneTabByTarget = restoredPreferredWorkspacePaneTabByTarget(
     workspace.id,
-    branchProjection ? { gitTargets: { branches: branchProjection } } : {},
+    repoSnapshot ? { gitTargets: { branches: repoSnapshot.branches, worktrees: repoSnapshot.worktrees } } : {},
     restoredPreferred,
     snapshot ? workspacePaneTabsByTargetFromQueryData(snapshot) : {},
   )

@@ -6,12 +6,15 @@ import {
 import type { WorkspaceUiState } from '#/web/stores/workspaces/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
+import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 
 export const INITIAL_WORKSPACE_PANE_TAB: WorkspacePaneTabType = 'status'
 
 interface WorkspacePaneTargetBranches {
   workspaceId: WorkspaceId
-  branches: ReadonlyArray<{ name: string; worktree?: { path?: string } | undefined }>
+  branches: ReadonlyArray<{ name: string }>
+  worktrees: readonly RepoWorktreeSnapshot[]
 }
 
 export function workspacePaneTabsTargetForRepoBranch(
@@ -21,10 +24,11 @@ export function workspacePaneTabsTargetForRepoBranch(
   if (!branchName) return null
   const branch = repo.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return null
-  if (!branch.worktree?.path) {
+  const worktree = repoWorktreeForBranch(repo.worktrees, branch.name)
+  if (!worktree) {
     return { kind: 'git-branch', workspaceId: repo.workspaceId, branchName: branch.name }
   }
-  return gitWorktreeWorkspacePaneTabsTarget(repo.workspaceId, branch.worktree.path)
+  return gitWorktreeWorkspacePaneTabsTarget(repo.workspaceId, worktree.path)
 }
 
 export function preferredWorkspacePaneTabForTarget(

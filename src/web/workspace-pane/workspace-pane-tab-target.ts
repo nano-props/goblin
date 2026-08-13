@@ -16,6 +16,7 @@ import {
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { GitHead } from '#/shared/git-head.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import {
   gitWorktreeFilesystemExecutionTarget,
   workspaceRootFilesystemExecutionTarget,
@@ -149,8 +150,8 @@ export function resolveWorkspacePaneDestinationTarget(
   if (!workspace || workspace.capability.kind !== 'git') return { kind: 'missing' }
   const branchModel = getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)
   const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
-  if (!branch) return { kind: 'missing' }
-  const worktreePath = branch.worktree?.path ?? null
+  if (!branchModel || !branch) return { kind: 'missing' }
+  const worktreePath = repoWorktreeForBranch(branchModel.worktrees, branchName)?.path ?? null
   return {
     kind: 'ready',
     lease: {
@@ -185,8 +186,8 @@ export function workspacePaneCommittedRuntimeTargetIsCurrent(target: WorkspacePa
   if (!workspace || workspace.capability.kind !== 'git' || workspace.workspaceRuntimeId !== target.workspaceRuntimeId)
     return false
   return (
-    getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)?.branches.some(
-      (branch) => branch.worktree?.path === target.worktreePath,
+    getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)?.worktrees.some(
+      (worktree) => worktree.path === target.worktreePath,
     ) ?? false
   )
 }
@@ -251,8 +252,7 @@ function resolveWorkspacePaneTabTarget(
     target: createWorkspacePaneTabModel({
       workspaceId,
       workspaceRuntimeId: workspace.workspaceRuntimeId,
-      routeTarget:
-        branchName === null ? { kind: 'workspace-root', workspaceId } : { kind: 'git-branch', workspaceId, branchName },
+      routeTarget: paneTarget,
       paneTarget,
       worktreeHead: paneTarget.kind === 'git-worktree' && branchName ? { kind: 'branch', branchName } : undefined,
       preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, paneTarget, options),
@@ -324,7 +324,11 @@ export function workspacePaneRouteNavigationBlockedForBranch(workspaceId: Worksp
   if (!branchModel) return false
   const branch = branchModel.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return false
-  const paneTarget = requiredGitWorkspacePaneTabsTarget(workspace.id, branchName, branch.worktree?.path ?? null)
+  const paneTarget = requiredGitWorkspacePaneTabsTarget(
+    workspace.id,
+    branchName,
+    repoWorktreeForBranch(branchModel.worktrees, branchName)?.path ?? null,
+  )
   if (workspacePaneTabsInteractionBlockedForTarget(paneTarget)) return true
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspace.id,
@@ -346,7 +350,7 @@ export function resolveWorkspacePaneTabTargetForBranch(
   if (!branchModel) return { kind: 'unavailable', reason: 'snapshot-unavailable' }
   const branch = branchModel.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return { kind: 'missing' }
-  const worktreePath = branch.worktree?.path ?? null
+  const worktreePath = repoWorktreeForBranch(branchModel.worktrees, branchName)?.path ?? null
   return resolveWorkspacePaneTabTarget(workspaceId, branchName, worktreePath, options)
 }
 

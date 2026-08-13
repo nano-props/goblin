@@ -147,7 +147,7 @@ export async function getBranches(
   options?.signal?.throwIfAborted()
   const mergedBranchNames = await getMergedBranchNames(cwd, defaultBranch, options?.signal)
   options?.signal?.throwIfAborted()
-  const branches = markDefaultBranch(parseBranches(output, currentBranch ?? '', worktrees), defaultBranch)
+  const branches = markDefaultBranch(parseBranches(output, currentBranch ?? ''), defaultBranch)
   return prioritizeDefaultBranch(
     mergedBranchNames ? markMergedToDefault(branches, defaultBranch, mergedBranchNames) : branches,
     defaultBranch,

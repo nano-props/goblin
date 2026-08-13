@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import {
   createRepoBranch,
   resetWorkspacesStore,
@@ -113,7 +113,7 @@ describe('workspace pane command target', () => {
     expect(appQueryClient.getQueryCache().getAll()).toHaveLength(0)
   })
 
-  test('projects a branch worktree only from a successful matching snapshot', async () => {
+  test('projects a branch worktree from the accepted snapshot while a refresh is stale', async () => {
     const workspace = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/command-target-branch-workspace',
       workspaceRuntimeId: 'command-target-branch-runtime',
@@ -151,20 +151,27 @@ describe('workspace pane command target', () => {
     if (!query) throw new Error('Missing snapshot query')
     query.setState({ ...query.state, status: 'error', error: new Error('snapshot unavailable') })
 
-    expect(workspacePaneCommandTargetFromQueryCache({ routeContext, workspace, queryClient: appQueryClient })).toEqual({
-      routeTarget: { kind: 'git-branch', workspaceId: workspace.id, branchName: 'feature/example' },
-      workspacePaneRoute: null,
-      filesystemTarget: null,
-    })
+    expect(workspacePaneCommandTargetFromQueryCache({ routeContext, workspace, queryClient: appQueryClient })).toEqual(
+      successfulBranchTarget,
+    )
     expect(query.getObserversCount()).toBe(0)
   })
 
-  test('admits a worktree target only from a successful matching status snapshot', async () => {
+  test('admits a worktree target from the accepted repository snapshot while a refresh is stale', async () => {
     const worktreePath = '/tmp/command-target-status-worktree'
     const workspace = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/command-target-status-workspace',
       workspaceRuntimeId: 'command-target-status-runtime',
-      status: [{ path: worktreePath, branch: 'feature/status', isMain: false, entries: [] }],
+      worktrees: [
+        {
+          path: worktreePath,
+          head: { kind: 'branch', branchName: 'feature/status' },
+          headOid: '1111111111111111111111111111111111111111',
+          operation: null,
+          isPrimary: false,
+          isLocked: false,
+        },
+      ],
     })
     const routeContext = {
       kind: 'worktree' as const,
@@ -199,14 +206,14 @@ describe('workspace pane command target', () => {
       }),
     ).toBeNull()
 
-    const queryKey = repoWorktreeStatusQueryKey(workspace.id, workspace.workspaceRuntimeId)
+    const queryKey = repoSnapshotQueryKey(workspace.id, workspace.workspaceRuntimeId)
     const query = appQueryClient.getQueryCache().find({ queryKey, exact: true })
-    if (!query) throw new Error('Missing worktree status query')
-    query.setState({ ...query.state, status: 'error', error: new Error('status unavailable') })
+    if (!query) throw new Error('Missing repository snapshot query')
+    query.setState({ ...query.state, status: 'error', error: new Error('snapshot unavailable') })
 
-    expect(
-      workspacePaneCommandTargetFromQueryCache({ routeContext, workspace, queryClient: appQueryClient }),
-    ).toBeNull()
+    expect(workspacePaneCommandTargetFromQueryCache({ routeContext, workspace, queryClient: appQueryClient })).toEqual(
+      successfulWorktreeTarget,
+    )
     expect(query.getObserversCount()).toBe(0)
   })
 })

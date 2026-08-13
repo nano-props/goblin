@@ -161,21 +161,22 @@ function harnessWorkspacePaneRoute(
 ): WorkspacePaneRoute | null | undefined {
   if (props.workspacePaneRouteMode === 'bare-branch') return null
   const branch = props.detail.branch
+  const worktree = props.detail.worktree ?? undefined
   const preferredTab = preferredWorkspacePaneTabForTarget(
     props.repo.ui,
     branch
-      ? branch.worktree?.path
+      ? worktree
         ? {
             kind: 'git-worktree' as const,
             workspaceId: props.repo.id,
-            worktreePath: branch.worktree.path,
+            worktreePath: worktree.path,
           }
         : { kind: 'git-branch' as const, workspaceId: props.repo.id, branchName: branch.name }
       : null,
   )
   if (preferredTab === 'terminal') {
-    const terminalFilesystemTargetKey = branch?.worktree?.path
-      ? formatTerminalFilesystemTargetKeyForPath(props.repo.id, branch.worktree.path)
+    const terminalFilesystemTargetKey = worktree
+      ? formatTerminalFilesystemTargetKeyForPath(props.repo.id, worktree.path)
       : null
     const terminalFilesystemTargetSnapshot = terminalFilesystemTargetKey
       ? readContext.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)

@@ -35,8 +35,19 @@ export type RepoPresentationForTest = WorkspaceState & {
   status: WorktreeStatus[] | undefined
 }
 
+interface BranchWorktreeFixture {
+  path: string
+  isPrimary: boolean
+  isLocked: boolean
+}
+
+export interface BranchSnapshotFixture extends BranchSnapshotInfo {
+  /** Test input metadata used to build the separate authoritative worktree snapshot. */
+  worktree?: BranchWorktreeFixture
+}
+
 interface RepoPresentationFactsForTest {
-  branches: BranchSnapshotInfo[]
+  branches: BranchSnapshotFixture[]
   currentBranch: string
   status?: WorktreeStatus[]
   worktrees?: RepoWorktreeSnapshot[]
@@ -127,7 +138,10 @@ export function setWorkspaceProbeForTest(workspaceId: string, workspaceProbe: Wo
   })
 }
 
-export function createBranchSnapshot(name: string, options: Partial<BranchSnapshotInfo> = {}): BranchSnapshotInfo {
+export function createBranchSnapshot(
+  name: string,
+  options: Partial<BranchSnapshotFixture> = {},
+): BranchSnapshotFixture {
   return {
     name,
     isCurrent: false,
@@ -142,11 +156,11 @@ export function createBranchSnapshot(name: string, options: Partial<BranchSnapsh
   }
 }
 
-export function createRepoBranch(name: string, options: Partial<BranchSnapshotInfo> = {}): BranchSnapshotInfo {
+export function createRepoBranch(name: string, options: Partial<BranchSnapshotFixture> = {}): BranchSnapshotFixture {
   return createBranchSnapshot(name, options)
 }
 
-export function createRepoWorktreeSnapshotsForTest(branches: readonly BranchSnapshotInfo[]): RepoWorktreeSnapshot[] {
+export function createRepoWorktreeSnapshotsForTest(branches: readonly BranchSnapshotFixture[]): RepoWorktreeSnapshot[] {
   return branches.flatMap((branch): RepoWorktreeSnapshot[] =>
     branch.worktree
       ? [
@@ -207,8 +221,8 @@ export function resetWorkspacesStore(): void {
 
 export function seedRepoWithReadModelForTest(options: {
   id: string
-  branches?: BranchSnapshotInfo[]
-  branchSnapshots?: BranchSnapshotInfo[]
+  branches?: BranchSnapshotFixture[]
+  branchSnapshots?: BranchSnapshotFixture[]
   currentBranch?: string
   currentBranchName?: string | null
   preferredWorkspacePaneTab?: WorkspacePaneTabType | null
@@ -276,7 +290,7 @@ export function seedRepoWithReadModelForTest(options: {
 export function seedRepoQueryDataForTest(
   repo: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'>,
   readModel: {
-    branches: BranchSnapshotInfo[]
+    branches: BranchSnapshotFixture[]
     currentBranch: string
     status?: WorktreeStatus[]
     worktrees?: RepoWorktreeSnapshot[]
@@ -297,13 +311,13 @@ export function seedRepoQueryDataForTest(
 }
 
 function testRepoSnapshot(
-  branches: BranchSnapshotInfo[],
+  branches: BranchSnapshotFixture[],
   current: string,
   remote: Partial<RepoRemoteInfo> = {},
   worktrees: RepoWorktreeSnapshot[] = createRepoWorktreeSnapshotsForTest(branches),
 ): RepoSnapshot {
   return {
-    branches,
+    branches: branches.map(branchSnapshotFromFixture),
     worktrees,
     current,
     remote: {
@@ -314,5 +328,23 @@ function testRepoSnapshot(
       hasGitHubRemote: false,
       ...remote,
     },
+  }
+}
+
+function branchSnapshotFromFixture(branch: BranchSnapshotFixture): BranchSnapshotInfo {
+  return {
+    name: branch.name,
+    isCurrent: branch.isCurrent,
+    ...(branch.isDefault === undefined ? {} : { isDefault: branch.isDefault }),
+    ...(branch.tracking === undefined ? {} : { tracking: branch.tracking }),
+    ...(branch.trackingGone === undefined ? {} : { trackingGone: branch.trackingGone }),
+    ahead: branch.ahead,
+    behind: branch.behind,
+    lastCommitHash: branch.lastCommitHash,
+    lastCommitShortHash: branch.lastCommitShortHash,
+    lastCommitMessage: branch.lastCommitMessage,
+    lastCommitDate: branch.lastCommitDate,
+    lastCommitAuthor: branch.lastCommitAuthor,
+    ...(branch.mergedToDefault === undefined ? {} : { mergedToDefault: branch.mergedToDefault }),
   }
 }

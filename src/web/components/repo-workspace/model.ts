@@ -1,6 +1,7 @@
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { branchWorktreeChanges, branchWorktreeStatus } from '#/web/stores/workspaces/worktree-state.ts'
+import { worktreeChanges, worktreeStatus } from '#/web/stores/workspaces/worktree-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 
 export type CurrentGitWorkspacePane = ReturnType<typeof getCurrentGitWorkspacePane>
@@ -22,9 +23,10 @@ export interface GitWorkspacePaneProjection extends BranchActionRepo {
 export function getCurrentGitWorkspacePane(workspace: GitWorkspacePaneProjection, pullRequest?: PullRequestInfo) {
   const branch =
     workspace.snapshot.branches.find((candidate) => candidate.name === workspace.ui.currentBranchName) ?? null
-  const currentBranchStatus = branchWorktreeStatus(workspace.status, branch)
-  const worktreeChanges = branch ? branchWorktreeChanges(workspace.status, branch) : undefined
-  const statusCount = worktreeChanges?.changeCount
+  const worktree = branch ? (repoWorktreeForBranch(workspace.snapshot.worktrees, branch.name) ?? null) : null
+  const currentBranchStatus = worktreeStatus(workspace.status, worktree?.path)
+  const changes = worktreeChanges(workspace.status, worktree?.path)
+  const statusCount = changes?.changeCount
 
   // The Git pane projection reads the target from the lifecycle
   // union via `remoteWorkspaceTarget`; we don't mirror it on the
@@ -33,7 +35,15 @@ export function getCurrentGitWorkspacePane(workspace: GitWorkspacePaneProjection
   // re-resolve the live lifecycle via `workspacesStore` (the
   // presentation object is a snapshot — it doesn't re-render on
   // lifecycle transitions).
-  return { workspaceId: workspace.id, branch, pullRequest, currentBranchStatus, statusCount, worktreeChanges }
+  return {
+    workspaceId: workspace.id,
+    branch,
+    worktree,
+    pullRequest,
+    currentBranchStatus,
+    statusCount,
+    worktreeChanges: changes,
+  }
 }
 
 export function getCurrentGitWorkspacePanePresentation(

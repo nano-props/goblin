@@ -15,12 +15,12 @@ import { ArrowDown, ArrowUp, FolderTree, GitBranch } from '@lucide/vue'
 import { i18nStore } from '#/web/stores/i18n.ts'
 import type { Lang } from '#/shared/settings.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
+import type { BranchSnapshotInfo, RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
-import { branchWorktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
+import { worktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
@@ -32,6 +32,7 @@ export interface BranchSummaryInlineRepo {
 interface BranchSummaryInlineProps {
   repo: BranchSummaryInlineRepo
   branch: BranchSnapshotInfo
+  worktree?: RepoWorktreeSnapshot
   selected?: boolean
   leadingTerminalBellCount?: number
   leadingTerminalOutputActive?: boolean
@@ -61,9 +62,14 @@ const Delta: FunctionalComponent<{ direction: 'ahead' | 'behind'; count: number;
 // (branch, repo) pair. Single source of truth shared by the icon, the
 // meta strip, and the outer title — recomputing these in three places
 // is what originally kept this file sprawling.
-export function computeBranchSummaryState(branch: BranchSnapshotInfo, repo: BranchSummaryInlineRepo, lang: Lang) {
-  const hasWorktree = !!branch.worktree?.path
-  const worktreeDirty = branchWorktreeChanges(repo.status, branch)?.dirty
+export function computeBranchSummaryState(
+  branch: BranchSnapshotInfo,
+  worktree: RepoWorktreeSnapshot | undefined,
+  repo: BranchSummaryInlineRepo,
+  lang: Lang,
+) {
+  const hasWorktree = !!worktree
+  const worktreeDirty = worktreeChanges(repo.status, worktree?.path)?.dirty
   const commitMeta = formatRelativeTimeOrNull(branch.lastCommitDate, lang)
   return { hasWorktree, worktreeDirty, commitMeta }
 }
@@ -143,16 +149,18 @@ export const BranchSummaryIcon: FunctionalComponent<BranchSummaryIconProps> = (p
 // leading BranchSummaryIcon glyph — no worktree / dirty badges here.
 // Read-only by design — none of the inner spans are interactive.
 // BranchRow renders it as part of BranchSummaryInline.
-export const BranchSummaryMeta = defineComponent<Pick<BranchSummaryInlineProps, 'repo' | 'branch' | 'selected'>>({
+export const BranchSummaryMeta = defineComponent<
+  Pick<BranchSummaryInlineProps, 'repo' | 'branch' | 'worktree' | 'selected'>
+>({
   name: 'BranchSummaryMeta',
-  props: ['repo', 'branch', 'selected'],
+  props: ['repo', 'branch', 'worktree', 'selected'],
   setup(props) {
     const t = useT()
     const lang = useStoreSelector(i18nStore, (state) => state.lang)
 
     return () => {
       const selected = props.selected ?? false
-      const { commitMeta } = computeBranchSummaryState(props.branch, props.repo, lang.value)
+      const { commitMeta } = computeBranchSummaryState(props.branch, props.worktree, props.repo, lang.value)
       return (
         <span
           class={cn(
@@ -202,6 +210,7 @@ export const BranchSummaryInline = defineComponent<BranchSummaryInlineProps>({
   props: [
     'repo',
     'branch',
+    'worktree',
     'selected',
     'leadingTerminalBellCount',
     'leadingTerminalOutputActive',
@@ -216,7 +225,7 @@ export const BranchSummaryInline = defineComponent<BranchSummaryInlineProps>({
     return () => {
       const selected = props.selected ?? false
       const leadingTerminalBellCount = props.leadingTerminalBellCount ?? 0
-      const state = computeBranchSummaryState(props.branch, props.repo, lang.value)
+      const state = computeBranchSummaryState(props.branch, props.worktree, props.repo, lang.value)
       const { hasWorktree, worktreeDirty } = state
       const iconDirty = props.worktreeIconDirty ?? worktreeDirty
       const showLeadingTerminalBell = leadingTerminalBellCount > 0

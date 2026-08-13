@@ -55,9 +55,9 @@ const REPO_WORKSPACE_STATIC_PANEL_BY_TYPE: Record<WorkspacePaneStaticTabType, Wo
 export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput): VNodeChild {
   if (isWorkspacePaneRuntimeTabType(input.type)) {
     const runtimeState = input.runtimeTabStateByType[input.type]
-    const branch = input.detail.branch
-    if (!branch?.worktree?.path) return null
-    const worktreePath = branch.worktree.path
+    const worktree = input.detail.worktree
+    if (!worktree) return null
+    const worktreePath = worktree.path
     const tabsTarget = gitWorktreeWorkspacePaneTabsTarget(input.repo.id, worktreePath)
     if (!tabsTarget) return null
     const runtimeTarget = runtimeWorkspacePaneTarget(tabsTarget, input.repo.workspaceRuntimeId)
@@ -131,6 +131,7 @@ function ChangesWorkspacePanePanel({ detail, workspacePaneId, panelLabel }: Work
       workspacePaneId={workspacePaneId}
       panelLabel={panelLabel}
       branch={branch}
+      hasWorktree={!!detail.worktree}
       currentBranchStatus={detail.currentBranchStatus}
       statusLoading={detail.loading.status}
     />
@@ -139,9 +140,9 @@ function ChangesWorkspacePanePanel({ detail, workspacePaneId, panelLabel }: Work
 
 function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
   const branch = detail.branch
-  const worktreePath = branch?.worktree?.path
+  const worktreePath = detail.worktree?.path
   const capabilities = repo.probe.capabilities
-  if (!worktreePath || !capabilities) {
+  if (!branch || !worktreePath || !capabilities) {
     return (
       <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
         <FiletreeNoWorktreeView />
@@ -151,7 +152,7 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
       <WorkspaceFilesystemTabPanel
-        routeTarget={{ kind: 'git-branch', workspaceId: repo.id, branchName: branch.name }}
+        routeTarget={{ kind: 'git-worktree', workspaceId: repo.id, worktreePath }}
         target={gitWorktreePaneFilesystemTarget({
           workspaceId: repo.id,
           workspaceRuntimeId: repo.workspaceRuntimeId,
@@ -234,13 +235,14 @@ interface BranchChangesTabProps {
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
   branch: GitWorkspacePaneBranch
+  hasWorktree: boolean
   currentBranchStatus: CurrentGitWorkspacePanePresentation['currentBranchStatus']
   statusLoading: boolean
 }
 
 const BranchChangesTab = defineComponent<BranchChangesTabProps>({
   name: 'BranchChangesTab',
-  props: ['workspacePaneId', 'panelLabel', 'branch', 'currentBranchStatus', 'statusLoading'],
+  props: ['workspacePaneId', 'panelLabel', 'branch', 'hasWorktree', 'currentBranchStatus', 'statusLoading'],
 
   setup(props) {
     const t = useT()
@@ -253,7 +255,7 @@ const BranchChangesTab = defineComponent<BranchChangesTabProps>({
           {...props.panelLabel}
           busy={props.statusLoading}
         >
-          {props.branch.worktree?.path ? (
+          {props.hasWorktree ? (
             <div class="relative flex min-h-0 flex-1 flex-col">
               {props.currentBranchStatus === undefined ? (
                 <EmptyState title={t(unavailableStatusKey)} />

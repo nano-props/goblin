@@ -21,11 +21,7 @@ export const PRETTY_FIELD_SEP = '%x00'
  * Fields, in order: refname:short, objectname, objectname:short, subject,
  * authordate:iso-strict, authorname, upstream:short, upstream:track.
  */
-export function parseBranches(
-  output: string,
-  currentBranch: string,
-  worktrees: WorktreeInfo[] = [],
-): BranchSnapshotInfo[] {
+export function parseBranches(output: string, currentBranch: string): BranchSnapshotInfo[] {
   if (!output) return []
 
   const lines = output.split('\n').filter((line) => line.length > 0)
@@ -48,19 +44,6 @@ export function parseBranches(
       throw new Error('Invalid branch snapshot metadata')
     }
   }
-
-  const worktreeMap = new Map(
-    worktrees.flatMap((worktree) =>
-      worktree.branch
-        ? [
-            [
-              worktree.branch,
-              { path: worktree.path, isPrimary: worktree.isPrimary, isLocked: worktree.isLocked ?? false },
-            ] as const,
-          ]
-        : [],
-    ),
-  )
 
   const branches: BranchSnapshotInfo[] = []
 
@@ -98,8 +81,6 @@ export function parseBranches(
       branchInfo.tracking = upstream
       branchInfo.trackingGone = track.includes('gone')
     }
-
-    branchInfo.worktree = worktreeMap.get(name)
 
     branches.push(branchInfo)
   }

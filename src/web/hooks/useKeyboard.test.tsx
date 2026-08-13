@@ -14,6 +14,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 
 vi.mock('vue-sonner', () => ({
   toast: {
@@ -159,6 +160,7 @@ describe('useKeyboard', () => {
     const selectTerminal = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
     const showRepoBranchTerminalSession = vi.fn(() => true)
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
@@ -172,7 +174,11 @@ describe('useKeyboard', () => {
     await renderHookHost({
       currentWorkspaceId: REPO_ID,
       currentBranchName: 'feature/worktree',
-      navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
+      navigation: navigationWith({
+        showRepoBranchWorkspacePaneTab,
+        showRepoBranchTerminalSession,
+        commitFilesystemWorkspacePaneRoute,
+      }),
     })
     seedInitialObservedWorkspacePaneRouteForTest({
       workspaceId: REPO_ID,
@@ -187,11 +193,14 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-111111111111111111111',
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      }),
+      { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+      expect.any(Object),
     )
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(selectTerminal).not.toHaveBeenCalled()
   })
@@ -308,6 +317,7 @@ describe('useKeyboard', () => {
     const selectTerminal = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
     const showRepoBranchTerminalSession = vi.fn(() => true)
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => terminalFilesystemTargetSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
@@ -321,7 +331,11 @@ describe('useKeyboard', () => {
     await renderHookHost({
       currentWorkspaceId: REPO_ID,
       currentBranchName: 'feature/worktree',
-      navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
+      navigation: navigationWith({
+        showRepoBranchWorkspacePaneTab,
+        showRepoBranchTerminalSession,
+        commitFilesystemWorkspacePaneRoute,
+      }),
     })
     seedInitialObservedWorkspacePaneRouteForTest({
       workspaceId: REPO_ID,
@@ -338,11 +352,14 @@ describe('useKeyboard', () => {
 
     await dispatchPrimaryShortcut('2', 'Digit2')
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-111111111111111111111',
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      }),
+      { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+      expect.any(Object),
     )
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(selectTerminal).not.toHaveBeenCalled()
     terminalHost.remove()
@@ -899,19 +916,21 @@ const HookHost = defineComponent<Partial<HookHostOptions>>({
             (candidate) => candidate.name === overrides.currentBranchName,
           )
         : null
+    const snapshot = repo ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId) : null
+    const worktree = snapshot && branch ? repoWorktreeForBranch(snapshot.worktrees, branch.name) : undefined
     const defaultCommandTarget =
-      repo?.capability.kind === 'git' && overrides.currentBranchName && branch?.worktree
+      repo?.capability.kind === 'git' && overrides.currentBranchName && worktree
         ? {
             routeTarget: {
-              kind: 'git-branch' as const,
+              kind: 'git-worktree' as const,
               workspaceId: repo.id,
-              branchName: overrides.currentBranchName,
+              worktreePath: worktree.path,
             },
             workspacePaneRoute: null,
             filesystemTarget: gitWorktreePaneFilesystemTarget({
               workspaceId: repo.id,
               workspaceRuntimeId: repo.workspaceRuntimeId,
-              worktreePath: branch.worktree.path,
+              worktreePath: worktree.path,
               head: { kind: 'branch' as const, branchName: overrides.currentBranchName },
               capabilities: repo.capability.probe.capabilities,
             }),

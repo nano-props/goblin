@@ -60,7 +60,7 @@ export function useGitWorkspacePaneTabModelInput(
 ): ComputedRef<WorkspacePaneTabModelInput> {
   const workspace = computed(() => toValue(gitWorkspace))
   const branchName = computed(() => toValue(detail).branch?.name ?? null)
-  const worktreePath = computed(() => toValue(detail).branch?.worktree?.path ?? null)
+  const worktreePath = computed(() => toValue(detail).worktree?.path ?? null)
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: () => workspace.value.id,
     workspaceRuntimeId: () => workspace.value.workspaceRuntimeId,
@@ -106,9 +106,7 @@ export function useGitWorkspacePaneTabModelInput(
     return {
       workspaceId: currentWorkspace.id,
       workspaceRuntimeId: currentWorkspace.workspaceRuntimeId,
-      routeTarget: currentBranchName
-        ? { kind: 'git-branch', workspaceId: currentWorkspace.id, branchName: currentBranchName }
-        : { kind: 'inactive', workspaceId: currentWorkspace.id },
+      routeTarget: target ?? { kind: 'inactive', workspaceId: currentWorkspace.id },
       paneTarget: target ?? { kind: 'inactive', workspaceId: currentWorkspace.id },
       worktreeHead:
         currentBranchName && currentWorktreePath

@@ -1,4 +1,5 @@
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import type { BranchSnapshotInfo, WorktreeStatus } from '#/shared/git-types.ts'
 
 export interface DashboardBranchItem {
@@ -32,7 +33,9 @@ export function buildDashboardSummary(
   const branches = branchModel.snapshot.branches
   const pullRequestsByBranch = new Map(pullRequestEntries?.map((entry) => [entry.branch, entry.pullRequest]) ?? [])
   const branchItems = branches.map((branch) => buildDashboardBranchItem(branchModel, pullRequestsByBranch, branch))
-  const worktreeBranches = branchItems.filter(({ branch }) => !!branch.worktree?.path)
+  const worktreeBranches = branchItems.filter(
+    ({ branch }) => !!repoWorktreeForBranch(branchModel.snapshot.worktrees, branch.name),
+  )
   const dirtyWorktreeCount = branchModel.status
     ? worktreeBranches.filter((item) => item.dirty === true).length
     : undefined
@@ -93,7 +96,7 @@ function branchAttentionScore({ branch, dirty, pullRequest }: DashboardBranchIte
 }
 
 function branchWorktreeDirty(branchModel: DashboardRepositoryFacts, branch: BranchSnapshotInfo): boolean | undefined {
-  const worktreePath = branch.worktree?.path
+  const worktreePath = repoWorktreeForBranch(branchModel.snapshot.worktrees, branch.name)?.path
   if (!worktreePath) return false
   const status = branchModel.status?.find((wt) => wt.path === worktreePath)
   return status ? status.entries.length > 0 : undefined

@@ -27,6 +27,7 @@ import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import {
   gitWorktreePaneFilesystemTarget,
   workspacePaneFilesystemRootPath,
@@ -81,14 +82,21 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
           (candidate) => candidate.name === options.branchName,
         )
       : null
-    if (repo?.capability.kind === 'git' && branch?.worktree) {
+    const worktree =
+      branch && repo
+        ? repoWorktreeForBranch(
+            getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.worktrees ?? [],
+            branch.name,
+          )
+        : undefined
+    if (repo?.capability.kind === 'git' && worktree) {
       return {
-        routeTarget: { kind: 'git-worktree', workspaceId: repo.id, worktreePath: branch.worktree.path },
+        routeTarget: { kind: 'git-worktree', workspaceId: repo.id, worktreePath: worktree.path },
         workspacePaneRoute: options.workspacePaneRoute,
         filesystemTarget: gitWorktreePaneFilesystemTarget({
           workspaceId: repo.id,
           workspaceRuntimeId: repo.workspaceRuntimeId,
-          worktreePath: branch.worktree.path,
+          worktreePath: worktree.path,
           head: { kind: 'branch', branchName: options.branchName },
           capabilities: repo.capability.probe.capabilities,
         }),
@@ -201,6 +209,7 @@ export function preferredWorkspacePaneTab(branch = 'feature/worktree') {
           {
             workspaceId: repo.id,
             branches: getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches ?? [],
+            worktrees: getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.worktrees ?? [],
           },
           branch,
         ),
@@ -219,6 +228,7 @@ export function tabsFor(branch: string): WorkspacePaneTabEntry[] {
         {
           workspaceId: repo.id,
           branches: getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches ?? [],
+          worktrees: getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.worktrees ?? [],
         },
         branch,
       )

@@ -7,6 +7,7 @@ describe('selectedBranchForBranchSet', () => {
     expect(
       selectedBranchForBranchSet({
         branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
+        worktrees: [],
         currentBranch: 'main',
         selectedBranch: null,
         viewMode: 'all',
@@ -18,6 +19,7 @@ describe('selectedBranchForBranchSet', () => {
     expect(
       selectedBranchForBranchSet({
         branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
+        worktrees: [],
         currentBranch: 'main',
         selectedBranch: 'missing',
         viewMode: 'all',

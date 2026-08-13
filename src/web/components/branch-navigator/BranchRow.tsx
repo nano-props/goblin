@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue'
 import type { FunctionalComponent, PropType } from 'vue'
-import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
+import type { BranchSnapshotInfo, RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import { BranchActionsMenu } from '#/web/components/BranchActionsMenu.tsx'
 import { BranchSummaryInline } from '#/web/components/repo-workspace/BranchSummaryInline.tsx'
 import { cn } from '#/web/lib/cn.ts'
@@ -15,6 +15,7 @@ import type { ElementRef } from '#/web/components/ui/refs.ts'
 export interface BranchRowProps {
   repo: BranchActionRepo
   branch: BranchSnapshotInfo
+  worktree?: RepoWorktreeSnapshot
   selected: string | null
   onSelectBranch: (branch: string) => void
   onOpenBranchStatus: (branch: string) => void
@@ -38,6 +39,7 @@ export const BranchRow = defineComponent<BranchRowProps>({
   props: {
     repo: { type: Object as PropType<BranchActionRepo>, required: true },
     branch: { type: Object as PropType<BranchSnapshotInfo>, required: true },
+    worktree: { type: Object as PropType<RepoWorktreeSnapshot>, default: undefined },
     selected: { type: String, default: null },
     onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
     onOpenBranchStatus: { type: Function as PropType<(branch: string) => void>, required: true },
@@ -80,6 +82,7 @@ export const BranchRow = defineComponent<BranchRowProps>({
             <BranchSummaryInline
               repo={props.repo}
               branch={props.branch}
+              worktree={props.worktree}
               selected={isSelected}
               leadingTerminalBellCount={leadingTerminalBellCount}
               leadingTerminalOutputActive={leadingTerminalOutputActive}

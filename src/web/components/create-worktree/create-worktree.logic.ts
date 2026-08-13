@@ -14,6 +14,7 @@ import {
   type RemoteTrackingBranchIdentity,
 } from '#/shared/worktree-create.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type CreateWorktreeMode = CreateWorktreeInput['mode']['kind']
@@ -56,7 +57,7 @@ export type Translate = (key: string, params?: Record<string, string | number>) 
 
 interface CreateWorktreeFormRepo {
   id: WorkspaceId
-  snapshot: Pick<RepoSnapshot, 'branches' | 'current'>
+  snapshot: Pick<RepoSnapshot, 'branches' | 'current' | 'worktrees'>
 }
 
 export function initialCreateWorktreeBase(snapshot: {
@@ -74,7 +75,7 @@ export function deriveCreateWorktreeForm(
 ): CreateWorktreeDerived {
   const localBranchNames = repo.snapshot.branches.map((b) => b.name)
   const hasLocalBranch = (name: string) => localBranchNames.includes(name)
-  const branchWorktree = (name: string) => repo.snapshot.branches.find((b) => b.name === name)?.worktree
+  const branchWorktree = (name: string) => repoWorktreeForBranch(repo.snapshot.worktrees, name)
 
   const branchTrimmed = state.branch.trim()
   const selectedRemoteBranch =

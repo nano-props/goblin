@@ -864,7 +864,11 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = workspacesStore.getState().workspaces[REPO_ID]
   const target = repo
     ? workspacePaneTabsTargetForRepoBranch(
-        { workspaceId: repo.id, branches: repoPresentationFromQueryForTest(repo).snapshot.branches },
+        {
+          workspaceId: repo.id,
+          branches: repoPresentationFromQueryForTest(repo).snapshot.branches,
+          worktrees: repoPresentationFromQueryForTest(repo).snapshot.worktrees,
+        },
         branchName,
       )
     : null
@@ -879,7 +883,11 @@ function preferredWorkspacePaneTab(branchName = 'feature/worktree') {
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
         workspacePaneTabsTargetForRepoBranch(
-          { workspaceId: repo.id, branches: repoPresentationFromQueryForTest(repo).snapshot.branches },
+          {
+            workspaceId: repo.id,
+            branches: repoPresentationFromQueryForTest(repo).snapshot.branches,
+            worktrees: repoPresentationFromQueryForTest(repo).snapshot.worktrees,
+          },
           branchName,
         ),
       )

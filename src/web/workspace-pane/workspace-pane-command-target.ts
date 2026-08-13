@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/query-core'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
-import type { RepoSnapshotResponse, RepoWorktreeStatusSnapshot } from '#/shared/api-types.ts'
+import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
@@ -12,8 +12,9 @@ import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-targe
 import type { GitHead } from '#/shared/git-head.ts'
 import { gitHead, gitHeadBranch } from '#/shared/git-head.ts'
 import type { WorkspaceRouteContext } from '#/web/app-layout-model.ts'
-import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 
 export type WorkspacePaneCommandTarget =
   | {
@@ -48,39 +49,37 @@ export function workspacePaneCommandTargetFromQueryCache(input: {
             repoSnapshotQueryKey(workspace.id, workspace.workspaceRuntimeId),
           )
         : undefined
-    const branch =
-      snapshotQuery?.status === 'success'
-        ? snapshotQuery.data?.snapshot.branches.find((candidate) => candidate.name === routeContext.branchName)
-        : undefined
-    const worktreePath = branch?.worktree?.path ?? null
+    const snapshot = snapshotQuery?.data?.snapshot
+    const worktreePath = snapshot
+      ? (repoWorktreeForBranch(snapshot.worktrees, routeContext.branchName)?.path ?? null)
+      : null
+    if (workspace.capability.kind === 'git' && worktreePath) {
+      return {
+        routeTarget: { kind: 'git-worktree', workspaceId: workspace.id, worktreePath },
+        workspacePaneRoute: routeContext.workspacePaneRoute,
+        filesystemTarget: gitWorktreePaneFilesystemTarget({
+          workspaceId: workspace.id,
+          workspaceRuntimeId: workspace.workspaceRuntimeId,
+          worktreePath,
+          head: gitHead(routeContext.branchName),
+          capabilities: workspace.capability.probe.capabilities,
+        }),
+      }
+    }
     return {
-      routeTarget: {
-        kind: 'git-branch',
-        workspaceId: workspace.id,
-        branchName: routeContext.branchName,
-      },
+      routeTarget: { kind: 'git-branch', workspaceId: workspace.id, branchName: routeContext.branchName },
       workspacePaneRoute: routeContext.workspacePaneRoute,
-      filesystemTarget:
-        workspace.capability.kind === 'git' && worktreePath
-          ? gitWorktreePaneFilesystemTarget({
-              workspaceId: workspace.id,
-              workspaceRuntimeId: workspace.workspaceRuntimeId,
-              worktreePath,
-              head: gitHead(routeContext.branchName),
-              capabilities: workspace.capability.probe.capabilities,
-            })
-          : null,
+      filesystemTarget: null,
     }
   }
 
   if (routeContext.kind === 'worktree' && routeContext.worktreePath && workspace.capability.kind === 'git') {
-    const statusQuery = input.queryClient.getQueryState<RepoWorktreeStatusSnapshot>(
-      repoWorktreeStatusQueryKey(workspace.id, workspace.workspaceRuntimeId),
+    const snapshotQuery = input.queryClient.getQueryState<RepoSnapshotResponse>(
+      repoSnapshotQueryKey(workspace.id, workspace.workspaceRuntimeId),
     )
-    const worktree =
-      statusQuery?.status === 'success'
-        ? statusQuery.data?.status.find((candidate) => candidate.path === routeContext.worktreePath)
-        : undefined
+    const worktree = snapshotQuery?.data?.snapshot.worktrees.find(
+      (candidate) => candidate.path === routeContext.worktreePath,
+    )
     if (!worktree) return null
     return {
       routeTarget: {
@@ -93,7 +92,7 @@ export function workspacePaneCommandTargetFromQueryCache(input: {
         workspaceId: workspace.id,
         workspaceRuntimeId: workspace.workspaceRuntimeId,
         worktreePath: routeContext.worktreePath,
-        head: gitHead(worktree.branch ?? null),
+        head: worktree.head,
         capabilities: workspace.capability.probe.capabilities,
       }),
     }

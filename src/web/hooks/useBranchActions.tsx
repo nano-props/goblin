@@ -5,6 +5,7 @@ import { toast } from 'vue-sonner'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/settings.ts'
@@ -17,7 +18,7 @@ import {
 } from '#/web/workspace-external-app-client.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
-import { branchWorktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
+import { worktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
 import { dispatchRepoBranchAction, isPushProtected } from '#/web/stores/workspaces/branch-action-write-paths.ts'
 import { dispatchWorkspaceUiAction } from '#/web/stores/workspaces/workspace-ui-action.ts'
 import { branchActionDialogsStore } from '#/web/stores/workspaces/branch-action-dialogs.ts'
@@ -70,11 +71,12 @@ export function getBranchActionCapabilities(
 ): BranchActionCapabilities {
   const isCurrent = branch.name === repo.snapshot.current
   const isProtected = PROTECTED_BRANCHES.has(branch.name)
-  const isRegularBranch = !isCurrent && !branch.worktree?.path && !isProtected
-  const worktreeChanges = branchWorktreeChanges(repo.status, branch)
-  const canRemoveWorktree = !!branch.worktree && branch.worktree.isPrimary === false
-  const canCopyPatch = !!branch.worktree && worktreeChanges?.dirty === true
-  const hasWorktree = !!branch.worktree?.path
+  const worktree = repoWorktreeForBranch(repo.snapshot.worktrees, branch.name)
+  const isRegularBranch = !isCurrent && !worktree && !isProtected
+  const changes = worktreeChanges(repo.status, worktree?.path)
+  const canRemoveWorktree = !!worktree && !worktree.isPrimary
+  const canCopyPatch = !!worktree && changes?.dirty === true
+  const hasWorktree = !!worktree
   const isRemoteRepo = isRemoteWorkspaceId(repo.id)
   return {
     canRemoveWorktree,
@@ -110,8 +112,9 @@ export function useBranchActions(
   const localActionScopeKey = computed(() => {
     const currentRepo = toValue(repo)
     const currentBranch = toValue(branch)
+    const worktree = repoWorktreeForBranch(currentRepo.snapshot.worktrees, currentBranch.name)
     return workspacePaneTabsTargetIdentityKey(
-      requiredGitWorkspacePaneTabsTarget(currentRepo.id, currentBranch.name, currentBranch.worktree?.path ?? null),
+      requiredGitWorkspacePaneTabsTarget(currentRepo.id, currentBranch.name, worktree?.path ?? null),
     )
   })
   const { pending, hasPending, run } = useAsyncPending<BranchUiActionOpId>({
@@ -164,7 +167,7 @@ export function useBranchActions(
   function copyPatch(): Promise<boolean> {
     const currentRepo = toValue(repo)
     const currentBranch = toValue(branch)
-    const worktreePath = currentBranch.worktree?.path
+    const worktreePath = repoWorktreeForBranch(currentRepo.snapshot.worktrees, currentBranch.name)?.path
     if (!worktreePath) return Promise.resolve(false)
     if (!globalThis.navigator?.clipboard?.writeText) {
       if (guardBusy()) return Promise.resolve(false)
@@ -198,8 +201,10 @@ export function useBranchActions(
   }
 
   function pull() {
+    const currentRepo = toValue(repo)
     const currentBranch = toValue(branch)
-    runRepoAction({ kind: 'pull', branch: currentBranch.name, worktreePath: currentBranch.worktree?.path })
+    const worktreePath = repoWorktreeForBranch(currentRepo.snapshot.worktrees, currentBranch.name)?.path
+    runRepoAction({ kind: 'pull', branch: currentBranch.name, worktreePath })
   }
 
   function push() {
@@ -219,7 +224,7 @@ export function useBranchActions(
 
   function openTerminal(app: TerminalApp) {
     const currentRepo = toValue(repo)
-    const worktreePath = toValue(branch).worktree?.path
+    const worktreePath = repoWorktreeForBranch(currentRepo.snapshot.worktrees, toValue(branch).name)?.path
     if (!worktreePath) return
     const target = gitWorktreeFilesystemExecutionTarget(currentRepo.id, currentRepo.workspaceRuntimeId, worktreePath)
     if (!target) return
@@ -228,7 +233,7 @@ export function useBranchActions(
 
   function openEditor(app: EditorApp) {
     const currentRepo = toValue(repo)
-    const worktreePath = toValue(branch).worktree?.path
+    const worktreePath = repoWorktreeForBranch(currentRepo.snapshot.worktrees, toValue(branch).name)?.path
     if (!worktreePath) return
     const target = gitWorktreeFilesystemExecutionTarget(currentRepo.id, currentRepo.workspaceRuntimeId, worktreePath)
     if (!target) return
@@ -237,7 +242,7 @@ export function useBranchActions(
 
   function openFinder() {
     const currentRepo = toValue(repo)
-    const worktreePath = toValue(branch).worktree?.path
+    const worktreePath = repoWorktreeForBranch(currentRepo.snapshot.worktrees, toValue(branch).name)?.path
     if (!worktreePath || isRemoteWorkspaceId(currentRepo.id)) return
     const target = gitWorktreeFilesystemExecutionTarget(currentRepo.id, currentRepo.workspaceRuntimeId, worktreePath)
     if (!target) return
@@ -258,12 +263,13 @@ export function useBranchActions(
   function requestRemoveWorktree() {
     const currentRepo = toValue(repo)
     const currentBranch = toValue(branch)
-    if (guardBusy() || !currentBranch.worktree?.path) return
+    const worktreePath = repoWorktreeForBranch(currentRepo.snapshot.worktrees, currentBranch.name)?.path
+    if (guardBusy() || !worktreePath) return
     branchActionDialogsStore.getState().openRemoveWorktreeConfirm(
       {
         repoId: currentRepo.id,
         branchName: currentBranch.name,
-        payload: { branch: currentBranch.name, path: currentBranch.worktree.path },
+        payload: { branch: currentBranch.name, path: worktreePath },
       },
       { isProtectedBranch: PROTECTED_BRANCHES.has(currentBranch.name) },
     )

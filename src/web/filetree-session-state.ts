@@ -15,7 +15,7 @@ import {
 
 interface ClientWorkspaceFilesystemTargetsProjection {
   gitTargets?: {
-    branches: ReadonlyArray<{ worktree?: { path?: string; isPrimary?: boolean; isLocked?: boolean } | undefined }>
+    worktrees: ReadonlyArray<{ path: string }>
   }
 }
 
@@ -89,7 +89,7 @@ function knownFilesystemRootPaths(
   const workspaceRoot = parseCanonicalWorkspaceLocator(workspaceId)?.path
   return new Set([
     ...(workspaceRoot ? [workspaceRoot] : []),
-    ...(workspace.gitTargets?.branches ?? []).map((branch) => branch.worktree?.path).filter(isNonEmptyString),
+    ...(workspace.gitTargets?.worktrees ?? []).map((worktree) => worktree.path).filter(isNonEmptyString),
   ])
 }
 

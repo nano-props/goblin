@@ -13,6 +13,7 @@ import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factor
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
+import type { BranchSnapshotFixture } from '#/web/test-utils/repo-store.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-test-repo')
 export const ipcHandlers: Record<string, IpcTestHandler> = {}
@@ -60,12 +61,13 @@ export function createWorktreeAction(): TestCreateWorktreeAction {
   }
 }
 
-export function branch(name: string, options: Partial<BranchSnapshotInfo> = {}): BranchSnapshotInfo {
+export function branch(name: string, options: Partial<BranchSnapshotFixture> = {}): BranchSnapshotFixture {
   return createBranchSnapshot(name, options)
 }
 
 export function repoSnapshotResponse(
-  snapshot: Omit<RepoSnapshot, 'remote' | 'worktrees'> & {
+  snapshot: Omit<RepoSnapshot, 'branches' | 'remote' | 'worktrees'> & {
+    branches: BranchSnapshotFixture[]
     remote?: RepoRemoteInfo
     worktrees?: RepoSnapshot['worktrees']
   },
@@ -79,7 +81,7 @@ export function repoSnapshotResponse(
   }
 }
 
-export function seedRepo(branches: BranchSnapshotInfo[], workspaceRuntimeId = 'repo-runtime-test'): string {
+export function seedRepo(branches: BranchSnapshotFixture[], workspaceRuntimeId = 'repo-runtime-test'): string {
   return seedRepoWithReadModelForTest({
     id: REPO_ID,
     branchSnapshots: branches,

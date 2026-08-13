@@ -86,7 +86,7 @@ describe('useBranchActionItems', () => {
   })
 
   test('keeps branch-static tabs visible for a branch without a worktree but hides changes and files', async () => {
-    const { result } = renderBranchActionItems({ branch: { ...branch(), worktree: undefined } })
+    const { result } = renderBranchActionItems({ withWorktree: false })
     const actionIds = visibleBranchActionItems(result.value.value).map((item) => item.id)
 
     expect(actionIds).toContain('status')
@@ -113,10 +113,11 @@ describe('useBranchActionItems', () => {
     )
   })
 
-  function renderBranchActionItems(options: { branch?: BranchSnapshotInfo } = {}) {
+  function renderBranchActionItems(options: { withWorktree?: boolean } = {}) {
     return renderComposableInJsdom(() => {
       const branchActions = mocks.useBranchActions()
-      return useBranchActionItems(repo(), options.branch ?? branch(), branchActions, {
+      const selectedBranch = branch()
+      return useBranchActionItems(repo(selectedBranch, options.withWorktree ?? true), selectedBranch, branchActions, {
         workspacePaneRoute: undefined,
       })
     })
@@ -138,14 +139,25 @@ function allVisibleCapabilities(): BranchActionCapabilities {
   }
 }
 
-function repo(): BranchActionRepo {
+function repo(branch: BranchSnapshotInfo, withWorktree: boolean): BranchActionRepo {
   return {
     id: workspaceIdForTest('goblin+file:///tmp/goblin-action-items'),
     workspaceRuntimeId: 'repo-runtime-test',
     snapshot: {
       current: 'main',
       branches: [],
-      worktrees: [],
+      worktrees: withWorktree
+        ? [
+            {
+              path: '/tmp/goblin-action-items-worktree',
+              head: { kind: 'branch', branchName: branch.name },
+              headOid: 'a'.repeat(40),
+              operation: null,
+              isPrimary: false,
+              isLocked: false,
+            },
+          ]
+        : [],
       remote: {
         remotes: [],
         hasRemotes: true,
@@ -173,6 +185,5 @@ function branch(): BranchSnapshotInfo {
     lastCommitDate: '',
     lastCommitAuthor: '',
     tracking: 'origin/feature/action-order',
-    worktree: { path: '/tmp/goblin-action-items-worktree', isPrimary: false, isLocked: false },
   }
 }

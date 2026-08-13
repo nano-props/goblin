@@ -260,7 +260,7 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
       enabled: () => props.workspacePaneRouteContext.kind === 'routed',
       workspaceId: () => props.repo.id,
       branchName: () => props.detail.branch?.name ?? null,
-      worktreePath: () => props.detail.branch?.worktree?.path ?? null,
+      worktreePath: () => props.detail.worktree?.path ?? null,
       route: () => (props.workspacePaneRouteContext.kind === 'routed' ? props.workspacePaneRouteContext.route : null),
       model: workspacePaneTabModel,
     })

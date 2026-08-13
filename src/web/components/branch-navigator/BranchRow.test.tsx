@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
-import { createRepoBranch, createGitRepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
+import {
+  createRepoBranch,
+  createGitRepoPresentationForTest,
+  createRepoWorktreeSnapshotsForTest,
+  type BranchSnapshotFixture,
+} from '#/web/test-utils/repo-store.ts'
 import { shallowRef } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
@@ -62,6 +67,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -87,6 +93,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -119,6 +126,7 @@ describe('BranchRow', () => {
           <BranchRow
             repo={repo}
             branch={branch}
+            worktree={worktreeForFixture(branch)}
             selected={null}
             onSelectBranch={vi.fn()}
             onOpenBranchStatus={vi.fn()}
@@ -153,6 +161,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -175,6 +184,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -204,6 +214,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -233,6 +244,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected="feature/a"
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -257,6 +269,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -280,6 +293,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -301,6 +315,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected="feature/a"
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -326,6 +341,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -358,6 +374,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -392,6 +409,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -421,6 +439,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected="feature/a"
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -448,6 +467,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected={null}
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -479,6 +499,7 @@ describe('BranchRow', () => {
         <BranchRow
           repo={repo}
           branch={branch}
+          worktree={worktreeForFixture(branch)}
           selected="feature/a"
           onSelectBranch={vi.fn()}
           onOpenBranchStatus={vi.fn()}
@@ -539,6 +560,7 @@ function renderRow(
       <BranchRow
         repo={repo}
         branch={branch}
+        worktree={worktreeForFixture(branch)}
         selected={null}
         onSelectBranch={vi.fn()}
         onOpenBranchStatus={vi.fn()}
@@ -567,6 +589,10 @@ function branchRowRepo() {
       status: [],
     },
   )
+}
+
+function worktreeForFixture(branch: BranchSnapshotFixture) {
+  return createRepoWorktreeSnapshotsForTest([branch])[0]
 }
 
 function markDirty(repo: ReturnType<typeof branchRowRepo>, count: number): void {

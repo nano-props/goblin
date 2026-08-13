@@ -6,6 +6,7 @@ import type { GitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoReadNotice } from '#/web/components/RepoReadNotice.tsx'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
 import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
@@ -21,6 +22,7 @@ import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { useGitWorktreeWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import type { WorkspacePaneRuntimeContext } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
+import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
 
 interface GitWorktreeFilesystemPaneProps {
   repo: GitWorkspacePaneShell
@@ -116,21 +118,33 @@ export const GitWorktreeFilesystemPane = defineComponent<GitWorktreeFilesystemPa
           ? statusReadModel.error.value.message
           : String(statusReadModel.error.value)
         : null
+      const snapshotFailure = repoQueryReadFailure(
+        {
+          isError: snapshotReadModel.isError.value,
+          error: snapshotReadModel.error.value,
+          isFetching: snapshotReadModel.isFetching.value,
+          data: snapshotReadModel.data.value,
+        },
+        () => void snapshotReadModel.refetch(),
+      )
       return (
-        <GitWorktreeFilesystemPaneReady
-          workspaceRuntime={{ workspaceRuntimeId: props.repo.workspaceRuntimeId, ui: props.repo.ui }}
-          workspaceProbe={props.workspaceProbe}
-          head={currentWorktree.head}
-          status={currentWorktreeStatus}
-          statusError={statusError}
-          statusRetrying={statusReadModel.isFetching.value}
-          onRetryStatus={() => void statusReadModel.refetch()}
-          target={currentTarget}
-          route={props.route}
-          workspacePaneId={props.workspacePaneId}
-          toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
-          onBackToNavigator={props.onBackToNavigator}
-        />
+        <>
+          <RepoReadNotice failures={snapshotFailure ? [snapshotFailure] : []} />
+          <GitWorktreeFilesystemPaneReady
+            workspaceRuntime={{ workspaceRuntimeId: props.repo.workspaceRuntimeId, ui: props.repo.ui }}
+            workspaceProbe={props.workspaceProbe}
+            head={currentWorktree.head}
+            status={currentWorktreeStatus}
+            statusError={statusError}
+            statusRetrying={statusReadModel.isFetching.value}
+            onRetryStatus={() => void statusReadModel.refetch()}
+            target={currentTarget}
+            route={props.route}
+            workspacePaneId={props.workspacePaneId}
+            toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
+            onBackToNavigator={props.onBackToNavigator}
+          />
+        </>
       )
     }
   },

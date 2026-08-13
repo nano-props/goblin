@@ -157,7 +157,7 @@ function createGitWorkspacePreferenceActions(set: WorkspacesSet, get: Workspaces
       if (!repo) return
       const branchModel = requireRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
       const target = workspacePaneTabsTargetForRepoBranch(
-        { workspaceId: repo.id, branches: branchModel.branches },
+        { workspaceId: repo.id, branches: branchModel.branches, worktrees: branchModel.worktrees },
         branch,
       )
       if (target) setWorkspacePaneTabForTarget(set, target, tab)

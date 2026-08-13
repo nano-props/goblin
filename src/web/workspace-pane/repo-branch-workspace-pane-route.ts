@@ -32,7 +32,7 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
   const branchModel = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
   if (!branchModel) return { kind: 'unavailable', reason: 'snapshot-unavailable' }
   const target = workspacePaneTabsTargetForRepoBranch(
-    { workspaceId: repo.id, branches: branchModel.branches },
+    { workspaceId: repo.id, branches: branchModel.branches, worktrees: branchModel.worktrees },
     branchName,
   )
   if (!target) return { kind: 'missing' }

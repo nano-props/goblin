@@ -172,7 +172,7 @@ export const BranchStatus = defineComponent<Props>({
         () => {
           const detail = props.detail
           const branchName = detail.branch?.name
-          const worktreePath = detail.branch?.worktree?.path
+          const worktreePath = detail.worktree?.path
           // History is branch-scoped; files and changes require a concrete worktree.
           if (!branchName || (type !== 'history' && !worktreePath)) return
           void dispatchOpenWorkspacePaneStaticTabAction({
@@ -203,13 +203,14 @@ export const BranchStatus = defineComponent<Props>({
         ? remoteWorkspaceTarget(repo.id, repo.admission.kind === 'remote' ? repo.admission.lifecycle : null)
         : null
       const protectedBranch = PROTECTED_BRANCHES.has(branch.name)
-      const worktreePath = branch.worktree?.path ? formatWorktreePath(branch.worktree?.path, worktreeTarget) : ''
+      const worktree = detail.worktree
+      const worktreePath = worktree ? formatWorktreePath(worktree.path, worktreeTarget) : ''
       const worktreeChangeCount = detail.worktreeChanges?.changeCount
       const hasRole = branch.isDefault || protectedBranch
       // Gate on the same value the chip displays. If `worktreeChangeCount` is 0,
       // the row shows "0 changes" and there's nothing to copy — keep the
       // button hidden so we don't surface an action next to a contradictory chip.
-      const hasWorktreeChanges = !!branch.worktree?.path && worktreeChangeCount !== undefined && worktreeChangeCount > 0
+      const hasWorktreeChanges = !!worktree && worktreeChangeCount !== undefined && worktreeChangeCount > 0
       const mergeKnown = branch.isDefault || branch.mergedToDefault !== undefined
       const showMerged = !branch.isDefault
       const commitTime = formatRelativeTimeOrNull(branch.lastCommitDate, lang.value)
@@ -226,11 +227,11 @@ export const BranchStatus = defineComponent<Props>({
       const mergeTone: Tone = !mergeKnown ? 'neutral' : branch.mergedToDefault ? 'success' : 'attention'
       const upstreamTone: Tone = branch.trackingGone || !branch.tracking ? 'attention' : 'brand'
       const syncTone: Tone = !branch.tracking ? 'attention' : branch.behind > 0 ? 'attention' : 'success'
-      const worktreeLocked = branch.worktree?.isLocked
+      const worktreeLocked = worktree?.isLocked
       // The "dirty worktree" signal moved to its own row below; the worktree
       // row only needs to surface lock state on its own.
-      const worktreeTone: Tone = worktreeLocked ? 'attention' : branch.worktree?.path ? 'brand' : 'neutral'
-      const worktreeValue = branch.worktree?.path ? (
+      const worktreeTone: Tone = worktreeLocked ? 'attention' : worktree ? 'brand' : 'neutral'
+      const worktreeValue = worktree ? (
         <div class="inline-flex max-w-full min-w-0 items-center gap-1.5 align-middle">
           <StatusLink
             mono
@@ -241,7 +242,7 @@ export const BranchStatus = defineComponent<Props>({
             {worktreePath}
           </StatusLink>
           <CopyButton
-            value={branch.worktree.path}
+            value={worktree.path}
             copyLabel={t('branch-status.copy-worktree-path')}
             copiedLabel={t('branch-status.copied')}
             class="shrink-0"

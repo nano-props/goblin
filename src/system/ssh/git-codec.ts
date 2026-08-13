@@ -57,7 +57,7 @@ export function parseRemoteSnapshot(output: string, worktrees: WorktreeInfo[] = 
   const branchOutput = sections.branches.join('\n')
   let branches: BranchSnapshotInfo[]
   try {
-    branches = parseBranches(branchOutput, current, worktrees)
+    branches = parseBranches(branchOutput, current)
   } catch {
     return null
   }

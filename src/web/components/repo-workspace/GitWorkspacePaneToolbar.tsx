@@ -52,12 +52,12 @@ export const GitWorkspacePaneToolbar = defineComponent<GitWorkspacePaneToolbarPr
         )
       }
       if (props.repo.probe.status !== 'ready') return null
-      const target: WorkspacePaneSurfaceTarget = branch.worktree
+      const target: WorkspacePaneSurfaceTarget = props.detail.worktree
         ? gitWorktreePaneFilesystemTarget({
             workspaceId: props.repo.id,
             workspaceRuntimeId: props.repo.workspaceRuntimeId,
             head: gitHead(branch.name),
-            worktreePath: branch.worktree.path,
+            worktreePath: props.detail.worktree.path,
             capabilities: props.repo.probe.capabilities,
           })
         : {

@@ -614,6 +614,7 @@ export function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
         {
           workspaceId: repo.id,
           branches: getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.branches ?? [],
+          worktrees: getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.worktrees ?? [],
         },
         branchName,
       )

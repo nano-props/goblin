@@ -40,13 +40,9 @@ interface WorkspacePaneTabsQueryWorkspaceState {
   session: WorkspaceSessionState
 }
 
-interface ClientWorkspaceBranchProjection {
-  name: string
-  worktree?: { path?: string }
-}
-
 interface ClientWorkspaceGitTargets {
-  branches: readonly ClientWorkspaceBranchProjection[]
+  branches: ReadonlyArray<{ name: string }>
+  worktrees: ReadonlyArray<{ path: string }>
 }
 
 interface ClientWorkspaceTargetProjection {
@@ -128,7 +124,7 @@ function clientWorkspaceRestorationProjections(
       ui: {
         preferredWorkspacePaneTabByTarget: workspace.ui.preferredWorkspacePaneTabByTarget,
       },
-      ...(branchModel ? { gitTargets: { branches: branchModel.branches } } : {}),
+      ...(branchModel ? { gitTargets: { branches: branchModel.branches, worktrees: branchModel.worktrees } } : {}),
     }
   }
   return projections
@@ -293,7 +289,7 @@ function clientWorkspaceContainsWorktreePath(
   workspace: ClientWorkspaceTargetProjection,
   worktreePath: string,
 ): boolean {
-  return workspace.gitTargets?.branches.some((branch) => branch.worktree?.path === worktreePath) === true
+  return workspace.gitTargets?.worktrees.some((worktree) => worktree.path === worktreePath) === true
 }
 
 function selectedTerminalSessionsForClientWorkspace(

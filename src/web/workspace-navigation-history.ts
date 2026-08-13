@@ -16,6 +16,7 @@ import { consumeAppHistoryPresentationAction } from '#/web/app-history-presentat
 import type { AppHistoryPresentationAction } from '#/web/app-history-presentation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; workspaceId: WorkspaceId }
@@ -174,8 +175,8 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
       const repo = workspacesStore.getState().workspaces[workspaceId]
       const branchModel =
         repo?.capability.kind === 'git' ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId) : null
-      const branch = branchModel?.branches.find((candidate) => candidate.name === routeContext.branchName)
-      const worktreePath = routeContext.worktreePath ?? branch?.worktree?.path ?? null
+      const worktree = branchModel ? repoWorktreeForBranch(branchModel.worktrees, routeContext.branchName) : undefined
+      const worktreePath = routeContext.worktreePath ?? worktree?.path ?? null
       const terminalFilesystemTargetKey = worktreePath
         ? formatTerminalFilesystemTargetKeyForPath(workspaceId, worktreePath)
         : null

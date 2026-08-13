@@ -36,15 +36,7 @@ export interface BranchSnapshotInfo {
   lastCommitMessage: string
   lastCommitDate: string
   lastCommitAuthor: string
-  /** Read-only branch-row projection derived atomically from authoritative worktree membership. */
-  worktree?: BranchWorktreeProjection
   mergedToDefault?: boolean
-}
-
-export interface BranchWorktreeProjection {
-  path: string
-  isPrimary: boolean
-  isLocked: boolean
 }
 
 export function repoWorktreeForBranch(

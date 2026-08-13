@@ -98,6 +98,7 @@ const BranchViewReadModel = defineComponent<BranchViewReadModelProps>({
       )
       return visibleBranches({
         branches: repo.value.snapshot.branches,
+        worktrees: repo.value.snapshot.worktrees,
         viewMode: repo.value.branchViewMode,
       }).filter((branch) => !operationBranches.has(branch.name))
     })

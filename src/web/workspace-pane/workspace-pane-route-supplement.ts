@@ -5,6 +5,7 @@ import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneCommittedRuntimeTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 
 export interface WorkspacePaneRouteSupplementTarget {
   workspaceId: WorkspaceId
@@ -23,7 +24,12 @@ export function commitWorkspacePaneRouteSupplement(
     return false
   const branchModel = getRepoSnapshotQueryData(workspace.id, workspace.workspaceRuntimeId)
   const branch = branchModel?.branches.find((candidate) => candidate.name === target.branchName)
-  if (!branch || (branch.worktree?.path ?? null) !== target.worktreePath) return false
+  if (
+    !branchModel ||
+    !branch ||
+    (repoWorktreeForBranch(branchModel.worktrees, target.branchName)?.path ?? null) !== target.worktreePath
+  )
+    return false
   state.setWorkspacePaneTab(
     target.workspaceId,
     target.branchName,

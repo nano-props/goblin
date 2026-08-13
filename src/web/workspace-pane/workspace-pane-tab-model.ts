@@ -133,8 +133,7 @@ export type WorkspacePaneSelection =
 export interface WorkspacePaneTabModel {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  /** URL family owned by the current pane. Kept separate from paneTarget because
-   * a branch route may persist tabs against its checked-out worktree target. */
+  /** Canonical URL target owned by the current pane. */
   routeTarget: WorkspacePaneModelTarget
   branchName: string | null
   worktreePath: string | null

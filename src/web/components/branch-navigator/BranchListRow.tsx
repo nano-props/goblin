@@ -13,6 +13,7 @@ import {
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { branchActionDisplayPhase } from '#/web/hooks/branch-action-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 
 export const BranchListRow = defineComponent<BranchRowProps>({
   name: 'BranchListRow',
@@ -28,11 +29,11 @@ export const BranchListRow = defineComponent<BranchRowProps>({
   },
 
   setup(props) {
-    const terminalSessionId = computed(() =>
-      props.branch.worktree?.path
-        ? formatTerminalFilesystemTargetKeyForPath(props.repo.id, props.branch.worktree.path)
-        : null,
-    )
+    const terminalSessionId = computed(() => {
+      const worktree = repoWorktreeForBranch(props.repo.snapshot.worktrees, props.branch.name)
+      return worktree ? formatTerminalFilesystemTargetKeyForPath(props.repo.id, worktree.path) : null
+    })
+    const worktree = computed(() => repoWorktreeForBranch(props.repo.snapshot.worktrees, props.branch.name))
     const terminalBellCount = useTerminalFilesystemTargetBellCount(terminalSessionId)
     const terminalOutputActive = useTerminalFilesystemTargetOutputActive(terminalSessionId)
 
@@ -40,6 +41,7 @@ export const BranchListRow = defineComponent<BranchRowProps>({
       <BranchRow
         repo={props.repo}
         branch={props.branch}
+        worktree={worktree.value}
         selected={props.selected}
         onSelectBranch={props.onSelectBranch}
         onOpenBranchStatus={props.onOpenBranchStatus}

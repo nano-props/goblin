@@ -129,6 +129,7 @@ function moveBranchSelection(
   if (!branchModel) return false
   const branches = visibleBranches({
     branches: branchModel.branches,
+    worktrees: branchModel.worktrees,
     viewMode: input.viewMode,
   })
   if (branches.length === 0) return false
