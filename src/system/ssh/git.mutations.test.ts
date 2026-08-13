@@ -6,7 +6,7 @@ import {
   type RemoteGitRunner,
 } from '#/system/ssh/git.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
-import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
+import type { RemoteCommandKind, RemoteCommandResult } from '#/system/ssh/commands.ts'
 import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import {
   LINKED_TARGET,
@@ -20,6 +20,14 @@ import {
   upstreamOutput,
   worktreePorcelain,
 } from '#/system/ssh/git-test-utils.ts'
+
+function attachedWorktreeAuthorityRead(command: RemoteCommandKind): RemoteCommandResult | null {
+  if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
+  if (command.type === 'gitOperationState') {
+    return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
+  }
+  return null
+}
 
 describe('remote git mutations', () => {
   test('deleteRemoteBranch allows safe delete when branch is merged into current HEAD without upstream', async () => {
@@ -449,7 +457,9 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree resolves equivalent absolute worktree paths', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      const authorityRead = attachedWorktreeAuthorityRead(command)
+      if (authorityRead) return authorityRead
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
@@ -500,6 +510,8 @@ describe('remote git mutations', () => {
 
   test('removeRemoteWorktree preserves status read failure at destructive admission', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command) => {
+      const authorityRead = attachedWorktreeAuthorityRead(command)
+      if (authorityRead) return authorityRead
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
       }
@@ -526,6 +538,8 @@ describe('remote git mutations', () => {
   test('removeRemoteWorktree reports uncertainty and impact after a started timeout', async () => {
     const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
     const run = vi.fn<RemoteGitRunner>(async (command) => {
+      const authorityRead = attachedWorktreeAuthorityRead(command)
+      if (authorityRead) return authorityRead
       if (command.type === 'gitWorktreeList') return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
       if (command.type === 'gitStatus') return okRemoteResult('')
       if (command.type === 'gitWorktreeRemove') {
@@ -562,6 +576,8 @@ describe('remote git mutations', () => {
 
   test('removeRemoteWorktree treats an unobserved start marker as uncertain mutation impact', async () => {
     const run = vi.fn<RemoteGitRunner>(async (command) => {
+      const authorityRead = attachedWorktreeAuthorityRead(command)
+      if (authorityRead) return authorityRead
       if (command.type === 'gitWorktreeList') return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
       if (command.type === 'gitStatus') return okRemoteResult('')
       if (command.type === 'gitWorktreeRemove') return failRemoteResult('connection failed')
@@ -588,6 +604,8 @@ describe('remote git mutations', () => {
   test('removeRemoteWorktree omits mutation impact when SSH provably did not start', async () => {
     const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
     const run = vi.fn<RemoteGitRunner>(async (command) => {
+      const authorityRead = attachedWorktreeAuthorityRead(command)
+      if (authorityRead) return authorityRead
       if (command.type === 'gitWorktreeList') return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
       if (command.type === 'gitStatus') return okRemoteResult('')
       if (command.type === 'gitWorktreeRemove') {
@@ -751,6 +769,8 @@ describe('remote git mutations', () => {
   test('removeRemoteWorktree resolves the upstream before any mutation', async () => {
     const beforeRemove = vi.fn(async () => ({ ok: true, message: '' }))
     const run = vi.fn<RemoteGitRunner>(async (command) => {
+      const authorityRead = attachedWorktreeAuthorityRead(command)
+      if (authorityRead) return authorityRead
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
       }
@@ -791,6 +811,102 @@ describe('remote git mutations', () => {
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-arguments' })
     expect(run).not.toHaveBeenCalled()
+  })
+
+  test('removeRemoteWorktree admits a detached rebase worktree by its materialized branch', async () => {
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(
+            worktreePorcelain(
+              [
+                'worktree /srv/repo',
+                'HEAD f00ba40',
+                'branch refs/heads/main',
+                '',
+                'worktree /srv/repo-feature',
+                'HEAD ba5eba1',
+                'detached',
+              ].join('\n'),
+            ),
+          )
+        case 'resolveRepoCommonDir':
+          return okRemoteResult('/srv/repo/.git\0')
+        case 'gitOperationState':
+          return command.path === '/srv/repo-feature'
+            ? okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/test\n')
+            : okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
+        case 'gitStatus':
+          return okRemoteResult('')
+        case 'gitWorktreeRemove':
+          return okRemoteResult('Removed worktree')
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      ...SUCCESSFUL_REMOTE_REMOVAL_LIFECYCLE,
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      deleteBranch: false,
+      run,
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      message: 'Removed worktree',
+      worktreePathsToInvalidate: ['/srv/repo', '/srv/repo-feature'],
+      worktreeRemoved: true,
+    })
+    expect(run).toHaveBeenCalledWith(
+      { type: 'gitWorktreeRemove', path: '/srv/repo', worktreePath: '/srv/repo-feature' },
+      TARGET,
+      { signal: undefined, timeoutMs: 300_000 },
+    )
+  })
+
+  test('removeRemoteWorktree fails before status or lifecycle when branch ownership does not match', async () => {
+    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const run = vi.fn<RemoteGitRunner>(async (command) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(
+            worktreePorcelain(
+              [
+                'worktree /srv/repo',
+                'HEAD f00ba40',
+                'branch refs/heads/main',
+                '',
+                'worktree /srv/repo-feature',
+                'HEAD ba5eba1',
+                'detached',
+              ].join('\n'),
+            ),
+          )
+        case 'resolveRepoCommonDir':
+          return okRemoteResult('/srv/repo/.git\0')
+        case 'gitOperationState':
+          return command.path === '/srv/repo-feature'
+            ? okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/other\n')
+            : okRemoteResult('operation none\nmaterialized-branch main\n')
+        default:
+          return failRemoteResult('unexpected command')
+      }
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove,
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      deleteBranch: false,
+      run,
+    })
+
+    expect(result).toEqual({ ok: false, message: 'error.worktree-not-found-for-branch' })
+    expect(run).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'gitStatus' }), TARGET, expect.anything())
+    expect(beforeRemove).not.toHaveBeenCalled()
   })
 
   test('removeRemoteWorktree removes the currently opened linked worktree from the primary path', async () => {

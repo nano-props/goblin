@@ -4,7 +4,7 @@ import { createRepoBranch, createGitRepoPresentationForTest } from '#/web/test-u
 import { shallowRef } from 'vue'
 import type { ComponentProps } from 'vue-component-type-helpers'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
+import { GitWorkspaceNavigatorBranchRow } from '#/web/components/workspace-navigator/GitWorkspaceNavigatorBranchRow.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -28,7 +28,7 @@ const terminalStoreMocks = vi.hoisted(() => ({
   outputActive: false,
 }))
 
-vi.mock('#/web/components/branch-navigator/BranchRow.tsx', () => ({
+vi.mock('#/web/components/workspace-navigator/BranchRow.tsx', () => ({
   BranchRow: (props: unknown) => {
     branchRowPropsSpy(props)
     return null
@@ -40,31 +40,31 @@ beforeEach(() => {
   terminalStoreMocks.outputActive = false
 })
 
-describe('BranchListRow', () => {
+describe('GitWorkspaceNavigatorBranchRow', () => {
   test('forwards `branchActionBusy=true` when an in-flight branch action targets this branch', () => {
     const repo = branchListRowRepo()
     repo.branchAction = { ...repo.branchAction, phase: 'running', target: 'feature/a' }
-    renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
+    renderInJsdom(<GitWorkspaceNavigatorBranchRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: true }))
   })
 
   test('forwards `branchActionBusy=false` when an in-flight branch action targets a different branch', () => {
     const repo = branchListRowRepo()
     repo.branchAction = { ...repo.branchAction, phase: 'running', target: 'feature/other' }
-    renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
+    renderInJsdom(<GitWorkspaceNavigatorBranchRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: false }))
   })
 
   test('forwards `branchActionBusy=false` when the operations state is idle', () => {
     const repo = branchListRowRepo()
-    renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
+    renderInJsdom(<GitWorkspaceNavigatorBranchRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: false }))
   })
 
   test('forwards terminal output activity from the worktree terminal snapshot', () => {
     terminalStoreMocks.outputActive = true
     const repo = branchListRowRepo()
-    renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
+    renderInJsdom(<GitWorkspaceNavigatorBranchRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalOutputActive: true }))
   })
 })
@@ -72,7 +72,7 @@ describe('BranchListRow', () => {
 function baseProps(
   repo: BranchActionRepo,
   branchName: string,
-): Omit<ComponentProps<typeof BranchListRow>, 'terminalBellCount' | 'branchActionBusy'> {
+): Omit<ComponentProps<typeof GitWorkspaceNavigatorBranchRow>, 'terminalBellCount' | 'branchActionBusy'> {
   return {
     repo,
     branch: createRepoBranch(branchName),

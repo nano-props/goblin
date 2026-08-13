@@ -8,8 +8,8 @@ import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
-import { NAVIGATOR_ROW_ACTION_BOX_CLASS } from '#/web/components/branch-navigator/navigator-row-metrics.ts'
-import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
+import { NAVIGATOR_ROW_ACTION_BOX_CLASS } from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
+import { NavigatorRow } from '#/web/components/workspace-navigator/NavigatorRow.tsx'
 import type { ElementRef } from '#/web/components/ui/refs.ts'
 
 export interface BranchRowProps {
@@ -26,7 +26,7 @@ export interface BranchRowProps {
   terminalOutputActive?: boolean
   /**
    * Whether a branch action (queued or running) currently targets this
-   * row. Resolved by the data-binding wrapper (`BranchListRow`) from
+   * row. Resolved by the data-binding wrapper (`GitWorkspaceNavigatorBranchRow`) from
    * `branchActionDisplayPhase` so the row stays purely presentational
    * and can be reused in contexts that don't carry a live operations
    * state. Defaults to `false` when the wrapper doesn't compute it.

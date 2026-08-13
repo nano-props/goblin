@@ -40,7 +40,7 @@ describe('GitWorkspacePaneContent routes', () => {
       ui: { ...existingPresentationRepo.ui, currentBranchName: 'feature/removed' },
     }
     const detail = getTestGitWorkspacePanePresentation(presentationRepo)
-    const onBackToBranchNavigator = vi.fn()
+    const onBackToGitWorkspaceNavigator = vi.fn()
 
     const renderMissingBranch = () =>
       renderInJsdom(
@@ -49,7 +49,7 @@ describe('GitWorkspacePaneContent routes', () => {
             repo={presentationRepo}
             detail={detail}
             workspacePaneId="workspace"
-            onBackToBranchNavigator={onBackToBranchNavigator}
+            onBackToGitWorkspaceNavigator={onBackToGitWorkspaceNavigator}
           />
         </TerminalSessionReadScope>,
       )
@@ -64,7 +64,7 @@ describe('GitWorkspacePaneContent routes', () => {
     expect(document.body.textContent).toContain('branches.missing')
     expect(document.body.textContent).not.toContain('branches.filter-empty')
     screen.getByRole('button', { name: 'branches.back-to-list' }).click()
-    expect(onBackToBranchNavigator).toHaveBeenCalledOnce()
+    expect(onBackToGitWorkspaceNavigator).toHaveBeenCalledOnce()
   })
 
   test('renders an empty pane on an explicit bare branch route without a saved preference', async () => {

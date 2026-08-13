@@ -31,7 +31,7 @@ const responsiveMocks = vi.hoisted(() => {
     },
   }
 })
-const branchNavigatorMocks = vi.hoisted(() => ({
+const gitWorkspaceNavigatorMocks = vi.hoisted(() => ({
   activate: vi.fn<(repoId: string) => void>(),
 }))
 const createWorktreePageMocks = vi.hoisted(() => ({
@@ -67,20 +67,20 @@ vi.mock('#/web/hooks/useRestoreWorkspaceTabsOnView.ts', () => ({
   useRestoreWorkspaceTabsOnView: restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView,
 }))
 
-vi.mock('#/web/components/BranchNavigator.tsx', () => {
-  const BranchNavigator: FunctionalComponent<{ repoId: string }> = (props) => (
+vi.mock('#/web/components/GitWorkspaceNavigator.tsx', () => {
+  const GitWorkspaceNavigator: FunctionalComponent<{ repoId: string }> = (props) => (
     <button
       type="button"
-      data-testid="branch-navigator"
+      data-testid="git-workspace-navigator"
       onClick={() => {
-        branchNavigatorMocks.activate(props.repoId)
+        gitWorkspaceNavigatorMocks.activate(props.repoId)
       }}
     >
       branch
     </button>
   )
-  BranchNavigator.props = ['repoId']
-  return { BranchNavigator }
+  GitWorkspaceNavigator.props = ['repoId']
+  return { GitWorkspaceNavigator }
 })
 
 vi.mock('#/web/components/workspace-pane/WorkspacePane.tsx', async () => {
@@ -335,7 +335,7 @@ beforeEach(() => {
     branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
     currentBranchName: null,
   })
-  branchNavigatorMocks.activate.mockImplementation(() => {})
+  gitWorkspaceNavigatorMocks.activate.mockImplementation(() => {})
   restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockClear()
   restoreWorkspaceTabsMocks.useRepoToasts.mockClear()
   restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockReturnValue({
@@ -345,7 +345,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  branchNavigatorMocks.activate.mockReset()
+  gitWorkspaceNavigatorMocks.activate.mockReset()
   createWorktreePageMocks.cancel.mockReset()
   createWorktreePageMocks.created.mockReset()
   vi.restoreAllMocks()
@@ -354,7 +354,7 @@ afterEach(() => {
 // RTL has no reusable harness for WorkspaceView routing, responsive layout, and Zen reveal behavior.
 export {
   responsiveMocks,
-  branchNavigatorMocks,
+  gitWorkspaceNavigatorMocks,
   createWorktreePageMocks,
   restoreWorkspaceTabsMocks,
   workspacePaneMocks,
@@ -362,7 +362,7 @@ export {
   filesystemWorkspaceProbe,
   branchWorkspaceView,
   render,
-  branchNavigator,
+  gitWorkspaceNavigator,
   buttonByTestId,
   buttonByLabel,
   workspacePane,
@@ -387,8 +387,8 @@ function render(element: VNode) {
   return renderInJsdom(element, { wrapper: WorkspaceViewTestScope })
 }
 
-function branchNavigator(container: HTMLElement): HTMLButtonElement | null {
-  return container.querySelector<HTMLButtonElement>('[data-testid="branch-navigator"]')
+function gitWorkspaceNavigator(container: HTMLElement): HTMLButtonElement | null {
+  return container.querySelector<HTMLButtonElement>('[data-testid="git-workspace-navigator"]')
 }
 
 function buttonByTestId(container: HTMLElement, testId: string): HTMLButtonElement | null {

@@ -40,7 +40,7 @@ import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-
 import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { BranchNavigatorRowIdentity } from '#/web/components/branch-navigator/branch-navigator-model.ts'
+import type { GitWorkspaceNavigatorRowIdentity } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 
 const INACTIVE_REPO_QUERY_WORKSPACE_ID = requiredWorkspaceId('goblin+file:///inactive-repo-query')
 
@@ -49,7 +49,7 @@ type AppOverlayController = ReturnType<typeof useAppOverlays>
 interface AuthenticatedAppRuntime {
   hydratedRouteWorkspaceId: ComputedRef<WorkspaceId | null>
   currentBranchName: ComputedRef<string | null>
-  currentBranchNavigatorRowIdentity: ComputedRef<BranchNavigatorRowIdentity | null>
+  currentGitWorkspaceNavigatorRowIdentity: ComputedRef<GitWorkspaceNavigatorRowIdentity | null>
   currentWorkspacePaneRoute: ComputedRef<ReturnType<typeof currentWorkspacePaneRouteFromContext>>
   currentWorkspacePaneCommandTarget: () => WorkspacePaneCommandTarget | null
   workspaceNavigationRouteContext: ComputedRef<WorkspaceNavigationRouteContext | null>
@@ -112,7 +112,7 @@ const AuthenticatedAppShell = defineComponent({
       )
       return worktree?.head.kind === 'branch' ? worktree.head.branchName : null
     })
-    const currentBranchNavigatorRowIdentity = computed<BranchNavigatorRowIdentity | null>(() => {
+    const currentGitWorkspaceNavigatorRowIdentity = computed<GitWorkspaceNavigatorRowIdentity | null>(() => {
       const context = routeContext.value
       if (context?.kind === 'branch') return { kind: 'branch', branchName: context.branchName }
       if (context?.kind === 'worktree') return { kind: 'worktree', worktreePath: context.worktreePath }
@@ -143,7 +143,7 @@ const AuthenticatedAppShell = defineComponent({
     const runtime: AuthenticatedAppRuntime = {
       hydratedRouteWorkspaceId,
       currentBranchName,
-      currentBranchNavigatorRowIdentity,
+      currentGitWorkspaceNavigatorRowIdentity,
       currentWorkspacePaneRoute,
       currentWorkspacePaneCommandTarget,
       workspaceNavigationRouteContext: computed(() =>
@@ -243,7 +243,7 @@ const AuthenticatedWorkspaceShell = defineComponent<{ runtime: AuthenticatedAppR
           <AuthenticatedWorkspaceSideEffects
             hydratedRouteWorkspaceId={runtime.hydratedRouteWorkspaceId.value}
             currentBranchName={runtime.currentBranchName.value}
-            currentBranchNavigatorRowIdentity={runtime.currentBranchNavigatorRowIdentity.value}
+            currentGitWorkspaceNavigatorRowIdentity={runtime.currentGitWorkspaceNavigatorRowIdentity.value}
             currentWorkspacePaneCommandTarget={runtime.currentWorkspacePaneCommandTarget}
             routeContext={runtime.workspaceNavigationRouteContext.value}
             navigation={currentNavigation}

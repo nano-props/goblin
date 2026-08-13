@@ -9,8 +9,8 @@ import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover
 import {
   NAVIGATOR_ROW_ACTION_BOX_CLASS,
   NAVIGATOR_ROW_LIST_CLASS,
-} from '#/web/components/branch-navigator/navigator-row-metrics.ts'
-import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
+} from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
+import { NavigatorRow } from '#/web/components/workspace-navigator/NavigatorRow.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { runShowWorkspacePaneTabCommand, runTerminalPrimaryActionCommand } from '#/web/commands/workspace-commands.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'

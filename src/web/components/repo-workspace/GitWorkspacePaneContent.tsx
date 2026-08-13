@@ -26,7 +26,7 @@ interface GitWorkspacePaneContentProps {
   workspacePaneTabModel: WorkspacePaneTabModel
   readFailures?: RepoReadFailure[]
   onRetryStatus?: () => void
-  onBackToBranchNavigator?: () => void
+  onBackToGitWorkspaceNavigator?: () => void
 }
 
 // Pure view: the workspace pane body is derived from the workspace store's
@@ -40,7 +40,7 @@ export const GitWorkspacePaneContent = defineComponent<GitWorkspacePaneContentPr
     'workspacePaneTabModel',
     'readFailures',
     'onRetryStatus',
-    'onBackToBranchNavigator',
+    'onBackToGitWorkspaceNavigator',
   ],
 
   setup(props) {
@@ -78,8 +78,8 @@ export const GitWorkspacePaneContent = defineComponent<GitWorkspacePaneContentPr
             <EmptyState
               title={t(missingRoutedBranch ? 'branches.missing' : 'branches.empty')}
               body={
-                compact.value && missingRoutedBranch && props.onBackToBranchNavigator ? (
-                  <Button type="button" variant="outline" size="sm" onClick={props.onBackToBranchNavigator}>
+                compact.value && missingRoutedBranch && props.onBackToGitWorkspaceNavigator ? (
+                  <Button type="button" variant="outline" size="sm" onClick={props.onBackToGitWorkspaceNavigator}>
                     {t('branches.back-to-list')}
                   </Button>
                 ) : undefined

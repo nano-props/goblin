@@ -20,7 +20,7 @@ import {
   filesystemWorkspaceProbe,
   branchWorkspaceView,
   render,
-  branchNavigator,
+  gitWorkspaceNavigator,
   buttonByTestId,
   workspacePane,
 } from '#/web/test-utils/workspace-view.tsx'
@@ -222,7 +222,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     )
 
     expect(workspacePane(container)).toBeNull()
-    expect(branchNavigator(container)).toBeNull()
+    expect(gitWorkspaceNavigator(container)).toBeNull()
     expect(container.querySelector('[data-testid="workspace-dashboard-page"]')).toBeNull()
   })
 
@@ -238,7 +238,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
 
     expect(workspacePane(container)?.dataset.currentBranchName).toBe('')
     expect(workspacePane(container)?.dataset.workspacePaneRouteKind).toBe('workspace-root')
-    expect(branchNavigator(container)).toBeNull()
+    expect(gitWorkspaceNavigator(container)).toBeNull()
     expect(container.querySelector('[data-testid="dashboard-row-action"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="workspace-root-row"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="create-worktree-row-action"]')).toBeNull()
@@ -257,7 +257,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
 
     expect(container.querySelector('[data-testid="workspace-dashboard-page"]')).not.toBeNull()
     expect(workspacePane(container)).toBeNull()
-    expect(branchNavigator(container)).toBeNull()
+    expect(gitWorkspaceNavigator(container)).toBeNull()
   })
 
   test('renders the shared directory Dashboard for a remote non-Git workspace', () => {
@@ -283,7 +283,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
 
     expect(container.querySelector('[data-testid="workspace-dashboard-page"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="workspace-root-row"]')).not.toBeNull()
-    expect(branchNavigator(container)).toBeNull()
+    expect(gitWorkspaceNavigator(container)).toBeNull()
     expect(container.querySelector('[data-testid="repo-sync-action"]')).toBeNull()
   })
 
@@ -346,7 +346,7 @@ describe('WorkspaceView workspace navigation and restore', () => {
     const { container } = render(branchWorkspaceView())
 
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
-    expect(branchNavigator(container)).toBeNull()
+    expect(gitWorkspaceNavigator(container)).toBeNull()
     expect(workspacePane(container)).toBeNull()
     expect(restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView).toHaveBeenCalledWith({
       workspaceId: expect.any(Function),

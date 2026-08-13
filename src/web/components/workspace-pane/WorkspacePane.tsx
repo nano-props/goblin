@@ -19,7 +19,7 @@ interface WorkspacePaneProps {
   workspacePaneRouteContext: WorkspacePaneRouteContext
   shortcutsEnabled?: boolean
   toolbarTrafficLightOffset?: boolean
-  onBackToBranchNavigator?: () => void
+  onBackToGitWorkspaceNavigator?: () => void
 }
 
 interface WorkspacePaneShell {
@@ -38,7 +38,7 @@ export const WorkspacePane = defineComponent<WorkspacePaneProps>({
     'workspacePaneRouteContext',
     'shortcutsEnabled',
     'toolbarTrafficLightOffset',
-    'onBackToBranchNavigator',
+    'onBackToGitWorkspaceNavigator',
   ],
 
   setup(props) {
@@ -67,7 +67,7 @@ export const WorkspacePane = defineComponent<WorkspacePaneProps>({
           workspacePaneId={workspacePaneId}
           shortcutsEnabled={props.shortcutsEnabled ?? true}
           toolbarTrafficLightOffset={props.toolbarTrafficLightOffset ?? false}
-          onBackToBranchNavigator={props.onBackToBranchNavigator}
+          onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
         />
       ) : null
   },
@@ -79,7 +79,7 @@ interface WorkspacePaneLoadedProps {
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
-  onBackToBranchNavigator?: () => void
+  onBackToGitWorkspaceNavigator?: () => void
 }
 
 const WorkspacePaneLoaded: FunctionalComponent<WorkspacePaneLoadedProps> = (props) => {
@@ -96,7 +96,7 @@ const WorkspacePaneLoaded: FunctionalComponent<WorkspacePaneLoadedProps> = (prop
         route={props.workspacePaneRouteContext.route}
         workspacePaneId={props.workspacePaneId}
         toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
-        onBackToNavigator={props.onBackToBranchNavigator}
+        onBackToNavigator={props.onBackToGitWorkspaceNavigator}
       />
     )
   }
@@ -118,7 +118,7 @@ const WorkspacePaneLoaded: FunctionalComponent<WorkspacePaneLoadedProps> = (prop
         workspacePaneId={props.workspacePaneId}
         route={props.workspacePaneRouteContext.kind === 'workspace-root' ? props.workspacePaneRouteContext.route : null}
         toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
-        onBackToNavigator={props.onBackToBranchNavigator}
+        onBackToNavigator={props.onBackToGitWorkspaceNavigator}
       />
     )
   }
@@ -132,7 +132,7 @@ const WorkspacePaneLoaded: FunctionalComponent<WorkspacePaneLoadedProps> = (prop
       workspacePaneId={props.workspacePaneId}
       shortcutsEnabled={props.shortcutsEnabled}
       toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
-      onBackToBranchNavigator={props.onBackToBranchNavigator}
+      onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
     />
   )
 }
@@ -143,7 +143,7 @@ WorkspacePaneLoaded.props = [
   'workspacePaneId',
   'shortcutsEnabled',
   'toolbarTrafficLightOffset',
-  'onBackToBranchNavigator',
+  'onBackToGitWorkspaceNavigator',
 ]
 
 function gitWorkspacePaneShell(

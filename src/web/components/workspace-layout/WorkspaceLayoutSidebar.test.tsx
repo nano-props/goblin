@@ -69,7 +69,7 @@ describe('WorkspaceLayoutSidebar', () => {
         workspaceId={WORKSPACE_ID}
         git={repoSnapshot()}
         compact={false}
-        branchContent={<div data-testid="branch-content" />}
+        navigatorContent={<div data-testid="navigator-content" />}
       />,
     )
 
@@ -89,7 +89,7 @@ describe('WorkspaceLayoutSidebar', () => {
       (element) => element.children.length === 0 && element.textContent?.trim() === 'tab.branches',
     )
     expect(branchTitle).not.toBeNull()
-    expect(container.querySelector('[data-testid="branch-content"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="navigator-content"]')).not.toBeNull()
 
     const settings = container.querySelector('button[aria-label="app-chrome.settings"]')
     expect(settings).not.toBeNull()
@@ -199,7 +199,7 @@ describe('WorkspaceLayoutSidebar', () => {
 
   test('uses the workspace background throughout the sidebar in compact UI', () => {
     const { container } = renderSidebar(
-      <WorkspaceLayoutSidebar workspaceId={WORKSPACE_ID} compact git={repoSnapshot()} branchContent={<div />} />,
+      <WorkspaceLayoutSidebar workspaceId={WORKSPACE_ID} compact git={repoSnapshot()} navigatorContent={<div />} />,
     )
 
     const sidebar = container.querySelector('aside')
@@ -213,7 +213,7 @@ describe('WorkspaceLayoutSidebar', () => {
         workspaceId={WORKSPACE_ID}
         compact={false}
         git={repoSnapshot()}
-        branchContent={<div />}
+        navigatorContent={<div />}
       />,
     )
 
@@ -227,7 +227,7 @@ describe('WorkspaceLayoutSidebar', () => {
         workspaceId={WORKSPACE_ID}
         git={repoSnapshot()}
         compact={false}
-        branchContent={<div />}
+        navigatorContent={<div />}
         onCreateWorktree={onCreateWorktree}
       />,
     )
@@ -246,7 +246,7 @@ describe('WorkspaceLayoutSidebar', () => {
         workspaceId={WORKSPACE_ID}
         git={repoSnapshot()}
         compact={false}
-        branchContent={<div data-testid="branch-content" />}
+        navigatorContent={<div data-testid="navigator-content" />}
       />,
     )
 
@@ -266,7 +266,7 @@ describe('WorkspaceLayoutSidebar', () => {
         git={repoSnapshot()}
         compact={false}
         chromeRegion="none"
-        branchContent={<div data-testid="branch-content" />}
+        navigatorContent={<div data-testid="navigator-content" />}
       />,
     )
 

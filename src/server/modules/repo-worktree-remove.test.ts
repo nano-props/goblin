@@ -97,6 +97,67 @@ describe('repo worktree removal', () => {
     expect(result.repoIdsToInvalidate).toEqual([WORKTREE_REPO_ID, REPO_ID])
   })
 
+  test('removeRepoWorktree admits a detached rebase worktree by its materialized branch', async () => {
+    mocks.readWorktreeMembership.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-worktree', isBare: false, isPrimary: false },
+    ])
+    mocks.readRepoWorktreeSnapshots.mockResolvedValueOnce([
+      {
+        path: '/tmp/repo',
+        head: { kind: 'branch', branchName: 'main' },
+        headOid: '1111111111111111111111111111111111111111',
+        operation: null,
+        materializedBranch: 'main',
+        isPrimary: true,
+        isLocked: false,
+      },
+      {
+        path: '/tmp/repo-worktree',
+        head: { kind: 'detached' },
+        headOid: '2222222222222222222222222222222222222222',
+        operation: { kind: 'rebase' },
+        materializedBranch: 'feature/a',
+        isPrimary: false,
+        isLocked: false,
+      },
+    ])
+
+    const result = await removeLocalRepoWorktreeForTest({ deleteBranch: false }, successfulRemovalLifecycle)
+
+    expect(result).toMatchObject({ ok: true })
+    expect(mocks.removeWorktree).toHaveBeenCalledOnce()
+  })
+
+  test('removeRepoWorktree fails before status or lifecycle when branch ownership does not match', async () => {
+    mocks.readWorktreeMembership.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
+      { path: '/tmp/repo-worktree', isBare: false, isPrimary: false },
+    ])
+    mocks.readRepoWorktreeSnapshots.mockResolvedValueOnce([
+      {
+        path: '/tmp/repo-worktree',
+        head: { kind: 'detached' },
+        headOid: '2222222222222222222222222222222222222222',
+        operation: { kind: 'rebase' },
+        materializedBranch: 'feature/other',
+        isPrimary: false,
+        isLocked: false,
+      },
+    ])
+    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
+
+    const result = await removeLocalRepoWorktreeForTest(
+      { deleteBranch: false },
+      { beforeRemove, afterWorktreeRemoved: successfulRemovalLifecycle.afterWorktreeRemoved },
+    )
+
+    expect(result).toEqual({ ok: false, message: 'error.worktree-not-found-for-branch' })
+    expect(mocks.sampleWorktreeStatusForTarget).not.toHaveBeenCalled()
+    expect(beforeRemove).not.toHaveBeenCalled()
+    expect(mocks.removeWorktree).not.toHaveBeenCalled()
+  })
+
   test('removeRepoWorktree returns Git removal failure without finalization', async () => {
     mocks.removeWorktree.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'git remove failed' }, 'failed'),

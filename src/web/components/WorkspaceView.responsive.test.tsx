@@ -12,7 +12,7 @@ import {
   REPO_ID,
   branchWorkspaceView,
   render,
-  branchNavigator,
+  gitWorkspaceNavigator,
   workspacePane,
   workspaceLayout,
   compactWorkspace,
@@ -35,7 +35,7 @@ describe('WorkspaceView responsive layout', () => {
     expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBe('true')
 
     await flushTestUpdates(async () => {
-      branchNavigator(container)?.click()
+      gitWorkspaceNavigator(container)?.click()
       await rerender(branchWorkspaceView())
     })
 
@@ -91,7 +91,7 @@ describe('WorkspaceView responsive layout', () => {
     expect(container.querySelector('[data-testid="create-worktree-row-action"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).toBeNull()
-    expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
+    expect(container.querySelectorAll('[data-testid="git-workspace-navigator-skeleton-action"]')).toHaveLength(0)
   })
 
   test('large-screen focused initial loading with current branch keeps floating sidebar reveal available', async () => {
@@ -137,17 +137,17 @@ describe('WorkspaceView responsive layout', () => {
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).toBeNull()
     expect(workspacePane(container)).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
-    expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
+    expect(container.querySelectorAll('[data-testid="git-workspace-navigator-skeleton-action"]')).toHaveLength(0)
   })
 
   test('resizing from split large-screen mode to compact shows Repo Workspace when a branch is selected', async () => {
     const { container, rerender } = render(branchWorkspaceView())
 
     await flushTestUpdates(() => {
-      branchNavigator(container)?.click()
+      gitWorkspaceNavigator(container)?.click()
     })
 
-    expect(branchNavigator(container)).not.toBeNull()
+    expect(gitWorkspaceNavigator(container)).not.toBeNull()
     expect(workspacePane(container)).not.toBeNull()
 
     responsiveMocks.mode = 'compact'

@@ -13,7 +13,7 @@ import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { BranchNavigatorView } from '#/web/components/branch-navigator/BranchNavigatorView.tsx'
+import { GitWorkspaceNavigatorView } from '#/web/components/workspace-navigator/GitWorkspaceNavigatorView.tsx'
 import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 import { AppNavigationProvider } from '#/web/app-navigation.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
@@ -82,7 +82,7 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('BranchNavigatorView', () => {
+describe('GitWorkspaceNavigatorView', () => {
   test('uses the TanStack Query snapshot for branch rows when available', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -94,7 +94,7 @@ describe('BranchNavigatorView', () => {
       currentBranch: 'feature/query',
     })
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
 
     expect(screen.getByText('feature/query')).toBeTruthy()
   })
@@ -115,7 +115,7 @@ describe('BranchNavigatorView', () => {
     })
     workspacesStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
 
     expect(screen.getByText('feature/worktree')).toBeTruthy()
     expect(screen.queryByText('feature/plain')).toBeNull()
@@ -136,7 +136,7 @@ describe('BranchNavigatorView', () => {
       worktrees: snapshot.worktrees.map((worktree) => ({ ...worktree, operation: { kind: 'merge' as const } })),
     })
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
 
     expect(screen.getByText('worktree-state.merge')).toBeTruthy()
     expect(screen.queryByText('feature/merge')).toBeNull()
@@ -163,7 +163,7 @@ describe('BranchNavigatorView', () => {
         ],
       })
 
-      renderBranchNavigatorView()
+      renderGitWorkspaceNavigatorView()
 
       expect(
         screen.getByText(kind === 'rebase' ? 'worktree-state.rebase-branch' : 'worktree-state.bisect'),
@@ -187,7 +187,7 @@ describe('BranchNavigatorView', () => {
       worktrees,
     })
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
     await fireEvent.click(screen.getByText('feature/destination'))
     await fireEvent.doubleClick(screen.getByText('feature/destination'))
 
@@ -219,7 +219,7 @@ describe('BranchNavigatorView', () => {
       ],
     })
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
     await fireEvent.doubleClick(screen.getByText('0123456'))
 
     expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
@@ -240,7 +240,7 @@ describe('BranchNavigatorView', () => {
     })
     seedRepoQueryDataForTest(repo, { branches: [branch], currentBranch: '' })
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
     await fireEvent.doubleClick(screen.getByText(branch.name))
 
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
@@ -275,7 +275,7 @@ describe('BranchNavigatorView', () => {
       ],
     })
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
 
     expect(screen.getByLabelText('branches.dirty')).toBeTruthy()
   })
@@ -300,7 +300,7 @@ describe('BranchNavigatorView', () => {
       ],
     })
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
 
     expect(screen.getByLabelText('branches.dirty')).toBeTruthy()
   })
@@ -323,7 +323,7 @@ describe('BranchNavigatorView', () => {
     })
     installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
 
     await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
     expect(screen.getByText('main')).toBeTruthy()
@@ -350,7 +350,7 @@ describe('BranchNavigatorView', () => {
     })
     installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
 
     expect((await screen.findByRole('status')).textContent).toContain('error.repo-membership-changing')
     expect(screen.getByText('main')).toBeTruthy()
@@ -374,7 +374,7 @@ describe('BranchNavigatorView', () => {
       .mockRejectedValueOnce(new Error('status failed'))
       .mockResolvedValueOnce({ workspaceRuntimeId: repo.workspaceRuntimeId, status: [], loadedAt: 2 })
     installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
 
     expect(await screen.findByText('status.stale-title')).toBeTruthy()
     expect(screen.getByText('main')).toBeTruthy()
@@ -405,7 +405,7 @@ describe('BranchNavigatorView', () => {
       refetchType: 'none',
     })
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
 
     await vi.waitFor(() => {
       expect(readSnapshot).toHaveBeenCalledOnce()
@@ -435,7 +435,7 @@ describe('BranchNavigatorView', () => {
     })
     installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
 
-    renderBranchNavigatorView()
+    renderGitWorkspaceNavigatorView()
 
     await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
     expect(screen.getByText('main')).toBeTruthy()
@@ -446,12 +446,12 @@ describe('BranchNavigatorView', () => {
   })
 })
 
-function renderBranchNavigatorView() {
+function renderGitWorkspaceNavigatorView() {
   return renderInJsdom(
     <VueQueryClientScope client={appQueryClient}>
       <AppNavigationProvider value={navigation}>
         <TerminalSessionReadScope value={terminalReadContext}>
-          <BranchNavigatorView repoId={REPO_ID} />
+          <GitWorkspaceNavigatorView repoId={REPO_ID} />
         </TerminalSessionReadScope>
       </AppNavigationProvider>
     </VueQueryClientScope>,

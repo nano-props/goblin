@@ -1,10 +1,10 @@
-// Branch list row wrapper. Resolves `terminalBellCount` from the
+// Git workspace navigator branch-row wrapper. Resolves `terminalBellCount` from the
 // terminal session projection and delegates rendering to BranchRow.
 
 import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { BranchRow } from '#/web/components/branch-navigator/BranchRow.tsx'
-import type { BranchRowProps } from '#/web/components/branch-navigator/BranchRow.tsx'
+import { BranchRow } from '#/web/components/workspace-navigator/BranchRow.tsx'
+import type { BranchRowProps } from '#/web/components/workspace-navigator/BranchRow.tsx'
 import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import {
@@ -15,8 +15,8 @@ import { branchActionDisplayPhase } from '#/web/hooks/branch-action-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 
-export const BranchListRow = defineComponent<BranchRowProps>({
-  name: 'BranchListRow',
+export const GitWorkspaceNavigatorBranchRow = defineComponent<BranchRowProps>({
+  name: 'GitWorkspaceNavigatorBranchRow',
   props: {
     repo: { type: Object as PropType<BranchActionRepo>, required: true },
     branch: { type: Object as PropType<BranchSnapshotInfo>, required: true },

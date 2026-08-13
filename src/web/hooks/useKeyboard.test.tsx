@@ -48,7 +48,7 @@ import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
 import { repoOperationsQueryKey, repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { BranchNavigatorRowIdentity } from '#/web/components/branch-navigator/branch-navigator-model.ts'
+import type { GitWorkspaceNavigatorRowIdentity } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import {
@@ -78,7 +78,7 @@ const FILESYSTEM_CAPABILITIES = {
 interface HookHostOptions {
   currentWorkspaceId: WorkspaceId | null
   currentBranchName: string | null
-  currentBranchNavigatorRowIdentity: BranchNavigatorRowIdentity | null
+  currentGitWorkspaceNavigatorRowIdentity: GitWorkspaceNavigatorRowIdentity | null
   currentWorkspacePaneCommandTarget: WorkspacePaneCommandTarget | null
   isWorkspaceShortcutSuppressed: () => boolean
   isSettingsOpen: () => boolean
@@ -283,7 +283,7 @@ describe('useKeyboard', () => {
     await renderHookHost({
       currentWorkspaceId: REPO_ID,
       currentBranchName: currentBranch.name,
-      currentBranchNavigatorRowIdentity: { kind: 'worktree', worktreePath: WORKTREE_PATH },
+      currentGitWorkspaceNavigatorRowIdentity: { kind: 'worktree', worktreePath: WORKTREE_PATH },
       navigation: navigationWith({ selectRepoBranch, selectRepoWorktree }),
     })
 
@@ -982,7 +982,7 @@ const HookHost = defineComponent<Partial<HookHostOptions>>({
   props: [
     'currentWorkspaceId',
     'currentBranchName',
-    'currentBranchNavigatorRowIdentity',
+    'currentGitWorkspaceNavigatorRowIdentity',
     'currentWorkspacePaneCommandTarget',
     'isWorkspaceShortcutSuppressed',
     'isSettingsOpen',
@@ -1030,8 +1030,8 @@ const HookHost = defineComponent<Partial<HookHostOptions>>({
       navigation: overrides.navigation ?? navigationWith(),
       currentWorkspaceId: overrides.currentWorkspaceId ?? null,
       currentBranchName: overrides.currentBranchName ?? null,
-      currentBranchNavigatorRowIdentity:
-        overrides.currentBranchNavigatorRowIdentity ??
+      currentGitWorkspaceNavigatorRowIdentity:
+        overrides.currentGitWorkspaceNavigatorRowIdentity ??
         (overrides.currentBranchName ? { kind: 'branch', branchName: overrides.currentBranchName } : null),
       currentWorkspacePaneCommandTarget: overrides.currentWorkspacePaneCommandTarget ?? defaultCommandTarget,
       onShowHelp: () => {},

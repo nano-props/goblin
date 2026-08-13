@@ -11,7 +11,7 @@ import {
   REPO_ID,
   branchWorkspaceView,
   render,
-  branchNavigator,
+  gitWorkspaceNavigator,
   buttonByTestId,
   buttonByLabel,
   workspacePane,
@@ -24,16 +24,16 @@ import {
 } from '#/web/test-utils/workspace-view.tsx'
 
 describe('WorkspaceView branch and page routes', () => {
-  test('large-screen branch activation keeps the Branch Navigator visible', async () => {
+  test('large-screen branch activation keeps the Git workspace navigator visible', async () => {
     const { container } = render(branchWorkspaceView())
 
     expect(workspaceLayout(container)?.dataset.mode).toBe('split')
 
     await flushTestUpdates(() => {
-      branchNavigator(container)?.click()
+      gitWorkspaceNavigator(container)?.click()
     })
 
-    expect(branchNavigator(container)).not.toBeNull()
+    expect(gitWorkspaceNavigator(container)).not.toBeNull()
     expect(workspaceLayout(container)?.dataset.mode).toBe('split')
     expect(workspacePane(container)).not.toBeNull()
   })
@@ -136,7 +136,7 @@ describe('WorkspaceView branch and page routes', () => {
     expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
     expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBeNull()
     expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBe('true')
-    expect(branchNavigator(container)).not.toBeNull()
+    expect(gitWorkspaceNavigator(container)).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-workspace-pane"]')).not.toBeNull()
     expect(workspacePane(container)).toBeNull()
   })
@@ -149,7 +149,7 @@ describe('WorkspaceView branch and page routes', () => {
     )
 
     expect(workspaceLayout(container)).toBeNull()
-    expect(branchNavigator(container)).not.toBeNull()
+    expect(gitWorkspaceNavigator(container)).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-workspace-pane"]')).toBeNull()
   })
 
@@ -185,20 +185,20 @@ describe('WorkspaceView branch and page routes', () => {
     expect(container.querySelector<HTMLElement>('[data-testid="create-worktree-page"]')?.dataset.compact).toBe('true')
   })
 
-  test('large-screen Zen Mode uses Branch Navigator until a branch opens a collapsed split workspace', async () => {
+  test('large-screen Zen Mode uses the Git workspace navigator until a branch opens a collapsed split workspace', async () => {
     workspacesStore.getState().setZenMode(true)
     const { container, rerender } = render(<WorkspaceView workspaceId={REPO_ID} />)
 
-    expect(branchNavigator(container)).not.toBeNull()
+    expect(gitWorkspaceNavigator(container)).not.toBeNull()
     expect(workspacePane(container)).toBeNull()
     expect(workspaceLayout(container)).toBeNull()
 
     await flushTestUpdates(async () => {
-      branchNavigator(container)?.click()
+      gitWorkspaceNavigator(container)?.click()
       await rerender(branchWorkspaceView())
     })
 
-    expect(branchNavigator(container)).not.toBeNull()
+    expect(gitWorkspaceNavigator(container)).not.toBeNull()
     expect(workspaceLayout(container)?.dataset.mode).toBe('split')
     expect(workspaceLayout(container)?.dataset.sidebarCollapsed).toBe('true')
     expect(workspacePane(container)).not.toBeNull()

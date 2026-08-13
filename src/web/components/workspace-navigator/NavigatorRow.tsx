@@ -3,7 +3,7 @@ import {
   NAVIGATOR_ROW_ACTION_SLOT_CLASS,
   NAVIGATOR_ROW_CONTENT_CLASS,
   NAVIGATOR_ROW_GRID_CLASS,
-} from '#/web/components/branch-navigator/navigator-row-metrics.ts'
+} from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
 import type { ElementRef } from '#/web/components/ui/refs.ts'
 import { toLiVNodeRef } from '#/web/components/ui/refs.ts'
 import { cn } from '#/web/lib/cn.ts'

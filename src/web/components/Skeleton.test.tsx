@@ -34,7 +34,7 @@ describe('WorkspaceLayoutSkeleton', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton />)
 
     expect(container.querySelectorAll('li')).toHaveLength(6)
-    expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
+    expect(container.querySelectorAll('[data-testid="git-workspace-navigator-skeleton-action"]')).toHaveLength(6)
     expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).toBeNull()
     expect(container.querySelector('[data-testid="repo-workspace-skeleton-action"]')).toBeNull()
@@ -50,18 +50,18 @@ describe('WorkspaceLayoutSkeleton', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton workspacePaneState="content" />)
 
     expect(container.querySelectorAll('li')).toHaveLength(6)
-    expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
+    expect(container.querySelectorAll('[data-testid="git-workspace-navigator-skeleton-action"]')).toHaveLength(6)
     expect(container.querySelectorAll('[data-testid="workspace-status-skeleton-row"]')).toHaveLength(8)
     expect(container.querySelector('[data-testid="mock-split-pane"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-workspace-pane-skeleton"]')).toBeNull()
   })
 
-  test('renders a single Branch Navigator skeleton in single-pane mode', () => {
+  test('renders a single Git workspace navigator skeleton in single-pane mode', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton singlePane />)
 
     expect(container.querySelectorAll('li')).toHaveLength(6)
-    expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(6)
+    expect(container.querySelectorAll('[data-testid="git-workspace-navigator-skeleton-action"]')).toHaveLength(6)
     expect(container.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
   })
 
@@ -72,7 +72,7 @@ describe('WorkspaceLayoutSkeleton', () => {
 
     expect(container.querySelectorAll('li')).toHaveLength(0)
     expect(container.querySelectorAll('[data-testid="workspace-status-skeleton-row"]')).toHaveLength(8)
-    expect(container.querySelectorAll('[data-testid="branch-navigator-skeleton-action"]')).toHaveLength(0)
+    expect(container.querySelectorAll('[data-testid="git-workspace-navigator-skeleton-action"]')).toHaveLength(0)
     expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="mock-split-pane"]')).toBeNull()
   })
@@ -80,12 +80,12 @@ describe('WorkspaceLayoutSkeleton', () => {
   test('sizes branch action placeholders like the icon-only action button', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton singlePane />)
 
-    const action = container.querySelector('[data-testid="branch-navigator-skeleton-action"] > div')
+    const action = container.querySelector('[data-testid="git-workspace-navigator-skeleton-action"] > div')
     expect(action?.className).toContain('h-6')
     expect(action?.className).toContain('w-7')
   })
 
-  test('uses the same row metrics as the real Branch Navigator list', () => {
+  test('uses the same row metrics as the real Git workspace navigator list', () => {
     const { container } = renderInJsdom(<WorkspaceLayoutSkeleton singlePane />)
 
     const row = container.querySelector('li')

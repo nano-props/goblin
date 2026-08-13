@@ -1,7 +1,7 @@
-// Persistent left branch navigator pane. ScrollArea container
-// around the shared BranchNavigatorView.
+// Persistent Git workspace navigator pane. ScrollArea container
+// around the shared GitWorkspaceNavigatorView.
 
-import { BranchNavigatorView } from '#/web/components/branch-navigator/BranchNavigatorView.tsx'
+import { GitWorkspaceNavigatorView } from '#/web/components/workspace-navigator/GitWorkspaceNavigatorView.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import type { FunctionalComponent } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -13,9 +13,9 @@ interface Props {
   currentWorktreePath?: string | null
 }
 
-export const BranchNavigator: FunctionalComponent<Props> = (props) => (
+export const GitWorkspaceNavigator: FunctionalComponent<Props> = (props) => (
   <ScrollArea class="h-full min-h-0 flex-1">
-    <BranchNavigatorView
+    <GitWorkspaceNavigatorView
       repoId={props.repoId}
       onSelectBranch={props.onSelectBranch}
       currentBranchName={props.currentBranchName}
@@ -24,4 +24,4 @@ export const BranchNavigator: FunctionalComponent<Props> = (props) => (
   </ScrollArea>
 )
 
-BranchNavigator.props = ['repoId', 'onSelectBranch', 'currentBranchName', 'currentWorktreePath']
+GitWorkspaceNavigator.props = ['repoId', 'onSelectBranch', 'currentBranchName', 'currentWorktreePath']

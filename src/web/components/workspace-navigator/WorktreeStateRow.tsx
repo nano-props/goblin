@@ -4,7 +4,7 @@ import type { PropType } from 'vue'
 import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-import { NavigatorRow } from '#/web/components/branch-navigator/NavigatorRow.tsx'
+import { NavigatorRow } from '#/web/components/workspace-navigator/NavigatorRow.tsx'
 import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
 import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
 import {

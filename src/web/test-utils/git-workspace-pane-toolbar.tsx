@@ -177,7 +177,14 @@ type GitWorkspacePaneToolbarHarnessProps = Omit<
 
 const GitWorkspacePaneToolbarHarness = defineComponent<GitWorkspacePaneToolbarHarnessProps>({
   name: 'GitWorkspacePaneToolbarHarness',
-  props: ['repo', 'detail', 'workspacePaneId', 'workspacePaneRoute', 'trafficLightOffset', 'onBackToBranchNavigator'],
+  props: [
+    'repo',
+    'detail',
+    'workspacePaneId',
+    'workspacePaneRoute',
+    'trafficLightOffset',
+    'onBackToGitWorkspaceNavigator',
+  ],
 
   setup(props) {
     const workspacePaneTabModel = useGitWorkspacePaneTabModel(
@@ -193,7 +200,7 @@ const GitWorkspacePaneToolbarHarness = defineComponent<GitWorkspacePaneToolbarHa
         workspacePaneRoute={props.workspacePaneRoute}
         workspacePaneTabModel={workspacePaneTabModel.value}
         trafficLightOffset={props.trafficLightOffset}
-        onBackToBranchNavigator={props.onBackToBranchNavigator}
+        onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
       />
     )
   },

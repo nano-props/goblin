@@ -215,8 +215,6 @@ export interface RepoSnapshot {
   branches: BranchSnapshotInfo[]
   worktrees: RepoWorktreeSnapshot[]
   current: string
-  /** Short commit hash when HEAD is detached (no branch checked out). */
-  currentHEAD?: string
   remote: RepoRemoteInfo
 }
 

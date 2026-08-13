@@ -1,22 +1,22 @@
 import { describe, expect, test } from 'vitest'
 import {
-  branchNavigatorRowIdentity,
-  branchNavigatorRows,
-} from '#/web/components/branch-navigator/branch-navigator-model.ts'
+  gitWorkspaceNavigatorRowIdentity,
+  gitWorkspaceNavigatorRows,
+} from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 import { createRepoBranch, createRepoWorktreeSnapshotForTest } from '#/web/test-utils/repo-store.ts'
 
 const WORKTREE_PATH = '/tmp/feature-worktree'
 
-describe('branchNavigatorRows', () => {
+describe('gitWorkspaceNavigatorRows', () => {
   test('uses a materialized worktree as the target identity at its branch position', () => {
     const branches = [createRepoBranch('main'), createRepoBranch('feature/example'), createRepoBranch('later')]
-    const rows = branchNavigatorRows({
+    const rows = gitWorkspaceNavigatorRows({
       branches,
       worktrees: [createRepoWorktreeSnapshotForTest('feature/example', WORKTREE_PATH)],
       viewMode: 'all',
     })
 
-    expect(rows.map(branchNavigatorRowIdentity)).toEqual([
+    expect(rows.map(gitWorkspaceNavigatorRowIdentity)).toEqual([
       { kind: 'branch', branchName: 'main' },
       { kind: 'worktree', worktreePath: WORKTREE_PATH },
       { kind: 'branch', branchName: 'later' },
@@ -30,9 +30,9 @@ describe('branchNavigatorRows', () => {
       head: { kind: 'detached' as const },
       operation: { kind: 'rebase' as const },
     }
-    const rows = branchNavigatorRows({ branches, worktrees: [worktree], viewMode: 'all' })
+    const rows = gitWorkspaceNavigatorRows({ branches, worktrees: [worktree], viewMode: 'all' })
 
-    expect(rows.map(branchNavigatorRowIdentity)).toEqual([
+    expect(rows.map(gitWorkspaceNavigatorRowIdentity)).toEqual([
       { kind: 'branch', branchName: 'main' },
       { kind: 'worktree', worktreePath: WORKTREE_PATH },
       { kind: 'branch', branchName: 'later' },
@@ -50,7 +50,9 @@ describe('branchNavigatorRows', () => {
     }
 
     expect(
-      branchNavigatorRows({ branches, worktrees: [worktree], viewMode: 'all' }).map(branchNavigatorRowIdentity),
+      gitWorkspaceNavigatorRows({ branches, worktrees: [worktree], viewMode: 'all' }).map(
+        gitWorkspaceNavigatorRowIdentity,
+      ),
     ).toEqual([
       { kind: 'branch', branchName: 'main' },
       { kind: 'branch', branchName: 'feature/example' },

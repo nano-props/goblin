@@ -5,7 +5,7 @@ import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import type { WorkspaceRouteView } from '#/web/App.tsx'
 import { WorkspaceLayoutPane } from '#/web/components/Layout.tsx'
 import {
-  BranchNavigatorSkeleton,
+  GitWorkspaceNavigatorSkeleton,
   EmptyWorkspacePaneSkeleton,
   WorkspaceLayoutSkeleton,
   WorkspacePaneSkeleton,
@@ -223,7 +223,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
         : undefined
 
       const renderSidebarPane = (
-        branchContent?: VNodeChild,
+        navigatorContent?: VNodeChild,
         chromeRegion: 'drag' | 'none' = zenModeCollapsed ? 'none' : 'drag',
       ): VNodeChild => (
         <WorkspaceLayoutPane>
@@ -231,7 +231,9 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
             workspaceId={currentWorkspace.id}
             git={git}
             compact={isCompact}
-            branchContent={branchContent ?? (!gitCapabilitySettled ? <BranchNavigatorSkeleton /> : undefined)}
+            navigatorContent={
+              navigatorContent ?? (!gitCapabilitySettled ? <GitWorkspaceNavigatorSkeleton /> : undefined)
+            }
             chromeRegion={chromeRegion}
             onOpenSettings={props.onOpenSettings}
             onSelectBranch={sidebarSelectBranch}
@@ -311,7 +313,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
                 }}
                 shortcutsEnabled={!isCompact || activeSinglePane === 'workspace'}
                 toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-                onBackToBranchNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
+                onBackToGitWorkspaceNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
               />
             )
           case 'worktree':
@@ -326,7 +328,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
                 }}
                 shortcutsEnabled={!isCompact || activeSinglePane === 'workspace'}
                 toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-                onBackToBranchNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
+                onBackToGitWorkspaceNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
               />
             )
           case 'newWorktree':
@@ -354,7 +356,7 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
                 workspacePaneRouteContext={workspacePaneRouteContext.value}
                 shortcutsEnabled={!isCompact || activeSinglePane === 'workspace'}
                 toolbarTrafficLightOffset={workspaceTrafficLightOffset}
-                onBackToBranchNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
+                onBackToGitWorkspaceNavigator={() => props.onOpenWorkspaceNavigator?.(currentWorkspace.id)}
               />
             )
         }
@@ -394,7 +396,8 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
         }
 
         if (currentWorkspace.session.projectionState === 'stub') {
-          const branchSkeleton = isCompact && routeBranchName ? undefined : <BranchNavigatorSkeleton />
+          const gitWorkspaceNavigatorSkeleton =
+            isCompact && routeBranchName ? undefined : <GitWorkspaceNavigatorSkeleton />
           return (
             <WorkspaceLayoutShell
               workspaceId={props.workspaceId}
@@ -403,8 +406,8 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
               workspacePaneActive={workspacePaneActive.value}
               workspacePaneSize={currentView.workspacePaneSize}
               onWorkspacePaneSizeChange={setWorkspacePaneSize}
-              sidebarPane={renderSidebarPane(branchSkeleton)}
-              zenRevealSidebarPane={renderSidebarPane(branchSkeleton, 'none')}
+              sidebarPane={renderSidebarPane(gitWorkspaceNavigatorSkeleton)}
+              zenRevealSidebarPane={renderSidebarPane(gitWorkspaceNavigatorSkeleton, 'none')}
               workspacePane={
                 <WorkspaceLayoutPane>
                   {routeBranchName ? (

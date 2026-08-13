@@ -23,7 +23,7 @@ interface GitWorkspacePaneToolbarProps {
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   workspacePaneTabModel: WorkspacePaneTabModel
   trafficLightOffset?: boolean
-  onBackToBranchNavigator?: () => void
+  onBackToGitWorkspaceNavigator?: () => void
 }
 
 export const GitWorkspacePaneToolbar = defineComponent<GitWorkspacePaneToolbarProps>({
@@ -35,7 +35,7 @@ export const GitWorkspacePaneToolbar = defineComponent<GitWorkspacePaneToolbarPr
     'workspacePaneRoute',
     'workspacePaneTabModel',
     'trafficLightOffset',
-    'onBackToBranchNavigator',
+    'onBackToGitWorkspaceNavigator',
   ],
 
   setup(props) {
@@ -76,7 +76,7 @@ export const GitWorkspacePaneToolbar = defineComponent<GitWorkspacePaneToolbarPr
           workspacePaneRoute={props.workspacePaneRoute}
           statusCount={props.detail.statusCount}
           trafficLightOffset={props.trafficLightOffset ?? false}
-          onBackToNavigator={props.onBackToBranchNavigator}
+          onBackToNavigator={props.onBackToGitWorkspaceNavigator}
         />
       )
     }

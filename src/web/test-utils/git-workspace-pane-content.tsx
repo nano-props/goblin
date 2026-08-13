@@ -97,7 +97,7 @@ export const GitWorkspacePaneContentHarness = defineComponent<GitWorkspacePaneCo
     'workspacePaneId',
     'readFailures',
     'onRetryStatus',
-    'onBackToBranchNavigator',
+    'onBackToGitWorkspaceNavigator',
     'workspacePaneRouteMode',
     'navigation',
   ],
@@ -112,7 +112,7 @@ export const GitWorkspacePaneContentHarness = defineComponent<GitWorkspacePaneCo
             workspacePaneId={props.workspacePaneId}
             readFailures={props.readFailures}
             onRetryStatus={props.onRetryStatus}
-            onBackToBranchNavigator={props.onBackToBranchNavigator}
+            onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
             workspacePaneRouteMode={props.workspacePaneRouteMode}
           />
         </VueQueryClientScope>
@@ -129,7 +129,7 @@ const GitWorkspacePaneContentInner = defineComponent<GitWorkspacePaneContentHarn
     'workspacePaneId',
     'readFailures',
     'onRetryStatus',
-    'onBackToBranchNavigator',
+    'onBackToGitWorkspaceNavigator',
     'workspacePaneRouteMode',
   ],
 
@@ -148,7 +148,7 @@ const GitWorkspacePaneContentInner = defineComponent<GitWorkspacePaneContentHarn
         workspacePaneId={props.workspacePaneId}
         readFailures={props.readFailures}
         onRetryStatus={props.onRetryStatus}
-        onBackToBranchNavigator={props.onBackToBranchNavigator}
+        onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
         workspacePaneTabModel={workspacePaneTabModel.value}
       />
     )

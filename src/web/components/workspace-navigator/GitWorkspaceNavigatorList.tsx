@@ -1,6 +1,6 @@
 // Pure presentational navigator list. Renders the ordered branch/worktree
 // row model and scrolls the highlighted row into view as
-// it changes. The wrapper (BranchNavigator pane) owns the data source,
+// it changes. The Git workspace navigator pane owns the data source,
 // the navigation glue, and the outer container
 // — this component owns the per-list action-menu state and the
 // scroll-into-view side effect.
@@ -15,17 +15,17 @@
 
 import { defineComponent, ref, watch } from 'vue'
 import type { PropType, VNodeChild } from 'vue'
-import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
-import type { BranchNavigatorRepo } from '#/web/components/branch-navigator/use-branch-navigator-data.ts'
-import { WorktreeStateRow } from '#/web/components/branch-navigator/WorktreeStateRow.tsx'
-import { NAVIGATOR_ROW_LIST_CLASS } from '#/web/components/branch-navigator/navigator-row-metrics.ts'
-import type { BranchNavigatorRow } from '#/web/components/branch-navigator/branch-navigator-model.ts'
+import { GitWorkspaceNavigatorBranchRow } from '#/web/components/workspace-navigator/GitWorkspaceNavigatorBranchRow.tsx'
+import type { GitWorkspaceNavigatorRepo } from '#/web/components/workspace-navigator/use-git-workspace-navigator-data.ts'
+import { WorktreeStateRow } from '#/web/components/workspace-navigator/WorktreeStateRow.tsx'
+import { NAVIGATOR_ROW_LIST_CLASS } from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
+import type { GitWorkspaceNavigatorRow } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 
 interface Props {
   /** May be null while repo data is not loaded yet; the list falls
    *  through to the empty-state slot in that case. */
-  repo: BranchNavigatorRepo | null
-  rows: BranchNavigatorRow[]
+  repo: GitWorkspaceNavigatorRepo | null
+  rows: GitWorkspaceNavigatorRow[]
   /** Name of the branch to mark as selected/highlighted in the list. */
   highlightedBranch: string | null
   highlightedWorktreePath?: string | null
@@ -37,11 +37,11 @@ interface Props {
   emptyState: VNodeChild
 }
 
-export const BranchNavigatorList = defineComponent<Props>({
-  name: 'BranchNavigatorList',
+export const GitWorkspaceNavigatorList = defineComponent<Props>({
+  name: 'GitWorkspaceNavigatorList',
   props: {
-    repo: { type: Object as PropType<BranchNavigatorRepo | null>, default: null },
-    rows: { type: Array as PropType<BranchNavigatorRow[]>, required: true },
+    repo: { type: Object as PropType<GitWorkspaceNavigatorRepo | null>, default: null },
+    rows: { type: Array as PropType<GitWorkspaceNavigatorRow[]>, required: true },
     highlightedBranch: { type: String, default: null },
     highlightedWorktreePath: { type: String, default: null },
     onSelectBranch: { type: Function as PropType<(branch: string) => void>, required: true },
@@ -111,7 +111,7 @@ export const BranchNavigatorList = defineComponent<Props>({
                 : null
               : props.highlightedBranch
             return (
-              <BranchListRow
+              <GitWorkspaceNavigatorBranchRow
                 key={row.kind === 'worktree' ? row.worktree.path : branch.name}
                 repo={props.repo!}
                 branch={branch}

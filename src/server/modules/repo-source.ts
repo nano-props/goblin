@@ -34,7 +34,6 @@ import {
   getBranchWorktreeIdentities,
   getBranches,
   getCurrentBranch,
-  getHeadHash,
   getLog as getGitLog,
   getRepoRoot,
   getUpstream,
@@ -64,9 +63,11 @@ import {
   type LogEntry,
   type PullRequestFetchMode,
   type PullRequestInfo,
+  repoWorktreeForBranch,
   repoWorktreeMaterializedBranch,
   type RepoMutationExecResult,
   type RepoLogTarget,
+  type RepoWorktreeSnapshot,
   type RepoUrlTarget,
   type WorktreeInfo,
   type WorktreeStatus,
@@ -483,6 +484,7 @@ function createLocalRepoSource(
   async function validateBranchDeletion(
     branch: string,
     upstream: GitUpstream | null,
+    worktreeSnapshots: RepoWorktreeSnapshot[],
     options?: {
       force?: boolean
       notMergedMessage?: 'error.branch-not-fully-merged' | 'error.cannot-remove-unpushed-worktree'
@@ -490,11 +492,8 @@ function createLocalRepoSource(
     signal?: AbortSignal,
     ignoredWorktreePath?: string,
     gitCwd = repoId,
-    knownWorktrees?: WorktreeInfo[],
   ): Promise<ExecResult | null> {
     const current = await getCurrentBranch(gitCwd, { signal })
-    const worktrees = knownWorktrees ?? (await readWorktreeMembership(gitCwd, signal))
-    const worktreeSnapshots = await readRepoWorktreeSnapshots(repoId, worktrees, signal)
     const ignoredPath = ignoredWorktreePath ? path.resolve(ignoredWorktreePath) : null
     const isCheckedOutElsewhere = worktreeSnapshots.some((worktree) => {
       if (repoWorktreeMaterializedBranch(worktree) !== branch) return false
@@ -576,10 +575,9 @@ function createLocalRepoSource(
       ])
       const branches = await getBranches(repoId, currentBranch, { signal: options?.signal })
       const current = currentBranch ?? ''
-      const currentHEAD = currentBranch === null ? await getHeadHash(repoId, { signal: options?.signal }) : undefined
       const remote = await getRemoteInfo(repoId, options?.signal)
       options?.signal?.throwIfAborted()
-      return { branches, worktrees, current, currentHEAD, remote }
+      return { branches, worktrees, current, remote }
     },
     async getWorkspacePaneTargetIdentities(options) {
       const membership = await readWorktreeMembership(repoId, options?.signal)
@@ -693,15 +691,16 @@ function createLocalRepoSource(
     async deleteBranch(branch, options, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const worktrees = await readWorktreeMembership(repoId, signal)
+      const worktreeSnapshots = await readRepoWorktreeSnapshots(repoId, worktrees, signal)
       const upstream = !options?.force || options?.deleteUpstream ? await getUpstream(repoId, branch, signal) : null
       const validation = await validateBranchDeletion(
         branch,
         upstream,
+        worktreeSnapshots,
         { force: options?.force },
         signal,
         undefined,
         repoId,
-        worktrees,
       )
       if (validation) return validation
       const repoIdsToInvalidate = localRepoIdsToInvalidate(repoId, worktrees)
@@ -719,8 +718,13 @@ function createLocalRepoSource(
         ? physicalWorktreeExecutionBinding(physicalWorktreeCapability)
         : null
       const requestedPath = exactExecution?.kind === 'local' ? exactExecution.canonicalWorktreePath : input.worktreePath
-      const removable = resolveRemovableWorktree(worktrees, input.branch, requestedPath, mainWorktreePath)
+      const removable = resolveRemovableWorktree(worktrees, requestedPath, mainWorktreePath)
       if (!removable.ok) return { ok: false, message: removable.message }
+      const worktreeSnapshots = await readRepoWorktreeSnapshots(repoId, worktrees, signal)
+      const branchWorktree = repoWorktreeForBranch(worktreeSnapshots, input.branch)
+      if (!branchWorktree || path.resolve(branchWorktree.path) !== path.resolve(removable.target.path)) {
+        return { ok: false, message: 'error.worktree-not-found-for-branch' }
+      }
       const targetStatus = await sampleWorktreeStatusForTarget(removable.target, signal)
       const statusAwareTarget =
         targetStatus.kind === 'status'
@@ -741,11 +745,11 @@ function createLocalRepoSource(
         const validation = await validateBranchDeletion(
           input.branch,
           upstream,
+          worktreeSnapshots,
           { force: input.forceDeleteBranch, notMergedMessage: 'error.cannot-remove-unpushed-worktree' },
           signal,
           removable.target.path,
           mutationCwd,
-          worktrees,
         )
         if (validation) return validation
       }

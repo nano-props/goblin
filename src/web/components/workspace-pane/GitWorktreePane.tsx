@@ -90,7 +90,7 @@ export const GitWorktreePane = defineComponent<GitWorktreePaneProps>({
       if (!currentTarget || !currentWorktree) {
         return <EmptyState title={t('workspace-route.not-found-title')} />
       }
-      if (currentWorktree.head.kind === 'branch') {
+      if (currentWorktree.head.kind === 'branch' && currentWorktree.operation === null) {
         return (
           <GitWorkspacePane
             gitWorkspace={{
@@ -101,7 +101,7 @@ export const GitWorktreePane = defineComponent<GitWorktreePaneProps>({
             workspacePaneId={props.workspacePaneId}
             shortcutsEnabled
             toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
-            onBackToBranchNavigator={props.onBackToNavigator}
+            onBackToGitWorkspaceNavigator={props.onBackToNavigator}
           />
         )
       }

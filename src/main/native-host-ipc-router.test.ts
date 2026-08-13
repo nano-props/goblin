@@ -4,7 +4,6 @@ import { HOST_IPC_ABORT_CHANNEL, HOST_IPC_CALL_CHANNEL } from '#/shared/ipc-chan
 import { isAncestor, getCurrentBranch, getUpstream, isGitRepo } from '#/system/git/branches.ts'
 import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { getWorkingStatus } from '#/system/git/status.ts'
-import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
 import { pullBranch } from '#/system/git/remote.ts'
 import { registerClientWindowSurface } from '#/main/client-surface-registry.ts'
 import { registerTrustedAppUrl } from '#/main/ipc/trusted-webcontents.ts'
@@ -83,11 +82,6 @@ vi.mock('#/system/git/worktrees.ts', () => ({
   createWorktree: vi.fn(),
   readWorktreeMembership: vi.fn(),
   removeWorktree: vi.fn(),
-}))
-
-vi.mock('#/shared/worktree-guards.ts', () => ({
-  resolveKnownWorktree: vi.fn(),
-  resolveRemovableWorktree: vi.fn(),
 }))
 
 vi.mock('#/system/git/git-exec.ts', () => ({
@@ -286,14 +280,6 @@ describe('main repo ipc cancellation', () => {
     ])
     vi.mocked(getUpstream).mockResolvedValue(null)
     vi.mocked(isAncestor).mockResolvedValue(false)
-    vi.mocked(resolveRemovableWorktree).mockReturnValue({
-      ok: true,
-      target: { path: '/repo-feature', branch: 'feature/cancel', isBare: false, isPrimary: false, isDirty: false },
-    })
-    vi.mocked(resolveKnownWorktree).mockReturnValue({
-      ok: true,
-      path: '/repo-feature',
-    })
     vi.mocked(pullBranch).mockResolvedValue({
       result: { ok: true, message: 'ok' },
       execution: { status: 'succeeded' },

@@ -93,7 +93,6 @@ const RepoSnapshotObjectSchema = v.strictObject({
     }),
   ),
   current: v.string(),
-  currentHEAD: v.optional(v.string()),
   remote: RepoRemoteInfoSchema,
 })
 const RepoSnapshotSchema = v.pipe(

@@ -157,6 +157,11 @@ describe('repo response schemas', () => {
         loadedAt: 1,
       }).success,
     ).toBe(false)
+    expect(
+      v.safeParse(RepoSnapshotResponseSchema, {
+        snapshot: { branches: [], worktrees: [], current: '', currentHEAD: 'abcdef1', remote },
+      }).success,
+    ).toBe(false)
   })
 
   test('rejects invalid worktree branch ownership', () => {

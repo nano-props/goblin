@@ -344,7 +344,7 @@ describe('WorkspacePane terminal routes', () => {
       branchSnapshots: [],
       currentBranchName: null,
     })
-    const onBackToBranchNavigator = vi.fn()
+    const onBackToGitWorkspaceNavigator = vi.fn()
 
     render(
       <VueQueryClientScope client={appQueryClient}>
@@ -355,7 +355,7 @@ describe('WorkspacePane terminal routes', () => {
                 workspaceId={REPO_ID}
                 currentBranchName="feature/removed"
                 workspacePaneRouteContext={{ kind: 'routed', route: null }}
-                onBackToBranchNavigator={onBackToBranchNavigator}
+                onBackToGitWorkspaceNavigator={onBackToGitWorkspaceNavigator}
               />
             </TerminalSessionReadScope>
           </TerminalSessionCommandScope>
@@ -364,7 +364,7 @@ describe('WorkspacePane terminal routes', () => {
     )
 
     screen.getByRole('button', { name: 'branches.back-to-list' }).click()
-    expect(onBackToBranchNavigator).toHaveBeenCalledOnce()
+    expect(onBackToGitWorkspaceNavigator).toHaveBeenCalledOnce()
   })
 
   test('records workspace history when creating a terminal from the status tab', async () => {

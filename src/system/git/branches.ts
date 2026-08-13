@@ -76,14 +76,6 @@ export async function getCurrentBranch(cwd: string, options?: { signal?: AbortSi
   return branch || null
 }
 
-/** Authoritative detached-HEAD identity read; failures and cancellation throw. */
-export async function getHeadHash(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
-  const head = await git(cwd, ['rev-parse', '--short', 'HEAD'], { signal: options?.signal })
-  options?.signal?.throwIfAborted()
-  if (!head) throw new Error('Git returned an empty HEAD')
-  return head
-}
-
 export async function getDefaultBranch(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   const ref = await git(cwd, ['for-each-ref', '--format=%(symref:short)', 'refs/remotes/origin/HEAD'], {
     signal: options?.signal,

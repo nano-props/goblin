@@ -865,8 +865,17 @@ export async function removeRemoteWorktree(
   const worktreePathsToInvalidate = worktrees.filter((worktree) => !worktree.isBare).map((worktree) => worktree.path)
 
   const mainWorktreePath = worktrees.find((worktree) => worktree.isPrimary)?.path ?? worktrees[0]?.path ?? ''
-  const resolved = resolveRemoteRemovableWorktree(worktrees, input.branch, input.worktreePath, mainWorktreePath)
+  const resolved = resolveRemoteRemovableWorktree(worktrees, input.worktreePath, mainWorktreePath)
   if ('ok' in resolved) return resolved
+  const worktreeSnapshots = await readRemoteRepoWorktreeSnapshots(target, worktrees, {
+    signal: input.signal,
+    run,
+  })
+  const resolvedPath = path.posix.resolve(resolved.path)
+  const branchWorktree = repoWorktreeForBranch(worktreeSnapshots, input.branch)
+  if (!branchWorktree || path.posix.resolve(branchWorktree.path) !== resolvedPath) {
+    return { ok: false, message: 'error.worktree-not-found-for-branch' }
+  }
   const mutationPath = resolved.path === target.remotePath && mainWorktreePath ? mainWorktreePath : target.remotePath
 
   const status = await runRemoteWorktreeStatusProbe(target, resolved.path, { signal: input.signal, run })
@@ -886,10 +895,6 @@ export async function removeRemoteWorktree(
         })
       : null
   if (input.deleteBranch) {
-    const worktreeSnapshots = await readRemoteRepoWorktreeSnapshots(target, worktrees, {
-      signal: input.signal,
-      run,
-    })
     const removedWorktreePath = path.posix.resolve(resolved.path)
     const currentBranch = await getRemoteCurrentBranch(target, {
       signal: input.signal,
@@ -1150,15 +1155,12 @@ async function resolveKnownRemoteWorktree(
 
 function resolveRemoteRemovableWorktree(
   worktrees: WorktreeInfo[],
-  branch: string,
   worktreePath: string,
   mainWorktreePath: string,
 ): WorktreeInfo | ExecResult {
   const resolvedPath = path.posix.resolve(worktreePath)
-  const target = worktrees.find(
-    (worktree) => path.posix.resolve(worktree.path) === resolvedPath && worktree.branch === branch,
-  )
-  if (!target) return { ok: false, message: 'error.worktree-not-found-for-branch' }
+  const target = worktrees.find((worktree) => path.posix.resolve(worktree.path) === resolvedPath)
+  if (!target) return { ok: false, message: 'error.worktree-not-found' }
   if (
     target.isPrimary ||
     (!!mainWorktreePath && path.posix.resolve(target.path) === path.posix.resolve(mainWorktreePath))

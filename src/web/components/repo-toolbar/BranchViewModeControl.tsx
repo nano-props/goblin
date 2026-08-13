@@ -10,7 +10,7 @@
 //                branches that own a worktree path render)
 //   unpressed → branchViewMode === 'all'       (no filter)
 // The underlying store action `setBranchViewMode` is unchanged;
-// BranchNavigator / persistence / refresh continue to read
+// GitWorkspaceNavigator / persistence / refresh continue to read
 // The value is a restorable per-workspace client preference.
 
 import { defineComponent } from 'vue'

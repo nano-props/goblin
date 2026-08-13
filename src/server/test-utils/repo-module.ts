@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, vi } from 'vitest'
-import type { PullRequestInfo } from '#/shared/git-types.ts'
+import type { PullRequestInfo, WorktreeInfo } from '#/shared/git-types.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -126,7 +126,6 @@ const hoistedMocks = vi.hoisted(() => ({
   getBranchWorktreeIdentities: vi.fn(),
   getBranchPullRequests: vi.fn(),
   getCurrentBranch: vi.fn(),
-  getHeadHash: vi.fn(),
   getDefaultBranch: vi.fn(),
   resolveRepoCommonDir: vi.fn(),
   resolveRepoObjectsDir: vi.fn(),
@@ -175,7 +174,6 @@ vi.mock('#/system/git/branches.ts', () => ({
   getBranches: hoistedMocks.getBranches,
   getBranchWorktreeIdentities: hoistedMocks.getBranchWorktreeIdentities,
   getCurrentBranch: hoistedMocks.getCurrentBranch,
-  getHeadHash: hoistedMocks.getHeadHash,
   getDefaultBranch: hoistedMocks.getDefaultBranch,
   resolveRepoCommonDir: hoistedMocks.resolveRepoCommonDir,
   resolveRepoObjectsDir: hoistedMocks.resolveRepoObjectsDir,
@@ -377,7 +375,21 @@ beforeEach(async () => {
   hoistedMocks.getRepoName.mockResolvedValue('repo')
   hoistedMocks.getRepoRoot.mockImplementation(async (cwd: string) => cwd)
   hoistedMocks.readWorktreeMembership.mockResolvedValue([])
-  hoistedMocks.readRepoWorktreeSnapshots.mockResolvedValue([])
+  hoistedMocks.readRepoWorktreeSnapshots.mockImplementation(async (_repoId, worktrees: WorktreeInfo[]) =>
+    worktrees
+      .filter((worktree) => !worktree.isBare)
+      .map((worktree) => ({
+        path: worktree.path,
+        head: worktree.branch
+          ? { kind: 'branch' as const, branchName: worktree.branch }
+          : { kind: 'detached' as const },
+        headOid: worktree.headOid ?? 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        operation: null,
+        materializedBranch: worktree.branch ?? null,
+        isPrimary: worktree.isPrimary,
+        isLocked: worktree.isLocked ?? false,
+      })),
+  )
   hoistedMocks.sampleWorktreeStatusForTarget.mockImplementation(async (worktree) => ({
     kind: worktree.isBare ? 'bare' : 'status',
     worktree,

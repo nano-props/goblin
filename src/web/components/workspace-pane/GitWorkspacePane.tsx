@@ -42,7 +42,7 @@ interface GitWorkspacePaneProps {
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
-  onBackToBranchNavigator?: () => void
+  onBackToGitWorkspaceNavigator?: () => void
 }
 
 export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
@@ -53,7 +53,7 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
     'workspacePaneId',
     'shortcutsEnabled',
     'toolbarTrafficLightOffset',
-    'onBackToBranchNavigator',
+    'onBackToGitWorkspaceNavigator',
   ],
 
   setup(props) {
@@ -143,7 +143,7 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
               workspacePaneId={props.workspacePaneId}
               shortcutsEnabled={props.shortcutsEnabled}
               toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
-              onBackToBranchNavigator={props.onBackToBranchNavigator}
+              onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
               readFailures={snapshotReadFailures}
             />
           ) : (
@@ -153,7 +153,7 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
               workspacePaneRouteContext={props.workspacePaneRouteContext}
               workspacePaneId={props.workspacePaneId}
               toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
-              onBackToBranchNavigator={props.onBackToBranchNavigator}
+              onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
               readFailures={snapshotReadFailures}
             />
           )}
@@ -242,7 +242,7 @@ interface GitWorkspacePaneSurfaceProps {
   workspacePaneRouteContext: WorkspacePaneRouteContext
   workspacePaneId: string
   toolbarTrafficLightOffset?: boolean
-  onBackToBranchNavigator?: () => void
+  onBackToGitWorkspaceNavigator?: () => void
   readFailures: RepoReadFailure[]
 }
 
@@ -254,7 +254,7 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
     'workspacePaneRouteContext',
     'workspacePaneId',
     'toolbarTrafficLightOffset',
-    'onBackToBranchNavigator',
+    'onBackToGitWorkspaceNavigator',
     'readFailures',
   ],
 
@@ -284,7 +284,7 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
             workspacePaneRoute={currentWorkspacePaneRoute}
             trafficLightOffset={props.toolbarTrafficLightOffset ?? false}
             workspacePaneTabModel={workspacePaneTabModel.value}
-            onBackToBranchNavigator={props.onBackToBranchNavigator}
+            onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
           />
           <GitWorkspacePaneContent
             repo={props.repo}
@@ -292,7 +292,7 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
             workspacePaneId={props.workspacePaneId}
             workspacePaneTabModel={workspacePaneTabModel.value}
             readFailures={props.readFailures}
-            onBackToBranchNavigator={props.onBackToBranchNavigator}
+            onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
             onRetryStatus={() => {
               void refreshRepoWorktreeStatus(
                 { get: workspacesStore.getState },
@@ -322,7 +322,7 @@ const GitBranchActionWorkspacePane = defineComponent<GitBranchActionWorkspacePan
     'workspacePaneId',
     'shortcutsEnabled',
     'toolbarTrafficLightOffset',
-    'onBackToBranchNavigator',
+    'onBackToGitWorkspaceNavigator',
     'readFailures',
   ],
 
@@ -349,7 +349,7 @@ const GitBranchActionWorkspacePane = defineComponent<GitBranchActionWorkspacePan
           workspacePaneRouteContext={props.workspacePaneRouteContext}
           workspacePaneId={props.workspacePaneId}
           toolbarTrafficLightOffset={props.toolbarTrafficLightOffset ?? false}
-          onBackToBranchNavigator={props.onBackToBranchNavigator}
+          onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
           readFailures={props.readFailures}
         />
       </BranchActionSurfaceProvider>
