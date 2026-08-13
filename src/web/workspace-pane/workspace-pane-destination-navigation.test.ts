@@ -401,7 +401,14 @@ function testNavigation(
 
 function deferredRouteCommit(completion: Promise<boolean>) {
   const started = Promise.withResolvers<void>()
-  const settle = async (options: Parameters<WorkspacePaneRouteCommitActions['commitWorkspacePaneRoute']>[3]) => {
+  const settle = async (
+    options:
+      | {
+          navigationGeneration?: ReturnType<typeof beginAppNavigation>
+          onCommit?: () => void
+        }
+      | undefined,
+  ) => {
     started.resolve()
     const accepted = await completion
     if (accepted && (!options?.navigationGeneration || appNavigationIsCurrent(options.navigationGeneration))) {

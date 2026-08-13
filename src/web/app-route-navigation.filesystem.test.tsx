@@ -11,7 +11,7 @@ import { observeAppHistoryNavigation, resetAppNavigationForTest } from '#/web/ap
 import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
-import type { FilesystemWorkspacePaneRouteTarget } from '#/web/app-route-navigation.ts'
+import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/filesystem-route-navigation-workspace')
@@ -108,14 +108,14 @@ describe('filesystem workspace pane route navigation', () => {
   })
 })
 
-function filesystemRootHref(target: FilesystemWorkspacePaneRouteTarget): string {
+function filesystemRootHref(target: FilesystemWorkspacePaneTabsTarget): string {
   const workspaceSlug = workspaceSlugFromId(target.workspaceId)
   return target.kind === 'workspace-root'
     ? `/workspace/${workspaceSlug}/root`
     : `/workspace/${workspaceSlug}/worktree/${worktreeSlugFromPath(target.worktreePath)}`
 }
 
-function filesystemRouteHref(target: FilesystemWorkspacePaneRouteTarget, route: WorkspacePaneRouteTarget): string {
+function filesystemRouteHref(target: FilesystemWorkspacePaneTabsTarget, route: WorkspacePaneRouteTarget): string {
   const rootHref = filesystemRootHref(target)
   if (route === null) return rootHref
   return route.kind === 'static' ? `${rootHref}/tab/${route.tab}` : `${rootHref}/terminal/${route.terminalSessionId}`

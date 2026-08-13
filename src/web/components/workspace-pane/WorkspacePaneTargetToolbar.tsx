@@ -346,6 +346,7 @@ function workspacePaneCommandTargetForSurface(
     return { routeTarget: target, workspacePaneRoute, filesystemTarget: surface }
   }
   if (surface.kind !== 'git-branch') throw new Error('git-branch route requires a git-branch surface')
+  if (workspacePaneRoute?.kind === 'terminal') throw new Error('git-branch route cannot present a runtime tab')
   return { routeTarget: target, workspacePaneRoute, filesystemTarget: null }
 }
 

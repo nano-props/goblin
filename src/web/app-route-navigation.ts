@@ -3,14 +3,15 @@ import type { RouteLocationRaw, Router } from 'vue-router'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type {
   BranchWorkspacePaneRouteTarget,
+  ParsedBranchWorkspacePaneRouteTarget,
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
 } from '#/web/App.tsx'
 import { appNavigationState } from '#/web/app-navigation-lifecycle.ts'
-import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import type { AppNavigationExecutionOptions, AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import { runOwnedAppNavigation } from '#/web/app-route-commit.ts'
 import {
   branchWorkspacePaneRouteFromHref,
@@ -28,26 +29,21 @@ import {
 } from '#/web/workspace-pane-route-commit.ts'
 import { branchSlugFromName, workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 
-export interface AppRouteNavigationOptions {
-  replace?: boolean
-  navigationGeneration?: AppNavigationGeneration
-  onCommit?: () => void
-  onAbandon?: () => void
-  routePrecondition?:
-    { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
+export interface AppRouteNavigationOptions<
+  Route = ParsedWorkspacePaneRouteTarget,
+> extends AppNavigationExecutionOptions {
+  routePrecondition?: { kind: 'exact-route'; route: Route } | { kind: 'current-workspace-target' }
 }
 
-export type FilesystemWorkspacePaneRouteTarget = Extract<
-  WorkspacePaneTabsTarget,
-  { kind: 'workspace-root' | 'git-worktree' }
->
+export type BranchAppRouteNavigationOptions = AppRouteNavigationOptions<ParsedBranchWorkspacePaneRouteTarget>
+
 export interface RepoBranchWorkspacePaneRouteNavigation {
-  openRepoBranch: (workspaceId: WorkspaceId, branchName: string, options?: AppRouteNavigationOptions) => boolean
+  openRepoBranch: (workspaceId: WorkspaceId, branchName: string, options?: BranchAppRouteNavigationOptions) => boolean
   openRepoBranchTab: (
     workspaceId: WorkspaceId,
     branchName: string,
     tab: WorkspacePaneStaticTabType,
-    options?: AppRouteNavigationOptions,
+    options?: BranchAppRouteNavigationOptions,
   ) => boolean
 }
 
@@ -70,7 +66,7 @@ export interface AppRouteNavigation extends RepoBranchWorkspacePaneRouteNavigati
     options?: AppRouteNavigationOptions,
   ) => boolean
   commitFilesystemWorkspacePaneRoute: (
-    target: FilesystemWorkspacePaneRouteTarget,
+    target: FilesystemWorkspacePaneTabsTarget,
     route: WorkspacePaneRouteTarget,
     options?: AppRouteNavigationOptions,
   ) => Promise<boolean>
@@ -92,7 +88,7 @@ export interface AppRouteNavigation extends RepoBranchWorkspacePaneRouteNavigati
     workspaceId: WorkspaceId,
     branchName: string,
     route: BranchWorkspacePaneRouteTarget,
-    options?: AppRouteNavigationOptions,
+    options?: BranchAppRouteNavigationOptions,
   ) => Promise<boolean>
   openRepoNewWorktree: (
     workspaceId: WorkspaceId,

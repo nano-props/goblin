@@ -31,6 +31,7 @@ import {
   workspacePaneCommandCoordinates,
   workspacePaneCommandPaneTarget,
   workspacePaneCommandRouteTarget,
+  workspacePaneCommandTargetHasFilesystem,
   workspacePaneCommandWorktreeHead,
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
@@ -159,39 +160,25 @@ async function showWorkspacePaneTabCommand({
 }
 
 export async function runTerminalPrimaryActionCommand(options: TerminalPrimaryActionCommandOptions): Promise<boolean> {
-  const coordinates = workspacePaneCommandCoordinates(options.target)
-  return coordinates.filesystemTarget
-    ? await dispatchTerminalRuntimePrimaryAction({
-        ...options,
-        ...coordinates,
-        filesystemTarget: coordinates.filesystemTarget,
-      })
-    : coordinates.branchName
-      ? await dispatchTerminalRuntimePrimaryAction({
-          ...options,
-          ...coordinates,
-          branchName: coordinates.branchName,
-          filesystemTarget: null,
-        })
-      : false
+  const target = options.target
+  if (!workspacePaneCommandTargetHasFilesystem(target)) return false
+  return await dispatchTerminalRuntimePrimaryAction({
+    ...target,
+    workspaceId: options.workspaceId,
+    navigation: options.navigation,
+    t: options.t,
+  })
 }
 
 export async function runNewTerminalTabCommand(options: NewTerminalTabCommandOptions): Promise<boolean> {
-  const coordinates = workspacePaneCommandCoordinates(options.target)
-  return coordinates.filesystemTarget
-    ? await dispatchNewTerminalRuntimeTabAction({
-        ...options,
-        ...coordinates,
-        filesystemTarget: coordinates.filesystemTarget,
-      })
-    : coordinates.branchName
-      ? await dispatchNewTerminalRuntimeTabAction({
-          ...options,
-          ...coordinates,
-          branchName: coordinates.branchName,
-          filesystemTarget: null,
-        })
-      : false
+  const target = options.target
+  if (!workspacePaneCommandTargetHasFilesystem(target)) return false
+  return await dispatchNewTerminalRuntimeTabAction({
+    ...target,
+    workspaceId: options.workspaceId,
+    navigation: options.navigation,
+    t: options.t,
+  })
 }
 
 export async function runCloseWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {

@@ -2,7 +2,8 @@ import { computed, toValue, watch } from 'vue'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import { useRouter } from 'vue-router'
 import { isEqual } from 'es-toolkit'
-import type { AppRouteNavigation, AppRouteNavigationOptions } from '#/web/app-route-navigation.ts'
+import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
+import type { AppNavigationExecutionOptions } from '#/web/app-navigation-lifecycle.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
@@ -240,7 +241,7 @@ function workspaceNavigationHistoryRouteSnapshotEqual(
 export function restoreWorkspaceNavigationEntry(
   entry: WorkspaceNavigationHistoryEntry,
   routeNavigation: AppRouteNavigation,
-  options?: AppRouteNavigationOptions,
+  options?: AppNavigationExecutionOptions,
 ): WorkspaceNavigationRestoreResult {
   if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return { kind: 'blocked' }
   switch (entry.route.kind) {

@@ -9,14 +9,15 @@ import { appNavigationIsCurrent, appNavigationState } from '#/web/app-navigation
 import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import { appRoutePreconditionMatches, settleOwnedAppRouteCommit } from '#/web/app-route-commit.ts'
 import { parsedWorkspacePaneRouteFromTargetHref } from '#/web/app-route-href.ts'
-import type { AppRouteNavigationOptions, FilesystemWorkspacePaneRouteTarget } from '#/web/app-route-navigation.ts'
+import type { AppRouteNavigationOptions, BranchAppRouteNavigationOptions } from '#/web/app-route-navigation.ts'
+import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { appRouteHref, currentAppRouteHref, navigateAppRoute } from '#/web/app-router-location.ts'
 import { branchSlugFromName, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 
 export async function commitFilesystemWorkspacePaneRoute(input: {
   router: Router
   workspaceSlug: string
-  paneTarget: FilesystemWorkspacePaneRouteTarget
+  paneTarget: FilesystemWorkspacePaneTabsTarget
   route: WorkspacePaneRouteTarget
   options?: AppRouteNavigationOptions
 }): Promise<boolean> {
@@ -56,15 +57,13 @@ export async function commitBranchWorkspacePaneRoute(input: {
   workspaceSlug: string
   branchName: string
   route: BranchWorkspacePaneRouteTarget
-  options?: AppRouteNavigationOptions
+  options?: BranchAppRouteNavigationOptions
 }): Promise<boolean> {
   const { router, workspaceSlug, branchName, route, options } = input
   if (options?.navigationGeneration && !appNavigationIsCurrent(options.navigationGeneration)) {
     return abandonAppRouteCommit(options)
   }
   const branchSlug = branchSlugFromName(branchName)
-  const branchRoutePrecondition = parsedBranchWorkspacePaneRoutePrecondition(options?.routePrecondition)
-  if (branchRoutePrecondition === 'runtime-tab') return abandonAppRouteCommit(options)
   const routeLocation = (candidate: ParsedBranchWorkspacePaneRouteTarget): RouteLocationRaw =>
     branchWorkspacePaneRouteLocation(workspaceSlug, branchSlug, candidate)
   const routeHref = (candidate: ParsedBranchWorkspacePaneRouteTarget): string =>
@@ -74,7 +73,7 @@ export async function commitBranchWorkspacePaneRoute(input: {
   const expectedCurrentHref = expectedCurrentWorkspacePaneHref(
     currentHref,
     branchRootHref,
-    branchRoutePrecondition,
+    options?.routePrecondition,
     routeHref,
   )
   if (expectedCurrentHref === null) return abandonAppRouteCommit(options)
@@ -97,18 +96,6 @@ export async function commitBranchWorkspacePaneRoute(input: {
   })
 }
 
-function parsedBranchWorkspacePaneRoutePrecondition(
-  precondition: AppRouteNavigationOptions['routePrecondition'],
-):
-  | { kind: 'exact-route'; route: ParsedBranchWorkspacePaneRouteTarget }
-  | { kind: 'current-workspace-target' }
-  | 'runtime-tab'
-  | undefined {
-  if (!precondition || precondition.kind === 'current-workspace-target') return precondition
-  const { route } = precondition
-  return route?.kind === 'terminal' ? 'runtime-tab' : { kind: 'exact-route', route }
-}
-
 function expectedCurrentWorkspacePaneHref<Route>(
   currentHref: string,
   rootHref: string,
@@ -122,7 +109,7 @@ function expectedCurrentWorkspacePaneHref<Route>(
 
 function filesystemWorkspacePaneRouteLocation(
   workspaceSlug: string,
-  paneTarget: FilesystemWorkspacePaneRouteTarget,
+  paneTarget: FilesystemWorkspacePaneTabsTarget,
   route: ParsedWorkspacePaneRouteTarget,
 ): RouteLocationRaw {
   if (paneTarget.kind === 'workspace-root') {

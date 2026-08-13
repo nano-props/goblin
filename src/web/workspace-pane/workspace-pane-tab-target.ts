@@ -13,6 +13,7 @@ import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pan
 import { workspacePaneTabsInteractionBlockedForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
   requiredGitWorkspacePaneTabsTarget,
+  type FilesystemWorkspacePaneTabsTarget,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { GitHead } from '#/shared/git-head.ts'
@@ -24,7 +25,7 @@ import {
 } from '#/shared/workspace-runtime.ts'
 
 export interface FilesystemWorkspacePaneTargetLease {
-  routeTarget: Extract<WorkspacePaneTabsTarget, { kind: 'workspace-root' | 'git-worktree' }>
+  routeTarget: FilesystemWorkspacePaneTabsTarget
   workspaceRuntimeId: string
 }
 

@@ -949,6 +949,9 @@ function currentWorkspacePaneCommandTarget(): WorkspacePaneCommandTarget | null 
       filesystemTarget: currentFilesystemTarget,
     }
   }
+  if (currentWorkspacePaneRoute?.kind === 'terminal') {
+    throw new Error('branch command target cannot present a runtime tab')
+  }
   return {
     routeTarget: { kind: 'git-branch', workspaceId: currentWorkspaceId, branchName: currentBranchName },
     workspacePaneRoute: currentWorkspacePaneRoute,

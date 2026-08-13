@@ -28,6 +28,8 @@ export interface RootWorkspacePaneTabsTarget {
 export type WorkspacePaneTabsTarget =
   RootWorkspacePaneTabsTarget | GitBranchWorkspacePaneTabsTarget | GitWorktreeWorkspacePaneTabsTarget
 
+export type FilesystemWorkspacePaneTabsTarget = RootWorkspacePaneTabsTarget | GitWorktreeWorkspacePaneTabsTarget
+
 /** Returns a branch target's stable identity; this is never a worktree HEAD presentation. */
 export function workspacePaneTabsBranchIdentity(target: WorkspacePaneTabsTarget): string | null {
   return target.kind === 'git-branch' ? target.branchName : null

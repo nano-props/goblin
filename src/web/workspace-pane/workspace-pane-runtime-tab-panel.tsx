@@ -3,7 +3,7 @@ import type { VNodeChild } from 'vue'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalPresentation, TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
@@ -22,7 +22,7 @@ export interface WorkspacePaneRuntimeTabPanelState {
 }
 
 export interface WorkspacePaneRuntimeTabPanelTarget {
-  routeTarget: WorkspacePaneTabsTarget
+  routeTarget: FilesystemWorkspacePaneTabsTarget
   runtimeTarget: RuntimeWorkspacePaneTarget
   presentation: TerminalPresentation
 }

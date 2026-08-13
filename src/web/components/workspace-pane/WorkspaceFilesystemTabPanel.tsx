@@ -5,7 +5,7 @@ import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 import { workspacePaneStaticTabId } from '#/shared/workspace-pane.ts'
 import { workspacePaneFilesystemExecutionTargetKey } from '#/shared/workspace-runtime.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { useAppNavigation } from '#/web/app-navigation.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { FiletreeView } from '#/web/components/workspace-pane/FiletreeView.tsx'
@@ -31,7 +31,7 @@ import { showCreatedWorkspacePaneFilesystemTerminal } from '#/web/workspace-pane
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 
 interface WorkspaceFilesystemTabPanelProps {
-  routeTarget: WorkspacePaneTabsTarget
+  routeTarget: FilesystemWorkspacePaneTabsTarget
   target: WorkspacePaneFilesystemTarget
 }
 

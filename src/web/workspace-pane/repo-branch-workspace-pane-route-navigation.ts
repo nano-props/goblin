@@ -1,33 +1,16 @@
-import type { BranchWorkspacePaneRouteTarget, ParsedWorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { BranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
-import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-
-interface WorkspacePaneRouteNavigationOptions {
-  replace?: boolean
-  navigationGeneration?: AppNavigationGeneration
-  onCommit?: () => void
-  onAbandon?: () => void
-  routePrecondition?:
-    { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
-}
-
-export interface WorkspacePaneRouteNavigation {
-  openRepoBranch: (repoId: WorkspaceId, branchName: string, options?: WorkspacePaneRouteNavigationOptions) => boolean
-  openRepoBranchTab: (
-    repoId: WorkspaceId,
-    branchName: string,
-    tab: WorkspacePaneStaticTabType,
-    options?: WorkspacePaneRouteNavigationOptions,
-  ) => boolean
-}
+import type {
+  BranchAppRouteNavigationOptions,
+  RepoBranchWorkspacePaneRouteNavigation,
+} from '#/web/app-route-navigation.ts'
 
 export function openResolvedWorkspacePaneRoute(
-  routeNavigation: WorkspacePaneRouteNavigation,
+  routeNavigation: RepoBranchWorkspacePaneRouteNavigation,
   repoId: WorkspaceId,
   branchName: string,
   route: BranchWorkspacePaneRouteTarget,
-  options?: WorkspacePaneRouteNavigationOptions,
+  options?: BranchAppRouteNavigationOptions,
 ): boolean {
   if (!route) {
     return options === undefined

@@ -2,6 +2,18 @@ import type { HistoryState } from 'vue-router'
 
 export type AppNavigationGeneration = number
 
+export interface AppNavigationExecutionOptions {
+  replace?: boolean
+  navigationGeneration?: AppNavigationGeneration
+  /**
+   * Once a navigation receives these effects, it owns their normal settlement:
+   * accepted navigation invokes `onCommit`, rejected/abandoned navigation
+   * invokes `onAbandon`, and neither result is settled again by its caller.
+   */
+  onCommit?: () => void
+  onAbandon?: () => void
+}
+
 export const APP_NAVIGATION_STATE_KEY = '__goblinAppNavigationGeneration' as const
 
 interface AppOwnedNavigation {

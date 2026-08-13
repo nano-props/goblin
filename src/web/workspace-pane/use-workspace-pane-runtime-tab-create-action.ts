@@ -51,6 +51,7 @@ export function useWorkspacePaneRuntimeTabCreateAction(
 
   return computed(() => {
     const terminalBase = toValue(input.base)
+    const routeTarget = toValue(input.routeTarget)
     return workspacePaneRuntimeTabCreateAction('terminal', {
       runtimeTabStateByType: toValue(input.runtimeTabStateByType),
       showCreatedRuntimeTab: (type, sessionId, presentation, routeRequest) =>
@@ -58,13 +59,16 @@ export function useWorkspacePaneRuntimeTabCreateAction(
           ? input.showCreatedRuntimeTab(type, sessionId, presentation, terminalBase.target, routeRequest)
           : false,
       t: input.t,
-      terminal: {
-        routeTarget: toValue(input.routeTarget),
-        base: terminalBase,
-        createTerminal: createTerminalWithAdmission,
-        captureOpenerIdentity,
-        focusTerminal,
-      },
+      terminal:
+        routeTarget.kind === 'git-branch'
+          ? undefined
+          : {
+              routeTarget,
+              base: terminalBase,
+              createTerminal: createTerminalWithAdmission,
+              captureOpenerIdentity,
+              focusTerminal,
+            },
     })
   })
 }

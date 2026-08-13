@@ -29,7 +29,7 @@ import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pan
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import {
   workspacePaneTabsTargetFromRuntime,
-  type WorkspacePaneTabsTarget,
+  type FilesystemWorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import { claimTerminalAutoFocus } from '#/web/terminal-focus.ts'
@@ -37,12 +37,12 @@ import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
 
 export interface CreatedTerminalRouteRequest {
   navigationGeneration: AppNavigationGeneration
-  routeTarget: WorkspacePaneTabsTarget
+  routeTarget: FilesystemWorkspacePaneTabsTarget
 }
 
 export type CreatedTerminalNavigation = Pick<
   AppNavigationActions,
-  'commitWorkspacePaneRoute' | 'commitFilesystemWorkspacePaneRoute' | 'commitWorkspaceRootTerminalSession'
+  'commitFilesystemWorkspacePaneRoute' | 'commitWorkspaceRootTerminalSession'
 >
 
 export interface WorkspacePaneRuntimeTabCreateAction {
@@ -67,7 +67,7 @@ export interface WorkspacePaneRuntimeTabCreateActionContext {
 export type WorkspacePaneRuntimeTabCreateStateByType = Record<WorkspacePaneRuntimeTabType, { createPending: boolean }>
 
 export interface WorkspacePaneTerminalCreateActionContext {
-  routeTarget: WorkspacePaneTabsTarget
+  routeTarget: FilesystemWorkspacePaneTabsTarget
   base: TerminalSessionBase | null
   createTerminal: (
     base: TerminalSessionBase,
@@ -79,7 +79,7 @@ export interface WorkspacePaneTerminalCreateActionContext {
 }
 
 export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
-  routeTarget: WorkspacePaneTabsTarget
+  routeTarget: FilesystemWorkspacePaneTabsTarget
   base: TerminalSessionBase
   createTerminal: (
     base: TerminalSessionBase,

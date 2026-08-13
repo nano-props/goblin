@@ -3,10 +3,12 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type {
   BranchWorkspacePaneRouteTarget,
+  ParsedBranchWorkspacePaneRouteTarget,
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
 } from '#/web/App.tsx'
-import type { FilesystemWorkspacePaneRouteTarget, AppRouteNavigation } from '#/web/app-route-navigation.ts'
+import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
+import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { CloseWorkspaceResult, WorkspaceNavigationHistoryTraversal } from '#/web/stores/workspaces/types.ts'
 import {
   restoreWorkspaceNavigationEntry,
@@ -23,22 +25,15 @@ import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-file
 import {
   beginAppNavigation,
   appNavigationIsCurrent,
+  type AppNavigationExecutionOptions,
   type AppNavigationGeneration,
 } from '#/web/app-navigation-lifecycle.ts'
 
-export interface AppNavigationOptions {
-  replace?: boolean
-  navigationGeneration?: AppNavigationGeneration
-  /**
-   * Once an action receives these effects, it owns their normal settlement:
-   * accepted navigation invokes `onCommit`, rejected/abandoned navigation
-   * invokes `onAbandon`, and neither result is settled again by its caller.
-   */
-  onCommit?: () => void
-  onAbandon?: () => void
-  routePrecondition?:
-    { kind: 'exact-route'; route: ParsedWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
+export interface AppNavigationOptions<Route = ParsedWorkspacePaneRouteTarget> extends AppNavigationExecutionOptions {
+  routePrecondition?: { kind: 'exact-route'; route: Route } | { kind: 'current-workspace-target' }
 }
+
+export type BranchAppNavigationOptions = AppNavigationOptions<ParsedBranchWorkspacePaneRouteTarget>
 
 export type WorkspaceRootPanePresentation =
   { kind: 'static'; tab: WorkspacePaneStaticTabType } | { kind: 'terminal'; terminalSessionId: string }
@@ -50,7 +45,7 @@ export interface WorkspacePaneRouteCommitActions {
     workspaceId: WorkspaceId,
     branch: string,
     route: BranchWorkspacePaneRouteTarget,
-    options?: AppNavigationOptions,
+    options?: BranchAppNavigationOptions,
   ) => Promise<boolean>
 }
 
@@ -63,7 +58,7 @@ export interface FilesystemWorkspacePaneRouteCommitActions extends WorkspacePane
 }
 
 export interface AppNavigationActions extends FilesystemWorkspacePaneRouteCommitActions {
-  activateWorkspace: (workspaceId: WorkspaceId, options?: Pick<AppNavigationOptions, 'navigationGeneration'>) => void
+  activateWorkspace: (workspaceId: WorkspaceId, options?: { navigationGeneration?: AppNavigationGeneration }) => void
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   cycleWorkspace: (direction: 1 | -1) => void
   selectRepoBranch: (workspaceId: WorkspaceId, branch: string, options?: { replace?: boolean }) => boolean
@@ -220,7 +215,7 @@ function workspaceRootPanePresentationOptions(
 }
 
 function commitFilesystemWorkspacePanePresentation(
-  target: FilesystemWorkspacePaneRouteTarget,
+  target: FilesystemWorkspacePaneTabsTarget,
   presentation: WorkspaceRootPanePresentation,
 ): boolean {
   const state = workspacesStore.getState()
@@ -285,7 +280,7 @@ function filesystemWorkspacePaneCommitTargetIsCurrent(target: FilesystemWorkspac
   return filesystemWorkspacePaneTargetLeaseIsCurrent(target)
 }
 
-function commitFilesystemWorkspacePaneEmptyPresentation(target: FilesystemWorkspacePaneRouteTarget): boolean {
+function commitFilesystemWorkspacePaneEmptyPresentation(target: FilesystemWorkspacePaneTabsTarget): boolean {
   const state = workspacesStore.getState()
   if (!state.workspaces[target.workspaceId]) return false
   state.setWorkspacePaneTabForTarget(target, null)
@@ -297,7 +292,7 @@ async function commitWorkspacePaneRoute(
   workspaceId: WorkspaceId,
   branchName: string,
   route: BranchWorkspacePaneRouteTarget,
-  options?: AppNavigationOptions,
+  options?: BranchAppNavigationOptions,
 ): Promise<boolean> {
   const generation = options?.navigationGeneration ?? beginAppNavigation()
   if (!appNavigationIsCurrent(generation)) {

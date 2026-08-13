@@ -6,6 +6,7 @@ import type { AcceptedTerminalRetirement } from '#/web/components/terminal/Termi
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
+import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 
 const mocks = vi.hoisted(() => ({
   listener: null as ((retirement: AcceptedTerminalRetirement) => void) | null,
@@ -42,12 +43,19 @@ describe('terminal retirement workspace pane presentation', () => {
     const navigation = appNavigationActionsForTest()
     const target = {
       routeTarget: {
-        kind: 'git-branch' as const,
+        kind: 'workspace-root' as const,
         workspaceId: WORKSPACE_ID,
-        branchName: 'feature/terminal-exit',
       },
       workspacePaneRoute: { kind: 'terminal' as const, terminalSessionId: 'term-111111111111111111111' },
-      filesystemTarget: null,
+      filesystemTarget: workspaceRootPaneFilesystemTarget({
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: 'workspace_runtime_terminal_exit',
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'unavailable' },
+        },
+      }),
     }
     const { unmount } = renderComposableInJsdom(() =>
       useTerminalRetirementWorkspacePanePresentation({
