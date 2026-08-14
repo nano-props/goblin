@@ -2,7 +2,7 @@
 
 import { describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
-import { createWebBootstrapOwner, startWebBootstrap } from '#/web/web-bootstrap.ts'
+import { createWebBootstrapOwner, startWebBootstrap } from '#/web/app/bootstrap/lifecycle.ts'
 
 describe('web bootstrap ownership', () => {
   test('an old successful bootstrap cannot replace a newer failed result', async () => {

@@ -1,4 +1,4 @@
-import { getInitialBootstrap } from '#/web/bootstrap.ts'
+import { getInitialBootstrap } from '#/web/app/bootstrap/initial-snapshot.ts'
 
 export interface ClientServerConfig {
   url: string

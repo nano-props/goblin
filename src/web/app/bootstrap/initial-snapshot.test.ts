@@ -47,12 +47,12 @@ describe('client bootstrap', () => {
       },
     })
 
-    const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
+    const { getInitialBootstrap } = await import('#/web/app/bootstrap/initial-snapshot.ts')
     expect(getInitialBootstrap()).toEqual(bootstrap)
   })
 
   test('falls back when the goblin bridge is unavailable', async () => {
-    const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
+    const { getInitialBootstrap } = await import('#/web/app/bootstrap/initial-snapshot.ts')
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: null,
@@ -60,7 +60,7 @@ describe('client bootstrap', () => {
   })
 
   test('keeps the strict initial bootstrap snapshot stable', async () => {
-    const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
+    const { getInitialBootstrap } = await import('#/web/app/bootstrap/initial-snapshot.ts')
     expect(getInitialBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: null,
@@ -139,7 +139,7 @@ describe('client bootstrap', () => {
       }),
     })
 
-    const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
+    const { getInitialBootstrap } = await import('#/web/app/bootstrap/initial-snapshot.ts')
     expect(getInitialBootstrap()).toEqual(bootstrap)
   })
 
@@ -155,7 +155,7 @@ describe('client bootstrap', () => {
       },
     })
 
-    const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
+    const { getInitialBootstrap } = await import('#/web/app/bootstrap/initial-snapshot.ts')
     expect(getInitialBootstrap()).toEqual(bootstrap)
   })
 
@@ -176,7 +176,7 @@ describe('client bootstrap', () => {
       },
     })
 
-    const { getInitialBootstrap } = await import('#/web/bootstrap.ts')
+    const { getInitialBootstrap } = await import('#/web/app/bootstrap/initial-snapshot.ts')
     expect(getInitialBootstrap()).toEqual(bootstrap)
   })
 
