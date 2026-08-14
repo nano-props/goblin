@@ -11,8 +11,8 @@
 //   - Shuts down cleanly when the app quits.
 //
 // The two consumers today are
-//   `#/web/server-invalidation-ingress.ts` and
-//   `#/web/server-client-intent-ingress.ts`; both reduce to
+//   `#/web/realtime/invalidation-ingress.ts` and
+//   `#/web/realtime/client-intent-ingress.ts`; both reduce to
 //   ~25 lines once they pick the path + parser and forward to this
 // factory.
 

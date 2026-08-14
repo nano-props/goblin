@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ServerInvalidationEvent } from '#/shared/server-invalidation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { subscribeRepoReadInvalidation } from '#/web/repos/read-invalidation-ingress.ts'
-import { subscribeServerInvalidationIngress } from '#/web/server-invalidation-ingress.ts'
+import { subscribeServerInvalidationIngress } from '#/web/realtime/invalidation-ingress.ts'
 
 const mocks = vi.hoisted(() => ({
   listener: null as ((event: ServerInvalidationEvent) => void) | null,
@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   dispose: vi.fn(),
 }))
 
-vi.mock('#/web/server-invalidation-ingress.ts', () => ({
+vi.mock('#/web/realtime/invalidation-ingress.ts', () => ({
   subscribeServerInvalidationIngress: vi.fn(
     (listener: (event: ServerInvalidationEvent) => void, onOpen?: () => void) => {
       mocks.listener = listener

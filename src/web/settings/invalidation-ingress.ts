@@ -1,4 +1,4 @@
-import { subscribeServerInvalidationIngress } from '#/web/server-invalidation-ingress.ts'
+import { subscribeServerInvalidationIngress } from '#/web/realtime/invalidation-ingress.ts'
 import { isSettingsInvalidationEvent, type SettingsInvalidationEvent } from '#/shared/server-invalidation.ts'
 
 type Listener = (event: SettingsInvalidationEvent) => void

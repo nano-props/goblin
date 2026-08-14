@@ -20,12 +20,12 @@ describe('server client intent ingress', () => {
   })
 
   afterEach(async () => {
-    const { resetServerClientIntentIngressForTests } = await import('#/web/server-client-intent-ingress.ts')
+    const { resetServerClientIntentIngressForTests } = await import('#/web/realtime/client-intent-ingress.ts')
     resetServerClientIntentIngressForTests()
   })
 
   test('connects to the client-intent channel', async () => {
-    const { subscribeServerClientIntentIngress } = await import('#/web/server-client-intent-ingress.ts')
+    const { subscribeServerClientIntentIngress } = await import('#/web/realtime/client-intent-ingress.ts')
     const dispose = subscribeServerClientIntentIngress(() => {})
 
     expect(wsMock.instances[0]?.url).toContain('/ws/client-intent')
@@ -33,7 +33,7 @@ describe('server client intent ingress', () => {
   })
 
   test('dispatches a valid client-effect-intent envelope', async () => {
-    const { subscribeServerClientIntentIngress } = await import('#/web/server-client-intent-ingress.ts')
+    const { subscribeServerClientIntentIngress } = await import('#/web/realtime/client-intent-ingress.ts')
     const listener = vi.fn()
     const dispose = subscribeServerClientIntentIngress(listener)
 
@@ -49,7 +49,7 @@ describe('server client intent ingress', () => {
   })
 
   test('drops malformed client-effect-intent envelopes', async () => {
-    const { subscribeServerClientIntentIngress } = await import('#/web/server-client-intent-ingress.ts')
+    const { subscribeServerClientIntentIngress } = await import('#/web/realtime/client-intent-ingress.ts')
     const listener = vi.fn()
     const dispose = subscribeServerClientIntentIngress(listener)
     const socket = wsMock.instances[0]
@@ -64,7 +64,7 @@ describe('server client intent ingress', () => {
   })
 
   test('rejects native-only lifecycle intents from the server ingress', async () => {
-    const { subscribeServerClientIntentIngress } = await import('#/web/server-client-intent-ingress.ts')
+    const { subscribeServerClientIntentIngress } = await import('#/web/realtime/client-intent-ingress.ts')
     const listener = vi.fn()
     const dispose = subscribeServerClientIntentIngress(listener)
     const socket = wsMock.instances[0]

@@ -62,7 +62,7 @@ describe('web invalidation sync', () => {
   })
 
   afterEach(async () => {
-    const { resetServerInvalidationIngressForTests } = await import('#/web/server-invalidation-ingress.ts')
+    const { resetServerInvalidationIngressForTests } = await import('#/web/realtime/invalidation-ingress.ts')
     resetServerInvalidationIngressForTests()
     vi.unstubAllGlobals()
   })

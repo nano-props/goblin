@@ -1,5 +1,5 @@
 import { isRepoReadInvalidationEvent, type RepoReadInvalidationEvent } from '#/shared/repo-read-invalidation.ts'
-import { subscribeServerInvalidationIngress } from '#/web/server-invalidation-ingress.ts'
+import { subscribeServerInvalidationIngress } from '#/web/realtime/invalidation-ingress.ts'
 
 type Listener = (event: RepoReadInvalidationEvent) => void
 

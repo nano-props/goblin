@@ -20,12 +20,12 @@ describe('server invalidation ingress', () => {
   })
 
   afterEach(async () => {
-    const { resetServerInvalidationIngressForTests } = await import('#/web/server-invalidation-ingress.ts')
+    const { resetServerInvalidationIngressForTests } = await import('#/web/realtime/invalidation-ingress.ts')
     resetServerInvalidationIngressForTests()
   })
 
   test('connects to the invalidation channel and dispatches valid events', async () => {
-    const { subscribeServerInvalidationIngress } = await import('#/web/server-invalidation-ingress.ts')
+    const { subscribeServerInvalidationIngress } = await import('#/web/realtime/invalidation-ingress.ts')
     const listener = vi.fn()
     const dispose = subscribeServerInvalidationIngress(listener)
 
@@ -37,7 +37,7 @@ describe('server invalidation ingress', () => {
   })
 
   test('drops malformed and unknown invalidation messages', async () => {
-    const { subscribeServerInvalidationIngress } = await import('#/web/server-invalidation-ingress.ts')
+    const { subscribeServerInvalidationIngress } = await import('#/web/realtime/invalidation-ingress.ts')
     const listener = vi.fn()
     const dispose = subscribeServerInvalidationIngress(listener)
     const socket = wsMock.instances[0]

@@ -51,7 +51,7 @@ vi.mock('#/web/hooks/useClientWorkspacePersistence.ts', () => ({
   useClientWorkspacePersistence: clientWorkspacePersistence,
 }))
 
-vi.mock('#/web/server-client-intent-ingress.ts', () => ({
+vi.mock('#/web/realtime/client-intent-ingress.ts', () => ({
   subscribeServerClientIntentIngress: () => () => {},
 }))
 

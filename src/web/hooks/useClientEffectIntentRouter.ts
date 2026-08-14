@@ -5,7 +5,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { onClientLocalEventType } from '#/web/local-events.ts'
 import { subscribeClientEffectIntent } from '#/web/client-ingress.ts'
-import { subscribeServerClientIntentIngress } from '#/web/server-client-intent-ingress.ts'
+import { subscribeServerClientIntentIngress } from '#/web/realtime/client-intent-ingress.ts'
 import { intentLog } from '#/web/logger.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import {
