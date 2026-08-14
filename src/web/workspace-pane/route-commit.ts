@@ -15,7 +15,7 @@ import type {
 } from '#/web/app/navigation/route-navigation.ts'
 import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { appRouteHref, currentAppRouteHref, navigateAppRoute } from '#/web/app/navigation/router-location.ts'
-import { branchSlugFromName, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
+import { branchSlugFromName, worktreeSlugFromPath } from '#/web/app/navigation/workspace-route-slugs.ts'
 
 export async function commitFilesystemWorkspacePaneRoute(input: {
   router: Router

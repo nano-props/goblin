@@ -31,7 +31,11 @@ import {
   commitBranchWorkspacePaneRoute,
   commitFilesystemWorkspacePaneRoute,
 } from '#/web/workspace-pane/route-commit.ts'
-import { branchSlugFromName, workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
+import {
+  branchSlugFromName,
+  workspaceSlugFromId,
+  worktreeSlugFromPath,
+} from '#/web/app/navigation/workspace-route-slugs.ts'
 
 export interface AppRouteNavigationOptions<
   Route extends ParsedWorkspacePaneRouteTarget = ParsedWorkspacePaneRouteTarget,

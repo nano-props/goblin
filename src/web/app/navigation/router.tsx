@@ -20,7 +20,7 @@ import {
   workspaceIdFromSlug,
   workspaceSlugFromId,
   worktreePathFromSlug,
-} from '#/web/workspace-route-slugs.ts'
+} from '#/web/app/navigation/workspace-route-slugs.ts'
 import type { RuntimeCoherentWorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'

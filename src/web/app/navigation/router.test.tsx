@@ -56,7 +56,7 @@ import {
   AppRouterProvider,
   appRouter,
 } from '#/web/app/navigation/router.tsx'
-import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
+import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/app/navigation/workspace-route-slugs.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {

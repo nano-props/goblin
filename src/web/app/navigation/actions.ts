@@ -13,7 +13,7 @@ import type { CloseWorkspaceResult, WorkspaceNavigationHistoryTraversal } from '
 import {
   restoreWorkspaceNavigationEntry,
   workspaceNavigationHistoryRestoreBlocked,
-} from '#/web/workspace-navigation-history.ts'
+} from '#/web/app/navigation/workspace-history.ts'
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   gitBranchPaneTargetLeaseOwnerIsCurrent,

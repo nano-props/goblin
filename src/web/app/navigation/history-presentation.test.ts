@@ -17,7 +17,7 @@ import { navigateAppRoute } from '#/web/app/navigation/router-location.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
-import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
+import { useWorkspaceNavigationHistory } from '#/web/app/navigation/workspace-history.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///test-workspace')
 

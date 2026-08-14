@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { workspaceIdFromSlug, workspaceSlugFromId } from '#/web/workspace-route-slugs.ts'
+import { workspaceIdFromSlug, workspaceSlugFromId } from '#/web/app/navigation/workspace-route-slugs.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('workspace route slugs', () => {

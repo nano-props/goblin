@@ -6,7 +6,7 @@ import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { AuthenticatedWorkspaceSideEffects } from '#/web/components/AuthenticatedWorkspaceSideEffects.tsx'
-import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
+import type { WorkspaceNavigationRouteContext } from '#/web/app/navigation/workspace-history.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 
 const sideEffectMocks = vi.hoisted(() => ({
@@ -32,7 +32,7 @@ vi.mock('#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts', () => ({
 vi.mock('#/web/settings/queries.ts', () => ({
   useSettingsQueryInvalidationSync: sideEffectMocks.useSettingsQueryInvalidationSync,
 }))
-vi.mock('#/web/workspace-navigation-history.ts', () => ({
+vi.mock('#/web/app/navigation/workspace-history.ts', () => ({
   useWorkspaceNavigationHistory: sideEffectMocks.useWorkspaceNavigationHistory,
 }))
 vi.mock('#/web/workspace-pane/use-terminal-retirement-workspace-pane-presentation.ts', () => ({

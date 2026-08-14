@@ -13,7 +13,11 @@ import type { HistoryState, RouteLocationRaw, RouteRecordRaw } from 'vue-router'
 
 import { useAppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
 import { observeAppHistoryNavigation, resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
-import { branchSlugFromName, workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
+import {
+  branchSlugFromName,
+  workspaceSlugFromId,
+  worktreeSlugFromPath,
+} from '#/web/app/navigation/workspace-route-slugs.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'

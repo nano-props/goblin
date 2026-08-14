@@ -2,8 +2,12 @@ import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { ParsedBranchWorkspacePaneRouteTarget, ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
 import { returnToFromHref } from '#/web/app/navigation/route-href.ts'
-import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
-import { branchNameFromSlug, workspaceIdFromSlug, worktreePathFromSlug } from '#/web/workspace-route-slugs.ts'
+import type { WorkspaceNavigationRouteContext } from '#/web/app/navigation/workspace-history.ts'
+import {
+  branchNameFromSlug,
+  workspaceIdFromSlug,
+  worktreePathFromSlug,
+} from '#/web/app/navigation/workspace-route-slugs.ts'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 
 export type WorkspaceRouteContext =

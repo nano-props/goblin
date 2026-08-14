@@ -13,7 +13,7 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/work
 import {
   useWorkspaceNavigationHistory,
   type WorkspaceNavigationRouteContext,
-} from '#/web/workspace-navigation-history.ts'
+} from '#/web/app/navigation/workspace-history.ts'
 
 // Filesystem routes follow the same authority rule as Git routes: the URL
 // selects a pane, and projection state only validates whether it can render.

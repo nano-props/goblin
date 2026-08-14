@@ -9,7 +9,7 @@ import type {
 import {
   useWorkspaceNavigationHistory,
   type WorkspaceNavigationRouteContext,
-} from '#/web/workspace-navigation-history.ts'
+} from '#/web/app/navigation/workspace-history.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
