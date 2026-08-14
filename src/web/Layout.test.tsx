@@ -68,7 +68,7 @@ vi.mock('#/web/components/WorkspaceOpenDialog.tsx', async () => {
   }
 })
 
-vi.mock('#/web/app-history-presentation.ts', async (importOriginal) => ({
+vi.mock('#/web/app/navigation/history-presentation.ts', async (importOriginal) => ({
   ...(await importOriginal()),
   useAppHistoryPresentationObserver: () => undefined,
 }))

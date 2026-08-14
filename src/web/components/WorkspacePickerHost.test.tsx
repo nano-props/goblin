@@ -16,7 +16,7 @@ vi.mock('#/web/runtime-settings-shortcuts.ts', () => ({
 vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
   useWorkspaceTerminalBellCounts: () => ({ value: {} }),
 }))
-vi.mock('#/web/app-navigation.tsx', () => ({
+vi.mock('#/web/app/navigation/context.tsx', () => ({
   useAppNavigation: () => ({
     activateWorkspace: vi.fn(),
     closeWorkspace: vi.fn(async () => ({ ok: true })),

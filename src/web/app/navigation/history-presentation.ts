@@ -2,7 +2,7 @@ import { onScopeDispose } from 'vue'
 import { useRouter } from 'vue-router'
 import type { HistoryState, Router, RouterHistory } from 'vue-router'
 import { createOpaqueId, isOpaqueId } from '#/shared/opaque-id.ts'
-import { observeAppHistoryNavigation } from '#/web/app-navigation-lifecycle.ts'
+import { observeAppHistoryNavigation } from '#/web/app/navigation/lifecycle.ts'
 
 const APP_HISTORY_ENTRY_ID_STATE_KEY = '__goblinAppHistoryEntryId' as const
 

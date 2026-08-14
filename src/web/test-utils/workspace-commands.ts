@@ -49,7 +49,7 @@ import {
   type ObservedAppNavigationActionsForTest,
   type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
+import { resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
 import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 
 // Command tests need one target, navigation, tab-store, and terminal-projection fixture boundary.

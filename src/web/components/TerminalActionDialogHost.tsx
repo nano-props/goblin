@@ -1,6 +1,6 @@
 import { defineComponent, watch } from 'vue'
 import type { FunctionalComponent } from 'vue'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { ConfirmDialog } from '#/web/components/ConfirmDialog.tsx'
 import { runConfirmCloseTerminalWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'

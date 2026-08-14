@@ -31,7 +31,7 @@ import {
   type ClientWorkspaceIntent,
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { OpenWorkspaceResult, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -43,7 +43,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { commitWorkspacePaneTerminalDestination } from '#/web/workspace-pane/workspace-pane-terminal-destination-navigation.ts'
 import { surfaceWorkspacePaneTerminalDestinationOutcome } from '#/web/workspace-pane/workspace-pane-terminal-destination-feedback.ts'
-import { appNavigationIsCurrent, beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
+import { appNavigationIsCurrent, beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
 
 interface TerminalBellIntentDeps {
   navigation: AppNavigationActions

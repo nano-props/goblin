@@ -22,7 +22,7 @@ import {
   routeNavigation,
   createPendingWorktreeSnapshot,
   installTerminalSessionCommandBridgeForTest,
-} from '#/web/app-navigation-actions.test-utils.ts'
+} from '#/web/app/navigation/actions.test-utils.ts'
 
 beforeEach(setupAppNavigationActionsTests)
 

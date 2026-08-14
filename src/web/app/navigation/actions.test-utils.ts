@@ -1,6 +1,6 @@
 import { expect, vi } from 'vitest'
-import { createAppNavigationActions as createAppNavigationActionsCore } from '#/web/app-navigation-actions.ts'
-import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
+import { createAppNavigationActions as createAppNavigationActionsCore } from '#/web/app/navigation/actions.ts'
+import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'

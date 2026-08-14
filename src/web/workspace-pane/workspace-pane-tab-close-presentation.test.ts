@@ -4,13 +4,13 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import {
   appNavigationIsCurrent,
   beginAppNavigation,
   registerAppNavigation,
   resetAppNavigationForTest,
-} from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/lifecycle.ts'
 import {
   observedAppNavigationActionsForTest,
   seedInitialObservedWorkspacePaneRouteForTest,

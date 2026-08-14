@@ -1,11 +1,11 @@
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalExecutionCoordinates, terminalExecutionPath } from '#/shared/terminal-types.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { isWorkspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { appNavigationIsCurrent, beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
+import { appNavigationIsCurrent, beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
 import {
   tryRunWorkspacePaneAction,
   workspacePaneActionTargetFromCoordinates,

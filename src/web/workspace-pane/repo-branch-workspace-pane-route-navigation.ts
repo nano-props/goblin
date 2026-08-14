@@ -3,7 +3,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
   BranchAppRouteNavigationOptions,
   RepoBranchWorkspacePaneRouteNavigation,
-} from '#/web/app-route-navigation.ts'
+} from '#/web/app/navigation/route-navigation.ts'
 
 export function openResolvedWorkspacePaneRoute(
   routeNavigation: RepoBranchWorkspacePaneRouteNavigation,

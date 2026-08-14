@@ -30,9 +30,9 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
-import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { claimTerminalAutoFocus } from '#/web/terminal-focus.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 
 export interface CreatedTerminalRouteRequest {
   navigationGeneration: AppNavigationGeneration

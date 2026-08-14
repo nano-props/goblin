@@ -14,7 +14,7 @@ import {
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import {
   dispatchCloseWorkspacePaneTabAction as dispatchCloseWorkspacePaneTabActionRaw,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction as dispatchConfirmCloseTerminalWorkspacePaneTabActionRaw,
@@ -50,7 +50,7 @@ import {
   appNavigationIsCurrent,
   registerAppNavigation,
   resetAppNavigationForTest,
-} from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/lifecycle.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 

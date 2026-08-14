@@ -14,16 +14,16 @@ import type {
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
 } from '#/web/App.tsx'
-import { appNavigationState } from '#/web/app-navigation-lifecycle.ts'
-import type { AppNavigationExecutionOptions, AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
-import { runOwnedAppNavigation } from '#/web/app-route-commit.ts'
+import { appNavigationState } from '#/web/app/navigation/lifecycle.ts'
+import type { AppNavigationExecutionOptions, AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
+import { runOwnedAppNavigation } from '#/web/app/navigation/route-commit.ts'
 import {
   branchWorkspacePaneRouteFromHref,
   returnToFromHref,
   routeReturnSearch,
   workspacePaneRouteFromTargetHref,
-} from '#/web/app-route-href.ts'
-import { appRouteHref, currentAppRouteHref, navigateAppRoute } from '#/web/app-router-location.ts'
+} from '#/web/app/navigation/route-href.ts'
+import { appRouteHref, currentAppRouteHref, navigateAppRoute } from '#/web/app/navigation/router-location.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'

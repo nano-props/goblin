@@ -5,13 +5,16 @@ import type {
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
 } from '#/web/App.tsx'
-import { appNavigationIsCurrent, appNavigationState } from '#/web/app-navigation-lifecycle.ts'
-import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
-import { appRoutePreconditionMatches, settleOwnedAppRouteCommit } from '#/web/app-route-commit.ts'
-import { parsedWorkspacePaneRouteFromTargetHref } from '#/web/app-route-href.ts'
-import type { AppRouteNavigationOptions, BranchAppRouteNavigationOptions } from '#/web/app-route-navigation.ts'
+import { appNavigationIsCurrent, appNavigationState } from '#/web/app/navigation/lifecycle.ts'
+import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
+import { appRoutePreconditionMatches, settleOwnedAppRouteCommit } from '#/web/app/navigation/route-commit.ts'
+import { parsedWorkspacePaneRouteFromTargetHref } from '#/web/app/navigation/route-href.ts'
+import type {
+  AppRouteNavigationOptions,
+  BranchAppRouteNavigationOptions,
+} from '#/web/app/navigation/route-navigation.ts'
 import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import { appRouteHref, currentAppRouteHref, navigateAppRoute } from '#/web/app-router-location.ts'
+import { appRouteHref, currentAppRouteHref, navigateAppRoute } from '#/web/app/navigation/router-location.ts'
 import { branchSlugFromName, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 
 export async function commitFilesystemWorkspacePaneRoute(input: {

@@ -5,7 +5,7 @@ import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-gua
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneTabControllerTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
+import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
 import { beginWorkspacePaneDestinationPresentation } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import {
   workspacePaneActionOutcomeSucceeded,
@@ -37,7 +37,7 @@ import {
   workspacePaneActionTargetFromCoordinates,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
+import { beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
 import {
   commitWorkspacePaneStaticTabPresentation,
   showWorkspacePaneTabOpenCommittedProjectionFailure,

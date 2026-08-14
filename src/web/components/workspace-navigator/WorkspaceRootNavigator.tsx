@@ -4,7 +4,7 @@ import type { FunctionalComponent, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { ActionPopover, ActionPopoverItem } from '#/web/components/ActionPopover.tsx'
 import {
   NAVIGATOR_ROW_ACTION_BOX_CLASS,

@@ -12,21 +12,21 @@ import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspaceFilesystemInvalidationSync.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
-import { createAppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { createAppNavigationActions } from '#/web/app/navigation/actions.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { provideLayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
 import { workspaceIdFromSlug } from '#/web/workspace-route-slugs.ts'
-import { useAppRouteNavigation } from '#/web/app-route-navigation.ts'
-import { useAppHistoryPresentationObserver } from '#/web/app-history-presentation.ts'
+import { useAppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
+import { useAppHistoryPresentationObserver } from '#/web/app/navigation/history-presentation.ts'
 import { workspacePaneCommandTargetFromQueryCache } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import {
   appLayoutRouteCallbacks,
   currentWorkspacePaneRouteFromContext,
   workspaceNavigationRouteContext,
   workspaceRouteContextFromVueRoute,
-} from '#/web/app-layout-model.ts'
+} from '#/web/app/navigation/layout-model.ts'
 import {
   WorkspaceSessionRestoreError,
   WorkspaceSessionRestorePlaceholder,
@@ -35,7 +35,7 @@ import { AppGlobalOverlays, WorkspaceContextOverlays } from '#/web/components/Ap
 import { AuthenticatedWorkspaceSideEffects } from '#/web/components/AuthenticatedWorkspaceSideEffects.tsx'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'

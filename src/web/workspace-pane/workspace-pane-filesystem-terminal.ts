@@ -1,4 +1,4 @@
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import {
   showCreatedTerminalWorkspacePaneRuntimeTab,
   type CreatedTerminalRouteRequest,

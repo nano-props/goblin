@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
+import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
 import {
   claimTerminalAutoFocus,
   fulfillTerminalPresentationFocus,

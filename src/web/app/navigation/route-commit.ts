@@ -5,7 +5,7 @@ import {
   registerAppNavigation,
   type AppNavigationOutcome,
   type AppNavigationGeneration,
-} from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/lifecycle.ts'
 import { navigationLog } from '#/web/logger.ts'
 
 export function runOwnedAppNavigation(input: {

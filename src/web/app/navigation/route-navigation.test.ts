@@ -1,14 +1,14 @@
 import { describe, expect, test, vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
-import { settleOwnedAppRouteCommit, settleAppRouteCommit } from '#/web/app-route-commit.ts'
+import { settleOwnedAppRouteCommit, settleAppRouteCommit } from '#/web/app/navigation/route-commit.ts'
 import {
   branchWorkspacePaneRouteFromHref,
   returnToFromHref,
   parsedWorkspacePaneRouteFromTargetHref,
   routeReturnSearch,
   workspacePaneRouteFromTargetHref,
-} from '#/web/app-route-href.ts'
-import { beginAppNavigation, observeAppHistoryNavigation, appNavigationState } from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/route-href.ts'
+import { beginAppNavigation, observeAppHistoryNavigation, appNavigationState } from '#/web/app/navigation/lifecycle.ts'
 
 describe('app route navigation helpers', () => {
   test('settles an awaited owned navigation when a newer presentation abandons it', async () => {

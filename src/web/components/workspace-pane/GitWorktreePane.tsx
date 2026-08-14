@@ -28,7 +28,7 @@ import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspa
 import { useGitWorktreeWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import type { WorkspacePaneRuntimeContext } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 
 interface GitWorktreePaneProps {

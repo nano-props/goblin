@@ -2,7 +2,7 @@ import {
   currentAppNavigationGeneration,
   appNavigationIsCurrent,
   type AppNavigationGeneration,
-} from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/lifecycle.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 
 type FocusTerminal = (

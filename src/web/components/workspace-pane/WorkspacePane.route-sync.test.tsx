@@ -16,8 +16,8 @@ import {
   TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'

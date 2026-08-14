@@ -52,8 +52,8 @@ import type {
   TerminalDescriptor,
   TerminalFilesystemTargetSnapshot,
 } from '#/web/components/terminal/types.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'

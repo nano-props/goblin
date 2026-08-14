@@ -1,7 +1,7 @@
 import { computed, defineComponent, onScopeDispose, watch } from 'vue'
 import type { FunctionalComponent, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import type { WorkspaceRouteView } from '#/web/App.tsx'
 import { WorkspaceLayoutPane } from '#/web/components/Layout.tsx'
 import {
@@ -33,7 +33,7 @@ import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { uiTransitionStore } from '#/web/stores/ui-transition.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { gitWorkspaceCanExecute, isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { gitBranchPaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 interface WorkspaceProjectionRestoreController {

@@ -14,7 +14,7 @@ import {
   handleTerminalBellClickIntent,
   handleWorkspaceClientIntent,
 } from '#/web/hooks/client-effect-intent-handlers.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { clientEffectIntentStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'

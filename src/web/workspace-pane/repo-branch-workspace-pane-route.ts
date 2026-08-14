@@ -1,7 +1,7 @@
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { RepoWorkspacePaneRouteNavigation } from '#/web/app-route-navigation.ts'
-import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import type { RepoWorkspacePaneRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
+import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
   createWorkspacePaneTabModel,

@@ -37,7 +37,7 @@ import {
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import type {
   TerminalFilesystemTargetSnapshot,
   TerminalSessionContextValue,

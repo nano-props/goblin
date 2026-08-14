@@ -1,7 +1,7 @@
 import { defineComponent } from 'vue'
 import { toast } from 'vue-sonner'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { CloneRepositoryDialog } from '#/web/components/CloneRepositoryDialog.tsx'
 import type { CloneRepositoryInput } from '#/web/components/CloneRepositoryDialog.tsx'
 import {

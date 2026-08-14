@@ -14,8 +14,8 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { TerminalSessionCommandScope } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue } from '#/web/components/terminal/types.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import {
   observeWorkspacePaneRouteForTest,
   observedAppNavigationActionsForTest,

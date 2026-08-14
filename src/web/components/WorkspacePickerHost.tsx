@@ -4,7 +4,7 @@
 import { computed, defineComponent } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
 import { WorkspacePicker } from '#/web/components/workspace-picker/WorkspacePicker.tsx'
 import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/summary-equality.ts'

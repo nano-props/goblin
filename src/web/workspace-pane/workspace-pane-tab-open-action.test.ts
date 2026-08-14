@@ -46,8 +46,8 @@ import {
   seedInitialObservedWorkspacePaneRouteForTest,
   type ObservedBranchRouteNavigationForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { beginAppNavigation, currentAppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
-import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
+import { beginAppNavigation, currentAppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
+import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import {
   runtimeWorkspacePaneTargetForTest,

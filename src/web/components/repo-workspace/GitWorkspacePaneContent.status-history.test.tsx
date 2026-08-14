@@ -33,7 +33,7 @@ import { getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresenta
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 describe('GitWorkspacePaneContent status-history', () => {
   test('renders the changes row with the copy patch action in the status tab when the worktree is dirty', async () => {
     const onCopyPatch = vi.fn()

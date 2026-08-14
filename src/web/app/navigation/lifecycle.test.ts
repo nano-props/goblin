@@ -8,9 +8,9 @@ import {
   appNavigationIsCurrent,
   registerAppNavigation,
   resetAppNavigationForTest,
-} from '#/web/app-navigation-lifecycle.ts'
-import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
-import { runOwnedAppNavigation } from '#/web/app-route-commit.ts'
+} from '#/web/app/navigation/lifecycle.ts'
+import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
+import { runOwnedAppNavigation } from '#/web/app/navigation/route-commit.ts'
 
 beforeEach(() => resetAppNavigationForTest())
 

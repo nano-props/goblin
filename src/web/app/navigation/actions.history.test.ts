@@ -10,7 +10,7 @@ import type {
   WorkspaceNavigationHistoryEntry,
   WorkspaceNavigationHistoryTraversal,
 } from '#/web/stores/workspaces/types.ts'
-import { currentAppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { currentAppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
 import {
@@ -25,7 +25,7 @@ import {
   createAppNavigationActions,
   markRepoGitUnavailable,
   routeNavigation,
-} from '#/web/app-navigation-actions.test-utils.ts'
+} from '#/web/app/navigation/actions.test-utils.ts'
 
 beforeEach(setupAppNavigationActionsTests)
 

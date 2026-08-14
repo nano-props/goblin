@@ -8,7 +8,7 @@ import { TerminalActionDialogHost } from '#/web/components/TerminalActionDialogH
 import { WorkspaceDropOverlay } from '#/web/components/WorkspaceDropOverlay.tsx'
 import { WorkspaceOpenDialog } from '#/web/components/WorkspaceOpenDialog.tsx'
 import { Toaster } from '#/web/components/ui/sonner.tsx'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import type { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'

@@ -18,7 +18,7 @@ import {
 import type {
   FilesystemWorkspacePaneRouteCommitActions,
   WorkspacePaneRouteCommitActions,
-} from '#/web/app-navigation-actions.ts'
+} from '#/web/app/navigation/actions.ts'
 import {
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
@@ -33,7 +33,7 @@ import type {
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { beginAppNavigation, currentAppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { beginAppNavigation, currentAppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }

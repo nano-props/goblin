@@ -7,7 +7,7 @@ import type {
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
 } from '#/web/App.tsx'
-import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
+import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
 import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { CloseWorkspaceResult, WorkspaceNavigationHistoryTraversal } from '#/web/stores/workspaces/types.ts'
 import {
@@ -30,7 +30,7 @@ import {
   appNavigationIsCurrent,
   type AppNavigationExecutionOptions,
   type AppNavigationGeneration,
-} from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/lifecycle.ts'
 
 export interface AppNavigationOptions<
   Route extends ParsedWorkspacePaneRouteTarget = ParsedWorkspacePaneRouteTarget,

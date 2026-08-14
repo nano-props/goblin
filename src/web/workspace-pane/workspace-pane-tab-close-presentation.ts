@@ -1,7 +1,7 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitHead } from '#/shared/git-head.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { workspacePaneTabEntryIdentity, type WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
@@ -23,7 +23,7 @@ import {
   workspacePaneActionTargetFromCoordinates,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { captureUnownedAppNavigationGeneration, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { captureUnownedAppNavigationGeneration, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { translate } from '#/web/stores/i18n-vue.ts'
 import { toast } from 'vue-sonner'

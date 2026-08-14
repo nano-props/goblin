@@ -39,7 +39,7 @@ beforeEach(() => {
   vi.doMock('#/web/logger.ts', () => ({
     bootstrapLog: { error: vi.fn(), warn: vi.fn() },
   }))
-  vi.doMock('#/web/app-router.tsx', () => ({
+  vi.doMock('#/web/app/navigation/router.tsx', () => ({
     appRouter: { install: vi.fn() },
     AppRouterProvider: defineComponent({
       name: 'TestAppRouterProvider',

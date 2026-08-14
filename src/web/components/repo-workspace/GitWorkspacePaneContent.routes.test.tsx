@@ -26,7 +26,7 @@ import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWork
 import { TerminalSessionReadScope } from '#/web/components/terminal/terminal-session-context.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 describe('GitWorkspacePaneContent routes', () => {
   test('offers a compact return to the branch list when the last routed branch no longer exists', async () => {
     const repo = seedRepoWithReadModelForTest({

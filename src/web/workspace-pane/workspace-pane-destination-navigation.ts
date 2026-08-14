@@ -1,5 +1,5 @@
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
-import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
+import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
 import {
@@ -7,7 +7,7 @@ import {
   appNavigationIsCurrent,
   resetAppNavigationForTest,
   type AppNavigationGeneration,
-} from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/lifecycle.ts'
 import {
   isGitWorktreeDestinationTargetLease,
   workspacePaneTargetLeaseIsCurrent,

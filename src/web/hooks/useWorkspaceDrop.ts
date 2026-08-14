@@ -10,7 +10,7 @@ import {
   reportOpenWorkspacePostOpenError,
   reportOpenWorkspaceUncertainty,
 } from '#/web/lib/open-workspace-result-feedback.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 
 interface Options {
   /** True when an overlay (Settings/Help) is up. While blocked, the

@@ -6,7 +6,7 @@ import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/share
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {

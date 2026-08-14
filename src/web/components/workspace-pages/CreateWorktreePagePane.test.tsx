@@ -26,7 +26,7 @@ import {
   beginAppNavigation,
   currentAppNavigationGeneration,
   resetAppNavigationForTest,
-} from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/lifecycle.ts'
 import { repoOperationsForTest } from '#/web/test-utils/repo-query-runtime.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace')

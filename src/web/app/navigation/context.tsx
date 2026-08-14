@@ -1,6 +1,6 @@
 import { defineComponent, inject, provide, toRef } from 'vue'
 import type { InjectionKey, PropType, Ref } from 'vue'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 
 const appNavigationKey: InjectionKey<Readonly<Ref<AppNavigationActions>>> = Symbol('app-navigation')
 

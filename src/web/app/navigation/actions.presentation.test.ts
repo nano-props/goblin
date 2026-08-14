@@ -36,8 +36,8 @@ import {
   WORKTREE_KEY,
   branchSelectionLease,
   worktreeSelectionLease,
-} from '#/web/app-navigation-actions.test-utils.ts'
-import { currentAppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/actions.test-utils.ts'
+import { currentAppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 
 beforeEach(setupAppNavigationActionsTests)
 

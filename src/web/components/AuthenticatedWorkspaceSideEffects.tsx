@@ -1,6 +1,6 @@
 import { computed, defineComponent } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'

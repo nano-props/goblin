@@ -16,7 +16,7 @@ import {
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'

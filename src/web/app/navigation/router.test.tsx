@@ -55,7 +55,7 @@ import {
   applyAppSettingsRouteChange,
   AppRouterProvider,
   appRouter,
-} from '#/web/app-router.tsx'
+} from '#/web/app/navigation/router.tsx'
 import { workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
@@ -63,15 +63,18 @@ import {
   currentWorkspacePaneRouteFromContext,
   appLayoutRouteCallbacks,
   workspaceRouteContextFromMatches,
-} from '#/web/app-layout-model.ts'
-import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
-import { requireAppHistoryPresentation, useAppHistoryPresentationObserver } from '#/web/app-history-presentation.ts'
+} from '#/web/app/navigation/layout-model.ts'
+import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
+import {
+  requireAppHistoryPresentation,
+  useAppHistoryPresentationObserver,
+} from '#/web/app/navigation/history-presentation.ts'
 import {
   beginAppNavigation,
   observeAppHistoryNavigation,
   appNavigationIsCurrent,
   resetAppNavigationForTest,
-} from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/lifecycle.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

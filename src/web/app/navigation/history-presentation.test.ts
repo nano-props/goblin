@@ -10,10 +10,10 @@ import {
   installAppHistoryPresentationObserver,
   requireAppHistoryPresentation,
   useAppHistoryPresentationObserver,
-} from '#/web/app-history-presentation.ts'
-import { appNavigationState, resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
-import { runOwnedAppNavigation } from '#/web/app-route-commit.ts'
-import { navigateAppRoute } from '#/web/app-router-location.ts'
+} from '#/web/app/navigation/history-presentation.ts'
+import { appNavigationState, resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
+import { runOwnedAppNavigation } from '#/web/app/navigation/route-commit.ts'
+import { navigateAppRoute } from '#/web/app/navigation/router-location.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'

@@ -1,7 +1,7 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitHead } from '#/shared/git-head.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import {
   terminalExecutionCoordinates,
   terminalExecutionPath,

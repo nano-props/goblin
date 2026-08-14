@@ -30,7 +30,7 @@ import {
   type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -49,7 +49,7 @@ import { repoOperationsQueryKey, repoSnapshotQueryKey } from '#/web/repo-query-k
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitWorkspaceNavigatorRowIdentity } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
-import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
+import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
 import {
   gitWorktreePaneFilesystemTarget,

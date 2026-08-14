@@ -44,8 +44,8 @@ import {
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 
