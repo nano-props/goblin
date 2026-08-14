@@ -42,6 +42,7 @@ import {
   runNewTerminalTabCommand,
   runShowWorkspacePaneTabCommand,
   terminalEntry,
+  toastMocks,
   worktreeSnapshotForSessions,
   worktreeSnapshotWithSecondTerminalSelected,
   worktreeSnapshotWithTerminal,
@@ -754,5 +755,8 @@ describe('workspace commands close', () => {
 
     expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
     expect(terminalActionDialogsStore.getState().closeConfirm).toBeNull()
+    expect(toastMocks.error).toHaveBeenCalledWith('error.workspace-tabs-close-blocked-loading', {
+      id: 'workspace-pane-tab-close-blocked',
+    })
   })
 })

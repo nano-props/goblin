@@ -486,6 +486,8 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
         ((currentSessionPhase === 'opening' && !descriptor.value) || (!attaching && presentationRecovery === 'pending'))
       const showEmptyCta =
         currentSessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !createPending.value
+      const showProjectionPendingRecovery =
+        currentSessionPhase === 'opening' && !descriptor.value && projectionPending && !!props.retryProjection
       const showStatusOverlay =
         (attaching && !showEmptyCta && !(currentSessionPhase === 'opening' && !descriptor.value && projectionFailed)) ||
         (!showErrorChip && !attaching && presentationRecovery === 'pending' && !projectionFailed)
@@ -607,18 +609,24 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
             />
           ) : null}
           {showUnownedOverlay ? <AttachmentOverlay badge={t('terminal.unowned')} snapshot={currentSnapshot} /> : null}
-          {showStatusOverlay ? <StatusOverlay label={statusOverlayLabel} /> : null}
+          {showStatusOverlay ? (
+            <StatusOverlay
+              label={statusOverlayLabel}
+              retryLabel={showProjectionPendingRecovery ? t('terminal.retry-loading') : undefined}
+              onRetry={showProjectionPendingRecovery ? props.retryProjection : undefined}
+            />
+          ) : null}
           {showProjectionRecoveryFailure ? (
             <PresentationFailureOverlay
               label={projectionFailureLabel}
-              retryLabel={props.retryProjection ? t('error.try-again') : undefined}
+              retryLabel={props.retryProjection ? t('terminal.retry-loading') : undefined}
               onRetry={props.retryProjection}
             />
           ) : null}
           {showPresentationFailure ? (
             <PresentationFailureOverlay
               label={t('terminal.restore-failed')}
-              retryLabel={t('error.try-again')}
+              retryLabel={t('terminal.retry-restoring')}
               onRetry={() => {
                 if (currentSessionId) context.retryPresentation(currentSessionId)
               }}

@@ -36,11 +36,12 @@ import { provideWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pa
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-workspace-container-repo')
 export const retryWorkspacePaneTabsForTest = vi.fn()
+export const retryTerminalProjectionForTest = vi.fn()
 
 const WorkspacePaneTestProvider = defineComponent({
   name: 'WorkspacePaneTestProvider',
   setup(_props, { slots }) {
-    provideTerminalProjectionRecoveryActions({ retryWorkspace: vi.fn() })
+    provideTerminalProjectionRecoveryActions({ retryWorkspace: retryTerminalProjectionForTest })
     provideWorkspacePaneTabsRetryActions({ retryWorkspace: retryWorkspacePaneTabsForTest })
     return () => (
       <WorkspacePaneTabStripScrollMemoryProvider>{slots.default?.()}</WorkspacePaneTabStripScrollMemoryProvider>

@@ -236,7 +236,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
     return () => {
       const filesystemTarget = props.target.kind === 'git-branch' ? null : props.target
       const showExternalAppLauncher = !compact.value && filesystemTarget !== null && props.externalAppItems.length > 0
-      const retryTabsLabel = t('error.try-again')
+      const retryTabsLabel = t('workspace-pane-tabs.retry-loading')
       const retryTabsAction =
         props.model.tabEntriesProjectionPhase === 'failed' ? (
           <Tip label={retryTabsLabel}>

@@ -14,7 +14,10 @@ import {
   type TerminalCreatedTabCommitResult,
 } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/terminal/components/terminal-create-admission.ts'
-import type { TerminalCreateTranslator } from '#/web/terminal/components/terminal-create-feedback.ts'
+import {
+  showTerminalCreateErrorToast,
+  type TerminalCreateTranslator,
+} from '#/web/terminal/components/terminal-create-feedback.ts'
 import type { TerminalCreateOptions, TerminalFocusRequest } from '#/web/terminal/components/types.ts'
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
@@ -35,6 +38,7 @@ import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navi
 import { claimTerminalAutoFocus } from '#/web/terminal/focus.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { workspacePaneRuntimeTabCreateBlockingPhase } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import type { WorkspacePaneRuntimeUnreadyProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 export interface CreatedTerminalRouteRequest {
   navigationGeneration: AppNavigationGeneration
@@ -135,8 +139,9 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
   if (!terminalCreateTargetIsCurrent(base)) return staleTerminalCreateResult()
   const target = terminalWorkspacePaneCoordinatorTarget(base)
   return await runWorkspacePaneAction(target, async () => {
-    if (!terminalCreateTargetIsCurrent(base)) return staleTerminalCreateResult()
-    if (!terminalCreateAdmissionIsReady(base)) return blockedTerminalCreateResult()
+    const admission = terminalCreateAdmission(base)
+    if (admission === 'stale') return staleTerminalCreateResult()
+    if (admission !== 'ready') return blockedTerminalCreateResult(admission, options.t)
     // Presentation is deliberately best-effort across unrelated navigation.
     // Starting this queued create may supersede a navigation that has begun but
     // has not settled yet. Once the router has actually left this filesystem
@@ -265,19 +270,23 @@ function terminalCreateTargetIsCurrent(base: TerminalSessionBase): boolean {
       )
 }
 
-function terminalCreateAdmissionIsReady(base: TerminalSessionBase): boolean {
+function terminalCreateAdmission(
+  base: TerminalSessionBase,
+): 'ready' | 'stale' | WorkspacePaneRuntimeUnreadyProjectionPhase {
+  if (!terminalCreateTargetIsCurrent(base)) return 'stale'
   const paneTarget = workspacePaneTabsTargetFromRuntime(base.target)
-  if (!paneTarget) return false
+  if (!paneTarget) return 'stale'
   const resolution = resolveWorkspacePaneTabTargetForPaneTarget({
     paneTarget,
     routeTarget: paneTarget,
     workspacePaneRoute: undefined,
   })
-  return (
-    resolution.kind === 'ready' &&
-    resolution.target.workspaceRuntimeId === base.target.workspaceRuntimeId &&
-    workspacePaneRuntimeTabCreateBlockingPhase(resolution.target, 'terminal') === null
-  )
+  if (resolution.kind === 'missing') return 'stale'
+  if (resolution.kind === 'unavailable') {
+    return resolution.reason === 'workspace-pane-tabs-failed' ? 'failed' : 'pending'
+  }
+  if (resolution.target.workspaceRuntimeId !== base.target.workspaceRuntimeId) return 'stale'
+  return workspacePaneRuntimeTabCreateBlockingPhase(resolution.target, 'terminal') ?? 'ready'
 }
 
 function staleTerminalCreateResult(): TerminalCreateCommandResult {
@@ -285,9 +294,15 @@ function staleTerminalCreateResult(): TerminalCreateCommandResult {
   return { ok: false, error, messageKey: 'error.terminal-create-failed' }
 }
 
-function blockedTerminalCreateResult(): TerminalCreateCommandResult {
-  const error = new Error('terminal creation blocked while workspace tabs are unavailable')
-  return { ok: false, error, messageKey: 'error.terminal-create-failed' }
+function blockedTerminalCreateResult(
+  phase: WorkspacePaneRuntimeUnreadyProjectionPhase,
+  t: TerminalCreateTranslator | undefined,
+): TerminalCreateCommandResult {
+  const messageKey =
+    phase === 'failed' ? 'error.terminal-create-blocked-load-failed' : 'error.terminal-create-blocked-loading'
+  const error = new Error(messageKey)
+  if (t) showTerminalCreateErrorToast(error, t)
+  return { ok: false, error, messageKey }
 }
 
 function terminalRuntimeTabCreateAction(

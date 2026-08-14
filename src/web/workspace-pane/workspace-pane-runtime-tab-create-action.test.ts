@@ -65,10 +65,15 @@ const WORKTREE_ROUTE_TARGET = {
 const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(),
 }))
+const terminalCreateFeedbackMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+  warning: vi.fn(),
+}))
 
 vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
 }))
+vi.mock('vue-sonner', () => ({ toast: terminalCreateFeedbackMocks }))
 
 beforeEach(() => {
   appQueryClient.clear()
@@ -87,6 +92,8 @@ beforeEach(() => {
     tabs: [],
   })
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockReset()
+  terminalCreateFeedbackMocks.error.mockReset()
+  terminalCreateFeedbackMocks.warning.mockReset()
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockResolvedValue({
     ok: true,
     terminalSessionId: TERMINAL_SESSION_ID,
@@ -131,10 +138,23 @@ describe('workspace pane runtime tab create action', () => {
           openerIdentity: null,
           showCreatedTerminalTab: vi.fn(),
           focusTerminal: vi.fn(),
+          t: translate,
         }),
-      ).resolves.toMatchObject({ ok: false })
+      ).resolves.toMatchObject({
+        ok: false,
+        messageKey:
+          projectionPhase === 'failed'
+            ? 'error.terminal-create-blocked-load-failed'
+            : 'error.terminal-create-blocked-loading',
+      })
 
       expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
+      expect(terminalCreateFeedbackMocks.error).toHaveBeenCalledWith('action.result-error', {
+        description:
+          projectionPhase === 'failed'
+            ? 'error.terminal-create-blocked-load-failed'
+            : 'error.terminal-create-blocked-loading',
+      })
     },
   )
 

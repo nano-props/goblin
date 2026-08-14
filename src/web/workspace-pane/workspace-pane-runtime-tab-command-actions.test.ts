@@ -58,6 +58,9 @@ const terminalPaneTarget = terminalPaneTargetCandidate
 const BRANCH_NAME = 'main'
 
 const terminalCoordinates = terminalSessionCoordinates(terminalBase)
+const terminalCommandFeedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
+
+vi.mock('vue-sonner', () => ({ toast: terminalCommandFeedbackMocks }))
 
 describe('workspace pane runtime tab command actions', () => {
   beforeEach(() => {
@@ -70,6 +73,8 @@ describe('workspace pane runtime tab command actions', () => {
     resetWorkspacePaneActionQueueForTest()
     resetWorkspacesStore()
     resetAppNavigationForTest()
+    terminalCommandFeedbackMocks.error.mockReset()
+    terminalCommandFeedbackMocks.warning.mockReset()
   })
 
   afterEach(() => {
@@ -647,13 +652,18 @@ describe('workspace pane runtime tab command actions', () => {
     const scenario = terminalCommandScenario([terminalSessionId])
 
     try {
-      await expect(dispatchNewTerminalRuntimeTabAction(scenario.options)).resolves.toBe(false)
+      await expect(
+        dispatchNewTerminalRuntimeTabAction({ ...scenario.options, t: (key) => key }),
+      ).resolves.toBe(false)
     } finally {
       scenario.resetBridge()
     }
 
     expect(scenario.terminalFilesystemTargetSnapshot).toHaveBeenCalledOnce()
     expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
+    expect(terminalCommandFeedbackMocks.error).toHaveBeenCalledWith('action.result-error', {
+      description: 'error.terminal-create-blocked-loading',
+    })
   })
 
   test.each([

@@ -9,7 +9,6 @@ import {
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import {
   isMaterializedWorkspacePaneRuntimeTab,
-  workspacePaneRuntimeTabCreateBlockingPhase,
   type WorkspacePaneRuntimePlaceholderTab,
   type WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
@@ -134,13 +133,6 @@ export async function dispatchNewTerminalRuntimeTabAction(
   const currentWorkspaceId = options.currentWorkspaceId
   if (!currentWorkspaceId || currentWorkspaceId !== options.target.filesystemTarget.workspaceId) return false
   if (!terminalCommandTargetIsCurrent(options.target.filesystemTarget)) return false
-  const resolution = resolveExistingTerminalTabTarget(
-    options.target.filesystemTarget,
-    options.target.workspacePaneRoute,
-  )
-  if (resolution.kind !== 'ready' || workspacePaneRuntimeTabCreateBlockingPhase(resolution.target, 'terminal')) {
-    return false
-  }
   const context = terminalRuntimeTabActionContext(options)
   return await runWorkspacePaneRuntimeNewAction('terminal', context)
 }

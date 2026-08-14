@@ -64,6 +64,8 @@ export const EmptyTerminalCta = defineComponent<EmptyTerminalCtaProps>({
 
 interface StatusOverlayProps {
   label: string
+  retryLabel?: string
+  onRetry?: () => void
 }
 
 // Hoisted so clsx + tailwind-merge don't re-allocate per render.
@@ -77,10 +79,15 @@ export const StatusOverlay: FunctionalComponent<StatusOverlayProps> = (props) =>
     <div class="goblin-terminal-session__status-overlay" role="status" aria-live="polite" aria-busy="true">
       <span class={STATUS_DOT_CLASS} />
       <span>{props.label}</span>
+      {props.retryLabel && props.onRetry ? (
+        <Button type="button" size="sm" variant="ghost" onClick={props.onRetry}>
+          {props.retryLabel}
+        </Button>
+      ) : null}
     </div>
   )
 }
-StatusOverlay.props = ['label']
+StatusOverlay.props = ['label', 'retryLabel', 'onRetry']
 
 export const AttachmentOverlay: FunctionalComponent<AttachmentOverlayProps> = (props) => {
   return (

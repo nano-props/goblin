@@ -44,6 +44,7 @@ import {
   render,
   routeNavigation,
   retryWorkspacePaneTabsForTest,
+  retryTerminalProjectionForTest,
   terminalCommandContext,
   terminalReadContext,
   terminalReadContextWithSession,
@@ -112,7 +113,7 @@ describe('WorkspacePane terminal routes', () => {
 
     const newTerminalButton = await screen.findByRole('button', { name: 'terminal.new' })
     expect(newTerminalButton.getAttribute('aria-disabled')).toBe('true')
-    const retryButton = screen.getByRole('button', { name: 'error.try-again' })
+    const retryButton = screen.getByRole('button', { name: 'workspace-pane-tabs.retry-loading' })
     await flushTestUpdates(() => retryButton.click())
     expect(retryWorkspacePaneTabsForTest).toHaveBeenCalledWith(workspaceId)
   })
@@ -168,6 +169,9 @@ describe('WorkspacePane terminal routes', () => {
     const loadingStatus = document.body.querySelector('.goblin-terminal-session__status-overlay')
     expect(loadingStatus?.textContent).toContain('terminal.loading')
     expect(loadingStatus?.textContent).not.toContain('terminal.opening')
+    const retryLoading = screen.getByRole('button', { name: 'terminal.retry-loading' })
+    await flushTestUpdates(() => retryLoading.click())
+    expect(retryTerminalProjectionForTest).toHaveBeenCalledWith(workspaceId)
 
     const tabIds = [...document.body.querySelectorAll<HTMLElement>('[role="tab"][id]')].map((tab) => tab.id)
     expect(new Set(tabIds).size).toBe(tabIds.length)
@@ -193,7 +197,11 @@ describe('WorkspacePane terminal routes', () => {
     await waitFor(() => {
       expect(screen.queryByRole('tab', { name: 'terminal.load-tab-failed' })).toBeNull()
       expect(screen.getByRole('button', { name: 'terminal.new' }).getAttribute('aria-disabled')).toBe('true')
+      expect(screen.getByRole('button', { name: 'terminal.retry-loading' })).toBeTruthy()
     })
+    retryTerminalProjectionForTest.mockClear()
+    await flushTestUpdates(() => screen.getByRole<HTMLElement>('button', { name: 'terminal.retry-loading' }).click())
+    expect(retryTerminalProjectionForTest).toHaveBeenCalledWith(workspaceId)
 
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',

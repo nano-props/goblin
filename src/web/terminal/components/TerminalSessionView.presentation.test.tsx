@@ -862,7 +862,7 @@ describe('TerminalSessionView presentation and focus', () => {
       expect(alert?.getAttribute('aria-live')).toBe('polite')
       expect(alert?.getAttribute('aria-atomic')).toBe('true')
       const retry = Array.from(view.container.querySelectorAll('button')).find(
-        (button) => button.textContent === 'error.try-again',
+        (button) => button.textContent === 'terminal.retry-restoring',
       )
 
       await flushTestUpdates(async () => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
@@ -878,7 +878,7 @@ describe('TerminalSessionView presentation and focus', () => {
       })
       expect(view.container.querySelector('[role="alert"]')).toBeNull()
       expect(view.container.textContent).toContain('terminal.restoring')
-      expect(view.container.textContent).not.toContain('error.try-again')
+      expect(view.container.textContent).not.toContain('terminal.retry-restoring')
     } finally {
       await view.cleanup()
     }

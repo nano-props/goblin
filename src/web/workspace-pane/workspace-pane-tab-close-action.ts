@@ -247,7 +247,15 @@ function beginCloseWorkspacePaneTabAction(
   const workspacePaneRoute = options.workspacePaneRoute
   const tab = target.tabs.find((candidate) => candidate.identity === closingIdentity) ?? null
   const runtimeTab = tab && isMaterializedWorkspacePaneRuntimeTab(tab) ? tab : null
-  if (isWorkspacePaneRuntimeTabEntry(tabEntry) && !runtimeTab) return { kind: 'done', result: false }
+  if (isWorkspacePaneRuntimeTabEntry(tabEntry) && !runtimeTab) {
+    if (tab?.kind === 'runtime-placeholder') {
+      surfaceWorkspacePaneTabCloseFeedback({
+        kind: 'blocked-runtime-materialization',
+        phase: tab.projectionPhase,
+      })
+    }
+    return { kind: 'done', result: false }
+  }
   const runtimeView = runtimeTab?.view
   if (runtimeView?.type === 'terminal') {
     const terminalBase = workspacePaneTerminalBaseForTabModel(target)
