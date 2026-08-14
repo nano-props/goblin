@@ -135,7 +135,7 @@ vi.mock('#/web/app/shell-client.ts', () => ({
   openExternalUrl: hoistedAppShellMocks.openExternalUrl,
 }))
 
-vi.mock('#/web/workspace-external-app-client.ts', () => ({
+vi.mock('#/web/external-apps/workspace-client.ts', () => ({
   openWorkspaceTerminal: hoistedWorkspaceExternalAppMocks.openWorkspaceTerminal,
   openWorkspaceEditor: hoistedWorkspaceExternalAppMocks.openWorkspaceEditor,
   openWorkspaceInFinder: hoistedWorkspaceExternalAppMocks.openWorkspaceInFinder,

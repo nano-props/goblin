@@ -532,7 +532,7 @@ describe('repo-client', () => {
       },
     })
     const { openWorkspaceEditor, openWorkspaceInFinder, openWorkspaceTerminal } =
-      await import('#/web/workspace-external-app-client.ts')
+      await import('#/web/external-apps/workspace-client.ts')
     await expect(openWorkspaceTerminal(executionTarget, 'ghostty')).resolves.toEqual({
       ok: true,
       message: 'server-terminal',
@@ -582,7 +582,7 @@ describe('repo-client', () => {
         .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-terminal' }) })
         .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) }),
     )
-    const { openWorkspaceEditor, openWorkspaceTerminal } = await import('#/web/workspace-external-app-client.ts')
+    const { openWorkspaceEditor, openWorkspaceTerminal } = await import('#/web/external-apps/workspace-client.ts')
     await openWorkspaceTerminal(executionTarget, 'ghostty')
     await openWorkspaceEditor(executionTarget, 'vscode')
 

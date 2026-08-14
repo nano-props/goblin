@@ -38,7 +38,7 @@ vi.mock('#/web/repos/client.ts', () => ({
   getRepoPatch: mocks.getRepoPatch,
 }))
 
-vi.mock('#/web/workspace-external-app-client.ts', () => ({
+vi.mock('#/web/external-apps/workspace-client.ts', () => ({
   openWorkspaceEditor: mocks.openWorkspaceEditor,
   openWorkspaceInFinder: mocks.openWorkspaceInFinder,
   openWorkspaceTerminal: mocks.openWorkspaceTerminal,

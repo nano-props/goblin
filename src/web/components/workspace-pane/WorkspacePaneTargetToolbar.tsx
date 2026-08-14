@@ -20,7 +20,7 @@ import { isPendingWorkspacePaneTabItem } from '#/web/components/workspace-pane/w
 import type { WorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import type { WorkspaceExternalAppItem } from '#/web/external-workspace-apps.tsx'
+import type { WorkspaceExternalAppItem } from '#/web/external-apps/catalog.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type {
   WorkspacePaneFilesystemTarget,

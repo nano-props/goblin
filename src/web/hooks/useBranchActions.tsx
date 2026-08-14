@@ -15,7 +15,7 @@ import {
   openWorkspaceEditor,
   openWorkspaceInFinder,
   openWorkspaceTerminal,
-} from '#/web/workspace-external-app-client.ts'
+} from '#/web/external-apps/workspace-client.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { copyToClipboard } from '#/web/clipboard/clipboard-copy.ts'
 import { worktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
