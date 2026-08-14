@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { vueAppErrorHandler } from '#/web/vue-app-error-handler.ts'
+import { vueAppErrorHandler } from '#/web/app/errors/vue-error-handler.ts'
 
 describe('vueAppErrorHandler', () => {
   test('lets Vue use its development error reporting', () => {

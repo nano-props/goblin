@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { markRenderErrorLogged } from '#/web/render-error-logging.ts'
+import { markRenderErrorLogged } from '#/web/app/errors/render-error-logging.ts'
 
 describe('markRenderErrorLogged', () => {
   test('dedupes object errors without mutating them', async () => {

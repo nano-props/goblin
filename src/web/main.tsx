@@ -12,7 +12,7 @@ import { appI18n, startI18nProjection } from '#/web/stores/i18n-vue.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { createWebBootstrapOwner, startWebBootstrap } from '#/web/app/bootstrap/lifecycle.ts'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
-import { vueAppErrorHandler } from '#/web/vue-app-error-handler.ts'
+import { vueAppErrorHandler } from '#/web/app/errors/vue-error-handler.ts'
 import { startNativeAppQuitIngress } from '#/web/app/lifecycle.ts'
 
 const INITIAL_PUBLIC_BOOTSTRAP_TIMEOUT_MS = 15_000

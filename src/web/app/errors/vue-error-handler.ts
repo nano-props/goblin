@@ -1,6 +1,6 @@
 import type { ComponentPublicInstance } from 'vue'
 import { bootstrapLog } from '#/web/logger.ts'
-import { markRenderErrorLogged } from '#/web/render-error-logging.ts'
+import { markRenderErrorLogged } from '#/web/app/errors/render-error-logging.ts'
 
 interface VueAppErrorLogger {
   error(message: string, context: unknown): void
