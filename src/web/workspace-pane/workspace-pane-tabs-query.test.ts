@@ -151,7 +151,7 @@ describe('workspace pane tabs query', () => {
     ).toEqual({ phase: 'ready', tabs: [workspacePaneStaticTabEntry('status')] })
   })
 
-  test('does not apply defaults to a target absent from a stale failed snapshot', async () => {
+  test('preserves protocol defaults for a target absent from an accepted snapshot after refresh fails', async () => {
     const queryClient = new QueryClient()
     writeWorkspacePaneTabsSnapshotQueryData(
       REPO_ROOT,
@@ -175,7 +175,7 @@ describe('workspace pane tabs query', () => {
         },
         queryClient,
       ),
-    ).toEqual({ phase: 'failed', tabs: [] })
+    ).toEqual({ phase: 'failed', tabs: [workspacePaneStaticTabEntry('status')] })
   })
 
   test('normalizes the complete snapshot and keeps no-worktree targets static-only', () => {

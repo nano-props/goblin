@@ -89,7 +89,7 @@ describe('workspace pane tab select action', () => {
     expect(navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
-  test('does not select defaults for a target absent from a stale failed snapshot', async () => {
+  test('keeps protocol defaults available for local navigation after projection failure', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('feature/worktree')],
@@ -106,9 +106,13 @@ describe('workspace pane tab select action', () => {
     const navigation = navigationWith()
     await failWorkspacePaneTabsQueryForTest(REPO_ID, repo.workspaceRuntimeId)
 
-    await expect(selectTab('workspace-pane:status', navigation)).resolves.toBe(false)
+    await expect(selectTab('workspace-pane:status', navigation)).resolves.toBe(true)
 
-    expect(navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.anything(),
+      { kind: 'static', tab: 'status' },
+      expect.anything(),
+    )
   })
 
   test('rejects a missing tab before starting navigation', async () => {

@@ -101,7 +101,7 @@ export function projectWorkspacePaneTabsForTarget(
   if (target.kind === 'inactive' || !data) return { phase, tabs: [] }
   const entry = workspacePaneTabsEntryForTarget(data.entries, target)
   if (entry) return { phase, tabs: [...entry.tabs] }
-  return { phase, tabs: phase === 'ready' ? defaultWorkspacePaneTabs() : [] }
+  return { phase, tabs: defaultWorkspacePaneTabs() }
 }
 
 /** Projects a complete successful snapshot; an absent target receives the protocol defaults. */
@@ -109,10 +109,7 @@ export function workspacePaneTabsForTargetFromSnapshot(
   data: WorkspacePaneTabsSnapshot,
   target: WorkspacePaneTabsReadTarget,
 ): WorkspacePaneTabEntry[] {
-  const resolvedTarget = target.kind === 'inactive' ? null : target
-  if (!resolvedTarget) return []
-  const entry = workspacePaneTabsEntryForTarget(data.entries, resolvedTarget)
-  return [...(entry?.tabs ?? defaultWorkspacePaneTabs())]
+  return projectWorkspacePaneTabsForTarget(data, 'ready', target).tabs
 }
 
 /**
