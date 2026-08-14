@@ -36,6 +36,7 @@ import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 
 export interface CreatedTerminalRouteRequest {
   navigationGeneration: AppNavigationGeneration
+  routePrecondition: { kind: 'current-workspace-target' }
 }
 
 export type CreatedTerminalNavigation = Pick<
@@ -131,11 +132,16 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
   }
   if (!terminalCreateTargetIsCurrent(base)) return staleTerminalCreateResult()
   const target = terminalWorkspacePaneCoordinatorTarget(base)
-  const navigationGeneration = beginAppNavigation()
-  let ownedFocusLease = claimTerminalAutoFocus(navigationGeneration)
-  try {
-    return await runWorkspacePaneAction(target, async () => {
-      if (!terminalCreateTargetIsCurrent(base)) return staleTerminalCreateResult()
+  return await runWorkspacePaneAction(target, async () => {
+    if (!terminalCreateTargetIsCurrent(base)) return staleTerminalCreateResult()
+    // Presentation is deliberately best-effort across unrelated navigation.
+    // Starting this queued create may supersede a navigation that has begun but
+    // has not settled yet. Once the router has actually left this filesystem
+    // target, the route precondition below rejects the stale presentation. Do
+    // not add batch or navigation-lineage state for this recoverable UI race.
+    const navigationGeneration = beginAppNavigation()
+    let ownedFocusLease = claimTerminalAutoFocus(navigationGeneration)
+    try {
       return await runCreateTerminalTabCommand({
         base,
         createTerminal: options.createTerminal,
@@ -151,6 +157,7 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
             showCreatedTerminalTab: async (terminalSessionId, presentation) => {
               const accepted = await options.showCreatedTerminalTab(terminalSessionId, presentation, {
                 navigationGeneration,
+                routePrecondition: { kind: 'current-workspace-target' },
               })
               if (accepted) ownedFocusLease?.commit(terminalSessionId, options.focusTerminal)
               else ownedFocusLease?.release()
@@ -159,10 +166,10 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
             },
           }),
       })
-    })
-  } finally {
-    ownedFocusLease?.release()
-  }
+    } finally {
+      ownedFocusLease?.release()
+    }
+  })
 }
 
 export function showCreatedTerminalWorkspacePaneRuntimeTab(

@@ -661,5 +661,8 @@ function terminalSession(terminalSessionId: string, selected: boolean) {
 }
 
 function createdTerminalRouteRequest(): CreatedTerminalRouteRequest {
-  return { navigationGeneration: beginAppNavigation() }
+  return {
+    navigationGeneration: beginAppNavigation(),
+    routePrecondition: { kind: 'current-workspace-target' },
+  }
 }
