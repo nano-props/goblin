@@ -46,7 +46,7 @@ import {
   type WorkspacePaneStaticTabRouteTransaction,
 } from '#/web/workspace-pane/workspace-pane-tab-open-presentation.ts'
 
-export interface OpenWorkspacePaneTargetStaticTabActionOptions {
+export interface WorkspacePaneTargetStaticTabActionOptions {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
   routeTarget: WorkspacePaneTabsTarget
@@ -56,6 +56,8 @@ export interface OpenWorkspacePaneTargetStaticTabActionOptions {
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   navigation: FilesystemWorkspacePaneRouteCommitActions
 }
+
+type WorkspacePaneTargetStaticTabPlacement = 'after-opener' | 'append'
 
 function paneTargetPresentationBranch(
   paneTarget: WorkspacePaneTabsTarget,
@@ -68,7 +70,21 @@ function paneTargetPresentationBranch(
 
 /** Opens and presents a static tab as one target-scoped transaction. */
 export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
-  input: OpenWorkspacePaneTargetStaticTabActionOptions,
+  input: WorkspacePaneTargetStaticTabActionOptions,
+): Promise<WorkspacePaneActionOutcome> {
+  return await dispatchWorkspacePaneTargetStaticTabAction(input, 'after-opener')
+}
+
+/** Shows a target-owned static tab from a generic entry and appends it when newly opened. */
+export async function dispatchShowWorkspacePaneTargetStaticTabAction(
+  input: WorkspacePaneTargetStaticTabActionOptions,
+): Promise<WorkspacePaneActionOutcome> {
+  return await dispatchWorkspacePaneTargetStaticTabAction(input, 'append')
+}
+
+async function dispatchWorkspacePaneTargetStaticTabAction(
+  input: WorkspacePaneTargetStaticTabActionOptions,
+  placementKind: WorkspacePaneTargetStaticTabPlacement,
 ): Promise<WorkspacePaneActionOutcome> {
   const workspace = workspacesStore.getState().workspaces[input.workspaceId]
   if (
@@ -82,12 +98,12 @@ export async function dispatchOpenWorkspacePaneTargetStaticTabAction(
   const workspaceRuntimeId = input.workspaceRuntimeId
   const worktreePath = workspacePaneTabsTargetWorktreePath(input.paneTarget)
   const branchName = paneTargetPresentationBranch(input.paneTarget, input.worktreeHead)
-  const openerIdentity = captureWorkspacePaneActiveTabIdentity(input.paneTarget, workspaceRuntimeId, {
-    workspacePaneRoute: input.workspacePaneRoute,
-  })
-  const placement: WorkspacePaneStaticTabPlacement = openerIdentity
-    ? { kind: 'after-opener', openerIdentity }
-    : { kind: 'append', openerIdentity: null }
+  const placement = workspacePaneStaticTabPlacement(
+    input.paneTarget,
+    workspaceRuntimeId,
+    input.workspacePaneRoute,
+    placementKind,
+  )
   const resolvedInput: ResolvedWorkspacePaneStaticTabOpenInput = {
     workspaceId: input.workspaceId,
     workspaceRuntimeId,
@@ -137,6 +153,20 @@ export interface ShowWorkspacePaneStaticTabActionOptions {
 type WorkspacePaneStaticTabPlacement =
   { kind: 'after-opener'; openerIdentity: string } | { kind: 'append'; openerIdentity: string | null }
 
+function workspacePaneStaticTabPlacement(
+  paneTarget: WorkspacePaneTabsTarget,
+  workspaceRuntimeId: string,
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
+  placementKind: WorkspacePaneTargetStaticTabPlacement,
+): WorkspacePaneStaticTabPlacement {
+  const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, workspaceRuntimeId, {
+    workspacePaneRoute,
+  })
+  return placementKind === 'after-opener' && openerIdentity
+    ? { kind: 'after-opener', openerIdentity }
+    : { kind: 'append', openerIdentity }
+}
+
 interface ResolvedWorkspacePaneStaticTabOpenInput {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
@@ -169,9 +199,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
     : lease.routeTarget.branchName
   const worktreePath = isGitWorktreeDestinationTargetLease(lease) ? lease.routeTarget.worktreePath : null
   const paneTarget = lease.routeTarget
-  const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, lease.workspaceRuntimeId, {
-    workspacePaneRoute,
-  })
+  const placement = workspacePaneStaticTabPlacement(paneTarget, lease.workspaceRuntimeId, workspacePaneRoute, 'append')
   const input: ResolvedWorkspacePaneStaticTabOpenInput = {
     workspaceId,
     workspaceRuntimeId: lease.workspaceRuntimeId,
@@ -181,7 +209,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
     paneTarget,
     type,
     sourceRoute: workspacePaneRoute,
-    placement: { kind: 'append', openerIdentity },
+    placement,
     navigation,
   }
   const admission = workspacePaneStaticTabOpenAdmission(input)
@@ -210,12 +238,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
   const workspaceRuntimeId = input.workspaceRuntimeId
   const sourceRoute = input.workspacePaneRoute
   const paneTarget = requiredGitWorkspacePaneTabsTarget(input.workspaceId, input.branchName, input.worktreePath ?? null)
-  const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, workspaceRuntimeId, {
-    workspacePaneRoute: sourceRoute,
-  })
-  const placement: WorkspacePaneStaticTabPlacement = openerIdentity
-    ? { kind: 'after-opener', openerIdentity }
-    : { kind: 'append', openerIdentity: null }
+  const placement = workspacePaneStaticTabPlacement(paneTarget, workspaceRuntimeId, sourceRoute, 'after-opener')
   const resolvedInput: ResolvedWorkspacePaneStaticTabOpenInput = {
     workspaceId: input.workspaceId,
     workspaceRuntimeId,

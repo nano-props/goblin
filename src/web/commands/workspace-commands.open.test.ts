@@ -45,6 +45,39 @@ import {
 } from '#/web/test-utils/workspace-commands.ts'
 
 describe('workspace commands open', () => {
+  test('show workspace pane tab command appends a new tab and preserves its routed opener', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [staticEntry('status'), staticEntry('files'), staticEntry('history')],
+      },
+    })
+
+    await expect(
+      runShowWorkspacePaneTabCommand({
+        workspacePaneRoute: { kind: 'static', tab: 'files' },
+        workspaceId: REPO_ID,
+        branchName: 'feature/worktree',
+        tab: 'changes',
+        navigation: navigationWith({}),
+      }),
+    ).resolves.toBe(true)
+
+    expect(tabsFor('feature/worktree')).toEqual([
+      staticEntry('status'),
+      staticEntry('files'),
+      staticEntry('history'),
+      staticEntry('changes'),
+    ])
+    expect(workspacePaneTabOpener(WORKTREE_PANE_TARGET, workspaceRuntimeIdForTest(), 'workspace-pane:changes')).toBe(
+      'workspace-pane:files',
+    )
+  })
+
   test('show workspace pane tab command fast-fails when the target branch projection is missing', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,

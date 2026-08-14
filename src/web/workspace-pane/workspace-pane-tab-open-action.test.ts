@@ -9,6 +9,7 @@ import {
   dispatchOpenWorkspacePaneStaticTabAction as dispatchOpenWorkspacePaneStaticTabActionRaw,
   dispatchOpenWorkspacePaneTargetStaticTabAction,
   dispatchShowWorkspacePaneStaticTabAction as dispatchShowWorkspacePaneStaticTabActionRaw,
+  dispatchShowWorkspacePaneTargetStaticTabAction,
   type OpenWorkspacePaneStaticTabActionOptions,
   type ShowWorkspacePaneStaticTabActionOptions,
 } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
@@ -25,7 +26,7 @@ import {
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
-import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
@@ -48,7 +49,10 @@ import {
 import { beginAppNavigation, currentAppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
 import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
-import { runtimeWorkspacePaneTargetForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
+import {
+  runtimeWorkspacePaneTargetForTest,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
@@ -337,6 +341,150 @@ describe('openWorkspacePaneTab', () => {
         'workspace-pane:changes'
       ],
     ).toBe('workspace-pane:files')
+  })
+
+  test('materializes status only for a different materialized branch destination before presenting it', async () => {
+    const currentBranchName = 'feature/current'
+    const currentWorktreePath = '/tmp/workspace-pane-tab-current-worktree'
+    const targetBranchName = 'feature/target'
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [createBranchSnapshot(currentBranchName), createBranchSnapshot(targetBranchName)],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest(currentBranchName, currentWorktreePath),
+        createRepoWorktreeSnapshotForTest(targetBranchName, WORKTREE_PATH),
+      ],
+      currentBranchName,
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneTabsByBranch: {
+        [currentBranchName]: [workspacePaneStaticTabEntry('files')],
+        [targetBranchName]: [workspacePaneStaticTabEntry('files')],
+      },
+    })
+    const currentPaneTarget = {
+      kind: 'git-worktree' as const,
+      workspaceId: REPO_ID,
+      worktreePath: currentWorktreePath,
+    }
+    const targetPaneTarget = {
+      kind: 'git-worktree' as const,
+      workspaceId: REPO_ID,
+      worktreePath: WORKTREE_PATH,
+    }
+    installWorkspacePaneTabsTestBridge({
+      initialSnapshot: {
+        revision: 0,
+        entries: [currentPaneTarget, targetPaneTarget].map((paneTarget) => ({
+          target: runtimeWorkspacePaneTargetForTest({ ...paneTarget, workspaceRuntimeId: repo.workspaceRuntimeId }),
+          tabs: [workspacePaneStaticTabEntry('files')],
+        })),
+      },
+    })
+    const baseNavigation = navigationWithStoreActions()
+    const commitFilesystemWorkspacePaneRoute = vi.fn(baseNavigation.commitFilesystemWorkspacePaneRoute)
+
+    await expect(
+      dispatchShowWorkspacePaneStaticTabActionRaw({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        branchName: targetBranchName,
+        type: 'status',
+        workspacePaneRoute: undefined,
+        navigation: { ...baseNavigation, commitFilesystemWorkspacePaneRoute },
+      }),
+    ).resolves.toMatchObject({ kind: 'completed' })
+
+    expect(openTabsFor(currentBranchName)).toEqual(['files'])
+    expect(preferredWorkspacePaneTab(currentBranchName)).toBe('files')
+    expect(openTabsFor(targetBranchName)).toEqual(['files', 'status'])
+    expect(preferredWorkspacePaneTab(targetBranchName)).toBe('status')
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      }),
+      { kind: 'static', tab: 'status' },
+      expect.any(Object),
+    )
+  })
+
+  test('places a target-owned tab next to its opener when opened from inside a pane', async () => {
+    const branchName = 'feature/worktree'
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [createRepoWorktreeSnapshotForTest(branchName, WORKTREE_PATH)],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneTabsByBranch: {
+        [branchName]: [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneStaticTabEntry('files'),
+          workspacePaneStaticTabEntry('history'),
+        ],
+      },
+    })
+    const paneTarget = { kind: 'git-worktree' as const, workspaceId: REPO_ID, worktreePath: WORKTREE_PATH }
+
+    await expect(
+      dispatchOpenWorkspacePaneTargetStaticTabAction({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        routeTarget: paneTarget,
+        paneTarget,
+        worktreeHead: { kind: 'branch', branchName },
+        type: 'changes',
+        workspacePaneRoute: { kind: 'static', tab: 'files' },
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toMatchObject({ kind: 'completed' })
+
+    expect(openTabsFor(branchName)).toEqual(['status', 'files', 'changes', 'history'])
+    expect(workspacePaneTabOpener(paneTarget, repo.workspaceRuntimeId, 'workspace-pane:changes')).toBe(
+      'workspace-pane:files',
+    )
+  })
+
+  test('materializes status for a detached worktree before presenting it from a generic entry', async () => {
+    const worktree = {
+      ...createRepoWorktreeSnapshotForTest('feature/detached', WORKTREE_PATH),
+      head: { kind: 'detached' as const },
+      materializedBranch: null,
+    }
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [],
+      worktrees: [worktree],
+      currentBranchName: null,
+      preferredWorkspacePaneTab: 'files',
+    })
+    const paneTarget = { kind: 'git-worktree' as const, workspaceId: REPO_ID, worktreePath: WORKTREE_PATH }
+    setWorkspacePaneTabsForTargetQueryData({
+      ...paneTarget,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('files')],
+    })
+
+    await expect(
+      dispatchShowWorkspacePaneTargetStaticTabAction({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        routeTarget: paneTarget,
+        paneTarget,
+        worktreeHead: worktree.head,
+        type: 'status',
+        workspacePaneRoute: undefined,
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toMatchObject({ kind: 'completed' })
+
+    expect(
+      readWorkspacePaneTabsForTarget({ ...paneTarget, workspaceRuntimeId: repo.workspaceRuntimeId }).map(
+        (entry) => entry.type,
+      ),
+    ).toEqual(['files', 'status'])
+    expect(preferredWorkspacePaneTabForTarget(workspacesStore.getState().workspaces[REPO_ID]!.ui, paneTarget)).toBe(
+      'status',
+    )
   })
 
   test('ignores an appended terminal close-back opener when placing a tab opened from status', async () => {

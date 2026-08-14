@@ -53,6 +53,7 @@ function requiredTestWorktreeTarget(input: {
 
 export function installWorkspacePaneTabsTestBridge(
   options: {
+    initialSnapshot?: WorkspacePaneTabsSnapshot
     updateWorkspaceTabs?: (
       input: WorkspacePaneTabsUpdateInput,
     ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
@@ -66,13 +67,37 @@ export function installWorkspacePaneTabsTestBridge(
   ) => void
   removeRuntimeTab: (input: TestWorkspacePaneRuntimeTabInput) => void
 } {
-  let serverEntries: WorkspacePaneTabsEntry[] = []
-  let serverRevision = 0
+  let serverEntries = (options.initialSnapshot?.entries ?? []).map((entry) => ({
+    ...entry,
+    tabs: [...entry.tabs],
+  }))
+  let serverRevision = options.initialSnapshot?.revision ?? 0
+  const initialSnapshotScope = options.initialSnapshot?.entries[0]?.target
+  if (
+    initialSnapshotScope &&
+    options.initialSnapshot?.entries.some(
+      (entry) =>
+        entry.target.workspaceId !== initialSnapshotScope.workspaceId ||
+        entry.target.workspaceRuntimeId !== initialSnapshotScope.workspaceRuntimeId,
+    )
+  ) {
+    throw new Error('workspace pane test bridge initial snapshot must have one workspace runtime scope')
+  }
+  const assertServerScope = (workspaceId: string, workspaceRuntimeId: string): void => {
+    if (
+      initialSnapshotScope &&
+      (workspaceId !== initialSnapshotScope.workspaceId ||
+        workspaceRuntimeId !== initialSnapshotScope.workspaceRuntimeId)
+    ) {
+      throw new Error('workspace pane test bridge cannot cross its initial workspace runtime scope')
+    }
+  }
   const targetKey = (input: WorkspacePaneTabsTarget) => workspacePaneTabsTargetIdentityKey(input)
   const entryTarget = (entry: WorkspacePaneTabsEntry) => workspacePaneTabsTargetFromRuntime(entry.target)
   const serverTabsForTarget = (
     input: WorkspacePaneTabsTarget & { workspaceRuntimeId: string },
   ): WorkspacePaneTabEntry[] => {
+    assertServerScope(input.workspaceId, input.workspaceRuntimeId)
     const entry = serverEntries.find((candidate) => {
       const target = entryTarget(candidate)
       return target && targetKey(target) === targetKey(input)
@@ -180,6 +205,7 @@ export function installWorkspacePaneTabsTestBridge(
     }),
     workspacePaneTabs: () => ({
       update: async (input) => {
+        assertServerScope(input.workspaceId, input.workspaceRuntimeId)
         const target = workspacePaneTabsTargetFromRuntime(input.target)
         if (!target) return { kind: 'projected', snapshot: serverSnapshot() }
         const targetWithRuntime = { ...target, workspaceRuntimeId: input.workspaceRuntimeId }
@@ -191,6 +217,7 @@ export function installWorkspacePaneTabsTestBridge(
         return { kind: 'projected', snapshot: commitServerSnapshot() }
       },
       list: async (input) => {
+        assertServerScope(input.workspaceId, input.workspaceRuntimeId)
         return {
           revision: serverRevision,
           entries: serverEntries.filter((entry) => entry.target.workspaceId === input.workspaceId),

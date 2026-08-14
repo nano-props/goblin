@@ -27,13 +27,13 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
 
 const mocks = vi.hoisted(() => ({
-  dispatchOpenWorkspacePaneTargetStaticTabAction: vi.fn(),
   dispatchShowWorkspacePaneStaticTabAction: vi.fn(),
+  dispatchShowWorkspacePaneTargetStaticTabAction: vi.fn(),
 }))
 
 vi.mock('#/web/workspace-pane/workspace-pane-tab-open-action.ts', () => ({
-  dispatchOpenWorkspacePaneTargetStaticTabAction: mocks.dispatchOpenWorkspacePaneTargetStaticTabAction,
   dispatchShowWorkspacePaneStaticTabAction: mocks.dispatchShowWorkspacePaneStaticTabAction,
+  dispatchShowWorkspacePaneTargetStaticTabAction: mocks.dispatchShowWorkspacePaneTargetStaticTabAction,
 }))
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/example-repo')
@@ -199,17 +199,20 @@ describe('GitWorkspaceNavigatorView', () => {
       routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
       workspaceRuntimeId: repo.workspaceRuntimeId,
     })
-    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+    expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
-        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        branchName: destination.name,
+        type: 'status',
+        workspacePaneRoute: undefined,
       }),
-      { kind: 'static', tab: 'status' },
     )
-    expect(mocks.dispatchShowWorkspacePaneStaticTabAction).not.toHaveBeenCalled()
+    expect(navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
   test('opens a detached worktree status through its canonical worktree target', async () => {
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('main')],
       currentBranchName: null,
@@ -229,12 +232,18 @@ describe('GitWorkspaceNavigatorView', () => {
     renderGitWorkspaceNavigatorView()
     await fireEvent.doubleClick(screen.getByText('0123456'))
 
-    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+    expect(mocks.dispatchShowWorkspacePaneTargetStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
         routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+        paneTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+        worktreeHead: { kind: 'detached' },
+        type: 'status',
+        workspacePaneRoute: undefined,
       }),
-      { kind: 'static', tab: 'status' },
     )
+    expect(navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).not.toHaveBeenCalled()
   })
 
@@ -262,8 +271,8 @@ describe('GitWorkspaceNavigatorView', () => {
     await fireEvent.click(worktreeMenu)
     await fireEvent.click(screen.getByRole('button', { name: 'tab.changes' }))
 
-    expect(mocks.dispatchOpenWorkspacePaneTargetStaticTabAction).toHaveBeenCalledOnce()
-    expect(mocks.dispatchOpenWorkspacePaneTargetStaticTabAction).toHaveBeenCalledWith(
+    expect(mocks.dispatchShowWorkspacePaneTargetStaticTabAction).toHaveBeenCalledOnce()
+    expect(mocks.dispatchShowWorkspacePaneTargetStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,

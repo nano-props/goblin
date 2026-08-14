@@ -17,8 +17,8 @@ import { branchViewModeForWorkspace } from '#/web/stores/workspaces/branch-view-
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import {
-  dispatchOpenWorkspacePaneTargetStaticTabAction,
   dispatchShowWorkspacePaneStaticTabAction,
+  dispatchShowWorkspacePaneTargetStaticTabAction,
 } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { gitBranchPaneTargetLease, gitWorktreePaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { gitWorkspaceNavigatorRows } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
@@ -129,15 +129,14 @@ const GitWorkspaceNavigatorViewReadModel = defineComponent<GitWorkspaceNavigator
     }
 
     function openWorktreeStatus(worktreePath: string): void {
-      const target = gitWorktreePaneTargetLease(props.repo.id, props.repo.workspaceRuntimeId, worktreePath)
-      void navigation.commitFilesystemWorkspacePaneRoute(target, { kind: 'static', tab: 'status' })
+      openWorktreeTab(worktreePath, 'status')
     }
 
     function openWorktreeTab(worktreePath: string, type: WorkspacePaneStaticTabType): void {
       const worktree = repo.value?.snapshot.worktrees.find((candidate) => candidate.path === worktreePath)
       if (!worktree) return
       const lease = gitWorktreePaneTargetLease(props.repo.id, props.repo.workspaceRuntimeId, worktreePath)
-      void dispatchOpenWorkspacePaneTargetStaticTabAction({
+      void dispatchShowWorkspacePaneTargetStaticTabAction({
         workspaceId: props.repo.id,
         workspaceRuntimeId: props.repo.workspaceRuntimeId,
         routeTarget: lease.routeTarget,

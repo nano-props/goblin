@@ -123,9 +123,7 @@ export const GitWorkspaceNavigatorList = defineComponent<Props>({
                 branch={branch}
                 selected={selected}
                 onSelectBranch={worktreePath ? () => props.onSelectWorktree?.(worktreePath) : props.onSelectBranch}
-                onOpenBranchStatus={
-                  worktreePath ? () => props.onOpenWorktreeStatus?.(worktreePath) : props.onOpenBranchStatus
-                }
+                onOpenBranchStatus={props.onOpenBranchStatus}
                 selectedRef={selectedRef}
                 actionMenuOpen={
                   actionMenuOpen.value?.kind === 'branch' && actionMenuOpen.value.identity === branch.name

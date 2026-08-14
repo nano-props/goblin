@@ -7,7 +7,7 @@ import {
   type ConfirmedTerminalWorkspacePaneTabClose,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { dispatchRetiredTerminalWorkspacePaneTabPresentationAction } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
-import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
+import { dispatchShowWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import {
   dispatchMoveWorkspacePaneTabAction,
   dispatchSelectWorkspacePaneTabByIndexAction,
@@ -129,7 +129,7 @@ async function showWorkspacePaneTabCommand({
   const { branchName, workspacePaneRoute } = workspacePaneCommandCoordinates(target)
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
-    const outcome = await dispatchOpenWorkspacePaneTargetStaticTabAction({
+    const outcome = await dispatchShowWorkspacePaneTargetStaticTabAction({
       workspaceId,
       workspaceRuntimeId: workspacePaneCommandRuntimeId(target),
       routeTarget: workspacePaneCommandRouteTarget(target),
