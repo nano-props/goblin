@@ -19,6 +19,7 @@ import { provideWorkspacePaneTabStripScrollMemory } from '#/web/components/works
 import type { WorkspacePaneRouteContext } from '#/web/components/workspace-pane/workspace-pane-types.ts'
 import { WorkspaceLayoutShell } from '#/web/components/workspace-layout/WorkspaceLayoutShell.tsx'
 import { WorkspaceLayoutSidebar } from '#/web/components/workspace-layout/WorkspaceLayoutSidebar.tsx'
+import { WorkspaceRepoReadNotice } from '#/web/components/workspace-layout/WorkspaceRepoReadNotice.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
@@ -439,6 +440,14 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
             sidebarPane={renderSidebarPane()}
             zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
             workspacePane={<WorkspaceLayoutPane>{renderWorkspacePaneContent()}</WorkspaceLayoutPane>}
+            notice={
+              git ? (
+                <WorkspaceRepoReadNotice
+                  workspaceId={currentWorkspace.id}
+                  workspaceRuntimeId={currentWorkspace.workspaceRuntimeId}
+                />
+              ) : undefined
+            }
             singlePaneActivePane={activeSinglePane}
           />
         )

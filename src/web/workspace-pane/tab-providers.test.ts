@@ -137,6 +137,15 @@ describe('workspace pane tab providers', () => {
     ).toBe('terminal.load-failed')
   })
 
+  test('labels each terminal placeholder by its own projection phase', () => {
+    expect(terminalWorkspacePaneTabProvider.placeholderLabel({ t, projectionPhase: 'pending' })).toBe(
+      'terminal.loading-tab',
+    )
+    expect(terminalWorkspacePaneTabProvider.placeholderLabel({ t, projectionPhase: 'failed' })).toBe(
+      'terminal.load-tab-failed',
+    )
+  })
+
   test('exposes terminal bell state as runtime tab attention metadata', () => {
     expect(terminalWorkspacePaneTabProvider.attention({ view: terminalView })).toEqual({ attention: false })
     expect(terminalWorkspacePaneTabProvider.attention({ view: { ...terminalView, hasBell: true } })).toEqual({

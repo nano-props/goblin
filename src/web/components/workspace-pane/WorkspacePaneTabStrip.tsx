@@ -176,7 +176,9 @@ export const WorkspacePaneTabStrip = defineComponent<WorkspacePaneTabStripProps>
       }
       if (isPendingWorkspacePaneTabItem(item)) return `${props.workspacePaneId}-${item.type}-pending-tab`
       const runtimeItems = props.items.filter(
-        (candidate) => candidate.kind === 'runtime' && candidate.runtimeType === item.runtimeType,
+        (candidate) =>
+          (candidate.kind === 'runtime' || candidate.kind === 'runtime-placeholder') &&
+          candidate.runtimeType === item.runtimeType,
       )
       const index = runtimeItems.findIndex((candidate) => candidate.identity === item.identity)
       return workspacePaneRuntimeTabProvider(item.runtimeType).buttonId(props.workspacePaneId, Math.max(0, index))

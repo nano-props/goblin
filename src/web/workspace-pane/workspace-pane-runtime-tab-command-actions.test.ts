@@ -6,6 +6,13 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import {
+  failWorkspacePaneTabsQueryForTest,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   setTerminalSessionCommandBridge,
   type TerminalSessionCommandBridge,
@@ -54,13 +61,23 @@ const terminalPaneTarget = terminalPaneTargetCandidate
 const BRANCH_NAME = 'main'
 
 const terminalCoordinates = terminalSessionCoordinates(terminalBase)
+const terminalCommandFeedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
+
+vi.mock('vue-sonner', () => ({ toast: terminalCommandFeedbackMocks }))
 
 describe('workspace pane runtime tab command actions', () => {
   beforeEach(() => {
+    appQueryClient.clear()
+    terminalProjectionHydrationStore.setState({
+      hydrationByWorkspace: new Map(),
+      lastSuccessfulRecoveryByWorkspace: new Map(),
+    })
     resetTerminalAutoFocusForTest()
     resetWorkspacePaneActionQueueForTest()
     resetWorkspacesStore()
     resetAppNavigationForTest()
+    terminalCommandFeedbackMocks.error.mockReset()
+    terminalCommandFeedbackMocks.warning.mockReset()
   })
 
   afterEach(() => {
@@ -108,7 +125,6 @@ describe('workspace pane runtime tab command actions', () => {
       branches: [createRepoBranch(branchName)],
       currentBranchName: branchName,
     })
-
     expect(
       captureWorkspacePaneActiveTabIdentity(terminalPaneTarget, terminalCoordinates.workspaceRuntimeId, {
         workspacePaneRoute: undefined,
@@ -446,6 +462,11 @@ describe('workspace pane runtime tab command actions', () => {
       branches: [createRepoBranch(branchName)],
       currentBranchName: branchName,
     })
+    setWorkspacePaneTabsForTargetQueryData({
+      ...terminalPaneTarget,
+      workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
+      tabs: [],
+    })
     const createTerminal = vi.fn(async () => 'created-session')
     const createTerminalWithAdmission = vi.fn(async () => ({
       terminalSessionId: 'created-session',
@@ -629,6 +650,196 @@ describe('workspace pane runtime tab command actions', () => {
     expect(terminalFilesystemTargetSnapshot).not.toHaveBeenCalled()
   })
 
+  test('new terminal command rejects while a canonical terminal entry is still materializing', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const scenario = terminalCommandScenario([terminalSessionId])
+
+    try {
+      await expect(
+        dispatchNewTerminalRuntimeTabAction({ ...scenario.options, t: (key) => key }),
+      ).resolves.toBe(false)
+    } finally {
+      scenario.resetBridge()
+    }
+
+    expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
+    expect(terminalCommandFeedbackMocks.error).toHaveBeenCalledWith('action.result-error', {
+      description: 'error.terminal-create-blocked-loading',
+    })
+    expect(scenario.terminalFilesystemTargetSnapshot).toHaveBeenCalledOnce()
+  })
+
+  test.each([
+    ['new', dispatchNewTerminalRuntimeTabAction],
+    ['primary', dispatchTerminalRuntimePrimaryAction],
+  ] as const)('%s terminal command fails closed while canonical tabs are unavailable', async (_name, dispatch) => {
+    const scenario = terminalCommandScenario(null)
+
+    try {
+      await expect(dispatch(scenario.options)).resolves.toBe(false)
+    } finally {
+      scenario.resetBridge()
+    }
+
+    expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
+  })
+
+  test('primary terminal command selects a canonical terminal entry while it is still materializing', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const scenario = terminalCommandScenario([terminalSessionId])
+
+    try {
+      await expect(dispatchTerminalRuntimePrimaryAction(scenario.options)).resolves.toBe(true)
+    } finally {
+      scenario.resetBridge()
+    }
+
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceRuntimeId: scenario.repo.workspaceRuntimeId }),
+      { kind: 'terminal', terminalSessionId },
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+    )
+    expect(scenario.terminalFilesystemTargetSnapshot).toHaveBeenCalled()
+    expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
+  })
+
+  test('primary terminal command queues placeholder selection behind target actions', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const scenario = terminalCommandScenario([terminalSessionId])
+    const coordinatorStarted = Promise.withResolvers<void>()
+    const releaseCoordinator = Promise.withResolvers<void>()
+    const coordinatorBlocker = runWorkspacePaneAction(
+      {
+        kind: 'git-worktree',
+        workspaceId: terminalCoordinates.workspaceId,
+        workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
+        worktreePath: terminalExecutionPath(terminalBase.target),
+      },
+      async () => {
+        coordinatorStarted.resolve()
+        await releaseCoordinator.promise
+      },
+    )
+    await coordinatorStarted.promise
+
+    const action = dispatchTerminalRuntimePrimaryAction(scenario.options)
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+
+    releaseCoordinator.resolve()
+    await coordinatorBlocker
+    try {
+      await expect(action).resolves.toBe(true)
+    } finally {
+      scenario.resetBridge()
+    }
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceRuntimeId: scenario.repo.workspaceRuntimeId }),
+      { kind: 'terminal', terminalSessionId },
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+    )
+  })
+
+  test('primary terminal command does not cross a replaced runtime while waiting in the target queue', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const scenario = terminalCommandScenario([terminalSessionId], terminalSessionId)
+    const coordinatorStarted = Promise.withResolvers<void>()
+    const releaseCoordinator = Promise.withResolvers<void>()
+    const coordinatorBlocker = runWorkspacePaneAction(
+      {
+        kind: 'git-worktree',
+        workspaceId: terminalCoordinates.workspaceId,
+        workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
+        worktreePath: terminalExecutionPath(terminalBase.target),
+      },
+      async () => {
+        coordinatorStarted.resolve()
+        await releaseCoordinator.promise
+      },
+    )
+    await coordinatorStarted.promise
+
+    const action = dispatchTerminalRuntimePrimaryAction(scenario.options)
+    const replacementRuntimeId = 'repo-runtime-replaced'
+    workspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [scenario.repo.id]: {
+          ...state.workspaces[scenario.repo.id]!,
+          workspaceRuntimeId: replacementRuntimeId,
+        },
+      },
+    }))
+    setWorkspacePaneTabsForTargetQueryData({
+      ...terminalPaneTarget,
+      workspaceRuntimeId: replacementRuntimeId,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+    })
+    await failWorkspacePaneTabsQueryForTest(terminalCoordinates.workspaceId, replacementRuntimeId)
+    releaseCoordinator.resolve()
+    await coordinatorBlocker
+
+    try {
+      await expect(action).resolves.toBe(false)
+    } finally {
+      scenario.resetBridge()
+    }
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
+  })
+
+  test('primary terminal command rejects placeholder selection while terminal creation is pending', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const scenario = terminalCommandScenario([terminalSessionId], null, true)
+
+    try {
+      await expect(dispatchTerminalRuntimePrimaryAction(scenario.options)).resolves.toBe(false)
+    } finally {
+      scenario.resetBridge()
+    }
+
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
+  })
+
+  test('primary terminal command keeps preferring an available terminal in a mixed projection', async () => {
+    const materializedSessionId = 'term-111111111111111111111'
+    const loadingSessionId = 'term-222222222222222222222'
+    const scenario = terminalCommandScenario([materializedSessionId, loadingSessionId], materializedSessionId)
+
+    try {
+      await expect(dispatchTerminalRuntimePrimaryAction(scenario.options)).resolves.toBe(true)
+    } finally {
+      scenario.resetBridge()
+    }
+
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceRuntimeId: scenario.repo.workspaceRuntimeId }),
+      { kind: 'terminal', terminalSessionId: materializedSessionId },
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+    )
+    expect(scenario.terminalFilesystemTargetSnapshot).toHaveBeenCalled()
+    expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
+  })
+
+  test('primary terminal command navigates to an accepted terminal while canonical tabs are stale', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const scenario = terminalCommandScenario([terminalSessionId], terminalSessionId)
+    await failWorkspacePaneTabsQueryForTest(terminalCoordinates.workspaceId, scenario.repo.workspaceRuntimeId)
+
+    try {
+      await expect(dispatchTerminalRuntimePrimaryAction(scenario.options)).resolves.toBe(true)
+    } finally {
+      scenario.resetBridge()
+    }
+
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceRuntimeId: scenario.repo.workspaceRuntimeId }),
+      { kind: 'terminal', terminalSessionId },
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+    )
+    expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
+  })
+
   test('new terminal action rejects when no runtime base is available', async () => {
     await expect(
       runWorkspacePaneRuntimeNewAction('terminal', {
@@ -657,6 +868,78 @@ function terminalSession(terminalSessionId: string, selected: boolean) {
     selected,
     hasBell: false,
     hasRecentOutput: false,
+  }
+}
+
+function terminalCommandScenario(
+  canonicalSessionIds: readonly string[] | null,
+  materializedSessionId: string | null = null,
+  createPending = false,
+) {
+  const repo = seedRepoWithReadModelForTest({
+    id: terminalBase.target.workspaceId,
+    workspaceRuntimeId: terminalBase.target.workspaceRuntimeId,
+    branches: [createRepoBranch(BRANCH_NAME)],
+    currentBranchName: BRANCH_NAME,
+    worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, terminalExecutionPath(terminalBase.target))],
+  })
+  if (canonicalSessionIds) {
+    setWorkspacePaneTabsForTargetQueryData({
+      ...terminalPaneTarget,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: canonicalSessionIds.map((sessionId) => workspacePaneRuntimeTabEntry('terminal', sessionId)),
+    })
+  }
+  const sessions = materializedSessionId ? [terminalSession(materializedSessionId, true)] : []
+  const terminalFilesystemTargetSnapshot = vi.fn(() => ({
+    terminalFilesystemTargetKey: '/repo\0/repo-worktree',
+    selectedDescriptor: null,
+    sessions,
+    count: sessions.length,
+    bellCount: 0,
+    outputActiveCount: 0,
+    createPending,
+  }))
+  const createTerminalWithAdmission = vi.fn()
+  const resetBridge = setTerminalSessionCommandBridge({
+    terminalFilesystemTargetSnapshot,
+    createTerminal: vi.fn(),
+    createTerminalWithAdmission,
+    selectTerminal: vi.fn(),
+    focusTerminal: vi.fn(),
+    closeTerminalByDescriptor: vi.fn(),
+  })
+  return {
+    repo,
+    options: terminalCommandOptions(repo.workspaceRuntimeId),
+    terminalFilesystemTargetSnapshot,
+    createTerminalWithAdmission,
+    resetBridge,
+  }
+}
+
+function terminalCommandOptions(workspaceRuntimeId: string) {
+  return {
+    currentWorkspaceId: terminalBase.target.workspaceId,
+    target: {
+      filesystemTarget: gitWorktreePaneFilesystemTarget({
+        workspaceId: terminalBase.target.workspaceId,
+        workspaceRuntimeId,
+        worktreePath: terminalExecutionPath(terminalBase.target),
+        head: { kind: 'branch' as const, branchName: BRANCH_NAME },
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+        },
+      }),
+      workspacePaneRoute: null,
+    },
+    navigation: {
+      commitWorkspacePaneRoute: vi.fn(async () => true),
+      commitFilesystemWorkspacePaneRoute: vi.fn(async () => true),
+      commitWorkspaceRootTerminalSession: vi.fn(async () => true),
+    },
   }
 }
 

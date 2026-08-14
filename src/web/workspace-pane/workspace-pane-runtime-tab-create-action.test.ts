@@ -20,6 +20,10 @@ import {
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
+import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import {
   beginAppNavigation,
   appNavigationIsCurrent,
@@ -35,6 +39,7 @@ import type {
   TerminalCreateCommandResult,
   TerminalCreatedTabCommitResult,
 } from '#/web/commands/terminal-create-command.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 
 const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-runtime-create-repo'
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-workspace-pane-create'
@@ -60,18 +65,35 @@ const WORKTREE_ROUTE_TARGET = {
 const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(),
 }))
+const terminalCreateFeedbackMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+  warning: vi.fn(),
+}))
 
 vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
 }))
+vi.mock('vue-sonner', () => ({ toast: terminalCreateFeedbackMocks }))
 
 beforeEach(() => {
+  appQueryClient.clear()
+  terminalProjectionHydrationStore.setState({
+    hydrationByWorkspace: new Map(),
+    lastSuccessfulRecoveryByWorkspace: new Map(),
+  })
   resetWorkspacePaneActionQueueForTest()
   resetTerminalAutoFocusForTest()
   resetAppNavigationForTest()
   resetWorkspacesStore()
   seedCurrentWorkspaceRuntime(WORKSPACE_RUNTIME_ID)
+  setWorkspacePaneTabsForTargetQueryData({
+    ...PANE_TARGET,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    tabs: [],
+  })
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockReset()
+  terminalCreateFeedbackMocks.error.mockReset()
+  terminalCreateFeedbackMocks.warning.mockReset()
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockResolvedValue({
     ok: true,
     terminalSessionId: TERMINAL_SESSION_ID,
@@ -80,6 +102,10 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  terminalProjectionHydrationStore.setState({
+    hydrationByWorkspace: new Map(),
+    lastSuccessfulRecoveryByWorkspace: new Map(),
+  })
   resetWorkspacePaneActionQueueForTest()
   resetTerminalAutoFocusForTest()
   resetWorkspacesStore()
@@ -87,6 +113,104 @@ afterEach(() => {
 })
 
 describe('workspace pane runtime tab create action', () => {
+  test.each(['pending', 'failed'] as const)(
+    'fails closed when canonical workspace tabs are %s',
+    async (projectionPhase) => {
+      appQueryClient.removeQueries({
+        queryKey: workspacePaneTabsQueryKey(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID),
+      })
+      if (projectionPhase === 'failed') {
+        await expect(
+          appQueryClient.fetchQuery({
+            queryKey: workspacePaneTabsQueryKey(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID),
+            queryFn: async () => {
+              throw new Error('workspace tabs unavailable')
+            },
+            retry: false,
+          }),
+        ).rejects.toThrow('workspace tabs unavailable')
+      }
+
+      await expect(
+        dispatchTerminalCreate({ createTerminal: vi.fn(), showCreatedTerminalTab: vi.fn(), t: translate }),
+      ).resolves.toMatchObject({
+        ok: false,
+        messageKey:
+          projectionPhase === 'failed'
+            ? 'error.terminal-create-blocked-load-failed'
+            : 'error.terminal-create-blocked-loading',
+      })
+
+      expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
+      expect(terminalCreateFeedbackMocks.error).toHaveBeenCalledWith('action.result-error', {
+        description:
+          projectionPhase === 'failed'
+            ? 'error.terminal-create-blocked-load-failed'
+            : 'error.terminal-create-blocked-loading',
+      })
+    },
+  )
+
+  test('fails fast while a canonical terminal view is still materializing', async () => {
+    setWorkspacePaneTabsForTargetQueryData({
+      ...PANE_TARGET,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', TERMINAL_SESSION_ID)],
+    })
+    terminalProjectionHydrationStore
+      .getState()
+      .markProjectionReady(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID)
+
+    await expect(
+      dispatchTerminalCreate({ createTerminal: vi.fn(), showCreatedTerminalTab: vi.fn(), t: translate }),
+    ).resolves.toMatchObject({
+      ok: false,
+      messageKey: 'error.terminal-create-blocked-loading',
+    })
+
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
+    expect(terminalCreateFeedbackMocks.error).toHaveBeenCalledWith('action.result-error', {
+      description: 'error.terminal-create-blocked-loading',
+    })
+  })
+
+  test('rechecks canonical materialization after waiting in the target queue', async () => {
+    const queuedActionMayRun = Promise.withResolvers<void>()
+    const coordinatorTarget = workspacePaneActionTargetFromFilesystemTarget(BASE.target)
+    const blocker = runWorkspacePaneAction(coordinatorTarget, async () => {
+      await queuedActionMayRun.promise
+      return true
+    })
+    const dispatch = dispatchTerminalCreate({
+      createTerminal: vi.fn(),
+      showCreatedTerminalTab: vi.fn(),
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      ...PANE_TARGET,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', TERMINAL_SESSION_ID)],
+    })
+
+    queuedActionMayRun.resolve()
+    await blocker
+    await expect(dispatch).resolves.toMatchObject({ ok: false })
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
+  })
+
+  test('fails closed when a canonical terminal trails an otherwise ready runtime projection', async () => {
+    terminalProjectionHydrationStore.getState().markProjectionReady(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID)
+    setWorkspacePaneTabsForTargetQueryData({
+      ...PANE_TARGET,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', TERMINAL_SESSION_ID)],
+    })
+
+    await expect(
+      dispatchTerminalCreate({ createTerminal: vi.fn(), showCreatedTerminalTab: vi.fn() }),
+    ).resolves.toMatchObject({ ok: false })
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
+  })
+
   test('navigates a detached worktree create to its real filesystem surface', async () => {
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const routeRequest = createdTerminalRouteRequest()
@@ -250,10 +374,7 @@ describe('workspace pane runtime tab create action', () => {
     const routeStarted = Promise.withResolvers<CreatedTerminalRouteRequest>()
     const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
 
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
-      createTerminal: vi.fn(async () => createAdmission()),
-      openerIdentity: null,
+    const dispatch = dispatchTerminalCreate({
       showCreatedTerminalTab: async (_terminalSessionId, _presentation, routeRequest) => {
         routeStarted.resolve(routeRequest)
         return await navigation.promise
@@ -293,10 +414,7 @@ describe('workspace pane runtime tab create action', () => {
     })
     const focusTerminal = vi.fn()
 
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
-      createTerminal: vi.fn(async () => createAdmission()),
-      openerIdentity: null,
+    const dispatch = dispatchTerminalCreate({
       showCreatedTerminalTab: vi.fn(() => true),
       focusTerminal,
     })
@@ -335,12 +453,8 @@ describe('workspace pane runtime tab create action', () => {
       },
     )
     const dispatches = terminalSessionIds.map(() =>
-      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        base: BASE,
-        createTerminal: vi.fn(async () => createAdmission()),
-        openerIdentity: null,
+      dispatchTerminalCreate({
         showCreatedTerminalTab,
-        focusTerminal: vi.fn(),
       }),
     )
     createCommandsMayCommit.resolve()
@@ -386,12 +500,8 @@ describe('workspace pane runtime tab create action', () => {
       },
     )
     const dispatches = terminalSessionIds.map(() =>
-      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        base: BASE,
-        createTerminal: vi.fn(async () => createAdmission()),
-        openerIdentity: null,
+      dispatchTerminalCreate({
         showCreatedTerminalTab,
-        focusTerminal: vi.fn(),
       }),
     )
 
@@ -413,10 +523,7 @@ describe('workspace pane runtime tab create action', () => {
     const heldCommand = holdTerminalCreateCommand()
     const showCreatedTerminalTab = vi.fn(() => true)
     const focusTerminal = vi.fn()
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
-      createTerminal: vi.fn(async () => createAdmission()),
-      openerIdentity: null,
+    const dispatch = dispatchTerminalCreate({
       showCreatedTerminalTab,
       focusTerminal,
     })
@@ -442,12 +549,9 @@ describe('workspace pane runtime tab create action', () => {
       () => blocker.promise,
     )
     const createTerminal = vi.fn(async () => createAdmission())
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
+    const dispatch = dispatchTerminalCreate({
       createTerminal,
-      openerIdentity: null,
       showCreatedTerminalTab: vi.fn(() => true),
-      focusTerminal: vi.fn(),
     })
 
     seedCurrentWorkspaceRuntime('repo-runtime-replacement')
@@ -462,10 +566,7 @@ describe('workspace pane runtime tab create action', () => {
   test('releases automatic focus when navigation rejects the created route', async () => {
     const heldCommand = holdTerminalCreateCommand()
     const focusTerminal = vi.fn()
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
-      createTerminal: vi.fn(async () => createAdmission()),
-      openerIdentity: null,
+    const dispatch = dispatchTerminalCreate({
       showCreatedTerminalTab: vi.fn(() => false),
       focusTerminal,
     })
@@ -486,10 +587,7 @@ describe('workspace pane runtime tab create action', () => {
   test('does not focus when an older create commits after a newer presentation', async () => {
     const heldCommand = holdTerminalCreateCommand()
     const focusTerminal = vi.fn()
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
-      createTerminal: vi.fn(async () => createAdmission()),
-      openerIdentity: null,
+    const dispatch = dispatchTerminalCreate({
       showCreatedTerminalTab: vi.fn(() => true),
       focusTerminal,
     })
@@ -504,16 +602,11 @@ describe('workspace pane runtime tab create action', () => {
   })
 
   test('delegates creation with the exact base and route commit boundary', async () => {
-    await expect(
-      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        base: BASE,
-        createTerminal: vi.fn(async () => createAdmission()),
-        openerIdentity: null,
-        showCreatedTerminalTab: vi.fn(() => true),
-        focusTerminal: vi.fn(),
-        t: translate,
-      }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: TERMINAL_SESSION_ID, presentationStatus: 'committed' })
+    await expect(dispatchTerminalCreate({ t: translate })).resolves.toEqual({
+      ok: true,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      presentationStatus: 'committed',
+    })
 
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledWith(
       expect.objectContaining({ base: BASE, commitCreatedTerminalTab: expect.any(Function) }),
@@ -627,6 +720,21 @@ describe('workspace pane runtime tab create action', () => {
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
   })
 })
+
+type TerminalCreateDispatchOptions = Parameters<typeof dispatchCreateTerminalWorkspacePaneRuntimeTabAction>[0]
+
+function dispatchTerminalCreate(
+  overrides: Partial<TerminalCreateDispatchOptions> = {},
+): ReturnType<typeof dispatchCreateTerminalWorkspacePaneRuntimeTabAction> {
+  return dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+    base: BASE,
+    createTerminal: vi.fn(async () => createAdmission()),
+    openerIdentity: null,
+    showCreatedTerminalTab: vi.fn(() => true),
+    focusTerminal: vi.fn(),
+    ...overrides,
+  })
+}
 
 function translate(key: string): string {
   return key

@@ -157,10 +157,11 @@ describe('WorkspaceDashboardPane', () => {
       </VueQueryClientScope>,
     )
 
-    await vi.waitFor(() => expect(container.textContent).toContain('status failed'))
-    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(1)
+    await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
+    expect(container.textContent).not.toContain('status failed')
+    expect(container.querySelectorAll('[role="alert"]')).toHaveLength(0)
     expect(container.textContent).not.toContain('status.stale-title')
-    expect(container.textContent).toContain('error.try-again')
+    expect(container.textContent).not.toContain('error.try-again')
     expect(container.textContent).not.toContain('dashboard.loading')
     expect(container.textContent).toContain('dashboard.metric.branches')
   })
@@ -224,13 +225,12 @@ describe('WorkspaceDashboardPane', () => {
     )
 
     await vi.waitFor(() => expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce())
-    await vi.waitFor(() => expect(container.textContent).toContain('status.stale-title'))
-    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1)
-    expect(container.textContent).toContain('error.try-again')
+    expect(container.textContent).not.toContain('status.stale-title')
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(0)
     expect(container.textContent).toContain('dashboard.metric.branches')
   })
 
-  test('combines simultaneous stale reads and retries each idle query once', async () => {
+  test('keeps pull request recovery local while workspace reads are owned by outer chrome', async () => {
     const workspace = seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
       branches: [createRepoBranch('main')],
@@ -273,8 +273,8 @@ describe('WorkspaceDashboardPane', () => {
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'error.try-again' }))
     await vi.waitFor(() => {
-      expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledTimes(2)
-      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledTimes(2)
+      expect(repoClientMocks.getRepoSnapshot).toHaveBeenCalledOnce()
+      expect(repoClientMocks.getRepoWorktreeStatus).toHaveBeenCalledOnce()
       expect(repoClientMocks.getRepoPullRequests).toHaveBeenCalledTimes(2)
     })
   })

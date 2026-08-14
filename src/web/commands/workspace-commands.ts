@@ -1,7 +1,6 @@
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import {
-  dispatchCloseCurrentWorkspacePaneTabAction,
   dispatchCloseWorkspacePaneTabAction,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
   type ConfirmedTerminalWorkspacePaneTabClose,
@@ -34,7 +33,6 @@ import {
   workspacePaneCommandWorktreeHead,
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import type { WorkspacePaneTabClosePresentationEffects } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
@@ -68,10 +66,7 @@ interface WorkspacePaneTabCommandTargetOptions {
 }
 
 interface CloseWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTargetOptions {
-  runtimeView?: WorkspacePaneRuntimeTabSummary
   selectedIdentity?: string | null
-  skipTerminalCloseConfirm?: boolean
-  skipRuntimeCloseConfirm?: boolean
   presentationEffects?: WorkspacePaneTabClosePresentationEffects
 }
 
@@ -205,24 +200,11 @@ export async function runCloseWorkspacePaneTabCommand(options: CloseWorkspacePan
 export async function runCloseCurrentWorkspacePaneTabCommand(
   options: CloseCurrentWorkspacePaneTabCommandOptions,
 ): Promise<boolean> {
-  const presentationEffects = options.presentationEffects
   if (!options.workspaceId || options.target.workspacePaneRoute === null) {
-    presentationEffects?.onAbandon()
+    options.presentationEffects?.onAbandon()
     return false
   }
-  try {
-    return dispatchCloseCurrentWorkspacePaneTabAction({
-      ...options,
-      workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
-      ...workspacePaneCommandCoordinates(options.target),
-      routeTarget: workspacePaneCommandRouteTarget(options.target),
-      paneTarget: workspacePaneCommandPaneTarget(options.target),
-      worktreeHead: workspacePaneCommandWorktreeHead(options.target),
-    })
-  } catch (error) {
-    presentationEffects?.onAbandon()
-    throw error
-  }
+  return await runCloseWorkspacePaneTabCommand(options)
 }
 
 export async function runConfirmCloseTerminalWorkspacePaneTabCommand(

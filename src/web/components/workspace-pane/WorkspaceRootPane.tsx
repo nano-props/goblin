@@ -16,6 +16,7 @@ import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspac
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { useWorkspaceRootTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
+import { selectedWorkspacePaneRuntimeSessionId } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 
 interface WorkspaceRootPaneProps {
   workspace: FilesystemWorkspacePaneProjection
@@ -63,10 +64,7 @@ export const WorkspaceRootPane = defineComponent<WorkspaceRootPaneProps>({
     return () => {
       const currentModel = model.value
       const currentActivePanel = activePanel.value
-      const selectedTerminalSessionId =
-        currentModel.selection?.kind === 'materialized-tab' && currentModel.selection.materializedTab.kind === 'runtime'
-          ? currentModel.selection.materializedTab.sessionId
-          : null
+      const selectedTerminalSessionId = selectedWorkspacePaneRuntimeSessionId(currentModel, 'terminal')
 
       return (
         <section class="flex min-h-0 flex-1 flex-col bg-background">

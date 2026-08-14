@@ -146,6 +146,8 @@ export async function renderTerminalSession(
   options: {
     snapshot?: TerminalSnapshot
     projectionPhase?: 'pending' | 'ready' | 'failed'
+    projectionErrorMessage?: string
+    retryProjection?: () => void
     repoRoot?: string
     worktreePath?: string
   } = {},
@@ -268,6 +270,8 @@ export async function renderTerminalSession(
           branch="feature"
           worktreePath={worktreePath}
           projectionPhase={options.projectionPhase}
+          projectionErrorMessage={options.projectionErrorMessage}
+          retryProjection={options.retryProjection}
         />
       </TerminalSessionReadScope>
     </TerminalSessionCommandScope>,

@@ -49,6 +49,7 @@ import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { WorkspaceFilesystemNode, WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 function cleanFileNode(id: string, parentId: string | null = null): WorkspaceFilesystemNode {
   return { id, path: id, name: id.split('/').at(-1) ?? id, parentId, kind: 'file', status: 'clean' }
@@ -514,6 +515,12 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
   test('opens a workspace-root file through the shared filesystem terminal flow', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///Users/example/Workspace/sample-project')
     const repo = seedRepoWithReadModelForTest({ id: workspaceId, branches: [], currentBranchName: null })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      workspaceId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [staticEntry('files')],
+    })
     filetreeClientMocks.getWorkspaceFilesystemTree.mockResolvedValueOnce({
       nodes: [
         {

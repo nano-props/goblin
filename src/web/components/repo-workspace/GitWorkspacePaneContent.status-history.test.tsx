@@ -550,7 +550,7 @@ describe('GitWorkspacePaneContent status-history', () => {
     expect(panel?.querySelector('[aria-label="src/beta.ts"]')).not.toBeNull()
   })
 
-  test('keeps stale changes visible and combines snapshot and status retry into one notice', async () => {
+  test('keeps stale changes visible without owning the workspace-level notice', () => {
     const worktreePath = '/tmp/stale-changes-panel-worktree'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -583,35 +583,16 @@ describe('GitWorkspacePaneContent status-history', () => {
       undefined,
       { state: 'empty', stale: false, error: null, retrying: false, retry: vi.fn() },
     )
-    const onRetryStatus = vi.fn()
-    const onRetrySnapshot = vi.fn()
-
     const { container } = renderInJsdom(
       <TerminalSessionReadScope value={emptyTerminalReadContext}>
         <BranchActionSurfaceProvider value={defaultBranchActionSurface()}>
-          <GitWorkspacePaneContentHarness
-            repo={presentationRepo}
-            detail={detail}
-            workspacePaneId="workspace"
-            readFailures={[
-              {
-                message: 'snapshot failed',
-                stale: true,
-                retrying: false,
-                retry: onRetrySnapshot,
-              },
-            ]}
-            onRetryStatus={onRetryStatus}
-          />
+          <GitWorkspacePaneContentHarness repo={presentationRepo} detail={detail} workspacePaneId="workspace" />
         </BranchActionSurfaceProvider>
       </TerminalSessionReadScope>,
     )
 
-    expect(screen.getAllByText('status.stale-title')).toHaveLength(1)
+    expect(screen.queryByText('status.stale-title')).toBeNull()
     expect(container.querySelector('[aria-label="src/stale.ts"]')).not.toBeNull()
-    await flushTestUpdates(() => screen.getByRole('button', { name: 'error.try-again' }).click())
-    expect(onRetrySnapshot).toHaveBeenCalledOnce()
-    expect(onRetryStatus).toHaveBeenCalledOnce()
   })
 
   test('renders branch status for a selected branch without a worktree', async () => {
@@ -629,6 +610,9 @@ describe('GitWorkspacePaneContent status-history', () => {
       ],
       currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/no-worktree': [staticEntry('status')],
+      },
     })
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 

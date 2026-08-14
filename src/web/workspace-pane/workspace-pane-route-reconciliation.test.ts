@@ -151,6 +151,27 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
+  test('waits for a canonical terminal view to catch up to its tab entry', () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const model = createBranchWorkspacePaneTabModel({
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      branchName: 'feature/route',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'terminal',
+      tabEntries: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+      tabEntriesProjectionPhase: 'ready',
+      runtimeTabViews: [],
+      runtimeTabStateByType: {
+        terminal: { projectionPhase: 'ready', selectedSessionId: null },
+      },
+      requestedSessionIdByRuntimeType: { terminal: terminalSessionId },
+    })
+
+    expect(model.runtimeTabStateByType.terminal.projectionPhase).toBe('pending')
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId }, model)).toEqual({ kind: 'pending' })
+  })
+
   test('waits for tab entries before validating a routed static tab', () => {
     const model = createBranchWorkspacePaneTabModel({
       workspaceId: REPO_ID,

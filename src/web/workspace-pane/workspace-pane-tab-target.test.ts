@@ -13,6 +13,8 @@ import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspa
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   gitWorktreePaneTargetLease,
+  resolveWorkspacePaneTabTargetForPaneTarget,
+  scopeWorkspacePaneTabTargetResolutionToRuntime,
   workspacePaneTabTargetForPaneTarget,
   workspacePaneTabTargetForWorkspace,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
@@ -53,7 +55,7 @@ describe('workspace pane tab target read model', () => {
     })
   })
 
-  test('does not create a target while the workspace pane tabs projection is not ready', () => {
+  test('keeps an unavailable read target distinct from a ready authority target', () => {
     const repo = emptyWorkspace(REPO_ID, 'repo-runtime-workspace-pane-no-tabs')
     markGitAvailable(repo)
     workspacesStore.setState((s) => ({
@@ -68,14 +70,23 @@ describe('workspace pane tab target read model', () => {
     })
     appQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
     const paneTarget = requiredGitWorkspacePaneTabsTarget(REPO_ID, 'feature/query', WORKTREE_PATH)
-    expect(
-      workspacePaneTabTargetForPaneTarget({
-        paneTarget,
-        routeTarget: paneTarget,
-        workspacePaneRoute: undefined,
-        worktreeHead: { kind: 'branch', branchName: 'feature/query' },
-      }),
-    ).toBeNull()
+    const input = {
+      paneTarget,
+      routeTarget: paneTarget,
+      workspacePaneRoute: undefined,
+      worktreeHead: { kind: 'branch' as const, branchName: 'feature/query' },
+    }
+    const resolution = resolveWorkspacePaneTabTargetForPaneTarget(input)
+    expect(resolution).toMatchObject({
+      kind: 'unavailable',
+      reason: 'workspace-pane-tabs-pending',
+      target: { tabEntriesProjectionPhase: 'pending' },
+    })
+    expect(scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, repo.workspaceRuntimeId)).toBe(resolution)
+    expect(scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, 'repo-runtime-replaced')).toEqual({
+      kind: 'missing',
+    })
+    expect(workspacePaneTabTargetForPaneTarget(input)).toBeNull()
   })
 
   test('keeps a worktree command lease current when a background status refresh fails with accepted data', async () => {

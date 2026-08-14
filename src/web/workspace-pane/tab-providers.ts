@@ -15,7 +15,10 @@ import {
   workspacePaneStaticTabEntry,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
-import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import type {
+  WorkspacePaneRuntimeProjectionPhase,
+  WorkspacePaneRuntimeUnreadyProjectionPhase,
+} from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 type T = (key: string, params?: Record<string, string | number>) => string
 
@@ -55,6 +58,11 @@ export interface WorkspacePanePendingTabMetadataInput {
   t: T
   createPending: boolean
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
+}
+
+export interface WorkspacePaneRuntimePlaceholderTabMetadataInput {
+  t: T
+  projectionPhase: WorkspacePaneRuntimeUnreadyProjectionPhase
 }
 
 export interface WorkspacePaneRuntimeTabAttention {
@@ -154,6 +162,7 @@ export abstract class WorkspacePaneRuntimeTabProvider<
   abstract tooltip(input: WorkspacePaneRuntimeTabMetadataInput<TType>): string
   abstract closeLabel(input: WorkspacePaneRuntimeTabMetadataInput<TType>): string
   abstract pendingLabel(input: WorkspacePanePendingTabMetadataInput): string
+  abstract placeholderLabel(input: WorkspacePaneRuntimePlaceholderTabMetadataInput): string
 
   attention(_input: WorkspacePaneRuntimeTabAttentionInput<TType>): WorkspacePaneRuntimeTabAttention {
     return { attention: false }
@@ -228,6 +237,12 @@ function terminalPendingLabelKey(
   return 'terminal.loading'
 }
 
+function terminalPlaceholderLabelKey(
+  input: WorkspacePaneRuntimePlaceholderTabMetadataInput,
+): 'terminal.load-tab-failed' | 'terminal.loading-tab' {
+  return input.projectionPhase === 'failed' ? 'terminal.load-tab-failed' : 'terminal.loading-tab'
+}
+
 export class TerminalWorkspacePaneTabProvider extends WorkspacePaneRuntimeTabProvider<'terminal'> {
   constructor() {
     super({ type: 'terminal', icon: Terminal })
@@ -267,6 +282,11 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneRuntimeTabPro
   pendingLabel(input: WorkspacePanePendingTabMetadataInput): string {
     const pendingLabelKey = terminalPendingLabelKey(input)
     return input.t(pendingLabelKey)
+  }
+
+  placeholderLabel(input: WorkspacePaneRuntimePlaceholderTabMetadataInput): string {
+    const placeholderLabelKey = terminalPlaceholderLabelKey(input)
+    return input.t(placeholderLabelKey)
   }
 
   override attention(input: WorkspacePaneRuntimeTabAttentionInput<'terminal'>): WorkspacePaneRuntimeTabAttention {

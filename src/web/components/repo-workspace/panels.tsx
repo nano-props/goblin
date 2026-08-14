@@ -14,10 +14,8 @@ import type {
 } from '#/web/components/repo-workspace/model.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { isWorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type {
-  WorkspacePaneRuntimeTabStateByType,
-  WorkspacePaneSelection,
-} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { selectedWorkspacePaneRuntimeSessionId } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
@@ -32,8 +30,7 @@ export interface WorkspacePanePanelRenderInput {
   detail: CurrentGitWorkspacePanePresentation
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
-  selection: WorkspacePaneSelection
-  runtimeTabStateByType: WorkspacePaneRuntimeTabStateByType
+  model: WorkspacePaneTabModel
 }
 
 type WorkspacePanePanelProps = Pick<WorkspacePanePanelRenderInput, 'repo' | 'detail' | 'workspacePaneId' | 'panelLabel'>
@@ -50,7 +47,7 @@ const REPO_WORKSPACE_STATIC_PANEL_BY_TYPE: Record<WorkspacePaneStaticTabType, Wo
 
 export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput): VNodeChild {
   if (isWorkspacePaneRuntimeTabType(input.type)) {
-    const runtimeState = input.runtimeTabStateByType[input.type]
+    const runtimeState = input.model.runtimeTabStateByType[input.type]
     const worktree = input.detail.worktree
     if (!worktree) return null
     const worktreePath = worktree.path
@@ -62,7 +59,7 @@ export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput
       type: input.type,
       workspacePaneId: input.workspacePaneId,
       panelLabel: input.panelLabel,
-      selectedSessionId: selectedRuntimeSessionId(input.selection, input.type),
+      selectedSessionId: selectedWorkspacePaneRuntimeSessionId(input.model, input.type),
       target: {
         runtimeTarget,
         presentation: terminalGitWorktreePresentation(),
@@ -82,12 +79,6 @@ export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput
       panelLabel={input.panelLabel}
     />
   )
-}
-
-function selectedRuntimeSessionId(selection: WorkspacePaneSelection, type: WorkspacePaneTabType): string | null {
-  if (selection.kind !== 'materialized-tab') return null
-  const tab = selection.materializedTab
-  return tab.kind === 'runtime' && tab.runtimeType === type ? tab.sessionId : null
 }
 
 function StatusWorkspacePanePanel({ repo, workspacePaneId, panelLabel, detail }: WorkspacePanePanelProps) {

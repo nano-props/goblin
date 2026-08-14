@@ -16,7 +16,6 @@ import { getRepoOperations, getRepoSnapshot, getRepoWorktreeBootstrapPreview } f
 import { settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
 import type { CreateWorktreeExecResult } from '#/shared/git-types.ts'
-import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { getSettingsSnapshot } from '#/web/settings/client.ts'
 import { DEFAULT_LOADING_DELAY_MS, DEFAULT_MIN_LOADING_VISIBLE_MS } from '#/web/hooks/useLoadingVisibility.ts'
@@ -142,7 +141,7 @@ describe('CreateWorktreePagePane', () => {
     ).toBeUndefined()
   })
 
-  test('keeps the accepted snapshot visible when its background refresh fails', async () => {
+  test('keeps the accepted snapshot visible while outer chrome owns refresh failure', async () => {
     const snapshotQuery = appQueryClient.getQueryCache().find({
       queryKey: repoSnapshotQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID),
       exact: true,
@@ -153,19 +152,17 @@ describe('CreateWorktreePagePane', () => {
     const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
 
     await waitFor(() => expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull())
-    expect(container.textContent).toContain('status.stale-title')
-    expect(container.textContent).toContain('snapshot refresh failed')
+    expect(container.textContent).not.toContain('status.stale-title')
+    expect(container.textContent).not.toContain('snapshot refresh failed')
   })
 
-  test('keeps the create form with a neutral retry when a snapshot read crosses a membership change', async () => {
+  test('keeps the create form while outer chrome owns a membership-change failure', async () => {
     const snapshotQueryKey = repoSnapshotQueryKey(REPO_ID, WORKSPACE_RUNTIME_ID)
     const snapshotQuery = appQueryClient.getQueryCache().find({
       queryKey: snapshotQueryKey,
       exact: true,
     })
-    const acceptedSnapshot = appQueryClient.getQueryData<RepoSnapshotResponse>(snapshotQueryKey)
-    if (!snapshotQuery || !acceptedSnapshot) throw new Error('missing snapshot query data')
-    mockedGetRepoSnapshot.mockRejectedValue(new Error('error.repo-membership-changing'))
+    if (!snapshotQuery) throw new Error('missing snapshot query data')
     snapshotQuery.setState({
       ...snapshotQuery.state,
       status: 'error',
@@ -175,20 +172,10 @@ describe('CreateWorktreePagePane', () => {
     const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
 
     await waitFor(() => expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull())
-    await waitFor(() => expect(container.textContent).toContain('error.repo-membership-changing'))
+    expect(container.textContent).not.toContain('error.repo-membership-changing')
     expect(container.textContent).not.toContain('status.stale-title')
-    const retry = [...container.querySelectorAll('button')].find(
-      (candidate) => candidate.textContent === 'error.try-again',
-    )
-    if (!retry) throw new Error('missing membership retry')
-
-    mockedGetRepoSnapshot.mockResolvedValue(acceptedSnapshot)
-    await flushTestUpdates(async () => retry.click())
-
-    await waitFor(() => expect(mockedGetRepoSnapshot).toHaveBeenCalled())
-    await waitFor(() => expect(container.textContent).not.toContain('error.repo-membership-changing'))
+    expect(container.textContent).not.toContain('error.try-again')
     expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull()
-    expect(container.textContent).not.toContain('status.stale-title')
   })
 
   test('keeps stable page chrome while branch data is loading', () => {

@@ -10,6 +10,7 @@ import {
   WORKSPACE_RUNTIME_ID,
   appRealtimeSocket,
   buildRuntime,
+  captureTestWorkspacePaneTargets,
   createLocalWorktreeTerminal,
   mockPtys,
   requestWorkspacePaneRuntime,
@@ -474,7 +475,11 @@ describe('server terminal runtime sessions', () => {
         sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
       ).toBe(true)
     })
-    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
+    const messages = sentSocketMessages(socket)
+    expect(messages.filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
+    expect(messages.findIndex((message) => message.type === 'sessions-changed')).toBeLessThan(
+      messages.findIndex((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+    )
     await expect(
       requestWorkspacePaneTabs(
         host,
@@ -484,6 +489,59 @@ describe('server terminal runtime sessions', () => {
         'req_list_after_exit',
       ),
     ).resolves.toMatchObject({ entries: [] })
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
+  test('invalidates workspace tabs once when eager reconciliation after a PTY exit fails', async () => {
+    let failReconciliation = false
+    const captureTargets: WorkspacePaneTargetProjectionProvider['captureTargets'] = async (...args) => {
+      if (failReconciliation) throw new Error('target projection unavailable')
+      return await captureTestWorkspacePaneTargets(...args)
+    }
+    const { host, shutdown } = await buildRuntime({ captureTargets })
+    const socket = appRealtimeSocket()
+    host.registerSocket('client_a', USER_1, socket)
+    const opened = await requestWorkspacePaneRuntime(
+      host,
+      socket,
+      {
+        runtimeType: 'terminal',
+        request: {
+          target: workspacePaneWorktreeTarget(WORKSPACE_RUNTIME_ID),
+          kind: 'additional',
+        },
+      },
+      'req_open_terminal_before_failed_reconciliation',
+    )
+    expect(opened.ok).toBe(true)
+    if (!opened.ok) return
+    await expect(
+      host.attach('client_a', USER_1, {
+        terminalRuntimeSessionId: opened.runtime.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: 0,
+        cols: 80,
+        rows: 24,
+      }),
+    ).resolves.toMatchObject({ ok: true, frame: 'stream' })
+    socket.send.mockClear()
+    failReconciliation = true
+
+    mockPtys[0]?.emitExit()
+
+    await vi.waitFor(() => {
+      expect(
+        sentSocketMessages(socket).filter(
+          (message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+        ),
+      ).toHaveLength(1)
+    })
+    const messages = sentSocketMessages(socket)
+    expect(messages.filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
+    expect(messages.findIndex((message) => message.type === 'sessions-changed')).toBeLessThan(
+      messages.findIndex((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+    )
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()

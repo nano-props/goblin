@@ -1,3 +1,5 @@
+import { RefreshCw } from '@lucide/vue'
+import { useIsFetching } from '@tanstack/vue-query'
 import { computed, defineComponent, onMounted, onScopeDispose, shallowRef } from 'vue'
 import type { FunctionalComponent, PropType } from 'vue'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
@@ -8,6 +10,8 @@ import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-targe
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
+import { Tip } from '#/web/components/Tip.tsx'
+import { Button } from '#/web/components/ui/button.tsx'
 import { useTerminalSessionContext } from '#/web/terminal/components/terminal-session-context.ts'
 import {
   WorkspaceExternalAppLauncher,
@@ -20,6 +24,7 @@ import { isPendingWorkspacePaneTabItem } from '#/web/components/workspace-pane/w
 import type { WorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
+import { useWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 import type { WorkspaceExternalAppItem } from '#/web/external-apps/catalog.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type {
@@ -38,9 +43,13 @@ import {
   workspacePaneTabItems,
 } from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import type { WorkspacePaneModelTarget, WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import type {
+  WorkspacePaneModelTarget,
+  WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
+import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import type { WorkspacePaneTabsReorderMutationInput } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 
 interface WorkspacePaneTargetToolbarProps {
@@ -117,6 +126,13 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
     const t = useT()
     const compact = useIsCompactUi()
     const navigation = useAppNavigation()
+    const tabsRetry = useWorkspacePaneTabsRetryActions()
+    const tabsFetchCount = useIsFetching(
+      computed(() => ({
+        queryKey: workspacePaneTabsQueryKey(props.target.workspaceId, props.target.workspaceRuntimeId),
+        exact: true,
+      })),
+    )
     const { scrollToBottom } = useTerminalSessionContext()
     const routeTarget = computed(() => requiredWorkspacePaneModelTarget(props.model.routeTarget, 'route'))
     const persistenceTarget = computed(() => requiredWorkspacePaneModelTarget(props.model.paneTarget, 'persistence'))
@@ -157,7 +173,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       return false
     }
 
-    const createAction = useWorkspacePaneRuntimeTabCreateAction({
+    const runtimeTabCreateAction = useWorkspacePaneRuntimeTabCreateAction({
       base: () => (props.target.kind === 'git-branch' ? null : workspacePaneFilesystemTerminalBase(props.target)),
       runtimeTabStateByType: () => props.model.runtimeTabStateByType,
       workspacePaneRoute: () => props.workspacePaneRoute,
@@ -191,7 +207,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
     const visualItems = computed(() =>
       orderWorkspacePaneItemsByTabEntries(items.value, visualTabs.value, workspacePaneTabEntryForItem),
     )
-    const activeTabIdentity = computed(() => props.model.activeTab?.identity ?? activePendingTabIdentity(props.model))
+    const activeTabIdentity = computed(() => displayedSelectionIdentity(props.model))
 
     const selectItem = (item: WorkspacePaneTabItem, reselect: boolean) => {
       if (isPendingWorkspacePaneTabItem(item)) return
@@ -212,6 +228,23 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
     return () => {
       const filesystemTarget = props.target.kind === 'git-branch' ? null : props.target
       const showExternalAppLauncher = !compact.value && filesystemTarget !== null && props.externalAppItems.length > 0
+      const retryTabsLabel = t('workspace-pane-tabs.retry-loading')
+      const tabsRetrying = tabsFetchCount.value > 0
+      const retryTabsAction =
+        props.model.tabEntriesProjectionPhase === 'failed' ? (
+          <Tip label={retryTabsLabel}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={retryTabsLabel}
+              aria-busy={tabsRetrying || undefined}
+              disabled={tabsRetrying}
+              onClick={() => tabsRetry.retryWorkspace(props.target.workspaceId)}
+            >
+              <RefreshCw aria-hidden="true" class={tabsRetrying ? 'animate-spin' : undefined} />
+            </Button>
+          </Tip>
+        ) : null
 
       return (
         <>
@@ -228,18 +261,23 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
             items={visualItems.value}
             workspacePaneId={props.workspacePaneId}
             activeTabIdentity={activeTabIdentity.value}
-            createAction={props.target.capabilities.terminal.available ? createAction.value : null}
+            createAction={props.target.capabilities.terminal.available ? runtimeTabCreateAction.value : null}
             trafficLightOffset={props.trafficLightOffset ?? false}
             onBackToNavigator={props.onBackToNavigator}
             trailingActions={
-              showExternalAppLauncher ? (
-                <WorkspaceExternalAppLauncher target={filesystemTarget} items={props.externalAppItems} />
+              retryTabsAction || showExternalAppLauncher ? (
+                <>
+                  {retryTabsAction}
+                  {showExternalAppLauncher ? (
+                    <WorkspaceExternalAppLauncher target={filesystemTarget} items={props.externalAppItems} />
+                  ) : null}
+                </>
               ) : null
             }
             onSelect={(item) => selectItem(item, false)}
             onReselect={(item) => selectItem(item, true)}
             onClose={(item, presentationEffects) => {
-              if (isPendingWorkspacePaneTabItem(item)) {
+              if (isPendingWorkspacePaneTabItem(item) || item.kind === 'runtime-placeholder') {
                 presentationEffects?.onAbandon()
                 return
               }
@@ -247,7 +285,6 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
                 workspaceId: props.target.workspaceId,
                 target: commandTarget.value,
                 targetIdentity: item.identity,
-                runtimeView: item.kind === 'runtime' ? item.view : undefined,
                 selectedIdentity: props.model.selectedIdentity,
                 navigation,
                 ...(presentationEffects ? { presentationEffects } : {}),
@@ -365,8 +402,15 @@ function workspacePaneCommandTargetForSurface(
   }
 }
 
-function activePendingTabIdentity(model: WorkspacePaneTabModel): string | null {
+function displayedSelectionIdentity(model: WorkspacePaneTabModel): string | null {
   const selection = model.selection
-  if (selection?.kind !== 'runtime-host') return null
-  return model.tabs.find((tab) => tab.kind === 'pending' && tab.runtimeType === selection.runtimeType)?.identity ?? null
+  if (selection?.kind === 'runtime-host') {
+    const pendingIdentity = model.tabs.find(
+      (tab) => tab.kind === 'pending' && tab.runtimeType === selection.runtimeType,
+    )?.identity
+    if (pendingIdentity) return pendingIdentity
+  }
+  return model.selectedIdentity && model.tabs.some((tab) => tab.identity === model.selectedIdentity)
+    ? model.selectedIdentity
+    : null
 }

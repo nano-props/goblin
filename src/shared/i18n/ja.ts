@@ -282,6 +282,7 @@ export const ja: Record<DictKey, string> = {
   'tab.refreshing-log': 'コミット履歴を取得中',
   'workspace-pane-tabs.tabs': 'ワークスペースタブ',
   'workspace-pane-tabs.empty': '開いているワークスペースタブはありません',
+  'workspace-pane-tabs.retry-loading': 'タブの読み込みを再試行',
   'workspace-pane-tabs.close-named': '{name} を閉じる',
   'workspace-pane-tabs.changes-tooltip': '{count} 件のファイル変更',
   'workspace-pane-tabs.status-tooltip': 'ステータス · {branch}',
@@ -399,10 +400,14 @@ export const ja: Record<DictKey, string> = {
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': 'ターミナルを開いています…',
   'terminal.loading': 'ターミナルを読み込み中…',
+  'terminal.retry-loading': 'ターミナルの読み込みを再試行',
   'terminal.load-failed': 'ターミナルを読み込めませんでした',
+  'terminal.loading-tab': 'ターミナルを読み込み中…',
+  'terminal.load-tab-failed': 'ターミナルを読み込めませんでした',
   'terminal.restarting': 'ターミナルを再起動しています…',
   'terminal.restoring': 'ターミナルを復元しています…',
   'terminal.restore-failed': 'ターミナルを復元できませんでした',
+  'terminal.retry-restoring': 'ターミナルの復元を再試行',
   'terminal.restart': 'ターミナルを再起動',
   'terminal.search-placeholder': 'ターミナルを検索',
   'terminal.search-no-results': '結果なし',
@@ -614,6 +619,9 @@ export const ja: Record<DictKey, string> = {
   'error.workspace-runtime-stale': 'ワークスペースランタイムが無効です',
   'error.workspace-tabs-committed-projection-failed':
     'タブの変更は保存されましたが、現在の表示を更新できませんでした。ワークスペースを開き直してください。',
+  'error.workspace-tabs-reorder-unavailable': 'タブを並べ替える前に、タブの読み込みを再試行してください。',
+  'error.workspace-tabs-action-blocked-loading': 'ワークスペースのタブの読み込みが完了してから、もう一度お試しください。',
+  'error.workspace-tabs-action-blocked-load-failed': 'ワークスペースのタブの読み込みを再試行してから、もう一度お試しください。',
   'error.workspace-tabs-outcome-uncertain':
     'タブの変更が保存されたか確認できませんでした。ワークスペースを開き直して現在の状態を確認してください。',
   'error.operation-outcome-uncertain':
@@ -652,6 +660,10 @@ export const ja: Record<DictKey, string> = {
   'error.ghostty-not-installed': 'Ghostty がインストールされていません',
   'error.terminal-not-installed': 'ターミナルがインストールされていません',
   'error.terminal-create-failed': 'ターミナルを作成できませんでした',
+  'error.terminal-create-blocked-loading': 'ワークスペースのタブとターミナルの読み込みが完了してから、もう一度お試しください。',
+  'error.terminal-create-blocked-load-failed': '失敗したタブまたはターミナルの読み込みを再試行してから、もう一度お試しください。',
+  'error.workspace-tabs-close-blocked-loading': 'ターミナルの読み込みが完了してから閉じてください。',
+  'error.workspace-tabs-close-blocked-load-failed': 'ターミナルの読み込みを再試行してから閉じてください。',
   'error.terminal-session-limit-reached':
     'ターミナルのグローバル上限（1,024 個）に達しました。ターミナルを閉じてから再試行してください。',
   'error.terminal-connection-timeout': 'ターミナルサービスへの接続がタイムアウトしました。もう一度お試しください。',

@@ -8,6 +8,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { defineComponent } from 'vue'
 import { flushMicrotasks, waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -37,6 +38,8 @@ import {
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
+import { useWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 
 const projectionMocks = vi.hoisted(() => ({
   reconcileServerSessionsSnapshot: vi.fn(() => true),
@@ -304,6 +307,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
   test('recovers a catalog gap that an origin partial effect cannot cover', async () => {
     const repo = seedCurrentRepo()
+    const recoveredCatalog = Promise.withResolvers<TerminalSessionsSnapshot>()
     projectionMocks.terminalSessionsCatalogCoverageRevision.mockReturnValue(2)
     recoverSessionsMock.mockResolvedValueOnce({ revision: 2, sessions: [] })
     const result = renderRuntimeProvider(REPO_ID)
@@ -312,17 +316,22 @@ describe('AppRuntimeProjectionProvider', () => {
         expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
       )
       recoverSessionsMock.mockClear()
-      recoverSessionsMock.mockResolvedValueOnce({ revision: 3, sessions: [] })
+      recoverSessionsMock.mockReturnValueOnce(recoveredCatalog.promise)
 
       await flushTestUpdates(async () => {
         sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 3 })
       })
 
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('pending')
       expect(recoverSessionsMock).toHaveBeenCalledWith({
         workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
       })
+      recoveredCatalog.resolve({ revision: 3, sessions: [] })
+      await vi.waitFor(() =>
+        expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
+      )
     } finally {
       result.unmount()
     }
@@ -539,6 +548,27 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
+  test('retries each failed runtime projection through its own recovery owner', async () => {
+    seedCurrentRepo()
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      recoverSessionsMock.mockClear()
+      listWorkspaceTabsMock.mockClear()
+
+      await flushTestUpdates(() => document.querySelector<HTMLElement>('[data-retry-workspace-tabs]')?.click())
+      await vi.waitFor(() => expect(listWorkspaceTabsMock).toHaveBeenCalledOnce())
+      expect(recoverSessionsMock).not.toHaveBeenCalled()
+
+      listWorkspaceTabsMock.mockClear()
+      await flushTestUpdates(() => document.querySelector<HTMLElement>('[data-retry-terminal-projection]')?.click())
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      expect(listWorkspaceTabsMock).not.toHaveBeenCalled()
+    } finally {
+      result.unmount()
+    }
+  })
+
   test('does not publish a pending recovery after provider unmount', async () => {
     const repo = seedCurrentRepo()
     const recovery = Promise.withResolvers<TerminalSessionsSnapshot>()
@@ -599,9 +629,31 @@ function RuntimeProbe({ currentWorkspaceId }: { currentWorkspaceId: WorkspaceId 
   return (
     <AppRuntimeProjectionProvider currentWorkspaceId={currentWorkspaceId}>
       <span>probe</span>
+      <RuntimeProjectionRecoveryProbe workspaceId={currentWorkspaceId} />
     </AppRuntimeProjectionProvider>
   )
 }
+
+const RuntimeProjectionRecoveryProbe = defineComponent<{ workspaceId: WorkspaceId | null }>({
+  name: 'RuntimeProjectionRecoveryProbe',
+  props: ['workspaceId'],
+  setup(props) {
+    const terminalRecovery = useTerminalProjectionRecoveryActions()
+    const workspaceTabsRetry = useWorkspacePaneTabsRetryActions()
+    return () => (
+      <>
+        <button
+          data-retry-terminal-projection=""
+          onClick={() => props.workspaceId && terminalRecovery.retryWorkspace(props.workspaceId)}
+        />
+        <button
+          data-retry-workspace-tabs=""
+          onClick={() => props.workspaceId && workspaceTabsRetry.retryWorkspace(props.workspaceId)}
+        />
+      </>
+    )
+  },
+})
 
 function seedCurrentRepo() {
   return seedRepoWithReadModelForTest({

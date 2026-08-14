@@ -27,6 +27,7 @@ import { captureUnownedAppNavigationGeneration, type AppNavigationGeneration } f
 import { terminalLog } from '#/web/logger.ts'
 import { translate } from '#/web/stores/i18n-vue.ts'
 import { toast } from 'vue-sonner'
+import type { WorkspacePaneRuntimeUnreadyProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 export interface WorkspacePaneTabClosePresentationEffects {
   onCommit(): void
@@ -59,6 +60,7 @@ type WorkspacePaneTabCloseFeedback =
   | { kind: 'outcome-uncertain' }
   | { kind: 'request-failed' }
   | { kind: 'presentation-failed' }
+  | { kind: 'blocked-runtime-materialization'; phase: WorkspacePaneRuntimeUnreadyProjectionPhase }
 
 const WORKSPACE_PANE_TAB_CLOSE_ERROR_KEYS = {
   invalidArguments: 'error.invalid-arguments',
@@ -141,6 +143,14 @@ export async function presentCommittedWorkspacePaneTabClose(input: {
 
 export function surfaceWorkspacePaneTabCloseFeedback(feedback: WorkspacePaneTabCloseFeedback): void {
   switch (feedback.kind) {
+    case 'blocked-runtime-materialization': {
+      const messageKey =
+        feedback.phase === 'failed'
+          ? 'error.workspace-tabs-close-blocked-load-failed'
+          : 'error.workspace-tabs-close-blocked-loading'
+      toast.error(translate(messageKey), { id: 'workspace-pane-tab-close-blocked' })
+      return
+    }
     case 'committed-projection-failed':
     case 'presentation-failed': {
       const messageKey = 'error.workspace-tabs-committed-projection-failed'
@@ -179,8 +189,9 @@ export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
   ) {
     return Promise.resolve(false)
   }
-  const target = resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute)
-  if (!target) return Promise.resolve(false)
+  const targetResolution = resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute)
+  if (targetResolution.kind !== 'ready') return Promise.resolve(false)
+  const target = targetResolution.target
   const closingIdentity = workspacePaneTabEntryIdentity({
     type: 'terminal',
     runtimeSessionId: options.terminalSessionId,

@@ -7,13 +7,16 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { createRestrictToTabStripBounds } from '#/web/components/tab-strip/drag-bounds.ts'
 import type {
   WorkspacePaneRuntimeTabItem,
+  WorkspacePaneRuntimePlaceholderTabItem,
   WorkspacePaneStaticTabItem,
   WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 
-type SortableWorkspacePaneTabItem = WorkspacePaneStaticTabItem | WorkspacePaneRuntimeTabItem
+type SortableWorkspacePaneTabItem =
+  WorkspacePaneStaticTabItem | WorkspacePaneRuntimeTabItem | WorkspacePaneRuntimePlaceholderTabItem
 
 export interface WorkspacePaneTabDnd {
+  disabled: () => boolean
   modifiers: DragDropProviderProps['modifiers']
   plugins: DragDropProviderProps['plugins']
   sensors: DragDropProviderProps['sensors']
@@ -64,6 +67,7 @@ export function useWorkspacePaneTabDnd(input: {
   onReorder: (tabs: WorkspacePaneTabEntry[]) => void
 }): WorkspacePaneTabDnd {
   return {
+    disabled: input.disabled,
     modifiers: [
       createRestrictToTabStripBounds({
         viewport: input.viewport,
@@ -95,7 +99,7 @@ export function useWorkspacePaneTabDnd(input: {
 }
 
 export function isSortableWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is SortableWorkspacePaneTabItem {
-  return item.kind === 'static' || item.kind === 'runtime'
+  return item.kind === 'static' || item.kind === 'runtime' || item.kind === 'runtime-placeholder'
 }
 
 function arrayMove<T>(array: T[], from: number, to: number): T[] {

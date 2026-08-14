@@ -174,6 +174,7 @@ export const WorkspacePaneScrollableTabsBody: FunctionalComponent<WorkspacePaneS
                 {...commonProps}
                 sortableIdentity={item.sortableId}
                 sortableIndex={sortableIndex}
+                sortableDisabled={props.dnd.disabled()}
               />
             )
           })}

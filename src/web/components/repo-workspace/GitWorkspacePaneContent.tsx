@@ -1,6 +1,5 @@
 import { defineComponent } from 'vue'
 import { EmptyState } from '#/web/components/Layout.tsx'
-import { RepoReadNotice } from '#/web/components/RepoReadNotice.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { renderGitWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 import type {
@@ -8,7 +7,6 @@ import type {
   GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import type { RepoReadFailure } from '#/web/repos/read-failure.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
@@ -24,8 +22,6 @@ interface GitWorkspacePaneContentProps {
   detail: CurrentGitWorkspacePanePresentation
   workspacePaneId: string
   workspacePaneTabModel: WorkspacePaneTabModel
-  readFailures?: RepoReadFailure[]
-  onRetryStatus?: () => void
   onBackToGitWorkspaceNavigator?: () => void
 }
 
@@ -38,8 +34,6 @@ export const GitWorkspacePaneContent = defineComponent<GitWorkspacePaneContentPr
     'detail',
     'workspacePaneId',
     'workspacePaneTabModel',
-    'readFailures',
-    'onRetryStatus',
     'onBackToGitWorkspaceNavigator',
   ],
 
@@ -51,16 +45,6 @@ export const GitWorkspacePaneContent = defineComponent<GitWorkspacePaneContentPr
       const { branch } = props.detail
       const selection = props.workspacePaneTabModel.selection
       const renderedTab = selection?.tab ?? null
-      const statusFailure: RepoReadFailure | null =
-        (renderedTab === 'status' || renderedTab === 'changes') && props.detail.errors.status
-          ? {
-              message: props.detail.errors.status,
-              stale: props.detail.stale.status,
-              retrying: props.detail.loading.status,
-              retry: props.onRetryStatus,
-            }
-          : null
-      const visibleReadFailures = [...(props.readFailures ?? []), statusFailure].filter((failure) => failure !== null)
       const panelLabel = workspacePanePanelLabel({
         selection,
         tabs: props.workspacePaneTabModel.tabs,
@@ -74,7 +58,6 @@ export const GitWorkspacePaneContent = defineComponent<GitWorkspacePaneContentPr
         const missingRoutedBranch = props.repo.ui.currentBranchName !== null
         return (
           <div class="flex min-h-0 flex-1 flex-col">
-            <RepoReadNotice failures={visibleReadFailures} />
             <EmptyState
               title={t(missingRoutedBranch ? 'branches.missing' : 'branches.empty')}
               body={
@@ -92,7 +75,6 @@ export const GitWorkspacePaneContent = defineComponent<GitWorkspacePaneContentPr
       if (!selection) {
         return (
           <div class="flex min-h-0 flex-1 flex-col">
-            <RepoReadNotice failures={visibleReadFailures} />
             <EmptyState title={t('workspace-pane-tabs.empty')} />
           </div>
         )
@@ -100,7 +82,6 @@ export const GitWorkspacePaneContent = defineComponent<GitWorkspacePaneContentPr
 
       return (
         <div class="flex min-h-0 flex-1 flex-col">
-          <RepoReadNotice failures={visibleReadFailures} />
           {renderedTab
             ? renderGitWorkspacePanePanel({
                 type: renderedTab,
@@ -108,8 +89,7 @@ export const GitWorkspacePaneContent = defineComponent<GitWorkspacePaneContentPr
                 detail: props.detail,
                 workspacePaneId: props.workspacePaneId,
                 panelLabel,
-                selection,
-                runtimeTabStateByType: props.workspacePaneTabModel.runtimeTabStateByType,
+                model: props.workspacePaneTabModel,
               })
             : null}
         </div>
@@ -130,7 +110,9 @@ function workspacePanePanelLabel(input: {
   if (tab?.kind === 'runtime') {
     const provider = workspacePaneRuntimeTabProvider(tab.runtimeType)
     const runtimeTabs = input.tabs.filter(
-      (candidate) => candidate.kind === 'runtime' && candidate.runtimeType === tab.runtimeType,
+      (candidate) =>
+        (candidate.kind === 'runtime' || candidate.kind === 'runtime-placeholder') &&
+        candidate.runtimeType === tab.runtimeType,
     )
     const index = runtimeTabs.findIndex((candidate) => candidate.identity === tab.identity)
     return {

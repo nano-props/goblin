@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Plus, X } from '@lucide/vue'
+import { Check, ChevronDown, LoaderCircle, Plus, X } from '@lucide/vue'
 import { PopoverTrigger } from 'reka-ui'
 import { defineComponent, ref } from 'vue'
 import type { ButtonHTMLAttributes, FunctionalComponent, HTMLAttributes } from 'vue'
@@ -13,6 +13,7 @@ import type { FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
 import {
   isPendingWorkspacePaneTabItem,
+  isRuntimePlaceholderWorkspacePaneTabItem,
   isRuntimeWorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import type {
@@ -143,23 +144,7 @@ export const WorkspacePaneTabSwitcherPopover = defineComponent<WorkspacePaneTabS
           </ScrollArea>
           {props.createAction ? (
             <div class="border-t border-separator p-1">
-              <button
-                type="button"
-                class={cn(
-                  'flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100',
-                  props.createAction.busy
-                    ? 'cursor-not-allowed opacity-70'
-                    : 'cursor-pointer hover:bg-accent hover:text-accent-foreground',
-                )}
-                onClick={selectNew}
-                disabled={props.createAction.busy}
-                aria-busy={props.createAction.busy ? 'true' : undefined}
-              >
-                <span class="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
-                  <Plus size={14} />
-                </span>
-                <span class="min-w-0 flex-1 truncate">{props.createAction.label}</span>
-              </button>
+              <WorkspacePaneNewMenuButton action={props.createAction} onCreate={selectNew} />
             </div>
           ) : null}
         </PopoverContent>
@@ -195,6 +180,31 @@ export const WorkspacePaneNewButton: FunctionalComponent<WorkspacePaneNewButtonP
 )
 
 WorkspacePaneNewButton.props = ['id', 'action', 'buttonRef']
+
+const WorkspacePaneNewMenuButton: FunctionalComponent<{
+  action: WorkspacePaneTabCreateAction
+  onCreate: () => void
+}> = (props) => (
+  <button
+    type="button"
+    class={cn(
+      'flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100',
+      props.action.busy
+        ? 'cursor-not-allowed opacity-70'
+        : 'cursor-pointer hover:bg-accent hover:text-accent-foreground',
+    )}
+    onClick={props.onCreate}
+    disabled={props.action.busy}
+    aria-busy={props.action.busy ? 'true' : undefined}
+  >
+    <span class="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
+      <Plus size={14} />
+    </span>
+    <span class="min-w-0 flex-1 truncate">{props.action.label}</span>
+  </button>
+)
+
+WorkspacePaneNewMenuButton.props = ['action', 'onCreate']
 
 export interface WorkspacePaneTabProps {
   item: WorkspacePaneTabItem
@@ -298,6 +308,7 @@ const WorkspacePaneTabChrome: FunctionalComponent<WorkspacePaneTabChromeProps> =
         'aria-selected': props.isSelected,
         'aria-label': ariaLabel,
         'aria-controls': props.item.panelId,
+        'aria-busy': isRuntimePlaceholderWorkspacePaneTabItem(props.item) && props.item.busy ? true : undefined,
         'aria-keyshortcuts': close?.kind === 'action' ? 'Delete' : undefined,
         ...collectionAria,
         tabIndex: props.isFocusable ? 0 : -1,
@@ -371,6 +382,7 @@ WorkspacePaneTab.props = [
 interface SortableWorkspacePaneTabProps extends WorkspacePaneTabProps {
   sortableIdentity: string
   sortableIndex: number
+  sortableDisabled: boolean
 }
 
 export const SortableWorkspacePaneTab = defineComponent<SortableWorkspacePaneTabProps>({
@@ -378,6 +390,7 @@ export const SortableWorkspacePaneTab = defineComponent<SortableWorkspacePaneTab
   props: [
     'sortableIdentity',
     'sortableIndex',
+    'sortableDisabled',
     'item',
     'isActive',
     'isSelected',
@@ -401,7 +414,7 @@ export const SortableWorkspacePaneTab = defineComponent<SortableWorkspacePaneTab
       () => props.sortableIdentity,
       () => props.sortableIndex,
       {
-        disabled: () => props.interactionDisabled,
+        disabled: () => props.interactionDisabled || props.sortableDisabled,
         onButtonRef: (node) => props.focusRegistry.setRef(props.item.identity)(node),
       },
     )
@@ -443,6 +456,9 @@ interface WorkspacePaneTabIconProps {
 
 const WorkspacePaneTabIcon: FunctionalComponent<WorkspacePaneTabIconProps> = (props) => {
   const iconClass = toolbarTabIconClassName(props.active, props.compact ?? false)
+  if (isRuntimePlaceholderWorkspacePaneTabItem(props.item) && props.item.busy) {
+    return <LoaderCircle size={13} class={cn(iconClass, 'animate-spin')} />
+  }
   const Icon = props.item.icon
   return <Icon size={13} class={iconClass} />
 }

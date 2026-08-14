@@ -34,6 +34,7 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
+  failWorkspacePaneTabsQueryForTest,
   runtimeWorkspacePaneTargetForTest,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/test-utils/workspace-pane-tabs.ts'
@@ -108,6 +109,35 @@ afterEach(() => {
 })
 
 describe('workspace pane tab close action', () => {
+  test('surfaces failed canonical tabs instead of silently closing stale data', async () => {
+    const updateWorkspaceTabs = vi.fn()
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
+    const repo = seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      currentBranchName: BRANCH_NAME,
+      workspacePaneTabsByBranch: { [BRANCH_NAME]: [workspacePaneStaticTabEntry('files')] },
+    })
+    await failWorkspacePaneTabsQueryForTest(REPO_ID, repo.workspaceRuntimeId)
+
+    await expect(
+      dispatchCloseWorkspacePaneTabAction({
+        routeTarget: WORKTREE_PANE_TARGET,
+        paneTarget: WORKTREE_PANE_TARGET,
+        worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+        workspaceId: REPO_ID,
+        workspacePaneRoute: { kind: 'static', tab: 'files' },
+        navigation: navigationWith(),
+      }),
+    ).resolves.toBe(false)
+
+    expect(feedbackMocks.error).toHaveBeenCalledWith('error.workspace-tabs-action-blocked-load-failed', {
+      id: 'workspace-pane-tabs-action-blocked',
+    })
+    expect(updateWorkspaceTabs).not.toHaveBeenCalled()
+  })
+
   test('rejects a confirmed terminal close owned by a stale runtime', async () => {
     const terminalSessionId = 'term-stalestale1111111111'
     const repo = seedRepoWithReadModelForTest({
@@ -746,9 +776,27 @@ describe('workspace pane tab close action', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => ({
         terminalFilesystemTargetKey,
-        selectedDescriptor: null,
-        sessions: [],
-        count: 0,
+        selectedDescriptor: {
+          terminalSessionId,
+          terminalFilesystemTargetKey,
+          index: 1,
+          target: runtimeTarget,
+          presentation: { kind: 'git-worktree' as const },
+        },
+        sessions: [
+          {
+            type: 'terminal',
+            terminalSessionId,
+            terminalFilesystemTargetKey,
+            index: 1,
+            title: 'terminal 1',
+            phase: 'open',
+            selected: true,
+            hasBell: false,
+            hasRecentOutput: false,
+          },
+        ],
+        count: 1,
         bellCount: 0,
         outputActiveCount: 0,
         createPending: false,
@@ -776,7 +824,6 @@ describe('workspace pane tab close action', () => {
         workspaceId: REPO_ID,
         workspacePaneRoute: { kind: 'terminal', terminalSessionId },
         navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
-        skipRuntimeCloseConfirm: true,
       }),
     ).resolves.toBe(true)
 

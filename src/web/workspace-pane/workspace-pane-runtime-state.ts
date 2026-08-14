@@ -1,4 +1,5 @@
-export type WorkspacePaneRuntimeProjectionPhase = 'pending' | 'ready' | 'failed'
+export type WorkspacePaneRuntimeUnreadyProjectionPhase = 'pending' | 'failed'
+export type WorkspacePaneRuntimeProjectionPhase = WorkspacePaneRuntimeUnreadyProjectionPhase | 'ready'
 
 export interface WorkspacePaneRuntimeProjectionState {
   phase: WorkspacePaneRuntimeProjectionPhase

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   createWorkspacePaneTabModel,
   materializedWorkspacePaneRuntimeTabSessionId,
+  workspacePaneRuntimeMaterializationPhase,
   workspacePaneTerminalBaseForTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/workspace-pane-tab-navigation.ts'
@@ -121,10 +122,37 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
     expect(model.selectedEntry).toEqual(terminalEntry(terminalSessionId))
     expect(model.selectedIdentity).toBe(`terminal:${terminalSessionId}`)
+    expect(model.tabs).toEqual([
+      expect.objectContaining({ identity: 'workspace-pane:files', kind: 'static' }),
+      expect.objectContaining({
+        identity: `terminal:${terminalSessionId}`,
+        kind: 'runtime-placeholder',
+        projectionPhase: 'pending',
+        tabEntry: terminalEntry(terminalSessionId),
+      }),
+    ])
+    expect(workspacePaneRuntimeMaterializationPhase(model.tabs, 'terminal')).toBe('pending')
     if (!model.selectedIdentity) throw new Error('expected selected terminal identity')
     expect(nextWorkspacePaneTabEntryAfterClose(model.tabEntries, model.selectedIdentity)).toEqual(
       workspacePaneStaticTabEntry('files'),
     )
+  })
+
+  test('stops reporting a terminal as unmaterialized once its live view is projected', () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const model = createModel({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'terminal',
+      tabEntries: [staticEntry('status'), terminalEntry(terminalSessionId)],
+      runtimeTabViews: [terminalView(terminalSessionId, 1, false)],
+      terminalProjectionPhase: 'ready',
+      selectedTerminalSessionId: terminalSessionId,
+    })
+
+    expect(workspacePaneRuntimeMaterializationPhase(model.tabs, 'terminal')).toBeNull()
   })
 
   test('projects a mixed tab list across static and terminal tabs', () => {
@@ -155,6 +183,26 @@ describe('repo workspace pane tab model', () => {
       ['workspace-pane:history', 'static'],
     ])
     expect(model.activeTab?.identity).toBe('workspace-pane:status')
+  })
+
+  test('preserves a selected canonical placeholder when another terminal is already materialized', () => {
+    const selectedSessionId = 'term-111111111111111111111'
+    const materializedSessionId = 'term-222222222222222222222'
+    const model = createModel({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'terminal',
+      tabEntries: [terminalEntry(selectedSessionId), terminalEntry(materializedSessionId)],
+      runtimeTabViews: [terminalView(materializedSessionId, 2, false)],
+      terminalProjectionPhase: 'pending',
+      selectedTerminalSessionId: selectedSessionId,
+    })
+
+    expect(model.activeTab).toBeNull()
+    expect(model.selectedIdentity).toBe(`terminal:${selectedSessionId}`)
+    expect(model.selection).toMatchObject({ kind: 'runtime-host', runtimeType: 'terminal' })
   })
 
   test('uses the selected terminal from the store as the active terminal tab', () => {
@@ -466,6 +514,57 @@ describe('repo workspace pane tab model', () => {
     })
     expect(model.activeTab).toBeNull()
     expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([['workspace-pane:status', 'static']])
+  })
+
+  test.each(['pending', 'failed'] as const)(
+    'projects canonical terminal placeholders while the runtime projection is %s',
+    (projectionPhase) => {
+      const firstTerminalSessionId = 'term-111111111111111111111'
+      const secondTerminalSessionId = 'term-222222222222222222222'
+      const model = createModel({
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        branchName: 'feature/model',
+        worktreePath: WORKTREE_PATH,
+        preferredTab: 'terminal',
+        tabEntries: [
+          terminalEntry(firstTerminalSessionId),
+          staticEntry('status'),
+          terminalEntry(secondTerminalSessionId),
+        ],
+        runtimeTabViews: [],
+        terminalProjectionPhase: projectionPhase,
+        selectedTerminalSessionId: null,
+      })
+
+      expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([
+        [`terminal:${firstTerminalSessionId}`, 'runtime-placeholder'],
+        ['workspace-pane:status', 'static'],
+        [`terminal:${secondTerminalSessionId}`, 'runtime-placeholder'],
+      ])
+      expect(model.selectedIdentity).toBe(`terminal:${firstTerminalSessionId}`)
+      expect(model.activeTab).toBeNull()
+    },
+  )
+
+  test('keeps a canonical runtime tab materializing while its view catches up', () => {
+    const model = createModel({
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'status',
+      tabEntries: [staticEntry('status'), terminalEntry('term-111111111111111111111')],
+      runtimeTabViews: [],
+      terminalProjectionPhase: 'ready',
+      selectedTerminalSessionId: null,
+    })
+
+    expect(model.tabs.map((tab) => [tab.identity, tab.kind])).toEqual([
+      ['workspace-pane:status', 'static'],
+      ['terminal:term-111111111111111111111', 'runtime-placeholder'],
+    ])
+    expect(model.runtimeTabStateByType.terminal.projectionPhase).toBe('pending')
   })
 
   test('falls back to the first materialized tab when the preferred worktree static tab is not open', () => {

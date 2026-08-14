@@ -28,10 +28,6 @@ import {
   useRepoSnapshotReadModel,
   useRepoWorktreeStatusReadModel,
 } from '#/web/repos/queries.ts'
-import { repoQueryReadFailure } from '#/web/repos/read-failure.ts'
-import type { RepoReadFailure } from '#/web/repos/read-failure.ts'
-import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { useGitWorkspacePaneRouteController } from '#/web/components/repo-workspace/git-workspace-pane-route-controller.ts'
 import { useGitWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -117,17 +113,6 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
           pullRequests: pullRequestProjection?.loading ?? false,
         },
       }
-      const snapshotReadFailure = repoQueryReadFailure(
-        {
-          isError: snapshotReadModel.isError.value,
-          error: snapshotReadModel.error.value,
-          isFetching: snapshotReadModel.isFetching.value,
-          data: snapshotReadModel.data.value,
-        },
-        () => void snapshotReadModel.refetch(),
-      )
-      const snapshotReadFailures = snapshotReadFailure ? [snapshotReadFailure] : []
-
       if (props.workspacePaneRouteContext.kind === 'routed' && detail.worktree) {
         return <EmptyState title={t('workspace-route.not-found-title')} />
       }
@@ -144,7 +129,6 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
               shortcutsEnabled={props.shortcutsEnabled}
               toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
               onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
-              readFailures={snapshotReadFailures}
             />
           ) : (
             <GitWorkspacePaneSurface
@@ -154,7 +138,6 @@ export const GitWorkspacePane = defineComponent<GitWorkspacePaneProps>({
               workspacePaneId={props.workspacePaneId}
               toolbarTrafficLightOffset={props.toolbarTrafficLightOffset}
               onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
-              readFailures={snapshotReadFailures}
             />
           )}
         </section>
@@ -243,7 +226,6 @@ interface GitWorkspacePaneSurfaceProps {
   workspacePaneId: string
   toolbarTrafficLightOffset?: boolean
   onBackToGitWorkspaceNavigator?: () => void
-  readFailures: RepoReadFailure[]
 }
 
 const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
@@ -255,7 +237,6 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
     'workspacePaneId',
     'toolbarTrafficLightOffset',
     'onBackToGitWorkspaceNavigator',
-    'readFailures',
   ],
 
   setup(props) {
@@ -291,15 +272,7 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
             detail={props.detail}
             workspacePaneId={props.workspacePaneId}
             workspacePaneTabModel={workspacePaneTabModel.value}
-            readFailures={props.readFailures}
             onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
-            onRetryStatus={() => {
-              void refreshRepoWorktreeStatus(
-                { get: workspacesStore.getState },
-                props.repo.id,
-                props.repo.workspaceRuntimeId,
-              )
-            }}
           />
         </>
       )
@@ -323,7 +296,6 @@ const GitBranchActionWorkspacePane = defineComponent<GitBranchActionWorkspacePan
     'shortcutsEnabled',
     'toolbarTrafficLightOffset',
     'onBackToGitWorkspaceNavigator',
-    'readFailures',
   ],
 
   setup(props) {
@@ -350,7 +322,6 @@ const GitBranchActionWorkspacePane = defineComponent<GitBranchActionWorkspacePan
           workspacePaneId={props.workspacePaneId}
           toolbarTrafficLightOffset={props.toolbarTrafficLightOffset ?? false}
           onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
-          readFailures={props.readFailures}
         />
       </BranchActionSurfaceProvider>
     )

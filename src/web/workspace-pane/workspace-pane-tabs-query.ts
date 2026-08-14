@@ -17,6 +17,9 @@ import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tab
 
 export type WorkspacePaneTabsQueryData = WorkspacePaneTabsSnapshot
 export type WorkspacePaneTabsProjectionPhase = 'pending' | 'ready' | 'failed'
+export type WorkspacePaneTabsRecoveryRequirement =
+  | { kind: 'fresh' }
+  | { kind: 'minimum-revision'; revision: number }
 
 export interface WorkspacePaneTabsTargetProjection {
   phase: WorkspacePaneTabsProjectionPhase
@@ -34,9 +37,11 @@ export function workspacePaneTabsQueryKey(workspaceId: WorkspaceId, workspaceRun
 }
 
 export function workspacePaneTabsQueryOptions(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
+  const queryKey = workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId)
   return {
-    queryKey: workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
-    queryFn: async () => await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId),
+    queryKey,
+    queryFn: async ({ client }: { client: QueryClient }) =>
+      await fetchWorkspacePaneTabsSnapshotForQuery(workspaceId, workspaceRuntimeId, client),
     structuralSharing: (oldData: unknown, newData: unknown) =>
       acceptedWorkspacePaneTabsSnapshot(
         oldData as WorkspacePaneTabsSnapshot | undefined,
@@ -74,10 +79,7 @@ export function readWorkspacePaneTabsForTarget(
   target: WorkspacePaneTabsReadTarget & { workspaceRuntimeId: string },
   queryClient: QueryClient = appQueryClient,
 ): WorkspacePaneTabEntry[] {
-  const snapshot = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(target.workspaceId, target.workspaceRuntimeId),
-  )
-  return workspacePaneTabsForTargetFromQueryData(snapshot ?? emptyWorkspacePaneTabsSnapshot(), target)
+  return readWorkspacePaneTabsProjectionForTarget(target, queryClient).tabs
 }
 
 export function readWorkspacePaneTabsProjectionForTarget(
@@ -87,22 +89,27 @@ export function readWorkspacePaneTabsProjectionForTarget(
   const state = queryClient.getQueryState<WorkspacePaneTabsQueryData>(
     workspacePaneTabsQueryKey(target.workspaceId, target.workspaceRuntimeId),
   )
-  if (state?.status === 'error') return { phase: 'failed', tabs: [] }
-  if (state?.status !== 'success') return { phase: 'pending', tabs: [] }
-  return {
-    phase: 'ready',
-    tabs: workspacePaneTabsForTargetFromQueryData(state.data ?? emptyWorkspacePaneTabsSnapshot(), target),
-  }
+  const phase = state?.status === 'success' ? 'ready' : state?.status === 'error' ? 'failed' : 'pending'
+  return projectWorkspacePaneTabsForTarget(state?.data, phase, target)
 }
 
-export function workspacePaneTabsForTargetFromQueryData(
+export function projectWorkspacePaneTabsForTarget(
+  data: WorkspacePaneTabsSnapshot | undefined,
+  phase: WorkspacePaneTabsProjectionPhase,
+  target: WorkspacePaneTabsReadTarget,
+): WorkspacePaneTabsTargetProjection {
+  if (target.kind === 'inactive' || !data) return { phase, tabs: [] }
+  const entry = workspacePaneTabsEntryForTarget(data.entries, target)
+  if (entry) return { phase, tabs: [...entry.tabs] }
+  return { phase, tabs: defaultWorkspacePaneTabs() }
+}
+
+/** Projects a complete successful snapshot; an absent target receives the protocol defaults. */
+export function workspacePaneTabsForTargetFromSnapshot(
   data: WorkspacePaneTabsSnapshot,
   target: WorkspacePaneTabsReadTarget,
 ): WorkspacePaneTabEntry[] {
-  const resolvedTarget = target.kind === 'inactive' ? null : target
-  if (!resolvedTarget) return []
-  const entry = workspacePaneTabsEntryForTarget(data.entries, resolvedTarget)
-  return [...(entry?.tabs ?? defaultWorkspacePaneTabs())]
+  return projectWorkspacePaneTabsForTarget(data, 'ready', target).tabs
 }
 
 /**
@@ -116,17 +123,14 @@ export function writeWorkspacePaneTabsSnapshotQueryData(
   queryClient: QueryClient = appQueryClient,
 ): boolean {
   if (!snapshot) return false
-  let accepted = false
-  queryClient.setQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
-    (current) => {
-      const next = acceptedWorkspacePaneTabsSnapshot(current, snapshot)
-      accepted = next !== current
-      return next
-    },
-  )
-  if (accepted) notifyWorkspacePaneTabsPersistenceChanged()
-  return accepted
+  const queryKey = workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId)
+  const current = queryClient.getQueryData<WorkspacePaneTabsQueryData>(queryKey)
+  const next = acceptedWorkspacePaneTabsSnapshot(current, snapshot)
+  if (next === current) return false
+
+  queryClient.setQueryData<WorkspacePaneTabsQueryData>(queryKey, next)
+  notifyWorkspacePaneTabsPersistenceChanged()
+  return true
 }
 
 export function refreshWorkspacePaneTabs(
@@ -134,7 +138,7 @@ export function refreshWorkspacePaneTabs(
   workspaceRuntimeId: string,
   queryClient: QueryClient = appQueryClient,
 ): void {
-  void refreshWorkspacePaneTabsQueryData(workspaceId, workspaceRuntimeId, queryClient).catch((err) => {
+  void refreshWorkspacePaneTabsQueryData(workspaceId, workspaceRuntimeId, { queryClient }).catch((err) => {
     goblinLog.warn('workspace pane tabs refresh failed', { workspaceId, workspaceRuntimeId, err })
   })
 }
@@ -142,10 +146,57 @@ export function refreshWorkspacePaneTabs(
 export async function refreshWorkspacePaneTabsQueryData(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
-  queryClient: QueryClient = appQueryClient,
+  options: { queryClient?: QueryClient; requirement?: WorkspacePaneTabsRecoveryRequirement } = {},
 ): Promise<void> {
-  const snapshot = await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId)
-  writeWorkspacePaneTabsSnapshotQueryData(workspaceId, workspaceRuntimeId, snapshot, queryClient)
+  const queryClient: QueryClient = options.queryClient ?? appQueryClient
+  const queryOptions = workspacePaneTabsQueryOptions(workspaceId, workspaceRuntimeId)
+  const joinedExistingRequest =
+    queryClient.getQueryState<WorkspacePaneTabsQueryData>(queryOptions.queryKey)?.fetchStatus === 'fetching'
+  const joinedError = await queryClient
+    .fetchQuery({
+      ...queryOptions,
+      staleTime: 0,
+    })
+    .then(
+      () => null,
+      (error: unknown) => error,
+    )
+  if (joinedError && !joinedExistingRequest) throw joinedError
+
+  const requirement = options.requirement
+  if (!requirement) return
+  if (
+    requirement.kind === 'minimum-revision' &&
+    workspacePaneTabsQueryRevision(queryClient, queryOptions.queryKey) >= requirement.revision
+  ) {
+    return
+  }
+  if (requirement.kind === 'fresh' && !joinedExistingRequest) return
+
+  // A recovery may join a request that started before its trigger. Once that
+  // request settles, perform one post-trigger read. A revision watermark also
+  // gets one fresh read when the joined snapshot cannot satisfy it. Failure at
+  // this boundary is final; callers surface it instead of polling.
+  await queryClient.fetchQuery({
+    ...queryOptions,
+    queryFn:
+      requirement.kind === 'minimum-revision'
+        ? async ({ client }: { client: QueryClient }) => {
+            const snapshot = await fetchWorkspacePaneTabsSnapshotForQuery(workspaceId, workspaceRuntimeId, client)
+            const acceptedRevision = Math.max(
+              snapshot.revision,
+              workspacePaneTabsQueryRevision(client, queryOptions.queryKey),
+            )
+            if (acceptedRevision < requirement.revision) {
+              throw new Error(
+                `Workspace pane tabs recovery did not reach required revision ${requirement.revision}; received ${acceptedRevision}`,
+              )
+            }
+            return snapshot
+          }
+        : queryOptions.queryFn,
+    staleTime: 0,
+  })
 }
 
 export function clearWorkspacePaneTabsProjectionState(workspaceId: WorkspaceId, workspaceRuntimeId: string): void {
@@ -205,6 +256,31 @@ async function fetchWorkspacePaneTabsSnapshot(
   )
 }
 
+async function fetchWorkspacePaneTabsSnapshotForQuery(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  queryClient: QueryClient,
+): Promise<WorkspacePaneTabsSnapshot> {
+  const queryKey = workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId)
+  const dataUpdateCount = queryClient.getQueryState<WorkspacePaneTabsQueryData>(queryKey)?.dataUpdateCount ?? 0
+  try {
+    return await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId)
+  } catch (error) {
+    const current = queryClient.getQueryState<WorkspacePaneTabsQueryData>(queryKey)
+    // A full authoritative snapshot committed after this read began makes its
+    // failure stale; the cache already contains the newer projection.
+    if (current?.data !== undefined && current.dataUpdateCount !== dataUpdateCount) return current.data
+    throw error
+  }
+}
+
+function workspacePaneTabsQueryRevision(
+  queryClient: QueryClient,
+  queryKey: ReturnType<typeof workspacePaneTabsQueryKey>,
+): number {
+  return queryClient.getQueryData<WorkspacePaneTabsQueryData>(queryKey)?.revision ?? -1
+}
+
 /** The single revision acceptance rule for every server-snapshot cache entry. */
 function acceptedWorkspacePaneTabsSnapshot(
   current: WorkspacePaneTabsSnapshot | undefined,
@@ -238,10 +314,6 @@ function normalizeWorkspacePaneTabsQueryEntries(entries: readonly WorkspacePaneT
 
 function workspacePaneTargetHasExecutionRoot(target: WorkspacePaneTabsTarget): boolean {
   return target.kind !== 'git-branch'
-}
-
-function emptyWorkspacePaneTabsSnapshot(): WorkspacePaneTabsSnapshot {
-  return { revision: 0, entries: [] }
 }
 
 function workspacePaneTabsEntryForTarget(

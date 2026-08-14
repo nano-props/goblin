@@ -10,7 +10,7 @@ import {
   WorkspacePaneTabStrip,
 } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import type { WorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
-import type { WorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import type { WorkspacePaneTabCreateAction } from '#/web/components/workspace-pane/WorkspacePaneTabPresentation.tsx'
 import type { WorkspacePaneTabClosePresentationEffects } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
 import {
   WorkspaceToolbar,
@@ -27,7 +27,7 @@ interface WorkspacePaneToolbarProps {
   workspacePaneId: string
   items: WorkspacePaneTabItem[]
   activeTabIdentity: string | null
-  createAction: WorkspacePaneRuntimeTabCreateAction | null
+  createAction: WorkspacePaneTabCreateAction | null
   trafficLightOffset?: boolean
   onBackToNavigator?: () => void
   trailingActions?: VNodeChild

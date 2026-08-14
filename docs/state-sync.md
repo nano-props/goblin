@@ -48,6 +48,27 @@ and terminal sessions are representative runtime-coherent domains. Their
 client projections may use different state libraries without changing their
 authority.
 
+### Projection failure and interaction policy
+
+Projection failure is handled according to what the interaction needs:
+
+- With no accepted data, show a scoped failure state and explicit retry; never
+  fabricate an empty success.
+- With accepted data, keep it visible for reading and local navigation. The
+  highest shared surface shows one compact, persistent stale notice and one
+  scope-correct retry; descendants do not repeat it.
+- Local presentation actions continue. An authoritative action that needs a
+  current projection fails at its final action boundary with actionable
+  feedback; buttons, menus, and shortcuts do not duplicate that admission.
+- A stable intent may still reach a server boundary that independently resolves
+  and validates all required authority.
+- A committed write remains committed if later projection fails. Recovery is
+  separate and never rolls back or replays the write.
+
+Recovery may require an event-after read or a minimum revision and may perform
+one bounded follow-up read. It never polls, retries forever, combines unrelated
+authorities, or automatically replays a rejected action.
+
 ### Mutation convergence
 
 - The authoritative write boundary returns the exact committed effect and

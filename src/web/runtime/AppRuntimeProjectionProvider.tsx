@@ -7,8 +7,10 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useTerminalSessionProjection } from '#/web/terminal/components/use-terminal-session-projection.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
-import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { workspacePaneTabsProjectionRevision } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
+  refreshWorkspacePaneTabsQueryData,
+  workspacePaneTabsProjectionRevision,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { createRuntimeProjectionScopeRegistry } from '#/web/runtime/runtime-projection-scope.ts'
 import type { RuntimeProjectionScope, RuntimeProjectionScopeRegistry } from '#/web/runtime/runtime-projection-scope.ts'
 import { reconcileOpenWorkspaceRuntimeMemberships } from '#/web/stores/workspaces/workspace-runtime-membership-recovery.ts'
@@ -19,6 +21,7 @@ import { WorkspacePaneTabsRecovery } from '#/web/runtime/workspace-pane-tabs-rec
 import { WorkspaceRuntimeReconnectRecovery } from '#/web/runtime/workspace-runtime-reconnect-recovery.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { provideTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
+import { provideWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 
 export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId: WorkspaceId | null }>({
   name: 'AppRuntimeProjectionProvider',
@@ -56,9 +59,8 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
         appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { error }),
     })
     const workspaceTabsRecovery = new WorkspacePaneTabsRecovery({
-      list: async (target) => await workspacePaneTabsClient.list(target),
-      commit: (target, snapshot) =>
-        writeCanonicalWorkspacePaneTabsSnapshot(target.workspaceId, target.workspaceRuntimeId, snapshot),
+      refresh: async (target, requirement) =>
+        await refreshWorkspacePaneTabsQueryData(target.workspaceId, target.workspaceRuntimeId, { requirement }),
       currentRevision: (target) => workspacePaneTabsProjectionRevision(target.workspaceId, target.workspaceRuntimeId),
       logFailure: (target, error) => {
         appRuntimeProjectionLog.debug('failed to refresh workspace pane tabs', { ...target, error })
@@ -77,12 +79,20 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
         })
       },
     })
+    const projectionScopeForWorkspace = (workspaceId: WorkspaceId) => {
+      const workspaceRuntimeId = workspaceRuntimeIdForRoot(workspaceId)
+      return workspaceRuntimeId ? scopeRegistry.scopeFor({ workspaceId, workspaceRuntimeId }) : null
+    }
     provideTerminalProjectionRecoveryActions({
       retryWorkspace(workspaceId) {
-        const workspaceRuntimeId = workspaceRuntimeIdForRoot(workspaceId)
-        if (!workspaceRuntimeId) return
-        const scope = scopeRegistry.scopeFor({ workspaceId, workspaceRuntimeId })
-        terminalRecovery.retry(scope)
+        const scope = projectionScopeForWorkspace(workspaceId)
+        if (scope) terminalRecovery.retry(scope)
+      },
+    })
+    provideWorkspacePaneTabsRetryActions({
+      retryWorkspace(workspaceId) {
+        const scope = projectionScopeForWorkspace(workspaceId)
+        if (scope) workspaceTabsRecovery.request(scope, { kind: 'fresh' })
       },
     })
 

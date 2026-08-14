@@ -272,6 +272,7 @@ export const ko: Record<DictKey, string> = {
   'tab.refreshing-log': '커밋 기록 가져오는 중',
   'workspace-pane-tabs.tabs': '워크스페이스 탭',
   'workspace-pane-tabs.empty': '열린 워크스페이스 탭이 없습니다',
+  'workspace-pane-tabs.retry-loading': '탭 불러오기 다시 시도',
   'workspace-pane-tabs.close-named': '{name} 닫기',
   'workspace-pane-tabs.changes-tooltip': '파일 변경 {count}개',
   'workspace-pane-tabs.status-tooltip': '상태 · {branch}',
@@ -389,10 +390,14 @@ export const ko: Record<DictKey, string> = {
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': '터미널 여는 중…',
   'terminal.loading': '터미널 불러오는 중…',
+  'terminal.retry-loading': '터미널 불러오기 다시 시도',
   'terminal.load-failed': '터미널을 불러오지 못했습니다',
+  'terminal.loading-tab': '터미널 불러오는 중…',
+  'terminal.load-tab-failed': '터미널을 불러오지 못했습니다',
   'terminal.restarting': '터미널 다시 시작 중…',
   'terminal.restoring': '터미널 복원 중…',
   'terminal.restore-failed': '터미널을 복원할 수 없습니다',
+  'terminal.retry-restoring': '터미널 복원 다시 시도',
   'terminal.restart': '터미널 다시 시작',
   'terminal.search-placeholder': '터미널 검색',
   'terminal.search-no-results': '결과 없음',
@@ -601,6 +606,9 @@ export const ko: Record<DictKey, string> = {
   'error.workspace-runtime-stale': '워크스페이스 런타임이 만료되었습니다',
   'error.workspace-tabs-committed-projection-failed':
     '탭 변경 사항은 저장되었지만 현재 보기를 새로 고칠 수 없습니다. 작업 공간을 다시 여세요.',
+  'error.workspace-tabs-reorder-unavailable': '탭을 정렬하기 전에 탭 불러오기를 다시 시도하세요.',
+  'error.workspace-tabs-action-blocked-loading': '워크스페이스 탭 로딩이 완료된 후 다시 시도해 주세요.',
+  'error.workspace-tabs-action-blocked-load-failed': '워크스페이스 탭 불러오기를 다시 시도한 후 작업해 주세요.',
   'error.workspace-tabs-outcome-uncertain':
     '탭 변경 사항이 저장되었는지 확인할 수 없습니다. 작업 공간을 다시 열고 현재 상태를 확인하세요.',
   'error.operation-outcome-uncertain':
@@ -639,6 +647,10 @@ export const ko: Record<DictKey, string> = {
   'error.ghostty-not-installed': 'Ghostty가 설치되어 있지 않습니다',
   'error.terminal-not-installed': '터미널이 설치되어 있지 않습니다',
   'error.terminal-create-failed': '터미널을 만들 수 없습니다',
+  'error.terminal-create-blocked-loading': '워크스페이스 탭과 터미널 로딩이 완료된 후 다시 시도해 주세요.',
+  'error.terminal-create-blocked-load-failed': '실패한 탭 또는 터미널 불러오기를 다시 시도한 후 다시 시도해 주세요.',
+  'error.workspace-tabs-close-blocked-loading': '터미널 로딩이 완료된 후 닫아 주세요.',
+  'error.workspace-tabs-close-blocked-load-failed': '터미널 불러오기를 다시 시도한 후 닫아 주세요.',
   'error.terminal-session-limit-reached': '전역 터미널 한도 1,024개에 도달했습니다. 터미널을 닫고 다시 시도하세요.',
   'error.terminal-connection-timeout': '터미널 서비스 연결 시간이 초과되었습니다. 다시 시도하세요.',
   'error.terminal-create-timeout': '터미널 생성 시간이 초과되었습니다. 다시 시도하세요.',

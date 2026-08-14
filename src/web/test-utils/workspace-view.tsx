@@ -42,6 +42,10 @@ const restoreWorkspaceTabsMocks = vi.hoisted(() => ({
   useRestoreWorkspaceTabsOnView: vi.fn(),
   useRepoToasts: vi.fn(),
 }))
+
+vi.mock('#/web/components/workspace-layout/WorkspaceRepoReadNotice.tsx', () => ({
+  WorkspaceRepoReadNotice: () => null,
+}))
 const workspacePaneMocks = vi.hoisted(() => ({
   scrollMemoryProbe: false,
 }))

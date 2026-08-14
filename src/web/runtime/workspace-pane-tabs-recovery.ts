@@ -1,20 +1,20 @@
-import type {
-  WorkspacePaneTabsSnapshot,
-  WorkspacePaneTabsChangedRealtimeMessage,
-} from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsChangedRealtimeMessage } from '#/shared/workspace-pane-tabs.ts'
 import type { RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
+import type { WorkspacePaneTabsRecoveryRequirement } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const WORKSPACE_TABS_REFRESH_LANE = 'workspace-tabs-refresh'
 
 export interface WorkspacePaneTabsRecoveryDependencies {
-  list: (target: RuntimeProjectionScope['target']) => Promise<WorkspacePaneTabsSnapshot>
-  commit: (target: RuntimeProjectionScope['target'], snapshot: WorkspacePaneTabsSnapshot) => void
+  refresh: (
+    target: RuntimeProjectionScope['target'],
+    requirement: WorkspacePaneTabsRecoveryRequirement,
+  ) => Promise<void>
   currentRevision: (target: RuntimeProjectionScope['target']) => number | null
   logFailure: (target: RuntimeProjectionScope['target'], error: unknown) => void
 }
 
 export interface WorkspacePaneTabsRecoveryActions {
-  request(scope: RuntimeProjectionScope): void
+  request(scope: RuntimeProjectionScope, requirement: WorkspacePaneTabsRecoveryRequirement): void
 }
 
 export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActions {
@@ -24,11 +24,11 @@ export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActio
     this.dependencies = dependencies
   }
 
-  request(scope: RuntimeProjectionScope): void {
+  request(scope: RuntimeProjectionScope, requirement: WorkspacePaneTabsRecoveryRequirement): void {
     scope.runLatest(
       WORKSPACE_TABS_REFRESH_LANE,
-      async () => await this.dependencies.list(scope.target),
-      (snapshot) => this.dependencies.commit(scope.target, snapshot),
+      async () => await this.dependencies.refresh(scope.target, requirement),
+      () => {},
       (error) => this.dependencies.logFailure(scope.target, error),
     )
   }
@@ -41,6 +41,10 @@ export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActio
     ) {
       return
     }
-    this.request(scope)
+    const requirement: WorkspacePaneTabsRecoveryRequirement =
+      message.change === 'revision' && message.workspaceRuntimeId === scope.target.workspaceRuntimeId
+        ? { kind: 'minimum-revision', revision: message.revision }
+        : { kind: 'fresh' }
+    this.request(scope, requirement)
   }
 }
