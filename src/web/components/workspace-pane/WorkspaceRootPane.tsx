@@ -10,7 +10,7 @@ import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/Work
 import type { FilesystemWorkspacePaneProjection } from '#/web/components/workspace-pane/workspace-pane-types.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import { useWorkspaceDirectoryOverview } from '#/web/workspace-directory-overview-query.ts'
+import { useWorkspaceDirectoryOverview } from '#/web/workspaces/filesystem/directory-overview-query.ts'
 import { useFilesystemWorkspacePaneRouteController } from '#/web/workspace-pane/filesystem-workspace-pane-route-controller.ts'
 import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'

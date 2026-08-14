@@ -33,7 +33,7 @@ import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { useWorkspaceDirectoryOverview } from '#/web/workspace-directory-overview-query.ts'
+import { useWorkspaceDirectoryOverview } from '#/web/workspaces/filesystem/directory-overview-query.ts'
 
 interface WorkspaceDashboardPaneProps {
   workspaceId: WorkspaceId

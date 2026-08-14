@@ -3,7 +3,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession,
   restoreFiletreeViewStateFromSession,
-} from '#/web/filetree-session-state.ts'
+} from '#/web/workspaces/filesystem/session-state.ts'
 import {
   filetreeInteractionScopeKey,
   resetFiletreeInteractionStore,

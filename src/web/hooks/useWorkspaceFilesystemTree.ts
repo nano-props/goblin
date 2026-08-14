@@ -12,16 +12,16 @@ import {
   readCurrentWorkspaceFilesystemTree,
   subscribeWorkspaceFilesystemRootReloadStart,
   workspaceFilesystemTreeChildrenQueryKey,
-} from '#/web/workspace-filesystem-query.ts'
+} from '#/web/workspaces/filesystem/query.ts'
 import {
   emptyLazyWorkspaceFilesystemTreeState,
   lazyWorkspaceFilesystemTreeReducer,
-} from '#/web/workspace-filesystem-lazy-state.ts'
+} from '#/web/workspaces/filesystem/lazy-state.ts'
 import type {
   LazyWorkspaceFilesystemTreeAction,
   LazyWorkspaceFilesystemTreeAggregate,
   LazyWorkspaceFilesystemTreeState,
-} from '#/web/workspace-filesystem-lazy-state.ts'
+} from '#/web/workspaces/filesystem/lazy-state.ts'
 import type { WorkspaceFilesystemTreeResult } from '#/shared/api-types.ts'
 import { workspacePaneFilesystemExecutionPath } from '#/shared/workspace-runtime.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'

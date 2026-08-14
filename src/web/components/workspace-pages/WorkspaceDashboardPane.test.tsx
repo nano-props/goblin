@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
-import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
+import { workspaceDirectoryOverviewQueryKey } from '#/web/workspaces/filesystem/directory-overview-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 

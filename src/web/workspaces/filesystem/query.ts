@@ -5,8 +5,8 @@ import {
   workspacePaneFilesystemExecutionPath,
   type WorkspacePaneFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
-import { getWorkspaceFilesystemTree } from '#/web/workspace-filesystem-client.ts'
-import { subscribeWorkspaceFilesystemInvalidation } from '#/web/workspace-filesystem-invalidation-ingress.ts'
+import { getWorkspaceFilesystemTree } from '#/web/workspaces/filesystem/client.ts'
+import { subscribeWorkspaceFilesystemInvalidation } from '#/web/workspaces/filesystem/invalidation-ingress.ts'
 
 const invalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
 const invalidationSyncByClient = new WeakMap<QueryClient, { references: number; stop: () => void }>()

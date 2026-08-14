@@ -6,7 +6,7 @@ import type { ClientWorkspaceState, SettingsSnapshot } from '#/shared/api-types.
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { bootstrapLog } from '#/web/logger.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { restoreFiletreeViewStateFromSession } from '#/web/filetree-session-state.ts'
+import { restoreFiletreeViewStateFromSession } from '#/web/workspaces/filesystem/session-state.ts'
 import { restoreRestorableWorkspaceStateFromClientWorkspace } from '#/web/restorable-workspace-state.ts'
 import { restoreWorkspaceAtBoot } from '#/web/settings/actions.ts'
 import { externalAppsQueryOptions, settingsSnapshotQueryOptions } from '#/web/settings/queries.ts'

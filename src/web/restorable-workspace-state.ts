@@ -13,7 +13,7 @@ import { parseWorkspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type { RestorableWorkspaceState, WorkspaceSessionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession } from '#/web/filetree-session-state.ts'
+import { persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession } from '#/web/workspaces/filesystem/session-state.ts'
 import type { FiletreeInteractionSnapshot } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import {

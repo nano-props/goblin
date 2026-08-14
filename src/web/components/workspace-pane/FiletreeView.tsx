@@ -20,7 +20,7 @@ import {
 } from '#/web/components/workspace-pane/filetree-navigation.ts'
 import { useRestoreTopVisibleRowIndex } from '#/web/hooks/useRestoreTopVisibleRowIndex.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspace-filesystem-lazy-state.ts'
+import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspaces/filesystem/lazy-state.ts'
 
 const EMPTY_KEY_SET: ReadonlySet<string> = new Set()
 

@@ -7,7 +7,7 @@ vi.mock('#/web/lib/server-config.ts', () => ({
   requireClientServerConfig: () => ({ url: 'http://example.test:32100/', accessToken: '' }),
 }))
 
-import { downloadWorkspaceFile } from '#/web/file-download.ts'
+import { downloadWorkspaceFile } from '#/web/workspaces/filesystem/download.ts'
 
 afterEach(() => vi.restoreAllMocks())
 

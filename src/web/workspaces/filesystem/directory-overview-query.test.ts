@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from 'vitest'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { getWorkspaceDirectoryOverview } from '#/web/workspace-client.ts'
-import { workspaceDirectoryOverviewQueryOptions } from '#/web/workspace-directory-overview-query.ts'
+import { workspaceDirectoryOverviewQueryOptions } from '#/web/workspaces/filesystem/directory-overview-query.ts'
 
 vi.mock('#/web/workspace-client.ts', () => ({
   getWorkspaceDirectoryOverview: vi.fn(),

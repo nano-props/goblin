@@ -24,7 +24,7 @@ import {
   setRepoSnapshotQueryData,
   setRepoWorktreeStatusQueryData,
 } from '#/web/repos/query-cache.ts'
-import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
+import { workspaceDirectoryOverviewQueryKey } from '#/web/workspaces/filesystem/directory-overview-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'

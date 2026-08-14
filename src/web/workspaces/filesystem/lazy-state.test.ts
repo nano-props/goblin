@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   emptyLazyWorkspaceFilesystemTreeState,
   lazyWorkspaceFilesystemTreeReducer,
-} from '#/web/workspace-filesystem-lazy-state.ts'
+} from '#/web/workspaces/filesystem/lazy-state.ts'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 
 function node(

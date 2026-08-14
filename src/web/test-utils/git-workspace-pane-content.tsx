@@ -72,7 +72,7 @@ vi.mock('#/web/repos/client.ts', () => ({
   getRepoLog: hoistedRepoClientMocks.getRepoLog,
   openRepoUrl: hoistedRepoClientMocks.openRepoUrl,
 }))
-vi.mock('#/web/workspace-filesystem-client.ts', () => ({
+vi.mock('#/web/workspaces/filesystem/client.ts', () => ({
   getWorkspaceFilesystemTree: hoistedFiletreeClientMocks.getWorkspaceFilesystemTree,
   getWorkspaceFileViewer: hoistedFiletreeClientMocks.getWorkspaceFileViewer,
 }))
