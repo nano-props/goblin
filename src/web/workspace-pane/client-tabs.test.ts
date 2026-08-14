@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
 import type { ClientAppRealtime } from '#/web/app-realtime-client.ts'
-import { createServerWorkspacePaneTabsClient } from '#/web/client-workspace-pane-tabs.ts'
+import { createServerWorkspacePaneTabsClient } from '#/web/workspace-pane/client-tabs.ts'
 import { formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const WORKSPACE_ID = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo' }, 'posix')!

@@ -30,7 +30,7 @@ import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import {
   commitBranchWorkspacePaneRoute,
   commitFilesystemWorkspacePaneRoute,
-} from '#/web/workspace-pane-route-commit.ts'
+} from '#/web/workspace-pane/route-commit.ts'
 import { branchSlugFromName, workspaceSlugFromId, worktreeSlugFromPath } from '#/web/workspace-route-slugs.ts'
 
 export interface AppRouteNavigationOptions<

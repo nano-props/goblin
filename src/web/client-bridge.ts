@@ -8,8 +8,8 @@ import { readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
 import { createClientAppRealtime, type AppRealtimeServerConfig } from '#/web/app-realtime-client.ts'
 import { createServerTerminalClient } from '#/web/client-terminal.ts'
-import { createServerWorkspacePaneTabsClient } from '#/web/client-workspace-pane-tabs.ts'
-import { createServerWorkspacePaneRuntimeClient } from '#/web/client-workspace-pane-runtime.ts'
+import { createServerWorkspacePaneTabsClient } from '#/web/workspace-pane/client-tabs.ts'
+import { createServerWorkspacePaneRuntimeClient } from '#/web/workspace-pane/client-runtime.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
 import type {
   ClientAppRealtimeLifecycle,
