@@ -31,7 +31,7 @@ describe('settings persistence', () => {
       })
     vi.doMock('write-file-atomic', () => ({ default: writeFileAtomic }))
 
-    const persistence = await import('#/server/modules/settings-persistence.ts')
+    const persistence = await import('#/server/settings/persistence.ts')
 
     await expect(persistence.writeUserSettingsJson({ value: 'first' })).rejects.toThrow('disk full')
     await expect(persistence.writeUserSettingsJson({ value: 'second' })).resolves.toBeUndefined()
@@ -45,7 +45,7 @@ describe('settings persistence', () => {
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
     const file = path.join(tmp, 'user-settings.json')
     writeFileSync(file, '{bad json', 'utf-8')
-    const persistence = await import('#/server/modules/settings-persistence.ts')
+    const persistence = await import('#/server/settings/persistence.ts')
 
     await expect(persistence.readUserSettingsJson()).rejects.toBeInstanceOf(SyntaxError)
     await expect(persistence.readUserSettingsJson()).rejects.toBeInstanceOf(SyntaxError)
@@ -56,7 +56,7 @@ describe('settings persistence', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-settings-persistence-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const persistence = await import('#/server/modules/settings-persistence.ts')
+    const persistence = await import('#/server/settings/persistence.ts')
 
     await expect(persistence.readUserSettingsJson()).resolves.toEqual({ kind: 'missing' })
     writeFileSync(path.join(tmp, 'user-settings.json'), 'null', 'utf-8')

@@ -21,7 +21,7 @@ const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
   commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
 }
 
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
   compareAndReplaceServerWorkspaceEntries: vi.fn(),
   confirmServerWorkspaceEntry: vi.fn(async (entry) => ({

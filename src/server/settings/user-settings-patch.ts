@@ -7,7 +7,7 @@ import {
   isLangPref,
   isThemePref,
   type UserSettingsData,
-} from '#/server/modules/user-settings-codec.ts'
+} from '#/server/settings/user-settings-codec.ts'
 
 export type UserSettingsPatch = Partial<UserSettings>
 

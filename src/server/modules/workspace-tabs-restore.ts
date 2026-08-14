@@ -10,7 +10,7 @@ import {
   type WorkspaceRuntimeMembershipCapability,
 } from '#/server/modules/workspace-runtimes.ts'
 import { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
-import { confirmServerWorkspaceEntry, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
+import { confirmServerWorkspaceEntry, getServerWorkspaceState } from '#/server/settings/source.ts'
 import { restoreWorkspacePaneTabsForMemberships, workspaceEntry } from '#/server/modules/workspace-pane-tabs-restore.ts'
 import { abortableWorkspaceRestore } from '#/server/modules/workspace-restore-utils.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'

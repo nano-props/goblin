@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   getServerWorkspaceSettings: vi.fn(),
 }))
 
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
   getServerRecentWorkspaces: mocks.getServerRecentWorkspaces,
   getServerWorkspaceSettings: mocks.getServerWorkspaceSettings,
@@ -37,7 +37,7 @@ describe('server settings snapshot runtime state', () => {
     const state = createNativeShortcutRegistrationState()
     state.globalShortcutRegistered = true
 
-    const snapshotMod = await import('#/server/modules/settings-snapshot.ts')
+    const snapshotMod = await import('#/server/settings/snapshot.ts')
     await expect(snapshotMod.getSettingsSnapshot(state)).resolves.toMatchObject({
       globalShortcut: 'Alt+G',
       globalShortcutRegistered: true,

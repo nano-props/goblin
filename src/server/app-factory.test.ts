@@ -104,7 +104,7 @@ vi.mock('node:fs', async () => {
   }
 })
 
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
 }))
 

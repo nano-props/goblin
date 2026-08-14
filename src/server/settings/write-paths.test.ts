@@ -16,7 +16,7 @@ vi.mock('#/server/modules/invalidation-broker.ts', () => ({
   publishSettingsInvalidation: mocks.publishSettingsInvalidation,
 }))
 
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   addServerRecentWorkspace: mocks.addServerRecentWorkspace,
   clearServerRecentWorkspaces: mocks.clearServerRecentWorkspaces,
   setServerFetchIntervalSec: mocks.setServerFetchIntervalSec,
@@ -51,7 +51,7 @@ describe('settings command handlers', () => {
     const i18nSnapshot = resolveI18nSnapshot('ja', 'ja-JP,ja;q=0.9,en;q=0.8')
     mocks.updateUserSettings.mockResolvedValue(updatedSettings)
     mocks.settingsInvalidationScopesForPrefsPatch.mockReturnValue(['i18n'])
-    const { handleUpdateUserSettings } = await import('#/server/modules/settings-write-paths.ts')
+    const { handleUpdateUserSettings } = await import('#/server/settings/write-paths.ts')
 
     await expect(
       handleUpdateUserSettings(
@@ -69,7 +69,7 @@ describe('settings command handlers', () => {
   test('adds recent repos and publishes settings snapshot invalidation', async () => {
     const repo = { id: workspaceIdForTest('goblin+file:///tmp/repo-a') }
     mocks.addServerRecentWorkspace.mockResolvedValue([repo])
-    const { handleAddRecentWorkspace } = await import('#/server/modules/settings-write-paths.ts')
+    const { handleAddRecentWorkspace } = await import('#/server/settings/write-paths.ts')
 
     await expect(handleAddRecentWorkspace({ workspace: repo })).resolves.toEqual({
       ok: true,

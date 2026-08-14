@@ -21,7 +21,7 @@ function prepareSettingsDataDir(): string {
 
 afterEach(async () => {
   try {
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     mod.resetServerSettingsSourceForTests()
   } finally {
     try {
@@ -39,7 +39,7 @@ afterEach(async () => {
 describe('settings source external app recents', () => {
   test('records the most recent workspace external app per canonical filesystem target', async () => {
     prepareSettingsDataDir()
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
 
     await mod.setServerWorkspaceExternalAppRecent({
       workspaceId: REPO_A,
@@ -72,7 +72,7 @@ describe('settings source external app recents', () => {
 
     mod.resetServerSettingsSourceForTests()
     vi.resetModules()
-    const reloaded = await import('#/server/modules/settings-source.ts')
+    const reloaded = await import('#/server/settings/source.ts')
     expect(await reloaded.getServerWorkspaceSettings()).toEqual([
       {
         workspaceId: REPO_A,
@@ -89,7 +89,7 @@ describe('settings source external app recents', () => {
 
   test('overwrites an existing recent on the same worktree key', async () => {
     prepareSettingsDataDir()
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
 
     await mod.setServerWorkspaceExternalAppRecent({
       workspaceId: REPO_A,
@@ -118,7 +118,7 @@ describe('settings source external app recents', () => {
       await writeFile(file, payload, 'utf-8')
     })
     vi.doMock('write-file-atomic', () => ({ default: writeFileAtomic }))
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const input = {
       workspaceId: REPO_A,
       targetKey: externalAppTargetKey('/repo-a/worktree-x'),
@@ -135,7 +135,7 @@ describe('settings source external app recents', () => {
 
   test('rejects invalid target and item inputs without touching disk', async () => {
     const dataDir = prepareSettingsDataDir()
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
 
     await expect(
       mod.setServerWorkspaceExternalAppRecent({
@@ -165,7 +165,7 @@ describe('settings source external app recents', () => {
 
   test('replaces settings containing malformed workspace entries with defaults', async () => {
     const dataDir = prepareSettingsDataDir()
-    const initial = await import('#/server/modules/settings-source.ts')
+    const initial = await import('#/server/settings/source.ts')
     await initial.getUserSettings()
     initial.resetServerSettingsSourceForTests()
     vi.resetModules()
@@ -193,7 +193,7 @@ describe('settings source external app recents', () => {
       'utf-8',
     )
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
 
     await expect(mod.getServerWorkspaceSettings()).resolves.toEqual([])
     expect(JSON.parse(await readFile(settingsFile, 'utf-8'))).toMatchObject({
@@ -206,7 +206,7 @@ describe('settings source external app recents', () => {
 
   test('rejects unknown item ids without overwriting valid entries', async () => {
     prepareSettingsDataDir()
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     await mod.setServerWorkspaceExternalAppRecent({
       workspaceId: REPO_A,
       targetKey: externalAppTargetKey('/repo-a/worktree-x'),
@@ -233,7 +233,7 @@ describe('settings source external app recents', () => {
 
   test('prunes removed-worktree settings without dropping repo-level trust', async () => {
     prepareSettingsDataDir()
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const configHash = `sha256:${'a'.repeat(64)}`
 
     await mod.setServerWorkspaceWorktreeBootstrapConfigTrust({ workspaceId: REPO_A, configHash, trusted: true })
@@ -268,7 +268,7 @@ describe('settings source external app recents', () => {
 
   test('prunes empty workspace settings entries after removed-worktree cleanup', async () => {
     prepareSettingsDataDir()
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
 
     await mod.setServerWorkspaceExternalAppRecent({
       workspaceId: REPO_A,

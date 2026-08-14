@@ -25,7 +25,7 @@ import {
   removeCapturedRepoWorktree,
 } from '#/server/modules/repo-write-paths.ts'
 import { cloneRepo } from '#/server/modules/repo-clone-write.ts'
-import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
+import { getServerFetchIntervalSec } from '#/server/settings/source.ts'
 import {
   publishRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation,

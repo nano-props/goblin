@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import type { UserSettings } from '#/shared/settings.ts'
 import { defaultServerWorkspaceState, defaultUserSettings } from '#/shared/settings-defaults.ts'
-import { currentSettingsData, type UserSettingsData } from '#/server/modules/user-settings-codec.ts'
+import { currentSettingsData, type UserSettingsData } from '#/server/settings/user-settings-codec.ts'
 import {
   planUserSettingsPatch,
   userSettingsFromData,
   validateUserSettingsPatch,
-} from '#/server/modules/user-settings-patch.ts'
+} from '#/server/settings/user-settings-patch.ts'
 
 const data: UserSettingsData = {
   ...defaultUserSettings(),

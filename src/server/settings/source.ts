@@ -4,7 +4,7 @@ import {
   resetUserSettingsPersistenceForTests,
   SettingsPersistenceWriteError,
   writeUserSettingsJson,
-} from '#/server/modules/settings-persistence.ts'
+} from '#/server/settings/persistence.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
 import type { UserSettings } from '#/shared/settings.ts'
 import {
@@ -52,13 +52,13 @@ import {
   isFetchInterval,
   normalizeWorkspace,
   type UserSettingsData,
-} from '#/server/modules/user-settings-codec.ts'
+} from '#/server/settings/user-settings-codec.ts'
 import {
   planUserSettingsPatch,
   userSettingsFromData,
   validateUserSettingsPatch,
   type UserSettingsPatch,
-} from '#/server/modules/user-settings-patch.ts'
+} from '#/server/settings/user-settings-patch.ts'
 
 type FetchIntervalListener = (sec: number) => void
 type UserSettingsReadOutcome =

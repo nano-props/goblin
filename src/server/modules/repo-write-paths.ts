@@ -26,7 +26,7 @@ import {
 import {
   pruneServerWorkspaceSettingsForRemovedWorktree,
   setServerWorkspaceWorktreeBootstrapConfigTrust,
-} from '#/server/modules/settings-source.ts'
+} from '#/server/settings/source.ts'
 import { type ExecResult, type ExecResultRecoveryMessageKey, type RepoUrlTarget } from '#/shared/git-types.ts'
 import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
 import { isValidWorkspaceLocatorInput, toSafeWorkspaceLocator } from '#/shared/input-validation.ts'

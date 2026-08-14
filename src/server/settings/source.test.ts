@@ -50,7 +50,7 @@ async function writeWorkspacePaneLayout(
 describe('settings source', () => {
   afterEach(async () => {
     try {
-      const mod = await import('#/server/modules/settings-source.ts')
+      const mod = await import('#/server/settings/source.ts')
       mod.resetServerSettingsSourceForTests()
       clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
       runtimeClientSequence = 0
@@ -70,7 +70,7 @@ describe('settings source', () => {
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const sec = await mod.getServerFetchIntervalSec()
 
     expect(sec).toBe(120)
@@ -97,7 +97,7 @@ describe('settings source', () => {
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const listener = vi.fn()
     const unsubscribe = mod.subscribeServerFetchInterval(listener)
 
@@ -163,7 +163,7 @@ describe('settings source', () => {
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     await mod.updateUserSettings({ globalShortcut: 'Alt+K' })
     await expect(mod.updateUserSettings({ globalShortcut: 'Control+O' })).rejects.toThrow('invalid global shortcut')
     expect((await mod.getUserSettings()).globalShortcut).toBe('Alt+K')
@@ -183,7 +183,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const before = await mod.getUserSettings()
 
     await expect(Reflect.apply(mod.updateUserSettings, undefined, [patch])).rejects.toThrow(message)
@@ -194,7 +194,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const before = await mod.getServerFetchIntervalSec()
 
     await expect(Reflect.apply(mod.setServerFetchIntervalSec, undefined, [sec])).rejects.toThrow(
@@ -209,7 +209,7 @@ describe('settings source', () => {
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
     await writeFile(path.join(tmp, 'user-settings.json'), '{bad json', 'utf-8')
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
 
     await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
     expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toMatchObject({
@@ -226,7 +226,7 @@ describe('settings source', () => {
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
     await writeFile(path.join(tmp, 'user-settings.json'), JSON.stringify(root), 'utf-8')
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
 
     await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
     expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toMatchObject({
@@ -244,7 +244,7 @@ describe('settings source', () => {
     const file = path.join(tmp, 'user-settings.json')
     await writeFile(file, JSON.stringify({ theme: 'bogus' }), 'utf-8')
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
 
     await expect(mod.getUserSettings()).resolves.toMatchObject({ lang: 'auto', theme: 'auto', fetchIntervalSec: 120 })
     expect(JSON.parse(await readFile(file, 'utf-8'))).toMatchObject({
@@ -259,7 +259,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const initial = await import('#/server/modules/settings-source.ts')
+    const initial = await import('#/server/settings/source.ts')
     await initial.updateUserSettings({ theme: 'dark' })
     initial.resetServerSettingsSourceForTests()
     const file = path.join(tmp, 'user-settings.json')
@@ -279,7 +279,7 @@ describe('settings source', () => {
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
     await mkdir(path.join(tmp, 'user-settings.json'))
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     await expect(mod.getServerWorkspaceState()).rejects.toMatchObject({ code: 'EISDIR' })
     expect(readdirSync(tmp)).toEqual(['user-settings.json'])
   })
@@ -289,7 +289,7 @@ describe('settings source', () => {
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
 
     await Promise.all([
       mod.addServerRecentWorkspace({ id: REPO_A }),
@@ -305,7 +305,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const entries = Array.from({ length: 12 }, (_, index) => ({
       id: workspaceIdForTest(`goblin+file:///repo-${index}`),
     }))
@@ -320,7 +320,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const source = await import('#/server/modules/settings-source.ts')
+    const source = await import('#/server/settings/source.ts')
     const runtimes = await import('#/server/modules/workspace-runtimes.ts')
     runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
     try {
@@ -346,7 +346,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const source = await import('#/server/modules/settings-source.ts')
+    const source = await import('#/server/settings/source.ts')
     const runtimes = await import('#/server/modules/workspace-runtimes.ts')
     runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
     try {
@@ -369,7 +369,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const repoA = { id: REPO_A }
     const repoB = { id: REPO_B }
     const repoC = { id: REPO_C }
@@ -406,7 +406,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const source = await import('#/server/modules/settings-source.ts')
+    const source = await import('#/server/settings/source.ts')
     const runtimes = await import('#/server/modules/workspace-runtimes.ts')
     const repoA = { id: REPO_A }
     const repoB = { id: REPO_B }
@@ -434,7 +434,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const entry = { id: REPO_A }
     await mod.addServerWorkspaceEntry(entry)
 
@@ -450,7 +450,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     await writeWorkspacePaneLayout(mod, REPO_A, {
       entries: [
         {
@@ -478,7 +478,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const repoEntry = { id: REPO_A }
     const empty = { entries: [] }
     const history: WorkspacePaneDurableLayout = {
@@ -536,7 +536,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const programmingError = new Error('invalid repository callback state')
     const replacement = Object.defineProperty({}, 'entries', {
       get() {
@@ -558,7 +558,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     await mod.serverWorkspacePaneLayoutRepository.load(REPO_A)
     const settingsFile = path.join(tmp, 'user-settings.json')
     rmSync(settingsFile)
@@ -585,7 +585,7 @@ describe('settings source', () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const repoEntry = { id: REPO_A }
     const staleLayout: WorkspacePaneDurableLayout = {
       entries: [
@@ -611,7 +611,7 @@ describe('settings source', () => {
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
 
     await mod.setServerWorkspaceWorktreeBootstrapConfigTrust({
       workspaceId: REPO_A,
@@ -645,7 +645,7 @@ describe('settings source', () => {
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
     await mod.setServerWorkspaceWorktreeBootstrapConfigTrust({
@@ -683,7 +683,7 @@ describe('settings source', () => {
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 
     await mod.setServerWorkspaceWorktreeBootstrapConfigTrust({
@@ -703,7 +703,7 @@ describe('settings source', () => {
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const mainTargetKey = branchTargetKey(REPO_B, 'main')
     const worktreeTargetKeyValue = worktreeTargetKey('/tmp/repo-b-worktree')
     const emptyTargetKey = branchTargetKey(REPO_B, 'empty')

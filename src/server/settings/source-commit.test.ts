@@ -31,11 +31,11 @@ const persistence = vi.hoisted(() => ({
   resetUserSettingsPersistenceForTests: vi.fn(),
 }))
 
-vi.mock('#/server/modules/settings-persistence.ts', () => persistence)
+vi.mock('#/server/settings/persistence.ts', () => persistence)
 
 describe('settings source commits', () => {
   afterEach(async () => {
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     mod.resetServerSettingsSourceForTests()
     persistence.stored = null
     persistence.failNextWrite = false
@@ -45,7 +45,7 @@ describe('settings source commits', () => {
   })
 
   test('commits a layout CAS with one durable write', async () => {
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const runtimes = await import('#/server/modules/workspace-runtimes.ts')
     const repository = mod.serverWorkspacePaneLayoutRepository
     const current = await repository.load(REPO_A)
@@ -73,7 +73,7 @@ describe('settings source commits', () => {
   })
 
   test('rejects a queued layout CAS when its runtime expires before the settings commit', async () => {
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const runtimes = await import('#/server/modules/workspace-runtimes.ts')
     const repository = mod.serverWorkspacePaneLayoutRepository
     const current = await repository.load(REPO_A)
@@ -107,7 +107,7 @@ describe('settings source commits', () => {
   })
 
   test('serializes runtime invalidation with an in-flight durable layout commit', async () => {
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const runtimes = await import('#/server/modules/workspace-runtimes.ts')
     const repository = mod.serverWorkspacePaneLayoutRepository
     const current = await repository.load(REPO_A)
@@ -157,7 +157,7 @@ describe('settings source commits', () => {
   })
 
   test('does not write when the workspace external app recent is already current', async () => {
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     const root = formatWorkspaceLocator({ transport: 'file', platform: 'posix', path: '/repo-a/worktree-x' }, 'posix')
     if (!root) throw new Error('invalid workspace locator fixture')
     const recent = {
@@ -176,7 +176,7 @@ describe('settings source commits', () => {
   })
 
   test('does not expose failed settings writes through the in-memory cache', async () => {
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     await mod.addServerRecentWorkspace({ id: REPO_A })
     persistence.failNextWrite = true
     await expect(mod.addServerRecentWorkspace({ id: REPO_B })).rejects.toThrow('disk full')
@@ -185,7 +185,7 @@ describe('settings source commits', () => {
   })
 
   test('retries default settings initialization after a transient write failure', async () => {
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
     persistence.failNextWrite = true
     await expect(mod.getServerFetchIntervalSec()).rejects.toThrow('disk full')
     await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
@@ -193,7 +193,7 @@ describe('settings source commits', () => {
 
   test('replaces invalid persisted settings with defaults', async () => {
     persistence.stored = { theme: 'bogus' }
-    const mod = await import('#/server/modules/settings-source.ts')
+    const mod = await import('#/server/settings/source.ts')
 
     await expect(mod.getUserSettings()).resolves.toMatchObject({ theme: 'auto', fetchIntervalSec: 120 })
     expect(persistence.writeUserSettingsJson).toHaveBeenCalledTimes(1)

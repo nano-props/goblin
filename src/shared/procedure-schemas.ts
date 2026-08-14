@@ -263,7 +263,7 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
 
 // Schemas for the settings command handlers. Each shape matches the typed
 // input contract documented on `handle*` in
-// `#/server/modules/settings-write-paths.ts` — the route layer
+// `#/server/settings/write-paths.ts` — the route layer
 // validates with these, then passes the parsed object directly to the
 // module layer.
 // Shared shape for the GitHub CLI state endpoints (`/api/settings/github-cli`

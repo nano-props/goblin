@@ -37,7 +37,7 @@ import {
 import { parseWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
-import { compareAndReplaceServerWorkspaceEntries, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
+import { compareAndReplaceServerWorkspaceEntries, getServerWorkspaceState } from '#/server/settings/source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { abortableWorkspaceRestore } from '#/server/modules/workspace-restore-utils.ts'
 import { restoreWorkspacePaneTabsForMemberships } from '#/server/modules/workspace-pane-tabs-restore.ts'

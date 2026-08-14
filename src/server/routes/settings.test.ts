@@ -33,17 +33,17 @@ vi.mock('#/server/modules/github-cli.ts', () => ({
   getServerGitHubCliState: mocks.getServerGitHubCliState,
 }))
 
-vi.mock('#/server/modules/settings-snapshot.ts', () => ({
+vi.mock('#/server/settings/snapshot.ts', () => ({
   getSettingsSnapshot: mocks.getSettingsSnapshot,
 }))
 
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
   addServerWorkspaceEntry: mocks.addServerWorkspaceEntry,
   removeServerWorkspaceEntry: mocks.removeServerWorkspaceEntry,
 }))
 
-vi.mock('#/server/modules/settings-write-paths.ts', () => ({
+vi.mock('#/server/settings/write-paths.ts', () => ({
   handleSetFetchInterval: mocks.handleSetFetchInterval,
   handleSetGlobalShortcutRegistered: mocks.handleSetGlobalShortcutRegistered,
   handleAddRecentWorkspace: mocks.handleAddRecentWorkspace,

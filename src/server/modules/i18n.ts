@@ -1,4 +1,4 @@
-import { getUserSettings } from '#/server/modules/settings-source.ts'
+import { getUserSettings } from '#/server/settings/source.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import type { I18nSnapshot } from '#/shared/api-types.ts'
 

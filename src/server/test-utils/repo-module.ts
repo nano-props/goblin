@@ -247,7 +247,7 @@ vi.mock('#/shared/input-validation.ts', () => ({
   toSafeWorkspaceLocator: (value: unknown) => (typeof value === 'string' ? value : null),
 }))
 
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   getServerWorkspaceSettings: hoistedMocks.getServerWorkspaceSettings,
   getServerFetchIntervalSec: hoistedMocks.getServerFetchIntervalSec,
   subscribeServerFetchInterval: hoistedMocks.subscribeServerFetchInterval,

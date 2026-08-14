@@ -88,7 +88,7 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
 vi.mock('#/server/modules/repo-clone-write.ts', () => ({
   cloneRepo: mocks.cloneRepo,
 }))
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
 }))
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({

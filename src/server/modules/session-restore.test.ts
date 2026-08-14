@@ -58,7 +58,7 @@ vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
   ),
 }))
 
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
   compareAndReplaceServerWorkspaceEntries: mocks.compareAndReplaceServerWorkspaceEntries,
   confirmServerWorkspaceEntry: mocks.confirmServerWorkspaceEntry,

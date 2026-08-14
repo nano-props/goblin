@@ -45,7 +45,7 @@ import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/worksp
 import {
   serverWorkspacePaneLayoutRepository,
   serverWorkspacePaneLayoutRestoreTransaction,
-} from '#/server/modules/settings-source.ts'
+} from '#/server/settings/source.ts'
 import { isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { isValidTerminalClientId } from '#/shared/terminal-validators.ts'
 import { TerminalSessionManager, type TerminalSessionCloseReason } from '#/server/terminal/terminal-session-manager.ts'

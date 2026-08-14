@@ -60,7 +60,7 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   fetchRepo: mocks.fetchRepo,
 }))
 
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
   subscribeServerFetchInterval: mocks.subscribeServerFetchInterval,
 }))
