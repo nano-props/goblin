@@ -24,7 +24,7 @@ const settingsActionsMocks = vi.hoisted(() => ({
 
 const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
 
-vi.mock('#/web/settings-actions.ts', () => settingsActionsMocks)
+vi.mock('#/web/settings/actions.ts', () => settingsActionsMocks)
 vi.mock('vue-sonner', () => ({ toast: feedbackMocks }))
 
 beforeEach(() => {
@@ -55,7 +55,7 @@ beforeEach(() => {
 
 describe('runtime settings controllers', () => {
   test('runs fetch settings writes through settings mutations', async () => {
-    const { useFetchSettingsController } = await import('#/web/runtime-settings-fetch.ts')
+    const { useFetchSettingsController } = await import('#/web/settings/runtime-fetch.ts')
     const { result } = renderComposableInJsdom(() => useFetchSettingsController(), { wrapper: AppVueQueryClientScope })
 
     result.value.setFetchInterval(300)
@@ -69,7 +69,7 @@ describe('runtime settings controllers', () => {
   })
 
   test('runs LAN settings writes through settings mutations', async () => {
-    const { useLanSettingsController } = await import('#/web/runtime-settings-lan.ts')
+    const { useLanSettingsController } = await import('#/web/settings/runtime-lan.ts')
     const { result } = renderComposableInJsdom(() => useLanSettingsController(), { wrapper: AppVueQueryClientScope })
 
     result.value.setLanEnabled(true)
@@ -80,7 +80,7 @@ describe('runtime settings controllers', () => {
 
   test('surfaces a rejected settings write once at the settings interaction boundary', async () => {
     settingsActionsMocks.setLanEnabled.mockRejectedValueOnce(new Error('settings unavailable'))
-    const { useLanSettingsController } = await import('#/web/runtime-settings-lan.ts')
+    const { useLanSettingsController } = await import('#/web/settings/runtime-lan.ts')
     const { result } = renderComposableInJsdom(() => useLanSettingsController(), { wrapper: AppVueQueryClientScope })
 
     result.value.setLanEnabled(true)
@@ -95,7 +95,7 @@ describe('runtime settings controllers', () => {
     settingsActionsMocks.setLanEnabled.mockRejectedValueOnce(
       new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'settings outcome uncertain' }),
     )
-    const { useLanSettingsController } = await import('#/web/runtime-settings-lan.ts')
+    const { useLanSettingsController } = await import('#/web/settings/runtime-lan.ts')
     const { result } = renderComposableInJsdom(() => useLanSettingsController(), { wrapper: AppVueQueryClientScope })
 
     result.value.setLanEnabled(true)
@@ -109,7 +109,7 @@ describe('runtime settings controllers', () => {
   })
 
   test('runs shortcut settings writes through settings mutations', async () => {
-    const { useShortcutSettingsController } = await import('#/web/runtime-settings-shortcuts.ts')
+    const { useShortcutSettingsController } = await import('#/web/settings/runtime-shortcuts.ts')
     const { result } = renderComposableInJsdom(() => useShortcutSettingsController(), {
       wrapper: AppVueQueryClientScope,
     })
@@ -133,7 +133,7 @@ describe('runtime settings controllers', () => {
   })
 
   test('runs external app refresh through settings mutations', async () => {
-    const { useExternalAppSettingsController } = await import('#/web/runtime-settings-external-apps.ts')
+    const { useExternalAppSettingsController } = await import('#/web/settings/runtime-external-apps.ts')
     const { result } = renderComposableInJsdom(() => useExternalAppSettingsController(), {
       wrapper: AppVueQueryClientScope,
     })
@@ -145,7 +145,7 @@ describe('runtime settings controllers', () => {
   })
 
   test('coalesces concurrent external app refreshes', async () => {
-    const { useExternalAppSettingsController } = await import('#/web/runtime-settings-external-apps.ts')
+    const { useExternalAppSettingsController } = await import('#/web/settings/runtime-external-apps.ts')
     const refresh = Promise.withResolvers<void>()
     settingsActionsMocks.refreshExternalAppsDetection.mockImplementation(async () => await refresh.promise)
     const { result } = renderComposableInJsdom(() => useExternalAppSettingsController(), {
@@ -161,7 +161,7 @@ describe('runtime settings controllers', () => {
   })
 
   test('runs GitHub CLI refresh through settings mutations', async () => {
-    const { useGitHubSettingsController } = await import('#/web/runtime-settings-github.ts')
+    const { useGitHubSettingsController } = await import('#/web/settings/runtime-github.ts')
     const { result } = renderComposableInJsdom(() => useGitHubSettingsController(), { wrapper: AppVueQueryClientScope })
 
     result.value.refreshGitHubCli()
@@ -171,7 +171,7 @@ describe('runtime settings controllers', () => {
   })
 
   test('coalesces concurrent GitHub CLI refreshes', async () => {
-    const { useGitHubSettingsController } = await import('#/web/runtime-settings-github.ts')
+    const { useGitHubSettingsController } = await import('#/web/settings/runtime-github.ts')
     const refresh = Promise.withResolvers<void>()
     settingsActionsMocks.refreshGitHubCliDetection.mockImplementation(async () => await refresh.promise)
     const { result } = renderComposableInJsdom(() => useGitHubSettingsController(), { wrapper: AppVueQueryClientScope })

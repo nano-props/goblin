@@ -59,7 +59,7 @@ const appDataClientMocks = vi.hoisted(() => ({
   removeWorkspaceFromSession: vi.fn(async () => {}),
 }))
 
-vi.mock('#/web/settings-actions.ts', () => ({
+vi.mock('#/web/settings/actions.ts', () => ({
   clearRecentWorkspaceHistory: appDataClientMocks.clearRecentWorkspaceHistory,
   removeWorkspaceFromSession: appDataClientMocks.removeWorkspaceFromSession,
 }))

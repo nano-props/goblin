@@ -3,14 +3,14 @@ import { computed, onScopeDispose, toValue } from 'vue'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { ExternalAppsSnapshot, GitHubCliState, LanInfo, SettingsSnapshot } from '#/shared/api-types.ts'
-import { getExternalAppsSnapshot, getGitHubCliState, getLanInfo, getSettingsSnapshot } from '#/web/settings-client.ts'
-import { subscribeSettingsInvalidation } from '#/web/settings-invalidation-ingress.ts'
+import { getExternalAppsSnapshot, getGitHubCliState, getLanInfo, getSettingsSnapshot } from '#/web/settings/client.ts'
+import { subscribeSettingsInvalidation } from '#/web/settings/invalidation-ingress.ts'
 import {
   externalAppsQueryKey,
   githubCliQueryKey,
   lanInfoQueryKey,
   settingsSnapshotQueryKey,
-} from '#/web/settings-query-cache.ts'
+} from '#/web/settings/query-cache.ts'
 
 function initialGitHubCliState(): GitHubCliState {
   return {

@@ -46,7 +46,7 @@ const mocks = vi.hoisted(() => {
   }
 })
 
-vi.mock('#/web/settings-actions.ts', () => ({
+vi.mock('#/web/settings/actions.ts', () => ({
   restoreWorkspaceTabsOnView: mocks.restoreWorkspaceTabsOnView,
 }))
 

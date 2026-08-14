@@ -29,7 +29,7 @@ vi.mock('#/web/hooks/useRepoStoreInvalidationRefresh.ts', () => ({
 vi.mock('#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts', () => ({
   useWorkspaceRuntimeInvalidationRefresh: sideEffectMocks.useWorkspaceRuntimeInvalidationRefresh,
 }))
-vi.mock('#/web/settings-queries.ts', () => ({
+vi.mock('#/web/settings/queries.ts', () => ({
   useSettingsQueryInvalidationSync: sideEffectMocks.useSettingsQueryInvalidationSync,
 }))
 vi.mock('#/web/workspace-navigation-history.ts', () => ({

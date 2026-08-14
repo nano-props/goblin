@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultServerWorkspaceState, defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type {
   GitHubCliState,
@@ -107,7 +107,7 @@ const appDataClientMocks = vi.hoisted(() => ({
   setTerminalNotificationsEnabled: vi.fn(async (enabled) => enabled),
 }))
 
-vi.mock('#/web/settings-client.ts', () => ({
+vi.mock('#/web/settings/client.ts', () => ({
   addRecentWorkspace: appDataClientMocks.addRecentWorkspace,
   clearRecentWorkspaces: appDataClientMocks.clearRecentWorkspaces,
   getSettingsSnapshot: appDataClientMocks.getSettingsSnapshot,
@@ -216,7 +216,7 @@ describe('settings actions', () => {
       recentWorkspaces: [{ id: WORKSPACE_A }],
       addedWorkspace: { id: WORKSPACE_A },
     })
-    const { recordRecentWorkspace } = await import('#/web/settings-actions.ts')
+    const { recordRecentWorkspace } = await import('#/web/settings/actions.ts')
 
     await recordRecentWorkspace({ id: WORKSPACE_A })
 
@@ -230,7 +230,7 @@ describe('settings actions', () => {
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ recentWorkspaces: [{ id: WORKSPACE_A }] }),
     )
-    const { clearRecentWorkspaceHistory } = await import('#/web/settings-actions.ts')
+    const { clearRecentWorkspaceHistory } = await import('#/web/settings/actions.ts')
 
     await clearRecentWorkspaceHistory()
 
@@ -252,7 +252,7 @@ describe('settings actions', () => {
       openWorkspaceEntries: session.openWorkspaceEntries,
       runtime: { workspaces: [], workspacePaneTabs: [], restoredWorkspaceId: session.restoredWorkspaceId },
     })
-    const { restoreWorkspaceAtBoot } = await import('#/web/settings-actions.ts')
+    const { restoreWorkspaceAtBoot } = await import('#/web/settings/actions.ts')
 
     const result = await restoreWorkspaceAtBoot('client_test000000000000')
 
@@ -265,7 +265,7 @@ describe('settings actions', () => {
   })
 
   test('restoreWorkspaceTabsOnView delegates lazy repo tab restore to the settings client', async () => {
-    const { restoreWorkspaceTabsOnView } = await import('#/web/settings-actions.ts')
+    const { restoreWorkspaceTabsOnView } = await import('#/web/settings/actions.ts')
     await expect(
       restoreWorkspaceTabsOnView(
         'client_test000000000000',
@@ -300,7 +300,7 @@ describe('settings actions', () => {
         },
       },
     })
-    const { refreshGitHubCliDetection } = await import('#/web/settings-actions.ts')
+    const { refreshGitHubCliDetection } = await import('#/web/settings/actions.ts')
 
     await refreshGitHubCliDetection()
 
@@ -313,7 +313,7 @@ describe('settings actions', () => {
   test('setLanEnabled updates runtime settings cache and invalidates LAN info', async () => {
     const invalidateSpy = vi.spyOn(appQueryClient, 'invalidateQueries')
     appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
-    const { setLanEnabled } = await import('#/web/settings-actions.ts')
+    const { setLanEnabled } = await import('#/web/settings/actions.ts')
 
     await setLanEnabled(true)
 
@@ -337,7 +337,7 @@ describe('settings actions', () => {
     appDataClientMocks.setGlobalShortcutDisabled.mockResolvedValue(false)
     appDataClientMocks.setLanEnabled.mockResolvedValue(false)
     const { setTerminalNotificationsEnabled, setShortcutsDisabled, setGlobalShortcutDisabled, setLanEnabled } =
-      await import('#/web/settings-actions.ts')
+      await import('#/web/settings/actions.ts')
 
     await setTerminalNotificationsEnabled(true)
     await setShortcutsDisabled(true)
@@ -358,7 +358,7 @@ describe('settings actions', () => {
       defaultSettingsSnapshot({ terminalNotificationsEnabled: false }),
     )
     appDataClientMocks.setTerminalNotificationsEnabled.mockRejectedValue(new Error('settings unavailable'))
-    const { setTerminalNotificationsEnabled } = await import('#/web/settings-actions.ts')
+    const { setTerminalNotificationsEnabled } = await import('#/web/settings/actions.ts')
 
     await expect(setTerminalNotificationsEnabled(true)).rejects.toThrow('settings unavailable')
 
@@ -377,7 +377,7 @@ describe('settings actions', () => {
       accelerator: 'Ctrl+Space',
       registered: false,
     })
-    const { setGlobalShortcut } = await import('#/web/settings-actions.ts')
+    const { setGlobalShortcut } = await import('#/web/settings/actions.ts')
 
     const state = await setGlobalShortcut('Ctrl+Space')
 
@@ -396,7 +396,7 @@ describe('settings actions', () => {
     appDataClientMocks.setGlobalShortcut.mockResolvedValue({
       kind: 'committed-projection-failed',
     })
-    const { setGlobalShortcut } = await import('#/web/settings-actions.ts')
+    const { setGlobalShortcut } = await import('#/web/settings/actions.ts')
 
     await expect(setGlobalShortcut('Ctrl+Space')).resolves.toEqual({
       kind: 'committed-projection-failed',
@@ -417,7 +417,7 @@ describe('settings actions', () => {
         },
       ],
     })
-    const { setRecentWorkspaceExternalAppPreference } = await import('#/web/settings-actions.ts')
+    const { setRecentWorkspaceExternalAppPreference } = await import('#/web/settings/actions.ts')
 
     await setRecentWorkspaceExternalAppPreference({
       workspaceId: WORKSPACE_A,

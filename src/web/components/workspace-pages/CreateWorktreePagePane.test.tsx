@@ -13,12 +13,12 @@ import { CreateWorktreePagePane } from '#/web/components/workspace-pages/CreateW
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { getRepoOperations, getRepoSnapshot, getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
-import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
 import type { CreateWorktreeExecResult } from '#/shared/git-types.ts'
 import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
-import { getSettingsSnapshot } from '#/web/settings-client.ts'
+import { getSettingsSnapshot } from '#/web/settings/client.ts'
 import { DEFAULT_LOADING_DELAY_MS, DEFAULT_MIN_LOADING_VISIBLE_MS } from '#/web/hooks/useLoadingVisibility.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
@@ -38,7 +38,7 @@ const surfaceMocks = vi.hoisted(() => ({
   } satisfies CreateWorktreeRequest,
 }))
 
-vi.mock('#/web/settings-client.ts', () => ({ getSettingsSnapshot: vi.fn() }))
+vi.mock('#/web/settings/client.ts', () => ({ getSettingsSnapshot: vi.fn() }))
 
 const mockedGetSettingsSnapshot = vi.mocked(getSettingsSnapshot)
 

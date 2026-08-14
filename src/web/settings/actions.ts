@@ -23,7 +23,7 @@ import {
   setTerminalNotificationsEnabled as setSettingsTerminalNotificationsEnabled,
   setThemeColorTheme as setSettingsThemeColorTheme,
   setThemePref as setSettingsThemePref,
-} from '#/web/settings-client.ts'
+} from '#/web/settings/client.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
@@ -34,7 +34,7 @@ import {
   updateWorkspaceSettingsStateCache,
   updateRuntimeRecentWorkspacesStateCache,
   updateRuntimeSettingsSnapshotCache,
-} from '#/web/settings-query-cache.ts'
+} from '#/web/settings/query-cache.ts'
 
 // Settings actions commit to the embedded server first. TanStack Query is the
 // window-local projection of that server result, never an independent source.

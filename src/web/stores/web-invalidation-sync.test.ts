@@ -195,7 +195,7 @@ describe('web invalidation sync', () => {
         }),
     )
 
-    const { createSettingsProjectionOwner } = await import('#/web/settings-projection-owner.ts')
+    const { createSettingsProjectionOwner } = await import('#/web/settings/projection-owner.ts')
     const owner = createSettingsProjectionOwner('test-sync')
     const dispose = owner.subscribe({ scope: 'settings-snapshot', read: fetch, apply })
 
@@ -228,7 +228,7 @@ describe('web invalidation sync', () => {
 
     const staleRead = Promise.withResolvers<string>()
     const applied: string[] = []
-    const { createSettingsProjectionOwner } = await import('#/web/settings-projection-owner.ts')
+    const { createSettingsProjectionOwner } = await import('#/web/settings/projection-owner.ts')
     const owner = createSettingsProjectionOwner('test-sync')
     const dispose = owner.subscribe({
       scope: 'theme',
@@ -255,7 +255,7 @@ describe('web invalidation sync', () => {
 
     const read = Promise.withResolvers<string>()
     const apply = vi.fn()
-    const { createSettingsProjectionOwner } = await import('#/web/settings-projection-owner.ts')
+    const { createSettingsProjectionOwner } = await import('#/web/settings/projection-owner.ts')
     const owner = createSettingsProjectionOwner('test-sync')
     const dispose = owner.subscribe({
       scope: 'theme',

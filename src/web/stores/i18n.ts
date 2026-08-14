@@ -15,9 +15,9 @@ import { createStore } from 'zustand/vanilla'
 import type { StoreApi } from 'zustand/vanilla'
 import type { I18nSnapshot } from '#/shared/api-types.ts'
 import type { Lang, LangPref } from '#/shared/settings.ts'
-import { getI18nSnapshot } from '#/web/settings-client.ts'
-import { createSettingsProjectionOwner } from '#/web/settings-projection-owner.ts'
-import { setI18nPreference } from '#/web/settings-actions.ts'
+import { getI18nSnapshot } from '#/web/settings/client.ts'
+import { createSettingsProjectionOwner } from '#/web/settings/projection-owner.ts'
+import { setI18nPreference } from '#/web/settings/actions.ts'
 
 export type I18nDictionary = Record<string, string>
 

@@ -1,8 +1,8 @@
 import { computed } from 'vue'
 import type { ComputedRef } from 'vue'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
+import { useSettingsSnapshotQuery } from '#/web/settings/queries.ts'
 import type { ExternalAppsSnapshot, RuntimeSettingsSnapshot, SettingsSnapshot } from '#/shared/api-types.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 

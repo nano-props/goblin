@@ -25,7 +25,7 @@ import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { BranchViewMode } from '#/shared/api-types.ts'
 import { gitBranchPaneTargetLease, gitWorktreePaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { getRuntimeShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
+import { getRuntimeShortcutSettings } from '#/web/settings/runtime-shortcuts.ts'
 import { keyboardRuntimeStateFromStore } from '#/web/stores/workspaces/selector-state.ts'
 import {
   runCloseCurrentWorkspacePaneTabCommand,

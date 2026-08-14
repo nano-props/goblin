@@ -57,7 +57,7 @@ describe('settings-client', () => {
       json: async () => defaultSettingsSnapshot({ theme: 'auto', colorTheme: 'github' }),
     }))
 
-    const { getThemeState } = await import('#/web/settings-client.ts')
+    const { getThemeState } = await import('#/web/settings/client.ts')
     await expect(getThemeState()).resolves.toEqual({ pref: 'auto', resolved: 'dark', colorTheme: 'github' })
   })
 
@@ -70,7 +70,7 @@ describe('settings-client', () => {
         prefs: defaultUserSettings({ theme: 'dark', colorTheme: 'github' }),
       }),
     }))
-    const { setThemePref } = await import('#/web/settings-client.ts')
+    const { setThemePref } = await import('#/web/settings/client.ts')
     await expect(setThemePref('dark')).resolves.toEqual({ pref: 'dark', resolved: 'dark', colorTheme: 'github' })
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -81,7 +81,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } }),
     }))
-    const { getI18nSnapshot } = await import('#/web/settings-client.ts')
+    const { getI18nSnapshot } = await import('#/web/settings/client.ts')
     await expect(getI18nSnapshot()).resolves.toEqual({ lang: 'ko', pref: 'auto', dict: { hello: '안녕' } })
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/i18n',
@@ -102,7 +102,7 @@ describe('settings-client', () => {
     })
     const controller = new AbortController()
 
-    const { getI18nSnapshot } = await import('#/web/settings-client.ts')
+    const { getI18nSnapshot } = await import('#/web/settings/client.ts')
     const request = getI18nSnapshot({ signal: controller.signal })
     const assertion = expect(request).rejects.toThrow('cancelled')
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
@@ -126,7 +126,7 @@ describe('settings-client', () => {
       }),
     }))
 
-    const { restoreServerWorkspace } = await import('#/web/settings-client.ts')
+    const { restoreServerWorkspace } = await import('#/web/settings/client.ts')
     await expect(
       restoreServerWorkspace('client_test000000000000', {
         activeWorkspaceId: workspaceIdForTest('goblin+file:///workspace'),
@@ -162,7 +162,7 @@ describe('settings-client', () => {
       json: async () => restored,
     }))
 
-    const { restoreWorkspaceTabs } = await import('#/web/settings-client.ts')
+    const { restoreWorkspaceTabs } = await import('#/web/settings/client.ts')
     await expect(
       restoreWorkspaceTabs(
         'client_test000000000000',
@@ -205,7 +205,7 @@ describe('settings-client', () => {
       },
     })
     const fetchMock = mockFetch()
-    const { setGlobalShortcut } = await import('#/web/settings-client.ts')
+    const { setGlobalShortcut } = await import('#/web/settings/client.ts')
     await expect(setGlobalShortcut('CommandOrControl+Shift+K')).resolves.toEqual({
       kind: 'projected',
       accelerator: 'CommandOrControl+Shift+K',
@@ -249,7 +249,7 @@ describe('settings-client', () => {
         i18n: { lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } },
       }),
     })
-    const { setI18nPref } = await import('#/web/settings-client.ts')
+    const { setI18nPref } = await import('#/web/settings/client.ts')
     await expect(setI18nPref('ja')).resolves.toEqual({ lang: 'ja', pref: 'ja', dict: { hello: 'こんにちは' } })
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(invokeIpc).not.toHaveBeenCalled()
@@ -265,7 +265,7 @@ describe('settings-client', () => {
       }),
     }))
 
-    const { setI18nPref } = await import('#/web/settings-client.ts')
+    const { setI18nPref } = await import('#/web/settings/client.ts')
     await expect(setI18nPref('ja')).rejects.toThrow('settings language update did not return i18n snapshot')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -299,7 +299,7 @@ describe('settings-client', () => {
         addedWorkspace: { id: 'goblin+file:///tmp/repo' },
       }),
     }))
-    const { addRecentWorkspace } = await import('#/web/settings-client.ts')
+    const { addRecentWorkspace } = await import('#/web/settings/client.ts')
     await expect(addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///tmp/repo') })).resolves.toMatchObject({
       recentWorkspaces: [{ id: 'goblin+file:///tmp/repo' }],
       addedWorkspace: { id: 'goblin+file:///tmp/repo' },
@@ -341,7 +341,7 @@ describe('settings-client', () => {
       ok: true,
       json: async () => ({ ok: true }),
     }))
-    const { clearRecentWorkspaces } = await import('#/web/settings-client.ts')
+    const { clearRecentWorkspaces } = await import('#/web/settings/client.ts')
     await expect(clearRecentWorkspaces()).resolves.toBeUndefined()
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/settings/recent-workspaces/clear',
@@ -382,7 +382,7 @@ describe('settings-client', () => {
         addedWorkspace: null,
       }),
     }))
-    const { addRecentWorkspace } = await import('#/web/settings-client.ts')
+    const { addRecentWorkspace } = await import('#/web/settings/client.ts')
     await expect(addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///candidate') })).resolves.toMatchObject({
       recentWorkspaces: [{ id: 'goblin+file:///existing' }],
       addedWorkspace: null,
@@ -420,7 +420,7 @@ describe('settings-client', () => {
         prefs: defaultUserSettings({ theme: 'dark' }),
       }),
     }))
-    const { setThemePref } = await import('#/web/settings-client.ts')
+    const { setThemePref } = await import('#/web/settings/client.ts')
     await expect(setThemePref('dark')).resolves.toMatchObject({ pref: 'dark' })
     expect(invokeIpc).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -457,7 +457,7 @@ describe('settings-client', () => {
         addedWorkspace: { id: 'goblin+file:///persisted' },
       }),
     }))
-    const { addRecentWorkspace } = await import('#/web/settings-client.ts')
+    const { addRecentWorkspace } = await import('#/web/settings/client.ts')
     await expect(addRecentWorkspace({ id: workspaceIdForTest('goblin+file:///persisted') })).resolves.toMatchObject({
       ok: true,
     })
@@ -489,7 +489,7 @@ describe('settings-client', () => {
       },
     })
     const fetchMock = mockFetch(async () => ({ ok: true, json: async () => ({ ok: true }) }))
-    const { clearRecentWorkspaces } = await import('#/web/settings-client.ts')
+    const { clearRecentWorkspaces } = await import('#/web/settings/client.ts')
     await expect(clearRecentWorkspaces()).resolves.toBeUndefined()
     expect(invokeIpc).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenCalledTimes(1)

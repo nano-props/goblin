@@ -29,7 +29,7 @@ vi.mock('#/web/workspace-pane/workspace-pane-tab-open-action.ts', () => ({
   dispatchShowWorkspacePaneStaticTabAction: mocks.dispatchShowWorkspacePaneStaticTabAction,
 }))
 
-vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
+vi.mock('#/web/settings/runtime-external-apps.ts', () => ({
   useExternalAppSettings: () => ({
     terminalAvailable: true,
     editorAvailable: true,

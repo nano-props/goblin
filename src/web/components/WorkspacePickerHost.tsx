@@ -11,7 +11,7 @@ import { workspacePickerItemsEqual } from '#/web/components/workspace-picker/sum
 import type { WorkspacePickerItem, WorkspacePickerSurface } from '#/web/components/workspace-picker/types.ts'
 import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import { reportCloseWorkspaceFailure } from '#/web/lib/open-workspace-result-feedback.ts'
-import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
+import { useShortcutSettings } from '#/web/settings/runtime-shortcuts.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'

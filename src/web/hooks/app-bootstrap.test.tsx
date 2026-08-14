@@ -12,8 +12,8 @@ import {
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
-import { getExternalAppsSnapshot, getI18nSnapshot, getSettingsSnapshot } from '#/web/settings-client.ts'
-import { restoreWorkspaceAtBoot } from '#/web/settings-actions.ts'
+import { getExternalAppsSnapshot, getI18nSnapshot, getSettingsSnapshot } from '#/web/settings/client.ts'
+import { restoreWorkspaceAtBoot } from '#/web/settings/actions.ts'
 import { isRemoteWorkspaceId, normalizeRemoteWorkspaceRef, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { i18nStore } from '#/web/stores/i18n.ts'
@@ -27,7 +27,7 @@ import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { themeStore } from '#/web/stores/theme.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import type {
   ClientWorkspaceState,
   ServerWorkspaceState,
@@ -40,13 +40,13 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { bootstrapLog } from '#/web/logger.ts'
 
-vi.mock('#/web/settings-client.ts', () => ({
+vi.mock('#/web/settings/client.ts', () => ({
   getExternalAppsSnapshot: vi.fn(),
   getI18nSnapshot: vi.fn(),
   getSettingsSnapshot: vi.fn(),
 }))
 
-vi.mock('#/web/settings-actions.ts', () => ({
+vi.mock('#/web/settings/actions.ts', () => ({
   restoreWorkspaceAtBoot: vi.fn(),
 }))
 

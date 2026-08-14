@@ -5,7 +5,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import { themeStore } from '#/web/stores/theme.ts'
 import { i18nStore } from '#/web/stores/i18n.ts'
-import { clearRecentWorkspaceHistory } from '#/web/settings-actions.ts'
+import { clearRecentWorkspaceHistory } from '#/web/settings/actions.ts'
 import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import {
   reportCloseWorkspaceFailure,

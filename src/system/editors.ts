@@ -67,8 +67,8 @@
 //      missed the new key. The known mock sites today are:
 //        - src/web/components/repo-workspace/RepoWorkspaceToolbar.test.tsx
 //        - src/web/components/SettingsSurface.test.tsx
-//        - src/web/settings-actions.test.ts
-//        - src/web/runtime-settings-hooks.test.tsx
+//        - src/web/settings/actions.test.ts
+//        - src/web/settings/runtime-hooks.test.tsx
 //        - src/main/native-host-ipc-router.test.ts
 //            (mocks `getEditorAppAvailability` directly)
 //      If a new mock site is added, add it to this list too.

@@ -1,8 +1,8 @@
 import { computed } from 'vue'
-import { useExternalAppsQuery } from '#/web/settings-queries.ts'
-import { readRuntimeExternalAppSettings } from '#/web/settings-read-projection.ts'
-import { refreshExternalAppsDetection } from '#/web/settings-actions.ts'
-import { useSettingsMutation } from '#/web/settings-mutations.ts'
+import { useExternalAppsQuery } from '#/web/settings/queries.ts'
+import { readRuntimeExternalAppSettings } from '#/web/settings/read-projection.ts'
+import { refreshExternalAppsDetection } from '#/web/settings/actions.ts'
+import { useSettingsMutation } from '#/web/settings/mutations.ts'
 
 export function useExternalAppSettings() {
   const { data } = useExternalAppsQuery()

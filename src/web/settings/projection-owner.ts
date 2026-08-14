@@ -1,4 +1,4 @@
-import { subscribeSettingsInvalidation } from '#/web/settings-invalidation-ingress.ts'
+import { subscribeSettingsInvalidation } from '#/web/settings/invalidation-ingress.ts'
 import { settingsLog } from '#/web/logger.ts'
 import type { SettingsInvalidationScope } from '#/shared/server-invalidation.ts'
 

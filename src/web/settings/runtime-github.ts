@@ -1,5 +1,5 @@
-import { refreshGitHubCliDetection } from '#/web/settings-actions.ts'
-import { useSettingsMutation } from '#/web/settings-mutations.ts'
+import { refreshGitHubCliDetection } from '#/web/settings/actions.ts'
+import { useSettingsMutation } from '#/web/settings/mutations.ts'
 
 export function useGitHubSettingsController() {
   const refreshMutation = useSettingsMutation(

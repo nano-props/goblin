@@ -1,7 +1,7 @@
 import type { RestoredWorkspaceRuntime } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
-import { restoreWorkspaceTabsOnView } from '#/web/settings-actions.ts'
+import { restoreWorkspaceTabsOnView } from '#/web/settings/actions.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export type WorkspaceProjectionPromotionResult =

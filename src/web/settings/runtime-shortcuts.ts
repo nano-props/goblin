@@ -3,9 +3,9 @@ import {
   currentRuntimeSettingsSnapshot,
   readRuntimeShortcutSettings,
   useRuntimeSettingsSnapshot,
-} from '#/web/settings-read-projection.ts'
-import { setGlobalShortcut, setGlobalShortcutDisabled, setShortcutsDisabled } from '#/web/settings-actions.ts'
-import { useSettingsMutation } from '#/web/settings-mutations.ts'
+} from '#/web/settings/read-projection.ts'
+import { setGlobalShortcut, setGlobalShortcutDisabled, setShortcutsDisabled } from '#/web/settings/actions.ts'
+import { useSettingsMutation } from '#/web/settings/mutations.ts'
 import type { SetGlobalShortcutResult } from '#/shared/api-types.ts'
 
 export function getRuntimeShortcutSettings() {

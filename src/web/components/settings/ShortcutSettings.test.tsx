@@ -14,7 +14,7 @@ const shortcutMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/web/app-shell-client.ts', () => ({ canUseGlobalShortcutSettings: () => true }))
-vi.mock('#/web/runtime-settings-shortcuts.ts', () => ({
+vi.mock('#/web/settings/runtime-shortcuts.ts', () => ({
   useShortcutSettings: () => ({
     value: {
       shortcutsDisabled: false,

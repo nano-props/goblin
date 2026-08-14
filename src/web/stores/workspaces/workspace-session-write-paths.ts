@@ -3,7 +3,7 @@ import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-oper
 import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspace-capability-refresh.ts'
 import { requestInitialRepoSnapshotLoad, requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { closeWorkspaceRuntime, openWorkspaceRuntime, openWorkspaceRuntimeForInput } from '#/web/workspace-client.ts'
-import { addWorkspaceToSession, recordRecentWorkspace, removeWorkspaceFromSession } from '#/web/settings-actions.ts'
+import { addWorkspaceToSession, recordRecentWorkspace, removeWorkspaceFromSession } from '#/web/settings/actions.ts'
 import {
   removeWorkspaceRuntimeFromCache,
   refreshWorkspaceRuntimes,

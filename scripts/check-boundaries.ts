@@ -83,10 +83,10 @@ const RULES: Rule[] = [
   },
   {
     fromPrefix: '/src/web/',
-    disallow: ['#/web/settings-client.ts'],
+    disallow: ['#/web/settings/client.ts'],
     allowedImportsByFile: {
       '/src/web/hooks/useAuthenticatedAppBootstrap.ts': ['getExternalAppsSnapshot', 'getSettingsSnapshot'],
-      '/src/web/settings-actions.ts': [
+      '/src/web/settings/actions.ts': [
         'addRecentWorkspace',
         'addWorkspaceEntry',
         'clearRecentWorkspaces',
@@ -106,7 +106,7 @@ const RULES: Rule[] = [
         'setThemeColorTheme',
         'setThemePref',
       ],
-      '/src/web/settings-queries.ts': [
+      '/src/web/settings/queries.ts': [
         'getExternalAppsSnapshot',
         'getGitHubCliState',
         'getLanInfo',
@@ -117,7 +117,7 @@ const RULES: Rule[] = [
       '/src/web/stores/theme.ts': ['getThemeState', 'resolveThemeStateFromSettings'],
     },
     reason:
-      'settings-client is the transport boundary; settings writes must flow through settings-actions so server results update TanStack Query projections',
+      'the settings client is the transport boundary; settings writes must flow through settings actions so server results update TanStack Query projections',
   },
 ]
 

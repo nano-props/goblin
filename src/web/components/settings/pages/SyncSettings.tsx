@@ -4,7 +4,7 @@ import {
   SettingsRow,
   SettingsSelect,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useFetchSettingsController, useFetchSettings } from '#/web/runtime-settings-fetch.ts'
+import { useFetchSettingsController, useFetchSettings } from '#/web/settings/runtime-fetch.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 export const SyncSettings = defineComponent({
   name: 'SyncSettings',

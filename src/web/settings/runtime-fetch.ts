@@ -3,9 +3,9 @@ import {
   currentRuntimeSettingsSnapshot,
   readRuntimeFetchSettings,
   useRuntimeSettingsSnapshot,
-} from '#/web/settings-read-projection.ts'
-import { setFetchInterval, setTerminalNotificationsEnabled } from '#/web/settings-actions.ts'
-import { useSettingsMutation } from '#/web/settings-mutations.ts'
+} from '#/web/settings/read-projection.ts'
+import { setFetchInterval, setTerminalNotificationsEnabled } from '#/web/settings/actions.ts'
+import { useSettingsMutation } from '#/web/settings/mutations.ts'
 
 export function getRuntimeFetchSettings() {
   return readRuntimeFetchSettings(currentRuntimeSettingsSnapshot())

@@ -74,7 +74,7 @@ import { renderInJsdom as renderInJsdomWithoutWorkspaceView } from '#/test-utils
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import { terminalSessionContextWithCreatedAdmissionForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
-import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
 import {
   observeWorkspacePaneRouteForTest,
@@ -123,7 +123,7 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   }),
 }))
 
-vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
+vi.mock('#/web/settings/runtime-external-apps.ts', () => ({
   useExternalAppSettings: () => ({
     get value() {
       return hoistedRuntimeExternalAppSettings.value

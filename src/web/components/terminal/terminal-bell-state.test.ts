@@ -6,7 +6,7 @@ import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
 import { terminalSessionBase } from '#/shared/terminal-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { CLIENT_BRIDGE_VERSION, ELECTRON_CLIENT_CAPABILITIES } from '#/shared/bootstrap.ts'
 

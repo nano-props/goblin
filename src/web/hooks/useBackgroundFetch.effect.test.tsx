@@ -20,7 +20,7 @@ vi.mock('#/web/repo-client.ts', () => ({
   setBackgroundSyncRepos: mocks.setBackgroundSyncRepos,
 }))
 
-vi.mock('#/web/runtime-settings-fetch.ts', () => ({
+vi.mock('#/web/settings/runtime-fetch.ts', () => ({
   useFetchSettings: () => ({ value: { fetchIntervalSec: 30 } }),
 }))
 

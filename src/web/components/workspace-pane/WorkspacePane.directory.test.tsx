@@ -36,7 +36,7 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/work
 import { gitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { externalAppsQueryKey } from '#/web/settings-query-cache.ts'
+import { externalAppsQueryKey } from '#/web/settings/query-cache.ts'
 import { repoLogQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import {

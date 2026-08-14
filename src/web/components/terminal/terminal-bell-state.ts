@@ -1,7 +1,7 @@
 import { workspaceNameFromLocator } from '#/shared/workspace-display-location.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import type { TerminalBellPolicyEvent, TerminalDescriptor } from '#/web/components/terminal/types.ts'
-import { getRuntimeFetchSettings } from '#/web/runtime-settings-fetch.ts'
+import { getRuntimeFetchSettings } from '#/web/settings/runtime-fetch.ts'
 import { terminalSessionBase, terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 const BELL_NOTIFICATION_THROTTLE_MS = 5000
 
