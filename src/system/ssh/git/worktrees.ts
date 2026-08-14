@@ -29,13 +29,15 @@ import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import { remoteCommandOutcome, remoteExecResult } from '#/system/ssh/command-execution.ts'
 import { isRemoteCommandName, remoteCommandExistsAtPath } from '#/system/ssh/command-probe.ts'
 import { REMOTE_GIT_BRANCH_OPERATION_TIMEOUT_MS } from '#/system/ssh/git/timeouts.ts'
-import { REMOTE_WORKTREE_STATUS_CONCURRENCY, runRemoteWorktreeStatusProbe } from '#/system/ssh/git/status-admission.ts'
+import { runRemoteWorktreeStatusProbe } from '#/system/ssh/git/status-admission.ts'
 import {
   deleteRemoteUpstreamBranch,
   getRemoteBranchMergeFacts,
   getRemoteCurrentBranch,
   getRemoteUpstream,
 } from '#/system/ssh/git/remote.ts'
+
+const REMOTE_WORKTREE_SNAPSHOT_CONCURRENCY = 4
 
 export interface RemoteFilesystemMutationResult extends ExecResult {
   worktreePathsToInvalidate?: readonly string[]
@@ -65,7 +67,7 @@ export async function readRemoteRepoWorktreeSnapshots(
   if (!commonDir) throw new Error('error.failed-read-repo')
   const snapshots = await mapWithConcurrency(
     usableWorktrees,
-    REMOTE_WORKTREE_STATUS_CONCURRENCY,
+    REMOTE_WORKTREE_SNAPSHOT_CONCURRENCY,
     async (worktree) => {
       if (worktree.isPrunable || worktree.headOid === undefined) {
         throw new Error('error.failed-read-repo')
