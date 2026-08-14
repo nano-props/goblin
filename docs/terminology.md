@@ -75,13 +75,13 @@ Rules:
 
 Within a feature, use these layer names when they fit:
 
-| Layer    | Typical forms                                                                                           |
-| -------- | ------------------------------------------------------------------------------------------------------- |
-| Boundary | `src/server/routes/<feature>.ts`, `src/web/<feature>-client.ts`                                         |
-| Read     | `src/web/<feature>-queries.ts`, `src/web/<feature>-snapshot.ts`, `src/server/modules/<feature>-read.ts` |
-| Write    | `src/server/modules/<feature>-write-paths.ts`, `src/web/<feature>-write-paths.ts`                       |
-| Source   | `src/server/modules/<feature>-source.ts`                                                                |
-| Runtime  | `runtime-<feature>*` only when the file truly exposes a read+write facade                               |
+| Layer    | Typical forms                                                                                         |
+| -------- | ----------------------------------------------------------------------------------------------------- |
+| Boundary | `src/server/routes/<feature>.ts`, `src/web/<feature>/client.ts`                                       |
+| Read     | `src/web/<feature>/queries.ts`, `src/web/<feature>/snapshot.ts`, `src/server/<feature>/read-paths.ts` |
+| Write    | `src/server/<feature>/write-paths.ts`, `src/web/<feature>/write-paths.ts`                             |
+| Source   | `src/server/<feature>/source.ts`                                                                      |
+| Runtime  | `src/web/<feature>/runtime.ts` only when the file truly exposes a read+write facade                   |
 
 Do not use `runtime` for a queue or scheduler that is not actually a runtime facade.
 
