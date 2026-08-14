@@ -1,4 +1,4 @@
-import { publishUserWorkspaceRuntimeInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { publishUserWorkspaceRuntimeInvalidation } from '#/server/realtime/invalidation-broker.ts'
 import { resolveServerRemoteWorkspaceConnection } from '#/server/modules/remote-workspace.ts'
 import { isCurrentWorkspaceRuntime, runRemoteWorkspaceLifecycle } from '#/server/modules/workspace-runtimes.ts'
 import { isRemoteWorkspaceId, type RemoteWorkspaceLifecycleCommandResult } from '#/shared/remote-workspace.ts'

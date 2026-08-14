@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   settingsInvalidationScopesForPrefsPatch: vi.fn(),
 }))
 
-vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
   publishSettingsInvalidation: mocks.publishSettingsInvalidation,
 }))
 

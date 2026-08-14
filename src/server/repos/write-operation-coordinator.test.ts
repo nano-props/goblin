@@ -57,7 +57,7 @@ vi.mock('#/server/repos/write-boundary.ts', () => ({
   resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
 }))
 
-vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
   publishRepoReadInvalidation: mocks.publishRepoReadInvalidation,
 }))
 

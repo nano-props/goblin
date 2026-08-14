@@ -59,7 +59,7 @@ vi.mock('#/server/modules/workspace-external-apps.ts', () => ({
 vi.mock('#/server/workspaces/local-path-suggestions.ts', () => ({
   getLocalPathSuggestions: mocks.getLocalPathSuggestions,
 }))
-vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
   publishUserRepoReadInvalidation: mocks.publishUserRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation: mocks.publishUserWorkspaceFilesystemInvalidation,
   publishUserWorkspaceRuntimeInvalidation: mocks.publishUserWorkspaceRuntimeInvalidation,

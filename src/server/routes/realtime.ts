@@ -4,12 +4,12 @@ import {
   InvalidationSocketLimitError,
   registerInvalidationSocket,
   unregisterInvalidationSocket,
-} from '#/server/modules/invalidation-broker.ts'
+} from '#/server/realtime/invalidation-broker.ts'
 import {
   ClientIntentSocketLimitError,
   registerClientIntentSocket,
   unregisterClientIntentSocket,
-} from '#/server/modules/client-intent-broker.ts'
+} from '#/server/realtime/client-intent-broker.ts'
 import { createWebSocketAccessTokenMiddleware } from '#/server/common/auth.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import { errorJson } from '#/server/common/responses.ts'

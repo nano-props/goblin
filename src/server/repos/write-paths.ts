@@ -1,7 +1,7 @@
 import path from 'node:path'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/repos/worktree-removal-lifecycle.ts'
 import { serverNodeLog } from '#/node/logger.ts'
-import { publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { publishSettingsInvalidation } from '#/server/realtime/invalidation-broker.ts'
 import {
   captureRepoWriteExecutionFromPhysicalWorktree,
   runWithRepoSource,

@@ -1,4 +1,4 @@
-import { publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { publishSettingsInvalidation } from '#/server/realtime/invalidation-broker.ts'
 import {
   addServerRecentWorkspace,
   clearServerRecentWorkspaces,

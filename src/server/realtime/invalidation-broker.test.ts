@@ -9,7 +9,7 @@ import {
   publishUserWorkspaceRuntimeInvalidation,
   registerInvalidationSocket,
   unregisterInvalidationSocket,
-} from '#/server/modules/invalidation-broker.ts'
+} from '#/server/realtime/invalidation-broker.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('invalidation broker', () => {

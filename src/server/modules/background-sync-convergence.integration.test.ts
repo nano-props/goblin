@@ -1,6 +1,6 @@
 import { QueryClient, QueryObserver } from '@tanstack/query-core'
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import type * as InvalidationBroker from '#/server/modules/invalidation-broker.ts'
+import type * as InvalidationBroker from '#/server/realtime/invalidation-broker.ts'
 import { REPO_ID, mocks } from '#/server/test-utils/repo-module.ts'
 import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
@@ -18,7 +18,7 @@ describe('background sync projection convergence', () => {
 
   test('registered background fetch invalidates a mounted observer into the final projection', async () => {
     useFakeTimers()
-    const broker = await vi.importActual<typeof InvalidationBroker>('#/server/modules/invalidation-broker.ts')
+    const broker = await vi.importActual<typeof InvalidationBroker>('#/server/realtime/invalidation-broker.ts')
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const projectionQueryKey = ['repo-data', REPO_ID, RUNTIME_ID, 'projection'] as const
     let projection = 'before-fetch'

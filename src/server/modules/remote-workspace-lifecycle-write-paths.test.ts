@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   publishInvalidation: vi.fn(),
 }))
 
-vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
   publishUserWorkspaceRuntimeInvalidation: mocks.publishInvalidation,
 }))
 vi.mock('#/server/modules/remote-workspace.ts', () => ({

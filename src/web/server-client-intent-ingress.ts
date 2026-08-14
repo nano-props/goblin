@@ -3,7 +3,7 @@ import { createServerWebSocketIngress } from '#/web/lib/server-ws-ingress.ts'
 
 // Server-controlled ingress for repo-view navigation requested by commands
 // such as `g delta` in a Goblin PTY. Client-side counterpart to
-// `#/server/modules/client-intent-broker.ts` and the `/ws/client-intent`
+// `#/server/realtime/client-intent-broker.ts` and the `/ws/client-intent`
 // realtime route. The server sends envelopes of the form
 //
 //   { type: 'client-effect-intent', intent: RepoViewClientIntent }

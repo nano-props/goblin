@@ -27,7 +27,7 @@ import {
 import {
   publishUserRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation,
-} from '#/server/modules/invalidation-broker.ts'
+} from '#/server/realtime/invalidation-broker.ts'
 import { probeLocalWorkspace, probeWorkspace } from '#/server/workspaces/probe.ts'
 import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
 import {

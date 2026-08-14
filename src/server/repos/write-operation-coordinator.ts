@@ -7,7 +7,7 @@ import {
   type RepoWriteExecutionCapability,
 } from '#/server/repos/source.ts'
 import { resolveRepoWriteBoundaryKey } from '#/server/repos/write-boundary.ts'
-import { publishRepoReadInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { publishRepoReadInvalidation } from '#/server/realtime/invalidation-broker.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
 import {
   isRemoteWorkspaceRuntimeFailure,

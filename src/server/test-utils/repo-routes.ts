@@ -91,7 +91,7 @@ vi.mock('#/server/repos/clone-write.ts', () => ({
 vi.mock('#/server/settings/source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
 }))
-vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
   publishRepoReadInvalidation: mocks.publishRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation: mocks.publishUserWorkspaceFilesystemInvalidation,
   publishUserWorkspaceRuntimeInvalidation: mocks.publishUserWorkspaceRuntimeInvalidation,

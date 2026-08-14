@@ -288,7 +288,7 @@ vi.mock('#/system/git/pull-requests.ts', () => ({
   getBranchPullRequests: hoistedMocks.getBranchPullRequests,
 }))
 
-vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
   publishRepoReadInvalidation: hoistedMocks.publishRepoReadInvalidation,
   publishSettingsInvalidation: hoistedMocks.publishSettingsInvalidation,
 }))

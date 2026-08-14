@@ -6,7 +6,7 @@ import {
   registerClientIntentSocket,
   ClientIntentSocketLimitError,
   unregisterClientIntentSocket,
-} from '#/server/modules/client-intent-broker.ts'
+} from '#/server/realtime/client-intent-broker.ts'
 
 describe('client intent broker', () => {
   beforeEach(() => {

@@ -51,7 +51,7 @@ vi.mock('#/server/runtime.ts', () => ({
   createServerRuntime: mocks.createServerRuntime,
 }))
 
-vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
   disconnectAllInvalidationSockets: mocks.disconnectAllInvalidationSockets,
 }))
 

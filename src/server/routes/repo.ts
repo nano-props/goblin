@@ -29,7 +29,7 @@ import { getServerFetchIntervalSec } from '#/server/settings/source.ts'
 import {
   publishRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation,
-} from '#/server/modules/invalidation-broker.ts'
+} from '#/server/realtime/invalidation-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import {
