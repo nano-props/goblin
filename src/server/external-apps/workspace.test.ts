@@ -23,11 +23,7 @@ vi.mock('#/system/terminals.ts', () => ({
 }))
 vi.mock('#/system/finder.ts', () => ({ openInFinder: mocks.openInFinder }))
 
-import {
-  openWorkspaceEditor,
-  openWorkspaceInFinder,
-  openWorkspaceTerminal,
-} from '#/server/modules/workspace-external-apps.ts'
+import { openWorkspaceEditor, openWorkspaceInFinder, openWorkspaceTerminal } from '#/server/external-apps/workspace.ts'
 
 const LOCAL_WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace')
 const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+ssh://example.test/workspace')

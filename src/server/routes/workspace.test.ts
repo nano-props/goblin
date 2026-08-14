@@ -51,7 +51,7 @@ vi.mock('#/server/workspaces/filesystem/file-trash.ts', () => ({ trashWorkspaceF
 vi.mock('#/server/workspaces/filesystem/file-download.ts', () => ({
   openWorkspaceFileDownload: mocks.openWorkspaceFileDownload,
 }))
-vi.mock('#/server/modules/workspace-external-apps.ts', () => ({
+vi.mock('#/server/external-apps/workspace.ts', () => ({
   openWorkspaceTerminal: mocks.openWorkspaceTerminal,
   openWorkspaceEditor: mocks.openWorkspaceEditor,
   openWorkspaceInFinder: mocks.openWorkspaceInFinder,

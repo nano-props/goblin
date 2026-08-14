@@ -14,11 +14,7 @@ import { readWorkspaceFileViewer } from '#/server/workspaces/filesystem/file-vie
 import { readWorkspaceDirectoryOverview } from '#/server/workspaces/filesystem/directory-overview.ts'
 import { trashWorkspaceFile } from '#/server/workspaces/filesystem/file-trash.ts'
 import { openWorkspaceFileDownload } from '#/server/workspaces/filesystem/file-download.ts'
-import {
-  openWorkspaceEditor,
-  openWorkspaceInFinder,
-  openWorkspaceTerminal,
-} from '#/server/modules/workspace-external-apps.ts'
+import { openWorkspaceEditor, openWorkspaceInFinder, openWorkspaceTerminal } from '#/server/external-apps/workspace.ts'
 import {
   requireCurrentWorkspaceRuntime,
   requireWorkspaceRuntimeEpochCapability,

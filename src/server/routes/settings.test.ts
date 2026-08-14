@@ -25,11 +25,11 @@ const mocks = vi.hoisted(() => ({
   removeServerWorkspaceEntry: vi.fn(),
 }))
 
-vi.mock('#/server/modules/external-apps.ts', () => ({
+vi.mock('#/server/external-apps/catalog.ts', () => ({
   getServerExternalAppsSnapshot: mocks.getServerExternalAppsSnapshot,
 }))
 
-vi.mock('#/server/modules/github-cli.ts', () => ({
+vi.mock('#/server/external-apps/github-cli.ts', () => ({
   getServerGitHubCliState: mocks.getServerGitHubCliState,
 }))
 

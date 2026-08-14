@@ -1,5 +1,5 @@
-import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
-import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
+import { getServerExternalAppsSnapshot } from '#/server/external-apps/catalog.ts'
+import { getServerGitHubCliState } from '#/server/external-apps/github-cli.ts'
 import { getSettingsSnapshot } from '#/server/settings/snapshot.ts'
 import { addServerWorkspaceEntry, getUserSettings, removeServerWorkspaceEntry } from '#/server/settings/source.ts'
 import { restoreServerWorkspace } from '#/server/workspaces/restore/session.ts'
