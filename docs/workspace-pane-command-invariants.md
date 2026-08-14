@@ -51,8 +51,23 @@ Target repair and branch retirement use the same aggregate boundary. Repair vali
 | Relative current-target: next/previous         | `direction` before queue                                 | resolve route, projection, adjacent tab, and generation at execution; every queued step runs                      |
 | Exact transition: active close-back            | source, destination, opener, and generation before write | never rebase; commit only while router still equals the source                                                    |
 | Route-only absolute destination                | destination and target lease at admission                | reject while the same target is busy; otherwise commit independently of the source route                          |
-| Resource command: create/close/open membership | write input and operation facts                          | server returns canonical projection; client accepts only the matching runtime, then follows the route class above |
+| Resource command: create/close/open membership | write input and operation facts                          | server returns canonical projection; client accepts only the matching runtime, then applies its route commit rule |
 | Recovery/reconciliation                        | canonical server/runtime snapshot                        | converge after server state; never repair or reclassify a user command                                            |
+
+Terminal creation is a resource command with sequential presentation. Accepted
+creates for one filesystem target execute in that target's action queue, and each
+create acquires navigation and focus authority only when it reaches the head of
+the queue. On the rapid-create happy path, each create completes its presentation
+commit before the next create starts, while resource work for independent targets
+and other intents remains concurrently admitted. Once the router presents a
+different filesystem target, its route precondition rejects remaining presentation
+commits without rolling back or replaying terminal resources that the server
+already accepted.
+
+A different navigation that is still settling may race with a queued terminal
+presentation and be superseded before its route becomes visible. This UI-only
+ordering is deliberately best-effort. Do not add terminal-create batch ownership,
+navigation lineage, retries, or replay to eliminate that recoverable overlap.
 
 ## Invariants
 
@@ -77,6 +92,8 @@ Target repair and branch retirement use the same aggregate boundary. Repair vali
 | Route-only destination arrives during target write  | reject immediately; the accepted write and route generation remain unchanged |
 | Router leaves the repo/branch while a command waits | reject with no navigation                                                    |
 | Runtime/worktree is replaced while a command waits  | reject with no effect on the replacement                                     |
+| Rapid terminal creates on one filesystem target     | create and present each in queue order; the final terminal remains selected   |
+| Router has left while terminal creates are draining | accepted resources remain; later presentation commits are rejected            |
 | Close write commits, then source CAS fails          | resource stays closed; the stale URL renders an empty pane                   |
 | One of two windows releases a shared runtime        | sibling remains current                                                      |
 | Recovery resets projection scopes                   | cancel old work; keep effect-owned listeners installed                       |

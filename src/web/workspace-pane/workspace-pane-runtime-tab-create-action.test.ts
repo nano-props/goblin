@@ -211,7 +211,7 @@ describe('workspace pane runtime tab create action', () => {
     )
   })
 
-  test('captures presentation authority before create and does not revive it after later navigation', async () => {
+  test('captures presentation authority when create begins and does not revive it after later navigation', async () => {
     const showCreatedRuntimeTab = vi.fn((_type, _sessionId, _presentation, routeRequest) =>
       appNavigationIsCurrent(routeRequest.navigationGeneration),
     )
@@ -240,7 +240,7 @@ describe('workspace pane runtime tab create action', () => {
     expect(showCreatedRuntimeTab).toHaveReturnedWith(false)
   })
 
-  test('claims one presentation before dispatch and transfers focus only after route commit', async () => {
+  test('claims one presentation when the queued dispatch begins and transfers focus only after route commit', async () => {
     const createButton = document.createElement('button')
     document.body.appendChild(createButton)
     createButton.focus()
@@ -303,6 +303,56 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(dispatch).resolves.toMatchObject({ ok: false })
     expect(focusTerminal).not.toHaveBeenCalled()
+  })
+
+  test('serializes presentation authority for concurrent creates on the same target', async () => {
+    const terminalSessionIds = [
+      'term-111111111111111111111',
+      'term-222222222222222222222',
+      'term-333333333333333333333',
+    ]
+    const createCommandsMayCommit = Promise.withResolvers<void>()
+    let commandIndex = 0
+    terminalCreateCommandMocks.runCreateTerminalTabCommand.mockImplementation(async (commandInput) => {
+      const terminalSessionId = terminalSessionIds[commandIndex]
+      commandIndex += 1
+      if (!terminalSessionId) throw new Error('unexpected terminal create command')
+      await createCommandsMayCommit.promise
+      const commit = await commandInput.commitCreatedTerminalTab(createAdmission(terminalSessionId))
+      return {
+        ok: true,
+        terminalSessionId,
+        presentationStatus: commit.status,
+      }
+    })
+    const presentedTerminalSessionIds: string[] = []
+    const showCreatedTerminalTab = vi.fn(
+      async (terminalSessionId: string, _presentation: unknown, routeRequest: CreatedTerminalRouteRequest) => {
+        expect(appNavigationIsCurrent(routeRequest.navigationGeneration)).toBe(true)
+        expect(routeRequest.routePrecondition).toEqual({ kind: 'current-workspace-target' })
+        presentedTerminalSessionIds.push(terminalSessionId)
+        return true
+      },
+    )
+    const dispatches = terminalSessionIds.map(() =>
+      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+        base: BASE,
+        createTerminal: vi.fn(async () => createAdmission()),
+        openerIdentity: null,
+        showCreatedTerminalTab,
+        focusTerminal: vi.fn(),
+      }),
+    )
+    createCommandsMayCommit.resolve()
+
+    await expect(Promise.all(dispatches)).resolves.toEqual(
+      terminalSessionIds.map((terminalSessionId) => ({
+        ok: true,
+        terminalSessionId,
+        presentationStatus: 'committed',
+      })),
+    )
+    expect(presentedTerminalSessionIds).toEqual(terminalSessionIds)
   })
 
   test('releases automatic focus when the create target is superseded', async () => {
@@ -529,7 +579,10 @@ function translate(key: string): string {
 }
 
 function createdTerminalRouteRequest(): CreatedTerminalRouteRequest {
-  return { navigationGeneration: beginAppNavigation() }
+  return {
+    navigationGeneration: beginAppNavigation(),
+    routePrecondition: { kind: 'current-workspace-target' },
+  }
 }
 
 interface HeldTerminalCreateCommandInput {
@@ -559,9 +612,9 @@ function committedCreateCommandResult(): TerminalCreateCommandResult {
   }
 }
 
-function createAdmission(): TerminalCreateLeaderAdmissionResult {
+function createAdmission(terminalSessionId = TERMINAL_SESSION_ID): TerminalCreateLeaderAdmissionResult {
   return {
-    terminalSessionId: TERMINAL_SESSION_ID,
+    terminalSessionId,
     presentation: { kind: 'git-worktree' as const },
     requestRole: 'leader',
     resourceDisposition: 'created',
