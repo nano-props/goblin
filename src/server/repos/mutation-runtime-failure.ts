@@ -1,5 +1,5 @@
 import type { RepoMutationResult } from '#/server/repos/mutation-impact.ts'
-import type { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import type { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 
 /**
  * Carries an established domain mutation result to its application owner before the

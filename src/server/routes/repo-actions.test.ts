@@ -9,7 +9,7 @@ import {
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepositoryBoundaryUnavailableError } from '#/server/repos/boundary-error.ts'
 import type { createRepoRoutes } from '#/server/routes/repo.ts'
-import { acquireWorkspaceRuntime, releaseWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
+import { acquireWorkspaceRuntime, releaseWorkspaceRuntime } from '#/server/workspaces/runtime/authority.ts'
 import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

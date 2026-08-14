@@ -1,11 +1,11 @@
 import {
   remoteWorkspaceRuntimeFailureFromCommandResult,
   remoteWorkspaceRuntimeFailureFromTargetResolutionError,
-} from '#/server/modules/remote-workspace-runtime-failure.ts'
+} from '#/server/workspaces/runtime/remote-failure.ts'
 import { parseRemoteWorkspaceId, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/config.ts'
-import type { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import type { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 import type { RemoteGitRunner } from '#/system/ssh/git.ts'
 
 export interface RepoSourceRuntimeContext {

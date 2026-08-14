@@ -7,7 +7,7 @@ import {
   isCurrentWorkspaceRuntime,
   isCurrentWorkspaceRuntimeMembership,
   releaseWorkspaceRuntimeMembershipLease,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -34,7 +34,7 @@ vi.mock('#/server/repos/read-paths.ts', () => ({
   readRepoSnapshot: mocks.readRepoSnapshot,
 }))
 
-vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
+vi.mock('#/server/workspaces/runtime/remote-lifecycle-write-paths.ts', () => ({
   runRemoteWorkspaceLifecycleWrite: mocks.runRemoteWorkspaceLifecycleWrite,
 }))
 

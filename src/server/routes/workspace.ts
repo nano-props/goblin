@@ -8,7 +8,7 @@ import {
   runSerializedInitialWorkspaceProbe,
   runSerializedWorkspaceRefresh,
   withWorkspaceRuntimeAdmission,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { readWorkspaceFilesystemTree } from '#/server/workspaces/filesystem/tree.ts'
 import { readWorkspaceFileViewer } from '#/server/workspaces/filesystem/file-viewer.ts'
 import { readWorkspaceDirectoryOverview } from '#/server/workspaces/filesystem/directory-overview.ts'
@@ -23,13 +23,13 @@ import {
   requireCurrentWorkspaceRuntime,
   requireWorkspaceRuntimeEpochCapability,
   runWorkspaceRuntimeRequest,
-} from '#/server/modules/workspace-runtime-request.ts'
+} from '#/server/workspaces/runtime/request.ts'
 import {
   publishUserRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation,
 } from '#/server/realtime/invalidation-broker.ts'
 import { probeLocalWorkspace, probeWorkspace } from '#/server/workspaces/probe.ts'
-import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
+import { workspaceGitCleanupRequired } from '#/server/workspaces/runtime/capability-transition.ts'
 import {
   commitGitCapabilityRemovalOrThrow,
   type WorkspaceCapabilityTransitionHost,

@@ -1,9 +1,9 @@
-import { failRemoteWorkspaceLifecycle } from '#/server/modules/workspace-runtimes.ts'
+import { failRemoteWorkspaceLifecycle } from '#/server/workspaces/runtime/authority.ts'
 import { publishUserWorkspaceRuntimeInvalidation } from '#/server/realtime/invalidation-broker.ts'
 import {
   isRemoteWorkspaceRuntimeFailure,
   type RemoteWorkspaceRuntimeFailureError,
-} from '#/server/modules/remote-workspace-runtime-failure.ts'
+} from '#/server/workspaces/runtime/remote-failure.ts'
 
 /**
  * Mark a workspace's remote lifecycle as failed from a classified

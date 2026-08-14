@@ -21,7 +21,7 @@ import {
   supersededRemoteWorkspaceLifecycleResult,
   type RemoteWorkspaceLifecycleRunResult,
   type RemoteWorkspaceTerminalCommitPlan,
-} from '#/server/modules/workspace-runtime-remote-policy.ts'
+} from '#/server/workspaces/runtime/remote-policy.ts'
 
 /**
  * Process-local authority for workspace runtime epochs.
@@ -31,7 +31,7 @@ import {
  * one runtime epoch is still owned and when it may be invalidated. Splitting
  * those writes would create a second liveness authority or distribute commit
  * ordering across callbacks. Pure remote result and probe-transition policy
- * lives in `workspace-runtime-remote-policy.ts`.
+ * lives in `remote-policy.ts`.
  */
 interface WorkspaceRuntimeState {
   workspaceId: WorkspaceId

@@ -12,7 +12,7 @@ import {
   type WorkspaceSettledProbeState,
   type WorkspaceUnavailableReason,
 } from '#/shared/workspace-runtime.ts'
-import { resolveServerRemoteWorkspaceConnection } from '#/server/modules/remote-workspace.ts'
+import { resolveServerRemoteWorkspaceConnection } from '#/server/workspaces/runtime/remote-connection.ts'
 import { parseGitHubRemoteUrl } from '#/system/github/graphql.ts'
 
 export interface LocalWorkspaceProbeDependencies {

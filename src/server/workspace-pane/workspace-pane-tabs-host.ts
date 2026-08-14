@@ -6,7 +6,7 @@ import type {
 } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import type { WorkspaceRuntimeMembershipCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeMembershipCapability } from '#/server/workspaces/runtime/authority.ts'
 
 type MaybePromise<T> = T | Promise<T>
 

@@ -6,11 +6,11 @@ import {
   isCurrentWorkspaceRuntime,
   WorkspaceRuntimeStaleError,
   type WorkspaceRuntimeEpochCapability,
-} from '#/server/modules/workspace-runtimes.ts'
-import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
-import { settleRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+} from '#/server/workspaces/runtime/authority.ts'
+import { isRemoteWorkspaceRuntimeFailure } from '#/server/workspaces/runtime/remote-failure.ts'
+import { settleRemoteWorkspaceRuntimeFailure } from '#/server/workspaces/runtime/remote-failure-settlement.ts'
 import { isRepositoryBoundaryUnavailableError } from '#/server/repos/boundary-error.ts'
-import { isWorkspaceRuntimeAdmissionClosedError } from '#/server/modules/workspace-runtime-admission-error.ts'
+import { isWorkspaceRuntimeAdmissionClosedError } from '#/server/workspaces/runtime/admission-error.ts'
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 import { isRepoMembershipReadConflictError } from '#/server/repos/membership-read-conflict.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
@@ -20,7 +20,7 @@ import {
   type RepoMutationResult,
 } from '#/server/repos/mutation-impact.ts'
 import { stopBackgroundSyncRuntime } from '#/server/modules/background-sync.ts'
-import type { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import type { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 
 const workspaceRuntimeRequestLogger = serverNodeLog.child({ module: 'workspace-runtime-request' })
 

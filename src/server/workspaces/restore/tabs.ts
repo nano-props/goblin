@@ -8,8 +8,8 @@ import {
   WorkspaceRuntimeStaleError,
   workspaceProbeStateForRuntime,
   type WorkspaceRuntimeMembershipCapability,
-} from '#/server/modules/workspace-runtimes.ts'
-import { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
+} from '#/server/workspaces/runtime/authority.ts'
+import { runRemoteWorkspaceLifecycleWrite } from '#/server/workspaces/runtime/remote-lifecycle-write-paths.ts'
 import { confirmServerWorkspaceEntry, getServerWorkspaceState } from '#/server/settings/source.ts'
 import { restoreWorkspacePaneTabsForMemberships, workspaceEntry } from '#/server/workspaces/restore/pane-tabs.ts'
 import { abortableWorkspaceRestore } from '#/server/workspaces/restore/utils.ts'
@@ -19,7 +19,7 @@ import {
   commitGitCapabilityRemovalOrThrow,
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
-import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
+import { workspaceGitCleanupRequired } from '#/server/workspaces/runtime/capability-transition.ts'
 import {
   workspaceGitAvailable,
   type WorkspaceProbeState,

@@ -7,7 +7,7 @@ import {
   clearWorkspaceRuntimesForUser,
   releaseWorkspaceRuntime,
   type WorkspaceRuntimeMembershipCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'

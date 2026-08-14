@@ -11,9 +11,9 @@ import {
 } from '#/server/repos/write-operation-coordinator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoWriteExecutionCapability } from '#/server/repos/source.ts'
-import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/workspaces/runtime/authority.ts'
 import { RepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
-import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { repoRuntimeCapabilityForTest } from '#/server/test-utils/repo-module.ts'
@@ -61,7 +61,7 @@ vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
   publishRepoReadInvalidation: mocks.publishRepoReadInvalidation,
 }))
 
-vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
+vi.mock('#/server/workspaces/runtime/authority.ts', () => ({
   onWorkspaceRuntimeClosed: (
     listener: (event: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string }) => void,
   ) => {

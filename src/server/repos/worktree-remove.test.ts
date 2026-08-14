@@ -249,7 +249,7 @@ describe('repo worktree removal', () => {
   test('prunes settings after an explicit removal lifecycle before propagating a preclassified carrier', async () => {
     const [{ RepoMutationRuntimeFailureError }, { RemoteWorkspaceRuntimeFailureError }] = await Promise.all([
       import('#/server/repos/mutation-runtime-failure.ts'),
-      import('#/server/modules/remote-workspace-runtime-failure.ts'),
+      import('#/server/workspaces/runtime/remote-failure.ts'),
     ])
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })

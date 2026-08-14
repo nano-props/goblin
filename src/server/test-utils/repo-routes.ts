@@ -4,7 +4,7 @@ import {
   clearWorkspaceRuntimesForUser,
   listWorkspaceRuntimes,
   runRemoteWorkspaceLifecycle,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'

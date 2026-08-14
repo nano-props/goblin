@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { acquireWorkspaceRuntime, clearWorkspaceRuntimesForUser } from '#/server/modules/workspace-runtimes.ts'
+import { acquireWorkspaceRuntime, clearWorkspaceRuntimesForUser } from '#/server/workspaces/runtime/authority.ts'
 import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'

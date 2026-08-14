@@ -21,15 +21,15 @@ import { serverNodeLog } from '#/node/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
-import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/workspaces/runtime/remote-failure-settlement.ts'
 import {
   WorkspaceRuntimeStaleError,
   type WorkspaceRuntimeMembershipCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { restorableWorkspacePaneTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { runtimeWorkspacePaneTargetKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceTerminalAvailable } from '#/shared/workspace-runtime.ts'
-import { workspaceProbeStateForRuntime } from '#/server/modules/workspace-runtimes.ts'
+import { workspaceProbeStateForRuntime } from '#/server/workspaces/runtime/authority.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { TerminalCloseOutcome } from '#/server/terminal/terminal-session-close.ts'

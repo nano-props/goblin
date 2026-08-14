@@ -5,14 +5,14 @@ import { serverNodeLog } from '#/node/logger.ts'
 import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/server/settings/source.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
-import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
+import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/workspaces/runtime/remote-failure-settlement.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
 import { publishRepoMutationInvalidations } from '#/server/repos/mutation-invalidation.ts'
 import {
   onWorkspaceRuntimeClosed,
   onWorkspaceRuntimeFailed,
   onWorkspaceRuntimeMembershipReleased,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import {
   backgroundSyncBackoffDelayMs,
   backgroundSyncNextEligibleAt,
@@ -24,7 +24,7 @@ import {
   type BackgroundSyncTargetIdentity,
   type RegisteredGitBackgroundSyncTarget,
 } from '#/server/modules/background-sync-policy.ts'
-import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/workspaces/runtime/authority.ts'
 
 interface AdmittedGitBackgroundSyncTarget extends GitBackgroundSyncTarget {
   runtimeCapability: WorkspaceRuntimeEpochCapability

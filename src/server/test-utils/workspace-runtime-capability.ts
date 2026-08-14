@@ -1,7 +1,7 @@
 import {
   runSerializedInitialWorkspaceProbe,
   type WorkspaceRuntimeEpochCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 

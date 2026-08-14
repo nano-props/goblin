@@ -208,7 +208,7 @@ describe('repo branch mutations', () => {
     const [{ RepoMutationRuntimeFailureError }, { RemoteWorkspaceRuntimeFailureError }, { pushRepoBranch }] =
       await Promise.all([
         import('#/server/repos/mutation-runtime-failure.ts'),
-        import('#/server/modules/remote-workspace-runtime-failure.ts'),
+        import('#/server/workspaces/runtime/remote-failure.ts'),
         import('#/server/repos/write-paths.ts'),
       ])
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
@@ -238,7 +238,7 @@ describe('repo branch mutations', () => {
     const [{ RepoMutationRuntimeFailureError }, { RemoteWorkspaceRuntimeFailureError }, { deleteRepoBranch }] =
       await Promise.all([
         import('#/server/repos/mutation-runtime-failure.ts'),
-        import('#/server/modules/remote-workspace-runtime-failure.ts'),
+        import('#/server/workspaces/runtime/remote-failure.ts'),
         import('#/server/repos/write-paths.ts'),
       ])
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })

@@ -3,10 +3,10 @@ import { createRemoteRoutes } from '#/server/routes/remote.ts'
 import type {
   RunRemoteWorkspaceLifecycleInput,
   RunRemoteWorkspaceLifecycleOptions,
-} from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
+} from '#/server/workspaces/runtime/remote-lifecycle-write-paths.ts'
 import type { RemoteWorkspaceLifecycleCommandResult } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { acquireWorkspaceRuntime, clearWorkspaceRuntimesForUser } from '#/server/modules/workspace-runtimes.ts'
+import { acquireWorkspaceRuntime, clearWorkspaceRuntimesForUser } from '#/server/workspaces/runtime/authority.ts'
 
 const REMOTE_ID = workspaceIdForTest('goblin+ssh://example/repo')
 const USER_ID = 'user-test'
@@ -24,10 +24,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('#/server/common/identity.ts', () => ({ userIdFromContext: () => 'user-test' }))
-vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
+vi.mock('#/server/workspaces/runtime/remote-lifecycle-write-paths.ts', () => ({
   runRemoteWorkspaceLifecycleWrite: mocks.runLifecycleWrite,
 }))
-vi.mock('#/server/modules/remote-workspace.ts', () => ({
+vi.mock('#/server/workspaces/runtime/remote-connection.ts', () => ({
   getServerRemotePathSuggestions: mocks.getServerRemotePathSuggestions,
   getServerSshHosts: vi.fn(),
   resolveServerRemoteTarget: vi.fn(),

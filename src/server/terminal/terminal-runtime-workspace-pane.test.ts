@@ -3,7 +3,7 @@ import {
   acquireWorkspaceRuntime,
   closeWorkspaceRuntimesForDurableRemoval,
   type WorkspaceRuntimeEpochCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import {
   WORKSPACE_PANE_TABS_REALTIME_EVENTS,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS,

@@ -22,7 +22,7 @@ import {
   workspaceRuntimeHasGitCapability,
   withWorkspaceRuntimeAdmission,
   WorkspaceRuntimeStaleError,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'

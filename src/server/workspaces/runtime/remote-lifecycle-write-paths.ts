@@ -1,9 +1,9 @@
 import { publishUserWorkspaceRuntimeInvalidation } from '#/server/realtime/invalidation-broker.ts'
-import { resolveServerRemoteWorkspaceConnection } from '#/server/modules/remote-workspace.ts'
-import { isCurrentWorkspaceRuntime, runRemoteWorkspaceLifecycle } from '#/server/modules/workspace-runtimes.ts'
+import { resolveServerRemoteWorkspaceConnection } from '#/server/workspaces/runtime/remote-connection.ts'
+import { isCurrentWorkspaceRuntime, runRemoteWorkspaceLifecycle } from '#/server/workspaces/runtime/authority.ts'
 import { isRemoteWorkspaceId, type RemoteWorkspaceLifecycleCommandResult } from '#/shared/remote-workspace.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
-import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
+import { workspaceGitCleanupRequired } from '#/server/workspaces/runtime/capability-transition.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface RunRemoteWorkspaceLifecycleInput {

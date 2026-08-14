@@ -50,7 +50,7 @@ describe('server remote target resolution', () => {
       timedOut: false,
     })
 
-    const { resolveServerRemoteTarget } = await import('#/server/modules/remote-workspace.ts')
+    const { resolveServerRemoteTarget } = await import('#/server/workspaces/runtime/remote-connection.ts')
     const result = await resolveServerRemoteTarget({ alias: 'prod', remotePath: '~/service' })
 
     expect('target' in result).toBe(true)
@@ -75,7 +75,7 @@ describe('server remote target resolution', () => {
       port: 22,
       remotePath: '/srv/workspace',
     })!
-    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/workspaces/runtime/remote-connection.ts')
 
     await expect(
       resolveServerRemoteWorkspaceConnection({ workspaceId: target.id }, undefined, {
@@ -90,7 +90,7 @@ describe('server remote target resolution', () => {
   })
 
   test('rejects a local workspace at the remote connection boundary', async () => {
-    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/workspaces/runtime/remote-connection.ts')
 
     await expect(
       resolveServerRemoteWorkspaceConnection({ workspaceId: workspaceIdForTest('goblin+file:///srv/workspace') }),
@@ -105,7 +105,7 @@ describe('server remote target resolution', () => {
       port: 22,
       remotePath: '/srv/workspace',
     })!
-    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/workspaces/runtime/remote-connection.ts')
 
     await expect(
       resolveServerRemoteWorkspaceConnection({ workspaceId: target.id }, undefined, {
@@ -126,7 +126,7 @@ describe('server remote target resolution', () => {
       port: 22,
       remotePath: '/srv/workspace',
     })!
-    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/workspaces/runtime/remote-connection.ts')
     const result = await resolveServerRemoteWorkspaceConnection({ workspaceId: target.id }, undefined, {
       resolveTarget: async () => ({ target }),
       probeRemote: async () => ({
@@ -151,7 +151,7 @@ describe('server remote target resolution', () => {
       port: 22,
       remotePath: '/missing',
     })!
-    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/workspaces/runtime/remote-connection.ts')
     const result = await resolveServerRemoteWorkspaceConnection({ workspaceId: target.id }, undefined, {
       resolveTarget: async () => ({ target }),
       probeRemote: async () => ({
@@ -175,7 +175,7 @@ describe('server remote target resolution', () => {
       port: 22,
       remotePath: '/srv/repo/child',
     })!
-    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/modules/remote-workspace.ts')
+    const { resolveServerRemoteWorkspaceConnection } = await import('#/server/workspaces/runtime/remote-connection.ts')
     await expect(
       resolveServerRemoteWorkspaceConnection({ workspaceId: target.id }, undefined, {
         resolveTarget: async () => ({ target }),

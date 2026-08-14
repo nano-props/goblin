@@ -4,7 +4,7 @@ import {
   captureWorkspaceRuntimeMembershipLease,
   expireWorkspaceRuntimeMembershipLease,
   onWorkspaceRuntimeMembershipAcquired,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 

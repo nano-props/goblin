@@ -4,7 +4,7 @@ import { localWorkspaceNativePath } from '#/server/workspaces/path.ts'
 import { resolveRemoteWorkspaceTarget } from '#/server/repos/remote-execution.ts'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
-import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/workspaces/runtime/remote-failure.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const DIRECTORY_OVERVIEW_TIMEOUT_MS = 30_000

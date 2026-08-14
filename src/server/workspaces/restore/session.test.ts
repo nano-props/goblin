@@ -39,7 +39,7 @@ const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
   commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
 }
 
-vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
+vi.mock('#/server/workspaces/runtime/authority.ts', () => ({
   WorkspaceRuntimeStaleError: mocks.WorkspaceRuntimeStaleError,
   acquireWorkspaceRuntimeLease: mocks.acquireWorkspaceRuntimeLease,
   captureWorkspaceRuntimeMembershipCapability: mocks.captureWorkspaceRuntimeMembershipCapability,
@@ -72,7 +72,7 @@ vi.mock('#/server/workspaces/probe.ts', () => ({
   probeWorkspace: mocks.probeWorkspace,
 }))
 
-vi.mock('#/server/modules/remote-workspace-lifecycle-write-paths.ts', () => ({
+vi.mock('#/server/workspaces/runtime/remote-lifecycle-write-paths.ts', () => ({
   runRemoteWorkspaceLifecycleWrite: mocks.runRemoteWorkspaceLifecycleWrite,
 }))
 

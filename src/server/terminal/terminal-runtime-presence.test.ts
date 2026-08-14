@@ -3,7 +3,7 @@ import {
   acquireWorkspaceRuntime,
   captureWorkspaceRuntimeMembershipLease,
   withWorkspaceRuntimeAdmission,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import {
   CLIENT_STATE_GRACE_MS,

@@ -12,9 +12,9 @@ import { isRepoMutationRuntimeFailureError } from '#/server/repos/mutation-runti
 import {
   isRemoteWorkspaceRuntimeFailure,
   type RemoteWorkspaceRuntimeFailureError,
-} from '#/server/modules/remote-workspace-runtime-failure.ts'
-import { onWorkspaceRuntimeClosed, onWorkspaceRuntimeFailed } from '#/server/modules/workspace-runtimes.ts'
-import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/remote-failure.ts'
+import { onWorkspaceRuntimeClosed, onWorkspaceRuntimeFailed } from '#/server/workspaces/runtime/authority.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/workspaces/runtime/authority.ts'
 import type {
   RepoOperationCancellationReason,
   RepoServerOperationKind,
@@ -24,7 +24,7 @@ import type {
 } from '#/shared/api-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { WorkspaceRuntimeAdmissionClosedError } from '#/server/modules/workspace-runtime-admission-error.ts'
+import { WorkspaceRuntimeAdmissionClosedError } from '#/server/workspaces/runtime/admission-error.ts'
 import {
   isSettledRepoWriteOperation,
   projectRepoWriteOperations,

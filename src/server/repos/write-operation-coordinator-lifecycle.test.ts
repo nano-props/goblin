@@ -22,7 +22,7 @@ vi.mock('#/server/repos/write-boundary.ts', () => ({
   resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
 }))
 
-vi.mock('#/server/modules/workspace-runtimes.ts', () => ({
+vi.mock('#/server/workspaces/runtime/authority.ts', () => ({
   onWorkspaceRuntimeClosed: (
     listener: (event: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string }) => void,
   ) => {

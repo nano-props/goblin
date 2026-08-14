@@ -4,9 +4,9 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import type { BackgroundSyncRegistrationAdmission } from '#/server/modules/background-sync.ts'
-import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
-import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/workspaces/runtime/authority.ts'
 
 const REPO = workspaceIdForTest('goblin+file:///workspace')
 const REPO_A = workspaceIdForTest('goblin+file:///workspace-a')
@@ -65,7 +65,7 @@ vi.mock('#/server/settings/source.ts', () => ({
   subscribeServerFetchInterval: mocks.subscribeServerFetchInterval,
 }))
 
-vi.mock('#/server/modules/remote-workspace-runtime-failure-settlement.ts', () => ({
+vi.mock('#/server/workspaces/runtime/remote-failure-settlement.ts', () => ({
   failRemoteWorkspaceRuntimeIfNeeded: mocks.failRemoteWorkspaceRuntimeIfNeeded,
 }))
 
@@ -158,7 +158,7 @@ describe('server background sync scheduler', () => {
 
   test('stops automatic sync when the authoritative runtime lifecycle fails elsewhere', async () => {
     const { acquireWorkspaceRuntime, failRemoteWorkspaceLifecycle, releaseWorkspaceRuntime } =
-      await import('#/server/modules/workspace-runtimes.ts')
+      await import('#/server/workspaces/runtime/authority.ts')
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REMOTE_REPO, CLIENT_ID)
     const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, getBackgroundSyncDiagnostics } =
       await import('#/server/modules/background-sync.ts')
@@ -709,7 +709,8 @@ describe('server background sync scheduler', () => {
       getBackgroundSyncRepos,
       prepareBackgroundSync,
     } = await import('#/server/modules/background-sync.ts')
-    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime } = await import('#/server/modules/workspace-runtimes.ts')
+    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime } =
+      await import('#/server/workspaces/runtime/authority.ts')
     const clientId = 'background-sync-client'
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO, clientId)
     await prepareBackgroundSync()
@@ -736,7 +737,7 @@ describe('server background sync scheduler', () => {
       prepareBackgroundSync,
     } = await import('#/server/modules/background-sync.ts')
     const { acquireWorkspaceRuntime, releaseWorkspaceRuntime, retainWorkspaceRuntimeResource } =
-      await import('#/server/modules/workspace-runtimes.ts')
+      await import('#/server/workspaces/runtime/authority.ts')
     const ownerClientId = 'background-sync-owner-client'
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO, ownerClientId)
     const retention = retainWorkspaceRuntimeResource(USER_ID, REPO, workspaceRuntimeId, 'terminal-session')
@@ -763,7 +764,8 @@ describe('server background sync scheduler', () => {
   test('aborts pending admission when its Workspace membership is released', async () => {
     const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, prepareBackgroundSync } =
       await import('#/server/modules/background-sync.ts')
-    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime } = await import('#/server/modules/workspace-runtimes.ts')
+    const { acquireWorkspaceRuntime, releaseWorkspaceRuntime } =
+      await import('#/server/workspaces/runtime/authority.ts')
     const clientId = 'background-sync-pending-client'
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REPO, clientId)
     await prepareBackgroundSync()

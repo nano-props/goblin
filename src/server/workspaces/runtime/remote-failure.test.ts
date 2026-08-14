@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { remoteWorkspaceRuntimeFailureReasonFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { remoteWorkspaceRuntimeFailureReasonFromCommandResult } from '#/server/workspaces/runtime/remote-failure.ts'
 import type { RemoteWorkspaceFailureReason, RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

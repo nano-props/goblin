@@ -36,7 +36,7 @@ import {
   isCurrentWorkspaceRuntimeMembership,
   workspaceRuntimeClientHasMemberships,
   workspaceRuntimeHasGitCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { workspaceLocatorForPath, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
@@ -47,7 +47,7 @@ import {
   runCreateWorktreeMutationRuntimeRequest,
   runGitWorkspaceMutationRuntimeRequest,
   runGitWorkspaceRuntimeRequest,
-} from '#/server/modules/workspace-runtime-request.ts'
+} from '#/server/workspaces/runtime/request.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/repos/worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'

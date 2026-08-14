@@ -9,7 +9,7 @@ import {
   runRemoteWorkspaceLifecycle,
   runSerializedInitialWorkspaceProbe,
   workspaceRuntimeHasGitCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import type { RemoteWorkspaceConnectionResult, RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'

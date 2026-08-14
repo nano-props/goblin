@@ -33,7 +33,7 @@ import { isValidWorkspaceLocatorInput, toSafeWorkspaceLocator } from '#/shared/i
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
-import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/workspaces/runtime/authority.ts'
 
 const repoWriteLogger = serverNodeLog.child({ module: 'repo-write-paths' })
 

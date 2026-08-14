@@ -13,8 +13,8 @@ import {
   onWorkspaceRuntimeClosed,
   WorkspaceRuntimeStaleError,
   type WorkspaceRuntimeClosedEvent,
-} from '#/server/modules/workspace-runtimes.ts'
-import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
+} from '#/server/workspaces/runtime/authority.ts'
+import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/workspaces/runtime/remote-failure.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import { localWorkspaceNativePath } from '#/server/workspaces/path.ts'
 import {

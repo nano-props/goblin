@@ -6,11 +6,11 @@ import {
   clearWorkspaceRuntimesForUser,
   listWorkspaceRuntimes,
   WorkspaceRuntimeStaleError,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 
 const USER_ID = 'workspace-route-user'
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/workspace-route')

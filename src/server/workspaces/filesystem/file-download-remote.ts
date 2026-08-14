@@ -10,7 +10,7 @@ import {
   nodeReadableStream,
   type NodeReadableStart,
 } from '#/server/workspaces/filesystem/file-download-stream.ts'
-import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/workspaces/runtime/remote-failure.ts'
 import { remoteFileDownloadStreamScript } from '#/system/ssh/remote-file-download-script.ts'
 import { buildCanonicalSshInvocation, ensureSshControlDirectory } from '#/system/ssh/invocation.ts'
 

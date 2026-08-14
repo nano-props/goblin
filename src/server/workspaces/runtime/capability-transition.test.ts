@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   workspaceGitCleanupRequired,
   workspaceGitProbeConclusion,
-} from '#/server/modules/workspace-capability-transition.ts'
+} from '#/server/workspaces/runtime/capability-transition.ts'
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 
 const PLAIN_PROBE: WorkspaceProbeState = {

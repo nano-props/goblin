@@ -3,16 +3,16 @@ import {
   runCreateWorktreeMutationRuntimeRequest,
   runGitWorkspaceMutationRuntimeRequest,
   runGitWorkspaceRuntimeRequest,
-} from '#/server/modules/workspace-runtime-request.ts'
-import { WorkspaceRuntimeAdmissionClosedError } from '#/server/modules/workspace-runtime-admission-error.ts'
+} from '#/server/workspaces/runtime/request.ts'
+import { WorkspaceRuntimeAdmissionClosedError } from '#/server/workspaces/runtime/admission-error.ts'
 import { RepoMembershipReadConflictError } from '#/server/repos/membership-read-conflict.ts'
 import { RepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
-import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const settleRemoteWorkspaceRuntimeFailureMock = vi.hoisted(() => vi.fn())
 const stopBackgroundSyncRuntimeMock = vi.hoisted(() => vi.fn())
-vi.mock('#/server/modules/remote-workspace-runtime-failure-settlement.ts', () => ({
+vi.mock('#/server/workspaces/runtime/remote-failure-settlement.ts', () => ({
   settleRemoteWorkspaceRuntimeFailure: settleRemoteWorkspaceRuntimeFailureMock,
 }))
 vi.mock('#/server/modules/background-sync.ts', () => ({

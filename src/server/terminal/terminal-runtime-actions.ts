@@ -26,7 +26,7 @@ import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import type { TerminalCloseOutcome, TerminalSessionCloseOutcome } from '#/server/terminal/terminal-session-close.ts'
-import type { WorkspaceRuntimeMembershipCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeMembershipCapability } from '#/server/workspaces/runtime/authority.ts'
 
 interface TerminalSessionServiceLike {
   listSessions(

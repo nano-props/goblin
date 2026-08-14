@@ -8,8 +8,8 @@ import { serverNodeLog } from '#/node/logger.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { PhysicalWorktreeCapture } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { isRepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
-import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
-import { WorkspaceRuntimeStaleError } from '#/server/modules/workspace-runtimes.ts'
+import { isRemoteWorkspaceRuntimeFailure } from '#/server/workspaces/runtime/remote-failure.ts'
+import { WorkspaceRuntimeStaleError } from '#/server/workspaces/runtime/authority.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 
 const worktreeRemovalLogger = serverNodeLog.child({ module: 'worktree-removal-application' })

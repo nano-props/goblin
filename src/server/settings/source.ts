@@ -41,11 +41,11 @@ import type {
   WorkspacePaneLayoutRestoreTransaction,
   WorkspacePaneLayoutRestoreTransactionOutcome,
 } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
-import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/workspaces/runtime/authority.ts'
 import {
   closeWorkspaceRuntimesForDurableRemoval,
   runWithWorkspaceRuntimeEpochCommitOwnership,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { MAX_RECENT_WORKSPACES, defaultUserSettings, defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import {
   currentSettingsData,

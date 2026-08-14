@@ -40,7 +40,7 @@ import {
   captureWorkspaceRuntimeEpochCapability,
   WorkspaceRuntimeStaleError,
   type WorkspaceRuntimeMembershipCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import {
   createTerminalSessionEnsurer,

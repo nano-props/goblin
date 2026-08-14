@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { acquireWorkspaceRuntime, releaseWorkspaceRuntime } from '#/server/modules/workspace-runtimes.ts'
+import { acquireWorkspaceRuntime, releaseWorkspaceRuntime } from '#/server/workspaces/runtime/authority.ts'
 import { REALTIME_LIVENESS_PROBE_INTERVAL_MS } from '#/server/realtime/realtime-broker.ts'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import {

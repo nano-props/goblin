@@ -351,7 +351,7 @@ describe('fetchRepo canonical boundaries', () => {
     const [writePaths, capabilityModule, workspaceRuntimes, coordinator] = await Promise.all([
       import('#/server/repos/write-paths.ts'),
       import('#/server/worktree-removal/physical-worktree-capability.ts'),
-      import('#/server/modules/workspace-runtimes.ts'),
+      import('#/server/workspaces/runtime/authority.ts'),
       import('#/server/repos/write-operation-coordinator.ts'),
     ])
     workspaceRuntimes.clearWorkspaceRuntimesForUser(userId)

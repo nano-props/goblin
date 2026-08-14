@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
+import { runRemoteWorkspaceLifecycleWrite } from '#/server/workspaces/runtime/remote-lifecycle-write-paths.ts'
 import {
   acquireWorkspaceRuntime,
   clearWorkspaceRuntimesForUser,
   failRemoteWorkspaceLifecycle,
   listWorkspaceRuntimes,
   releaseWorkspaceRuntime,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import type { RemoteWorkspaceConnectionResult } from '#/shared/remote-workspace.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
   publishUserWorkspaceRuntimeInvalidation: mocks.publishInvalidation,
 }))
-vi.mock('#/server/modules/remote-workspace.ts', () => ({
+vi.mock('#/server/workspaces/runtime/remote-connection.ts', () => ({
   resolveServerRemoteWorkspaceConnection: mocks.resolveConnection,
 }))
 

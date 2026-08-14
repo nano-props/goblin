@@ -15,7 +15,7 @@ import {
   acquireWorkspaceRuntimeLease,
   captureWorkspaceRuntimeMembershipCapability,
   clearWorkspaceRuntimesForUser,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 
 let tmp: string | null = null
 let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -321,7 +321,7 @@ describe('settings source', () => {
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
     const source = await import('#/server/settings/source.ts')
-    const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+    const runtimes = await import('#/server/workspaces/runtime/authority.ts')
     runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
     try {
       const initialRuntimeId = runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, 'client-initial')
@@ -347,7 +347,7 @@ describe('settings source', () => {
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
     const source = await import('#/server/settings/source.ts')
-    const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+    const runtimes = await import('#/server/workspaces/runtime/authority.ts')
     runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
     try {
       await source.addServerWorkspaceEntry({ id: REPO_A })
@@ -375,7 +375,7 @@ describe('settings source', () => {
     const repoC = { id: REPO_C }
     await mod.addServerWorkspaceEntry(repoA)
     await mod.addServerWorkspaceEntry(repoB)
-    const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+    const runtimes = await import('#/server/workspaces/runtime/authority.ts')
     runtimes.clearWorkspaceRuntimesForUser(RUNTIME_USER_ID)
     try {
       const runtimeA = runtimes.acquireWorkspaceRuntime(RUNTIME_USER_ID, REPO_A, 'client-a')
@@ -407,7 +407,7 @@ describe('settings source', () => {
     previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
     process.env.GOBLIN_SERVER_DATA_DIR = tmp
     const source = await import('#/server/settings/source.ts')
-    const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+    const runtimes = await import('#/server/workspaces/runtime/authority.ts')
     const repoA = { id: REPO_A }
     const repoB = { id: REPO_B }
     await source.addServerWorkspaceEntry(repoA)

@@ -26,7 +26,7 @@ describe('session restore membership invalidation', () => {
   afterEach(async () => {
     try {
       const settings = await import('#/server/settings/source.ts')
-      const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+      const runtimes = await import('#/server/workspaces/runtime/authority.ts')
       settings.resetServerSettingsSourceForTests()
       runtimes.clearWorkspaceRuntimesForUser(RESTORE_USER_ID)
       runtimes.clearWorkspaceRuntimesForUser(OTHER_USER_ID)
@@ -43,7 +43,7 @@ describe('session restore membership invalidation', () => {
 
   test('restore batch repair invalidates every runtime projected from removed durable memberships', async () => {
     const settings = await import('#/server/settings/source.ts')
-    const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+    const runtimes = await import('#/server/workspaces/runtime/authority.ts')
     const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     const retainedWorkspaceId = workspaceIdForCurrentPlatform('/retained-workspace')
     const removedWorkspaceA = workspaceIdForOtherPlatform('A')

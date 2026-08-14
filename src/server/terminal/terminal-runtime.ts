@@ -59,7 +59,7 @@ import {
   onWorkspaceRuntimeClosed,
   retainWorkspaceRuntimeResource,
   type WorkspaceRuntimeEpochCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'

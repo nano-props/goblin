@@ -7,7 +7,7 @@ import {
   remoteWorkspaceLifecycleTarget,
   settledRemoteWorkspaceLifecycleResult,
   supersededRemoteWorkspaceLifecycleResult,
-} from '#/server/modules/workspace-runtime-remote-policy.ts'
+} from '#/server/workspaces/runtime/remote-policy.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const workspaceId = workspaceIdForTest('goblin+ssh://example/workspace')

@@ -1,4 +1,4 @@
-import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/workspaces/runtime/authority.ts'
 
 export type WorkspaceCapabilityTransitionCommitResult =
   { kind: 'committed' } | { kind: 'failed-before-commit'; error: unknown }

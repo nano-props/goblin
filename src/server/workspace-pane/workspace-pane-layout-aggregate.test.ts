@@ -31,7 +31,7 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type {
   WorkspaceRuntimeEpochCapability,
   WorkspaceRuntimeMembershipCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 
 const scope = { userId: 'user-a', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime-a' }
 const testEpochCapability = epochCapabilityForTest(scope)

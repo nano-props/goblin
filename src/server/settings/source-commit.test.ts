@@ -46,7 +46,7 @@ describe('settings source commits', () => {
 
   test('commits a layout CAS with one durable write', async () => {
     const mod = await import('#/server/settings/source.ts')
-    const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+    const runtimes = await import('#/server/workspaces/runtime/authority.ts')
     const repository = mod.serverWorkspacePaneLayoutRepository
     const current = await repository.load(REPO_A)
     const writesBefore = persistence.writeUserSettingsJson.mock.calls.length
@@ -74,7 +74,7 @@ describe('settings source commits', () => {
 
   test('rejects a queued layout CAS when its runtime expires before the settings commit', async () => {
     const mod = await import('#/server/settings/source.ts')
-    const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+    const runtimes = await import('#/server/workspaces/runtime/authority.ts')
     const repository = mod.serverWorkspacePaneLayoutRepository
     const current = await repository.load(REPO_A)
     const writeStarted = Promise.withResolvers<void>()
@@ -108,7 +108,7 @@ describe('settings source commits', () => {
 
   test('serializes runtime invalidation with an in-flight durable layout commit', async () => {
     const mod = await import('#/server/settings/source.ts')
-    const runtimes = await import('#/server/modules/workspace-runtimes.ts')
+    const runtimes = await import('#/server/workspaces/runtime/authority.ts')
     const repository = mod.serverWorkspacePaneLayoutRepository
     const current = await repository.load(REPO_A)
     const lease = runtimes.acquireWorkspaceRuntimeLease('user-commit', REPO_A, 'client-commit')

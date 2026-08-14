@@ -6,7 +6,7 @@ import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.t
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { ServerWorkspaceMatchOutcome } from '#/server/settings/source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import type { WorkspaceRuntimeMembershipCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeMembershipCapability } from '#/server/workspaces/runtime/authority.ts'
 import { repoWorktreeMaterializedBranch } from '#/shared/git-types.ts'
 
 interface WorkspacePaneTabsRestoreInput {
