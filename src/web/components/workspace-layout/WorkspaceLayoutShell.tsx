@@ -13,7 +13,6 @@ interface WorkspaceLayoutShellProps {
   onWorkspacePaneSizeChange: (size: number) => void
   sidebarPane: VNodeChild
   workspacePane: VNodeChild
-  notice?: VNodeChild
   singlePaneActivePane?: 'navigator' | 'workspace'
   zenModeToggleEnabled?: boolean
   zenRevealSidebarPane?: VNodeChild
@@ -58,7 +57,6 @@ export const WorkspaceLayoutShell: FunctionalComponent<WorkspaceLayoutShellProps
 
   return (
     <section class="relative flex min-w-0 flex-1 flex-col">
-      {props.notice}
       {workspaceBody}
       {!props.compact && zenModeToggleEnabled && props.zenRevealSidebarPane ? (
         <ZenModeSidebarChrome
@@ -83,7 +81,6 @@ WorkspaceLayoutShell.props = [
   'onWorkspacePaneSizeChange',
   'sidebarPane',
   'workspacePane',
-  'notice',
   'singlePaneActivePane',
   'zenModeToggleEnabled',
   'zenRevealSidebarPane',

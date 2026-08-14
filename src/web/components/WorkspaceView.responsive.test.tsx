@@ -7,6 +7,7 @@ import { useFakeTimers } from '#/test-utils/timers.ts'
 import { WorkspaceView } from '#/web/components/WorkspaceView.tsx'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
+import { setWorkspaceProbeForTest } from '#/web/test-utils/repo-store.ts'
 import {
   responsiveMocks,
   REPO_ID,
@@ -21,9 +22,32 @@ import {
   zenModeSidebarTrigger,
   setReadModelLoading,
   setRepoUnavailable,
+  filesystemWorkspaceProbe,
+  workspaceRepoReadNotificationHostMocks,
 } from '#/web/test-utils/workspace-view.tsx'
 
 describe('WorkspaceView responsive layout', () => {
+  test('mounts the repository read notification host in compact Git workspaces', () => {
+    responsiveMocks.mode = 'compact'
+    const workspace = workspacesStore.getState().workspaces[REPO_ID]
+    if (!workspace) throw new Error('missing workspace fixture')
+
+    render(<WorkspaceView workspaceId={REPO_ID} />)
+
+    expect(workspaceRepoReadNotificationHostMocks.render).toHaveBeenCalledWith({
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: workspace.workspaceRuntimeId,
+    })
+  })
+
+  test('does not mount the repository read notification host for filesystem workspaces', () => {
+    setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
+
+    render(<WorkspaceView workspaceId={REPO_ID} />)
+
+    expect(workspaceRepoReadNotificationHostMocks.render).not.toHaveBeenCalled()
+  })
+
   test('compact branch activation slides Repo Workspace into the active pane', async () => {
     responsiveMocks.mode = 'compact'
     const { container, rerender } = render(<WorkspaceView workspaceId={REPO_ID} />)

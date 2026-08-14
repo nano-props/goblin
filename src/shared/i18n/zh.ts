@@ -71,6 +71,7 @@ export const zh: Record<DictKey, string> = {
   'app-chrome.menu': '菜单',
   'app-chrome.settings': '设置 (⌘,)',
   'app-chrome.settings-tooltip': '设置',
+  'app-chrome.notifications': '通知',
 
   // ---- Dependencies ------------------------------------------------------
 
@@ -359,6 +360,7 @@ export const zh: Record<DictKey, string> = {
   'status.main-worktree': '主',
   'status.worktree-clean': '干净',
   'status.stale-title': '正在显示旧的改动数据',
+  'status.dismiss-notification': '关闭通知',
   'status.copy-patch': '补丁',
   'status.copy-patch-label': '复制补丁',
   'status.copy-patch-title': '复制补丁',
