@@ -3,7 +3,7 @@ import { remoteExecResult } from '#/system/ssh/command-execution.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 
 describe('remote command execution', () => {
-  test('prefers stderr when converting remote exec failures', () => {
+  test('prefers message over stderr when converting remote exec failures', () => {
     expect(
       remoteExecResult({
         ok: false,

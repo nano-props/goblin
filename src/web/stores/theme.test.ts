@@ -202,7 +202,7 @@ describe('theme store OS-appearance sync', () => {
 
   test('matchMedia unavailable: hydrate still completes and listener is a no-op', async () => {
     // Use `theme: 'light'` so `resolveThemeStateFromUserSettings` in
-    // `settings-client.ts` never dereferences `matchMedia` (the
+    // `settings/client.ts` never dereferences `matchMedia` (the
     // optional chain there yields `undefined` when matchMedia is
     // absent, and `.matches` would throw).
     installWindow({ matchMedia: 'absent' })
