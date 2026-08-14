@@ -20,7 +20,7 @@ import { branchViewModeForWorkspace } from '#/web/stores/workspaces/branch-view-
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { runBranchActionShortcut } from '#/web/keyboard/branch-action-shortcuts.ts'
 import { matchClientKeyboardShortcut } from '#/shared/shortcut-definitions.ts'
-import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
+import { terminalHasKeyboardFocus } from '#/web/terminal/focus.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { BranchViewMode } from '#/shared/api-types.ts'

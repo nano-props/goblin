@@ -32,7 +32,7 @@ const mocks = vi.hoisted(() => ({
 
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 
-vi.mock('#/web/terminal.ts', () => ({
+vi.mock('#/web/terminal/client-facade.ts', () => ({
   terminalClient: {
     close: mocks.closeMock,
     listWorkspaceTabs: mocks.listWorkspaceTabsMock,

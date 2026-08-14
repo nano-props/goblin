@@ -50,7 +50,7 @@ import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitWorkspaceNavigatorRowIdentity } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
-import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
+import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal/focus.ts'
 import {
   gitWorktreePaneFilesystemTarget,
   workspaceRootPaneFilesystemTarget,

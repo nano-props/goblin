@@ -37,7 +37,7 @@ import {
   appNavigationIsCurrent,
   resetAppNavigationForTest,
 } from '#/web/app/navigation/lifecycle.ts'
-import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
+import { resetTerminalAutoFocusForTest } from '#/web/terminal/focus.ts'
 
 const terminalBase = {
   target: {

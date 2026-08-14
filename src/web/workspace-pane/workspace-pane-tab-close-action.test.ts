@@ -44,7 +44,7 @@ import {
   claimTerminalAutoFocus,
   fulfillTerminalPresentationFocus,
   resetTerminalAutoFocusForTest,
-} from '#/web/terminal-focus.ts'
+} from '#/web/terminal/focus.ts'
 import {
   beginAppNavigation,
   appNavigationIsCurrent,

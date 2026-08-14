@@ -10,7 +10,7 @@ import type {
   TerminalRestartResult,
   TerminalResizeResult,
 } from '#/shared/terminal-types.ts'
-import { terminalClient } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal/client-facade.ts'
 import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-font.ts'
 import {

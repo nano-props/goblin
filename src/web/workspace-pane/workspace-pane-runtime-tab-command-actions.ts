@@ -43,7 +43,7 @@ import {
   claimTerminalAutoFocus,
   type TerminalAutoFocusLease,
   type TerminalPresentationFocusEffects,
-} from '#/web/terminal-focus.ts'
+} from '#/web/terminal/focus.ts'
 
 export interface ExistingTerminalPresentationRouteRequest extends TerminalPresentationFocusEffects {
   navigationGeneration: AppNavigationGeneration

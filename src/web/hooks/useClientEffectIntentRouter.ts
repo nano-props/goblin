@@ -21,7 +21,7 @@ import { clientEffectIntentStoreActionsFromStore } from '#/web/stores/workspaces
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
-import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
+import { terminalHasKeyboardFocus } from '#/web/terminal/focus.ts'
 import { terminalSessionCoordinates } from '#/shared/terminal-types.ts'
 import { clientEffectIntentRequiresWorkspaceBootstrap } from '#/web/hooks/client-effect-intent-plans.ts'
 

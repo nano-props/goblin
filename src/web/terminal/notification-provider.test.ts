@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { onClientLocalEventType, resetClientLocalEventsForTests } from '#/web/local-events.ts'
-import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
+import { createTerminalNotificationProvider } from '#/web/terminal/notification-provider.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'

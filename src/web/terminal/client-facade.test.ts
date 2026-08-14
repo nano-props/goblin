@@ -31,7 +31,7 @@ describe('terminal web host client', () => {
 
   test('attaches terminals through terminal websocket request-response in web host mode', async () => {
     const fetchMock = mockFetch()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { readClientPageId } = await import('#/web/client-page-id.ts')
 
     const dispose = terminalClient.onOutput(() => {})
@@ -87,7 +87,7 @@ describe('terminal web host client', () => {
   })
 
   test('uses the page instance id for the realtime connection', async () => {
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { readClientPageId } = await import('#/web/client-page-id.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
@@ -131,7 +131,7 @@ describe('terminal web host client', () => {
   })
 
   test('uses the websocket client id when resolving identity role', async () => {
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { readClientPageId } = await import('#/web/client-page-id.ts')
     const clientId = readClientPageId()
     const onIdentity = vi.fn()
@@ -169,7 +169,7 @@ describe('terminal web host client', () => {
 
   test('does not fall back to http when attach websocket cannot open', async () => {
     const fetchMock = mockFetch()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     const attachPromise = terminalClient.attach({
@@ -188,7 +188,7 @@ describe('terminal web host client', () => {
 
   test('does not fall back to http when write websocket is unavailable', async () => {
     const fetchMock = mockFetch()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     const writePromise = terminalClient.write({
@@ -241,7 +241,7 @@ describe('terminal web host client', () => {
   })
 
   test('closes an idle terminal socket after a one-shot websocket request resolves without subscribers', async () => {
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const recoverPromise = terminalClient.recoverSessions({
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -270,7 +270,7 @@ describe('terminal web host client', () => {
 
   test('closes an idle terminal socket after a one-shot websocket request times out without subscribers', async () => {
     useFakeTimers()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const recoverPromise = terminalClient.recoverSessions({
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -298,7 +298,7 @@ describe('terminal web host client', () => {
 
   test('sends periodic liveness probes while the realtime socket is open', async () => {
     useFakeTimers()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
@@ -314,7 +314,7 @@ describe('terminal web host client', () => {
 
   test('periodic liveness probe send failure closes and reconnects an unhealthy realtime socket', async () => {
     useFakeTimers()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
@@ -349,7 +349,7 @@ describe('terminal web host client', () => {
 
   test('request timeout closes an unhealthy socket even while subscribers keep realtime open', async () => {
     useFakeTimers()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
@@ -381,7 +381,7 @@ describe('terminal web host client', () => {
   })
 
   test('forwards terminal output, bell, title, and exit events from the web socket', async () => {
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { workspacePaneTabsClient } = await import('#/web/workspace-pane/workspace-pane-tabs-client.ts')
     const onOutput = vi.fn()
     const onBell = vi.fn()
@@ -596,7 +596,7 @@ describe('terminal web host client', () => {
 
   test('kickReconnect health-probes an open app realtime socket and keeps it when pong arrives', async () => {
     useFakeTimers()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { appRealtimeClient } = await import('#/web/app-realtime.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
@@ -616,7 +616,7 @@ describe('terminal web host client', () => {
 
   test('kickReconnect does not stack duplicate health probes for the same open socket', async () => {
     useFakeTimers()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { appRealtimeClient } = await import('#/web/app-realtime.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
@@ -634,7 +634,7 @@ describe('terminal web host client', () => {
 
   test('kickReconnect reconnects an open app realtime socket when health probe send fails', async () => {
     useFakeTimers()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { appRealtimeClient } = await import('#/web/app-realtime.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
@@ -654,7 +654,7 @@ describe('terminal web host client', () => {
 
   test('kickReconnect reconnects an open app realtime socket when health probe times out', async () => {
     useFakeTimers()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { appRealtimeClient } = await import('#/web/app-realtime.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
@@ -673,7 +673,7 @@ describe('terminal web host client', () => {
   })
 
   test('kickReconnect replaces a closing app realtime socket while realtime subscribers remain', async () => {
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { appRealtimeClient } = await import('#/web/app-realtime.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
@@ -687,7 +687,7 @@ describe('terminal web host client', () => {
   })
 
   test('reuses a connecting terminal socket when subscribers briefly drop to zero', async () => {
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const firstDispose = terminalClient.onOutput(() => {})
     expect(wsMock.instances).toHaveLength(1)
 
@@ -721,7 +721,7 @@ describe('terminal web host client', () => {
 
   test('ignores stale terminal socket events after reconnect creates a newer socket', async () => {
     useFakeTimers()
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const onOutput = vi.fn()
     const dispose = terminalClient.onOutput(onOutput)
     const firstSocket = wsMock.instances[0]
@@ -775,7 +775,7 @@ describe('terminal web host client', () => {
   test('stops reconnecting terminal sockets after app quitting starts', async () => {
     useFakeTimers()
     const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing initial terminal socket')
@@ -789,7 +789,7 @@ describe('terminal web host client', () => {
   })
 
   test('emits terminal bell click events from browser notifications in web host mode', async () => {
-    const { terminalClient } = await import('#/web/terminal.ts')
+    const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const { onClientLocalEventType, resetClientLocalEventsForTests } = await import('#/web/local-events.ts')
     const bellClick = vi.fn()
     const dispose = onClientLocalEventType('terminal-bell-click', bellClick)

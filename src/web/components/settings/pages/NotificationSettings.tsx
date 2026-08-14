@@ -5,7 +5,7 @@ import { Switch } from '#/web/components/ui/switch.tsx'
 import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { useFetchSettingsController, useFetchSettings } from '#/web/settings/runtime-fetch.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import { terminalClient } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal/client-facade.ts'
 import { getPlatform } from '#/web/stores/host-info.ts'
 import { settingsLog } from '#/web/logger.ts'
 export const NotificationSettings = defineComponent({

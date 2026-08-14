@@ -31,7 +31,7 @@ import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pan
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
-import { claimTerminalAutoFocus } from '#/web/terminal-focus.ts'
+import { claimTerminalAutoFocus } from '#/web/terminal/focus.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 
 export interface CreatedTerminalRouteRequest {

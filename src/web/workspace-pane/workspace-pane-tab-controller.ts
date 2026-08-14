@@ -31,7 +31,7 @@ import {
   appNavigationIsCurrent,
   type AppNavigationGeneration,
 } from '#/web/app/navigation/lifecycle.ts'
-import { claimTerminalPresentationFocus, type TerminalPresentationFocusEffects } from '#/web/terminal-focus.ts'
+import { claimTerminalPresentationFocus, type TerminalPresentationFocusEffects } from '#/web/terminal/focus.ts'
 
 export type WorkspacePaneTabControllerRoute = WorkspacePaneRouteTarget
 export interface WorkspacePaneControllerTarget {

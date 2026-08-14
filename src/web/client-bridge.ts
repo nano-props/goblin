@@ -7,10 +7,10 @@ import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import { readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
 import { createClientAppRealtime, type AppRealtimeServerConfig } from '#/web/app-realtime-client.ts'
-import { createServerTerminalClient } from '#/web/client-terminal.ts'
+import { createServerTerminalClient } from '#/web/terminal/server-client.ts'
 import { createServerWorkspacePaneTabsClient } from '#/web/workspace-pane/client-tabs.ts'
 import { createServerWorkspacePaneRuntimeClient } from '#/web/workspace-pane/client-runtime.ts'
-import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
+import { createTerminalNotificationProvider } from '#/web/terminal/notification-provider.ts'
 import type {
   ClientAppRealtimeLifecycle,
   ClientTerminal,

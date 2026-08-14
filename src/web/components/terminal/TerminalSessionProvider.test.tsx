@@ -139,7 +139,7 @@ vi.mock('#/web/components/terminal/terminal-runtime-membership-index.ts', async 
 
 vi.mock('#/web/components/terminal/terminal-font.ts', () => geometryMocks)
 
-vi.mock('#/web/terminal.ts', () => ({
+vi.mock('#/web/terminal/client-facade.ts', () => ({
   terminalClient: {
     onOutput: (listener: NonNullable<RealtimeListeners['output']>) => realtime.subscribe('output', listener),
     onBell: (listener: NonNullable<RealtimeListeners['bell']>) => realtime.subscribe('bell', listener),

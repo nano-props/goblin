@@ -1,7 +1,7 @@
 import { defineComponent, onMounted, onScopeDispose, watch } from 'vue'
 import '#/web/components/terminal/terminal-session.css'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { terminalClient } from '#/web/terminal.ts'
+import { terminalClient } from '#/web/terminal/client-facade.ts'
 import {
   provideTerminalSessionContext,
   provideTerminalSessionReadContext,

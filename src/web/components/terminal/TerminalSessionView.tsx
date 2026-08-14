@@ -35,7 +35,7 @@ import { terminalLog } from '#/web/logger.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal-focus.ts'
+import { cancelTerminalAutoFocus, fulfillTerminalPresentationFocus } from '#/web/terminal/focus.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
