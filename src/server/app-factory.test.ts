@@ -85,7 +85,7 @@ vi.mock('node:fs/promises', () => ({
   readFile: mocks.readFile,
 }))
 
-vi.mock('#/server/modules/clipboard-write-paths.ts', () => ({
+vi.mock('#/server/clipboard/write-paths.ts', () => ({
   saveClipboardFiles: mocks.saveClipboardFiles,
   pruneStaleClipboardTempDirs: mocks.pruneStaleClipboardTempDirs,
   pruneExpiredClipboardTempFiles: mocks.pruneExpiredClipboardTempFiles,

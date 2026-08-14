@@ -20,7 +20,7 @@ aroundEach(async (runTest) => {
 
 describe('saveClipboardFiles', () => {
   test('writes uploaded files under <serverDataDir>/clipboard-tmp-<pid>/ with timestamped names', async () => {
-    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     const file = new File([new Uint8Array([1, 2, 3])], 'shot.png', { type: 'image/png' })
     const { paths } = await saveClipboardFiles([file])
     expect(paths).toHaveLength(1)
@@ -40,7 +40,7 @@ describe('saveClipboardFiles', () => {
     // process-level counter into the filename so the
     // `<ISO>-<index>-<name>` collision across paste events
     // can't return.
-    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     const a = await saveClipboardFiles([new File([new Uint8Array([1])], 'first.bin')])
     const b = await saveClipboardFiles([new File([new Uint8Array([1])], 'first.bin')])
     expect(a.paths[0]).not.toBe(b.paths[0])
@@ -49,12 +49,12 @@ describe('saveClipboardFiles', () => {
   })
 
   test('returns empty paths for empty input', async () => {
-    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     expect(await saveClipboardFiles([])).toEqual({ paths: [] })
   })
 
   test('rejects an oversized file before creating storage', async () => {
-    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     const oversized = new File([new Uint8Array([1])], 'oversized.bin')
     Object.defineProperty(oversized, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
 
@@ -63,7 +63,7 @@ describe('saveClipboardFiles', () => {
   })
 
   test('rejects excess files before creating storage', async () => {
-    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     const files = Array.from({ length: MAX_PASTE_UPLOAD_FILES + 1 }, (_, index) => new File([], `empty-${index}.txt`))
 
     await expect(saveClipboardFiles(files)).rejects.toEqual(new PasteFileLimitError('count'))
@@ -71,7 +71,7 @@ describe('saveClipboardFiles', () => {
   })
 
   test('validates the complete batch before writing any file', async () => {
-    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     const valid = new File([new Uint8Array([1])], 'valid.bin')
     const oversized = new File([new Uint8Array([2])], 'oversized.bin')
     Object.defineProperty(oversized, 'size', { value: PASTE_FILE_MAX_BYTES + 1 })
@@ -81,7 +81,7 @@ describe('saveClipboardFiles', () => {
   })
 
   test('removes files owned by a batch when a later file cannot be read', async () => {
-    const { clipboardTempDir, saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { clipboardTempDir, saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     const unreadable = new File([new Uint8Array([2])], 'unreadable.bin')
     vi.spyOn(unreadable, 'arrayBuffer').mockRejectedValue(new Error('file read failed'))
 
@@ -92,7 +92,7 @@ describe('saveClipboardFiles', () => {
   })
 
   test('sanitises path-separator characters in the file name', async () => {
-    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     const file = new File([new Uint8Array([0])], '../escape/attempt.bin')
     const { paths } = await saveClipboardFiles([file])
     expect(paths[0]).not.toContain('../')
@@ -108,7 +108,7 @@ describe('saveClipboardFiles', () => {
     // together — Windows NTFS treats both as reserved. If a future
     // refactor narrows the character class to \x00-\x1F, this
     // re-fails loudly.
-    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     const c1Char = String.fromCharCode(0x90)
     const file = new File([new Uint8Array([0])], `name${c1Char}tail.bin`)
     const { paths } = await saveClipboardFiles([file])
@@ -117,7 +117,7 @@ describe('saveClipboardFiles', () => {
   })
 
   test('falls back to "clipboard.bin" for empty file names', async () => {
-    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     const file = new File([new Uint8Array([0])], '')
     const { paths } = await saveClipboardFiles([file])
     // Filename is `<ISO>-0-<counter>-clipboard.bin`; the counter is
@@ -126,7 +126,7 @@ describe('saveClipboardFiles', () => {
   })
 
   test('prefixes Windows reserved file stems after sanitising', async () => {
-    const { saveClipboardFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     const { paths } = await saveClipboardFiles([
       new File([new Uint8Array([0])], 'AUX.png'),
       new File([new Uint8Array([0])], 'com1.txt'),
@@ -138,8 +138,7 @@ describe('saveClipboardFiles', () => {
 
 describe('pruneStaleClipboardTempDirs', () => {
   test('removes clipboard-tmp-* dirs from previous runs but preserves the current one', async () => {
-    const { pruneStaleClipboardTempDirs, saveClipboardFiles } =
-      await import('#/server/modules/clipboard-write-paths.ts')
+    const { pruneStaleClipboardTempDirs, saveClipboardFiles } = await import('#/server/clipboard/write-paths.ts')
     const stale = path.join(dataDir, 'clipboard-tmp-99999')
     await mkdir(stale, { recursive: true })
     await writeFile(path.join(stale, 'leftover.bin'), 'x')
@@ -152,7 +151,7 @@ describe('pruneStaleClipboardTempDirs', () => {
   })
 
   test('ignores unrelated entries', async () => {
-    const { pruneStaleClipboardTempDirs } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { pruneStaleClipboardTempDirs } = await import('#/server/clipboard/write-paths.ts')
     await mkdir(path.join(dataDir, 'someone-else'), { recursive: true })
     await pruneStaleClipboardTempDirs()
     const entries = await readdir(dataDir)
@@ -161,15 +160,14 @@ describe('pruneStaleClipboardTempDirs', () => {
 
   test('does not throw if the data dir does not exist', async () => {
     vi.stubEnv('GOBLIN_SERVER_DATA_DIR', path.join(dataDir, 'never-existed'))
-    const { pruneStaleClipboardTempDirs } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { pruneStaleClipboardTempDirs } = await import('#/server/clipboard/write-paths.ts')
     await expect(pruneStaleClipboardTempDirs()).resolves.toBeUndefined()
   })
 })
 
 describe('pruneExpiredClipboardTempFiles', () => {
   test('removes expired files from the current server temp dir but preserves fresh files', async () => {
-    const { clipboardTempDir, pruneExpiredClipboardTempFiles } =
-      await import('#/server/modules/clipboard-write-paths.ts')
+    const { clipboardTempDir, pruneExpiredClipboardTempFiles } = await import('#/server/clipboard/write-paths.ts')
     const currentDir = clipboardTempDir()
     await mkdir(currentDir, { recursive: true })
     const oldFile = path.join(currentDir, 'old.bin')
@@ -190,13 +188,12 @@ describe('pruneExpiredClipboardTempFiles', () => {
   })
 
   test('does not throw if the current server temp dir does not exist', async () => {
-    const { pruneExpiredClipboardTempFiles } = await import('#/server/modules/clipboard-write-paths.ts')
+    const { pruneExpiredClipboardTempFiles } = await import('#/server/clipboard/write-paths.ts')
     await expect(pruneExpiredClipboardTempFiles()).resolves.toBeUndefined()
   })
 
   test('handles empty dirs, subdirs, and stat failures without throwing', async () => {
-    const { clipboardTempDir, pruneExpiredClipboardTempFiles } =
-      await import('#/server/modules/clipboard-write-paths.ts')
+    const { clipboardTempDir, pruneExpiredClipboardTempFiles } = await import('#/server/clipboard/write-paths.ts')
     const currentDir = clipboardTempDir()
     await mkdir(currentDir, { recursive: true })
     await expect(pruneExpiredClipboardTempFiles(Date.now(), 0)).resolves.toBeUndefined()

@@ -4,7 +4,7 @@ import {
   pruneExpiredClipboardTempFiles,
   pruneStaleClipboardTempDirs,
   saveClipboardFiles,
-} from '#/server/modules/clipboard-write-paths.ts'
+} from '#/server/clipboard/write-paths.ts'
 import { MAX_PASTE_UPLOAD_FILES, PASTE_FILE_MAX_BYTES, PasteFileLimitError } from '#/shared/clipboard-paste.ts'
 
 const PASTE_UPLOAD_LIMIT_MESSAGES = {

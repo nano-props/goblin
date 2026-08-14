@@ -283,7 +283,7 @@ export function createApp(options: ServerAppOptions): Hono {
   // interval keeps the event loop alive.
   const periodic = setInterval(
     () => {
-      void import('#/server/modules/clipboard-write-paths.ts')
+      void import('#/server/clipboard/write-paths.ts')
         .then((m) => Promise.all([m.pruneStaleClipboardTempDirs(), m.pruneExpiredClipboardTempFiles()]))
         .catch((err) => console.warn('[clipboard] periodic prune failed', err))
     },
