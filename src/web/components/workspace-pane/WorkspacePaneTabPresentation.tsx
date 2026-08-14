@@ -1,12 +1,11 @@
 import { Check, ChevronDown, LoaderCircle, Plus, X } from '@lucide/vue'
 import { PopoverTrigger } from 'reka-ui'
 import { defineComponent, ref } from 'vue'
-import type { ButtonHTMLAttributes, FunctionalComponent, HTMLAttributes, VNodeChild } from 'vue'
+import type { ButtonHTMLAttributes, FunctionalComponent, HTMLAttributes } from 'vue'
 import { Button, buttonVariants } from '#/web/components/ui/button.tsx'
 import { Popover, PopoverContent } from '#/web/components/ui/popover.tsx'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { Separator } from '#/web/components/ui/separator.tsx'
-import { Tip } from '#/web/components/Tip.tsx'
 import { ToolbarClosableTab } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
 import type { ToolbarTabClose } from '#/web/components/tab-strip/ToolbarClosableTab.tsx'
 import { toolbarTabChromeClassName, toolbarTabIconClassName } from '#/web/components/tab-strip/tab-variants.ts'
@@ -32,8 +31,6 @@ export type WorkspacePaneT = (key: string, params?: Record<string, string | numb
 export interface WorkspacePaneTabCreateAction {
   label: string
   busy?: boolean
-  disabled?: boolean
-  disabledReason?: string
   blocksTabInteraction?: boolean
   onCreate: () => void
 }
@@ -62,7 +59,7 @@ export const WorkspacePaneTabSwitcherPopover = defineComponent<WorkspacePaneTabS
     }
 
     const selectNew = () => {
-      if (!props.createAction || props.createAction.busy || props.createAction.disabled) return
+      if (!props.createAction || props.createAction.busy) return
       open.value = false
       props.createAction.onCreate()
     }
@@ -162,80 +159,52 @@ interface WorkspacePaneNewButtonProps {
   buttonRef?: ElementRef<HTMLButtonElement>
 }
 
-export const WorkspacePaneNewButton: FunctionalComponent<WorkspacePaneNewButtonProps> = (props) => {
-  const unavailable = props.action.busy || props.action.disabled
-  const nativeDisabled = unavailable && !props.action.disabledReason
-  const button = (
-    <button
-      ref={toButtonVNodeRef(props.buttonRef)}
-      type="button"
-      class={cn(
-        buttonVariants({ variant: 'ghost', size: 'icon' }),
-        'h-7 w-7 shrink-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent',
-      )}
-      data-slot="button"
-      data-variant="ghost"
-      data-size="icon"
-      id={props.id}
-      onClick={() => {
-        if (!unavailable) props.action.onCreate()
-      }}
-      disabled={nativeDisabled}
-      aria-disabled={unavailable ? 'true' : undefined}
-      aria-busy={props.action.busy ? 'true' : undefined}
-      aria-label={props.action.label}
-      title={props.action.disabledReason ?? props.action.label}
-      data-workspace-pane-new-button=""
-    >
-      <Plus size={14} />
-    </button>
-  )
-  return workspacePaneCreateActionWithDisabledTip(props.action, button)
-}
+export const WorkspacePaneNewButton: FunctionalComponent<WorkspacePaneNewButtonProps> = (props) => (
+  <button
+    ref={toButtonVNodeRef(props.buttonRef)}
+    type="button"
+    class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'h-7 w-7 shrink-0')}
+    data-slot="button"
+    data-variant="ghost"
+    data-size="icon"
+    id={props.id}
+    onClick={props.action.onCreate}
+    disabled={props.action.busy}
+    aria-busy={props.action.busy ? 'true' : undefined}
+    aria-label={props.action.label}
+    title={props.action.label}
+    data-workspace-pane-new-button=""
+  >
+    <Plus size={14} />
+  </button>
+)
 
 WorkspacePaneNewButton.props = ['id', 'action', 'buttonRef']
 
 const WorkspacePaneNewMenuButton: FunctionalComponent<{
   action: WorkspacePaneTabCreateAction
   onCreate: () => void
-}> = (props) => {
-  const unavailable = props.action.busy || props.action.disabled
-  const nativeDisabled = unavailable && !props.action.disabledReason
-  const button = (
-    <button
-      type="button"
-      class={cn(
-        'flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100',
-        props.action.busy || props.action.disabled
-          ? 'cursor-not-allowed opacity-70'
-          : 'cursor-pointer hover:bg-accent hover:text-accent-foreground',
-      )}
-      onClick={() => {
-        if (!unavailable) props.onCreate()
-      }}
-      disabled={nativeDisabled}
-      aria-disabled={unavailable ? 'true' : undefined}
-      aria-busy={props.action.busy ? 'true' : undefined}
-    >
-      <span class="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
-        <Plus size={14} />
-      </span>
-      <span class="min-w-0 flex-1 truncate">{props.action.label}</span>
-    </button>
-  )
-  return workspacePaneCreateActionWithDisabledTip(props.action, button)
-}
+}> = (props) => (
+  <button
+    type="button"
+    class={cn(
+      'flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100',
+      props.action.busy
+        ? 'cursor-not-allowed opacity-70'
+        : 'cursor-pointer hover:bg-accent hover:text-accent-foreground',
+    )}
+    onClick={props.onCreate}
+    disabled={props.action.busy}
+    aria-busy={props.action.busy ? 'true' : undefined}
+  >
+    <span class="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
+      <Plus size={14} />
+    </span>
+    <span class="min-w-0 flex-1 truncate">{props.action.label}</span>
+  </button>
+)
 
 WorkspacePaneNewMenuButton.props = ['action', 'onCreate']
-
-function workspacePaneCreateActionWithDisabledTip(
-  action: WorkspacePaneTabCreateAction,
-  button: VNodeChild,
-): VNodeChild {
-  const reason = action.disabledReason
-  if (!reason) return button
-  return <Tip label={reason}>{button}</Tip>
-}
 
 export interface WorkspacePaneTabProps {
   item: WorkspacePaneTabItem

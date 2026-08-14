@@ -42,10 +42,9 @@ import {
   workspacePaneTabItems,
 } from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import {
-  workspacePaneRuntimeTabCreateBlockingPhase,
-  type WorkspacePaneModelTarget,
-  type WorkspacePaneTabModel,
+import type {
+  WorkspacePaneModelTarget,
+  WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
@@ -173,24 +172,6 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       showCreatedRuntimeTab,
       t,
     })
-    const createAction = computed(() => {
-      const action = runtimeTabCreateAction.value
-      if (!action) return null
-      const blockingPhase = workspacePaneRuntimeTabCreateBlockingPhase(props.model, 'terminal')
-      const disabledReason =
-        props.model.tabEntriesProjectionPhase === 'failed'
-          ? t('terminal.new-disabled-tabs-load-failed')
-          : blockingPhase === 'failed'
-            ? t('terminal.new-disabled-load-failed')
-            : blockingPhase === 'pending'
-              ? t('terminal.new-disabled-loading')
-              : undefined
-      return {
-        ...action,
-        disabled: blockingPhase !== null,
-        disabledReason,
-      }
-    })
     const items = computed(() =>
       workspacePaneTabItems({
         model: props.model,
@@ -269,7 +250,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
             items={visualItems.value}
             workspacePaneId={props.workspacePaneId}
             activeTabIdentity={activeTabIdentity.value}
-            createAction={props.target.capabilities.terminal.available ? createAction.value : null}
+            createAction={props.target.capabilities.terminal.available ? runtimeTabCreateAction.value : null}
             trafficLightOffset={props.trafficLightOffset ?? false}
             onBackToNavigator={props.onBackToNavigator}
             trailingActions={

@@ -132,14 +132,7 @@ describe('workspace pane runtime tab create action', () => {
       }
 
       await expect(
-        dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-          base: BASE,
-          createTerminal: vi.fn(),
-          openerIdentity: null,
-          showCreatedTerminalTab: vi.fn(),
-          focusTerminal: vi.fn(),
-          t: translate,
-        }),
+        dispatchTerminalCreate({ createTerminal: vi.fn(), showCreatedTerminalTab: vi.fn(), t: translate }),
       ).resolves.toMatchObject({
         ok: false,
         messageKey:
@@ -169,14 +162,7 @@ describe('workspace pane runtime tab create action', () => {
       .markProjectionReady(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID)
 
     await expect(
-      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        base: BASE,
-        createTerminal: vi.fn(),
-        openerIdentity: null,
-        showCreatedTerminalTab: vi.fn(),
-        focusTerminal: vi.fn(),
-        t: translate,
-      }),
+      dispatchTerminalCreate({ createTerminal: vi.fn(), showCreatedTerminalTab: vi.fn(), t: translate }),
     ).resolves.toMatchObject({
       ok: false,
       messageKey: 'error.terminal-create-blocked-loading',
@@ -195,12 +181,9 @@ describe('workspace pane runtime tab create action', () => {
       await queuedActionMayRun.promise
       return true
     })
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
+    const dispatch = dispatchTerminalCreate({
       createTerminal: vi.fn(),
-      openerIdentity: null,
       showCreatedTerminalTab: vi.fn(),
-      focusTerminal: vi.fn(),
     })
     setWorkspacePaneTabsForTargetQueryData({
       ...PANE_TARGET,
@@ -223,13 +206,7 @@ describe('workspace pane runtime tab create action', () => {
     })
 
     await expect(
-      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        base: BASE,
-        createTerminal: vi.fn(),
-        openerIdentity: null,
-        showCreatedTerminalTab: vi.fn(),
-        focusTerminal: vi.fn(),
-      }),
+      dispatchTerminalCreate({ createTerminal: vi.fn(), showCreatedTerminalTab: vi.fn() }),
     ).resolves.toMatchObject({ ok: false })
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
   })
@@ -397,10 +374,7 @@ describe('workspace pane runtime tab create action', () => {
     const routeStarted = Promise.withResolvers<CreatedTerminalRouteRequest>()
     const focusTerminal = vi.fn((_terminalSessionId: string, _request?: TerminalFocusRequest) => true)
 
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
-      createTerminal: vi.fn(async () => createAdmission()),
-      openerIdentity: null,
+    const dispatch = dispatchTerminalCreate({
       showCreatedTerminalTab: async (_terminalSessionId, _presentation, routeRequest) => {
         routeStarted.resolve(routeRequest)
         return await navigation.promise
@@ -440,10 +414,7 @@ describe('workspace pane runtime tab create action', () => {
     })
     const focusTerminal = vi.fn()
 
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
-      createTerminal: vi.fn(async () => createAdmission()),
-      openerIdentity: null,
+    const dispatch = dispatchTerminalCreate({
       showCreatedTerminalTab: vi.fn(() => true),
       focusTerminal,
     })
@@ -482,12 +453,8 @@ describe('workspace pane runtime tab create action', () => {
       },
     )
     const dispatches = terminalSessionIds.map(() =>
-      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        base: BASE,
-        createTerminal: vi.fn(async () => createAdmission()),
-        openerIdentity: null,
+      dispatchTerminalCreate({
         showCreatedTerminalTab,
-        focusTerminal: vi.fn(),
       }),
     )
     createCommandsMayCommit.resolve()
@@ -533,12 +500,8 @@ describe('workspace pane runtime tab create action', () => {
       },
     )
     const dispatches = terminalSessionIds.map(() =>
-      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        base: BASE,
-        createTerminal: vi.fn(async () => createAdmission()),
-        openerIdentity: null,
+      dispatchTerminalCreate({
         showCreatedTerminalTab,
-        focusTerminal: vi.fn(),
       }),
     )
 
@@ -560,10 +523,7 @@ describe('workspace pane runtime tab create action', () => {
     const heldCommand = holdTerminalCreateCommand()
     const showCreatedTerminalTab = vi.fn(() => true)
     const focusTerminal = vi.fn()
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
-      createTerminal: vi.fn(async () => createAdmission()),
-      openerIdentity: null,
+    const dispatch = dispatchTerminalCreate({
       showCreatedTerminalTab,
       focusTerminal,
     })
@@ -589,12 +549,9 @@ describe('workspace pane runtime tab create action', () => {
       () => blocker.promise,
     )
     const createTerminal = vi.fn(async () => createAdmission())
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
+    const dispatch = dispatchTerminalCreate({
       createTerminal,
-      openerIdentity: null,
       showCreatedTerminalTab: vi.fn(() => true),
-      focusTerminal: vi.fn(),
     })
 
     seedCurrentWorkspaceRuntime('repo-runtime-replacement')
@@ -609,10 +566,7 @@ describe('workspace pane runtime tab create action', () => {
   test('releases automatic focus when navigation rejects the created route', async () => {
     const heldCommand = holdTerminalCreateCommand()
     const focusTerminal = vi.fn()
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
-      createTerminal: vi.fn(async () => createAdmission()),
-      openerIdentity: null,
+    const dispatch = dispatchTerminalCreate({
       showCreatedTerminalTab: vi.fn(() => false),
       focusTerminal,
     })
@@ -633,10 +587,7 @@ describe('workspace pane runtime tab create action', () => {
   test('does not focus when an older create commits after a newer presentation', async () => {
     const heldCommand = holdTerminalCreateCommand()
     const focusTerminal = vi.fn()
-    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base: BASE,
-      createTerminal: vi.fn(async () => createAdmission()),
-      openerIdentity: null,
+    const dispatch = dispatchTerminalCreate({
       showCreatedTerminalTab: vi.fn(() => true),
       focusTerminal,
     })
@@ -651,16 +602,11 @@ describe('workspace pane runtime tab create action', () => {
   })
 
   test('delegates creation with the exact base and route commit boundary', async () => {
-    await expect(
-      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        base: BASE,
-        createTerminal: vi.fn(async () => createAdmission()),
-        openerIdentity: null,
-        showCreatedTerminalTab: vi.fn(() => true),
-        focusTerminal: vi.fn(),
-        t: translate,
-      }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: TERMINAL_SESSION_ID, presentationStatus: 'committed' })
+    await expect(dispatchTerminalCreate({ t: translate })).resolves.toEqual({
+      ok: true,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      presentationStatus: 'committed',
+    })
 
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledWith(
       expect.objectContaining({ base: BASE, commitCreatedTerminalTab: expect.any(Function) }),
@@ -774,6 +720,21 @@ describe('workspace pane runtime tab create action', () => {
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
   })
 })
+
+type TerminalCreateDispatchOptions = Parameters<typeof dispatchCreateTerminalWorkspacePaneRuntimeTabAction>[0]
+
+function dispatchTerminalCreate(
+  overrides: Partial<TerminalCreateDispatchOptions> = {},
+): ReturnType<typeof dispatchCreateTerminalWorkspacePaneRuntimeTabAction> {
+  return dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+    base: BASE,
+    createTerminal: vi.fn(async () => createAdmission()),
+    openerIdentity: null,
+    showCreatedTerminalTab: vi.fn(() => true),
+    focusTerminal: vi.fn(),
+    ...overrides,
+  })
+}
 
 function translate(key: string): string {
   return key

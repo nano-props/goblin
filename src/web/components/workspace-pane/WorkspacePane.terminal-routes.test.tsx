@@ -9,6 +9,7 @@ import { screen, waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { VNode } from 'vue'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx'
 import {
@@ -16,7 +17,10 @@ import {
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
 } from '#/web/terminal/components/terminal-session-context.ts'
-import type { TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
+import type {
+  TerminalSessionContextValue,
+  TerminalSessionReadContextValue,
+} from '#/web/terminal/components/types.ts'
 import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
@@ -64,6 +68,30 @@ beforeEach(() => {
   responsiveMocks.compact = false
 })
 
+interface WorkspacePaneFixtureContexts {
+  navigationActions?: AppNavigationActions
+  commandContext?: TerminalSessionContextValue
+  readContext?: TerminalSessionReadContextValue
+}
+
+function workspacePaneFixture(pane: VNode, contexts: WorkspacePaneFixtureContexts = {}): VNode {
+  return (
+    <VueQueryClientScope client={appQueryClient}>
+      <AppNavigationProvider value={contexts.navigationActions ?? navigation}>
+        <TerminalSessionCommandScope value={contexts.commandContext ?? terminalCommandContext}>
+          <TerminalSessionReadScope value={contexts.readContext ?? terminalReadContext}>
+            {pane}
+          </TerminalSessionReadScope>
+        </TerminalSessionCommandScope>
+      </AppNavigationProvider>
+    </VueQueryClientScope>
+  )
+}
+
+function renderWorkspacePane(pane: VNode, contexts: WorkspacePaneFixtureContexts = {}) {
+  return render(workspacePaneFixture(pane, contexts))
+}
+
 describe('WorkspacePane terminal routes', () => {
   test('offers an explicit workspace tabs retry when their projection fails', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/failed-tabs-workspace')
@@ -80,19 +108,11 @@ describe('WorkspacePane terminal routes', () => {
       tabs: [workspacePaneStaticTabEntry('files')],
     })
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                workspacePaneRouteContext={{ kind: 'workspace-root', route: { kind: 'static', tab: 'files' } }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
+    renderWorkspacePane(
+      <WorkspacePane
+        workspaceId={workspaceId}
+        workspacePaneRouteContext={{ kind: 'workspace-root', route: { kind: 'static', tab: 'files' } }}
+      />,
     )
 
     const tabsQuery = appQueryClient.getQueryCache().find({
@@ -111,14 +131,13 @@ describe('WorkspacePane terminal routes', () => {
     })
 
     const newTerminalButton = await screen.findByRole('button', { name: 'terminal.new' })
-    expect(newTerminalButton.getAttribute('aria-disabled')).toBe('true')
-    expect(newTerminalButton.getAttribute('title')).toBe('terminal.new-disabled-tabs-load-failed')
+    expect(newTerminalButton.getAttribute('aria-disabled')).toBeNull()
     const retryButton = screen.getByRole('button', { name: 'workspace-pane-tabs.retry-loading' })
     await flushTestUpdates(() => retryButton.click())
     expect(retryWorkspacePaneTabsForTest).toHaveBeenCalledWith(workspaceId)
   })
 
-  test('keeps terminal loading contextual and disables creation until every pane terminal materializes', async () => {
+  test('keeps New available while terminal projection materializes', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/loading-terminal-workspace')
     const materializedSessionId = 'term-111111111111111111111'
     const loadingSessionId = 'term-222222222222222222222'
@@ -141,24 +160,15 @@ describe('WorkspacePane terminal routes', () => {
     workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'terminal')
     const terminalFilesystemTargetKey = formatTerminalFilesystemTargetKeyForPath(workspaceId, workspaceId)
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope
-              value={terminalReadContextWithSession(terminalFilesystemTargetKey, materializedSessionId)}
-            >
-              <WorkspacePane
-                workspaceId={workspaceId}
-                workspacePaneRouteContext={{
-                  kind: 'workspace-root',
-                  route: { kind: 'terminal', terminalSessionId: loadingSessionId },
-                }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
+    renderWorkspacePane(
+      <WorkspacePane
+        workspaceId={workspaceId}
+        workspacePaneRouteContext={{
+          kind: 'workspace-root',
+          route: { kind: 'terminal', terminalSessionId: loadingSessionId },
+        }}
+      />,
+      { readContext: terminalReadContextWithSession(terminalFilesystemTargetKey, materializedSessionId) },
     )
 
     const loadingTab = screen.getByRole('tab', { name: 'terminal.loading-tab' })
@@ -177,7 +187,7 @@ describe('WorkspacePane terminal routes', () => {
     const newTerminalButton = screen.getByRole('button', { name: 'terminal.new' })
     if (!(newTerminalButton instanceof HTMLButtonElement)) throw new Error('missing new terminal button')
     expect(newTerminalButton.disabled).toBe(false)
-    expect(newTerminalButton.getAttribute('aria-disabled')).toBe('true')
+    expect(newTerminalButton.getAttribute('aria-disabled')).toBeNull()
     expect(newTerminalButton.getAttribute('aria-busy')).toBeNull()
 
     terminalProjectionHydrationStore
@@ -187,17 +197,12 @@ describe('WorkspacePane terminal routes', () => {
       const failedTab = screen.getByRole('tab', { name: 'terminal.load-tab-failed' })
       expect(failedTab.querySelector('.animate-spin')).toBeNull()
       expect(failedTab.getAttribute('aria-busy')).toBeNull()
-      expect(newTerminalButton.disabled).toBe(false)
-      expect(newTerminalButton.getAttribute('aria-disabled')).toBe('true')
     })
 
     terminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
     await waitFor(() => {
       expect(screen.queryByRole('tab', { name: 'terminal.load-tab-failed' })).toBeNull()
       expect(screen.getByRole('tab', { name: 'terminal.loading-tab' })).toBeTruthy()
-      const blockedNewTerminal = screen.getByRole('button', { name: 'terminal.new' })
-      expect(blockedNewTerminal.getAttribute('aria-disabled')).toBe('true')
-      expect(blockedNewTerminal.getAttribute('title')).toBe('terminal.new-disabled-loading')
       expect(screen.queryByRole('button', { name: 'terminal.retry-loading' })).toBeNull()
       expect(screen.queryByRole('alert')).toBeNull()
       expect(document.body.querySelector('.goblin-terminal-session__status-overlay')?.textContent).toContain(
@@ -205,18 +210,6 @@ describe('WorkspacePane terminal routes', () => {
       )
     })
 
-    setWorkspacePaneTabsForTargetQueryData({
-      kind: 'workspace-root',
-      workspaceId,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('files'), workspacePaneRuntimeTabEntry('terminal', materializedSessionId)],
-    })
-    await waitFor(() => {
-      const readyNewTerminalButton = screen.getByRole('button', { name: 'terminal.new' })
-      if (!(readyNewTerminalButton instanceof HTMLButtonElement)) throw new Error('missing new terminal button')
-      expect(readyNewTerminalButton.disabled).toBe(false)
-      expect(readyNewTerminalButton.getAttribute('aria-disabled')).toBeNull()
-    })
   })
 
   test('selects an existing workspace-root terminal after Files without a route transition', async () => {
@@ -281,19 +274,13 @@ describe('WorkspacePane terminal routes', () => {
       commitFilesystemWorkspacePaneRoute,
     }
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={workspaceNavigation}>
-          <TerminalSessionCommandScope value={workspaceTerminalCommands}>
-            <TerminalSessionReadScope value={workspaceTerminalReadContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                workspacePaneRouteContext={{ kind: 'workspace-root', route: null }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
+    renderWorkspacePane(
+      <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'workspace-root', route: null }} />,
+      {
+        navigationActions: workspaceNavigation,
+        commandContext: workspaceTerminalCommands,
+        readContext: workspaceTerminalReadContext,
+      },
     )
 
     expect(screen.getByRole('tabpanel', { name: 'tab.files' })).toBeTruthy()
@@ -347,23 +334,17 @@ describe('WorkspacePane terminal routes', () => {
       async () => false,
     )
     const workspaceNavigation = { ...navigation, commitFilesystemWorkspacePaneRoute }
-    const workspace = (readContext: TerminalSessionReadContextValue, routeSessionId = exitedSessionId) => (
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={workspaceNavigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={readContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                workspacePaneRouteContext={{
-                  kind: 'workspace-root',
-                  route: { kind: 'terminal', terminalSessionId: routeSessionId },
-                }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>
-    )
+    const workspace = (readContext: TerminalSessionReadContextValue, routeSessionId = exitedSessionId) =>
+      workspacePaneFixture(
+        <WorkspacePane
+          workspaceId={workspaceId}
+          workspacePaneRouteContext={{
+            kind: 'workspace-root',
+            route: { kind: 'terminal', terminalSessionId: routeSessionId },
+          }}
+        />,
+        { navigationActions: workspaceNavigation, readContext },
+      )
     const { rerender } = render(
       workspace(
         terminalReadContextWithSessions(
@@ -420,23 +401,17 @@ describe('WorkspacePane terminal routes', () => {
       async () => false,
     )
     const actions = { ...navigation, commitFilesystemWorkspacePaneRoute }
-    const workspace = (readContext: TerminalSessionReadContextValue) => (
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={actions}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={readContext}>
-              <WorkspacePane
-                workspaceId={workspaceId}
-                workspacePaneRouteContext={{
-                  kind: 'workspace-root',
-                  route: { kind: 'terminal', terminalSessionId: exitedSessionId },
-                }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>
-    )
+    const workspace = (readContext: TerminalSessionReadContextValue) =>
+      workspacePaneFixture(
+        <WorkspacePane
+          workspaceId={workspaceId}
+          workspacePaneRouteContext={{
+            kind: 'workspace-root',
+            route: { kind: 'terminal', terminalSessionId: exitedSessionId },
+          }}
+        />,
+        { navigationActions: actions, readContext },
+      )
 
     const { rerender } = render(
       workspace(
@@ -475,16 +450,8 @@ describe('WorkspacePane terminal routes', () => {
       tabs: [],
     })
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
+    renderWorkspacePane(
+      <WorkspacePane workspaceId={workspaceId} workspacePaneRouteContext={{ kind: 'routed', route: null }} />,
     )
 
     expect(screen.getByText('workspace-pane-tabs.empty')).toBeTruthy()
@@ -502,21 +469,13 @@ describe('WorkspacePane terminal routes', () => {
     })
     const onBackToGitWorkspaceNavigator = vi.fn()
 
-    render(
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigation}>
-          <TerminalSessionCommandScope value={terminalCommandContext}>
-            <TerminalSessionReadScope value={terminalReadContext}>
-              <WorkspacePane
-                workspaceId={REPO_ID}
-                currentBranchName="feature/removed"
-                workspacePaneRouteContext={{ kind: 'routed', route: null }}
-                onBackToGitWorkspaceNavigator={onBackToGitWorkspaceNavigator}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>,
+    renderWorkspacePane(
+      <WorkspacePane
+        workspaceId={REPO_ID}
+        currentBranchName="feature/removed"
+        workspacePaneRouteContext={{ kind: 'routed', route: null }}
+        onBackToGitWorkspaceNavigator={onBackToGitWorkspaceNavigator}
+      />,
     )
 
     screen.getByRole('button', { name: 'branches.back-to-list' }).click()
@@ -600,21 +559,15 @@ describe('WorkspacePane terminal routes', () => {
     const workspace = (
       workspacePaneRoute: WorkspacePaneRoute | null,
       nextReadContext: TerminalSessionReadContextValue = readContext,
-    ) => (
-      <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={testNavigation}>
-          <TerminalSessionCommandScope value={commandContext}>
-            <TerminalSessionReadScope value={nextReadContext}>
-              <WorkspacePane
-                workspaceId={REPO_ID}
-                currentBranchName={null}
-                workspacePaneRouteContext={{ kind: 'git-worktree', worktreePath, route: workspacePaneRoute }}
-              />
-            </TerminalSessionReadScope>
-          </TerminalSessionCommandScope>
-        </AppNavigationProvider>
-      </VueQueryClientScope>
-    )
+    ) =>
+      workspacePaneFixture(
+        <WorkspacePane
+          workspaceId={REPO_ID}
+          currentBranchName={null}
+          workspacePaneRouteContext={{ kind: 'git-worktree', worktreePath, route: workspacePaneRoute }}
+        />,
+        { navigationActions: testNavigation, commandContext, readContext: nextReadContext },
+      )
     const { rerender } = render(workspace({ kind: 'static', tab: 'status' }))
 
     await waitFor(() => {
