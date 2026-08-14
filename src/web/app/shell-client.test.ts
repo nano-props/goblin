@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import type { ClientBridge } from '#/web/client-bridge-types.ts'
+import type { ClientBridge } from '#/web/bridge/types.ts'
 
 function installWindow(openReturn: unknown = {}) {
   Object.defineProperty(globalThis, 'window', {
@@ -69,7 +69,7 @@ describe('app shell client', () => {
   })
 
   test('opens app settings through the client bridge host', async () => {
-    const bridgeModule = await import('#/web/client-bridge.ts')
+    const bridgeModule = await import('#/web/bridge/client.ts')
     const openSettingsWindow = vi.fn(async () => true)
     bridgeModule.setClientBridgeForTests(
       testBridge({
@@ -106,7 +106,7 @@ describe('app shell client', () => {
   })
 
   test('opens the project GitHub URL through the native host with https-only policy', async () => {
-    const bridgeModule = await import('#/web/client-bridge.ts')
+    const bridgeModule = await import('#/web/bridge/client.ts')
     const hostOpenExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/nano-props/goblin' }))
     bridgeModule.setClientBridgeForTests(
       testBridge({
@@ -130,7 +130,7 @@ describe('app shell client', () => {
   })
 
   test('chooses workspace paths through the client bridge host', async () => {
-    const bridgeModule = await import('#/web/client-bridge.ts')
+    const bridgeModule = await import('#/web/bridge/client.ts')
     const openDirectoryDialog = vi.fn(async (input?: { title?: string }) =>
       input?.title === 'Open Workspace' ? '/tmp/repo' : '/tmp',
     )
@@ -154,7 +154,7 @@ describe('app shell client', () => {
 
   test('stops waiting for a native directory selection when its caller is cancelled', async () => {
     const selection = Promise.withResolvers<string | null>()
-    const bridgeModule = await import('#/web/client-bridge.ts')
+    const bridgeModule = await import('#/web/bridge/client.ts')
     bridgeModule.setClientBridgeForTests(
       testBridge({
         host: () => ({
@@ -177,7 +177,7 @@ describe('app shell client', () => {
 
   test('does not open a native directory picker for an already cancelled caller', async () => {
     const openDirectoryDialog = vi.fn(async () => '/tmp/unowned-selection')
-    const bridgeModule = await import('#/web/client-bridge.ts')
+    const bridgeModule = await import('#/web/bridge/client.ts')
     bridgeModule.setClientBridgeForTests(
       testBridge({
         host: () => ({
@@ -199,7 +199,7 @@ describe('app shell client', () => {
   })
 
   test('saveClipboardFiles forwards paths from the bridge', async () => {
-    const bridgeModule = await import('#/web/client-bridge.ts')
+    const bridgeModule = await import('#/web/bridge/client.ts')
     bridgeModule.setClientBridgeForTests(testBridge({ saveClipboardFiles: vi.fn(async () => ['/tmp/a', '/tmp/b']) }))
     const { saveClipboardFiles } = await import('#/web/app/shell-client.ts')
     const files = [new File([new Uint8Array([1])], 'a'), new File([new Uint8Array([2])], 'b')]
@@ -207,7 +207,7 @@ describe('app shell client', () => {
   })
 
   test('saveClipboardFiles propagates a synchronous bridge failure', async () => {
-    const bridgeModule = await import('#/web/client-bridge.ts')
+    const bridgeModule = await import('#/web/bridge/client.ts')
     bridgeModule.setClientBridgeForTests(
       testBridge({
         saveClipboardFiles: vi.fn(() => {
@@ -220,7 +220,7 @@ describe('app shell client', () => {
   })
 
   test('saveClipboardFiles propagates an asynchronous bridge failure', async () => {
-    const bridgeModule = await import('#/web/client-bridge.ts')
+    const bridgeModule = await import('#/web/bridge/client.ts')
     bridgeModule.setClientBridgeForTests(
       testBridge({
         saveClipboardFiles: vi.fn(async () => {

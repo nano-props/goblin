@@ -23,7 +23,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { REPO_MEMBERSHIP_READ_CONFLICT_KEY } from '#/shared/repo-membership-read.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
-import { readClientPageId } from '#/web/client-page-id.ts'
+import { readClientPageId } from '#/web/bridge/page-id.ts'
 import {
   decodeWith,
   ExecResultResponseSchema,

@@ -19,8 +19,8 @@ import type {
   TerminalSessionsSnapshot,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabsChangedRealtimeMessage, WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
-import type { ClientBridge } from '#/web/client-bridge-types.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import type { ClientBridge } from '#/web/bridge/types.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -45,7 +45,7 @@ const projectionMocks = vi.hoisted(() => ({
   reconcileOpenWorkspaceRuntimeMemberships: vi.fn(),
 }))
 
-vi.mock('#/web/client-page-id.ts', () => ({ readClientPageId: () => 'client_sharedterminal' }))
+vi.mock('#/web/bridge/page-id.ts', () => ({ readClientPageId: () => 'client_sharedterminal' }))
 
 vi.mock('#/web/terminal/components/use-terminal-session-projection.ts', () => ({
   useTerminalSessionProjection: () => projectionMocks,

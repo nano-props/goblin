@@ -1,5 +1,5 @@
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
-import { getClientBridge } from '#/web/client-bridge.ts'
+import { getClientBridge } from '#/web/bridge/client.ts'
 
 function readInitialBootstrap(): ClientBootstrapSnapshot {
   return getClientBridge().getBootstrap()

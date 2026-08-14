@@ -1,4 +1,4 @@
-import { notifyNativeAppQuitDrained, readNativeBridge } from '#/web/native-bridge.ts'
+import { notifyNativeAppQuitDrained, readNativeBridge } from '#/web/bridge/native.ts'
 import { errorToAppQuitDrainResult } from '#/shared/app-quit-drain.ts'
 
 type Listener = () => void | Promise<void>

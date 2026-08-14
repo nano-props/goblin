@@ -8,7 +8,7 @@ import {
   parseTerminalFilesystemTargetKey,
 } from '#/shared/terminal-filesystem-target-key.ts'
 import { terminalClient } from '#/web/terminal/client-facade.ts'
-import { readClientPageId } from '#/web/client-page-id.ts'
+import { readClientPageId } from '#/web/bridge/page-id.ts'
 import type {
   TerminalBellRealtimeEvent,
   TerminalExitEvent,

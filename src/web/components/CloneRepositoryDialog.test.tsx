@@ -4,7 +4,7 @@ import { flushTestUpdates } from '#/test-utils/render.tsx'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CloneRepositoryDialog, type CloneRepositoryInput } from '#/web/components/CloneRepositoryDialog.tsx'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'

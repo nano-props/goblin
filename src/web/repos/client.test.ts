@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import type { ClientBridge } from '#/web/client-bridge-types.ts'
+import type { ClientBridge } from '#/web/bridge/types.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -97,7 +97,7 @@ describe('repo-client', () => {
   test('opens repository branch URLs through the native host bridge when available', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     window.open = vi.fn(() => null)
-    const bridgeModule = await import('#/web/client-bridge.ts')
+    const bridgeModule = await import('#/web/bridge/client.ts')
     const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }))
     bridgeModule.setClientBridgeForTests(
       testBridge({
@@ -146,7 +146,7 @@ describe('repo-client', () => {
 
   test('opens repository commit URLs through the native host bridge when available', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const bridgeModule = await import('#/web/client-bridge.ts')
+    const bridgeModule = await import('#/web/bridge/client.ts')
     const openExternalUrl = vi.fn(async () => ({ ok: true, message: 'https://github.com/acme/repo/commit/abcdef1' }))
     bridgeModule.setClientBridgeForTests(
       testBridge({

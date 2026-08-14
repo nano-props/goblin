@@ -1,5 +1,5 @@
-import { getClientBridge } from '#/web/client-bridge.ts'
-import type { ClientAppRealtimeLifecycle } from '#/web/client-bridge-types.ts'
+import { getClientBridge } from '#/web/bridge/client.ts'
+import type { ClientAppRealtimeLifecycle } from '#/web/bridge/types.ts'
 
 function getAppRealtimeClient(): ClientAppRealtimeLifecycle {
   return getClientBridge().appRealtime()

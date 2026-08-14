@@ -10,7 +10,7 @@ import type {
   TerminalSessionClosedEvent,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
-import type { ClientTerminal } from '#/web/client-bridge-types.ts'
+import type { ClientTerminal } from '#/web/bridge/types.ts'
 import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/terminal/components/types.ts'
 import type { ClientAppRealtime, AppRealtimeServerConfig } from '#/web/app/realtime/client.ts'
 import type { TerminalNotificationProvider } from '#/web/terminal/notification-provider.ts'

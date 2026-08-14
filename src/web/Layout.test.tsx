@@ -39,7 +39,7 @@ vi.mock('#/web/hooks/useAuthenticatedAppBootstrap.ts', () => ({
   useAuthenticatedAppBootstrap: () => ({ state: authenticatedBootstrapState, retry: authenticatedBootstrapMock.retry }),
 }))
 
-vi.mock('#/web/client-ingress.ts', () => ({
+vi.mock('#/web/bridge/ingress.ts', () => ({
   subscribeClientEffectIntent: (listener: (intent: { type: string }) => void) => {
     clientIntentIngress.subscriptionStarts += 1
     clientIntentIngress.listeners.add(listener)

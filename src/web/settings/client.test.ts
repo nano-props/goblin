@@ -3,7 +3,7 @@ import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { defaultSettingsSnapshot, defaultUserSettings } from '#/shared/settings-defaults.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 
@@ -87,7 +87,7 @@ describe('client bootstrap', () => {
     const bootstrap: ClientBootstrapSnapshot = webBootstrap({
       initialServer: { url: 'http://127.0.0.1:32100', accessToken: 'secret' },
     })
-    const bridgeModule = await import('#/web/client-bridge.ts')
+    const bridgeModule = await import('#/web/bridge/client.ts')
     bridgeModule.setClientBridgeForTests({
       kind: () => 'web',
       hasCapability: () => false,
@@ -189,7 +189,7 @@ describe('client bootstrap', () => {
       },
     })
 
-    const { readInjectedWebBootstrap } = await import('#/web/client-bootstrap-bridge.ts')
+    const { readInjectedWebBootstrap } = await import('#/web/bridge/bootstrap.ts')
     expect(() => readInjectedWebBootstrap()).toThrow('Invalid injected client bootstrap')
   })
 
@@ -223,7 +223,7 @@ describe('client bootstrap', () => {
       },
     })
 
-    const { readInjectedWebBootstrap } = await import('#/web/client-bootstrap-bridge.ts')
+    const { readInjectedWebBootstrap } = await import('#/web/bridge/bootstrap.ts')
     expect(() => readInjectedWebBootstrap()).toThrow('Invalid injected client bootstrap')
   })
 
@@ -237,7 +237,7 @@ describe('client bootstrap', () => {
       value: { getElementById: () => ({ textContent: '' }) },
     })
 
-    const { readInjectedWebBootstrap } = await import('#/web/client-bootstrap-bridge.ts')
+    const { readInjectedWebBootstrap } = await import('#/web/bridge/bootstrap.ts')
     expect(() => readInjectedWebBootstrap()).toThrow('Empty client bootstrap element')
   })
 
@@ -253,7 +253,7 @@ describe('client bootstrap', () => {
       },
     })
 
-    const { readQueryBootstrap } = await import('#/web/client-bootstrap-bridge.ts')
+    const { readQueryBootstrap } = await import('#/web/bridge/bootstrap.ts')
     expect(() => readQueryBootstrap()).toThrow('Invalid client bootstrap server URL')
   })
 
@@ -274,7 +274,7 @@ describe('client bootstrap', () => {
       },
     })
 
-    const { readQueryBootstrap } = await import('#/web/client-bootstrap-bridge.ts')
+    const { readQueryBootstrap } = await import('#/web/bridge/bootstrap.ts')
     expect(readQueryBootstrap()).toEqual({
       runtime: { kind: 'web', bridgeVersion: CLIENT_BRIDGE_VERSION, capabilities: [] },
       initialServer: {

@@ -20,7 +20,7 @@ import {
   type ObservedAppNavigationActionsForTest,
   type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,

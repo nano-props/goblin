@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { onClientLocalEventType, resetClientLocalEventsForTests } from '#/web/local-events.ts'
+import { onClientLocalEventType, resetClientLocalEventsForTests } from '#/web/bridge/local-events.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal/notification-provider.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'

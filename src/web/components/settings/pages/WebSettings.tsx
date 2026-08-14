@@ -6,7 +6,7 @@ import { SettingsGroup, SettingsList, SettingsRow } from '#/web/components/setti
 import { Switch } from '#/web/components/ui/switch.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { getInitialBootstrap } from '#/web/bootstrap.ts'
-import { getClientBridge } from '#/web/client-bridge.ts'
+import { getClientBridge } from '#/web/bridge/client.ts'
 import { useLanInfoQuery } from '#/web/settings/queries.ts'
 import { useLanSettingsController, useLanSettings } from '#/web/settings/runtime-lan.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'

@@ -1,6 +1,6 @@
 import { isClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ClientEffectIntent, ClientEffectIntentType } from '#/shared/client-effect-intents.ts'
-import { getClientBridge } from '#/web/client-bridge.ts'
+import { getClientBridge } from '#/web/bridge/client.ts'
 
 export function subscribeClientEffectIntent(cb: (event: ClientEffectIntent) => void): () => void {
   return getClientBridge().onEffectIntent(cb)

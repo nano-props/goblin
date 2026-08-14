@@ -4,7 +4,7 @@
 // actions, workspace runtime events, and workspace-pane tab operations.
 // Repo/store fixtures live in #/web/test-utils/repo-store.ts.
 
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import type { RemoteWorkspaceRuntimeLifecycle } from '#/shared/remote-workspace.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'

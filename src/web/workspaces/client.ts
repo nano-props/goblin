@@ -6,7 +6,7 @@ import type {
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
-import { readClientPageId } from '#/web/client-page-id.ts'
+import { readClientPageId } from '#/web/bridge/page-id.ts'
 import { postServerCommandJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import { decodeWith } from '#/shared/http-response-schema.ts'
 import {

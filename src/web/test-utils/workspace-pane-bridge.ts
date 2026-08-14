@@ -19,8 +19,8 @@ import {
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import type { ClientBridge } from '#/web/client-bridge-types.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
+import type { ClientBridge } from '#/web/bridge/types.ts'
 import {
   readWorkspacePaneTabsForTarget,
   writeWorkspacePaneTabsSnapshotQueryData,

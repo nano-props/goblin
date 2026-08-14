@@ -15,7 +15,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {

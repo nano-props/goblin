@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 describe('client ingress', () => {
@@ -29,7 +29,7 @@ describe('client ingress', () => {
       },
     })
 
-    const { subscribeClientEffectIntentType } = await import('#/web/client-ingress.ts')
+    const { subscribeClientEffectIntentType } = await import('#/web/bridge/ingress.ts')
     const cb = vi.fn()
     const unsubscribe = subscribeClientEffectIntentType('external-open-enqueued', cb)
 

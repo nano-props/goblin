@@ -54,7 +54,7 @@ import type {
 } from '#/web/terminal/components/types.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'

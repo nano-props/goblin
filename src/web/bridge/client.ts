@@ -1,11 +1,11 @@
 import type { ClientNativeCapability } from '#/shared/bootstrap.ts'
 import type { IpcRequest } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { ClientHostBridge, ClientBridge } from '#/web/client-bridge-types.ts'
-import { readNativeBridge } from '#/web/native-bridge.ts'
+import type { ClientHostBridge, ClientBridge } from '#/web/bridge/types.ts'
+import { readNativeBridge } from '#/web/bridge/native.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
-import { readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
-import { readClientPageId } from '#/web/client-page-id.ts'
+import { readWebBootstrap } from '#/web/bridge/bootstrap.ts'
+import { readClientPageId } from '#/web/bridge/page-id.ts'
 import { createClientAppRealtime, type AppRealtimeServerConfig } from '#/web/app/realtime/client.ts'
 import { createServerTerminalClient } from '#/web/terminal/server-client.ts'
 import { createServerWorkspacePaneTabsClient } from '#/web/workspace-pane/client-tabs.ts'
@@ -16,7 +16,7 @@ import type {
   ClientTerminal,
   ClientWorkspacePaneRuntime,
   ClientWorkspacePaneTabs,
-} from '#/web/client-bridge-types.ts'
+} from '#/web/bridge/types.ts'
 
 /** The complete native preload contract exposes this fixed capability set. */
 function capabilitiesFromBridge(bridge: NonNullable<Window['goblinNative']>): ReadonlySet<ClientNativeCapability> {

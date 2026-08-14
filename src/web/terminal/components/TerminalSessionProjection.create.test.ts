@@ -52,7 +52,7 @@ vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
   workspacePaneTabsAfterSnapshotCommit: mocks.workspacePaneTabsAfterSnapshotCommitMock,
 }))
 
-vi.mock('#/web/client-page-id.ts', () => ({
+vi.mock('#/web/bridge/page-id.ts', () => ({
   readClientPageId: mocks.clientIdMock,
 }))
 

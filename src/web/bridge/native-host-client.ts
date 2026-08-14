@@ -1,6 +1,6 @@
 import type { NativeHostIpcPath, IpcRequest } from '#/shared/api-types.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
-import { getClientBridge } from '#/web/client-bridge.ts'
+import { getClientBridge } from '#/web/bridge/client.ts'
 
 function createNativeRequestId(): string {
   return createOpaqueId('ipc')

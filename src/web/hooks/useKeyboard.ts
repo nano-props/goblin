@@ -33,7 +33,7 @@ import {
   runNewTerminalTabCommand,
   runSelectWorkspacePaneTabByIndexCommand,
 } from '#/web/commands/workspace-commands.ts'
-import { getClientBridge } from '#/web/client-bridge.ts'
+import { getClientBridge } from '#/web/bridge/client.ts'
 import { translate } from '#/web/stores/i18n-vue.ts'
 import { toast } from 'vue-sonner'
 import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'

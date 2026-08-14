@@ -1,5 +1,5 @@
-import { getClientBridge } from '#/web/client-bridge.ts'
-import type { ClientTerminal } from '#/web/client-bridge-types.ts'
+import { getClientBridge } from '#/web/bridge/client.ts'
+import type { ClientTerminal } from '#/web/bridge/types.ts'
 
 function getTerminalClient(): ClientTerminal {
   return getClientBridge().terminal()

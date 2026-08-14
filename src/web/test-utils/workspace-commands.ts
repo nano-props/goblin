@@ -12,7 +12,7 @@ import {
 } from '#/web/commands/workspace-commands.ts'
 import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'

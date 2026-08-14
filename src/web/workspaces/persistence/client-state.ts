@@ -7,8 +7,8 @@ import {
 } from '#/shared/client-workspace-state-schema.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { sessionLog } from '#/web/logger.ts'
-import { readNativeBridge } from '#/web/native-bridge.ts'
-import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
+import { readNativeBridge } from '#/web/bridge/native.ts'
+import { invokeNativeIpcPath } from '#/web/bridge/native-host-client.ts'
 
 const CLIENT_WORKSPACE_STORAGE_KEY = 'goblin.workspace'
 

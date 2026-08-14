@@ -4,7 +4,7 @@ import {
   workspacePaneRuntimeOpenResultMatchesRequest,
 } from '#/shared/workspace-pane-runtime-validators.ts'
 import type { ClientAppRealtime } from '#/web/app/realtime/client.ts'
-import type { ClientWorkspacePaneRuntime } from '#/web/client-bridge-types.ts'
+import type { ClientWorkspacePaneRuntime } from '#/web/bridge/types.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 
 function indeterminateInvalidResponse(message: string): ClientRealtimeRequestError {

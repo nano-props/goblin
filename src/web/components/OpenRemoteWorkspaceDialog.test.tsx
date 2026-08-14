@@ -11,7 +11,7 @@ import { OpenRemoteWorkspaceDialog } from '#/web/components/OpenRemoteWorkspaceD
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'

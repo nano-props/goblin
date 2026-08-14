@@ -26,7 +26,7 @@ import {
   sameTerminalRuntimeBinding,
 } from '#/web/terminal/components/terminal-session-runtime.ts'
 import { TerminalSessionView } from '#/web/terminal/components/terminal-session-view.ts'
-import { readClientPageId } from '#/web/client-page-id.ts'
+import { readClientPageId } from '#/web/bridge/page-id.ts'
 import {
   latestRenderedOutputCheckpoint,
   normalizeRenderedOutputCheckpoint,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 
 function installBridge(calls: Array<{ path: string; input?: unknown }>, result = new Promise(() => {})): void {
@@ -35,7 +35,7 @@ describe('native host client', () => {
   test('aborts native IPC requests', async () => {
     const calls: Array<{ path: string; input?: unknown }> = []
     installBridge(calls)
-    const { invokeNativeIpcPath } = await import('#/web/native-host-client.ts')
+    const { invokeNativeIpcPath } = await import('#/web/bridge/native-host-client.ts')
     const ctrl = new AbortController()
     const promise = invokeNativeIpcPath(
       'settings.setGlobalShortcut',

@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 import { installHostBootstrap } from '#/web/test-utils/host-bootstrap.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
@@ -32,7 +32,7 @@ describe('terminal web host client', () => {
   test('attaches terminals through terminal websocket request-response in web host mode', async () => {
     const fetchMock = mockFetch()
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const { readClientPageId } = await import('#/web/client-page-id.ts')
+    const { readClientPageId } = await import('#/web/bridge/page-id.ts')
 
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
@@ -88,7 +88,7 @@ describe('terminal web host client', () => {
 
   test('uses the page instance id for the realtime connection', async () => {
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const { readClientPageId } = await import('#/web/client-page-id.ts')
+    const { readClientPageId } = await import('#/web/bridge/page-id.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     const attachPromise = terminalClient.attach({
@@ -132,7 +132,7 @@ describe('terminal web host client', () => {
 
   test('uses the websocket client id when resolving identity role', async () => {
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const { readClientPageId } = await import('#/web/client-page-id.ts')
+    const { readClientPageId } = await import('#/web/bridge/page-id.ts')
     const clientId = readClientPageId()
     const onIdentity = vi.fn()
     const dispose = terminalClient.onIdentity(onIdentity)
@@ -790,7 +790,7 @@ describe('terminal web host client', () => {
 
   test('emits terminal bell click events from browser notifications in web host mode', async () => {
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const { onClientLocalEventType, resetClientLocalEventsForTests } = await import('#/web/local-events.ts')
+    const { onClientLocalEventType, resetClientLocalEventsForTests } = await import('#/web/bridge/local-events.ts')
     const bellClick = vi.fn()
     const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
     const terminalSessionId = 'term-222222222222222222222'

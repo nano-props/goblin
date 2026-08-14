@@ -3,8 +3,8 @@ import type {
   TerminalNotifyBellInput,
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
-import { emitClientLocalEvent } from '#/web/local-events.ts'
-import { readNativeBridge } from '#/web/native-bridge.ts'
+import { emitClientLocalEvent } from '#/web/bridge/local-events.ts'
+import { readNativeBridge } from '#/web/bridge/native.ts'
 
 export interface TerminalNotificationProvider {
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>

@@ -6,8 +6,8 @@ import type { ClientWorkspaceState } from '#/shared/api-types.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { withBrowserStorageUnavailable } from '#/test-utils/storage.ts'
-import * as nativeBridge from '#/web/native-bridge.ts'
-import * as nativeHostClient from '#/web/native-host-client.ts'
+import * as nativeBridge from '#/web/bridge/native.ts'
+import * as nativeHostClient from '#/web/bridge/native-host-client.ts'
 
 beforeEach(() => {
   localStorage.clear()
