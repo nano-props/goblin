@@ -1,6 +1,6 @@
 import type { Dirent } from 'node:fs'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { getLocalPathSuggestionsForHost } from '#/server/modules/local-path-suggestions.ts'
+import { getLocalPathSuggestionsForHost } from '#/server/workspaces/local-path-suggestions.ts'
 
 const mocks = vi.hoisted(() => ({
   opendir: vi.fn(),

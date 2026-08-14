@@ -13,14 +13,14 @@ const mocks = vi.hoisted(() => ({
   ensureSshControlDirectory: vi.fn(),
 }))
 
-vi.mock('#/server/modules/workspace-filesystem-execution.ts', () => ({
+vi.mock('#/server/workspaces/filesystem/execution.ts', () => ({
   resolveWorkspaceFilesystemExecution: mocks.resolveWorkspaceFilesystemExecution,
 }))
 vi.mock('#/system/ssh/invocation.ts', () => ({
   buildCanonicalSshInvocation: mocks.buildCanonicalSshInvocation,
   ensureSshControlDirectory: mocks.ensureSshControlDirectory,
 }))
-import { openWorkspaceFileDownload } from '#/server/modules/workspace-file-download.ts'
+import { openWorkspaceFileDownload } from '#/server/workspaces/filesystem/file-download.ts'
 
 const target = {
   kind: 'workspace-root' as const,

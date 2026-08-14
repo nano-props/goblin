@@ -33,22 +33,22 @@ const mocks = vi.hoisted(() => ({
   getLocalPathSuggestions: vi.fn(),
 }))
 
-vi.mock('#/server/modules/workspace-probe.ts', () => ({
+vi.mock('#/server/workspaces/probe.ts', () => ({
   probeLocalWorkspace: mocks.probeLocalWorkspace,
   probeWorkspace: mocks.probeWorkspace,
 }))
 
-vi.mock('#/server/modules/workspace-filesystem-tree.ts', () => ({
+vi.mock('#/server/workspaces/filesystem/tree.ts', () => ({
   readWorkspaceFilesystemTree: mocks.readWorkspaceFilesystemTree,
 }))
-vi.mock('#/server/modules/workspace-file-viewer.ts', () => ({
+vi.mock('#/server/workspaces/filesystem/file-viewer.ts', () => ({
   readWorkspaceFileViewer: mocks.readWorkspaceFileViewer,
 }))
-vi.mock('#/server/modules/workspace-directory-overview.ts', () => ({
+vi.mock('#/server/workspaces/filesystem/directory-overview.ts', () => ({
   readWorkspaceDirectoryOverview: mocks.readWorkspaceDirectoryOverview,
 }))
-vi.mock('#/server/modules/workspace-file-trash.ts', () => ({ trashWorkspaceFile: mocks.trashWorkspaceFile }))
-vi.mock('#/server/modules/workspace-file-download.ts', () => ({
+vi.mock('#/server/workspaces/filesystem/file-trash.ts', () => ({ trashWorkspaceFile: mocks.trashWorkspaceFile }))
+vi.mock('#/server/workspaces/filesystem/file-download.ts', () => ({
   openWorkspaceFileDownload: mocks.openWorkspaceFileDownload,
 }))
 vi.mock('#/server/modules/workspace-external-apps.ts', () => ({
@@ -56,7 +56,7 @@ vi.mock('#/server/modules/workspace-external-apps.ts', () => ({
   openWorkspaceEditor: mocks.openWorkspaceEditor,
   openWorkspaceInFinder: mocks.openWorkspaceInFinder,
 }))
-vi.mock('#/server/modules/local-path-suggestions.ts', () => ({
+vi.mock('#/server/workspaces/local-path-suggestions.ts', () => ({
   getLocalPathSuggestions: mocks.getLocalPathSuggestions,
 }))
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({

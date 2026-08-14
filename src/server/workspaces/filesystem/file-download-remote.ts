@@ -4,12 +4,12 @@ import path from 'node:path'
 import type { Readable } from 'node:stream'
 import { CodedError } from '#/shared/coded-error.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
-import type { ResolvedWorkspaceFilesystemExecution } from '#/server/modules/workspace-filesystem-execution.ts'
+import type { ResolvedWorkspaceFilesystemExecution } from '#/server/workspaces/filesystem/execution.ts'
 import {
   bytesFromReadableChunk,
   nodeReadableStream,
   type NodeReadableStart,
-} from '#/server/modules/workspace-file-download-stream.ts'
+} from '#/server/workspaces/filesystem/file-download-stream.ts'
 import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { remoteFileDownloadStreamScript } from '#/system/ssh/remote-file-download-script.ts'
 import { buildCanonicalSshInvocation, ensureSshControlDirectory } from '#/system/ssh/invocation.ts'

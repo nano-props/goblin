@@ -72,7 +72,7 @@ vi.mock('#/server/repos/read-paths.ts', () => ({
   readRepoOperationsSnapshot: mocks.readRepoOperationsSnapshot,
   getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
 }))
-vi.mock('#/server/modules/workspace-probe.ts', () => ({
+vi.mock('#/server/workspaces/probe.ts', () => ({
   probeLocalWorkspace: mocks.probeLocalWorkspace,
   probeWorkspace: mocks.probeWorkspace,
 }))

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { localWorkspaceNativePath, resolveWorkspaceScopedPath } from '#/server/modules/workspace-path.ts'
+import { localWorkspaceNativePath, resolveWorkspaceScopedPath } from '#/server/workspaces/path.ts'
 
 describe('workspace native execution paths', () => {
   test('decodes a canonical local workspace only at the execution boundary', () => {

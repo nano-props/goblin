@@ -32,7 +32,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   trashRemoteFile: mocks.trashRemoteFile,
 }))
 
-import { trashWorkspaceFile } from '#/server/modules/workspace-file-trash.ts'
+import { trashWorkspaceFile } from '#/server/workspaces/filesystem/file-trash.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'

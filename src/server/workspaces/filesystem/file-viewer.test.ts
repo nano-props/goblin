@@ -29,7 +29,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   resolveRemoteWorktree: mocks.resolveRemoteWorktree,
 }))
 
-import { readWorkspaceFileViewer } from '#/server/modules/workspace-file-viewer.ts'
+import { readWorkspaceFileViewer } from '#/server/workspaces/filesystem/file-viewer.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'

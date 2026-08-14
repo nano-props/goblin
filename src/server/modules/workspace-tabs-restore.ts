@@ -14,7 +14,7 @@ import { confirmServerWorkspaceEntry, getServerWorkspaceState } from '#/server/s
 import { restoreWorkspacePaneTabsForMemberships, workspaceEntry } from '#/server/modules/workspace-pane-tabs-restore.ts'
 import { abortableWorkspaceRestore } from '#/server/modules/workspace-restore-utils.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
+import { probeWorkspace } from '#/server/workspaces/probe.ts'
 import {
   commitGitCapabilityRemovalOrThrow,
   type WorkspaceCapabilityTransitionHost,

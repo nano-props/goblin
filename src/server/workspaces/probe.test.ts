@@ -8,7 +8,7 @@ import {
   probeLocalWorkspace,
   type LocalGitRootProbe,
   type LocalWorkspaceProbeDependencies,
-} from '#/server/modules/workspace-probe.ts'
+} from '#/server/workspaces/probe.ts'
 
 function gitProbe(result: LocalGitRootProbe): LocalWorkspaceProbeDependencies['gitRoot'] {
   return vi.fn(async () => result)

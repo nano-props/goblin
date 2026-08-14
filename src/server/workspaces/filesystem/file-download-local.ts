@@ -2,8 +2,8 @@ import { constants as fsConstants } from 'node:fs'
 import { open, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { CodedError } from '#/shared/coded-error.ts'
-import type { ResolvedWorkspaceFilesystemExecution } from '#/server/modules/workspace-filesystem-execution.ts'
-import { nodeReadableStream } from '#/server/modules/workspace-file-download-stream.ts'
+import type { ResolvedWorkspaceFilesystemExecution } from '#/server/workspaces/filesystem/execution.ts'
+import { nodeReadableStream } from '#/server/workspaces/filesystem/file-download-stream.ts'
 
 type LocalFilesystemExecution = Extract<ResolvedWorkspaceFilesystemExecution, { transport: 'local' }>
 

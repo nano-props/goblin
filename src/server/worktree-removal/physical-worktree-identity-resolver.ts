@@ -16,7 +16,7 @@ import {
 } from '#/server/modules/workspace-runtimes.ts'
 import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
-import { localWorkspaceNativePath } from '#/server/modules/workspace-path.ts'
+import { localWorkspaceNativePath } from '#/server/workspaces/path.ts'
 import {
   issuePhysicalWorktreeExecutionCapability,
   type PhysicalWorktreeExecutionBinding,

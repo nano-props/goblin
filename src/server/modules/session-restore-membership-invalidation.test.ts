@@ -5,7 +5,7 @@ import path from 'node:path'
 import { formatWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 
-vi.mock('#/server/modules/workspace-probe.ts', () => ({
+vi.mock('#/server/workspaces/probe.ts', () => ({
   probeWorkspace: vi.fn(async () => ({
     status: 'unavailable' as const,
     reason: 'error.workspace-path-not-found' as const,

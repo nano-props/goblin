@@ -2,7 +2,7 @@ import { mkdir, mkdtempDisposable, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { getLocalPathSuggestions } from '#/server/modules/local-path-suggestions.ts'
+import { getLocalPathSuggestions } from '#/server/workspaces/local-path-suggestions.ts'
 import { workspaceLocatorFromNativeCommandInput } from '#/server/modules/native-workspace-input.ts'
 
 describe('getLocalPathSuggestions', () => {

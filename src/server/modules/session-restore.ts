@@ -27,7 +27,7 @@ import {
   type WorkspaceRuntimeMembershipLeaseEntry,
   type WorkspaceRuntimeMembershipCapability,
 } from '#/server/modules/workspace-runtimes.ts'
-import { probeWorkspace } from '#/server/modules/workspace-probe.ts'
+import { probeWorkspace } from '#/server/workspaces/probe.ts'
 import {
   workspaceGitAvailable,
   type WorkspaceGitReadyProbeState,

@@ -10,8 +10,8 @@ import {
   readGitWorktreeFilesystemSourceRemote,
   readWorkspaceFilesystemSourceLocal,
   readWorkspaceFilesystemSourceRemote,
-} from '#/server/modules/workspace-filesystem-source.ts'
-import { buildChildNodes, buildLimitedChildNodes } from '#/server/modules/workspace-filesystem-source-pure.ts'
+} from '#/server/workspaces/filesystem/source.ts'
+import { buildChildNodes, buildLimitedChildNodes } from '#/server/workspaces/filesystem/source-pure.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 

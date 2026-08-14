@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
   parseRemoteDirectoryOverview,
   readLocalDirectoryOverview,
-} from '#/server/modules/workspace-directory-overview.ts'
+} from '#/server/workspaces/filesystem/directory-overview.ts'
 
 describe('workspace directory overview', () => {
   it('counts only direct entries', async () => {

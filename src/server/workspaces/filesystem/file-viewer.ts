@@ -2,7 +2,7 @@ import type { WorkspaceFileViewerResult } from '#/shared/api-types.ts'
 import { remoteCommandExists, remoteCommandExistsAtWorkspaceRoot } from '#/system/ssh/git.ts'
 import { userShellCommandExists } from '#/system/user-shell.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
-import { resolveWorkspaceFilesystemExecution } from '#/server/modules/workspace-filesystem-execution.ts'
+import { resolveWorkspaceFilesystemExecution } from '#/server/workspaces/filesystem/execution.ts'
 
 const BAT_VIEWERS = ['bat', 'batcat'] as const
 type WorkspaceFileViewer = Omit<WorkspaceFileViewerResult, 'executionRoot'>

@@ -18,9 +18,9 @@ import {
   readGitWorktreeFilesystemSourceRemote,
   readWorkspaceFilesystemSourceLocal,
   readWorkspaceFilesystemSourceRemote,
-} from '#/server/modules/workspace-filesystem-source.ts'
+} from '#/server/workspaces/filesystem/source.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
-import { resolveWorkspaceFilesystemExecution } from '#/server/modules/workspace-filesystem-execution.ts'
+import { resolveWorkspaceFilesystemExecution } from '#/server/workspaces/filesystem/execution.ts'
 
 export interface WorkspaceFilesystemTreeReadOptions extends WorkspaceFilesystemSourceOptions {
   readonly signal?: AbortSignal

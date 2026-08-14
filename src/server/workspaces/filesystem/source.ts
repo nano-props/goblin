@@ -16,7 +16,7 @@ import {
   buildLimitedChildNodes,
   parseNullSeparatedPaths,
   stripRemoteEntryPrefix,
-} from '#/server/modules/workspace-filesystem-source-pure.ts'
+} from '#/server/workspaces/filesystem/source-pure.ts'
 
 export const MAX_WORKSPACE_FILESYSTEM_NODES = 50_000
 

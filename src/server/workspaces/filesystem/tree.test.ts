@@ -16,7 +16,7 @@ vi.mock('#/server/repos/remote-execution.ts', () => ({
   remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))
 
-vi.mock('#/server/modules/workspace-filesystem-source.ts', () => ({
+vi.mock('#/server/workspaces/filesystem/source.ts', () => ({
   readGitWorktreeFilesystemSourceLocal: mocks.readGitWorktreeFilesystemSourceLocal,
   readWorkspaceFilesystemSourceLocal: mocks.readWorkspaceFilesystemSourceLocal,
   readGitWorktreeFilesystemSourceRemote: mocks.readGitWorktreeFilesystemSourceRemote,
@@ -31,7 +31,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   resolveRemoteWorktree: mocks.resolveRemoteWorktree,
 }))
 
-import { readWorkspaceFilesystemTree } from '#/server/modules/workspace-filesystem-tree.ts'
+import { readWorkspaceFilesystemTree } from '#/server/workspaces/filesystem/tree.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { canonicalRuntimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-validators.ts'

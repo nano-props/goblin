@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   openInFinder: vi.fn(),
 }))
 
-vi.mock('#/server/modules/workspace-filesystem-execution.ts', () => ({
+vi.mock('#/server/workspaces/filesystem/execution.ts', () => ({
   resolveWorkspaceFilesystemExecution: mocks.resolveWorkspaceFilesystemExecution,
 }))
 vi.mock('#/system/editors.ts', () => ({
