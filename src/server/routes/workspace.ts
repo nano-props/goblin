@@ -37,7 +37,7 @@ import { homedir } from 'node:os'
 import { canonicalRuntimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-validators.ts'
 import type { RuntimeWorkspacePaneTarget, WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import { getLocalPathSuggestions } from '#/server/workspaces/local-path-suggestions.ts'
-import { workspaceLocatorFromNativeCommandInput } from '#/server/modules/native-workspace-input.ts'
+import { workspaceLocatorFromNativeCommandInput } from '#/server/workspaces/native-input.ts'
 
 export function createWorkspaceRoutes(options: {
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost

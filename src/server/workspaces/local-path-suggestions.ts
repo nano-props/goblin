@@ -7,7 +7,7 @@ import {
   nativeLeafMatches,
   planNativeDirectorySuggestions,
   type NativeDirectorySuggestionPlan,
-} from '#/server/modules/native-workspace-input.ts'
+} from '#/server/workspaces/native-input.ts'
 import type { WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
 
 const MAX_SUGGESTIONS = 20

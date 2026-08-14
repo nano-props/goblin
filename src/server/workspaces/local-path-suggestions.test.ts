@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { getLocalPathSuggestions } from '#/server/workspaces/local-path-suggestions.ts'
-import { workspaceLocatorFromNativeCommandInput } from '#/server/modules/native-workspace-input.ts'
+import { workspaceLocatorFromNativeCommandInput } from '#/server/workspaces/native-input.ts'
 
 describe('getLocalPathSuggestions', () => {
   test('returns only matching directories in deterministic order', async () => {

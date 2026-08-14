@@ -4,7 +4,7 @@ import {
   nativeLeafMatches,
   planNativeDirectorySuggestions,
   workspaceLocatorFromNativeCommandInput,
-} from '#/server/modules/native-workspace-input.ts'
+} from '#/server/workspaces/native-input.ts'
 
 describe('native workspace input', () => {
   test.each([
