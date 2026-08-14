@@ -8,7 +8,10 @@ import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projecti
 import { useTerminalSessionProjection } from '#/web/terminal/components/use-terminal-session-projection.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { workspacePaneTabsProjectionRevision } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
+  markWorkspacePaneTabsProjectionFailed,
+  workspacePaneTabsProjectionRevision,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { createRuntimeProjectionScopeRegistry } from '#/web/runtime/runtime-projection-scope.ts'
 import type { RuntimeProjectionScope, RuntimeProjectionScopeRegistry } from '#/web/runtime/runtime-projection-scope.ts'
 import { reconcileOpenWorkspaceRuntimeMemberships } from '#/web/stores/workspaces/workspace-runtime-membership-recovery.ts'
@@ -60,6 +63,8 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
       list: async (target) => await workspacePaneTabsClient.list(target),
       commit: (target, snapshot) =>
         writeCanonicalWorkspacePaneTabsSnapshot(target.workspaceId, target.workspaceRuntimeId, snapshot),
+      markFailed: (target, error) =>
+        markWorkspacePaneTabsProjectionFailed(target.workspaceId, target.workspaceRuntimeId, error),
       currentRevision: (target) => workspacePaneTabsProjectionRevision(target.workspaceId, target.workspaceRuntimeId),
       logFailure: (target, error) => {
         appRuntimeProjectionLog.debug('failed to refresh workspace pane tabs', { ...target, error })

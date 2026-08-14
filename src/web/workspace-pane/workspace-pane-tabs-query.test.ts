@@ -5,7 +5,9 @@ import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
+  markWorkspacePaneTabsProjectionFailed,
   readWorkspacePaneTabsForTarget,
+  readWorkspacePaneTabsProjectionForTarget,
   refreshWorkspacePaneTabsQueryData,
   workspacePaneTabsByTargetFromQueryData,
   workspacePaneTabsQueryKey,
@@ -81,6 +83,38 @@ describe('workspace pane tabs query', () => {
     const current = snapshot(4, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])])
     expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)).toBe(true)
     expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)).toBe(true)
+  })
+
+  test('preserves stale tabs while exposing a failed recovery until a snapshot succeeds', () => {
+    const queryClient = new QueryClient()
+    const current = snapshot(4, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])])
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)
+
+    markWorkspacePaneTabsProjectionFailed(
+      REPO_ROOT,
+      WORKSPACE_RUNTIME_ID,
+      new Error('tabs unavailable'),
+      queryClient,
+    )
+
+    expect(queryClient.getQueryData(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))).toEqual(current)
+    expect(
+      readWorkspacePaneTabsProjectionForTarget(
+        {
+          kind: 'git-branch',
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          branchName: 'feature/a',
+        },
+        queryClient,
+      ),
+    ).toEqual({ phase: 'failed', tabs: [] })
+
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(5, []), queryClient)
+
+    expect(queryClient.getQueryState(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))?.status).toBe(
+      'success',
+    )
   })
 
   test('normalizes the complete snapshot and keeps no-worktree targets static-only', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
 import { WorkspacePaneTabsRecovery } from '#/web/runtime/workspace-pane-tabs-recovery.ts'
 
@@ -16,6 +17,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     const recovery = new WorkspacePaneTabsRecovery({
       list,
       commit,
+      markFailed: vi.fn(),
       currentRevision: () => null,
       logFailure: vi.fn(),
     })
@@ -30,6 +32,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     const recovery = new WorkspacePaneTabsRecovery({
       list,
       commit: vi.fn(),
+      markFailed: vi.fn(),
       currentRevision: () => 4,
       logFailure: vi.fn(),
     })
@@ -52,6 +55,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     const recovery = new WorkspacePaneTabsRecovery({
       list,
       commit,
+      markFailed: vi.fn(),
       currentRevision: () => 99,
       logFailure: vi.fn(),
     })
@@ -66,5 +70,45 @@ describe('WorkspacePaneTabsRecovery', () => {
     })
 
     await vi.waitFor(() => expect(commit).toHaveBeenCalled())
+  })
+
+  test('publishes a failed projection once when the active recovery request fails', async () => {
+    const error = new Error('tabs unavailable')
+    const markFailed = vi.fn()
+    const logFailure = vi.fn()
+    const recovery = new WorkspacePaneTabsRecovery({
+      list: vi.fn(async () => await Promise.reject(error)),
+      commit: vi.fn(),
+      markFailed,
+      currentRevision: () => null,
+      logFailure,
+    })
+
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true))
+
+    await vi.waitFor(() => expect(markFailed).toHaveBeenCalledWith(TARGET, error))
+    expect(markFailed).toHaveBeenCalledOnce()
+    expect(logFailure).toHaveBeenCalledWith(TARGET, error)
+  })
+
+  test('does not publish failure after the runtime scope is replaced', async () => {
+    const request = Promise.withResolvers<WorkspacePaneTabsSnapshot>()
+    let current = true
+    const markFailed = vi.fn()
+    const recovery = new WorkspacePaneTabsRecovery({
+      list: vi.fn(async () => await request.promise),
+      commit: vi.fn(),
+      markFailed,
+      currentRevision: () => null,
+      logFailure: vi.fn(),
+    })
+    const scope = new RuntimeProjectionScope(TARGET, () => current)
+
+    recovery.request(scope)
+    current = false
+    request.reject(new Error('stale failure'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(markFailed).not.toHaveBeenCalled()
   })
 })

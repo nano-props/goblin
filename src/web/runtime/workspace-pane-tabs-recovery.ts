@@ -9,6 +9,7 @@ const WORKSPACE_TABS_REFRESH_LANE = 'workspace-tabs-refresh'
 export interface WorkspacePaneTabsRecoveryDependencies {
   list: (target: RuntimeProjectionScope['target']) => Promise<WorkspacePaneTabsSnapshot>
   commit: (target: RuntimeProjectionScope['target'], snapshot: WorkspacePaneTabsSnapshot) => void
+  markFailed: (target: RuntimeProjectionScope['target'], error: unknown) => void
   currentRevision: (target: RuntimeProjectionScope['target']) => number | null
   logFailure: (target: RuntimeProjectionScope['target'], error: unknown) => void
 }
@@ -29,7 +30,10 @@ export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActio
       WORKSPACE_TABS_REFRESH_LANE,
       async () => await this.dependencies.list(scope.target),
       (snapshot) => this.dependencies.commit(scope.target, snapshot),
-      (error) => this.dependencies.logFailure(scope.target, error),
+      (error) => {
+        this.dependencies.markFailed(scope.target, error)
+        this.dependencies.logFailure(scope.target, error)
+      },
     )
   }
 

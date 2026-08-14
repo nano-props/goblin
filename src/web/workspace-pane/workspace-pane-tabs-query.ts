@@ -129,6 +129,23 @@ export function writeWorkspacePaneTabsSnapshotQueryData(
   return accepted
 }
 
+export function markWorkspacePaneTabsProjectionFailed(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  error: unknown,
+  queryClient: QueryClient = appQueryClient,
+): void {
+  const queryKey = workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId)
+  const query =
+    queryClient.getQueryCache().find({ queryKey, exact: true }) ??
+    queryClient.getQueryCache().build(queryClient, workspacePaneTabsQueryOptions(workspaceId, workspaceRuntimeId))
+  query.setState({
+    ...query.state,
+    status: 'error',
+    error: error instanceof Error ? error : new Error(String(error)),
+  })
+}
+
 export function refreshWorkspacePaneTabs(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,

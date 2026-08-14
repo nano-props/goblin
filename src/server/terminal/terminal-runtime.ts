@@ -445,21 +445,26 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     if (reason === 'workspace-pane') return
     return sessionService
       .reconcileTerminalTabsForSession(userId, session)
-      .then((result) => {
-        if (result.kind === 'runtime-stale') return
-        publishWorkspaceTabsChanged(userId, coordinates.workspaceId)
-      })
-      .catch((err) => {
-        terminalRuntimeLogger.warn(
-          {
-            userId,
-            terminalRuntimeSessionId: session.terminalRuntimeSessionId,
-            workspaceId: coordinates.workspaceId,
-            err,
-          },
-          'failed to reconcile workspace tabs after terminal session close',
-        )
-      })
+      .then(
+        (result) => {
+          if (result.kind === 'runtime-stale') return
+          publishWorkspaceTabsChanged(userId, coordinates.workspaceId)
+        },
+        (err) => {
+          terminalRuntimeLogger.warn(
+            {
+              userId,
+              terminalRuntimeSessionId: session.terminalRuntimeSessionId,
+              workspaceId: coordinates.workspaceId,
+              err,
+            },
+            'failed to reconcile workspace tabs after terminal session close',
+          )
+          // Session retirement is already authoritative. Invalidate the stale
+          // tabs projection once even when this eager projection fails.
+          publishWorkspaceTabsChanged(userId, coordinates.workspaceId)
+        },
+      )
   }
 }
 
