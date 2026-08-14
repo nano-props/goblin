@@ -80,25 +80,26 @@ import { validateBranchDeletionPolicy, validateRemovableWorktreeState } from '#/
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import {
   bootstrapRemoteWorktreeAfterCreate,
+  getRemoteWorktreeBootstrapPreview,
+} from '#/system/ssh/git/worktree-bootstrap.ts'
+import {
   createRemoteWorktree,
-  deleteRemoteBranch,
-  fetchRemoteRepo,
-  getRemoteBrowserUrl,
-  getRemoteLog,
-  getRemotePatch,
   getRemoteRepoWorktreePaths,
   resolveRemoteWorktreePath,
-  getRemoteWorkspacePaneTargetIdentities,
-  getRemoteSnapshot,
-  getRemoteStatus,
-  getRemoteWorktreeBootstrapPreview,
-  getRemoteTrackingBranches as getSshRemoteTrackingBranches,
-  type RemoteGitRunner,
-  type RemoteWorktreeRemovalResult,
-  pullRemoteBranch,
-  pushRemoteBranch,
   removeRemoteWorktree,
-} from '#/system/ssh/git.ts'
+} from '#/system/ssh/git/worktrees.ts'
+import { deleteRemoteBranch, getRemoteLog, pullRemoteBranch } from '#/system/ssh/git/branches.ts'
+import {
+  fetchRemoteRepo,
+  getRemoteBrowserUrl,
+  getRemoteTrackingBranches as getSshRemoteTrackingBranches,
+  pushRemoteBranch,
+} from '#/system/ssh/git/remote.ts'
+import { getRemotePatch } from '#/system/ssh/git/patch.ts'
+import { getRemoteWorkspacePaneTargetIdentities, getRemoteSnapshot } from '#/system/ssh/git/snapshot.ts'
+import { getRemoteStatus } from '#/system/ssh/git/status.ts'
+import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
+import type { RemoteWorktreeRemovalResult } from '#/system/ssh/git/worktrees.ts'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { getBranchPullRequests, getBranchPullRequestsForRepoRef } from '#/system/git/pull-requests.ts'
 import type { GitUpstream } from '#/system/git/upstream.ts'
@@ -313,7 +314,7 @@ function localRepoIdsToInvalidate(repoId: string, worktrees: readonly WorktreeIn
 async function readRemoteRepoIdsToInvalidate(
   target: RemoteWorkspaceTarget,
   signal?: AbortSignal,
-  run?: RemoteGitRunner,
+  run?: RemoteCommandRunner,
 ): Promise<WorkspaceId[]> {
   const worktreePaths = await getRemoteRepoWorktreePaths(target, { signal, run })
   signal?.throwIfAborted()
@@ -324,8 +325,8 @@ async function runRemoteRepoMutation<Result extends RepoMutationResult>(
   repoId: string,
   target: RemoteWorkspaceTarget,
   runtime: RepoSourceRuntimeContext | undefined,
-  fallbackRun: RemoteGitRunner | undefined,
-  task: (run: RemoteGitRunner) => Promise<Result>,
+  fallbackRun: RemoteCommandRunner | undefined,
+  task: (run: RemoteCommandRunner) => Promise<Result>,
 ): Promise<Result> {
   const run = fallbackRun ?? ((command, remoteTarget, options) => runRemoteCommand(remoteTarget, command, options))
   if (!runtime) return await task(run)
@@ -342,9 +343,9 @@ async function runRemoteRepoMutation<Result extends RepoMutationResult>(
 }
 
 function remoteMembershipMutationRunner(
-  run: RemoteGitRunner,
+  run: RemoteCommandRunner,
   runMembershipMutation: RunRepoMembershipMutation,
-): RemoteGitRunner {
+): RemoteCommandRunner {
   return async (command, target, options) => {
     if (command.type !== 'gitWorktreeAdd' && command.type !== 'gitWorktreeRemove') {
       return await run(command, target, options)
@@ -1041,7 +1042,7 @@ function hasRemoteTrackingBranch(
 
 async function remotePullRequestRepoRef(
   target: RemoteWorkspaceTarget,
-  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+  options: { signal?: AbortSignal; run?: RemoteCommandRunner } = {},
 ): Promise<GitHubRepoRef | null> {
   const snapshot = await getRemoteSnapshot(target, { signal: options.signal, run: options.run })
   if (!snapshot?.remote.hasGitHubRemote) return null

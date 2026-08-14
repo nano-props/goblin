@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   resolveRemoteWorkspaceTarget: vi.fn(),
   remoteRuntimeAwareGitRunner: vi.fn(),
   remoteCommandExists: vi.fn(),
-  remoteCommandExistsAtWorkspaceRoot: vi.fn(),
+  remoteCommandExistsAtPath: vi.fn(),
   resolveRemoteWorktree: vi.fn(),
 }))
 
@@ -23,10 +23,13 @@ vi.mock('#/server/repos/remote-execution.ts', () => ({
   remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))
 
-vi.mock('#/system/ssh/git.ts', () => ({
+vi.mock('#/system/ssh/git/worktrees.ts', () => ({
   remoteCommandExists: mocks.remoteCommandExists,
-  remoteCommandExistsAtWorkspaceRoot: mocks.remoteCommandExistsAtWorkspaceRoot,
   resolveRemoteWorktree: mocks.resolveRemoteWorktree,
+}))
+
+vi.mock('#/system/ssh/command-probe.ts', () => ({
+  remoteCommandExistsAtPath: mocks.remoteCommandExistsAtPath,
 }))
 
 import { readWorkspaceFileViewer } from '#/server/workspaces/filesystem/file-viewer.ts'
@@ -146,7 +149,7 @@ describe('workspace file viewer read layer', () => {
 
   test('resolves an SSH workspace locator without a Git worktree lookup', async () => {
     mocks.resolveRemoteWorkspaceTarget.mockResolvedValueOnce(remotePlainWorkspaceTarget)
-    mocks.remoteCommandExistsAtWorkspaceRoot.mockResolvedValueOnce(true)
+    mocks.remoteCommandExistsAtPath.mockResolvedValueOnce(true)
 
     await expect(readWorkspaceFileViewer(rootTarget(remotePlainWorkspaceId))).resolves.toEqual({
       viewer: 'bat',
@@ -154,7 +157,7 @@ describe('workspace file viewer read layer', () => {
       executionRoot: '/srv/plain-workspace',
     })
     expect(mocks.resolveRemoteWorktree).not.toHaveBeenCalled()
-    expect(mocks.remoteCommandExistsAtWorkspaceRoot).toHaveBeenCalledWith(
+    expect(mocks.remoteCommandExistsAtPath).toHaveBeenCalledWith(
       remotePlainWorkspaceTarget,
       '/srv/plain-workspace',
       'bat',

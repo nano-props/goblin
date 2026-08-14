@@ -6,7 +6,8 @@ import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-
 import { parseWorkspaceLocator, workspaceLocatorsShareTransport } from '#/shared/workspace-locator.ts'
 import { remoteRuntimeAwareGitRunner, resolveRemoteWorkspaceTarget } from '#/server/repos/remote-execution.ts'
 import { readWorktreeMembership } from '#/system/git/worktrees.ts'
-import { resolveRemoteWorktree, type RemoteGitRunner } from '#/system/ssh/git.ts'
+import { resolveRemoteWorktree } from '#/system/ssh/git/worktrees.ts'
+import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 
 interface ResolvedWorkspaceFilesystemExecutionBase {
   target: WorkspacePaneFilesystemExecutionTarget
@@ -19,7 +20,7 @@ export type ResolvedWorkspaceFilesystemExecution =
   | (ResolvedWorkspaceFilesystemExecutionBase & {
       transport: 'remote'
       remoteTarget: RemoteWorkspaceTarget
-      run: RemoteGitRunner
+      run: RemoteCommandRunner
     })
 
 /** Resolve and authorize a runtime-bound filesystem target before native I/O. */

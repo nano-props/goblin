@@ -10,7 +10,8 @@ import { execa } from 'execa'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
-import { getRemoteTreeWalk, type RemoteGitRunner } from '#/system/ssh/git.ts'
+import { getRemoteTreeWalk } from '#/system/ssh/git/worktrees.ts'
+import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import { getRemoteDirectoryWalk } from '#/system/ssh/filesystem.ts'
 import {
   buildLimitedChildNodes,
@@ -61,7 +62,7 @@ export interface GitWorktreeFilesystemSourceRemoteInput {
   readonly worktreePath: string
   readonly options: WorkspaceFilesystemSourceOptions
   readonly signal: AbortSignal | undefined
-  readonly run?: RemoteGitRunner
+  readonly run?: RemoteCommandRunner
   /** Optional trusted worktree list from the caller. */
   readonly knownWorktrees?: ReadonlyArray<WorktreeInfo>
 }

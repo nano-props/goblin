@@ -1,14 +1,9 @@
 import { describe, expect, test, vi } from 'vitest'
-import {
-  getRemoteTreeWalk,
-  remoteCommandExists,
-  remoteCommandExistsAtWorkspaceRoot,
-  type RemoteGitRunner,
-  resolveRemoteWorktree,
-} from '#/system/ssh/git.ts'
+import { getRemoteTreeWalk, remoteCommandExists, resolveRemoteWorktree } from '#/system/ssh/git/worktrees.ts'
+import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
-import { NUL, TARGET, failRemoteResult, okRemoteResult } from '#/system/ssh/git-test-utils.ts'
+import { NUL, TARGET, failRemoteResult, okRemoteResult } from '#/system/ssh/git/test-utils.ts'
 
 describe('remote git filesystem', () => {
   test('skips gitWorktreeList when knownWorktrees is supplied', async () => {
@@ -17,7 +12,7 @@ describe('remote git filesystem', () => {
     const knownWorktrees: WorktreeInfo[] = [
       { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
     ]
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) => {
       const NUL = String.fromCharCode(0)
       switch (command.type) {
         case 'gitDirectoryChildren':
@@ -43,7 +38,7 @@ describe('remote git filesystem', () => {
   })
 
   test('reads the authoritative worktree list when no prefetched list is supplied', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(
@@ -74,7 +69,7 @@ describe('remote git filesystem', () => {
 
   test('rejects a request for an unknown worktree path even when knownWorktrees is supplied', async () => {
     const knownWorktrees: WorktreeInfo[] = [{ path: '/srv/repo', branch: 'main', isBare: false, isPrimary: true }]
-    const run = vi.fn<RemoteGitRunner>()
+    const run = vi.fn<RemoteCommandRunner>()
     const result = await getRemoteTreeWalk(TARGET, '/srv/repo-missing', {
       run: run,
       knownWorktrees,
@@ -87,7 +82,7 @@ describe('remote git filesystem', () => {
     const knownWorktrees: WorktreeInfo[] = [
       { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
     ]
-    const run = vi.fn<RemoteGitRunner>()
+    const run = vi.fn<RemoteCommandRunner>()
 
     const result = await resolveRemoteWorktree(TARGET, '/srv/repo-feature/', {
       run: run,
@@ -99,24 +94,11 @@ describe('remote git filesystem', () => {
   })
 
   test('throws the remote read failure instead of returning an empty authority set', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => failRemoteResult('ssh unavailable'))
+    const run = vi.fn<RemoteCommandRunner>(async () => failRemoteResult('ssh unavailable'))
 
     await expect(resolveRemoteWorktree(TARGET, '/srv/repo-feature', { run: run })).rejects.toThrow('ssh unavailable')
 
     expect(run).toHaveBeenCalledWith({ type: 'gitWorktreeList', path: '/srv/repo' }, TARGET, { signal: undefined })
-  })
-
-  test('checks an explicitly authorized workspace root without inventing a worktree', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(''))
-
-    await expect(remoteCommandExistsAtWorkspaceRoot(TARGET, '/srv/plain-workspace', 'bat', { run: run })).resolves.toBe(
-      true,
-    )
-    expect(run).toHaveBeenCalledWith(
-      { type: 'commandExists', path: '/srv/plain-workspace', commandName: 'bat' },
-      TARGET,
-      { signal: undefined },
-    )
   })
 
   test.each([
@@ -126,7 +108,7 @@ describe('remote git filesystem', () => {
     const knownWorktrees: WorktreeInfo[] = [
       { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
     ]
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) => {
       if (command.type === 'commandExists') return okRemoteResult('')
       return failRemoteResult('unexpected')
     })
@@ -148,7 +130,7 @@ describe('remote git filesystem', () => {
   })
 
   test('returns false for unsafe command names without touching the remote', async () => {
-    const run = vi.fn<RemoteGitRunner>()
+    const run = vi.fn<RemoteCommandRunner>()
 
     const result = await remoteCommandExists(TARGET, '/srv/repo-feature', 'bat; whoami', { run: run })
 
@@ -157,7 +139,7 @@ describe('remote git filesystem', () => {
   })
 
   test('returns false for unknown worktrees', async () => {
-    const run = vi.fn<RemoteGitRunner>()
+    const run = vi.fn<RemoteCommandRunner>()
 
     const result = await remoteCommandExists(TARGET, '/srv/missing', 'bat', {
       run: run,

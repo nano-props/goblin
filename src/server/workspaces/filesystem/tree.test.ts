@@ -27,7 +27,7 @@ vi.mock('#/system/git/worktrees.ts', () => ({
   readWorktreeMembership: mocks.readWorktreeMembership,
 }))
 
-vi.mock('#/system/ssh/git.ts', () => ({
+vi.mock('#/system/ssh/git/worktrees.ts', () => ({
   resolveRemoteWorktree: mocks.resolveRemoteWorktree,
 }))
 

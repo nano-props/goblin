@@ -1,14 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
-import {
-  getRemoteBrowserUrl,
-  getRemoteSnapshot,
-  getRemoteRepoWorktreePaths,
-  getRemoteWorkspacePaneTargetIdentities,
-  resolveRemoteWorktreePath,
-  type RemoteGitRunner,
-} from '#/system/ssh/git.ts'
-import { parseRemoteRepoCommonDir, remoteExecResult } from '#/system/ssh/git-codec.ts'
-import type { WorktreeInfo } from '#/shared/git-types.ts'
+import { getRemoteSnapshot, getRemoteWorkspacePaneTargetIdentities } from '#/system/ssh/git/snapshot.ts'
+import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import {
   MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT,
@@ -16,59 +8,12 @@ import {
   TARGET,
   failRemoteResult,
   okRemoteResult,
-  upstreamOutput,
   worktreePorcelain,
-} from '#/system/ssh/git-test-utils.ts'
+} from '#/system/ssh/git/test-utils.ts'
 
-describe('remote git snapshot', () => {
-  test('parses a canonical repository common directory', () => {
-    expect(parseRemoteRepoCommonDir('/srv/repo/.git\0')).toBe('/srv/repo/.git')
-  })
-
-  test('rejects malformed repository common directory output', () => {
-    expect(parseRemoteRepoCommonDir('')).toBeNull()
-  })
-
-  test('builds browser URLs from remote verbose output', async () => {
-    const run: RemoteGitRunner = async (command) => {
-      switch (command.type) {
-        case 'gitRemoteVerbose':
-          return okRemoteResult(
-            'origin\tgit@github.com:acme/project.git (fetch)\norigin\tgit@github.com:acme/project.git (push)',
-          )
-        case 'gitOperationState':
-          return okRemoteResult('operation none\nmaterialized-branch\n')
-        case 'gitUpstream':
-          return okRemoteResult(upstreamOutput('origin', 'feature/test'))
-        default:
-          return okRemoteResult('')
-      }
-    }
-
-    await expect(getRemoteBrowserUrl(TARGET, { type: 'root' }, { run: run })).resolves.toBe(
-      'https://github.com/acme/project',
-    )
-    await expect(getRemoteBrowserUrl(TARGET, { type: 'branch', branch: 'feature/test' }, { run: run })).resolves.toBe(
-      'https://github.com/acme/project/tree/feature/test',
-    )
-    await expect(getRemoteBrowserUrl(TARGET, { type: 'commit', hash: 'abcdef1' }, { run: run })).resolves.toBe(
-      'https://github.com/acme/project/commit/abcdef1',
-    )
-  })
-
-  test('getRemoteBrowserUrl rejects unsafe URL targets before running remote commands', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(''))
-
-    await expect(
-      getRemoteBrowserUrl(TARGET, { type: 'branch', branch: 'feature/test;echo bad' }, { run: run }),
-    ).resolves.toBeNull()
-    await expect(getRemoteBrowserUrl(TARGET, { type: 'commit', hash: 'not-a-hash' }, { run: run })).resolves.toBeNull()
-
-    expect(run).not.toHaveBeenCalled()
-  })
-
+describe('remote Git snapshot', () => {
   test('includes remote metadata in remote snapshots', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       switch (command.type) {
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
@@ -132,7 +77,7 @@ describe('remote git snapshot', () => {
   })
 
   test('includes detached operation state in remote worktree snapshots', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       switch (command.type) {
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
@@ -166,7 +111,7 @@ describe('remote git snapshot', () => {
 
   test('resolves a physical source path only when its workspace spelling differs from membership', async () => {
     const aliasTarget = { ...TARGET, remotePath: '/srv/repo-alias' }
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
@@ -193,7 +138,7 @@ describe('remote git snapshot', () => {
     'rejects a malformed or unknown resolved source workspace path %j',
     async (sourcePath) => {
       const aliasTarget = { ...TARGET, remotePath: '/srv/repo-alias' }
-      const run = vi.fn<RemoteGitRunner>(async (command) => {
+      const run = vi.fn<RemoteCommandRunner>(async (command) => {
         if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
         if (command.type === 'resolveGitWorkspacePath') return okRemoteResult(sourcePath)
         return okRemoteResult('')
@@ -205,7 +150,7 @@ describe('remote git snapshot', () => {
 
   test('preserves symbolic HEAD only for a bare remote source workspace', async () => {
     const bareTarget = { ...TARGET, remotePath: '/srv/repo.git' }
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'gitWorktreeList') return okRemoteResult(worktreePorcelain('worktree /srv/repo.git\nbare'))
       if (command.type === 'gitSnapshot') {
         return okRemoteResult(
@@ -227,7 +172,7 @@ describe('remote git snapshot', () => {
   })
 
   test('reads linked worktree operation state with its own administrative identity', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       switch (command.type) {
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
@@ -277,7 +222,7 @@ describe('remote git snapshot', () => {
   })
 
   test('reads remote workspace-pane identity without status or remote display commands', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
       if (command.type === 'gitLocalBranches') return okRemoteResult('main\nfeature/no-worktree')
@@ -301,7 +246,7 @@ describe('remote git snapshot', () => {
   })
 
   test('rejects an attached remote membership that changes to rebase while operation state is read', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
       if (command.type === 'gitOperationState') {
@@ -315,7 +260,7 @@ describe('remote git snapshot', () => {
   })
 
   test('accepts an attached remote worktree while bisect is waiting for boundary commits', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
       if (command.type === 'gitOperationState') return okRemoteResult('operation bisect\nmaterialized-branch main\n')
@@ -337,7 +282,7 @@ describe('remote git snapshot', () => {
     ['rebase', 'operation rebase\nmaterialized-branch refs/heads/feature/in-progress\n'],
     ['bisect', 'operation bisect\nmaterialized-branch feature/in-progress\n'],
   ] as const)('does not expose the branch retained by a detached remote %s', async (kind, operationOutput) => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(
@@ -361,7 +306,7 @@ describe('remote git snapshot', () => {
   })
 
   test('rejects a detached-HEAD display value in the remote state protocol', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(
@@ -379,7 +324,7 @@ describe('remote git snapshot', () => {
   })
 
   test('rejects a plain branch name from the remote rebase protocol', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(
@@ -397,7 +342,7 @@ describe('remote git snapshot', () => {
   })
 
   test('rejects a ref-prefixed branch outside the remote rebase protocol', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
       if (command.type === 'gitOperationState') {
@@ -411,7 +356,7 @@ describe('remote git snapshot', () => {
   })
 
   test('rejects detached ownership without an operation at the remote producer boundary', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(
@@ -427,7 +372,7 @@ describe('remote git snapshot', () => {
   })
 
   test('rejects duplicate materialized branches at the remote producer boundary', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(
@@ -455,7 +400,7 @@ describe('remote git snapshot', () => {
   })
 
   test('rejects a committed materialized branch missing from remote refs', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(
@@ -473,7 +418,7 @@ describe('remote git snapshot', () => {
   })
 
   test('rejects an empty branch ref from the remote rebase protocol', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(
@@ -491,7 +436,7 @@ describe('remote git snapshot', () => {
   })
 
   test('retains a remote bisect branch while presenting a concurrent cherry-pick', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(
@@ -517,7 +462,7 @@ describe('remote git snapshot', () => {
   })
 
   test('does not turn a failed authoritative remote snapshot into missing data', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) => {
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitSnapshot') return failRemoteResult('ssh unavailable')
       if (command.type === 'gitOperationState') return okRemoteResult('operation none\nmaterialized-branch main\n')
@@ -539,7 +484,7 @@ describe('remote git snapshot', () => {
     '__GOBLIN_REMOTE_CURRENT__\nvalue main\nunexpected\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__',
     '__GOBLIN_REMOTE_CURRENT__\nvalue main\n__GOBLIN_REMOTE_DEFAULT__\nvalue main\n__GOBLIN_REMOTE_BRANCHES__\nmain\x00abc1234',
   ])('rejects malformed authoritative snapshot envelopes', async (stdout) => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'gitSnapshot') return okRemoteResult(stdout)
       if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
@@ -551,7 +496,7 @@ describe('remote git snapshot', () => {
   })
 
   test('accepts an authoritative snapshot with three empty sections and no remotes', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) =>
+    const run = vi.fn<RemoteCommandRunner>(async (command) =>
       command.type === 'gitSnapshot'
         ? okRemoteResult(
             '__GOBLIN_REMOTE_CURRENT__\nvalue \n__GOBLIN_REMOTE_DEFAULT__\nvalue \n__GOBLIN_REMOTE_BRANCHES__\n',
@@ -581,7 +526,7 @@ describe('remote git snapshot', () => {
     'origin\tgit@example.test:project.git (fetch)',
     'origin\tgit@example.test:project.git (fetch)\ntruncated remote output',
   ])('rejects malformed authoritative remote output', async (remoteOutput) => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       if (command.type === 'gitSnapshot') {
         return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
       }
@@ -598,7 +543,7 @@ describe('remote git snapshot', () => {
   test.each(['gitWorktreeList', 'gitRemoteVerbose'] as const)(
     'rejects an authoritative remote snapshot when %s fails',
     async (failedCommand) => {
-      const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+      const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) => {
         if (command.type === failedCommand) return failRemoteResult(`${failedCommand} failed`)
         if (command.type === 'gitSnapshot') {
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
@@ -610,25 +555,8 @@ describe('remote git snapshot', () => {
     },
   )
 
-  test('rejects failed authoritative worktree-path discovery', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => failRemoteResult('worktree discovery failed'))
-
-    await expect(getRemoteRepoWorktreePaths(TARGET, { run })).rejects.toThrow('worktree discovery failed')
-  })
-
-  test('resolves a created worktree through the remote Git root boundary', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) =>
-      command.type === 'revParseTopLevel' ? okRemoteResult('/srv/feature\n') : failRemoteResult('unexpected'),
-    )
-
-    await expect(resolveRemoteWorktreePath(TARGET, '/srv/nested/../feature', { run })).resolves.toBe('/srv/feature')
-    expect(run).toHaveBeenCalledWith({ type: 'revParseTopLevel', path: '/srv/nested/../feature' }, TARGET, {
-      signal: undefined,
-    })
-  })
-
   test('does not turn a failed remote worktree membership read into branch-only targets', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) =>
+    const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) =>
       command.type === 'gitWorktreeList'
         ? ({ ok: false, stdout: '', stderr: '', message: 'worktree list failed' } as RemoteCommandResult)
         : okRemoteResult(''),
@@ -638,7 +566,7 @@ describe('remote git snapshot', () => {
   })
 
   test('returns an attached worktree identity without a commit for an unborn repository', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) =>
+    const run = vi.fn<RemoteCommandRunner>(async (command) =>
       command.type === 'gitWorktreeList'
         ? okRemoteResult(worktreePorcelain(`worktree /srv/repo\nHEAD ${'0'.repeat(40)}\nbranch refs/heads/main`))
         : command.type === 'resolveRepoCommonDir'
@@ -663,7 +591,7 @@ describe('remote git snapshot', () => {
     ['detached', 'operation none\nmaterialized-branch\n'],
     ['branch refs/heads/main', 'operation merge\nmaterialized-branch main\n'],
   ])('rejects an invalid unborn remote worktree with %s state', async (membershipState, operationState) => {
-    const run = vi.fn<RemoteGitRunner>(async (command) =>
+    const run = vi.fn<RemoteCommandRunner>(async (command) =>
       command.type === 'gitWorktreeList'
         ? okRemoteResult(worktreePorcelain(`worktree /srv/repo\nHEAD ${'0'.repeat(40)}\n${membershipState}`))
         : command.type === 'resolveRepoCommonDir'
@@ -674,16 +602,5 @@ describe('remote git snapshot', () => {
     )
 
     await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
-  })
-
-  test('prefers stderr when converting remote exec failures', () => {
-    expect(
-      remoteExecResult({
-        ok: false,
-        stdout: '',
-        stderr: 'permission denied',
-        message: 'unknown',
-      } as RemoteCommandResult),
-    ).toEqual({ ok: false, message: 'unknown' })
   })
 })

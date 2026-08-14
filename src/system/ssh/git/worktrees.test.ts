@@ -1,13 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
-import {
-  createRemoteWorktree,
-  deleteRemoteBranch,
-  removeRemoteWorktree,
-  type RemoteGitRunner,
-} from '#/system/ssh/git.ts'
-import type { WorktreeInfo } from '#/shared/git-types.ts'
+import { createRemoteWorktree, removeRemoteWorktree } from '#/system/ssh/git/worktrees.ts'
+import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import type { RemoteCommandKind, RemoteCommandResult } from '#/system/ssh/commands.ts'
-import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import {
   LINKED_TARGET,
   MAIN_AND_LINKED_WORKTREES_OUTPUT,
@@ -19,7 +13,7 @@ import {
   okRemoteResult,
   upstreamOutput,
   worktreePorcelain,
-} from '#/system/ssh/git-test-utils.ts'
+} from '#/system/ssh/git/test-utils.ts'
 
 function attachedWorktreeAuthorityRead(command: RemoteCommandKind): RemoteCommandResult | null {
   if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
@@ -29,267 +23,9 @@ function attachedWorktreeAuthorityRead(command: RemoteCommandKind): RemoteComman
   return null
 }
 
-describe('remote git mutations', () => {
-  test('deleteRemoteBranch allows safe delete when branch is merged into current HEAD without upstream', async () => {
-    const run = vi.fn<RemoteGitRunner>(
-      async (command: {
-        type: string
-        ancestor?: string
-        descendant?: string
-        branch?: string
-        attachedBranch?: string | null
-      }) => {
-        switch (command.type) {
-          case 'gitSnapshot':
-            return okRemoteResult(
-              [
-                '__GOBLIN_REMOTE_CURRENT__',
-                'value release/1.0',
-                '__GOBLIN_REMOTE_DEFAULT__',
-                'value main',
-                '__GOBLIN_REMOTE_BRANCHES__',
-                'release/1.0\x00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x00aaaaaaa\x00Release\x002024-01-01T00:00:00Z\x00Alice\x00origin/release/1.0\x00',
-                'feature/test\x00ba5eba1000000000000000000000000000000000\x00ba5eba1\x00Feature\x002024-01-02T00:00:00Z\x00Alice\x00\x00',
-              ].join('\n'),
-            )
-          case 'gitWorktreeList':
-            return okRemoteResult(
-              worktreePorcelain(
-                'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/release/1.0',
-              ),
-            )
-          case 'resolveRepoCommonDir':
-            return okRemoteResult('/srv/repo/.git\0')
-          case 'gitOperationState':
-            return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
-          case 'gitStatus':
-            return okRemoteResult('')
-          case 'gitRemoteVerbose':
-            return okRemoteResult('')
-          case 'gitIsAncestor':
-            return okRemoteResult(command.descendant === 'release/1.0' ? 'true' : 'false')
-          case 'gitUpstream':
-            return okRemoteResult(NUL.repeat(3))
-          case 'gitBranchDelete':
-            return okRemoteResult('Deleted branch feature/test')
-          default:
-            return okRemoteResult('')
-        }
-      },
-    )
-
-    const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', run: run })
-
-    expect(result).toEqual({
-      ok: true,
-      message: 'Deleted branch feature/test',
-      branchEffect: 'local-delete-confirmed',
-    })
-    expect(run).toHaveBeenCalledWith(
-      { type: 'gitIsAncestor', path: '/srv/repo', ancestor: 'feature/test', descendant: 'release/1.0' },
-      TARGET,
-      { signal: undefined },
-    )
-  })
-
-  test('deleteRemoteBranch does not query ancestry against a missing tracking ref', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
-      switch (command.type) {
-        case 'gitSnapshot':
-          return okRemoteResult(
-            [
-              '__GOBLIN_REMOTE_CURRENT__',
-              'value release/1.0',
-              '__GOBLIN_REMOTE_DEFAULT__',
-              'value main',
-              '__GOBLIN_REMOTE_BRANCHES__',
-              '',
-            ].join('\n'),
-          )
-        case 'gitWorktreeList':
-          return okRemoteResult(
-            worktreePorcelain(
-              'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/release/1.0',
-            ),
-          )
-        case 'resolveRepoCommonDir':
-          return okRemoteResult('/srv/repo/.git\0')
-        case 'gitOperationState':
-          return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
-        case 'gitUpstream':
-          return okRemoteResult(upstreamOutput('origin', 'feature/test', ''))
-        case 'gitIsAncestor':
-          return command.descendant === 'release/1.0'
-            ? okRemoteResult('false')
-            : failRemoteResult('missing tracking ref reached ancestry check')
-        default:
-          return okRemoteResult('')
-      }
-    })
-
-    const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', run })
-
-    expect(result).toEqual({ ok: false, message: 'error.branch-not-fully-merged', branchEffect: 'none' })
-    expect(run.mock.calls.filter(([command]) => command.type === 'gitIsAncestor')).toHaveLength(1)
-    expect(run).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'gitBranchDelete' }),
-      TARGET,
-      expect.anything(),
-    )
-  })
-
-  test('deleteRemoteBranch rejects a branch retained by a rebasing worktree before mutation', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
-      switch (command.type) {
-        case 'gitWorktreeList':
-          return okRemoteResult(
-            worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),
-          )
-        case 'resolveRepoCommonDir':
-          return okRemoteResult('/srv/repo/.git\0')
-        case 'gitOperationState':
-          return okRemoteResult('operation rebase\nmaterialized-branch refs/heads/feature/test\n')
-        case 'gitSnapshot':
-          return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
-        case 'gitRemoteVerbose':
-          return okRemoteResult('')
-        default:
-          return okRemoteResult('')
-      }
-    })
-
-    const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', force: true, run })
-
-    expect(result).toEqual({ ok: false, message: 'error.cannot-delete-checked-out-branch', branchEffect: 'none' })
-    expect(run).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'gitBranchDelete' }),
-      TARGET,
-      expect.anything(),
-    )
-  })
-
-  test('deleteRemoteBranch reports an uncertain result after timeout', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
-      switch (command.type) {
-        case 'gitSnapshot':
-          return okRemoteResult(
-            [
-              '__GOBLIN_REMOTE_CURRENT__',
-              'value release/1.0',
-              '__GOBLIN_REMOTE_DEFAULT__',
-              'value main',
-              '__GOBLIN_REMOTE_BRANCHES__',
-              '',
-            ].join('\n'),
-          )
-        case 'gitWorktreeList':
-          return okRemoteResult(
-            worktreePorcelain(
-              'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/release/1.0',
-            ),
-          )
-        case 'resolveRepoCommonDir':
-          return okRemoteResult('/srv/repo/.git\0')
-        case 'gitOperationState':
-          return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
-        case 'gitUpstream':
-          return okRemoteResult(NUL.repeat(3))
-        case 'gitIsAncestor':
-          return okRemoteResult('true')
-        case 'gitBranchDelete':
-          return { ...failRemoteResult('timeout'), timedOut: true, remoteStarted: true }
-        default:
-          return okRemoteResult('')
-      }
-    })
-
-    const result = await deleteRemoteBranch(TARGET, { branch: 'feature/test', run })
-
-    expect(result).toEqual({
-      ok: false,
-      message: 'timeout',
-      branchEffect: 'may-have-changed',
-      failureExecution: { status: 'timed-out' },
-    })
-  })
-
-  test.each([
-    {
-      name: 'deletes the configured upstream when requested',
-      remote: 'fork',
-      upstreamBranch: 'topic/feature-test',
-      pushResult: okRemoteResult('deleted upstream'),
-      expected: { ok: true, message: 'deleted upstream', branchEffect: 'local-delete-confirmed' },
-    },
-    {
-      name: 'reports upstream delete failure after deleting the local branch',
-      remote: 'origin',
-      upstreamBranch: 'feature/test',
-      pushResult: { ...failRemoteResult('remote rejected delete'), remoteStarted: true },
-      expected: {
-        ok: false,
-        message: 'remote rejected delete',
-        branchEffect: 'local-delete-confirmed',
-        failureExecution: { status: 'failed' },
-      },
-    },
-  ] as const)('deleteRemoteBranch $name', async ({ remote, upstreamBranch, pushResult, expected }) => {
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string; attachedBranch?: string | null }) => {
-      switch (command.type) {
-        case 'gitSnapshot':
-          return okRemoteResult(
-            [
-              '__GOBLIN_REMOTE_CURRENT__',
-              'value release/1.0',
-              '__GOBLIN_REMOTE_DEFAULT__',
-              'value main',
-              '__GOBLIN_REMOTE_BRANCHES__',
-              'release/1.0\x00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x00aaaaaaa\x00Release\x002024-01-01T00:00:00Z\x00Alice\x00origin/release/1.0\x00',
-              `feature/test\x00ba5eba1000000000000000000000000000000000\x00ba5eba1\x00Feature\x002024-01-02T00:00:00Z\x00Alice\x00${remote}/${upstreamBranch}\x00`,
-            ].join('\n'),
-          )
-        case 'gitWorktreeList':
-          return okRemoteResult(
-            worktreePorcelain(
-              'worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/release/1.0',
-            ),
-          )
-        case 'resolveRepoCommonDir':
-          return okRemoteResult('/srv/repo/.git\0')
-        case 'gitOperationState':
-          return okRemoteResult(`operation none\nmaterialized-branch ${command.attachedBranch ?? ''}\n`)
-        case 'gitStatus':
-          return okRemoteResult('')
-        case 'gitIsAncestor':
-          return okRemoteResult('true')
-        case 'gitUpstream':
-          return okRemoteResult(upstreamOutput(remote, upstreamBranch))
-        case 'gitBranchDelete':
-          return okRemoteResult('Deleted branch feature/test')
-        case 'gitPushDeleteBranch':
-          return pushResult
-        default:
-          return okRemoteResult('')
-      }
-    })
-
-    const result = await deleteRemoteBranch(TARGET, {
-      branch: 'feature/test',
-      deleteUpstream: true,
-      run: run,
-    })
-
-    expect(result).toEqual(expected)
-    expect(run).toHaveBeenCalledWith(
-      { type: 'gitPushDeleteBranch', path: '/srv/repo', remote, branch: upstreamBranch },
-      TARGET,
-      { signal: undefined, timeoutMs: 180_000 },
-    )
-    expect(run.mock.calls.filter(([command]) => command.type === 'gitUpstream')).toHaveLength(1)
-  })
-
+describe('remote Git worktree mutations', () => {
   test('removeRemoteWorktree allows deleting branch when merged into current HEAD without upstream', async () => {
-    const run = vi.fn<RemoteGitRunner>(
+    const run = vi.fn<RemoteCommandRunner>(
       async (command: {
         type: string
         descendant?: string
@@ -372,7 +108,7 @@ describe('remote git mutations', () => {
 
   test('removeRemoteWorktree refuses safely without querying a missing tracking ref', async () => {
     const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
@@ -431,7 +167,7 @@ describe('remote git mutations', () => {
         'detached',
       ].join('\n'),
     )
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(worktrees)
@@ -475,7 +211,7 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree resolves equivalent absolute worktree paths', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       const authorityRead = attachedWorktreeAuthorityRead(command)
       if (authorityRead) return authorityRead
       switch (command.type) {
@@ -512,7 +248,7 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree rejects relative worktree paths before running remote commands', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(''))
+    const run = vi.fn<RemoteCommandRunner>(async () => okRemoteResult(''))
 
     const result = await removeRemoteWorktree(TARGET, {
       ...SUCCESSFUL_REMOTE_REMOVAL_LIFECYCLE,
@@ -527,7 +263,7 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree preserves status read failure at destructive admission', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       const authorityRead = attachedWorktreeAuthorityRead(command)
       if (authorityRead) return authorityRead
       if (command.type === 'gitWorktreeList') {
@@ -554,7 +290,7 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree refuses a locked worktree before reading status', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       const authorityRead = attachedWorktreeAuthorityRead(command)
       if (authorityRead) return authorityRead
       if (command.type === 'gitWorktreeList') {
@@ -590,7 +326,7 @@ describe('remote git mutations', () => {
 
   test('removeRemoteWorktree reports uncertainty and impact after a started timeout', async () => {
     const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       const authorityRead = attachedWorktreeAuthorityRead(command)
       if (authorityRead) return authorityRead
       if (command.type === 'gitWorktreeList') return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
@@ -628,7 +364,7 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree treats an unobserved start marker as uncertain mutation impact', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       const authorityRead = attachedWorktreeAuthorityRead(command)
       if (authorityRead) return authorityRead
       if (command.type === 'gitWorktreeList') return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
@@ -656,7 +392,7 @@ describe('remote git mutations', () => {
 
   test('removeRemoteWorktree omits mutation impact when SSH provably did not start', async () => {
     const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       const authorityRead = attachedWorktreeAuthorityRead(command)
       if (authorityRead) return authorityRead
       if (command.type === 'gitWorktreeList') return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
@@ -692,7 +428,7 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree rejects an equivalent path to the primary worktree', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string }) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) => {
       if (command.type === 'gitWorktreeList') {
         return okRemoteResult(
           worktreePorcelain(
@@ -716,7 +452,7 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree deletes the configured upstream after worktree and branch deletion', async () => {
-    const run = vi.fn<RemoteGitRunner>(
+    const run = vi.fn<RemoteCommandRunner>(
       async (command: {
         type: string
         descendant?: string
@@ -776,7 +512,7 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree surfaces recovery when upstream cleanup is cancelled after removal', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command: { type: string; attachedBranch?: string | null }) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command: { type: string; attachedBranch?: string | null }) => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(MAIN_AND_LINKED_WORKTREES_OUTPUT)
@@ -825,7 +561,7 @@ describe('remote git mutations', () => {
 
   test('removeRemoteWorktree resolves the upstream before any mutation', async () => {
     const beforeRemove = vi.fn(async () => ({ ok: true, message: '' }))
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       const authorityRead = attachedWorktreeAuthorityRead(command)
       if (authorityRead) return authorityRead
       if (command.type === 'gitWorktreeList') {
@@ -856,7 +592,7 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree rejects unsafe branch names before running remote commands', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult(''))
+    const run = vi.fn<RemoteCommandRunner>(async () => okRemoteResult(''))
 
     const result = await removeRemoteWorktree(TARGET, {
       ...SUCCESSFUL_REMOTE_REMOVAL_LIFECYCLE,
@@ -871,7 +607,7 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree refuses a detached rebase before status or mutation', async () => {
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(
@@ -917,7 +653,7 @@ describe('remote git mutations', () => {
 
   test('removeRemoteWorktree fails before status or lifecycle when branch ownership does not match', async () => {
     const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
-    const run = vi.fn<RemoteGitRunner>(async (command) => {
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
       switch (command.type) {
         case 'gitWorktreeList':
           return okRemoteResult(
@@ -959,7 +695,7 @@ describe('remote git mutations', () => {
   })
 
   test('removeRemoteWorktree removes the currently opened linked worktree from the primary path', async () => {
-    const run = vi.fn<RemoteGitRunner>(
+    const run = vi.fn<RemoteCommandRunner>(
       async (command: {
         type: string
         path?: string
@@ -1026,7 +762,7 @@ describe('remote git mutations', () => {
   })
 
   test('createRemoteWorktree rejects relative paths before running remote commands', async () => {
-    const run = vi.fn<RemoteGitRunner>()
+    const run = vi.fn<RemoteCommandRunner>()
 
     const result = await createRemoteWorktree(TARGET, {
       worktreePath: 'relative/path',
@@ -1042,7 +778,7 @@ describe('remote git mutations', () => {
   })
 
   test('createRemoteWorktree uses the worktree operation timeout', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => okRemoteResult('Created worktree'))
+    const run = vi.fn<RemoteCommandRunner>(async () => okRemoteResult('Created worktree'))
     const input = {
       worktreePath: '/srv/repo-feature',
       mode: { kind: 'newBranch' as const, newBranch: 'feature/test', baseRef: 'main' },
@@ -1065,7 +801,7 @@ describe('remote git mutations', () => {
   })
 
   test('createRemoteWorktree reports uncertain state when a started remote command times out', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => ({
+    const run = vi.fn<RemoteCommandRunner>(async () => ({
       ok: false,
       stdout: '',
       stderr: '',
@@ -1087,7 +823,7 @@ describe('remote git mutations', () => {
   })
 
   test('createRemoteWorktree keeps timeout uncertain when the start marker was not observed', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => ({
+    const run = vi.fn<RemoteCommandRunner>(async () => ({
       ok: false,
       stdout: '',
       stderr: '',
@@ -1109,7 +845,7 @@ describe('remote git mutations', () => {
   })
 
   test('createRemoteWorktree preserves proof that SSH was not invoked', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => ({
+    const run = vi.fn<RemoteCommandRunner>(async () => ({
       ok: false,
       stdout: '',
       stderr: '',
@@ -1130,7 +866,7 @@ describe('remote git mutations', () => {
   })
 
   test('createRemoteWorktree treats an unconfirmed remote protocol start as a failed attempt', async () => {
-    const run = vi.fn<RemoteGitRunner>(async () => ({
+    const run = vi.fn<RemoteCommandRunner>(async () => ({
       ok: false,
       stdout: '',
       stderr: '',

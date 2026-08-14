@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { lstat } from 'node:fs/promises'
 import type { ExecResult } from '#/shared/git-types.ts'
-import { trashRemoteFile } from '#/system/ssh/git.ts'
+import { trashRemoteFile } from '#/system/ssh/git/worktrees.ts'
 import { movePathToTrash } from '#/system/trash.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import { resolveWorkspaceFilesystemExecution } from '#/server/workspaces/filesystem/execution.ts'

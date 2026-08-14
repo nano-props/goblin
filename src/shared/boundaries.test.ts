@@ -243,6 +243,32 @@ describe('architecture boundary rules', () => {
     ])
   })
 
+  test('prevents system capabilities from depending on application runtimes', () => {
+    expect(
+      checkArchitectureSources([
+        {
+          relativeFilePath: '/src/system/ssh/adapter.ts',
+          source:
+            "import type { ServerRuntime } from '#/server/runtime.ts'\nimport { App } from '#/web/App.tsx'\nimport { register } from '#/main/ipc.ts'\n",
+        },
+        {
+          relativeFilePath: '/src/system/git/nested/adapter.ts',
+          source: "import { createServer } from '../../../server/bootstrap.ts'\n",
+        },
+        {
+          relativeFilePath: '/src/system/git/safe.ts',
+          source:
+            "import path from 'node:path'\nimport type { ExecResult } from '#/shared/git-types.ts'\nimport { parseLog } from '#/system/git/parsers.ts'\n",
+        },
+      ]),
+    ).toEqual([
+      expect.stringContaining('/src/system/ssh/adapter.ts: disallowed import "#/server/runtime.ts"'),
+      expect.stringContaining('/src/system/ssh/adapter.ts: disallowed import "#/web/App.tsx"'),
+      expect.stringContaining('/src/system/ssh/adapter.ts: disallowed import "#/main/ipc.ts"'),
+      expect.stringContaining('/src/system/git/nested/adapter.ts: disallowed import "../../../server/bootstrap.ts"'),
+    ])
+  })
+
   test('rejects legacy direct repo read surfaces in web code', () => {
     expect(
       checkArchitectureSources([

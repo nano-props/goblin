@@ -8,7 +8,8 @@ import {
 import { isRemoteWorkspaceId, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { parseWorkspaceLocator, type WorkspaceId, type WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
 import { resolveRepoCommonDir } from '#/system/git/branches.ts'
-import { resolveRemoteRepoCommonDir, type RemoteGitRunner } from '#/system/ssh/git.ts'
+import { resolveRemoteRepoCommonDir } from '#/system/ssh/git/worktrees.ts'
+import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 
 type RepoWriteBoundary = { kind: 'local-git'; commonDir: string } | { kind: 'remote-git'; executionIdentity: string }
 
@@ -97,7 +98,7 @@ export async function resolveRepoWriteBoundaryForLocator(
 export async function resolveRemoteRepoWriteBoundaryForTarget(
   target: RemoteWorkspaceTarget,
   signal?: AbortSignal,
-  run?: RemoteGitRunner,
+  run?: RemoteCommandRunner,
 ): Promise<RepoWriteBoundary> {
   const commonDir = await resolveRemoteRepoCommonDir(target, { signal, run })
   signal?.throwIfAborted()

@@ -1,5 +1,6 @@
 import type { WorkspaceFileViewerResult } from '#/shared/api-types.ts'
-import { remoteCommandExists, remoteCommandExistsAtWorkspaceRoot } from '#/system/ssh/git.ts'
+import { remoteCommandExists } from '#/system/ssh/git/worktrees.ts'
+import { remoteCommandExistsAtPath } from '#/system/ssh/command-probe.ts'
 import { userShellCommandExists } from '#/system/user-shell.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import { resolveWorkspaceFilesystemExecution } from '#/server/workspaces/filesystem/execution.ts'
@@ -22,7 +23,7 @@ export async function readWorkspaceFileViewer(
     for (const viewer of BAT_VIEWERS) {
       const exists =
         target.kind === 'workspace-root'
-          ? await remoteCommandExistsAtWorkspaceRoot(resolved.remoteTarget, resolved.executionPath, viewer, {
+          ? await remoteCommandExistsAtPath(resolved.remoteTarget, resolved.executionPath, viewer, {
               signal,
               run: resolved.run,
             })

@@ -187,7 +187,7 @@ const remoteMocks = vi.hoisted(() => ({
   getRemoteDirectoryWalk: vi.fn(),
 }))
 
-vi.mock('#/system/ssh/git.ts', () => ({
+vi.mock('#/system/ssh/git/worktrees.ts', () => ({
   getRemoteTreeWalk: remoteMocks.getRemoteTreeWalk,
 }))
 vi.mock('#/system/ssh/filesystem.ts', () => ({ getRemoteDirectoryWalk: remoteMocks.getRemoteDirectoryWalk }))

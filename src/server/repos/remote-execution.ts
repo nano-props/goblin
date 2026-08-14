@@ -6,7 +6,7 @@ import { parseRemoteWorkspaceId, type RemoteWorkspaceTarget } from '#/shared/rem
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { resolveRemoteTarget as resolveSshRemoteTarget } from '#/system/ssh/config.ts'
 import type { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
-import type { RemoteGitRunner } from '#/system/ssh/git.ts'
+import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 
 export interface RepoSourceRuntimeContext {
   workspaceRuntimeId: string
@@ -35,7 +35,7 @@ export function remoteRuntimeAwareGitRunner(
   repoRoot: string,
   workspaceRuntimeId: string,
   sourceTarget: RemoteWorkspaceTarget,
-): RemoteGitRunner {
+): RemoteCommandRunner {
   return async (command, target, options) => {
     const result = await runRemoteCommand(target, command, options)
     const failure = remoteWorkspaceRuntimeFailureFromCommandResult({
@@ -50,7 +50,7 @@ export function remoteRuntimeAwareGitRunner(
 }
 
 interface RemoteMutationAttempt {
-  run: RemoteGitRunner
+  run: RemoteCommandRunner
   capturedRuntimeFailure(): RemoteWorkspaceRuntimeFailureError | null
 }
 

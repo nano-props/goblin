@@ -1,4 +1,4 @@
-import type { RemoteGitRunner } from '#/system/ssh/git.ts'
+import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'

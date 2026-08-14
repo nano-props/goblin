@@ -76,6 +76,11 @@ const RULES: Rule[] = [
     reason: 'shared layer must be reusable across web/server/main; must not depend on Electron',
   },
   {
+    fromPrefix: '/src/system/',
+    disallow: ['#/server/', '#/web/', '#/main/'],
+    reason: 'system capabilities must remain independent of server, web, and main application runtimes',
+  },
+  {
     fromPrefix: '/src/',
     disallow: ['#/shared/terminal.ts'],
     reason:

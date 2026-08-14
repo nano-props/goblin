@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { okRemoteResult, upstreamOutput, worktreePorcelain } from '#/system/ssh/git-test-utils.ts'
+import { okRemoteResult, upstreamOutput, worktreePorcelain } from '#/system/ssh/git/test-utils.ts'
 import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
 
 const target: RemoteWorkspaceTarget = {

@@ -6,11 +6,9 @@ import {
   REMOTE_SNAPSHOT_BRANCHES_MARKER,
   REMOTE_SNAPSHOT_CURRENT_MARKER,
   REMOTE_SNAPSHOT_DEFAULT_MARKER,
-  type RemoteCommandResult,
 } from '#/system/ssh/commands.ts'
 import type {
   BranchSnapshotInfo,
-  ExecResult,
   GitOperation,
   RepoRemoteInfo,
   RepoWorktreeSnapshot,
@@ -169,11 +167,6 @@ export function remoteBootstrapSummaryFromOutput(stdout: string): WorktreeBootst
     skippedMissing: compactWorktreeBootstrapPaths(missing),
     ...(setup ? { setup: { command: setup } } : {}),
   }
-}
-
-export function remoteExecResult(result: RemoteCommandResult): ExecResult {
-  if (result.ok) return { ok: true, message: result.stdout || result.stderr || 'ok' }
-  return { ok: false, message: result.message || result.stderr || 'error.unknown' }
 }
 
 export function isValidRemotePath(value: string): boolean {

@@ -27,7 +27,7 @@ vi.mock('#/server/repos/remote-execution.ts', () => ({
   remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))
 
-vi.mock('#/system/ssh/git.ts', () => ({
+vi.mock('#/system/ssh/git/worktrees.ts', () => ({
   resolveRemoteWorktree: mocks.resolveRemoteWorktree,
   trashRemoteFile: mocks.trashRemoteFile,
 }))

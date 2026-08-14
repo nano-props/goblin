@@ -263,25 +263,43 @@ vi.mock('#/system/ssh/diagnostics.ts', () => ({
   testRemoteWorkspace: vi.fn(),
 }))
 
-vi.mock('#/system/ssh/git.ts', () => ({
+vi.mock('#/system/ssh/git/worktree-bootstrap.ts', () => ({
   bootstrapRemoteWorktreeAfterCreate: hoistedMocks.bootstrapRemoteWorktreeAfterCreate,
+  getRemoteWorktreeBootstrapPreview: hoistedMocks.getRemoteWorktreeBootstrapPreview,
+}))
+
+vi.mock('#/system/ssh/git/worktrees.ts', () => ({
   createRemoteWorktree: hoistedMocks.createRemoteWorktree,
-  deleteRemoteBranch: hoistedMocks.deleteRemoteBranch,
-  fetchRemoteRepo: hoistedMocks.fetchRemoteRepo,
-  getRemoteBrowserUrl: vi.fn(),
-  getRemoteLog: vi.fn(),
-  getRemotePatch: vi.fn(),
   getRemoteRepoWorktreePaths: hoistedMocks.getRemoteRepoWorktreePaths,
-  getRemoteWorkspacePaneTargetIdentities: hoistedMocks.getRemoteWorkspacePaneTargetIdentities,
   resolveRemoteRepoCommonDir: hoistedMocks.resolveRemoteRepoCommonDir,
   resolveRemoteWorktreePath: hoistedMocks.resolveRemoteWorktreePath,
-  getRemoteSnapshot: hoistedMocks.getRemoteSnapshot,
-  getRemoteStatus: vi.fn(),
-  getRemoteTrackingBranches: vi.fn(),
-  getRemoteWorktreeBootstrapPreview: hoistedMocks.getRemoteWorktreeBootstrapPreview,
-  pullRemoteBranch: hoistedMocks.pullRemoteBranch,
-  pushRemoteBranch: hoistedMocks.pushRemoteBranch,
   removeRemoteWorktree: hoistedMocks.removeRemoteWorktree,
+}))
+
+vi.mock('#/system/ssh/git/branches.ts', () => ({
+  deleteRemoteBranch: hoistedMocks.deleteRemoteBranch,
+  getRemoteLog: vi.fn(),
+  pullRemoteBranch: hoistedMocks.pullRemoteBranch,
+}))
+
+vi.mock('#/system/ssh/git/remote.ts', () => ({
+  fetchRemoteRepo: hoistedMocks.fetchRemoteRepo,
+  getRemoteBrowserUrl: vi.fn(),
+  getRemoteTrackingBranches: vi.fn(),
+  pushRemoteBranch: hoistedMocks.pushRemoteBranch,
+}))
+
+vi.mock('#/system/ssh/git/patch.ts', () => ({
+  getRemotePatch: vi.fn(),
+}))
+
+vi.mock('#/system/ssh/git/snapshot.ts', () => ({
+  getRemoteWorkspacePaneTargetIdentities: hoistedMocks.getRemoteWorkspacePaneTargetIdentities,
+  getRemoteSnapshot: hoistedMocks.getRemoteSnapshot,
+}))
+
+vi.mock('#/system/ssh/git/status.ts', () => ({
+  getRemoteStatus: vi.fn(),
 }))
 
 vi.mock('#/system/git/pull-requests.ts', () => ({
