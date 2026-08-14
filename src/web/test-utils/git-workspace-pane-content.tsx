@@ -94,8 +94,6 @@ export const GitWorkspacePaneContentHarness = defineComponent<GitWorkspacePaneCo
     'repo',
     'detail',
     'workspacePaneId',
-    'readFailures',
-    'onRetryStatus',
     'onBackToGitWorkspaceNavigator',
     'workspacePaneRouteMode',
     'navigation',
@@ -111,8 +109,6 @@ export const GitWorkspacePaneContentHarness = defineComponent<GitWorkspacePaneCo
             repo={props.repo}
             detail={props.detail}
             workspacePaneId={props.workspacePaneId}
-            readFailures={props.readFailures}
-            onRetryStatus={props.onRetryStatus}
             onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
             workspacePaneRouteMode={props.workspacePaneRouteMode}
           />
@@ -128,8 +124,6 @@ const GitWorkspacePaneContentInner = defineComponent<GitWorkspacePaneContentHarn
     'repo',
     'detail',
     'workspacePaneId',
-    'readFailures',
-    'onRetryStatus',
     'onBackToGitWorkspaceNavigator',
     'workspacePaneRouteMode',
   ],
@@ -147,8 +141,6 @@ const GitWorkspacePaneContentInner = defineComponent<GitWorkspacePaneContentHarn
         repo={props.repo}
         detail={props.detail}
         workspacePaneId={props.workspacePaneId}
-        readFailures={props.readFailures}
-        onRetryStatus={props.onRetryStatus}
         onBackToGitWorkspaceNavigator={props.onBackToGitWorkspaceNavigator}
         workspacePaneTabModel={workspacePaneTabModel.value}
       />

@@ -54,7 +54,7 @@ describe('workspace pane tab target read model', () => {
     })
   })
 
-  test('does not create a target while the workspace pane tabs projection is not ready', () => {
+  test('keeps an unavailable read target distinct from a ready authority target', () => {
     const repo = emptyWorkspace(REPO_ID, 'repo-runtime-workspace-pane-no-tabs')
     markGitAvailable(repo)
     workspacesStore.setState((s) => ({
@@ -75,9 +75,11 @@ describe('workspace pane tab target read model', () => {
       workspacePaneRoute: undefined,
       worktreeHead: { kind: 'branch' as const, branchName: 'feature/query' },
     }
-    expect(resolveWorkspacePaneTabTargetForPaneTarget(input)).toEqual({
+    const resolution = resolveWorkspacePaneTabTargetForPaneTarget(input)
+    expect(resolution).toMatchObject({
       kind: 'unavailable',
       reason: 'workspace-pane-tabs-pending',
+      target: { tabEntriesProjectionPhase: 'pending' },
     })
     expect(workspacePaneTabTargetForPaneTarget(input)).toBeNull()
   })

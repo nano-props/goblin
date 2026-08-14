@@ -7,7 +7,7 @@ import { appQueryClient } from '#/web/app/query-client.ts'
 import { beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
 import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { ScrollPane } from '#/web/components/Layout.tsx'
-import { RepoStatusFailureView, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 import {
   isConfigTrustStateLoading,
   resolveConfigTrusted,
@@ -284,9 +284,6 @@ const GitCreateWorktreePagePane = defineComponent<GitCreateWorktreePagePaneProps
         )
       }
 
-      const snapshotError = snapshotReadModel.error.value
-      const staleMessageKey =
-        snapshotError instanceof Error ? snapshotError.message : String(snapshotError ?? 'error.failed-read-repo')
       const currentSettingsSnapshot = settingsSnapshot.value
       const configTrusted = currentSettingsSnapshot
         ? resolveConfigTrusted({
@@ -316,13 +313,6 @@ const GitCreateWorktreePagePane = defineComponent<GitCreateWorktreePagePaneProps
 
       return (
         <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={props.onCancel}>
-          {snapshotReadModel.isError.value ? (
-            <RepoStatusStaleNotice
-              messageKey={staleMessageKey}
-              retrying={snapshotReadModel.isFetching.value}
-              onRetry={() => void snapshotReadModel.refetch()}
-            />
-          ) : null}
           <ScrollPane>
             <CreateWorktreePageBody
               repo={projectedRepo}

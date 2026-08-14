@@ -616,6 +616,8 @@ export const en = {
   'error.workspace-tabs-committed-projection-failed':
     'The tab change was saved, but the current view could not be refreshed. Reopen the workspace to continue.',
   'error.workspace-tabs-reorder-unavailable': 'Retry loading tabs before reordering them.',
+  'error.workspace-tabs-action-blocked-loading': 'Wait for workspace tabs to finish loading, then try again.',
+  'error.workspace-tabs-action-blocked-load-failed': 'Retry loading workspace tabs before trying again.',
   'error.workspace-tabs-outcome-uncertain':
     'Could not confirm whether the tab change was saved. Reopen the workspace and check its current state.',
   'error.operation-outcome-uncertain':

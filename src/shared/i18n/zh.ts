@@ -587,6 +587,8 @@ export const zh: Record<DictKey, string> = {
   'error.workspace-runtime-stale': '工作区运行时已失效',
   'error.workspace-tabs-committed-projection-failed': '标签页更改已保存，但当前视图无法刷新。请重新打开工作区后继续。',
   'error.workspace-tabs-reorder-unavailable': '请先重试加载标签页，再进行排序。',
+  'error.workspace-tabs-action-blocked-loading': '请等待工作区标签加载完成后再试。',
+  'error.workspace-tabs-action-blocked-load-failed': '请先重试加载工作区标签，再进行操作。',
   'error.workspace-tabs-outcome-uncertain': '无法确认标签页更改是否已保存。请重新打开工作区并检查当前状态。',
   'error.operation-outcome-uncertain': '无法确认操作是否完成。请检查当前状态后再重试。',
   'error.workspace-target-stale': '工作区目标已发生变化，请重试',

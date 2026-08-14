@@ -17,8 +17,8 @@ describe('WorkspacePaneTabsRecovery', () => {
       logFailure: vi.fn(),
     })
 
-    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'latest' })
-    await vi.waitFor(() => expect(refresh).toHaveBeenCalledWith(TARGET, { kind: 'latest' }))
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'fresh' })
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledWith(TARGET, { kind: 'fresh' }))
   })
 
   test('skips a revision event already represented by the cache', () => {
@@ -58,7 +58,7 @@ describe('WorkspacePaneTabsRecovery', () => {
       revision: 1,
     })
 
-    await vi.waitFor(() => expect(refresh).toHaveBeenCalledWith(TARGET, { kind: 'latest' }))
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledWith(TARGET, { kind: 'fresh' }))
   })
 
   test('reruns after an in-flight refresh when a newer revision is announced', async () => {
@@ -71,7 +71,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     })
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    recovery.request(scope, { kind: 'latest' })
+    recovery.request(scope, { kind: 'fresh' })
     await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce())
     recovery.handleChanged(scope, {
       type: 'workspace-pane-tabs.changed',
@@ -95,7 +95,7 @@ describe('WorkspacePaneTabsRecovery', () => {
       logFailure,
     })
 
-    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'latest' })
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'fresh' })
 
     await vi.waitFor(() => expect(logFailure).toHaveBeenCalledWith(TARGET, error))
   })
@@ -111,7 +111,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     })
     const scope = new RuntimeProjectionScope(TARGET, () => current)
 
-    recovery.request(scope, { kind: 'latest' })
+    recovery.request(scope, { kind: 'fresh' })
     current = false
     request.reject(new Error('stale failure'))
     await new Promise((resolve) => setTimeout(resolve, 0))

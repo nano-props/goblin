@@ -620,6 +620,8 @@ export const ja: Record<DictKey, string> = {
   'error.workspace-tabs-committed-projection-failed':
     'タブの変更は保存されましたが、現在の表示を更新できませんでした。ワークスペースを開き直してください。',
   'error.workspace-tabs-reorder-unavailable': 'タブを並べ替える前に、タブの読み込みを再試行してください。',
+  'error.workspace-tabs-action-blocked-loading': 'ワークスペースのタブの読み込みが完了してから、もう一度お試しください。',
+  'error.workspace-tabs-action-blocked-load-failed': 'ワークスペースのタブの読み込みを再試行してから、もう一度お試しください。',
   'error.workspace-tabs-outcome-uncertain':
     'タブの変更が保存されたか確認できませんでした。ワークスペースを開き直して現在の状態を確認してください。',
   'error.operation-outcome-uncertain':

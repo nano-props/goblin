@@ -911,6 +911,33 @@ describe('TerminalSessionView presentation and focus', () => {
     }
   })
 
+  test('keeps a live terminal usable while exposing failed projection recovery', async () => {
+    const retryProjection = vi.fn()
+    const view = await renderTerminalSession(
+      {},
+      {
+        projectionPhase: 'failed',
+        projectionErrorMessage: 'error.workspace-runtime-stale',
+        retryProjection,
+      },
+    )
+
+    try {
+      const alert = view.container.querySelector('[role="alert"]')
+      expect(alert?.textContent).toContain('terminal.load-failed')
+      expect(alert?.textContent).toContain('error.workspace-runtime-stale')
+      expect(view.container.querySelector('.goblin-terminal-session__host--hidden')).toBeNull()
+      const retry = Array.from(view.container.querySelectorAll('button')).find(
+        (button) => button.textContent === 'terminal.retry-loading',
+      )
+
+      await flushTestUpdates(async () => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+      expect(retryProjection).toHaveBeenCalledOnce()
+    } finally {
+      await view.cleanup()
+    }
+  })
+
   test('keeps unowned attachment passive and reserves takeover for true viewers', async () => {
     const unowned = await renderTerminalSession(
       {},

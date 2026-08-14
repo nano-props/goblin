@@ -2,7 +2,10 @@ import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import { workspacePaneTabTargetForPaneTarget } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  resolveWorkspacePaneTabTargetForPaneTarget,
+  type WorkspacePaneTabTargetResolution,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export function resolveCloseWorkspacePaneTarget(
@@ -14,15 +17,16 @@ export function resolveCloseWorkspacePaneTarget(
     worktreeHead?: GitHead
   },
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
-): WorkspacePaneTabModel | null {
-  if (!input.workspaceId) return null
-  const target = workspacePaneTabTargetForPaneTarget({
+): WorkspacePaneTabTargetResolution {
+  if (!input.workspaceId) return { kind: 'missing' }
+  const resolution = resolveWorkspacePaneTabTargetForPaneTarget({
     paneTarget: input.paneTarget,
     routeTarget: input.routeTarget,
     workspacePaneRoute,
     worktreeHead: input.worktreeHead,
   })
-  return target?.workspaceRuntimeId === input.workspaceRuntimeId ? target : null
+  if (resolution.kind !== 'ready') return resolution
+  return resolution.target.workspaceRuntimeId === input.workspaceRuntimeId ? resolution : { kind: 'missing' }
 }
 
 export function workspacePaneTabsTargetForClose(target: WorkspacePaneTabModel): WorkspacePaneTabsTarget {

@@ -26,7 +26,7 @@ import {
   gitWorktreePaneTargetLease,
   workspaceRootPaneTargetLease,
   workspacePaneTabTargetBlocksInteraction,
-  workspacePaneTabTargetForPaneTarget,
+  type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { terminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
@@ -55,6 +55,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-close-target.ts'
 import type { WorkspacePaneTabCloseOutcome } from '#/web/workspace-pane/workspace-pane-tab-close-outcome.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
+import { surfaceWorkspacePaneTabTargetUnavailable } from '#/web/workspace-pane/workspace-pane-tab-action-feedback.ts'
 
 export interface CloseWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
@@ -99,7 +100,9 @@ export async function dispatchCloseWorkspacePaneTabAction(
   const ownedOptions = presentationEffects ? { ...options, presentationEffects } : options
   try {
     if (!ownedOptions.workspaceId) return await closeWorkspacePaneTabAction(ownedOptions)
-    const coordinatorTarget = resolveCloseWorkspacePaneTarget(ownedOptions, ownedOptions.workspacePaneRoute)
+    const coordinatorTarget = admitCloseWorkspacePaneTarget(
+      resolveCloseWorkspacePaneTarget(ownedOptions, ownedOptions.workspacePaneRoute),
+    )
     if (!coordinatorTarget) {
       presentationEffects?.onAbandon()
       return false
@@ -194,7 +197,10 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
     target: confirmedTerminal.base,
   }
   const confirmedIdentity = targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed)
-  const closeTarget = workspaceId ? resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute) : null
+  const closeTargetResolution = workspaceId
+    ? resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute)
+    : { kind: 'missing' as const }
+  const closeTarget = closeTargetResolution.kind === 'ready' ? closeTargetResolution.target : null
   if (closeTarget && workspacePaneTabTargetBlocksInteraction(closeTarget)) {
     presentationEffects?.onAbandon()
     return false
@@ -236,7 +242,9 @@ function beginCloseWorkspacePaneTabAction(
   options: CloseWorkspacePaneTabActionOptions,
 ): CloseWorkspacePaneTabActionStart {
   const { workspaceId, targetIdentity } = options
-  const target = workspaceId ? resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute) : null
+  const target = workspaceId
+    ? admitCloseWorkspacePaneTarget(resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute))
+    : null
   if (!target) return { kind: 'done', result: false }
   if (workspacePaneTabTargetBlocksInteraction(target)) return { kind: 'done', result: true }
   const tabEntry = targetIdentity
@@ -306,6 +314,14 @@ function beginCloseWorkspacePaneTabAction(
     transition,
     completion: close.completion,
   }
+}
+
+function admitCloseWorkspacePaneTarget(resolution: WorkspacePaneTabTargetResolution): WorkspacePaneTabModel | null {
+  if (resolution.kind === 'unavailable') {
+    surfaceWorkspacePaneTabTargetUnavailable(resolution.reason)
+    return null
+  }
+  return resolution.kind === 'ready' ? resolution.target : null
 }
 
 function openWorkspacePaneRuntimeCloseConfirm(

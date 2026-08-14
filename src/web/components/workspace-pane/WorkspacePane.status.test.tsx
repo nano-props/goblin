@@ -43,7 +43,7 @@ beforeEach(() => {
 })
 
 describe('WorkspacePane status presentation', () => {
-  test('keeps the workspace shell mounted when the initial worktree status read fails', async () => {
+  test('keeps the workspace shell mounted while outer chrome owns the status failure', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [createBranchSnapshot('main')],
@@ -84,9 +84,9 @@ describe('WorkspacePane status presentation', () => {
       })
     })
 
-    await vi.waitFor(() => expect(screen.getByText('status failed')).toBeTruthy())
-    expect(screen.getByRole('alert')).toBeTruthy()
-    expect(screen.getAllByText('error.try-again').length).toBeGreaterThan(0)
+    expect(screen.queryByText('status failed')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByText('error.try-again')).toBeNull()
     expect(screen.queryByTestId('repo-workspace-skeleton')).toBeNull()
     expect(screen.getByRole('tab', { name: 'tab.status' })).toBeTruthy()
   })
@@ -254,7 +254,7 @@ describe('WorkspacePane status presentation', () => {
     expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).not.toBeNull()
   })
 
-  test('keeps the last accepted status visible with one notice when snapshot and status refreshes fail', async () => {
+  test('keeps the last accepted status visible while outer chrome owns refresh failures', async () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-stale'
     const branch = createBranchSnapshot('feature/stale')
     const repo = seedRepoWithReadModelForTest({
@@ -320,8 +320,8 @@ describe('WorkspacePane status presentation', () => {
     })
 
     expect(screen.getByLabelText('changed.ts')).toBeTruthy()
-    await vi.waitFor(() => expect(screen.getAllByText('status.stale-title')).toHaveLength(1))
-    expect(screen.getByText(/error.failed-read-repo/)).toBeTruthy()
+    expect(screen.queryByText('status.stale-title')).toBeNull()
+    expect(screen.queryByText(/error.failed-read-repo/)).toBeNull()
   })
 
   test('uses the TanStack Query snapshot for workspace branch presentation when available', async () => {

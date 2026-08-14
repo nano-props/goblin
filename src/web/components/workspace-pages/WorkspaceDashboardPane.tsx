@@ -31,7 +31,6 @@ import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { useWorkspaceDirectoryOverview } from '#/web/workspaces/filesystem/directory-overview-query.ts'
 
@@ -160,14 +159,6 @@ const GitDashboardReadModel = defineComponent<{
         : null,
     )
 
-    function retryStatus(): void {
-      void refreshRepoWorktreeStatus(
-        { get: workspacesStore.getState },
-        props.workspace.id,
-        props.workspace.workspaceRuntimeId,
-      )
-    }
-
     return () => {
       const currentBranchModel = branchModel.value
       const currentSummary = summary.value
@@ -188,24 +179,6 @@ const GitDashboardReadModel = defineComponent<{
       }
 
       const readFailures = [
-        repoQueryReadFailure(
-          {
-            isError: snapshotReadModel.isError.value,
-            error: snapshotReadModel.error.value,
-            isFetching: snapshotReadModel.isFetching.value,
-            data: snapshotReadModel.data.value,
-          },
-          () => void snapshotReadModel.refetch(),
-        ),
-        repoQueryReadFailure(
-          {
-            isError: statusReadModel.isError.value,
-            error: statusReadModel.error.value,
-            isFetching: statusReadModel.isFetching.value,
-            data: statusReadModel.data.value,
-          },
-          retryStatus,
-        ),
         repoQueryReadFailure(
           {
             isError: pullRequestsReadModel.isError.value,

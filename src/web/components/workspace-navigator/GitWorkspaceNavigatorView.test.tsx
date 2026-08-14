@@ -20,7 +20,7 @@ import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
-import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
+import { repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { TerminalSessionReadScope } from '#/web/terminal/components/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -338,7 +338,7 @@ describe('GitWorkspaceNavigatorView', () => {
     expect(screen.getByLabelText('branches.dirty')).toBeTruthy()
   })
 
-  test('keeps branch rows visible with unknown dirty state when the initial status read fails', async () => {
+  test('keeps branch rows visible with unknown dirty state while outer chrome owns status failure', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('main')],
@@ -360,12 +360,11 @@ describe('GitWorkspaceNavigatorView', () => {
 
     await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
     expect(screen.getByText('main')).toBeTruthy()
-    expect((await screen.findByRole('alert')).textContent).toContain('error.failed-read-repo')
-    expect(screen.getByRole('button', { name: 'error.try-again' })).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.queryByLabelText('branches.dirty')).toBeNull()
   })
 
-  test('offers a neutral retry when the initial status read crosses a membership change', async () => {
+  test('keeps branch rows visible while outer chrome owns a membership-change failure', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('main')],
@@ -385,13 +384,13 @@ describe('GitWorkspaceNavigatorView', () => {
 
     renderGitWorkspaceNavigatorView()
 
-    expect((await screen.findByRole('status')).textContent).toContain('error.repo-membership-changing')
+    await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
     expect(screen.getByText('main')).toBeTruthy()
+    expect(screen.queryByRole('status')).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
-    expect(screen.getByRole('button', { name: 'error.try-again' })).toBeTruthy()
   })
 
-  test('keeps last-good branch status visible with a retryable stale warning', async () => {
+  test('keeps last-good branch status visible without a local stale warning', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('main')],
@@ -402,57 +401,18 @@ describe('GitWorkspaceNavigatorView', () => {
       currentBranch: 'main',
       status: [{ path: REPO_ID, branch: 'main', isMain: true, entries: [] }],
     })
-    const readStatus = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('status failed'))
-      .mockResolvedValueOnce({ workspaceRuntimeId: repo.workspaceRuntimeId, status: [], loadedAt: 2 })
-    installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
-    renderGitWorkspaceNavigatorView()
-
-    expect(await screen.findByText('status.stale-title')).toBeTruthy()
-    expect(screen.getByText('main')).toBeTruthy()
-    await flushTestUpdates(() => screen.getByRole<HTMLElement>('button', { name: 'error.try-again' }).click())
-    await vi.waitFor(() => expect(readStatus).toHaveBeenCalledTimes(2))
-    await vi.waitFor(() => expect(screen.queryByText('status.stale-title')).toBeNull())
-  })
-
-  test('presents simultaneous snapshot and status failures as one retryable notice', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('main')],
-      currentBranchName: 'main',
-    })
-    const readSnapshot = vi.fn(async () => {
-      throw new Error('snapshot failed')
-    })
     const readStatus = vi.fn(async () => {
       throw new Error('status failed')
     })
-    installGoblinTestBridge({
-      'repo.snapshot': readSnapshot,
-      'repo.worktreeStatus': readStatus,
-    })
-    await appQueryClient.invalidateQueries({
-      queryKey: repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId),
-      exact: true,
-      refetchType: 'none',
-    })
-
+    installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
     renderGitWorkspaceNavigatorView()
 
-    await vi.waitFor(() => {
-      expect(readSnapshot).toHaveBeenCalledOnce()
-      expect(readStatus).toHaveBeenCalledOnce()
-    })
-    expect(await screen.findAllByText('status.stale-title')).toHaveLength(1)
-    await flushTestUpdates(() => screen.getByRole<HTMLElement>('button', { name: 'error.try-again' }).click())
-    await vi.waitFor(() => {
-      expect(readSnapshot).toHaveBeenCalledTimes(2)
-      expect(readStatus).toHaveBeenCalledTimes(2)
-    })
+    await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
+    expect(screen.getByText('main')).toBeTruthy()
+    expect(screen.queryByText('status.stale-title')).toBeNull()
   })
 
-  test('keeps the last accepted projection with a neutral retry while worktree membership changes', async () => {
+  test('keeps the last accepted projection visible while worktree membership changes', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('main')],
@@ -473,10 +433,10 @@ describe('GitWorkspaceNavigatorView', () => {
     await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
     expect(screen.getByText('main')).toBeTruthy()
     expect(screen.queryByText('status.stale-title')).toBeNull()
+    expect(screen.queryByRole('status')).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
-    expect((await screen.findByRole('status')).textContent).toContain('error.repo-membership-changing')
-    expect(screen.getByRole('button', { name: 'error.try-again' })).toBeTruthy()
   })
+
 })
 
 function renderGitWorkspaceNavigatorView() {

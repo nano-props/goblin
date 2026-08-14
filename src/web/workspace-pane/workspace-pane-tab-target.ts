@@ -132,12 +132,17 @@ export function filesystemWorkspacePaneTargetLeaseIsCurrent(lease: FilesystemWor
   return snapshot?.worktrees.some((worktree) => worktree.path === worktreePath) ?? false
 }
 
+export type WorkspacePaneTabTargetUnavailableReason =
+  | 'workspace-pane-tabs-pending'
+  | 'workspace-pane-tabs-failed'
+
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: WorkspacePaneTabModel }
   | { kind: 'missing' }
   | {
       kind: 'unavailable'
-      reason: 'workspace-pane-tabs-pending' | 'workspace-pane-tabs-failed'
+      reason: WorkspacePaneTabTargetUnavailableReason
+      target: WorkspacePaneTabModel
     }
 
 export interface WorkspacePaneTabTargetOptions {
@@ -265,30 +270,29 @@ export function resolveWorkspacePaneTabTargetForPaneTarget(
     ...paneTarget,
     workspaceRuntimeId: workspace.workspaceRuntimeId,
   })
+  const target = createWorkspacePaneTabModel({
+    workspaceId: workspace.id,
+    workspaceRuntimeId: workspace.workspaceRuntimeId,
+    routeTarget,
+    paneTarget,
+    worktreeHead,
+    preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, paneTarget, { workspacePaneRoute }),
+    allowPreferredTabFallback: workspacePaneRoute === undefined,
+    tabEntries: tabsProjection.tabs,
+    tabEntriesProjectionPhase: tabsProjection.phase,
+    runtimeTabViews: runtimeProjection.runtimeTabViews,
+    runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+    requestedSessionIdByRuntimeType:
+      workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined,
+  })
   if (tabsProjection.phase !== 'ready') {
     return {
       kind: 'unavailable',
       reason: tabsProjection.phase === 'failed' ? 'workspace-pane-tabs-failed' : 'workspace-pane-tabs-pending',
+      target,
     }
   }
-  return {
-    kind: 'ready',
-    target: createWorkspacePaneTabModel({
-      workspaceId: workspace.id,
-      workspaceRuntimeId: workspace.workspaceRuntimeId,
-      routeTarget,
-      paneTarget,
-      worktreeHead,
-      preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, paneTarget, { workspacePaneRoute }),
-      allowPreferredTabFallback: workspacePaneRoute === undefined,
-      tabEntries: tabsProjection.tabs,
-      tabEntriesProjectionPhase: tabsProjection.phase,
-      runtimeTabViews: runtimeProjection.runtimeTabViews,
-      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
-      requestedSessionIdByRuntimeType:
-        workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined,
-    }),
-  }
+  return { kind: 'ready', target }
 }
 
 export function workspacePaneTabTargetForPaneTarget(

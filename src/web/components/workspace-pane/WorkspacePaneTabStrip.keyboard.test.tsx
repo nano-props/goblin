@@ -123,38 +123,6 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
     expect(document.activeElement?.id).toBe('workspace-workspace-pane-tab-1')
   })
 
-  test('disables sorting without disabling tab selection', async () => {
-    const user = userEvent.setup()
-    const onSelect = vi.fn()
-    const TestWorkspacePaneTabStrip = makeWorkspacePaneTabStrip()
-
-    renderInJsdom(
-      <TestWorkspacePaneTabStrip
-        terminalFilesystemTargetKey="/repo\0/repo/worktree"
-        workspacePaneId="workspace"
-        reorderEnabled={false}
-        sessions={[
-          session({ terminalSessionId: 'term-111111111111111111111', selected: true }),
-          session({ terminalSessionId: 'term-222222222222222222222', selected: false, index: 2 }),
-        ]}
-        onNew={() => {}}
-        onSelect={onSelect}
-        onScrollToBottom={() => {}}
-        onClose={() => {}}
-        onReorder={() => {}}
-      />,
-      { wrapper: WorkspacePaneTabStripScrollMemoryProvider },
-    )
-
-    const sortableInput = dndMocks.useSortable.mock.calls[0]?.[0] as { disabled: () => boolean }
-    expect(sortableInput.disabled()).toBe(true)
-
-    const secondTab = document.body.querySelector('#workspace-workspace-pane-tab-1')
-    if (!(secondTab instanceof HTMLButtonElement)) throw new Error('missing second terminal tab')
-    await user.click(secondTab)
-    expect(onSelect).toHaveBeenCalledOnce()
-  })
-
   test('closes the focused closable tab with Delete', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
@@ -192,7 +160,6 @@ interface TestWorkspacePaneTabStripProps {
   sessions: TerminalSessionSummary[]
   workspacePaneId: string
   panelActive?: boolean
-  reorderEnabled?: boolean
   onNew: () => void
   onSelect: (terminalFilesystemTargetKey: string, tab: TerminalSessionSummary) => void
   onScrollToBottom: (key: string) => void
@@ -243,7 +210,6 @@ function makeWorkspacePaneTabStrip(): FunctionalComponent<TestWorkspacePaneTabSt
     'sessions',
     'workspacePaneId',
     'panelActive',
-    'reorderEnabled',
     'onNew',
     'onSelect',
     'onScrollToBottom',

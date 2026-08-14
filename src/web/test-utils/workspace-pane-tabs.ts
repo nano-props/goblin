@@ -64,6 +64,26 @@ export function setWorkspacePaneTabsForTargetQueryData(
   )
 }
 
+export async function failWorkspacePaneTabsQueryForTest(
+  workspaceIdInput: string,
+  workspaceRuntimeId: string,
+  queryClient: QueryClient = appQueryClient,
+): Promise<void> {
+  const workspaceId = workspaceIdForTest(workspaceIdInput)
+  const failed = await queryClient
+    .fetchQuery({
+      queryKey: workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
+      queryFn: async () => await Promise.reject(new Error('workspace pane tabs unavailable')),
+      staleTime: 0,
+      retry: false,
+    })
+    .then(
+      () => false,
+      () => true,
+    )
+  if (!failed) throw new Error('expected workspace pane tabs query to fail')
+}
+
 function currentSnapshot(
   workspaceId: string,
   workspaceRuntimeId: string,

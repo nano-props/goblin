@@ -1,5 +1,6 @@
 import type { WorkspacePaneTabsChangedRealtimeMessage } from '#/shared/workspace-pane-tabs.ts'
 import type { RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
+import type { WorkspacePaneTabsRecoveryRequirement } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const WORKSPACE_TABS_REFRESH_LANE = 'workspace-tabs-refresh'
 
@@ -15,10 +16,6 @@ export interface WorkspacePaneTabsRecoveryDependencies {
 export interface WorkspacePaneTabsRecoveryActions {
   request(scope: RuntimeProjectionScope, requirement: WorkspacePaneTabsRecoveryRequirement): void
 }
-
-export type WorkspacePaneTabsRecoveryRequirement =
-  | { kind: 'latest' }
-  | { kind: 'minimum-revision'; revision: number }
 
 export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActions {
   private readonly dependencies: WorkspacePaneTabsRecoveryDependencies
@@ -47,7 +44,7 @@ export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActio
     const requirement: WorkspacePaneTabsRecoveryRequirement =
       message.change === 'revision' && message.workspaceRuntimeId === scope.target.workspaceRuntimeId
         ? { kind: 'minimum-revision', revision: message.revision }
-        : { kind: 'latest' }
+        : { kind: 'fresh' }
     this.request(scope, requirement)
   }
 }

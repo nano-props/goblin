@@ -607,6 +607,8 @@ export const ko: Record<DictKey, string> = {
   'error.workspace-tabs-committed-projection-failed':
     '탭 변경 사항은 저장되었지만 현재 보기를 새로 고칠 수 없습니다. 작업 공간을 다시 여세요.',
   'error.workspace-tabs-reorder-unavailable': '탭을 정렬하기 전에 탭 불러오기를 다시 시도하세요.',
+  'error.workspace-tabs-action-blocked-loading': '워크스페이스 탭 로딩이 완료된 후 다시 시도해 주세요.',
+  'error.workspace-tabs-action-blocked-load-failed': '워크스페이스 탭 불러오기를 다시 시도한 후 작업해 주세요.',
   'error.workspace-tabs-outcome-uncertain':
     '탭 변경 사항이 저장되었는지 확인할 수 없습니다. 작업 공간을 다시 열고 현재 상태를 확인하세요.',
   'error.operation-outcome-uncertain':

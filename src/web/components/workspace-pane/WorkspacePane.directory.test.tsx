@@ -655,7 +655,7 @@ describe('WorkspacePane directory workspaces', () => {
     expect(screen.queryByText('111111111111')).toBeNull()
   })
 
-  test('surfaces a stale snapshot while keeping an authoritative detached-worktree pane visible', async () => {
+  test('keeps an authoritative detached-worktree pane visible while outer chrome owns snapshot failure', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace/repo-stale-snapshot')
     const worktreePath = '/workspace/detached-stale-snapshot'
     const repo = seedRepoWithReadModelForTest({
@@ -698,8 +698,8 @@ describe('WorkspacePane directory workspaces', () => {
     })
 
     expect(screen.getByTestId('worktree-pane')).toBeTruthy()
-    expect(screen.getByText('status.stale-title')).toBeTruthy()
-    expect(screen.getByText(/snapshot refresh failed/)).toBeTruthy()
+    expect(screen.queryByText('status.stale-title')).toBeNull()
+    expect(screen.queryByText(/snapshot refresh failed/)).toBeNull()
   })
 
   test('restores a saved History tab from a bare detached-worktree route', async () => {

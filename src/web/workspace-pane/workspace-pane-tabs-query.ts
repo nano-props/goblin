@@ -17,6 +17,9 @@ import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tab
 
 export type WorkspacePaneTabsQueryData = WorkspacePaneTabsSnapshot
 export type WorkspacePaneTabsProjectionPhase = 'pending' | 'ready' | 'failed'
+export type WorkspacePaneTabsRecoveryRequirement =
+  | { kind: 'fresh' }
+  | { kind: 'minimum-revision'; revision: number }
 
 export interface WorkspacePaneTabsTargetProjection {
   phase: WorkspacePaneTabsProjectionPhase
@@ -89,7 +92,12 @@ export function readWorkspacePaneTabsProjectionForTarget(
   const state = queryClient.getQueryState<WorkspacePaneTabsQueryData>(
     workspacePaneTabsQueryKey(target.workspaceId, target.workspaceRuntimeId),
   )
-  if (state?.status === 'error') return { phase: 'failed', tabs: [] }
+  if (state?.status === 'error') {
+    return {
+      phase: 'failed',
+      tabs: workspacePaneTabsForTargetFromQueryData(state.data ?? emptyWorkspacePaneTabsSnapshot(), target),
+    }
+  }
   if (state?.status !== 'success') return { phase: 'pending', tabs: [] }
   return {
     phase: 'ready',
@@ -141,34 +149,55 @@ export function refreshWorkspacePaneTabs(
 export async function refreshWorkspacePaneTabsQueryData(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
-  options: { queryClient?: QueryClient; minimumRevision?: number | null } = {},
+  options: { queryClient?: QueryClient; requirement?: WorkspacePaneTabsRecoveryRequirement } = {},
 ): Promise<void> {
-  const queryClient = options.queryClient ?? appQueryClient
+  const queryClient: QueryClient = options.queryClient ?? appQueryClient
   const queryOptions = workspacePaneTabsQueryOptions(workspaceId, workspaceRuntimeId)
-  await queryClient.fetchQuery({
-    ...queryOptions,
-    staleTime: 0,
-  })
-  const minimumRevision = options.minimumRevision
-  if (minimumRevision === undefined || minimumRevision === null) return
-  if (workspacePaneTabsQueryRevision(queryClient, queryOptions.queryKey) >= minimumRevision) return
+  const joinedExistingRequest =
+    queryClient.getQueryState<WorkspacePaneTabsQueryData>(queryOptions.queryKey)?.fetchStatus === 'fetching'
+  const joinedError = await queryClient
+    .fetchQuery({
+      ...queryOptions,
+      staleTime: 0,
+    })
+    .then(
+      () => null,
+      (error: unknown) => error,
+    )
+  if (joinedError && !joinedExistingRequest) throw joinedError
 
-  // A revision event can join a request that started before the server
-  // committed that revision. Once the joined request settles, perform one
-  // fresh read. A second stale snapshot violates the published watermark and
-  // fails the Query instead of starting an unbounded retry loop.
+  const requirement = options.requirement
+  if (!requirement) return
+  if (
+    requirement.kind === 'minimum-revision' &&
+    workspacePaneTabsQueryRevision(queryClient, queryOptions.queryKey) >= requirement.revision
+  ) {
+    return
+  }
+  if (requirement.kind === 'fresh' && !joinedExistingRequest) return
+
+  // A recovery may join a request that started before its trigger. Once that
+  // request settles, perform one post-trigger read. A revision watermark also
+  // gets one fresh read when the joined snapshot cannot satisfy it. Failure at
+  // this boundary is final; callers surface it instead of polling.
   await queryClient.fetchQuery({
     ...queryOptions,
-    queryFn: async ({ client }: { client: QueryClient }) => {
-      const snapshot = await fetchWorkspacePaneTabsSnapshotForQuery(workspaceId, workspaceRuntimeId, client)
-      const acceptedRevision = Math.max(snapshot.revision, workspacePaneTabsQueryRevision(client, queryOptions.queryKey))
-      if (acceptedRevision < minimumRevision) {
-        throw new Error(
-          `Workspace pane tabs recovery did not reach required revision ${minimumRevision}; received ${acceptedRevision}`,
-        )
-      }
-      return snapshot
-    },
+    queryFn:
+      requirement.kind === 'minimum-revision'
+        ? async ({ client }: { client: QueryClient }) => {
+            const snapshot = await fetchWorkspacePaneTabsSnapshotForQuery(workspaceId, workspaceRuntimeId, client)
+            const acceptedRevision = Math.max(
+              snapshot.revision,
+              workspacePaneTabsQueryRevision(client, queryOptions.queryKey),
+            )
+            if (acceptedRevision < requirement.revision) {
+              throw new Error(
+                `Workspace pane tabs recovery did not reach required revision ${requirement.revision}; received ${acceptedRevision}`,
+              )
+            }
+            return snapshot
+          }
+        : queryOptions.queryFn,
     staleTime: 0,
   })
 }

@@ -481,9 +481,7 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
       const projectionFailed = projectionPhase === 'failed'
       const showPresentationFailure = !showErrorChip && !attaching && presentationRecovery === 'failed'
       const showProjectionRecoveryFailure =
-        !showErrorChip &&
-        projectionFailed &&
-        ((currentSessionPhase === 'opening' && !descriptor.value) || (!attaching && presentationRecovery === 'pending'))
+        !showErrorChip && projectionFailed && presentationRecovery !== 'failed'
       const showEmptyCta =
         currentSessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !createPending.value
       const showStatusOverlay =

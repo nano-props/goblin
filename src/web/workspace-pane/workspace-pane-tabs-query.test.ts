@@ -107,7 +107,7 @@ describe('workspace pane tabs query', () => {
         },
         queryClient,
       ),
-    ).toEqual({ phase: 'failed', tabs: [] })
+    ).toEqual({ phase: 'failed', tabs: [workspacePaneStaticTabEntry('status')] })
 
     writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(5, []), queryClient)
 
@@ -260,6 +260,63 @@ describe('workspace pane tabs query', () => {
     expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
   })
 
+  test('performs one post-trigger read when a fresh recovery joined an older query', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const requests: Array<ReturnType<typeof Promise.withResolvers<WorkspacePaneTabsSnapshot>>> = []
+    vi.mocked(workspacePaneTabsClient.list).mockImplementation(async () => {
+      const request = Promise.withResolvers<WorkspacePaneTabsSnapshot>()
+      requests.push(request)
+      return await request.promise
+    })
+
+    const initial = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })
+    await vi.waitFor(() => expect(requests).toHaveLength(1))
+    const fresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, {
+      queryClient,
+      requirement: { kind: 'fresh' },
+    })
+    requests[0]!.resolve(snapshot(4, []))
+    await initial
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+
+    requests[1]!.resolve(snapshot(5, []))
+    await fresh
+
+    expect(
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(
+        workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID),
+      )?.revision,
+    ).toBe(5)
+  })
+
+  test('still performs the post-trigger read when the joined query failed', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const requests: Array<ReturnType<typeof Promise.withResolvers<WorkspacePaneTabsSnapshot>>> = []
+    vi.mocked(workspacePaneTabsClient.list).mockImplementation(async () => {
+      const request = Promise.withResolvers<WorkspacePaneTabsSnapshot>()
+      requests.push(request)
+      return await request.promise
+    })
+
+    const initial = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })
+    const initialFailure = expect(initial).rejects.toThrow('old request failed')
+    await vi.waitFor(() => expect(requests).toHaveLength(1))
+    const fresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, {
+      queryClient,
+      requirement: { kind: 'fresh' },
+    })
+    requests[0]!.reject(new Error('old request failed'))
+    await initialFailure
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+
+    requests[1]!.resolve(snapshot(5, []))
+    await fresh
+
+    expect(queryClient.getQueryState(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))?.status).toBe(
+      'success',
+    )
+  })
+
   test('performs one fresh read when a minimum revision joined an older query', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const requests: Array<ReturnType<typeof Promise.withResolvers<WorkspacePaneTabsSnapshot>>> = []
@@ -273,7 +330,7 @@ describe('workspace pane tabs query', () => {
     await vi.waitFor(() => expect(requests).toHaveLength(1))
     const required = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, {
       queryClient,
-      minimumRevision: 5,
+      requirement: { kind: 'minimum-revision', revision: 5 },
     })
     requests[0]!.resolve(snapshot(4, []))
     await initial
@@ -302,7 +359,7 @@ describe('workspace pane tabs query', () => {
     await vi.waitFor(() => expect(requests).toHaveLength(1))
     const required = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, {
       queryClient,
-      minimumRevision: 5,
+      requirement: { kind: 'minimum-revision', revision: 5 },
     })
     requests[0]!.resolve(snapshot(4, []))
     await initial

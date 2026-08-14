@@ -189,8 +189,9 @@ export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
   ) {
     return Promise.resolve(false)
   }
-  const target = resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute)
-  if (!target) return Promise.resolve(false)
+  const targetResolution = resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute)
+  if (targetResolution.kind !== 'ready') return Promise.resolve(false)
+  const target = targetResolution.target
   const closingIdentity = workspacePaneTabEntryIdentity({
     type: 'terminal',
     runtimeSessionId: options.terminalSessionId,

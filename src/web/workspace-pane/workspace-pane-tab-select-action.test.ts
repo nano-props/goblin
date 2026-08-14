@@ -34,6 +34,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { failWorkspacePaneTabsQueryForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-select-repo')
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-select-worktree'
@@ -56,6 +57,20 @@ afterEach(() => {
 })
 
 describe('workspace pane tab select action', () => {
+  test('keeps stale canonical tabs available for local navigation after projection failure', async () => {
+    const target = seedTarget(['status', 'files'])
+    const navigation = navigationWith()
+    await failWorkspacePaneTabsQueryForTest(REPO_ID, target.workspaceRuntimeId)
+
+    await expect(selectTab('workspace-pane:files', navigation)).resolves.toBe(true)
+
+    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.anything(),
+      { kind: 'static', tab: 'files' },
+      expect.anything(),
+    )
+  })
+
   test('rejects a missing tab before starting navigation', async () => {
     seedTarget(['status'])
     const generation = currentAppNavigationGeneration()
@@ -186,6 +201,29 @@ describe('workspace pane tab select action', () => {
     await expect(queuedAction).resolves.toBe(false)
     expect(currentAppNavigationGeneration()).toBe(generation)
     expect(showTab).not.toHaveBeenCalled()
+  })
+
+  test('keeps queued local navigation usable when canonical tabs become unavailable', async () => {
+    const target = seedTarget(['status', 'files'])
+    observeStatusRoute(target)
+    const navigation = navigationWith({}, { autoSeedInitialRoute: false })
+    const blocker = Promise.withResolvers<void>()
+    const blockingAction = runWorkspacePaneAction(
+      workspacePaneActionTargetFromCoordinates(target),
+      () => blocker.promise,
+    )
+    const selection = selectTab('workspace-pane:files', navigation)
+
+    await failWorkspacePaneTabsQueryForTest(REPO_ID, target.workspaceRuntimeId)
+    blocker.resolve()
+    await blockingAction
+
+    await expect(selection).resolves.toBe(true)
+    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.anything(),
+      { kind: 'static', tab: 'files' },
+      expect.anything(),
+    )
   })
 
   test('rejects a queued relative move after the router leaves its workspace target', async () => {

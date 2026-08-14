@@ -120,7 +120,7 @@ export async function dispatchTerminalRuntimePrimaryAction(
     options.target.filesystemTarget,
     options.target.workspacePaneRoute,
   )
-  if (resolution.kind !== 'ready') return false
+  if (resolution.kind === 'missing') return false
   const target = resolution.target
   const placeholderTab = terminalPlaceholderForEmptyProjection(target)
   if (placeholderTab) {
