@@ -11,7 +11,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { Layout } from '#/web/Layout.tsx'
 import { useWorkspaceTerminalBellCounts } from '#/web/terminal/components/terminal-session-store.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
-import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authenticated.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
@@ -35,7 +35,7 @@ vi.mock('#/web/components/TokenGate.tsx', () => ({
   }),
 }))
 
-vi.mock('#/web/hooks/useAuthenticatedAppBootstrap.ts', () => ({
+vi.mock('#/web/app/bootstrap/authenticated.ts', () => ({
   useAuthenticatedAppBootstrap: () => ({ state: authenticatedBootstrapState, retry: authenticatedBootstrapMock.retry }),
 }))
 

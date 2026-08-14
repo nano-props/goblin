@@ -11,7 +11,7 @@ import {
 } from '#/shared/settings-defaults.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import { useAuthenticatedAppBootstrap } from '#/web/app/bootstrap/authenticated.ts'
 import { getExternalAppsSnapshot, getI18nSnapshot, getSettingsSnapshot } from '#/web/settings/client.ts'
 import { restoreWorkspaceAtBoot } from '#/web/settings/actions.ts'
 import { isRemoteWorkspaceId, normalizeRemoteWorkspaceRef, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'

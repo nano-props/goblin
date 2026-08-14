@@ -37,7 +37,7 @@ import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSession
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
-import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authenticated.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/terminal/components/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'

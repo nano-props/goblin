@@ -90,7 +90,7 @@ const RULES: Rule[] = [
     fromPrefix: '/src/web/',
     disallow: ['#/web/settings/client.ts'],
     allowedImportsByFile: {
-      '/src/web/hooks/useAuthenticatedAppBootstrap.ts': ['getExternalAppsSnapshot', 'getSettingsSnapshot'],
+      '/src/web/app/bootstrap/authenticated.ts': ['getExternalAppsSnapshot', 'getSettingsSnapshot'],
       '/src/web/settings/actions.ts': [
         'addRecentWorkspace',
         'addWorkspaceEntry',
