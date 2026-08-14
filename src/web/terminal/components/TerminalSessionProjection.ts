@@ -36,14 +36,13 @@ import type {
   TerminalComposerMode,
   TerminalCreateOptions,
   TerminalFocusRequest,
-  TerminalIdentityRealtimeEvent,
-  TerminalLifecycleRealtimeEvent,
   TerminalRuntimeMembershipIndex,
   TerminalFilesystemTargetSnapshot,
   TerminalSnapshot,
   TerminalVirtualKey,
   WorkspaceTerminalSessionSummary,
 } from '#/web/terminal/components/types.ts'
+import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/terminal/projection-types.ts'
 import type { WorkspacePaneTabCloseOutcome } from '#/web/workspace-pane/workspace-pane-tab-close-outcome.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import {

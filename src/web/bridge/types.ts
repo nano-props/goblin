@@ -42,7 +42,7 @@ import type {
   WorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
-import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/terminal/components/types.ts'
+import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/terminal/projection-types.ts'
 
 export interface ClientTerminal {
   attach: (input: TerminalAttachInput) => Promise<TerminalAttachResult>

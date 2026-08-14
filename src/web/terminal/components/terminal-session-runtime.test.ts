@@ -4,7 +4,7 @@ import {
   TerminalSessionRuntime,
   type TerminalRuntimeAttachResult,
 } from '#/web/terminal/components/terminal-session-runtime.ts'
-import type { TerminalIdentityViewModel } from '#/web/terminal/components/types.ts'
+import type { TerminalIdentityViewModel } from '#/web/terminal/projection-types.ts'
 
 type OptionalIdentityRevision<T> = T extends unknown
   ? Omit<T, 'identityRevision'> & { identityRevision?: number }

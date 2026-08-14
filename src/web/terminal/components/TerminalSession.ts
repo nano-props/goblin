@@ -47,13 +47,12 @@ import type {
   TerminalComposerMode,
   TerminalFocusRequest,
   TerminalInputWriter,
-  TerminalIdentityViewModel,
-  TerminalLifecycleViewModel,
   TerminalPresentationRecovery,
   TerminalSessionHydrationInput,
   TerminalSearchResult,
   TerminalVirtualKey,
 } from '#/web/terminal/components/types.ts'
+import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/terminal/projection-types.ts'
 const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
 
 export type TerminalNotify = (

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { TerminalSessionState } from '#/web/terminal/components/terminal-session-state.ts'
-import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/terminal/components/types.ts'
+import type { TerminalIdentityViewModel, TerminalLifecycleViewModel } from '#/web/terminal/projection-types.ts'
 
 const DEFAULT_COMPOSER = { expanded: false, mode: 'input' as const, draft: '', historyEntries: [] }
 

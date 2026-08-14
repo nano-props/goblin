@@ -10,13 +10,12 @@ import type {
 } from '#/shared/terminal-types.ts'
 import { sameTerminalCanonicalSize, TerminalSessionState } from '#/web/terminal/components/terminal-session-state.ts'
 import type { TerminalOutputCheckpoint } from '#/web/terminal/components/terminal-session-state.ts'
+import type { TerminalComposerMode, TerminalSearchResult } from '#/web/terminal/components/types.ts'
 import type {
   TerminalControllerViewModel,
-  TerminalComposerMode,
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
-  TerminalSearchResult,
-} from '#/web/terminal/components/types.ts'
+} from '#/web/terminal/projection-types.ts'
 
 export interface TerminalRuntimeBinding {
   terminalRuntimeSessionId: string

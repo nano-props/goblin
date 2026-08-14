@@ -19,12 +19,11 @@ import {
   useTerminalSessionReadContext,
 } from '#/web/terminal/components/terminal-session-context.ts'
 import type {
-  TerminalIdentityRealtimeEvent,
-  TerminalLifecycleRealtimeEvent,
   TerminalRuntimeMembershipIndex,
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
 } from '#/web/terminal/components/types.ts'
+import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/terminal/projection-types.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 

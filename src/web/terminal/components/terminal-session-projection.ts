@@ -11,11 +11,8 @@ import {
 } from '#/shared/terminal-types.ts'
 import { terminalDescriptor } from '#/web/terminal/components/terminal-descriptor.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
-import type {
-  TerminalDescriptor,
-  TerminalSessionHydrationInput,
-  TerminalIdentityViewModel,
-} from '#/web/terminal/components/types.ts'
+import type { TerminalDescriptor, TerminalSessionHydrationInput } from '#/web/terminal/components/types.ts'
+import type { TerminalIdentityViewModel } from '#/web/terminal/projection-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 type TerminalStartResult = Extract<TerminalAttachResult | TerminalRestartResult, { ok: true }>
