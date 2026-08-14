@@ -14,6 +14,7 @@ import {
   showCreatedTerminalWorkspacePaneRuntimeTab,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 
 export interface WorkspacePaneRuntimeTabPanelState {
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
@@ -46,6 +47,7 @@ const TerminalWorkspacePaneRuntimeTabPanel = defineComponent<WorkspacePaneRuntim
     const t = useT()
     const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
     const navigation = useAppNavigation()
+    const projectionRecovery = useTerminalProjectionRecoveryActions()
 
     const createTerminalForSlot = async (base: TerminalSessionBase) => {
       await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
@@ -94,6 +96,7 @@ const TerminalWorkspacePaneRuntimeTabPanel = defineComponent<WorkspacePaneRuntim
             selectedTerminalSessionId={props.selectedSessionId}
             projectionPhase={props.runtimeState.projectionPhase}
             projectionErrorMessage={props.runtimeState.projectionErrorMessage}
+            retryProjection={() => projectionRecovery.retryWorkspace(base.target.workspaceId)}
             createTerminalForSlot={createTerminalForSlot}
           />
         </WorkspacePanePanelFrame>

@@ -55,6 +55,7 @@ interface TerminalSessionViewProps {
   selectedTerminalSessionId?: string | null
   projectionPhase?: TerminalProjectionHydrationPhase
   projectionErrorMessage?: string
+  retryProjection?: () => void
   createTerminalForSlot: (base: TerminalSessionBase) => Promise<unknown>
 }
 
@@ -64,7 +65,14 @@ type TerminalFileInputAdmission = 'available' | 'remote-unsupported' | 'inactive
 
 export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
   name: 'TerminalSessionView',
-  props: ['base', 'selectedTerminalSessionId', 'projectionPhase', 'projectionErrorMessage', 'createTerminalForSlot'],
+  props: [
+    'base',
+    'selectedTerminalSessionId',
+    'projectionPhase',
+    'projectionErrorMessage',
+    'retryProjection',
+    'createTerminalForSlot',
+  ],
 
   setup(props) {
     const t = useT()
@@ -96,6 +104,7 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
         ? (selectedDescriptor.value?.terminalSessionId ?? null)
         : props.selectedTerminalSessionId,
     )
+    const attachableTerminalSessionId = computed(() => descriptor.value?.terminalSessionId ?? null)
     const snapshot = useTerminalSnapshot(terminalSessionId)
     const sessionCount = useTerminalFilesystemTargetCount(terminalFilesystemTargetKey)
     const createPending = useTerminalFilesystemTargetCreatePending(terminalFilesystemTargetKey)
@@ -138,7 +147,7 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
     // host ref becoming available after mount must not restart session-owned
     // listeners or clear that session's search decorations.
     watch(
-      [terminalSessionId, host],
+      [attachableTerminalSessionId, host],
       ([sessionId, hostElement], _previous, onCleanup) => {
         if (!sessionId || !hostElement) return
         const selected = descriptor.value
@@ -474,15 +483,15 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
       const showProjectionRecoveryFailure =
         !showErrorChip &&
         projectionFailed &&
-        ((currentSessionPhase === 'opening' && !hasSessions) || (!attaching && presentationRecovery === 'pending'))
+        ((currentSessionPhase === 'opening' && !descriptor.value) || (!attaching && presentationRecovery === 'pending'))
       const showEmptyCta =
         currentSessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !createPending.value
       const showStatusOverlay =
-        (attaching && !showEmptyCta && !(currentSessionPhase === 'opening' && !hasSessions && projectionFailed)) ||
+        (attaching && !showEmptyCta && !(currentSessionPhase === 'opening' && !descriptor.value && projectionFailed)) ||
         (!showErrorChip && !attaching && presentationRecovery === 'pending' && !projectionFailed)
       let statusOverlayLabel = t('terminal.opening')
       if (currentSessionPhase === 'restarting') statusOverlayLabel = t('terminal.restarting')
-      else if (currentSessionPhase === 'opening' && !hasSessions && projectionPending) {
+      else if (currentSessionPhase === 'opening' && !descriptor.value && projectionPending) {
         statusOverlayLabel = t('terminal.loading')
       } else if (presentationRecovery === 'pending') {
         statusOverlayLabel = t('terminal.restoring')
@@ -599,7 +608,13 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
           ) : null}
           {showUnownedOverlay ? <AttachmentOverlay badge={t('terminal.unowned')} snapshot={currentSnapshot} /> : null}
           {showStatusOverlay ? <StatusOverlay label={statusOverlayLabel} /> : null}
-          {showProjectionRecoveryFailure ? <PresentationFailureOverlay label={projectionFailureLabel} /> : null}
+          {showProjectionRecoveryFailure ? (
+            <PresentationFailureOverlay
+              label={projectionFailureLabel}
+              retryLabel={props.retryProjection ? t('error.try-again') : undefined}
+              onRetry={props.retryProjection}
+            />
+          ) : null}
           {showPresentationFailure ? (
             <PresentationFailureOverlay
               label={t('terminal.restore-failed')}

@@ -20,6 +20,10 @@ import {
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
+import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import {
   beginAppNavigation,
   appNavigationIsCurrent,
@@ -35,6 +39,7 @@ import type {
   TerminalCreateCommandResult,
   TerminalCreatedTabCommitResult,
 } from '#/web/commands/terminal-create-command.ts'
+import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 
 const REPO_ROOT = 'goblin+file:///tmp/workspace-pane-runtime-create-repo'
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-workspace-pane-create'
@@ -66,11 +71,21 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 }))
 
 beforeEach(() => {
+  appQueryClient.clear()
+  terminalProjectionHydrationStore.setState({
+    hydrationByWorkspace: new Map(),
+    lastSuccessfulRecoveryByWorkspace: new Map(),
+  })
   resetWorkspacePaneActionQueueForTest()
   resetTerminalAutoFocusForTest()
   resetAppNavigationForTest()
   resetWorkspacesStore()
   seedCurrentWorkspaceRuntime(WORKSPACE_RUNTIME_ID)
+  setWorkspacePaneTabsForTargetQueryData({
+    ...PANE_TARGET,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    tabs: [],
+  })
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockReset()
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockResolvedValue({
     ok: true,
@@ -80,6 +95,10 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  terminalProjectionHydrationStore.setState({
+    hydrationByWorkspace: new Map(),
+    lastSuccessfulRecoveryByWorkspace: new Map(),
+  })
   resetWorkspacePaneActionQueueForTest()
   resetTerminalAutoFocusForTest()
   resetWorkspacesStore()
@@ -87,6 +106,84 @@ afterEach(() => {
 })
 
 describe('workspace pane runtime tab create action', () => {
+  test.each(['pending', 'failed'] as const)(
+    'fails closed when canonical workspace tabs are %s',
+    async (projectionPhase) => {
+      appQueryClient.removeQueries({
+        queryKey: workspacePaneTabsQueryKey(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID),
+      })
+      if (projectionPhase === 'failed') {
+        await expect(
+          appQueryClient.fetchQuery({
+            queryKey: workspacePaneTabsQueryKey(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID),
+            queryFn: async () => {
+              throw new Error('workspace tabs unavailable')
+            },
+            retry: false,
+          }),
+        ).rejects.toThrow('workspace tabs unavailable')
+      }
+
+      await expect(
+        dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+          base: BASE,
+          createTerminal: vi.fn(),
+          openerIdentity: null,
+          showCreatedTerminalTab: vi.fn(),
+          focusTerminal: vi.fn(),
+        }),
+      ).resolves.toMatchObject({ ok: false })
+
+      expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
+    },
+  )
+
+  test('rechecks canonical materialization after waiting in the target queue', async () => {
+    const queuedActionMayRun = Promise.withResolvers<void>()
+    const coordinatorTarget = workspacePaneActionTargetFromFilesystemTarget(BASE.target)
+    const blocker = runWorkspacePaneAction(coordinatorTarget, async () => {
+      await queuedActionMayRun.promise
+      return true
+    })
+    const dispatch = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+      base: BASE,
+      createTerminal: vi.fn(),
+      openerIdentity: null,
+      showCreatedTerminalTab: vi.fn(),
+      focusTerminal: vi.fn(),
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      ...PANE_TARGET,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', TERMINAL_SESSION_ID)],
+    })
+
+    queuedActionMayRun.resolve()
+    await blocker
+    await expect(dispatch).resolves.toMatchObject({ ok: false })
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
+  })
+
+  test('fails closed when a canonical terminal trails an otherwise ready runtime projection', async () => {
+    terminalProjectionHydrationStore.getState().markProjectionReady(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID)
+    setWorkspacePaneTabsForTargetQueryData({
+      ...PANE_TARGET,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', TERMINAL_SESSION_ID)],
+    })
+
+    await expect(
+      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+        base: BASE,
+        createTerminal: vi.fn(),
+        openerIdentity: null,
+        showCreatedTerminalTab: vi.fn(),
+        focusTerminal: vi.fn(),
+      }),
+    ).resolves.toMatchObject({ ok: false })
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
+  })
+
   test('navigates a detached worktree create to its real filesystem surface', async () => {
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const routeRequest = createdTerminalRouteRequest()

@@ -3,6 +3,7 @@
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
+import { WorkspacePaneNewButton } from '#/web/components/workspace-pane/WorkspacePaneTabPresentation.tsx'
 import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import { createRuntimeWorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
@@ -10,6 +11,32 @@ import type { TerminalSessionSummary } from '#/web/terminal/components/types.ts'
 import { TestWorkspacePaneTabStrip, flushTimers, render, session } from '#/web/test-utils/workspace-pane-tab-strip.tsx'
 
 describe('WorkspacePaneTabStrip presentation and interaction', () => {
+  test('keeps an unavailable New action semantic, focusable, and inert when it has a reason', () => {
+    const onCreate = vi.fn()
+
+    render(
+      <WorkspacePaneNewButton
+        action={{
+          label: 'terminal.new',
+          disabled: true,
+          disabledReason: 'terminal.new-disabled-loading',
+          onCreate,
+        }}
+      />,
+    )
+
+    const button = document.body.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
+    if (!button) throw new Error('missing New terminal button')
+
+    expect(button.disabled).toBe(false)
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+    button.focus()
+    expect(document.activeElement).toBe(button)
+
+    button.click()
+    expect(onCreate).not.toHaveBeenCalled()
+  })
+
   test('shows terminal tooltip content with only the original title', async () => {
     render(
       <TestWorkspacePaneTabStrip

@@ -42,6 +42,8 @@ import {
   type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
+import { provideTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
+import { provideWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
@@ -100,6 +102,8 @@ export const GitWorkspacePaneContentHarness = defineComponent<GitWorkspacePaneCo
   ],
 
   setup(props) {
+    provideTerminalProjectionRecoveryActions({ retryWorkspace: vi.fn() })
+    provideWorkspacePaneTabsRetryActions({ retryWorkspace: vi.fn() })
     return () => (
       <AppNavigationProvider value={props.navigation ?? navigationWith({})}>
         <VueQueryClientScope client={appQueryClient}>

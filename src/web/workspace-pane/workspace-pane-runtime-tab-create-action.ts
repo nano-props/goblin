@@ -19,6 +19,7 @@ import type { TerminalCreateOptions, TerminalFocusRequest } from '#/web/terminal
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   gitWorktreePaneTargetLease,
+  resolveWorkspacePaneTabTargetForPaneTarget,
   workspaceRootPaneTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
@@ -33,6 +34,7 @@ import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs
 import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { claimTerminalAutoFocus } from '#/web/terminal/focus.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
+import { workspacePaneRuntimeTabCreateBlockingPhase } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 
 export interface CreatedTerminalRouteRequest {
   navigationGeneration: AppNavigationGeneration
@@ -134,6 +136,7 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
   const target = terminalWorkspacePaneCoordinatorTarget(base)
   return await runWorkspacePaneAction(target, async () => {
     if (!terminalCreateTargetIsCurrent(base)) return staleTerminalCreateResult()
+    if (!terminalCreateAdmissionIsReady(base)) return blockedTerminalCreateResult()
     // Presentation is deliberately best-effort across unrelated navigation.
     // Starting this queued create may supersede a navigation that has begun but
     // has not settled yet. Once the router has actually left this filesystem
@@ -262,8 +265,28 @@ function terminalCreateTargetIsCurrent(base: TerminalSessionBase): boolean {
       )
 }
 
+function terminalCreateAdmissionIsReady(base: TerminalSessionBase): boolean {
+  const paneTarget = workspacePaneTabsTargetFromRuntime(base.target)
+  if (!paneTarget) return false
+  const resolution = resolveWorkspacePaneTabTargetForPaneTarget({
+    paneTarget,
+    routeTarget: paneTarget,
+    workspacePaneRoute: undefined,
+  })
+  return (
+    resolution.kind === 'ready' &&
+    resolution.target.workspaceRuntimeId === base.target.workspaceRuntimeId &&
+    workspacePaneRuntimeTabCreateBlockingPhase(resolution.target, 'terminal') === null
+  )
+}
+
 function staleTerminalCreateResult(): TerminalCreateCommandResult {
   const error = new Error('error.workspace-runtime-stale')
+  return { ok: false, error, messageKey: 'error.terminal-create-failed' }
+}
+
+function blockedTerminalCreateResult(): TerminalCreateCommandResult {
+  const error = new Error('terminal creation blocked while workspace tabs are unavailable')
   return { ok: false, error, messageKey: 'error.terminal-create-failed' }
 }
 

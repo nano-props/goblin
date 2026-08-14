@@ -21,7 +21,10 @@ import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/works
 import { terminalGitWorktreePresentation, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 
 import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
-import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import type {
+  WorkspacePaneRuntimeProjectionPhase,
+  WorkspacePaneRuntimeUnreadyProjectionPhase,
+} from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 import type {
   WorkspacePaneRuntimeTabSummary,
   WorkspacePaneTabSummary,
@@ -50,7 +53,7 @@ import {
 
 export type WorkspacePaneModelTarget = WorkspacePaneTabsTarget | { kind: 'inactive'; workspaceId: WorkspaceId }
 
-export type WorkspacePaneTabKind = 'static' | 'runtime' | 'pending'
+export type WorkspacePaneTabKind = 'static' | 'runtime' | 'runtime-placeholder' | 'pending'
 
 interface WorkspacePaneTabBase {
   identity: string
@@ -64,12 +67,22 @@ export interface WorkspacePaneStaticTab extends WorkspacePaneTabBase {
   view: null
 }
 
-export interface WorkspacePaneRuntimeTab extends WorkspacePaneTabBase {
+export interface WorkspacePaneMaterializedRuntimeTab extends WorkspacePaneTabBase {
   type: WorkspacePaneRuntimeTabType
   kind: 'runtime'
   runtimeType: WorkspacePaneRuntimeTabType
   view: WorkspacePaneRuntimeTabSummary
   sessionId: string
+}
+
+export interface WorkspacePaneRuntimePlaceholderTab extends WorkspacePaneTabBase {
+  type: WorkspacePaneRuntimeTabType
+  kind: 'runtime-placeholder'
+  runtimeType: WorkspacePaneRuntimeTabType
+  sessionId: string
+  tabEntry: WorkspacePaneRuntimeTabEntry
+  projectionPhase: WorkspacePaneRuntimeUnreadyProjectionPhase
+  view: null
 }
 
 export interface WorkspacePanePendingTab extends WorkspacePaneTabBase {
@@ -81,8 +94,10 @@ export interface WorkspacePanePendingTab extends WorkspacePaneTabBase {
   selected: true
 }
 
-export type WorkspacePaneMaterializedTab = WorkspacePaneStaticTab | WorkspacePaneRuntimeTab
-export type WorkspacePaneTab = WorkspacePaneMaterializedTab | WorkspacePanePendingTab
+export type WorkspacePaneRuntimeTabProjection = WorkspacePaneMaterializedRuntimeTab | WorkspacePaneRuntimePlaceholderTab
+export type WorkspacePaneMaterializedTab = WorkspacePaneStaticTab | WorkspacePaneMaterializedRuntimeTab
+export type WorkspacePaneSelectableTab = WorkspacePaneMaterializedTab | WorkspacePaneRuntimePlaceholderTab
+export type WorkspacePaneTab = WorkspacePaneSelectableTab | WorkspacePanePendingTab
 
 export interface WorkspacePaneRuntimeTabState {
   type: WorkspacePaneRuntimeTabType
@@ -227,14 +242,16 @@ export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): 
     filesystemTarget,
   })
   const hasWorktree = !!worktreePath
-  const runtimeTabStateByType = runtimeTabStateByTypeFromInput(input)
   const runtimeViews = input.runtimeTabViews.filter((view) => !!runtimeTabTargetKeyByType[view.type])
+  const runtimeTabStateByType = runtimeTabStateByTypeFromInput(input, tabEntries, runtimeViews)
   const runtimeViewsByType = runtimeViewsByTypeFromViews(runtimeViews)
-  const materializedTabs = materializedWorkspacePaneTabs({
+  const projectedTabs = projectedWorkspacePaneTabs({
     tabEntries,
     runtimeViews,
+    runtimeTabStateByType,
     hasWorktree,
   })
+  const materializedTabs = projectedTabs.filter(isMaterializedWorkspacePaneTab)
   const staticTabs = materializedTabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type] : []))
   const candidateTab = input.preferredTab
     ? resolveRenderableWorkspacePaneTab(input.preferredTab, {
@@ -243,12 +260,7 @@ export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): 
       })
     : null
   const materializedActiveTab = candidateTab
-    ? activeWorkspacePaneTab(
-        materializedTabs,
-        candidateTab,
-        runtimeTabStateByType,
-        input.requestedSessionIdByRuntimeType,
-      )
+    ? activeWorkspacePaneTab(projectedTabs, candidateTab, runtimeTabStateByType, input.requestedSessionIdByRuntimeType)
     : null
   const selection =
     input.preferredTab === null
@@ -264,7 +276,7 @@ export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): 
     selection?.kind === 'runtime-host' && runtimeTabStateByType[selection.runtimeType].createPending
       ? pendingRuntimeWorkspacePaneTab(selection.runtimeType)
       : null
-  const tabs = pendingTab ? [...materializedTabs, pendingTab] : materializedTabs
+  const tabs = pendingTab ? [...projectedTabs, pendingTab] : projectedTabs
   const selectedEntry = selectedWorkspacePaneTabEntry({
     selection,
     tabEntries,
@@ -320,7 +332,7 @@ function staticWorkspacePaneTab(type: WorkspacePaneStaticTabType): WorkspacePane
   }
 }
 
-function runtimeWorkspacePaneTab(view: WorkspacePaneRuntimeTabSummary): WorkspacePaneRuntimeTab {
+function runtimeWorkspacePaneTab(view: WorkspacePaneRuntimeTabSummary): WorkspacePaneMaterializedRuntimeTab {
   const sessionId = workspacePaneRuntimeTabSummarySessionId(view)
   return {
     identity: workspacePaneRuntimeTabSummaryIdentity(view),
@@ -329,6 +341,22 @@ function runtimeWorkspacePaneTab(view: WorkspacePaneRuntimeTabSummary): Workspac
     runtimeType: view.type,
     view,
     sessionId,
+  }
+}
+
+function runtimePlaceholderWorkspacePaneTab(
+  entry: WorkspacePaneRuntimeTabEntry,
+  projectionPhase: WorkspacePaneRuntimeUnreadyProjectionPhase,
+): WorkspacePaneRuntimePlaceholderTab {
+  return {
+    identity: runtimeTabEntryIdentity(entry),
+    type: entry.type,
+    kind: 'runtime-placeholder',
+    runtimeType: entry.type,
+    sessionId: workspacePaneRuntimeTabSessionId(entry),
+    tabEntry: entry,
+    projectionPhase,
+    view: null,
   }
 }
 
@@ -344,25 +372,22 @@ function pendingRuntimeWorkspacePaneTab(type: WorkspacePaneRuntimeTabType): Work
   }
 }
 
-function nextSelectableWorkspacePaneTab(
-  tabs: readonly WorkspacePaneTab[],
-  index: number,
-  direction: 1 | -1,
-): WorkspacePaneMaterializedTab | null {
-  for (let offset = 1; offset < tabs.length; offset += 1) {
-    const tab = tabs[index + direction * offset]
-    if (!tab) return null
-    if (isMaterializedWorkspacePaneTab(tab)) return tab
-  }
-  return null
+export function isMaterializedWorkspacePaneTab(tab: WorkspacePaneTab): tab is WorkspacePaneMaterializedTab {
+  return tab.kind === 'static' || tab.kind === 'runtime'
 }
 
-export function isMaterializedWorkspacePaneTab(tab: WorkspacePaneTab): tab is WorkspacePaneMaterializedTab {
+export function isSelectableWorkspacePaneTab(tab: WorkspacePaneTab): tab is WorkspacePaneSelectableTab {
   return tab.kind !== 'pending'
 }
 
-export function isWorkspacePaneRuntimeTab(tab: WorkspacePaneTab): tab is WorkspacePaneRuntimeTab {
+export function isMaterializedWorkspacePaneRuntimeTab(
+  tab: WorkspacePaneTab,
+): tab is WorkspacePaneMaterializedRuntimeTab {
   return tab.kind === 'runtime'
+}
+
+export function isWorkspacePaneRuntimeTabProjection(tab: WorkspacePaneTab): tab is WorkspacePaneRuntimeTabProjection {
+  return tab.kind === 'runtime' || tab.kind === 'runtime-placeholder'
 }
 
 export function materializedWorkspacePaneRuntimeTabSessionId(
@@ -372,22 +397,51 @@ export function materializedWorkspacePaneRuntimeTabSessionId(
   return tab?.kind === 'runtime' && tab.runtimeType === type ? tab.sessionId : null
 }
 
+export function selectedWorkspacePaneRuntimeSessionId(
+  model: WorkspacePaneTabModel,
+  runtimeType: WorkspacePaneRuntimeTabType,
+): string | null {
+  const entry = model.selectedEntry
+  return entry && isWorkspacePaneRuntimeTabEntry(entry) && entry.type === runtimeType
+    ? workspacePaneRuntimeTabSessionId(entry)
+    : null
+}
+
 export function workspacePaneTabModelBlocksTabInteraction(
   model: Pick<WorkspacePaneTabModel, 'runtimeTabStateByType'>,
 ): boolean {
   return WORKSPACE_PANE_RUNTIME_TAB_TYPES.some((type) => model.runtimeTabStateByType[type].createPending)
 }
 
-function materializedWorkspacePaneTabs(input: {
+export function workspacePaneRuntimeMaterializationPhase(
+  tabs: readonly WorkspacePaneTab[],
+  runtimeType: WorkspacePaneRuntimeTabType,
+): WorkspacePaneRuntimeUnreadyProjectionPhase | null {
+  for (const tab of tabs) {
+    if (tab.kind === 'runtime-placeholder' && tab.runtimeType === runtimeType) return tab.projectionPhase
+  }
+  return null
+}
+
+export function workspacePaneRuntimeTabCreateBlockingPhase(
+  model: WorkspacePaneTabModel,
+  runtimeType: WorkspacePaneRuntimeTabType,
+): WorkspacePaneRuntimeUnreadyProjectionPhase | null {
+  if (model.tabEntriesProjectionPhase !== 'ready') return model.tabEntriesProjectionPhase
+  return workspacePaneRuntimeMaterializationPhase(model.tabs, runtimeType)
+}
+
+function projectedWorkspacePaneTabs(input: {
   tabEntries: readonly WorkspacePaneTabEntry[]
   runtimeViews: readonly WorkspacePaneRuntimeTabSummary[]
+  runtimeTabStateByType: WorkspacePaneRuntimeTabStateByType
   hasWorktree: boolean
-}): WorkspacePaneMaterializedTab[] {
+}): Array<WorkspacePaneMaterializedTab | WorkspacePaneRuntimePlaceholderTab> {
   const runtimeViewByIdentity = new Map(
     input.runtimeViews.map((view) => [workspacePaneRuntimeTabSummaryIdentity(view), view]),
   )
   const seenRuntimeTabs = new Set<string>()
-  const tabs: WorkspacePaneMaterializedTab[] = []
+  const tabs: Array<WorkspacePaneMaterializedTab | WorkspacePaneRuntimePlaceholderTab> = []
 
   for (const entry of input.tabEntries) {
     const runtimeEntry = isWorkspacePaneRuntimeTabEntry(entry)
@@ -398,9 +452,14 @@ function materializedWorkspacePaneTabs(input: {
     }
     const identity = runtimeTabEntryIdentity(entry)
     const runtimeView = runtimeViewByIdentity.get(identity)
-    if (!runtimeView || seenRuntimeTabs.has(identity)) continue
+    if (seenRuntimeTabs.has(identity)) continue
     seenRuntimeTabs.add(identity)
-    tabs.push(runtimeWorkspacePaneTab(runtimeView))
+    if (runtimeView) {
+      tabs.push(runtimeWorkspacePaneTab(runtimeView))
+      continue
+    }
+    const projectionPhase = input.runtimeTabStateByType[entry.type].projectionPhase
+    if (projectionPhase !== 'ready') tabs.push(runtimePlaceholderWorkspacePaneTab(entry, projectionPhase))
   }
 
   return tabs
@@ -451,19 +510,24 @@ function selectedWorkspacePaneTabEntry(input: {
   const requestedSessionId = input.requestedSessionIdByRuntimeType?.[runtimeType]
   const selectedSessionId =
     requestedSessionId !== undefined ? requestedSessionId : input.runtimeTabStateByType[runtimeType].selectedSessionId
-  if (!selectedSessionId) return null
+  const selectedEntry = selectedSessionId
+    ? input.tabEntries.find(
+        (entry) =>
+          isWorkspacePaneRuntimeTabEntry(entry) &&
+          entry.type === runtimeType &&
+          entry.runtimeSessionId === selectedSessionId,
+      )
+    : null
+  if (requestedSessionId !== undefined) return selectedEntry ?? null
   return (
-    input.tabEntries.find(
-      (entry) =>
-        isWorkspacePaneRuntimeTabEntry(entry) &&
-        entry.type === runtimeType &&
-        entry.runtimeSessionId === selectedSessionId,
-    ) ?? null
+    selectedEntry ??
+    input.tabEntries.find((entry) => isWorkspacePaneRuntimeTabEntry(entry) && entry.type === runtimeType) ??
+    null
   )
 }
 
 function activeWorkspacePaneTab(
-  tabs: readonly WorkspacePaneMaterializedTab[],
+  tabs: readonly WorkspacePaneSelectableTab[],
   renderableTab: WorkspacePaneTabType,
   runtimeTabStateByType: WorkspacePaneRuntimeTabStateByType,
   requestedSessionIdByRuntimeType: WorkspacePaneRequestedRuntimeSessionByType | undefined,
@@ -473,34 +537,55 @@ function activeWorkspacePaneTab(
     if (requestedSessionId !== undefined) {
       return requestedSessionId
         ? (tabs.find(
-            (tab) => tab.kind === 'runtime' && tab.type === renderableTab && tab.sessionId === requestedSessionId,
+            (tab): tab is WorkspacePaneMaterializedRuntimeTab =>
+              tab.kind === 'runtime' && tab.type === renderableTab && tab.sessionId === requestedSessionId,
           ) ?? null)
         : null
     }
     const selectedSessionId = runtimeTabStateByType[renderableTab].selectedSessionId
     if (selectedSessionId) {
       const selected = tabs.find(
-        (tab) => tab.kind === 'runtime' && tab.type === renderableTab && tab.sessionId === selectedSessionId,
+        (tab) =>
+          isWorkspacePaneRuntimeTabProjection(tab) && tab.type === renderableTab && tab.sessionId === selectedSessionId,
       )
-      if (selected) return selected
+      if (selected) return selected.kind === 'runtime' ? selected : null
     }
-    return tabs.find((tab) => tab.kind === 'runtime' && tab.type === renderableTab) ?? null
+    return (
+      tabs.find(
+        (tab): tab is WorkspacePaneMaterializedRuntimeTab => tab.kind === 'runtime' && tab.type === renderableTab,
+      ) ?? null
+    )
   }
-  return tabs.find((tab) => tab.type === renderableTab) ?? null
+  return tabs.find((tab): tab is WorkspacePaneStaticTab => tab.kind === 'static' && tab.type === renderableTab) ?? null
 }
 
 function runtimeTabEntryIdentity(entry: WorkspacePaneRuntimeTabEntry): string {
   return workspacePaneRuntimeTabIdentity(entry.type, workspacePaneRuntimeTabSessionId(entry))
 }
 
-function runtimeTabStateByTypeFromInput(input: WorkspacePaneTabModelInput): WorkspacePaneRuntimeTabStateByType {
+function runtimeTabStateByTypeFromInput(
+  input: WorkspacePaneTabModelInput,
+  tabEntries: readonly WorkspacePaneTabEntry[],
+  runtimeViews: readonly WorkspacePaneRuntimeTabSummary[],
+): WorkspacePaneRuntimeTabStateByType {
+  const runtimeViewIdentities = new Set(runtimeViews.map(workspacePaneRuntimeTabSummaryIdentity))
   const runtimeTabStateByType: Partial<WorkspacePaneRuntimeTabStateByType> = {}
   for (const type of WORKSPACE_PANE_RUNTIME_TAB_TYPES) {
     const state = input.runtimeTabStateByType[type]
+    const projectionPhase =
+      state?.projectionPhase === 'ready' &&
+      tabEntries.some(
+        (entry) =>
+          isWorkspacePaneRuntimeTabEntry(entry) &&
+          entry.type === type &&
+          !runtimeViewIdentities.has(runtimeTabEntryIdentity(entry)),
+      )
+        ? 'pending'
+        : (state?.projectionPhase ?? 'pending')
     runtimeTabStateByType[type] = {
       type,
       createPending: state?.createPending ?? false,
-      projectionPhase: state?.projectionPhase ?? 'pending',
+      projectionPhase,
       projectionErrorMessage: state?.projectionErrorMessage,
       selectedSessionId: state?.selectedSessionId ?? null,
     }
@@ -523,7 +608,7 @@ function runtimeTabAvailabilityByTypeForTabs(
 ): WorkspacePaneRuntimeTabAvailabilityByType {
   const sessionCountByType = new Map<WorkspacePaneRuntimeTabType, number>()
   for (const tab of tabs) {
-    if (!isWorkspacePaneRuntimeTab(tab)) continue
+    if (!isMaterializedWorkspacePaneRuntimeTab(tab)) continue
     sessionCountByType.set(tab.runtimeType, (sessionCountByType.get(tab.runtimeType) ?? 0) + 1)
   }
   const runtimeTabAvailabilityByType: WorkspacePaneRuntimeTabAvailabilityByType = {}

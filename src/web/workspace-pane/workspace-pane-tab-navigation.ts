@@ -1,7 +1,7 @@
 import { workspacePaneTabEntryIdentity, type WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
-  isMaterializedWorkspacePaneTab,
-  type WorkspacePaneMaterializedTab,
+  isSelectableWorkspacePaneTab,
+  type WorkspacePaneSelectableTab,
   type WorkspacePaneTab,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 
@@ -23,7 +23,7 @@ export function adjacentWorkspacePaneTab(
   tabs: readonly WorkspacePaneTab[],
   activeIdentity: string | null | undefined,
   direction: 1 | -1,
-): WorkspacePaneMaterializedTab | null {
+): WorkspacePaneSelectableTab | null {
   if (tabs.length === 0) return null
   if (!activeIdentity) return null
   const activeIndex = tabs.findIndex((tab) => tab.identity === activeIdentity)
@@ -31,7 +31,7 @@ export function adjacentWorkspacePaneTab(
   for (let offset = 1; offset < tabs.length; offset += 1) {
     const nextIndex = (activeIndex + direction * offset + tabs.length) % tabs.length
     const tab = tabs[nextIndex]
-    if (tab && isMaterializedWorkspacePaneTab(tab)) return tab
+    if (tab && isSelectableWorkspacePaneTab(tab)) return tab
   }
   return null
 }

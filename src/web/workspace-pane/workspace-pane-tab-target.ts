@@ -137,7 +137,7 @@ export type WorkspacePaneTabTargetResolution =
   | { kind: 'missing' }
   | {
       kind: 'unavailable'
-      reason: 'snapshot-unavailable' | 'workspace-pane-tabs-pending' | 'workspace-pane-tabs-failed'
+      reason: 'workspace-pane-tabs-pending' | 'workspace-pane-tabs-failed'
     }
 
 export interface WorkspacePaneTabTargetOptions {
@@ -233,70 +233,29 @@ export function workspacePaneTabTargetForWorkspace(
   workspaceId: WorkspaceId,
   options: WorkspacePaneTabTargetOptions = workspacePanePreferenceTargetOptions,
 ): WorkspacePaneTabModel | null {
-  const resolution = resolveWorkspacePaneTabTarget(workspaceId, null, workspaceId, options)
+  const paneTarget = { kind: 'workspace-root' as const, workspaceId }
+  const resolution = resolveWorkspacePaneTabTargetForPaneTarget({
+    paneTarget,
+    routeTarget: paneTarget,
+    workspacePaneRoute: options.workspacePaneRoute,
+  })
   return resolution.kind === 'ready' ? resolution.target : null
 }
 
-function resolveWorkspacePaneTabTarget(
-  workspaceId: WorkspaceId,
-  branchName: string | null,
-  worktreePath: string | null,
-  options: WorkspacePaneTabTargetOptions,
-): WorkspacePaneTabTargetResolution {
-  const workspace = workspacesStore.getState().workspaces[workspaceId]
-  if (!workspace) return { kind: 'missing' }
-  if (branchName !== null && workspace.capability.kind !== 'git') return { kind: 'missing' }
-  const paneTarget: WorkspacePaneTabsTarget =
-    branchName === null
-      ? { kind: 'workspace-root', workspaceId }
-      : requiredGitWorkspacePaneTabsTarget(workspaceId, branchName, worktreePath)
-  const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
-    workspaceId,
-    workspaceRuntimeId: workspace.workspaceRuntimeId,
-    filesystemTarget: filesystemExecutionTargetForPaneTarget(paneTarget, workspace.workspaceRuntimeId),
-  })
-  const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
-    ...paneTarget,
-    workspaceRuntimeId: workspace.workspaceRuntimeId,
-  })
-  if (tabEntriesProjection.phase !== 'ready') {
-    return {
-      kind: 'unavailable',
-      reason: tabEntriesProjection.phase === 'failed' ? 'workspace-pane-tabs-failed' : 'workspace-pane-tabs-pending',
-    }
-  }
-  return {
-    kind: 'ready',
-    target: createWorkspacePaneTabModel({
-      workspaceId,
-      workspaceRuntimeId: workspace.workspaceRuntimeId,
-      routeTarget: paneTarget,
-      paneTarget,
-      worktreeHead: paneTarget.kind === 'git-worktree' && branchName ? { kind: 'branch', branchName } : undefined,
-      preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, paneTarget, options),
-      allowPreferredTabFallback: options.workspacePaneRoute === undefined,
-      tabEntries: tabEntriesProjection.tabs,
-      tabEntriesProjectionPhase: tabEntriesProjection.phase,
-      runtimeTabViews: runtimeProjection.runtimeTabViews,
-      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
-      requestedSessionIdByRuntimeType:
-        options.workspacePaneRoute?.kind === 'terminal'
-          ? { terminal: options.workspacePaneRoute.terminalSessionId }
-          : undefined,
-    }),
-  }
-}
-
-export function workspacePaneTabTargetForPaneTarget(input: {
+export interface WorkspacePaneTabTargetForPaneTargetInput {
   paneTarget: WorkspacePaneTabsTarget
   routeTarget: WorkspacePaneTabsTarget
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   worktreeHead?: GitHead
-}): WorkspacePaneTabModel | null {
+}
+
+export function resolveWorkspacePaneTabTargetForPaneTarget(
+  input: WorkspacePaneTabTargetForPaneTargetInput,
+): WorkspacePaneTabTargetResolution {
   const { paneTarget, routeTarget, workspacePaneRoute, worktreeHead } = input
   const workspace = workspacesStore.getState().workspaces[paneTarget.workspaceId]
-  if (!workspace) return null
-  if (paneTarget.kind !== 'workspace-root' && workspace.capability.kind !== 'git') return null
+  if (!workspace) return { kind: 'missing' }
+  if (paneTarget.kind !== 'workspace-root' && workspace.capability.kind !== 'git') return { kind: 'missing' }
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: workspace.id,
     workspaceRuntimeId: workspace.workspaceRuntimeId,
@@ -306,22 +265,37 @@ export function workspacePaneTabTargetForPaneTarget(input: {
     ...paneTarget,
     workspaceRuntimeId: workspace.workspaceRuntimeId,
   })
-  if (tabsProjection.phase !== 'ready') return null
-  return createWorkspacePaneTabModel({
-    workspaceId: workspace.id,
-    workspaceRuntimeId: workspace.workspaceRuntimeId,
-    routeTarget,
-    paneTarget,
-    worktreeHead,
-    preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, paneTarget, { workspacePaneRoute }),
-    allowPreferredTabFallback: workspacePaneRoute === undefined,
-    tabEntries: tabsProjection.tabs,
-    tabEntriesProjectionPhase: tabsProjection.phase,
-    runtimeTabViews: runtimeProjection.runtimeTabViews,
-    runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
-    requestedSessionIdByRuntimeType:
-      workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined,
-  })
+  if (tabsProjection.phase !== 'ready') {
+    return {
+      kind: 'unavailable',
+      reason: tabsProjection.phase === 'failed' ? 'workspace-pane-tabs-failed' : 'workspace-pane-tabs-pending',
+    }
+  }
+  return {
+    kind: 'ready',
+    target: createWorkspacePaneTabModel({
+      workspaceId: workspace.id,
+      workspaceRuntimeId: workspace.workspaceRuntimeId,
+      routeTarget,
+      paneTarget,
+      worktreeHead,
+      preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, paneTarget, { workspacePaneRoute }),
+      allowPreferredTabFallback: workspacePaneRoute === undefined,
+      tabEntries: tabsProjection.tabs,
+      tabEntriesProjectionPhase: tabsProjection.phase,
+      runtimeTabViews: runtimeProjection.runtimeTabViews,
+      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+      requestedSessionIdByRuntimeType:
+        workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined,
+    }),
+  }
+}
+
+export function workspacePaneTabTargetForPaneTarget(
+  input: WorkspacePaneTabTargetForPaneTargetInput,
+): WorkspacePaneTabModel | null {
+  const resolution = resolveWorkspacePaneTabTargetForPaneTarget(input)
+  return resolution.kind === 'ready' ? resolution.target : null
 }
 
 export function workspacePaneRouteNavigationBlockedForBranch(workspaceId: WorkspaceId, branchName: string): boolean {

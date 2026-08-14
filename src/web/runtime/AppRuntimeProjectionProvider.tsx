@@ -19,6 +19,7 @@ import { WorkspacePaneTabsRecovery } from '#/web/runtime/workspace-pane-tabs-rec
 import { WorkspaceRuntimeReconnectRecovery } from '#/web/runtime/workspace-runtime-reconnect-recovery.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { provideTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
+import { provideWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 
 export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId: WorkspaceId | null }>({
   name: 'AppRuntimeProjectionProvider',
@@ -77,12 +78,20 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
         })
       },
     })
+    const projectionScopeForWorkspace = (workspaceId: WorkspaceId) => {
+      const workspaceRuntimeId = workspaceRuntimeIdForRoot(workspaceId)
+      return workspaceRuntimeId ? scopeRegistry.scopeFor({ workspaceId, workspaceRuntimeId }) : null
+    }
     provideTerminalProjectionRecoveryActions({
       retryWorkspace(workspaceId) {
-        const workspaceRuntimeId = workspaceRuntimeIdForRoot(workspaceId)
-        if (!workspaceRuntimeId) return
-        const scope = scopeRegistry.scopeFor({ workspaceId, workspaceRuntimeId })
-        terminalRecovery.retry(scope)
+        const scope = projectionScopeForWorkspace(workspaceId)
+        if (scope) terminalRecovery.retry(scope)
+      },
+    })
+    provideWorkspacePaneTabsRetryActions({
+      retryWorkspace(workspaceId) {
+        const scope = projectionScopeForWorkspace(workspaceId)
+        if (scope) workspaceTabsRecovery.request(scope)
       },
     })
 

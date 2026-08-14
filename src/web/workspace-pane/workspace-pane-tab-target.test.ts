@@ -13,6 +13,7 @@ import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspa
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   gitWorktreePaneTargetLease,
+  resolveWorkspacePaneTabTargetForPaneTarget,
   workspacePaneTabTargetForPaneTarget,
   workspacePaneTabTargetForWorkspace,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
@@ -68,14 +69,17 @@ describe('workspace pane tab target read model', () => {
     })
     appQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
     const paneTarget = requiredGitWorkspacePaneTabsTarget(REPO_ID, 'feature/query', WORKTREE_PATH)
-    expect(
-      workspacePaneTabTargetForPaneTarget({
-        paneTarget,
-        routeTarget: paneTarget,
-        workspacePaneRoute: undefined,
-        worktreeHead: { kind: 'branch', branchName: 'feature/query' },
-      }),
-    ).toBeNull()
+    const input = {
+      paneTarget,
+      routeTarget: paneTarget,
+      workspacePaneRoute: undefined,
+      worktreeHead: { kind: 'branch' as const, branchName: 'feature/query' },
+    }
+    expect(resolveWorkspacePaneTabTargetForPaneTarget(input)).toEqual({
+      kind: 'unavailable',
+      reason: 'workspace-pane-tabs-pending',
+    })
+    expect(workspacePaneTabTargetForPaneTarget(input)).toBeNull()
   })
 
   test('keeps a worktree command lease current when a background status refresh fails with accepted data', async () => {

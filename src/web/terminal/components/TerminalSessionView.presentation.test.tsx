@@ -162,7 +162,7 @@ describe('TerminalSessionView presentation and focus', () => {
     }
   })
 
-  test('keeps the active terminal attached when selected descriptor metadata changes', async () => {
+  test('attaches when an explicit descriptor materializes without reattaching for metadata changes', async () => {
     const descriptor = {
       terminalSessionId: 'term-111111111111111111111',
       terminalFilesystemTargetKey: '/repo\0/worktree',
@@ -171,19 +171,9 @@ describe('TerminalSessionView presentation and focus', () => {
     }
     let terminalFilesystemTargetSnapshot = completeFilesystemTargetSnapshot({
       terminalFilesystemTargetKey: '/repo\0/worktree',
-      selectedDescriptor: descriptor,
-      sessions: [
-        {
-          terminalSessionId: 'term-111111111111111111111',
-          terminalFilesystemTargetKey: '/repo\0/worktree',
-          index: 1,
-          title: 'zsh',
-          phase: 'open' as const,
-          selected: true,
-          hasBell: false,
-        },
-      ],
-      count: 1,
+      selectedDescriptor: null,
+      sessions: [],
+      count: 0,
       createPending: false,
     })
     const snapshot = {
@@ -236,6 +226,7 @@ describe('TerminalSessionView presentation and focus', () => {
             workspaceRuntimeId={'repo-runtime-test'}
             branch="feature"
             worktreePath="/worktree"
+            selectedTerminalSessionId={descriptor.terminalSessionId}
           />
         </TerminalSessionReadScope>
       </TerminalSessionCommandScope>,
@@ -243,7 +234,35 @@ describe('TerminalSessionView presentation and focus', () => {
 
     try {
       await flushTestUpdates(() => {})
+      expect(attach).not.toHaveBeenCalled()
+      expect(clearSearch).not.toHaveBeenCalled()
+
+      terminalFilesystemTargetSnapshot = completeFilesystemTargetSnapshot({
+        terminalFilesystemTargetKey: '/repo\0/worktree',
+        selectedDescriptor: null,
+        sessions: [
+          {
+            terminalSessionId: descriptor.terminalSessionId,
+            terminalFilesystemTargetKey: '/repo\0/worktree',
+            index: 1,
+            title: 'zsh',
+            phase: 'open',
+            selected: false,
+            hasBell: false,
+          },
+        ],
+        count: 1,
+        createPending: false,
+      })
+      await flushTestUpdates(async () => {
+        for (const listener of filesystemTargetListeners) listener()
+      })
+
       expect(attach).toHaveBeenCalledTimes(1)
+      expect(attach).toHaveBeenCalledWith(
+        expect.objectContaining({ terminalSessionId: descriptor.terminalSessionId }),
+        expect.any(HTMLDivElement),
+      )
       expect(clearSearch).not.toHaveBeenCalled()
 
       terminalFilesystemTargetSnapshot = completeFilesystemTargetSnapshot({
@@ -521,12 +540,24 @@ describe('TerminalSessionView presentation and focus', () => {
     }
   })
 
-  test('shows terminal projection failure reason while opening without sessions', async () => {
+  test('shows terminal projection recovery for a missing selected session while another session is loaded', async () => {
+    const retryProjection = vi.fn()
     const terminalFilesystemTargetSnapshot = {
       terminalFilesystemTargetKey: '/repo\0/worktree',
       selectedDescriptor: null,
-      sessions: [],
-      count: 0,
+      sessions: [
+        {
+          terminalSessionId: 'term-222222222222222222222',
+          terminalFilesystemTargetKey: '/repo\0/worktree',
+          index: 2,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: false,
+          hasBell: false,
+          hasRecentOutput: false,
+        },
+      ],
+      count: 1,
       createPending: false,
     }
     const context: TerminalSessionContextValue = terminalSessionContextForTest({
@@ -565,6 +596,8 @@ describe('TerminalSessionView presentation and focus', () => {
             worktreePath="/worktree"
             projectionPhase="failed"
             projectionErrorMessage="error.workspace-runtime-stale"
+            selectedTerminalSessionId="term-111111111111111111111"
+            retryProjection={retryProjection}
           />
         </TerminalSessionReadScope>
       </TerminalSessionCommandScope>,
@@ -573,6 +606,10 @@ describe('TerminalSessionView presentation and focus', () => {
     try {
       expect(container.textContent).toContain('terminal.load-failed')
       expect(container.textContent).toContain('error.workspace-runtime-stale')
+      const retryButton = container.querySelector('button')
+      if (!(retryButton instanceof HTMLButtonElement)) throw new Error('missing projection retry button')
+      await userEvent.click(retryButton)
+      expect(retryProjection).toHaveBeenCalledOnce()
     } finally {
       unmount()
     }

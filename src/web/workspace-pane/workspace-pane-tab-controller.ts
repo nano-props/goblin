@@ -15,7 +15,7 @@ import type {
   WorkspacePaneRouteCommitActions,
 } from '#/web/app/navigation/actions.ts'
 import {
-  isWorkspacePaneRuntimeTab,
+  isWorkspacePaneRuntimeTabProjection,
   type WorkspacePaneModelTarget,
   type WorkspacePaneTab,
   type WorkspacePaneTabModel,
@@ -47,7 +47,7 @@ type WorkspacePaneControllerRoutePrecondition =
   { kind: 'exact-route'; route: ParsedBranchWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 
 export function workspacePaneControllerRouteForTab(tab: WorkspacePaneTab): WorkspacePaneTabControllerRoute | undefined {
-  if (isWorkspacePaneRuntimeTab(tab)) {
+  if (isWorkspacePaneRuntimeTabProjection(tab)) {
     if (tab.runtimeType === 'terminal') return { kind: 'terminal', terminalSessionId: tab.sessionId }
     return undefined
   }
@@ -134,8 +134,8 @@ export async function selectWorkspacePaneControllerTab(
     return false
   }
   const focusEffects =
-    isWorkspacePaneRuntimeTab(tab) && tab.runtimeType === 'terminal'
-      ? (providedFocusEffects ?? claimTerminalPresentationFocus(navigationGeneration, tab.sessionId))
+    route?.kind === 'terminal'
+      ? (providedFocusEffects ?? claimTerminalPresentationFocus(navigationGeneration, route.terminalSessionId))
       : null
   return await commitWorkspacePaneControllerTargetRoute(
     target,

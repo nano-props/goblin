@@ -23,12 +23,18 @@ import {
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { defineComponent } from 'vue'
+import { provideTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 interface CapturedTerminalSessionViewProps {
   base: TerminalSessionBase
   selectedTerminalSessionId?: string | null
   projectionPhase?: string
   projectionErrorMessage?: string
+  retryProjection?: () => void
   createTerminalForSlot?: (base: TerminalSessionBase) => Promise<unknown>
 }
 
@@ -55,6 +61,7 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 }))
 
 beforeEach(() => {
+  appQueryClient.clear()
   resetWorkspacePaneActionQueueForTest()
   resetWorkspacesStore()
   seedRepoWithReadModelForTest({
@@ -71,9 +78,17 @@ beforeEach(() => {
     worktreePath: '/repo-worktree',
     route: null,
   })
+  setWorkspacePaneTabsForTargetQueryData({
+    kind: 'git-worktree',
+    workspaceId: workspaceIdForTest('goblin+file:///repo'),
+    workspaceRuntimeId: 'repo-runtime-1',
+    worktreePath: '/repo-worktree',
+    tabs: [],
+  })
 })
 
 afterEach(() => {
+  appQueryClient.clear()
   resetWorkspacePaneActionQueueForTest()
   resetWorkspacesStore()
   terminalSessionViewMocks.props.length = 0
@@ -82,7 +97,7 @@ afterEach(() => {
 
 describe('workspace pane runtime tab panel', () => {
   test('renders terminal runtime panel through the runtime panel registry', () => {
-    const { container } = renderPanel()
+    const { container, retryWorkspace } = renderPanel()
 
     const panel = container.querySelector('#workspace-terminal-panel')
     expect(panel?.getAttribute('role')).toBe('tabpanel')
@@ -102,6 +117,8 @@ describe('workspace pane runtime tab panel', () => {
       projectionPhase: 'failed',
       projectionErrorMessage: 'boom',
     })
+    terminalSessionViewMocks.props[0]?.retryProjection?.()
+    expect(retryWorkspace).toHaveBeenCalledWith(workspaceIdForTest('goblin+file:///repo'))
   })
 
   test('delegates terminal empty-slot create to the terminal create command', async () => {
@@ -170,33 +187,45 @@ describe('workspace pane runtime tab panel', () => {
 
 function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = {}) {
   const navigation = navigationWith()
+  const retryWorkspace = vi.fn()
   const result = renderInJsdom(
-    <AppNavigationProvider value={navigation}>
-      <TerminalSessionCommandScope value={input.terminalContext ?? terminalCommandContextWith()}>
-        {renderWorkspacePaneRuntimeTabPanel({
-          type: 'terminal',
-          workspacePaneId: 'workspace',
-          panelLabel: { label: 'Terminal' },
-          target: {
-            runtimeTarget: {
-              kind: 'git-worktree' as const,
-              workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
-              workspaceRuntimeId: 'repo-runtime-1',
-              root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
+    <TerminalProjectionRecoveryTestScope retryWorkspace={retryWorkspace}>
+      <AppNavigationProvider value={navigation}>
+        <TerminalSessionCommandScope value={input.terminalContext ?? terminalCommandContextWith()}>
+          {renderWorkspacePaneRuntimeTabPanel({
+            type: 'terminal',
+            workspacePaneId: 'workspace',
+            panelLabel: { label: 'Terminal' },
+            target: {
+              runtimeTarget: {
+                kind: 'git-worktree' as const,
+                workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+                workspaceRuntimeId: 'repo-runtime-1',
+                root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
+              },
+              presentation: { kind: 'git-worktree' as const },
             },
-            presentation: { kind: 'git-worktree' as const },
-          },
-          selectedSessionId: 'term-111111111111111111111',
-          runtimeState: {
-            projectionPhase: 'failed',
-            projectionErrorMessage: 'boom',
-          },
-        })}
-      </TerminalSessionCommandScope>
-    </AppNavigationProvider>,
+            selectedSessionId: 'term-111111111111111111111',
+            runtimeState: {
+              projectionPhase: 'failed',
+              projectionErrorMessage: 'boom',
+            },
+          })}
+        </TerminalSessionCommandScope>
+      </AppNavigationProvider>
+    </TerminalProjectionRecoveryTestScope>,
   )
-  return { ...result, navigation }
+  return { ...result, navigation, retryWorkspace }
 }
+
+const TerminalProjectionRecoveryTestScope = defineComponent<{ retryWorkspace: (workspaceId: WorkspaceId) => void }>({
+  name: 'TerminalProjectionRecoveryTestScope',
+  props: ['retryWorkspace'],
+  setup(props, { slots }) {
+    provideTerminalProjectionRecoveryActions({ retryWorkspace: props.retryWorkspace })
+    return () => slots.default?.()
+  },
+})
 
 function navigationWith(): AppNavigationActions {
   return observedAppNavigationActionsForTest({

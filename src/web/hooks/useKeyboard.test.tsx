@@ -55,6 +55,7 @@ import {
   gitWorktreePaneFilesystemTarget,
   workspaceRootPaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const branchShortcutMocks = vi.hoisted(() => ({
   runBranchActionShortcut: vi.fn(),
@@ -599,6 +600,12 @@ describe('useKeyboard', () => {
         },
         diagnostics: [],
       },
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: workspaceRuntimeIdForTest(),
+      tabs: [],
     })
     const createTerminal = vi.fn(async (_base: unknown, _options?: TerminalCreateOptions) =>
       Promise.resolve('term-222222222222222222222'),

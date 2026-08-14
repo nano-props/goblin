@@ -114,7 +114,7 @@ export const WorkspacePaneTabStrip = defineComponent<WorkspacePaneTabStripProps>
 
     const handleNew = () => {
       const createAction = props.createAction
-      if (!createAction || createAction.busy) return
+      if (!createAction || createAction.busy || createAction.disabled) return
       scrollNewButtonIntoView()
       createAction.onCreate()
     }
@@ -124,6 +124,8 @@ export const WorkspacePaneTabStrip = defineComponent<WorkspacePaneTabStripProps>
         ? {
             label: props.createAction.label,
             busy: props.createAction.busy ?? false,
+            disabled: props.createAction.disabled ?? false,
+            disabledReason: props.createAction.disabledReason,
             blocksTabInteraction: props.createAction.blocksTabInteraction ?? false,
             onCreate: handleNew,
           }
@@ -176,7 +178,9 @@ export const WorkspacePaneTabStrip = defineComponent<WorkspacePaneTabStripProps>
       }
       if (isPendingWorkspacePaneTabItem(item)) return `${props.workspacePaneId}-${item.type}-pending-tab`
       const runtimeItems = props.items.filter(
-        (candidate) => candidate.kind === 'runtime' && candidate.runtimeType === item.runtimeType,
+        (candidate) =>
+          (candidate.kind === 'runtime' || candidate.kind === 'runtime-placeholder') &&
+          candidate.runtimeType === item.runtimeType,
       )
       const index = runtimeItems.findIndex((candidate) => candidate.identity === item.identity)
       return workspacePaneRuntimeTabProvider(item.runtimeType).buttonId(props.workspacePaneId, Math.max(0, index))

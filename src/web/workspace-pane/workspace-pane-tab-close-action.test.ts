@@ -746,9 +746,27 @@ describe('workspace pane tab close action', () => {
     setTerminalSessionCommandBridge({
       terminalFilesystemTargetSnapshot: () => ({
         terminalFilesystemTargetKey,
-        selectedDescriptor: null,
-        sessions: [],
-        count: 0,
+        selectedDescriptor: {
+          terminalSessionId,
+          terminalFilesystemTargetKey,
+          index: 1,
+          target: runtimeTarget,
+          presentation: { kind: 'git-worktree' as const },
+        },
+        sessions: [
+          {
+            type: 'terminal',
+            terminalSessionId,
+            terminalFilesystemTargetKey,
+            index: 1,
+            title: 'terminal 1',
+            phase: 'open',
+            selected: true,
+            hasBell: false,
+            hasRecentOutput: false,
+          },
+        ],
+        count: 1,
         bellCount: 0,
         outputActiveCount: 0,
         createPending: false,
@@ -776,7 +794,6 @@ describe('workspace pane tab close action', () => {
         workspaceId: REPO_ID,
         workspacePaneRoute: { kind: 'terminal', terminalSessionId },
         navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
-        skipRuntimeCloseConfirm: true,
       }),
     ).resolves.toBe(true)
 

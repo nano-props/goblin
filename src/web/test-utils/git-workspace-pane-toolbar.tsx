@@ -84,6 +84,7 @@ import {
   type ObservedAppNavigationActionsForTest,
   type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
+import { provideWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 
 // RTL has no reusable harness for Git toolbar routing, tab state, and external-app settings.
 const hoistedToolbarResponsiveMocks = vi.hoisted(() => ({ compactUi: false }))
@@ -187,6 +188,7 @@ const GitWorkspacePaneToolbarHarness = defineComponent<GitWorkspacePaneToolbarHa
   ],
 
   setup(props) {
+    provideWorkspacePaneTabsRetryActions({ retryWorkspace: vi.fn() })
     const workspacePaneTabModel = useGitWorkspacePaneTabModel(
       () => props.repo,
       () => props.detail,

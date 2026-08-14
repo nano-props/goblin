@@ -30,6 +30,7 @@ import type { WorkspacePaneRuntimeContext } from '#/web/workspace-pane/use-works
 import { repoQueryReadFailure } from '#/web/repos/read-failure.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
+import { selectedWorkspacePaneRuntimeSessionId } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 
 interface GitWorktreePaneProps {
   repo: GitWorkspacePaneShell
@@ -208,10 +209,7 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
     return () => {
       const currentModel = model.value
       const selection = currentModel.selection
-      const selectedTerminalSessionId =
-        selection?.kind === 'materialized-tab' && selection.materializedTab.kind === 'runtime'
-          ? selection.materializedTab.sessionId
-          : null
+      const selectedTerminalSessionId = selectedWorkspacePaneRuntimeSessionId(currentModel, 'terminal')
       const routeMissing = routeReconciliation.value.kind === 'missing'
       const openStaticTab = (type: 'changes' | 'history') => {
         void dispatchOpenWorkspacePaneTargetStaticTabAction({

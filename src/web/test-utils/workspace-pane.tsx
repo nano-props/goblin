@@ -1,6 +1,6 @@
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, expect, vi } from 'vitest'
-import type { VNode } from 'vue'
+import { defineComponent, type VNode } from 'vue'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
@@ -31,11 +31,25 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
+import { provideTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
+import { provideWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-workspace-container-repo')
+export const retryWorkspacePaneTabsForTest = vi.fn()
+
+const WorkspacePaneTestProvider = defineComponent({
+  name: 'WorkspacePaneTestProvider',
+  setup(_props, { slots }) {
+    provideTerminalProjectionRecoveryActions({ retryWorkspace: vi.fn() })
+    provideWorkspacePaneTabsRetryActions({ retryWorkspace: retryWorkspacePaneTabsForTest })
+    return () => (
+      <WorkspacePaneTabStripScrollMemoryProvider>{slots.default?.()}</WorkspacePaneTabStripScrollMemoryProvider>
+    )
+  },
+})
 
 export function render(element: VNode) {
-  return renderInJsdom(element, { wrapper: WorkspacePaneTabStripScrollMemoryProvider })
+  return renderInJsdom(element, { wrapper: WorkspacePaneTestProvider })
 }
 
 beforeEach(() => {

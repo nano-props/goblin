@@ -108,8 +108,7 @@ export const GitWorkspacePaneContent = defineComponent<GitWorkspacePaneContentPr
                 detail: props.detail,
                 workspacePaneId: props.workspacePaneId,
                 panelLabel,
-                selection,
-                runtimeTabStateByType: props.workspacePaneTabModel.runtimeTabStateByType,
+                model: props.workspacePaneTabModel,
               })
             : null}
         </div>
@@ -130,7 +129,9 @@ function workspacePanePanelLabel(input: {
   if (tab?.kind === 'runtime') {
     const provider = workspacePaneRuntimeTabProvider(tab.runtimeType)
     const runtimeTabs = input.tabs.filter(
-      (candidate) => candidate.kind === 'runtime' && candidate.runtimeType === tab.runtimeType,
+      (candidate) =>
+        (candidate.kind === 'runtime' || candidate.kind === 'runtime-placeholder') &&
+        candidate.runtimeType === tab.runtimeType,
     )
     const index = runtimeTabs.findIndex((candidate) => candidate.identity === tab.identity)
     return {

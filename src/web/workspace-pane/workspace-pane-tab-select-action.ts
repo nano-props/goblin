@@ -163,7 +163,7 @@ async function moveWorkspacePaneTabAction(
   const currentRoute = branchName ? navigation.currentWorkspacePaneRoute(workspaceId, branchName) : undefined
   if (branchName && currentRoute === undefined) return false
   const target = resolveSelectableWorkspacePaneTarget(options, currentRoute)
-  const tab = target ? adjacentWorkspacePaneTab(target.tabs, target.activeTab?.identity, direction) : null
+  const tab = target ? adjacentWorkspacePaneTab(target.tabs, target.selectedIdentity, direction) : null
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(queuedTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
   return await selectWorkspacePaneControllerTab(target, tab, navigation)

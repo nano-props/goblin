@@ -4,6 +4,7 @@ import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import {
   createPendingWorkspacePaneTabItem,
+  createRuntimePlaceholderWorkspacePaneTabItem,
   createRuntimeWorkspacePaneTabItem,
   createStaticWorkspacePaneTabItem,
   isPendingWorkspacePaneTabItem,
@@ -49,6 +50,20 @@ export function workspacePaneTabItems(input: WorkspacePaneTabItemsInput): Worksp
           type: tab.type,
           label,
           tooltip: label,
+          panelId: provider.panelId(input.workspacePaneId),
+        }),
+      ]
+    }
+    if (tab.kind === 'runtime-placeholder') {
+      const label = provider.placeholderLabel({
+        t: input.t,
+        projectionPhase: tab.projectionPhase,
+      })
+      return [
+        createRuntimePlaceholderWorkspacePaneTabItem({
+          tabEntry: tab.tabEntry,
+          label,
+          busy: tab.projectionPhase === 'pending',
           panelId: provider.panelId(input.workspacePaneId),
         }),
       ]

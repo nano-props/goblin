@@ -284,7 +284,7 @@ describe('workspace commands close', () => {
     expect(presentationEffects.onAbandon).toHaveBeenCalledOnce()
   })
 
-  test('close workspace tab command uses each committed snapshot between rapid closes', async () => {
+  test('rapid current-tab closes stay bound to the observed route', async () => {
     seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       id: REPO_ID,
@@ -358,9 +358,8 @@ describe('workspace commands close', () => {
 
     closeResolvers[0]?.(true)
     await expect(firstClose).resolves.toBe(true)
-    expect(closeTerminalByDescriptor).toHaveBeenNthCalledWith(2, 'term-222222222222222222222', expectedTerminalBase())
-    closeResolvers[1]?.(true)
-    await expect(secondClose).resolves.toBe(true)
+    await expect(secondClose).resolves.toBe(false)
+    expect(closeTerminalByDescriptor).toHaveBeenCalledOnce()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
@@ -671,7 +670,7 @@ describe('workspace commands close', () => {
     expect(presentationEffects.onAbandon).toHaveBeenCalledOnce()
   })
 
-  test('close workspace tab command closes the selected canonical terminal while its live view is pending', async () => {
+  test('close workspace tab command rejects a selected canonical terminal while its live view is pending', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
@@ -706,8 +705,54 @@ describe('workspace commands close', () => {
         branchName: 'feature/worktree',
         navigation: navigationWith(),
       }),
-    ).toBe(true)
+    ).toBe(false)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith(terminalSessionId, expect.any(Object))
+    expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
+  })
+
+  test('current-tab close keeps the routed placeholder instead of retargeting a materialized store selection', async () => {
+    const routedSessionId = 'term-111111111111111111111'
+    const materializedSessionId = 'term-222222222222222222222'
+    seedRepoWithReadModelForTest({
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
+      id: REPO_ID,
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [
+          staticEntry('status'),
+          terminalEntry(routedSessionId),
+          terminalEntry(materializedSessionId),
+        ],
+      },
+    })
+    workspacesStore.getState().setSelectedTerminal(WORKTREE_KEY, materializedSessionId)
+    const closeTerminalByDescriptor = vi.fn(async () => ({
+      kind: 'committed' as const,
+      projection: 'applied' as const,
+    }))
+    setTerminalSessionCommandBridge({
+      terminalFilesystemTargetSnapshot: () => worktreeSnapshotForSessions([materializedSessionId]),
+      createTerminal: vi.fn(async () => routedSessionId),
+      createTerminalWithAdmission: vi.fn(async () => {
+        throw new Error('unexpected terminal creation')
+      }),
+      selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(() => false),
+      closeTerminalByDescriptor,
+    })
+
+    await expect(
+      runCloseCurrentWorkspacePaneTabCommand({
+        workspacePaneRoute: { kind: 'terminal', terminalSessionId: routedSessionId },
+        workspaceId: REPO_ID,
+        branchName: 'feature/worktree',
+        navigation: navigationWith(),
+      }),
+    ).resolves.toBe(false)
+
+    expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
+    expect(terminalActionDialogsStore.getState().closeConfirm).toBeNull()
   })
 })

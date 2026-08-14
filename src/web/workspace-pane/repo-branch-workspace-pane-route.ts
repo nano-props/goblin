@@ -5,7 +5,7 @@ import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navi
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
   createWorkspacePaneTabModel,
-  isWorkspacePaneRuntimeTab,
+  isMaterializedWorkspacePaneRuntimeTab,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import {
@@ -70,7 +70,7 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
   })
   const activeTab = model.activeTab
   if (!activeTab) return { kind: 'route', target, route: null }
-  if (isWorkspacePaneRuntimeTab(activeTab)) {
+  if (isMaterializedWorkspacePaneRuntimeTab(activeTab)) {
     if (activeTab.runtimeType === 'terminal') {
       return { kind: 'route', target, route: { kind: 'terminal', terminalSessionId: activeTab.sessionId } }
     }

@@ -27,7 +27,8 @@ import {
 } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type {
-  WorkspacePaneRuntimeTab,
+  WorkspacePaneMaterializedRuntimeTab,
+  WorkspacePaneRuntimePlaceholderTab,
   WorkspacePaneStaticTab,
   WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
@@ -203,6 +204,33 @@ describe('workspace pane tab controller transactions', () => {
 
     expect(onCommit).not.toHaveBeenCalled()
     expect(onAbandon).toHaveBeenCalledOnce()
+  })
+
+  test('carries terminal focus through placeholder selection', async () => {
+    const onCommit = vi.fn()
+    const onAbandon = vi.fn()
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async (_target, _route, options) => {
+      options?.onCommit?.()
+      return true
+    })
+
+    await expect(
+      selectWorkspacePaneControllerTab(
+        {
+          ...workspacePaneTarget(),
+          routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/worktree-a' },
+          branchName: 'feature/a',
+          worktreePath: '/worktree-a',
+          paneTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/worktree-a' },
+        },
+        terminalPlaceholderTab(),
+        controllerNavigation({ commitFilesystemWorkspacePaneRoute }),
+        { focusEffects: { onCommit, onAbandon } },
+      ),
+    ).resolves.toBe(true)
+
+    expect(onCommit).toHaveBeenCalledOnce()
+    expect(onAbandon).not.toHaveBeenCalled()
   })
 
   test('does not settle terminal focus twice when committed navigation rejects', async () => {
@@ -462,7 +490,7 @@ function staticTab(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTab {
   return { identity: workspacePaneStaticTabId(type), type, kind: 'static', view: null }
 }
 
-function terminalTab(): WorkspacePaneRuntimeTab {
+function terminalTab(): WorkspacePaneMaterializedRuntimeTab {
   const terminalSessionId = 'term-111111111111111111111'
   return {
     identity: `terminal:${terminalSessionId}`,
@@ -481,5 +509,19 @@ function terminalTab(): WorkspacePaneRuntimeTab {
       hasBell: false,
       hasRecentOutput: false,
     },
+  }
+}
+
+function terminalPlaceholderTab(): WorkspacePaneRuntimePlaceholderTab {
+  const terminalSessionId = 'term-111111111111111111111'
+  return {
+    identity: `terminal:${terminalSessionId}`,
+    type: 'terminal',
+    kind: 'runtime-placeholder',
+    runtimeType: 'terminal',
+    sessionId: terminalSessionId,
+    tabEntry: workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+    projectionPhase: 'pending',
+    view: null,
   }
 }
