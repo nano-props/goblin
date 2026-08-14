@@ -12,7 +12,7 @@ import {
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import {
   getRepoSnapshotQueryData,
   getRepoWorktreeStatusQueryData,

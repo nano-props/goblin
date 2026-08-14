@@ -278,7 +278,7 @@ describe('theme store OS-appearance sync', () => {
 
   test('setPref syncs the settings snapshot query cache from the server response', async () => {
     installWindow({ matchMedia: createMediaQuery(false) })
-    const { appQueryClient } = await import('#/web/app-query-client.ts')
+    const { appQueryClient } = await import('#/web/app/query-client.ts')
     const { settingsSnapshotQueryKey } = await import('#/web/settings/query-cache.ts')
     appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),

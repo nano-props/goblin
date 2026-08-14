@@ -21,7 +21,7 @@ import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projecti
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {

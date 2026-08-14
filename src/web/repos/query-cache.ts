@@ -6,7 +6,7 @@ import type {
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { repoOperationsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 
 export function getRepoOperationsQueryData(

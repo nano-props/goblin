@@ -19,7 +19,7 @@ import type {
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
-vi.mock('#/web/app-shell-client.ts', () => ({
+vi.mock('#/web/app/shell-client.ts', () => ({
   pathForDroppedFile: vi.fn(() => ''),
   saveClipboardFiles: vi.fn(() => Promise.resolve([])),
 }))

@@ -5,7 +5,7 @@ import {
 import type { WorkspacePaneTabsChangedRealtimeMessage } from '#/shared/workspace-pane-tabs.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import type { ClientWorkspacePaneTabs } from '#/web/client-bridge-types.ts'
-import type { ClientAppRealtime } from '#/web/app-realtime-client.ts'
+import type { ClientAppRealtime } from '#/web/app/realtime/client.ts'
 
 export function createServerWorkspacePaneTabsClient(realtime: ClientAppRealtime): ClientWorkspacePaneTabs {
   const changedSubscribers = new Set<(message: WorkspacePaneTabsChangedRealtimeMessage) => void>()

@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultServerWorkspaceState, defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import type {

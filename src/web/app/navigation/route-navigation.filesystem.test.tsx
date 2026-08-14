@@ -22,7 +22,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/filesystem-route-navigation-workspace')

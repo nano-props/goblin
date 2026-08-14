@@ -31,7 +31,7 @@ import type {
   WorkspacePaneStaticTab,
   WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { beginAppNavigation, currentAppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

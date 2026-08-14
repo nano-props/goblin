@@ -74,7 +74,7 @@ describe('client bootstrap seeding', () => {
       getI18nSnapshot: vi.fn(async () => nextSnapshot),
       setI18nPref: vi.fn(async () => nextSnapshot),
     }))
-    const { appQueryClient } = await import('#/web/app-query-client.ts')
+    const { appQueryClient } = await import('#/web/app/query-client.ts')
     const { settingsSnapshotQueryKey } = await import('#/web/settings/query-cache.ts')
     appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ lang: 'auto' }))
 

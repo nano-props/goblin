@@ -597,7 +597,7 @@ describe('terminal web host client', () => {
   test('kickReconnect health-probes an open app realtime socket and keeps it when pong arrives', async () => {
     useFakeTimers()
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const { appRealtimeClient } = await import('#/web/app-realtime.ts')
+    const { appRealtimeClient } = await import('#/web/app/realtime/index.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
@@ -617,7 +617,7 @@ describe('terminal web host client', () => {
   test('kickReconnect does not stack duplicate health probes for the same open socket', async () => {
     useFakeTimers()
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const { appRealtimeClient } = await import('#/web/app-realtime.ts')
+    const { appRealtimeClient } = await import('#/web/app/realtime/index.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
@@ -635,7 +635,7 @@ describe('terminal web host client', () => {
   test('kickReconnect reconnects an open app realtime socket when health probe send fails', async () => {
     useFakeTimers()
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const { appRealtimeClient } = await import('#/web/app-realtime.ts')
+    const { appRealtimeClient } = await import('#/web/app/realtime/index.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
@@ -655,7 +655,7 @@ describe('terminal web host client', () => {
   test('kickReconnect reconnects an open app realtime socket when health probe times out', async () => {
     useFakeTimers()
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const { appRealtimeClient } = await import('#/web/app-realtime.ts')
+    const { appRealtimeClient } = await import('#/web/app/realtime/index.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
@@ -674,7 +674,7 @@ describe('terminal web host client', () => {
 
   test('kickReconnect replaces a closing app realtime socket while realtime subscribers remain', async () => {
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
-    const { appRealtimeClient } = await import('#/web/app-realtime.ts')
+    const { appRealtimeClient } = await import('#/web/app/realtime/index.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
@@ -774,7 +774,7 @@ describe('terminal web host client', () => {
 
   test('stops reconnecting terminal sockets after app quitting starts', async () => {
     useFakeTimers()
-    const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const { markAppQuitting } = await import('#/web/app/lifecycle.ts')
     const { terminalClient } = await import('#/web/terminal/client-facade.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]

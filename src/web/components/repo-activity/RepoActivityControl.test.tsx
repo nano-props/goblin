@@ -16,7 +16,7 @@ import {
 } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { setRepoOperationsQueryData } from '#/web/repos/query-cache.ts'
 import { repoOperationsQueryKey } from '#/web/repos/query-keys.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 

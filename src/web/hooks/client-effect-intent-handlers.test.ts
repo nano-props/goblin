@@ -26,7 +26,7 @@ import {
   type ObservedAppNavigationActionsForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { setRepoOperationsQueryData } from '#/web/repos/query-cache.ts'
 import { repoOperationsQueryKey } from '#/web/repos/query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'

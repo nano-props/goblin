@@ -10,7 +10,7 @@ import { installGoblinTestBridge, type IpcTestHandler } from '#/web/test-utils/b
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 

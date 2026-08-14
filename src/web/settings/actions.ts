@@ -26,7 +26,7 @@ import {
 } from '#/web/settings/client.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import {
   externalAppsQueryKey,
   lanInfoQueryKey,

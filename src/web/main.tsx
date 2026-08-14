@@ -3,7 +3,7 @@ import type { FunctionalComponent } from 'vue'
 import { VueQueryPlugin } from '@tanstack/vue-query'
 import { VueQueryDevtools } from '@tanstack/vue-query-devtools'
 import { AppRouterProvider, appRouter } from '#/web/app/navigation/router.tsx'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { AuthProvider } from '#/web/auth/AuthProvider.tsx'
 import { ResponsiveUiProvider } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { bootstrapLog } from '#/web/logger.ts'
@@ -13,7 +13,7 @@ import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { createWebBootstrapOwner, startWebBootstrap } from '#/web/web-bootstrap.ts'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 import { vueAppErrorHandler } from '#/web/vue-app-error-handler.ts'
-import { startNativeAppQuitIngress } from '#/web/app-lifecycle.ts'
+import { startNativeAppQuitIngress } from '#/web/app/lifecycle.ts'
 
 const INITIAL_PUBLIC_BOOTSTRAP_TIMEOUT_MS = 15_000
 

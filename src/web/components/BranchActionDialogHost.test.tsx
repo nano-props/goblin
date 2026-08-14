@@ -31,7 +31,7 @@ import {
 } from '#/web/stores/workspaces/branch-action-dialogs.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import type { VNode, VNodeChild } from 'vue'
 
 vi.mock('#/web/hooks/branchActionDispatch.ts', () => ({

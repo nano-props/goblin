@@ -8,7 +8,7 @@ import type {
 } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { getRepoOperations, getRepoPullRequests, getRepoSnapshot, getRepoWorktreeStatus } from '#/web/repos/client.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { waitForPromiseWithSignal } from '#/web/lib/abort.ts'
 import {
   repoDataQueryKey,

@@ -3,7 +3,7 @@ import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { repoPullRequestsQueryPrefix } from '#/web/repos/query-keys.ts'
 import {
   REPO_ID,

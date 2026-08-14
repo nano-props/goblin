@@ -16,7 +16,7 @@ describe('app lifecycle', () => {
   })
 
   test('marks the app as quitting and notifies listeners', async () => {
-    const { isAppQuitting, markAppQuitting, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const { isAppQuitting, markAppQuitting, subscribeAppQuitting } = await import('#/web/app/lifecycle.ts')
     const onQuit = vi.fn()
     subscribeAppQuitting(onQuit)
 
@@ -32,7 +32,7 @@ describe('app lifecycle', () => {
       nativeQuit = listener
       return () => {}
     })
-    const { startNativeAppQuitIngress, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const { startNativeAppQuitIngress, subscribeAppQuitting } = await import('#/web/app/lifecycle.ts')
     const onQuit = vi.fn()
     subscribeAppQuitting(onQuit)
     startNativeAppQuitIngress()
@@ -46,7 +46,7 @@ describe('app lifecycle', () => {
   test('notifies native only after async quit listeners finish', async () => {
     const listenerStarted = Promise.withResolvers<void>()
     const drained = Promise.withResolvers<void>()
-    const { markAppQuitting, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const { markAppQuitting, subscribeAppQuitting } = await import('#/web/app/lifecycle.ts')
     subscribeAppQuitting(async () => {
       listenerStarted.resolve()
       await drained.promise
@@ -62,7 +62,7 @@ describe('app lifecycle', () => {
   })
 
   test('notifies native with a failed result when a quit listener fails', async () => {
-    const { markAppQuitting, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const { markAppQuitting, subscribeAppQuitting } = await import('#/web/app/lifecycle.ts')
     subscribeAppQuitting(async () => {
       throw new Error('save failed')
     })
@@ -77,7 +77,7 @@ describe('app lifecycle', () => {
   test('waits for all quit listeners to settle before reporting failure', async () => {
     const slowListenerStarted = Promise.withResolvers<void>()
     const slow = Promise.withResolvers<void>()
-    const { markAppQuitting, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const { markAppQuitting, subscribeAppQuitting } = await import('#/web/app/lifecycle.ts')
     subscribeAppQuitting(async () => {
       throw new Error('save failed')
     })
@@ -104,7 +104,7 @@ describe('app lifecycle', () => {
       value: undefined,
     })
 
-    const { isAppQuitting, subscribeAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const { isAppQuitting, subscribeAppQuitting } = await import('#/web/app/lifecycle.ts')
     const onQuit = vi.fn()
     const dispose = subscribeAppQuitting(onQuit)
 

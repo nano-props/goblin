@@ -1,5 +1,5 @@
 import { computed, defineComponent, onScopeDispose, watch } from 'vue'
-import { appRealtimeClient } from '#/web/app-realtime.ts'
+import { appRealtimeClient } from '#/web/app/realtime/index.ts'
 import { readClientPageId } from '#/web/client-page-id.ts'
 import { terminalClient } from '#/web/terminal/client-facade.ts'
 import { appRuntimeProjectionLog } from '#/web/logger.ts'

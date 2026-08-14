@@ -1,4 +1,4 @@
-import { pathForDroppedFile, saveClipboardFiles } from '#/web/app-shell-client.ts'
+import { pathForDroppedFile, saveClipboardFiles } from '#/web/app/shell-client.ts'
 import {
   isTerminalPastePathSafe,
   MAX_PASTE_BATCH_BYTES,

@@ -39,7 +39,7 @@ import {
   formatTerminalFilesystemTargetKey,
   formatTerminalFilesystemTargetKeyForPath,
 } from '#/shared/terminal-filesystem-target-key.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   observedAppNavigationActionsForTest,

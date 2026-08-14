@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   saveClipboardFiles: vi.fn<(files: File[]) => Promise<string[]>>(),
 }))
 
-vi.mock('#/web/app-shell-client.ts', () => ({
+vi.mock('#/web/app/shell-client.ts', () => ({
   pathForDroppedFile: mocks.pathForDroppedFile,
   saveClipboardFiles: mocks.saveClipboardFiles,
 }))

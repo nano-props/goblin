@@ -1,7 +1,7 @@
 import { ref, toValue, watch } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { toast } from 'vue-sonner'
-import { pathForDroppedFile } from '#/web/app-shell-client.ts'
+import { pathForDroppedFile } from '#/web/app/shell-client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'

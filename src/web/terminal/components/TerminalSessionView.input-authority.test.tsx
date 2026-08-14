@@ -309,7 +309,7 @@ describe('TerminalSessionView input authority', () => {
     // blob-save backend and ultimately write nothing. We override
     // to drive the path-attempt tier and assert the resulting
     // shell-escaped writeInput call.
-    const shellClient = await import('#/web/app-shell-client.ts')
+    const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) => `/resolved/${file.name}`)
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 
@@ -523,7 +523,7 @@ describe('TerminalSessionView input authority', () => {
       subscribeSnapshot: () => () => {},
     }
 
-    const shellClient = await import('#/web/app-shell-client.ts')
+    const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockImplementation((file: File) => `/resolved/${file.name}`)
     vi.mocked(shellClient.saveClipboardFiles).mockResolvedValue([])
 

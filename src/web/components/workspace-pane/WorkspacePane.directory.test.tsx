@@ -18,7 +18,7 @@ import {
   createRepoWorktreeSnapshotForTest,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/repo-store.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import {
   getRepoSnapshotQueryData,
   setRepoSnapshotQueryData,

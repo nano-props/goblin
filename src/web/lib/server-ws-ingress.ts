@@ -16,7 +16,7 @@
 //   ~25 lines once they pick the path + parser and forward to this
 // factory.
 
-import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
+import { isAppQuitting, subscribeAppQuitting } from '#/web/app/lifecycle.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import { resolveClientServerConfig } from '#/web/lib/server-config.ts'

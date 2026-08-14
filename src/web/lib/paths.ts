@@ -1,4 +1,4 @@
-import { homeDirectory } from '#/web/app-shell-client.ts'
+import { homeDirectory } from '#/web/app/shell-client.ts'
 import {
   formatRemoteWorktreeLocator,
   formatWorkspaceDisplayLocation as formatSharedWorkspaceDisplayLocation,

@@ -1,4 +1,4 @@
-import { openExternalUrl } from '#/web/app-shell-client.ts'
+import { openExternalUrl } from '#/web/app/shell-client.ts'
 import { SERVER_REQUEST_TIMEOUT_ERROR, postServerCommandJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   CloneRepoResult,

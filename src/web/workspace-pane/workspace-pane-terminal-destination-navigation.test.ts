@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import {
   createRepoBranch,

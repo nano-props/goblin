@@ -2,7 +2,7 @@
 
 import { focusManager } from '@tanstack/query-core'
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import '#/web/app-query-client.ts'
+import '#/web/app/query-client.ts'
 
 describe('app query focus events', () => {
   afterEach(() => {

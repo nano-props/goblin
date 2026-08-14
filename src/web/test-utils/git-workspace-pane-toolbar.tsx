@@ -131,7 +131,7 @@ vi.mock('#/web/settings/runtime-external-apps.ts', () => ({
   }),
 }))
 
-vi.mock('#/web/app-shell-client.ts', () => ({
+vi.mock('#/web/app/shell-client.ts', () => ({
   openExternalUrl: hoistedAppShellMocks.openExternalUrl,
 }))
 

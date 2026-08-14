@@ -43,7 +43,7 @@ import { terminalDescriptorForTest, terminalSessionBaseForTest } from '#/web/tes
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
 import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { setRepoOperationsQueryData } from '#/web/repos/query-cache.ts'
 import { repoOperationsQueryKey, repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'

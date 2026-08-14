@@ -11,7 +11,7 @@ import type {
   TerminalResizeResult,
 } from '#/shared/terminal-types.ts'
 import { terminalClient } from '#/web/terminal/client-facade.ts'
-import { openExternalUrl } from '#/web/app-shell-client.ts'
+import { openExternalUrl } from '#/web/app/shell-client.ts'
 import { preloadTerminalFont } from '#/web/terminal/components/terminal-font.ts'
 import {
   projectTerminalStartResultForClient,

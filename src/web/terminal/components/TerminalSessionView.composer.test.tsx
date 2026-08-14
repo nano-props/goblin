@@ -424,7 +424,7 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('inserts selected file paths into the composer draft without writing directly to the terminal', async () => {
-    const shellClient = await import('#/web/app-shell-client.ts')
+    const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValueOnce('/abs/notes file.txt')
     const rendered = await renderTerminalSession()
 
@@ -455,7 +455,7 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('shows file progress while Composer resolves an uploaded file', async () => {
-    const shellClient = await import('#/web/app-shell-client.ts')
+    const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     const savedPaths = Promise.withResolvers<string[]>()
     vi.mocked(shellClient.saveClipboardFiles).mockReturnValueOnce(savedPaths.promise)
@@ -484,7 +484,7 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('keeps the composer draft and reports an oversized uploaded blob', async () => {
-    const shellClient = await import('#/web/app-shell-client.ts')
+    const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     const toast = terminalSessionViewToastForTest()
     toast.error.mockClear()
@@ -504,7 +504,7 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('keeps the composer draft when file upload fails', async () => {
-    const shellClient = await import('#/web/app-shell-client.ts')
+    const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValue('')
     vi.mocked(shellClient.saveClipboardFiles).mockRejectedValue(new Error('network down'))
     const toast = terminalSessionViewToastForTest()
@@ -526,7 +526,7 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('does not offer file upload for a remote terminal', async () => {
-    const shellClient = await import('#/web/app-shell-client.ts')
+    const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockClear()
     vi.mocked(shellClient.saveClipboardFiles).mockClear()
     const toast = terminalSessionViewToastForTest()
@@ -558,7 +558,7 @@ describe('TerminalSessionView composer', () => {
   })
 
   test.each(['paste', 'drop'] as const)('keeps terminal file %s routed to the PTY over the Composer', async (kind) => {
-    const shellClient = await import('#/web/app-shell-client.ts')
+    const shellClient = await import('#/web/app/shell-client.ts')
     vi.mocked(shellClient.pathForDroppedFile).mockReturnValueOnce('/abs/notes file.txt')
     const rendered = await renderTerminalSession()
 
@@ -598,7 +598,7 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('keeps tabular clipboard text on the native Composer paste path when a file is incidental', async () => {
-    const shellClient = await import('#/web/app-shell-client.ts')
+    const shellClient = await import('#/web/app/shell-client.ts')
     const rendered = await renderTerminalSession()
 
     try {

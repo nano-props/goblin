@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { screen } from '@testing-library/vue'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchFilterAction, CreateWorktreeRowAction } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { setRepoOperationsQueryData } from '#/web/repos/query-cache.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 

@@ -5,7 +5,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { setRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 
 const REMOTE_WORKSPACE_ID = workspaceIdForTest('goblin+file:///remote-workspace')

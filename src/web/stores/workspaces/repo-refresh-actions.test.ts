@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { repoDataQueryKey, repoOperationsQueryPrefix, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import {
   handleRepoInvalidationRefresh,

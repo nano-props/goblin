@@ -83,13 +83,13 @@ describe('app shell client', () => {
       }),
     )
 
-    const { openAppSettings } = await import('#/web/app-shell-client.ts')
+    const { openAppSettings } = await import('#/web/app/shell-client.ts')
     await expect(openAppSettings('about')).resolves.toBe(true)
     expect(openSettingsWindow).toHaveBeenCalledWith({ page: 'about' })
   })
 
   test('opens external URLs in the browser when no native host is available', async () => {
-    const { openExternalUrl } = await import('#/web/app-shell-client.ts')
+    const { openExternalUrl } = await import('#/web/app/shell-client.ts')
     await expect(openExternalUrl('https://example.com')).resolves.toEqual({ ok: true, message: 'https://example.com' })
     expect(window.open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer')
   })
@@ -100,7 +100,7 @@ describe('app shell client', () => {
     // protection). The client cannot observe the outcome, so the URL
     // handoff is treated as best-effort success.
     installWindow(null)
-    const { openExternalUrl } = await import('#/web/app-shell-client.ts')
+    const { openExternalUrl } = await import('#/web/app/shell-client.ts')
     await expect(openExternalUrl('https://example.com')).resolves.toEqual({ ok: true, message: 'https://example.com' })
     expect(window.open).toHaveBeenCalledWith('https://example.com', '_blank', 'noopener,noreferrer')
   })
@@ -120,7 +120,7 @@ describe('app shell client', () => {
       }),
     )
 
-    const { openProjectGitHub } = await import('#/web/app-shell-client.ts')
+    const { openProjectGitHub } = await import('#/web/app/shell-client.ts')
     await expect(openProjectGitHub()).resolves.toEqual({ ok: true, message: 'https://github.com/nano-props/goblin' })
     expect(hostOpenExternalUrl).toHaveBeenCalledWith({
       url: 'https://github.com/nano-props/goblin',
@@ -146,7 +146,7 @@ describe('app shell client', () => {
     )
 
     const { chooseCloneParentPath, chooseLocalWorkspacePath, hasNativeDirectoryPicker } =
-      await import('#/web/app-shell-client.ts')
+      await import('#/web/app/shell-client.ts')
     expect(hasNativeDirectoryPicker()).toBe(true)
     await expect(chooseLocalWorkspacePath()).resolves.toBe('/tmp/repo')
     await expect(chooseCloneParentPath()).resolves.toBe('/tmp')
@@ -165,7 +165,7 @@ describe('app shell client', () => {
         }),
       }),
     )
-    const { chooseCloneParentPath } = await import('#/web/app-shell-client.ts')
+    const { chooseCloneParentPath } = await import('#/web/app/shell-client.ts')
     const abortController = new AbortController()
 
     const choosing = chooseCloneParentPath({ signal: abortController.signal })
@@ -188,7 +188,7 @@ describe('app shell client', () => {
         }),
       }),
     )
-    const { chooseLocalWorkspacePath } = await import('#/web/app-shell-client.ts')
+    const { chooseLocalWorkspacePath } = await import('#/web/app/shell-client.ts')
     const abortController = new AbortController()
     abortController.abort()
 
@@ -201,7 +201,7 @@ describe('app shell client', () => {
   test('saveClipboardFiles forwards paths from the bridge', async () => {
     const bridgeModule = await import('#/web/client-bridge.ts')
     bridgeModule.setClientBridgeForTests(testBridge({ saveClipboardFiles: vi.fn(async () => ['/tmp/a', '/tmp/b']) }))
-    const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
+    const { saveClipboardFiles } = await import('#/web/app/shell-client.ts')
     const files = [new File([new Uint8Array([1])], 'a'), new File([new Uint8Array([2])], 'b')]
     await expect(saveClipboardFiles(files)).resolves.toEqual(['/tmp/a', '/tmp/b'])
   })
@@ -215,7 +215,7 @@ describe('app shell client', () => {
         }),
       }),
     )
-    const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
+    const { saveClipboardFiles } = await import('#/web/app/shell-client.ts')
     await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow('bridge unavailable')
   })
 
@@ -228,7 +228,7 @@ describe('app shell client', () => {
         }),
       }),
     )
-    const { saveClipboardFiles } = await import('#/web/app-shell-client.ts')
+    const { saveClipboardFiles } = await import('#/web/app/shell-client.ts')
     await expect(saveClipboardFiles([new File([new Uint8Array([1])], 'a')])).rejects.toThrow('async bridge failure')
   })
 })

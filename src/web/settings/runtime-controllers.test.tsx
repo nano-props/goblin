@@ -4,7 +4,7 @@ import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { CodedError } from '#/shared/coded-error.ts'
 
 const settingsActionsMocks = vi.hoisted(() => ({

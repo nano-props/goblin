@@ -8,7 +8,7 @@ import {
   createAppRealtimeWebSocketUrl,
   encodeAppRealtimeClientMessage,
   parseAppRealtimeSocketServerMessage,
-} from '#/web/app-realtime-socket-utils.ts'
+} from '#/web/app/realtime/socket-utils.ts'
 import {
   createClientRealtimeSocketConnection,
   type ClientRealtimeSocketConnection,

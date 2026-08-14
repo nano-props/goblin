@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
-import { createClientAppRealtime } from '#/web/app-realtime-client.ts'
+import { createClientAppRealtime } from '#/web/app/realtime/client.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 
 let wsMock: WebSocketMockHandle

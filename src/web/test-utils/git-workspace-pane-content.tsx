@@ -46,7 +46,7 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/work
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 
 // RTL has no reusable harness for Git content routing, query state, and terminal/filesystem contexts.

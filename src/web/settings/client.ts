@@ -1,4 +1,4 @@
-import { canUseGlobalShortcutSettings } from '#/web/app-shell-client.ts'
+import { canUseGlobalShortcutSettings } from '#/web/app/shell-client.ts'
 import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
 import { fetchServerJson, postServerCommandJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {

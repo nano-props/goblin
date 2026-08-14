@@ -1,5 +1,5 @@
 import { openRepoUrl } from '#/web/repos/client.ts'
-import { openExternalUrl } from '#/web/app-shell-client.ts'
+import { openExternalUrl } from '#/web/app/shell-client.ts'
 import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'

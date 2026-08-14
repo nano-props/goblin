@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/query-core'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import type { WorkspaceRuntimeEntry, WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import { listWorkspaceRuntimes } from '#/web/workspaces/client.ts'
 

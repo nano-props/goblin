@@ -194,7 +194,7 @@ describe('repo-client', () => {
       json: async () => ({ ok: true, message: 'ok', path: '/tmp/repo' }),
     }))
     const { cloneRepository } = await import('#/web/repos/client.ts')
-    const { hasNativeDirectoryPicker } = await import('#/web/app-shell-client.ts')
+    const { hasNativeDirectoryPicker } = await import('#/web/app/shell-client.ts')
     expect(hasNativeDirectoryPicker()).toBe(false)
     await expect(
       cloneRepository({

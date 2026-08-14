@@ -13,7 +13,7 @@ import {
   reportOpenWorkspacePostOpenEffects,
   reportOpenWorkspaceUncertainty,
 } from '#/web/lib/open-workspace-result-feedback.ts'
-import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
+import { consumeExternalOpenPaths } from '#/web/app/shell-client.ts'
 import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
 import {

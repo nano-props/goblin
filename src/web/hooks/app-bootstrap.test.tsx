@@ -26,7 +26,7 @@ import {
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { themeStore } from '#/web/stores/theme.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import type {
   ClientWorkspaceState,

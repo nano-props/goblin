@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { APP_REALTIME_WS_MESSAGE_LIMIT_BYTES } from '#/shared/app-realtime-validators.ts'
 import type { AppRealtimeClientMessage } from '#/shared/app-realtime-socket.ts'
-import { encodeAppRealtimeClientMessage } from '#/web/app-realtime-socket-utils.ts'
+import { encodeAppRealtimeClientMessage } from '#/web/app/realtime/socket-utils.ts'
 
 describe('app realtime socket encoding', () => {
   test('rejects a request whose complete encoded frame exceeds the transport limit', () => {

@@ -15,7 +15,7 @@ import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-t
 import type { RestorableWorkspaceState, WorkspaceSessionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { persistedFiletreeViewStateByFilesystemTargetByWorkspaceForSession } from '#/web/workspaces/filesystem/session-state.ts'
 import type { FiletreeInteractionSnapshot } from '#/web/stores/workspaces/filetree-interaction-state.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import {
   workspacePaneTabsByTargetFromQueryData,
   workspacePaneTabsQueryKey,

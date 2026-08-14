@@ -11,7 +11,7 @@ import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factor
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import {
   getRepoSnapshotQueryData,
   setRepoSnapshotQueryData,
