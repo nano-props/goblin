@@ -355,6 +355,64 @@ describe('workspace pane runtime tab create action', () => {
     expect(presentedTerminalSessionIds).toEqual(terminalSessionIds)
   })
 
+  test('keeps accepted queued creates but rejects presentation after the router leaves the target', async () => {
+    const terminalSessionIds = ['term-111111111111111111111', 'term-222222222222222222222']
+    const firstCommandMayFinish = Promise.withResolvers<void>()
+    const firstPresentationCommitted = Promise.withResolvers<void>()
+    let commandIndex = 0
+    terminalCreateCommandMocks.runCreateTerminalTabCommand.mockImplementation(async (commandInput) => {
+      const terminalSessionId = terminalSessionIds[commandIndex]
+      commandIndex += 1
+      if (!terminalSessionId) throw new Error('unexpected terminal create command')
+      const commit = await commandInput.commitCreatedTerminalTab(createAdmission(terminalSessionId))
+      if (terminalSessionId === terminalSessionIds[0]) {
+        firstPresentationCommitted.resolve()
+        await firstCommandMayFinish.promise
+      }
+      return {
+        ok: true,
+        terminalSessionId,
+        presentationStatus: commit.status,
+      }
+    })
+    let routerPresentsTarget = true
+    const presentationAttempts: string[] = []
+    const showCreatedTerminalTab = vi.fn(
+      async (terminalSessionId: string, _presentation: unknown, routeRequest: CreatedTerminalRouteRequest) => {
+        expect(routeRequest.routePrecondition).toEqual({ kind: 'current-workspace-target' })
+        presentationAttempts.push(terminalSessionId)
+        return routerPresentsTarget
+      },
+    )
+    const dispatches = terminalSessionIds.map(() =>
+      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+        base: BASE,
+        createTerminal: vi.fn(async () => createAdmission()),
+        openerIdentity: null,
+        showCreatedTerminalTab,
+        focusTerminal: vi.fn(),
+      }),
+    )
+
+    await firstPresentationCommitted.promise
+    routerPresentsTarget = false
+    firstCommandMayFinish.resolve()
+
+    await expect(Promise.all(dispatches)).resolves.toEqual([
+      {
+        ok: true,
+        terminalSessionId: terminalSessionIds[0],
+        presentationStatus: 'committed',
+      },
+      {
+        ok: true,
+        terminalSessionId: terminalSessionIds[1],
+        presentationStatus: 'navigation-rejected',
+      },
+    ])
+    expect(presentationAttempts).toEqual(terminalSessionIds)
+  })
+
   test('releases automatic focus when the create target is superseded', async () => {
     const heldCommand = holdTerminalCreateCommand()
     const showCreatedTerminalTab = vi.fn(() => true)
