@@ -7,7 +7,7 @@ import {
   createWorkspacePaneTabModel,
   isWorkspacePaneRuntimeTab,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,

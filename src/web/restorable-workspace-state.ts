@@ -21,7 +21,7 @@ import {
   workspacePaneTabsQueryKey,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import {
   defaultWorkspacePaneTabs,
   workspacePaneStaticTabsFromEntries,

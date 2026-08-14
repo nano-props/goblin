@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { refreshStatusLog } from '#/web/logger.ts'
-import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { REPO_ID, branch, ipcHandlers, resetRefreshTest, seedRepo } from '#/web/stores/workspaces/refresh-test-utils.ts'

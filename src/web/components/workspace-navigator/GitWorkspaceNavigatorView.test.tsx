@@ -20,11 +20,11 @@ import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
-import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { TerminalSessionReadScope } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 
 const mocks = vi.hoisted(() => ({
   dispatchShowWorkspacePaneStaticTabAction: vi.fn(),

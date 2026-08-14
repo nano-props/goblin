@@ -11,8 +11,8 @@ import {
   repoSnapshotQueryOptions,
   repoRemoteBranchesQueryOptions,
   repoWorktreeStatusQueryOptions,
-} from '#/web/repo-query-options.ts'
-import { projectRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
+} from '#/web/repos/query-options.ts'
+import { projectRepoOperationsQueryData } from '#/web/repos/query-cache.ts'
 
 export function useRepoSnapshotReadModel(
   repoRoot: MaybeRefOrGetter<WorkspaceId>,

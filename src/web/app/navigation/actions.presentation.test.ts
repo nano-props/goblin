@@ -16,9 +16,9 @@ import {
   getRepoSnapshotQueryData,
   setRepoSnapshotQueryData,
   setRepoWorktreeStatusQueryData,
-} from '#/web/repo-query-cache.ts'
+} from '#/web/repos/query-cache.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 import {
   REPO_ID,
   OTHER_WORKSPACE_ID,

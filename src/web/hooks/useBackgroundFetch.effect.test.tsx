@@ -10,13 +10,13 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 
 const mocks = vi.hoisted(() => ({
   setBackgroundSyncRepos: vi.fn(async (_targets: unknown, _signal?: AbortSignal) => {}),
 }))
 
-vi.mock('#/web/repo-client.ts', () => ({
+vi.mock('#/web/repos/client.ts', () => ({
   setBackgroundSyncRepos: mocks.setBackgroundSyncRepos,
 }))
 

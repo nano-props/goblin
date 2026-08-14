@@ -27,7 +27,7 @@ import { useRestoreWorkspaceTabsOnView } from '#/web/hooks/useRestoreWorkspaceTa
 import type { WorkspaceProjectionPromotionViewState } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
 import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
-import { invalidateRepoMetadataQueries, invalidateRepoWorktreeStatusQueries } from '#/web/repo-query-runtime.ts'
+import { invalidateRepoMetadataQueries, invalidateRepoWorktreeStatusQueries } from '#/web/repos/query-runtime.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { uiTransitionStore } from '#/web/stores/ui-transition.ts'

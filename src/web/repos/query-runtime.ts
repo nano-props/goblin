@@ -7,7 +7,7 @@ import type {
   RepoWorktreeStatusSnapshot,
 } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { getRepoOperations, getRepoPullRequests, getRepoSnapshot, getRepoWorktreeStatus } from '#/web/repo-client.ts'
+import { getRepoOperations, getRepoPullRequests, getRepoSnapshot, getRepoWorktreeStatus } from '#/web/repos/client.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { waitForPromiseWithSignal } from '#/web/lib/abort.ts'
 import {
@@ -17,7 +17,7 @@ import {
   repoPullRequestsQueryPrefix,
   repoSnapshotQueryKey,
   repoWorktreeStatusQueryKey,
-} from '#/web/repo-query-keys.ts'
+} from '#/web/repos/query-keys.ts'
 
 class StaleRepoRuntimeReadError extends Error {
   constructor() {

@@ -14,7 +14,7 @@ import { screen } from '@testing-library/vue'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchFilterAction, CreateWorktreeRowAction } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
+import { setRepoOperationsQueryData } from '#/web/repos/query-cache.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo-toolbar-actions-test-repo')

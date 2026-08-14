@@ -18,7 +18,7 @@ import type {
 } from '#/web/app/navigation/actions.ts'
 import { resolveWorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { createAppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'

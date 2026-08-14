@@ -11,7 +11,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { replaceWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-test-repo')

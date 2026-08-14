@@ -15,7 +15,7 @@ import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-targe
 import type { GitHead } from '#/shared/git-head.ts'
 import { gitHeadBranch } from '#/shared/git-head.ts'
 import type { WorkspaceRouteContext } from '#/web/app/navigation/layout-model.ts'
-import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 

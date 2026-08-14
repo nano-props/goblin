@@ -30,7 +30,7 @@ import {
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoMutationExecResult } from '#/shared/git-types.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 
 interface BranchActionDispatchContext {
   repo: BranchActionRepo

@@ -11,7 +11,7 @@ import {
   repoSnapshotQueryKey,
   repoRemoteBranchesQueryKey,
   repoWorktreeStatusQueryKey,
-} from '#/web/repo-query-keys.ts'
+} from '#/web/repos/query-keys.ts'
 import {
   fetchQueryOwnedRepoOperationsReadModel,
   fetchQueryOwnedRepoMetadataQuery,
@@ -19,8 +19,8 @@ import {
   fetchQueryOwnedRepoSnapshotReadModel,
   fetchQueryOwnedRepoWorktreeStatusReadModel,
   isStaleRepoRuntimeReadError,
-} from '#/web/repo-query-runtime.ts'
-import { getRepoLog, getRepoRemoteBranches } from '#/web/repo-client.ts'
+} from '#/web/repos/query-runtime.ts'
+import { getRepoLog, getRepoRemoteBranches } from '#/web/repos/client.ts'
 import { pullRequestCollectionCacheTtlMs } from '#/shared/pull-request-state.ts'
 
 const retryStaleRepoRuntimeRead = (_failureCount: number, error: unknown): boolean => isStaleRepoRuntimeReadError(error)

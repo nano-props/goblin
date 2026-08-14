@@ -11,7 +11,7 @@ import {
   StatusRows,
 } from '#/web/components/workspace-pane/status-ui.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import { worktreeOperationKey } from '#/web/worktree-presentation.ts'
+import { worktreeOperationKey } from '#/web/repos/worktree-presentation.ts'
 
 interface WorktreeStatusOverviewProps {
   worktree: RepoWorktreeSnapshot

@@ -23,7 +23,7 @@ import {
   getRepoSnapshotQueryData,
   setRepoSnapshotQueryData,
   setRepoWorktreeStatusQueryData,
-} from '#/web/repo-query-cache.ts'
+} from '#/web/repos/query-cache.ts'
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
@@ -37,7 +37,7 @@ import { gitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { externalAppsQueryKey } from '#/web/settings/query-cache.ts'
-import { repoLogQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoLogQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import {
   directoryWorkspaceProbe,

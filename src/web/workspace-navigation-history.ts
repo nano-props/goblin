@@ -17,7 +17,7 @@ import { consumeAppHistoryPresentationAction } from '#/web/app/navigation/histor
 import type { AppHistoryPresentationAction } from '#/web/app/navigation/history-presentation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; workspaceId: WorkspaceId }

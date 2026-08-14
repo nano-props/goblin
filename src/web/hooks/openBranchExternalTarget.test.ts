@@ -14,7 +14,7 @@ vi.mock('#/web/app-shell-client.ts', () => ({
   openExternalUrl: mocks.openExternalUrl,
 }))
 
-vi.mock('#/web/repo-client.ts', () => ({
+vi.mock('#/web/repos/client.ts', () => ({
   openRepoUrl: mocks.openRepoUrl,
 }))
 

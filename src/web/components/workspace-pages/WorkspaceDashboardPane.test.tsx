@@ -13,7 +13,7 @@ import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WorkspaceDashboardPane } from '#/web/components/workspace-pages/WorkspaceDashboardPane.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -24,7 +24,7 @@ const repoClientMocks = vi.hoisted(() => ({
   getRepoPullRequests: vi.fn(),
 }))
 
-vi.mock('#/web/repo-client.ts', () => ({
+vi.mock('#/web/repos/client.ts', () => ({
   getRepoSnapshot: repoClientMocks.getRepoSnapshot,
   getRepoWorktreeStatus: repoClientMocks.getRepoWorktreeStatus,
   getRepoPullRequests: repoClientMocks.getRepoPullRequests,

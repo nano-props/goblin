@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoPullRequestsQueryPrefix } from '#/web/repo-query-keys.ts'
+import { repoPullRequestsQueryPrefix } from '#/web/repos/query-keys.ts'
 import {
   REPO_ID,
   branch,

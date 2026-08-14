@@ -9,7 +9,7 @@ import {
   reportOpenWorkspaceUncertainty,
 } from '#/web/lib/open-workspace-result-feedback.ts'
 import { sessionLog } from '#/web/logger.ts'
-import { cloneRepository as runCloneRepository } from '#/web/repo-client.ts'
+import { cloneRepository as runCloneRepository } from '#/web/repos/client.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'

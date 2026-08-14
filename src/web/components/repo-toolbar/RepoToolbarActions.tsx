@@ -11,7 +11,7 @@ import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewM
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import { useLayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
-import { useRepoOperationsReadModel, useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
+import { useRepoOperationsReadModel, useRepoSnapshotReadModel } from '#/web/repos/queries.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { branchViewModeForWorkspace, DEFAULT_BRANCH_VIEW_MODE } from '#/web/stores/workspaces/branch-view-mode.ts'

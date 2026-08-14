@@ -10,19 +10,19 @@ import {
   getRepoOperationsQueryData,
   getRepoSnapshotQueryData,
   setRepoSnapshotQueryData,
-} from '#/web/repo-query-cache.ts'
+} from '#/web/repos/query-cache.ts'
 import {
   repoOperationsQueryKey,
   repoPullRequestsQueryKey,
   repoSnapshotQueryKey,
   repoWorktreeStatusQueryKey,
-} from '#/web/repo-query-keys.ts'
+} from '#/web/repos/query-keys.ts'
 import {
   repoOperationsQueryOptions,
   repoPullRequestsQueryOptions,
   repoSnapshotQueryOptions,
   repoWorktreeStatusQueryOptions,
-} from '#/web/repo-query-options.ts'
+} from '#/web/repos/query-options.ts'
 import {
   invalidateRepoOperationsQueries,
   invalidateRepoMetadataQueries,
@@ -33,7 +33,7 @@ import {
   fetchQueryOwnedRepoSnapshotReadModel,
   refreshActiveRepoPullRequestQueries,
   refreshRepoSnapshotReadModel,
-} from '#/web/repo-query-runtime.ts'
+} from '#/web/repos/query-runtime.ts'
 import { repoOperationsForTest, WORKSPACE_ID } from '#/web/test-utils/repo-query-runtime.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
@@ -45,7 +45,7 @@ const repoClientMocks = vi.hoisted(() => ({
   getRepoRemoteBranches: vi.fn(),
 }))
 
-vi.mock('#/web/repo-client.ts', () => repoClientMocks)
+vi.mock('#/web/repos/client.ts', () => repoClientMocks)
 
 const REMOTE = {
   remotes: [],

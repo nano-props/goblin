@@ -14,7 +14,7 @@ import {
 } from '#/web/components/terminal/terminal-session-store.ts'
 import type { ElementRef } from '#/web/components/ui/refs.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import { worktreePresentationLabel } from '#/web/worktree-presentation.ts'
+import { worktreePresentationLabel } from '#/web/repos/worktree-presentation.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { NavigatorRowActionSlot } from '#/web/components/workspace-navigator/NavigatorRowActionSlot.tsx'
 import { WorktreeActionsMenu } from '#/web/components/workspace-navigator/WorktreeActionsMenu.tsx'

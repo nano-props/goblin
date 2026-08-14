@@ -4,7 +4,7 @@ import type { AppNavigationActions, AppNavigationOptions } from '#/web/app/navig
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { workspacePaneTabTargetForPaneTarget } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'

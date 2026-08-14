@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ServerInvalidationEvent } from '#/shared/server-invalidation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { subscribeRepoReadInvalidation } from '#/web/repo-read-invalidation-ingress.ts'
+import { subscribeRepoReadInvalidation } from '#/web/repos/read-invalidation-ingress.ts'
 import { subscribeServerInvalidationIngress } from '#/web/server-invalidation-ingress.ts'
 
 const mocks = vi.hoisted(() => ({

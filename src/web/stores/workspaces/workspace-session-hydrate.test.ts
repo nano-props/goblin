@@ -6,7 +6,7 @@ import {
 } from '#/shared/remote-workspace.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import { workspaceRuntimesQueryKey } from '#/web/workspace-runtime-query.ts'
 import {

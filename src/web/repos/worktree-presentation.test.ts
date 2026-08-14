@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { GitOperation } from '#/shared/git-types.ts'
-import { worktreeOperationKey } from '#/web/worktree-presentation.ts'
+import { worktreeOperationKey } from '#/web/repos/worktree-presentation.ts'
 
 describe('worktree operation presentation', () => {
   test.each([

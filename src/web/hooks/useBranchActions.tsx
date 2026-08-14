@@ -10,7 +10,7 @@ import type { BranchSnapshotInfo } from '#/shared/git-types.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/settings.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
-import { getRepoPatch } from '#/web/repo-client.ts'
+import { getRepoPatch } from '#/web/repos/client.ts'
 import {
   openWorkspaceEditor,
   openWorkspaceInFinder,

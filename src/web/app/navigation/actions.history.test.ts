@@ -12,7 +12,7 @@ import type {
 } from '#/web/stores/workspaces/types.ts'
 import { currentAppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 import {
   REPO_ID,
   REPO_A_ID,

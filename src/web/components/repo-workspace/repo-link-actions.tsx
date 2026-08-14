@@ -1,7 +1,7 @@
 import { defineComponent, onScopeDispose } from 'vue'
 import type { HTMLAttributes, PropType } from 'vue'
 import { throttle } from 'es-toolkit'
-import { openRepoUrl } from '#/web/repo-client.ts'
+import { openRepoUrl } from '#/web/repos/client.ts'
 import { StatusLink } from '#/web/components/workspace-pane/status-ui.tsx'
 import type { Tone } from '#/web/components/workspace-pane/status-ui.tsx'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'

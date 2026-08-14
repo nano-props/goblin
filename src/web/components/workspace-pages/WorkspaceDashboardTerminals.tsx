@@ -21,10 +21,10 @@ import { useT } from '#/web/stores/i18n-vue.ts'
 import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
+import { useRepoSnapshotReadModel } from '#/web/repos/queries.ts'
 import { useWorkspacePaneTabsQuery } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { orderWorkspaceDashboardTerminals } from '#/web/components/workspace-pages/workspace-dashboard-terminal-order.ts'
-import { worktreePresentationLabel } from '#/web/worktree-presentation.ts'
+import { worktreePresentationLabel } from '#/web/repos/worktree-presentation.ts'
 import {
   gitWorktreePaneTargetLease,
   workspaceRootPaneTargetLease,

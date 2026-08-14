@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { setBackgroundSyncRepos } from '#/web/repo-client.ts'
+import { setBackgroundSyncRepos } from '#/web/repos/client.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 

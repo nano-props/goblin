@@ -25,7 +25,7 @@ import {
 } from '#/web/app/navigation/route-href.ts'
 import { appRouteHref, currentAppRouteHref, navigateAppRoute } from '#/web/app/navigation/router-location.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import {
   commitBranchWorkspacePaneRoute,

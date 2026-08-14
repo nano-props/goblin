@@ -25,7 +25,7 @@ import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspa
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import {
   gitWorktreePaneFilesystemTarget,

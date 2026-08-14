@@ -28,7 +28,7 @@ import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.t
 import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { cn } from '#/web/lib/cn.ts'
-import { useRepoRemoteBranchesQuery } from '#/web/repo-queries.ts'
+import { useRepoRemoteBranchesQuery } from '#/web/repos/queries.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import type { RepoOperationState } from '#/web/stores/workspaces/operations.ts'
 import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'

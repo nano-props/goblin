@@ -18,7 +18,7 @@ import {
   getRepoWorktreeStatusQueryData,
   setRepoSnapshotQueryData,
   setRepoWorktreeStatusQueryData,
-} from '#/web/repo-query-cache.ts'
+} from '#/web/repos/query-cache.ts'
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { GitWorkspaceClientState, WorkspaceState } from '#/web/stores/workspaces/types.ts'

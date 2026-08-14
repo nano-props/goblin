@@ -118,7 +118,7 @@ describe('repo-client', () => {
       ok: true,
       json: async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }),
     }))
-    const { openRepoUrl } = await import('#/web/repo-client.ts')
+    const { openRepoUrl } = await import('#/web/repos/client.ts')
     await expect(
       openRepoUrl(workspaceId, workspaceRuntimeId, { type: 'branch', branch: 'feature/test' }),
     ).resolves.toEqual({
@@ -167,7 +167,7 @@ describe('repo-client', () => {
       ok: true,
       json: async () => ({ ok: true, message: 'https://github.com/acme/repo/commit/abcdef1' }),
     }))
-    const { openRepoUrl } = await import('#/web/repo-client.ts')
+    const { openRepoUrl } = await import('#/web/repos/client.ts')
 
     await expect(openRepoUrl(workspaceId, workspaceRuntimeId, { type: 'commit', hash: 'abcdef1' })).resolves.toEqual({
       ok: true,
@@ -193,7 +193,7 @@ describe('repo-client', () => {
       ok: true,
       json: async () => ({ ok: true, message: 'ok', path: '/tmp/repo' }),
     }))
-    const { cloneRepository } = await import('#/web/repo-client.ts')
+    const { cloneRepository } = await import('#/web/repos/client.ts')
     const { hasNativeDirectoryPicker } = await import('#/web/app-shell-client.ts')
     expect(hasNativeDirectoryPicker()).toBe(false)
     await expect(
@@ -221,7 +221,7 @@ describe('repo-client', () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const response = { workspaceRuntimeId, status: [], loadedAt: 1_000 }
     const fetchMock = mockFetch(async () => ({ ok: true, json: async () => response }))
-    const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
+    const { getRepoWorktreeStatus } = await import('#/web/repos/client.ts')
 
     await expect(getRepoWorktreeStatus(workspaceId, workspaceRuntimeId)).resolves.toEqual(response)
     expect(fetchMock).toHaveBeenCalledWith(
@@ -241,7 +241,7 @@ describe('repo-client', () => {
       status: 400,
       json: async () => ({ ok: false, code: 'BAD_REQUEST', message: 'error.failed-read-repo' }),
     }))
-    const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
+    const { getRepoWorktreeStatus } = await import('#/web/repos/client.ts')
 
     await expect(getRepoWorktreeStatus(workspaceId, workspaceRuntimeId)).rejects.toMatchObject({
       message: 'error.failed-read-repo',
@@ -256,7 +256,7 @@ describe('repo-client', () => {
       status: 400,
       json: async () => ({ ok: false, code: 'BAD_REQUEST', message: 'error.repo-membership-changing' }),
     }))
-    const { getRepoWorktreeStatus } = await import('#/web/repo-client.ts')
+    const { getRepoWorktreeStatus } = await import('#/web/repos/client.ts')
 
     await expect(getRepoWorktreeStatus(workspaceId, workspaceRuntimeId)).rejects.toThrow(
       'error.repo-membership-changing',
@@ -275,7 +275,7 @@ describe('repo-client', () => {
       })
     })
 
-    const { fetchRepo, pullRepoBranch, pushRepoBranch } = await import('#/web/repo-client.ts')
+    const { fetchRepo, pullRepoBranch, pushRepoBranch } = await import('#/web/repos/client.ts')
     const controllers = [new AbortController(), new AbortController(), new AbortController()]
     const requests = [
       fetchRepo(workspaceId, workspaceRuntimeId, controllers[0]!.signal),
@@ -302,7 +302,7 @@ describe('repo-client', () => {
       json: async () => ({ ok: true, message: 'ok', unexpected: true }),
     }))
 
-    const { fetchRepo } = await import('#/web/repo-client.ts')
+    const { fetchRepo } = await import('#/web/repos/client.ts')
     await expect(fetchRepo(workspaceId, workspaceRuntimeId)).rejects.toThrow()
   })
 
@@ -313,7 +313,7 @@ describe('repo-client', () => {
       json: async () => ({ ok: true, message: 'created', worktreePath: '/private/tmp/repo-feature' }),
     }))
 
-    const { createRepoWorktree } = await import('#/web/repo-client.ts')
+    const { createRepoWorktree } = await import('#/web/repos/client.ts')
     await expect(
       createRepoWorktree(
         workspaceId,
@@ -338,7 +338,7 @@ describe('repo-client', () => {
       })
     })
 
-    const { cloneRepository } = await import('#/web/repo-client.ts')
+    const { cloneRepository } = await import('#/web/repos/client.ts')
     const request = cloneRepository({
       url: 'https://example.com/repo.git',
       parentPath: '/tmp',
@@ -370,7 +370,7 @@ describe('repo-client', () => {
       })
     })
 
-    const { removeRepoWorktree } = await import('#/web/repo-client.ts')
+    const { removeRepoWorktree } = await import('#/web/repos/client.ts')
     const request = removeRepoWorktree(
       workspaceId,
       'repo-runtime-test',
@@ -402,7 +402,7 @@ describe('repo-client', () => {
       })
     })
 
-    const { createRepoWorktree } = await import('#/web/repo-client.ts')
+    const { createRepoWorktree } = await import('#/web/repos/client.ts')
     const request = createRepoWorktree(
       workspaceId,
       'repo-runtime-test',
@@ -432,7 +432,7 @@ describe('repo-client', () => {
       })
     })
 
-    const { createRepoWorktree } = await import('#/web/repo-client.ts')
+    const { createRepoWorktree } = await import('#/web/repos/client.ts')
     const request = createRepoWorktree(
       workspaceId,
       'repo-runtime-test',
@@ -466,7 +466,7 @@ describe('repo-client', () => {
       })
     })
 
-    const { getRepoPatch } = await import('#/web/repo-client.ts')
+    const { getRepoPatch } = await import('#/web/repos/client.ts')
     const request = getRepoPatch(workspaceId, 'repo-runtime-test', '/tmp/repo-feature')
     const assertion = expect(request).rejects.toThrow('error.request-timeout')
 
@@ -484,7 +484,7 @@ describe('repo-client', () => {
       ok: true,
       json: async () => ({ ok: false, message: 'error.failed-read-repo' }),
     }))
-    const { getRepoLog } = await import('#/web/repo-client.ts')
+    const { getRepoLog } = await import('#/web/repos/client.ts')
     await expect(
       getRepoLog(workspaceId, 'repo-runtime-test', { kind: 'branch', branchName: 'feature/work' }),
     ).rejects.toThrow('error.failed-read-repo')

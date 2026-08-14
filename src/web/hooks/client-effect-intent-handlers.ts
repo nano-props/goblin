@@ -35,7 +35,7 @@ import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { OpenWorkspaceResult, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import {
   workspacePaneCommandCoordinates,

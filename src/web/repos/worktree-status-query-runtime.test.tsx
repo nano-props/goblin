@@ -5,21 +5,21 @@ import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { RepoWorktreeStatusSnapshot } from '#/shared/api-types.ts'
 import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
-import { getRepoWorktreeStatusQueryData, setRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
-import { repoWorktreeStatusQueryOptions } from '#/web/repo-query-options.ts'
-import { useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
+import { getRepoWorktreeStatusQueryData, setRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
+import { repoWorktreeStatusQueryOptions } from '#/web/repos/query-options.ts'
+import { useRepoWorktreeStatusReadModel } from '#/web/repos/queries.ts'
 import {
   invalidateRepoMetadataQueries,
   invalidateRepoWorktreeStatusQueries,
   refreshRepoWorktreeStatusReadModel,
-} from '#/web/repo-query-runtime.ts'
+} from '#/web/repos/query-runtime.ts'
 import { WORKSPACE_ID } from '#/web/test-utils/repo-query-runtime.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepoWorktreeStatus: vi.fn(),
 }))
 
-vi.mock('#/web/repo-client.ts', () => repoClientMocks)
+vi.mock('#/web/repos/client.ts', () => repoClientMocks)
 
 beforeEach(() => {
   repoClientMocks.getRepoWorktreeStatus.mockReset()

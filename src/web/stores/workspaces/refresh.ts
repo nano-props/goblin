@@ -1,4 +1,4 @@
-import { ensureRepoSnapshotReadModel, refreshRepoSnapshotReadModel } from '#/web/repo-query-runtime.ts'
+import { ensureRepoSnapshotReadModel, refreshRepoSnapshotReadModel } from '#/web/repos/query-runtime.ts'
 import { appendRepoEvent, errorEvent } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { resolveActionWorkspaceRuntimeId } from '#/web/stores/workspaces/refresh-state.ts'
 import { updateIfFresh } from '#/web/stores/workspaces/workspace-guards.ts'

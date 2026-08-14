@@ -15,7 +15,7 @@ import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'

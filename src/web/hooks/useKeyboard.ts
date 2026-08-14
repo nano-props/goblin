@@ -36,7 +36,7 @@ import {
 import { getClientBridge } from '#/web/client-bridge.ts'
 import { translate } from '#/web/stores/i18n-vue.ts'
 import { toast } from 'vue-sonner'
-import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import {
   workspacePaneCommandCoordinates,
   type WorkspacePaneCommandTarget,

@@ -9,7 +9,7 @@ import {
   useRepoOperationsReadModel,
   useRepoSnapshotReadModel,
   useRepoWorktreeStatusReadModel,
-} from '#/web/repo-queries.ts'
+} from '#/web/repos/queries.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import {
   EMPTY_CHECKBOXES,

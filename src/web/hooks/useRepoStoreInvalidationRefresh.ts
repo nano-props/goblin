@@ -1,5 +1,5 @@
 import { onScopeDispose } from 'vue'
-import { subscribeRepoReadInvalidation } from '#/web/repo-read-invalidation-ingress.ts'
+import { subscribeRepoReadInvalidation } from '#/web/repos/read-invalidation-ingress.ts'
 import {
   handleRepoInvalidationRefresh,
   resyncActiveRepoReadQueries,

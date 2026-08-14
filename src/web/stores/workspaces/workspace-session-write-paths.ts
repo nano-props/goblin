@@ -13,8 +13,8 @@ import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/work
 import { workspacesLog } from '#/web/logger.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { disposeRepoRuntimeReadState } from '#/web/repo-query-runtime.ts'
-import { repoDataQueryKey } from '#/web/repo-query-keys.ts'
+import { disposeRepoRuntimeReadState } from '#/web/repos/query-runtime.ts'
+import { repoDataQueryKey } from '#/web/repos/query-keys.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import type {
   CloseWorkspaceResult,

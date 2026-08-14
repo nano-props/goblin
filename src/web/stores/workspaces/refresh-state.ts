@@ -1,7 +1,7 @@
 import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import { canStartRemoteFetch } from '#/web/stores/workspaces/sync-state.ts'
 import type { WorkspaceState, WorkspacesGet } from '#/web/stores/workspaces/types.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { isGitWorkspace, type GitWorkspaceState } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 
 export function shouldAttemptFetch(repo: WorkspaceState | null | undefined, workspaceRuntimeId: string): boolean {

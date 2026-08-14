@@ -34,7 +34,7 @@ const mocks = vi.hoisted(() => ({
   toastWarning: vi.fn(),
 }))
 
-vi.mock('#/web/repo-client.ts', () => ({
+vi.mock('#/web/repos/client.ts', () => ({
   getRepoPatch: mocks.getRepoPatch,
 }))
 

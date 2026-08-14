@@ -13,7 +13,7 @@ import {
   type GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
 import { useGitWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
-import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import {
   useTerminalSessionReadContext,
@@ -68,7 +68,7 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
     },
   }),
 }))
-vi.mock('#/web/repo-client.ts', () => ({
+vi.mock('#/web/repos/client.ts', () => ({
   getRepoLog: hoistedRepoClientMocks.getRepoLog,
   openRepoUrl: hoistedRepoClientMocks.openRepoUrl,
 }))

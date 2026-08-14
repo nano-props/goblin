@@ -19,7 +19,7 @@ import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/filesystem-route-navigation-workspace')
 const WORKTREE_PATH = '/tmp/filesystem-route-navigation-worktree'

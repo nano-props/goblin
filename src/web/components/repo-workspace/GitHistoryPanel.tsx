@@ -6,7 +6,7 @@ import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { HistoryCommitGraph, HistoryCommitGraphSkeleton } from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
-import { useRepoLogQuery } from '#/web/repo-queries.ts'
+import { useRepoLogQuery } from '#/web/repos/queries.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
 interface GitHistoryPanelProps {
