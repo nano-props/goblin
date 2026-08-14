@@ -169,10 +169,10 @@ Use those distinctions to decide control first, then choose the layer.
 Prefer:
 
 - `routes/settings.ts`
-- `settings-queries.ts`
-- `settings-write-paths.ts`
-- `settings-source.ts`
-- `runtime-settings-external-apps.ts` (only if it exposes read + write)
+- `settings/queries.ts`
+- `settings/write-paths.ts`
+- `settings/source.ts`
+- `settings/runtime-external-apps.ts` (only if it exposes read + write)
 
 Avoid broad catch-all names like:
 

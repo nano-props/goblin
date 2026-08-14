@@ -1664,7 +1664,7 @@ let projectionInstance: TerminalSessionProjection | null = null
  * canonical app caller; tests inject via `setTerminalSessionProjectionForTests`.
  *
  * Mirrors the `getClientBridge()` shape at
- * `src/web/client-bridge.ts`.
+ * `src/web/bridge/client.ts`.
  */
 export function getTerminalSessionProjection(deps: TerminalSessionProjectionDeps): TerminalSessionProjection {
   if (!projectionInstance) {
@@ -1684,7 +1684,7 @@ export function getTerminalSessionProjection(deps: TerminalSessionProjectionDeps
  *    reference before clearing the session.
  *
  * Production code never calls this. Mirrors
- * `setClientBridgeForTests()` at `src/web/client-bridge.ts`.
+ * `setClientBridgeForTests()` at `src/web/bridge/client.ts`.
  */
 export function setTerminalSessionProjectionForTests(instance: TerminalSessionProjection | null): void {
   projectionInstance = instance

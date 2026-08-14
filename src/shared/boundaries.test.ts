@@ -247,19 +247,19 @@ describe('architecture boundary rules', () => {
     expect(
       checkArchitectureSources([
         {
-          relativeFilePath: '/src/web/repo-client.ts',
+          relativeFilePath: '/src/web/repos/client.ts',
           source: "await requestGoblin('repo.status', { cwd })\n",
         },
         {
-          relativeFilePath: '/src/web/repo-client.ts',
+          relativeFilePath: '/src/web/repos/client.ts',
           source: "await postServerJson('/api/repo/projection', { cwd })\n",
         },
         {
-          relativeFilePath: '/src/web/repo-client.ts',
+          relativeFilePath: '/src/web/repos/client.ts',
           source: 'await getRepoProjection(cwd)\n',
         },
         {
-          relativeFilePath: '/src/web/repo-client.ts',
+          relativeFilePath: '/src/web/repos/client.ts',
           source: 'const schema = REPO_PROCEDURE_SCHEMAS.status\n',
         },
         {
