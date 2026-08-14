@@ -64,7 +64,7 @@ export function wireAccessTokenIpc(): void {
   // Host info (home dir, platform) used to live here too under
   // `goblin:get-home-dir` / `goblin:get-platform`. They were
   // removed when host info moved to the public `/api/host`
-  // endpoint (see `#/server/modules/host-info.ts` and
+  // endpoint (see `#/server/host-info.ts` and
   // `#/web/stores/host-info.ts`); the embedded client now
   // fetches it the same way the standalone web path does.
   ipcMain.handle(GET_ACCESS_TOKEN_PROJECTION_CHANNEL, async (event): Promise<AccessTokenProjection> => {
