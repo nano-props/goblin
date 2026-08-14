@@ -1,5 +1,5 @@
 import { defineComponent } from 'vue'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
 import { FiletreeActionDialogHost } from '#/web/components/FiletreeActionDialogHost.tsx'
 import { OpenRemoteWorkspaceDialog } from '#/web/components/OpenRemoteWorkspaceDialog.tsx'

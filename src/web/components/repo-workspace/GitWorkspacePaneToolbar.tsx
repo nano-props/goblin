@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue'
 import { gitHead } from '#/shared/git-head.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type {
   CurrentGitWorkspacePanePresentation,
   GitWorkspacePaneProjection,

@@ -1,4 +1,4 @@
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'

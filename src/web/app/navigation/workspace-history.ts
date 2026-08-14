@@ -8,7 +8,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/workspaces/types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/workspaces/navigation-history-entry.ts'
-import type { BranchWorkspacePaneRouteTarget, WorkspacePaneRoute } from '#/web/App.tsx'
+import type { BranchWorkspacePaneRouteTarget, WorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import {
   workspacePaneRouteNavigationBlockedForBranch,
   workspacePaneRouteNavigationBlockedForWorktree,

@@ -1,6 +1,6 @@
 import { computed, toValue, watch } from 'vue'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
-import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/app/navigation/route-model.ts'
 import {
   reconcileWorkspacePaneRoute,
   workspacePaneRouteHistoryResolution,

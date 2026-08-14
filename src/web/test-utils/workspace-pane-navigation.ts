@@ -1,5 +1,5 @@
 import { afterEach, vi } from 'vitest'
-import type { ParsedWorkspacePaneRoute, WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute, WorkspacePaneRouteTarget } from '#/web/app/navigation/route-model.ts'
 import type { AppNavigationActions, AppNavigationOptions } from '#/web/app/navigation/actions.ts'
 import { openResolvedWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { workspacePaneTabTargetForPaneTarget } from '#/web/workspace-pane/workspace-pane-tab-target.ts'

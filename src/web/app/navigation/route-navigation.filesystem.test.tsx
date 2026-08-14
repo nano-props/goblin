@@ -19,7 +19,7 @@ import {
   worktreeSlugFromPath,
 } from '#/web/app/navigation/workspace-route-slugs.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { WorkspacePaneRouteTarget } from '#/web/app/navigation/route-model.ts'
 import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 import { appQueryClient } from '#/web/app/query-client.ts'

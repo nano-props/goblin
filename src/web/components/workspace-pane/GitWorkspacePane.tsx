@@ -17,7 +17,7 @@ import type {
   GitWorkspacePaneShell,
   WorkspacePaneRouteContext,
 } from '#/web/components/workspace-pane/workspace-pane-types.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.tsx'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'

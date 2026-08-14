@@ -3,7 +3,7 @@ import type {
   BranchWorkspacePaneRouteTarget,
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
-} from '#/web/App.tsx'
+} from '#/web/app/navigation/route-model.ts'
 
 export function workspacePaneRouteFromTargetHref(
   currentHref: string,

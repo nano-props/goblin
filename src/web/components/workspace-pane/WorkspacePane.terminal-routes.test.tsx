@@ -31,7 +31,7 @@ import {
   terminalSessionContextForTest,
 } from '#/web/test-utils/terminal-session-context.ts'
 import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
-import type { WorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   REPO_ID,

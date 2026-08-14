@@ -1,4 +1,4 @@
-import type { BranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { BranchWorkspacePaneRouteTarget } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type {
   BranchAppRouteNavigationOptions,

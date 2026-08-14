@@ -35,7 +35,7 @@ import {
   workspacePaneStaticTabEntry,
   workspacePaneRuntimeTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import {
   observedAppNavigationActionsForTest,
   workspacePaneTabModelForBranchForTest,

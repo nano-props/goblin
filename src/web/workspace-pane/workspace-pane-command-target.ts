@@ -1,5 +1,8 @@
 import type { QueryClient } from '@tanstack/query-core'
-import type { ParsedBranchWorkspacePaneRouteTarget, ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type {
+  ParsedBranchWorkspacePaneRouteTarget,
+  ParsedWorkspacePaneRoute,
+} from '#/web/app/navigation/route-model.ts'
 import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import type {
   GitWorktreePaneFilesystemTarget,

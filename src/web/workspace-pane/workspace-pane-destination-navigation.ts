@@ -1,4 +1,4 @@
-import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { WorkspacePaneRouteTarget } from '#/web/app/navigation/route-model.ts'
 import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'

@@ -3,7 +3,7 @@ import type {
   ParsedBranchWorkspacePaneRouteTarget,
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
-} from '#/web/App.tsx'
+} from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   isWorkspacePaneRuntimeTabEntry,

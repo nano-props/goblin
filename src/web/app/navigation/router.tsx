@@ -8,7 +8,11 @@ import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { createAppHistoryPresentationHistory } from '#/web/app/navigation/history-presentation.ts'
 import { App } from '#/web/App.tsx'
-import type { ParsedBranchWorkspacePaneRouteTarget, ParsedWorkspacePaneRoute, WorkspaceRouteView } from '#/web/App.tsx'
+import type {
+  ParsedBranchWorkspacePaneRouteTarget,
+  ParsedWorkspacePaneRoute,
+  WorkspaceRouteView,
+} from '#/web/app/navigation/route-model.ts'
 import { Layout } from '#/web/Layout.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'

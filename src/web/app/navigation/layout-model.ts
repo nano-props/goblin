@@ -1,5 +1,8 @@
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { ParsedBranchWorkspacePaneRouteTarget, ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type {
+  ParsedBranchWorkspacePaneRouteTarget,
+  ParsedWorkspacePaneRoute,
+} from '#/web/app/navigation/route-model.ts'
 import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
 import { returnToFromHref } from '#/web/app/navigation/route-href.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/app/navigation/workspace-history.ts'

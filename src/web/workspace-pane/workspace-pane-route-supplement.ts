@@ -1,4 +1,4 @@
-import type { BranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { BranchWorkspacePaneRouteTarget } from '#/web/app/navigation/route-model.ts'
 import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'

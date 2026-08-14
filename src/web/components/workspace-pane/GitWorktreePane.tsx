@@ -2,7 +2,7 @@ import { computed, defineComponent } from 'vue'
 import type { WorkspaceGitReadyProbeState } from '#/shared/workspace-runtime.ts'
 import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { GitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import {
   RepoReadFailureNotice,

@@ -4,7 +4,7 @@ import type {
   ParsedBranchWorkspacePaneRouteTarget,
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
-} from '#/web/App.tsx'
+} from '#/web/app/navigation/route-model.ts'
 import { appNavigationIsCurrent, appNavigationState } from '#/web/app/navigation/lifecycle.ts'
 import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { appRoutePreconditionMatches, settleOwnedAppRouteCommit } from '#/web/app/navigation/route-commit.ts'

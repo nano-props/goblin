@@ -1,6 +1,6 @@
 import { computed, defineComponent } from 'vue'
 import { runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { WorkspaceDirectoryStatus } from '#/web/components/workspace-pane/WorkspaceDirectoryStatus.tsx'

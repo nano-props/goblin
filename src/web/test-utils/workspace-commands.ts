@@ -1,6 +1,6 @@
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, vi } from 'vitest'
-import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { WorkspacePaneRouteTarget } from '#/web/app/navigation/route-model.ts'
 import {
   runCloseCurrentWorkspacePaneTabCommand as runCloseCurrentWorkspacePaneTabCommandRaw,
   runCloseWorkspacePaneTabCommand as runCloseWorkspacePaneTabCommandRaw,

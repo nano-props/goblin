@@ -6,7 +6,7 @@ import type {
   ParsedBranchWorkspacePaneRouteTarget,
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
-} from '#/web/App.tsx'
+} from '#/web/app/navigation/route-model.ts'
 import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
 import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { CloseWorkspaceResult, WorkspaceNavigationHistoryTraversal } from '#/web/stores/workspaces/types.ts'

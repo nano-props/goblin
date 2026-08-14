@@ -2,7 +2,7 @@ import { computed, defineComponent, onScopeDispose, watch } from 'vue'
 import type { FunctionalComponent, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
-import type { WorkspaceRouteView } from '#/web/App.tsx'
+import type { WorkspaceRouteView } from '#/web/app/navigation/route-model.ts'
 import { WorkspaceLayoutPane } from '#/web/components/Layout.tsx'
 import {
   GitWorkspaceNavigatorSkeleton,

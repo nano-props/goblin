@@ -13,7 +13,7 @@ import type {
   ParsedBranchWorkspacePaneRouteTarget,
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
-} from '#/web/App.tsx'
+} from '#/web/app/navigation/route-model.ts'
 import { appNavigationState } from '#/web/app/navigation/lifecycle.ts'
 import type { AppNavigationExecutionOptions, AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { runOwnedAppNavigation } from '#/web/app/navigation/route-commit.ts'

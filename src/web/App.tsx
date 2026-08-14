@@ -1,8 +1,8 @@
 import { defineComponent } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
+import type { WorkspaceRouteView } from '#/web/app/navigation/route-model.ts'
 import { EmptyWorkspaceView } from '#/web/components/EmptyWorkspaceView.tsx'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { SettingsPageScreen } from '#/web/components/SettingsPageScreen.tsx'
@@ -12,34 +12,6 @@ import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { workspaceLayoutBehavior } from '#/web/lib/workspace-layout.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-
-export type WorkspaceRouteView =
-  | { kind: 'empty'; workspaceId: WorkspaceId }
-  | { kind: 'workspace-root'; workspaceId: WorkspaceId; workspacePaneRoute: ParsedWorkspacePaneRoute | null }
-  | {
-      kind: 'worktree'
-      workspaceId: WorkspaceId
-      worktreePath: string
-      workspacePaneRoute: ParsedWorkspacePaneRoute | null
-    }
-  | { kind: 'dashboard'; workspaceId: WorkspaceId }
-  | {
-      kind: 'branch'
-      workspaceId: WorkspaceId
-      branchName: string
-      workspacePaneRoute: ParsedBranchWorkspacePaneRouteTarget
-    }
-  | { kind: 'newWorktree'; workspaceId: WorkspaceId }
-
-export type WorkspacePaneRoute =
-  { kind: 'static'; tab: WorkspacePaneStaticTabType } | { kind: 'terminal'; terminalSessionId: string }
-
-export type WorkspacePaneRouteTarget = WorkspacePaneRoute | null
-export type BranchWorkspacePaneRouteTarget = Extract<WorkspacePaneRoute, { kind: 'static' }> | null
-export type ParsedWorkspacePaneRoute = WorkspacePaneRoute | { kind: 'invalid-static'; tabKey: string }
-export type ParsedWorkspacePaneRouteTarget = ParsedWorkspacePaneRoute | null
-export type ParsedBranchWorkspacePaneRouteTarget =
-  BranchWorkspacePaneRouteTarget | Extract<ParsedWorkspacePaneRoute, { kind: 'invalid-static' }>
 
 export interface AppProps {
   routeSettingsPage?: SettingsPage | null

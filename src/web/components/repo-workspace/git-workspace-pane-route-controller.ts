@@ -5,7 +5,7 @@ import type {
   BranchWorkspacePaneRouteTarget,
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
-} from '#/web/App.tsx'
+} from '#/web/app/navigation/route-model.ts'
 import {
   useWorkspaceNavigationHistory,
   type WorkspaceNavigationRouteContext,
