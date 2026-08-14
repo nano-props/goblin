@@ -4,7 +4,7 @@ import { createServerWebSocketIngress } from '#/web/lib/server-ws-ingress.ts'
 // Shared server-owned invalidation ingress for browser and Electron
 // clients. In Electron terminology, the Electron client here is the
 // BrowserWindow renderer process. Distinct from native-host
-// ingress (`client-ingress.ts`), which is for Electron IPC-driven
+// ingress (`#/web/bridge/ingress.ts`), which is for Electron IPC-driven
 // events/intents only.
 
 function parseInvalidationMessage(data: unknown): ServerInvalidationEvent | null {

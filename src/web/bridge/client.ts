@@ -115,7 +115,7 @@ function getOrCreateRealtimeClients(): ClientServerRealtimeClients {
  *    is detected per-call, not per-bridge.
  *
  *  - The previous "two factories" model forced every call site
- *    (`app-shell-client`, `terminal`, `clipboard`) to be aware of
+ *    (`app/shell-client`, `terminal/client-facade`, `clipboard/resolver`) to be aware of
  *    the Electron vs web split. With a single bridge the split is
  *    a property of the bridge's `kind()` and `hasCapability()`
  *    results, not a fork in every call site.

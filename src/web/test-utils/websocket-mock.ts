@@ -10,7 +10,7 @@
 //     behavior tests for the repo store expect from a benign real
 //     socket.
 //   - `autoOpen: false` — the socket stays in `CONNECTING` until the
-//     test calls `emitOpen()` itself. `terminal.test.ts` uses this
+//     test calls `emitOpen()` itself. `#/web/terminal/client-facade.test.ts` uses this
 //     flavor to exercise the timeout / early-close paths.
 
 export interface MockWebSocketInstance {

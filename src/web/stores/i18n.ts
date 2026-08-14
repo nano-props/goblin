@@ -9,7 +9,7 @@
 // it with the user's preferred language. The `hydrated` flag flips
 // to true on the first successful snapshot commit.
 // I18n hydration reads the public settings transport; preference writes go
-// through settings-actions.
+// through `#/web/settings/actions.ts`.
 
 import { createStore } from 'zustand/vanilla'
 import type { StoreApi } from 'zustand/vanilla'

@@ -148,7 +148,7 @@ function seedWebBootstrap() {
   }
   // Web runtime: no `goblinNative` preload surface, no rotate
   // capability. The client falls through to the safe defaults
-  // in `client-bridge.ts`.
+  // in `#/web/bridge/client.ts`.
   delete testWindow.goblinNative
   setClientBridgeForTests({
     kind: () => 'web',

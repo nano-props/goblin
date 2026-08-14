@@ -23,7 +23,7 @@ The main collisions this spec resolves are:
 2. Prefer product meaning over implementation accidents.
    Name the business object, not the mechanism currently used to implement it.
 3. Feature first, layer second.
-   Start names with the feature, then the role: `repo-source.ts`, not `source-repo.ts`.
+   Group by feature, then name the role: `repos/source.ts`, not `source/repos.ts`.
 4. Client and server must share the same nouns.
    If the client says `RepoSnapshot`, the server should say `getRepoSnapshot`.
 5. Use explicit layer words.
@@ -53,7 +53,7 @@ If a name fails any step above, rename it before adding more code around it.
 | Electron main-process side           | `native host`          | Use `native host` in names and docs; keep `src/main/` only for alias stability. |
 | Server spawned by the native host    | `embedded server`      | Do not introduce `local server` as a competing term.                            |
 | Aggregate runtime object             | `runtime`              | Reserve for a facade that wires a feature or app runtime together.              |
-| Authoritative persistence / IO layer | `source`               | Prefer `repo-source.ts` over `repo-backend.ts`.                                 |
+| Authoritative persistence / IO layer | `source`               | Prefer `repos/source.ts` over `repos/backend.ts`.                               |
 | Outside-UI intent envelope           | `client effect intent` | Use the existing term consistently.                                             |
 
 ## State classes
@@ -139,7 +139,7 @@ Canonical examples:
 
 | Concept                     | Canonical                             | Deprecated                                       |
 | --------------------------- | ------------------------------------- | ------------------------------------------------ |
-| Authoritative repo accessor | `RepoSource` / `repo-source.ts`       | `RepoBackend` / `repo-backend.ts`                |
+| Authoritative repo accessor | `RepoSource` / `repos/source.ts`      | `RepoBackend` / `repos/backend.ts`               |
 | Snapshot read               | `getRepoSnapshot`                     | `getRepositorySnapshot`                          |
 | Status read                 | `getRepoStatus`                       | `getRepositoryStatus`                            |
 | Log read                    | `getRepoLog`                          | `getRepositoryLog`                               |

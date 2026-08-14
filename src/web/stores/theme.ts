@@ -8,7 +8,7 @@
 // still projects the server-owned preference into native host state,
 // but it is not the business source of truth.
 // Theme hydration can read the transport snapshot directly; theme writes go
-// through settings-actions.
+// through `#/web/settings/actions.ts`.
 
 import { createStore } from 'zustand/vanilla'
 import type { StoreApi } from 'zustand/vanilla'
