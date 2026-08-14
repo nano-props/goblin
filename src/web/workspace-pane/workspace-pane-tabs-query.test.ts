@@ -185,13 +185,34 @@ describe('workspace pane tabs query', () => {
 
     const committed = snapshot(9, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])])
     expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, committed, queryClient)).toBe(true)
-    await expect(refresh).resolves.toBeUndefined()
     request.reject(new Error('stale query failure'))
+    await expect(refresh).resolves.toBeUndefined()
 
     expect(queryClient.getQueryData(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))).toEqual(committed)
     expect(queryClient.getQueryState(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))?.status).toBe(
       'success',
     )
+  })
+
+  test('does not cancel a refresh that is pursuing a higher revision', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const current = snapshot(4, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])])
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)
+    const request = Promise.withResolvers<WorkspacePaneTabsSnapshot>()
+    vi.mocked(workspacePaneTabsClient.list).mockImplementationOnce(async () => await request.promise)
+    const refresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
+    await vi.waitFor(() => expect(workspacePaneTabsClient.list).toHaveBeenCalledOnce())
+
+    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)).toBe(true)
+    expect(queryClient.getQueryState(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))?.fetchStatus).toBe(
+      'fetching',
+    )
+
+    const next = snapshot(5, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])])
+    request.resolve(next)
+    await refresh
+
+    expect(queryClient.getQueryData(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))).toEqual(next)
   })
 
   test('accepts an equal revision as the canonical complete snapshot', () => {

@@ -34,9 +34,21 @@ export function workspacePaneTabsQueryKey(workspaceId: WorkspaceId, workspaceRun
 }
 
 export function workspacePaneTabsQueryOptions(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
+  const queryKey = workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId)
   return {
-    queryKey: workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
-    queryFn: async () => await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId),
+    queryKey,
+    queryFn: async ({ client }: { client: QueryClient }) => {
+      const dataUpdateCount = client.getQueryState<WorkspacePaneTabsQueryData>(queryKey)?.dataUpdateCount ?? 0
+      try {
+        return await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId)
+      } catch (error) {
+        const current = client.getQueryState<WorkspacePaneTabsQueryData>(queryKey)
+        // A full authoritative snapshot committed after this read began makes
+        // its failure stale; the cache already contains the newer projection.
+        if (current?.data !== undefined && current.dataUpdateCount !== dataUpdateCount) return current.data
+        throw error
+      }
+    },
     structuralSharing: (oldData: unknown, newData: unknown) =>
       acceptedWorkspacePaneTabsSnapshot(
         oldData as WorkspacePaneTabsSnapshot | undefined,
@@ -121,9 +133,6 @@ export function writeWorkspacePaneTabsSnapshotQueryData(
   const next = acceptedWorkspacePaneTabsSnapshot(current, snapshot)
   if (next === current) return false
 
-  // A successful authoritative write supersedes any older list request. Query
-  // cancellation is synchronous; the returned promise only observes cleanup.
-  void queryClient.cancelQueries({ queryKey, exact: true })
   queryClient.setQueryData<WorkspacePaneTabsQueryData>(queryKey, next)
   notifyWorkspacePaneTabsPersistenceChanged()
   return true
