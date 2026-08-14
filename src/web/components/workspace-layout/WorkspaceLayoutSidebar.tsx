@@ -15,7 +15,7 @@ import { TitleBarDragRegion } from '#/web/components/title-bar-chrome-region.tsx
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { WorkspaceDashboardRowAction } from '#/web/components/workspace-layout/WorkspaceDashboardRowAction.tsx'
 import { WorkspaceRefreshAction } from '#/web/components/workspace-toolbar/WorkspaceRefreshAction.tsx'
-import { useLayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
+import { useLayoutOverlayActions } from '#/web/app/layout-overlay-actions-context.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import type { GitWorkspaceClientState } from '#/web/stores/workspaces/types.ts'

@@ -14,7 +14,7 @@ import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspace
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { createAppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
-import { provideLayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
+import { provideLayoutOverlayActions } from '#/web/app/layout-overlay-actions-context.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appNavigationStoreActionsFromStore } from '#/web/stores/workspaces/selector-actions.ts'
 import { workspaceIdFromSlug } from '#/web/app/navigation/workspace-route-slugs.ts'

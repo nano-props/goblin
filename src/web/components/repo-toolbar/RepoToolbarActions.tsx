@@ -10,7 +10,7 @@ import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivity
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
 import { SidebarRowButton } from '#/web/components/ui/sidebar-row-button.tsx'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
-import { useLayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
+import { useLayoutOverlayActions } from '#/web/app/layout-overlay-actions-context.ts'
 import { useRepoOperationsReadModel, useRepoSnapshotReadModel } from '#/web/repos/queries.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
