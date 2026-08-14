@@ -151,6 +151,33 @@ describe('workspace pane tabs query', () => {
     ).toEqual({ phase: 'ready', tabs: [workspacePaneStaticTabEntry('status')] })
   })
 
+  test('does not apply defaults to a target absent from a stale failed snapshot', async () => {
+    const queryClient = new QueryClient()
+    writeWorkspacePaneTabsSnapshotQueryData(
+      REPO_ROOT,
+      WORKSPACE_RUNTIME_ID,
+      snapshot(4, [entry('feature/a', null, [workspacePaneStaticTabEntry('files')])]),
+      queryClient,
+    )
+    vi.mocked(workspacePaneTabsClient.list).mockRejectedValueOnce(new Error('tabs unavailable'))
+
+    await expect(
+      refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient }),
+    ).rejects.toThrow('tabs unavailable')
+
+    expect(
+      readWorkspacePaneTabsProjectionForTarget(
+        {
+          kind: 'git-branch',
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          branchName: 'feature/b',
+        },
+        queryClient,
+      ),
+    ).toEqual({ phase: 'failed', tabs: [] })
+  })
+
   test('normalizes the complete snapshot and keeps no-worktree targets static-only', () => {
     const queryClient = new QueryClient()
     const accepted = writeWorkspacePaneTabsSnapshotQueryData(

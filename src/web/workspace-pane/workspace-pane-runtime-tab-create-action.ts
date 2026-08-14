@@ -23,6 +23,7 @@ import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   gitWorktreePaneTargetLease,
   resolveWorkspacePaneTabTargetForPaneTarget,
+  scopeWorkspacePaneTabTargetResolutionToRuntime,
   workspaceRootPaneTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
@@ -276,16 +277,18 @@ function terminalCreateAdmission(
   if (!terminalCreateTargetIsCurrent(base)) return 'stale'
   const paneTarget = workspacePaneTabsTargetFromRuntime(base.target)
   if (!paneTarget) return 'stale'
-  const resolution = resolveWorkspacePaneTabTargetForPaneTarget({
-    paneTarget,
-    routeTarget: paneTarget,
-    workspacePaneRoute: undefined,
-  })
+  const resolution = scopeWorkspacePaneTabTargetResolutionToRuntime(
+    resolveWorkspacePaneTabTargetForPaneTarget({
+      paneTarget,
+      routeTarget: paneTarget,
+      workspacePaneRoute: undefined,
+    }),
+    base.target.workspaceRuntimeId,
+  )
   if (resolution.kind === 'missing') return 'stale'
   if (resolution.kind === 'unavailable') {
     return resolution.reason === 'workspace-pane-tabs-failed' ? 'failed' : 'pending'
   }
-  if (resolution.target.workspaceRuntimeId !== base.target.workspaceRuntimeId) return 'stale'
   return workspacePaneRuntimeTabCreateBlockingPhase(resolution.target, 'terminal') ?? 'ready'
 }
 

@@ -17,6 +17,7 @@ import {
 import { isWorkspacePaneRuntimeTabEntry, workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
 import {
   resolveWorkspacePaneTabTargetForPaneTarget,
+  scopeWorkspacePaneTabTargetResolutionToRuntime,
   workspacePaneTabTargetBlocksInteraction,
   type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
@@ -223,8 +224,8 @@ function selectableWorkspacePaneTarget(
   resolution: WorkspacePaneTabTargetResolution,
   workspaceRuntimeId: string,
 ): WorkspacePaneTabModel | null {
-  if (resolution.kind === 'missing' || resolution.target.workspaceRuntimeId !== workspaceRuntimeId) return null
-  return resolution.target
+  const scoped = scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, workspaceRuntimeId)
+  return scoped.kind === 'missing' ? null : scoped.target
 }
 
 function paneTargetPresentationBranch(

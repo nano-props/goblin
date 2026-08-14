@@ -135,6 +135,13 @@ describe('WorkspacePane terminal routes', () => {
     const retryButton = screen.getByRole('button', { name: 'workspace-pane-tabs.retry-loading' })
     await flushTestUpdates(() => retryButton.click())
     expect(retryWorkspacePaneTabsForTest).toHaveBeenCalledWith(workspaceId)
+
+    await flushTestUpdates(() => {
+      tabsQuery.setState({ ...tabsQuery.state, fetchStatus: 'fetching' })
+    })
+    expect(retryButton.getAttribute('aria-busy')).toBe('true')
+    expect((retryButton as HTMLButtonElement).disabled).toBe(true)
+    expect(retryButton.querySelector('.animate-spin')).not.toBeNull()
   })
 
   test('keeps New available while terminal projection materializes', async () => {

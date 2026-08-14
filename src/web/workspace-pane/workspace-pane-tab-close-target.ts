@@ -4,6 +4,7 @@ import type { GitHead } from '#/shared/git-head.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import {
   resolveWorkspacePaneTabTargetForPaneTarget,
+  scopeWorkspacePaneTabTargetResolutionToRuntime,
   type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
@@ -25,8 +26,7 @@ export function resolveCloseWorkspacePaneTarget(
     workspacePaneRoute,
     worktreeHead: input.worktreeHead,
   })
-  if (resolution.kind !== 'ready') return resolution
-  return resolution.target.workspaceRuntimeId === input.workspaceRuntimeId ? resolution : { kind: 'missing' }
+  return scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, input.workspaceRuntimeId)
 }
 
 export function workspacePaneTabsTargetForClose(target: WorkspacePaneTabModel): WorkspacePaneTabsTarget {

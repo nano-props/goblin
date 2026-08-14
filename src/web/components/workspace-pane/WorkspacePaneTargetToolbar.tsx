@@ -1,4 +1,5 @@
 import { RefreshCw } from '@lucide/vue'
+import { useIsFetching } from '@tanstack/vue-query'
 import { computed, defineComponent, onMounted, onScopeDispose, shallowRef } from 'vue'
 import type { FunctionalComponent, PropType } from 'vue'
 import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
@@ -48,6 +49,7 @@ import type {
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
+import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import type { WorkspacePaneTabsReorderMutationInput } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 
 interface WorkspacePaneTargetToolbarProps {
@@ -125,6 +127,12 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
     const compact = useIsCompactUi()
     const navigation = useAppNavigation()
     const tabsRetry = useWorkspacePaneTabsRetryActions()
+    const tabsFetchCount = useIsFetching(
+      computed(() => ({
+        queryKey: workspacePaneTabsQueryKey(props.target.workspaceId, props.target.workspaceRuntimeId),
+        exact: true,
+      })),
+    )
     const { scrollToBottom } = useTerminalSessionContext()
     const routeTarget = computed(() => requiredWorkspacePaneModelTarget(props.model.routeTarget, 'route'))
     const persistenceTarget = computed(() => requiredWorkspacePaneModelTarget(props.model.paneTarget, 'persistence'))
@@ -221,6 +229,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       const filesystemTarget = props.target.kind === 'git-branch' ? null : props.target
       const showExternalAppLauncher = !compact.value && filesystemTarget !== null && props.externalAppItems.length > 0
       const retryTabsLabel = t('workspace-pane-tabs.retry-loading')
+      const tabsRetrying = tabsFetchCount.value > 0
       const retryTabsAction =
         props.model.tabEntriesProjectionPhase === 'failed' ? (
           <Tip label={retryTabsLabel}>
@@ -228,9 +237,11 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
               variant="ghost"
               size="icon"
               aria-label={retryTabsLabel}
+              aria-busy={tabsRetrying || undefined}
+              disabled={tabsRetrying}
               onClick={() => tabsRetry.retryWorkspace(props.target.workspaceId)}
             >
-              <RefreshCw aria-hidden="true" />
+              <RefreshCw aria-hidden="true" class={tabsRetrying ? 'animate-spin' : undefined} />
             </Button>
           </Tip>
         ) : null

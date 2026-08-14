@@ -79,10 +79,7 @@ export function readWorkspacePaneTabsForTarget(
   target: WorkspacePaneTabsReadTarget & { workspaceRuntimeId: string },
   queryClient: QueryClient = appQueryClient,
 ): WorkspacePaneTabEntry[] {
-  const snapshot = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(target.workspaceId, target.workspaceRuntimeId),
-  )
-  return snapshot ? workspacePaneTabsForTargetFromQueryData(snapshot, target) : []
+  return readWorkspacePaneTabsProjectionForTarget(target, queryClient).tabs
 }
 
 export function readWorkspacePaneTabsProjectionForTarget(
@@ -92,20 +89,23 @@ export function readWorkspacePaneTabsProjectionForTarget(
   const state = queryClient.getQueryState<WorkspacePaneTabsQueryData>(
     workspacePaneTabsQueryKey(target.workspaceId, target.workspaceRuntimeId),
   )
-  if (state?.status === 'error') {
-    return {
-      phase: 'failed',
-      tabs: state.data ? workspacePaneTabsForTargetFromQueryData(state.data, target) : [],
-    }
-  }
-  if (state?.status !== 'success') return { phase: 'pending', tabs: [] }
-  return {
-    phase: 'ready',
-    tabs: state.data ? workspacePaneTabsForTargetFromQueryData(state.data, target) : [],
-  }
+  const phase = state?.status === 'success' ? 'ready' : state?.status === 'error' ? 'failed' : 'pending'
+  return projectWorkspacePaneTabsForTarget(state?.data, phase, target)
 }
 
-export function workspacePaneTabsForTargetFromQueryData(
+export function projectWorkspacePaneTabsForTarget(
+  data: WorkspacePaneTabsSnapshot | undefined,
+  phase: WorkspacePaneTabsProjectionPhase,
+  target: WorkspacePaneTabsReadTarget,
+): WorkspacePaneTabsTargetProjection {
+  if (target.kind === 'inactive' || !data) return { phase, tabs: [] }
+  const entry = workspacePaneTabsEntryForTarget(data.entries, target)
+  if (entry) return { phase, tabs: [...entry.tabs] }
+  return { phase, tabs: phase === 'ready' ? defaultWorkspacePaneTabs() : [] }
+}
+
+/** Projects a complete successful snapshot; an absent target receives the protocol defaults. */
+export function workspacePaneTabsForTargetFromSnapshot(
   data: WorkspacePaneTabsSnapshot,
   target: WorkspacePaneTabsReadTarget,
 ): WorkspacePaneTabEntry[] {

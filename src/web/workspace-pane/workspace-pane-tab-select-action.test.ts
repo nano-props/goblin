@@ -34,7 +34,10 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { failWorkspacePaneTabsQueryForTest } from '#/web/test-utils/workspace-pane-tabs.ts'
+import {
+  failWorkspacePaneTabsQueryForTest,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-select-repo')
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-select-worktree'
@@ -77,6 +80,28 @@ describe('workspace pane tab select action', () => {
       branchSnapshots: [createBranchSnapshot('feature/worktree')],
       worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
       currentBranchName: 'feature/worktree',
+    })
+    const navigation = navigationWith()
+    await failWorkspacePaneTabsQueryForTest(REPO_ID, repo.workspaceRuntimeId)
+
+    await expect(selectTab('workspace-pane:status', navigation)).resolves.toBe(false)
+
+    expect(navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+  })
+
+  test('does not select defaults for a target absent from a stale failed snapshot', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
+      currentBranchName: 'feature/worktree',
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      branchName: 'feature/other',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('status')],
     })
     const navigation = navigationWith()
     await failWorkspacePaneTabsQueryForTest(REPO_ID, repo.workspaceRuntimeId)

@@ -739,6 +739,54 @@ describe('workspace pane runtime tab command actions', () => {
     )
   })
 
+  test('primary terminal command does not cross a replaced runtime while waiting in the target queue', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const scenario = terminalCommandScenario([terminalSessionId], terminalSessionId)
+    const coordinatorStarted = Promise.withResolvers<void>()
+    const releaseCoordinator = Promise.withResolvers<void>()
+    const coordinatorBlocker = runWorkspacePaneAction(
+      {
+        kind: 'git-worktree',
+        workspaceId: terminalCoordinates.workspaceId,
+        workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
+        worktreePath: terminalExecutionPath(terminalBase.target),
+      },
+      async () => {
+        coordinatorStarted.resolve()
+        await releaseCoordinator.promise
+      },
+    )
+    await coordinatorStarted.promise
+
+    const action = dispatchTerminalRuntimePrimaryAction(scenario.options)
+    const replacementRuntimeId = 'repo-runtime-replaced'
+    workspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [scenario.repo.id]: {
+          ...state.workspaces[scenario.repo.id]!,
+          workspaceRuntimeId: replacementRuntimeId,
+        },
+      },
+    }))
+    setWorkspacePaneTabsForTargetQueryData({
+      ...terminalPaneTarget,
+      workspaceRuntimeId: replacementRuntimeId,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+    })
+    await failWorkspacePaneTabsQueryForTest(terminalCoordinates.workspaceId, replacementRuntimeId)
+    releaseCoordinator.resolve()
+    await coordinatorBlocker
+
+    try {
+      await expect(action).resolves.toBe(false)
+    } finally {
+      scenario.resetBridge()
+    }
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
+  })
+
   test('primary terminal command rejects placeholder selection while terminal creation is pending', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const scenario = terminalCommandScenario([terminalSessionId], null, true)

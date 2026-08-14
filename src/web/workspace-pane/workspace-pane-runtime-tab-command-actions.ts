@@ -29,6 +29,7 @@ import {
   gitWorktreePaneTargetLease,
   resolveWorkspacePaneTabTargetForPaneTarget,
   workspaceRootPaneTargetLease,
+  scopeWorkspacePaneTabTargetResolutionToRuntime,
   type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
@@ -95,9 +96,7 @@ function resolveExistingTerminalTabTarget(
     workspacePaneRoute,
     worktreeHead: filesystemTarget.kind === 'git-worktree' ? filesystemTarget.head : undefined,
   })
-  return resolution.kind !== 'ready' || resolution.target.workspaceRuntimeId === filesystemTarget.workspaceRuntimeId
-    ? resolution
-    : { kind: 'missing' }
+  return scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, filesystemTarget.workspaceRuntimeId)
 }
 
 const WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE: Record<

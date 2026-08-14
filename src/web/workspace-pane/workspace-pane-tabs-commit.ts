@@ -11,7 +11,7 @@ import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-gua
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
   readWorkspacePaneTabsForTarget,
-  workspacePaneTabsForTargetFromQueryData,
+  workspacePaneTabsForTargetFromSnapshot,
   writeWorkspacePaneTabsSnapshotQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
@@ -201,7 +201,7 @@ export function workspacePaneTabsAfterSnapshotCommit(
 ): WorkspacePaneTabEntry[] | null {
   if (commit === 'scope-rejected') return null
   return commit === 'applied'
-    ? workspacePaneTabsForTargetFromQueryData(snapshot, target)
+    ? workspacePaneTabsForTargetFromSnapshot(snapshot, target)
     : readWorkspacePaneTabsForTarget(target, queryClient)
 }
 
