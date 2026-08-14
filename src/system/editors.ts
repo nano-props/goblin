@@ -41,11 +41,11 @@
 //      — it is a hand-written `v.picklist`, NOT auto-derived from the
 //      type alias, so the two will drift if you only update one.
 //   5. Add `'editor:webstorm'` to `WORKSPACE_EXTERNAL_APP_IDS` in
-//      `src/shared/repo-settings.ts`. The compile-time guard in
-//      `src/web/external-workspace-apps.tsx` will reject the build
+//      `src/shared/workspace-settings.ts`. The compile-time guard in
+//      `src/web/external-apps/catalog.tsx` will reject the build
 //      if you skip this step — that's by design.
 //   6. Append a new entry to `WORKSPACE_EXTERNAL_EDITOR_APPS` in
-//      `src/web/external-workspace-apps.tsx`. (The same compile-time
+//      `src/web/external-apps/catalog.tsx`. (The same compile-time
 //      guard also catches a mismatch in the other direction — if you
 //      add the id here without registering it in step 5, the build
 //      fails.)
