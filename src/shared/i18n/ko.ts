@@ -392,8 +392,6 @@ export const ko: Record<DictKey, string> = {
   'terminal.loading': '터미널 불러오는 중…',
   'terminal.retry-loading': '터미널 불러오기 다시 시도',
   'terminal.load-failed': '터미널을 불러오지 못했습니다',
-  'terminal.workspace-state-inconsistent':
-    '워크스페이스 탭과 터미널 상태가 일치하지 않습니다. 계속하기 전에 페이지를 새로 고침하세요.',
   'terminal.loading-tab': '터미널 불러오는 중…',
   'terminal.load-tab-failed': '터미널을 불러오지 못했습니다',
   'terminal.restarting': '터미널 다시 시작 중…',
@@ -411,8 +409,6 @@ export const ko: Record<DictKey, string> = {
   'terminal.new-disabled-loading': '터미널 로딩이 완료될 때까지 기다려 주세요',
   'terminal.new-disabled-load-failed': '새 터미널을 만들기 전에 터미널 로딩을 다시 시도해 주세요',
   'terminal.new-disabled-tabs-load-failed': '새 터미널을 만들기 전에 탭 불러오기를 다시 시도해 주세요',
-  'terminal.new-disabled-state-inconsistent':
-    '워크스페이스 탭과 터미널 상태가 일치하지 않습니다. 새 터미널을 만들기 전에 페이지를 새로 고침하세요.',
   'terminal.close': '터미널 닫기',
   'terminal.close-named': '터미널 {name} 닫기',
   'terminal.confirm-close-running-title': '실행 중인 터미널을 닫을까요?',
@@ -653,8 +649,6 @@ export const ko: Record<DictKey, string> = {
   'error.terminal-create-failed': '터미널을 만들 수 없습니다',
   'error.terminal-create-blocked-loading': '워크스페이스 탭과 터미널 로딩이 완료된 후 다시 시도해 주세요.',
   'error.terminal-create-blocked-load-failed': '실패한 탭 또는 터미널 불러오기를 다시 시도한 후 다시 시도해 주세요.',
-  'error.workspace-pane-state-inconsistent':
-    '워크스페이스 탭과 터미널 상태가 일치하지 않습니다. 계속하기 전에 페이지를 새로 고침하세요.',
   'error.workspace-tabs-close-blocked-loading': '터미널 로딩이 완료된 후 닫아 주세요.',
   'error.workspace-tabs-close-blocked-load-failed': '터미널 불러오기를 다시 시도한 후 닫아 주세요.',
   'error.terminal-session-limit-reached': '전역 터미널 한도 1,024개에 도달했습니다. 터미널을 닫고 다시 시도하세요.',

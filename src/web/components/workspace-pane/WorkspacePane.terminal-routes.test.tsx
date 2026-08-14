@@ -194,12 +194,15 @@ describe('WorkspacePane terminal routes', () => {
     terminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
     await waitFor(() => {
       expect(screen.queryByRole('tab', { name: 'terminal.load-tab-failed' })).toBeNull()
-      expect(screen.getByRole('tab', { name: 'terminal.workspace-state-inconsistent' })).toBeTruthy()
+      expect(screen.getByRole('tab', { name: 'terminal.loading-tab' })).toBeTruthy()
       const blockedNewTerminal = screen.getByRole('button', { name: 'terminal.new' })
       expect(blockedNewTerminal.getAttribute('aria-disabled')).toBe('true')
-      expect(blockedNewTerminal.getAttribute('title')).toBe('terminal.new-disabled-state-inconsistent')
+      expect(blockedNewTerminal.getAttribute('title')).toBe('terminal.new-disabled-loading')
       expect(screen.queryByRole('button', { name: 'terminal.retry-loading' })).toBeNull()
-      expect(screen.getByRole('alert').textContent).toContain('terminal.workspace-state-inconsistent')
+      expect(screen.queryByRole('alert')).toBeNull()
+      expect(document.body.querySelector('.goblin-terminal-session__status-overlay')?.textContent).toContain(
+        'terminal.loading',
+      )
     })
 
     setWorkspacePaneTabsForTargetQueryData({

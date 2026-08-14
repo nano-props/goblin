@@ -23,8 +23,7 @@ import { terminalGitWorktreePresentation, type TerminalSessionBase } from '#/sha
 import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
 import type {
   WorkspacePaneRuntimeProjectionPhase,
-  WorkspacePaneRuntimeTabProjectionPhase,
-  WorkspacePaneRuntimeTabUnreadyProjectionPhase,
+  WorkspacePaneRuntimeUnreadyProjectionPhase,
 } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 import type {
   WorkspacePaneRuntimeTabSummary,
@@ -82,7 +81,7 @@ export interface WorkspacePaneRuntimePlaceholderTab extends WorkspacePaneTabBase
   runtimeType: WorkspacePaneRuntimeTabType
   sessionId: string
   tabEntry: WorkspacePaneRuntimeTabEntry
-  projectionPhase: WorkspacePaneRuntimeTabUnreadyProjectionPhase
+  projectionPhase: WorkspacePaneRuntimeUnreadyProjectionPhase
   view: null
 }
 
@@ -103,7 +102,7 @@ export type WorkspacePaneTab = WorkspacePaneSelectableTab | WorkspacePanePending
 export interface WorkspacePaneRuntimeTabState {
   type: WorkspacePaneRuntimeTabType
   createPending: boolean
-  projectionPhase: WorkspacePaneRuntimeTabProjectionPhase
+  projectionPhase: WorkspacePaneRuntimeProjectionPhase
   projectionErrorMessage?: string
   selectedSessionId: string | null
 }
@@ -347,7 +346,7 @@ function runtimeWorkspacePaneTab(view: WorkspacePaneRuntimeTabSummary): Workspac
 
 function runtimePlaceholderWorkspacePaneTab(
   entry: WorkspacePaneRuntimeTabEntry,
-  projectionPhase: WorkspacePaneRuntimeTabUnreadyProjectionPhase,
+  projectionPhase: WorkspacePaneRuntimeUnreadyProjectionPhase,
 ): WorkspacePaneRuntimePlaceholderTab {
   return {
     identity: runtimeTabEntryIdentity(entry),
@@ -417,7 +416,7 @@ export function workspacePaneTabModelBlocksTabInteraction(
 export function workspacePaneRuntimeMaterializationPhase(
   tabs: readonly WorkspacePaneTab[],
   runtimeType: WorkspacePaneRuntimeTabType,
-): WorkspacePaneRuntimeTabUnreadyProjectionPhase | null {
+): WorkspacePaneRuntimeUnreadyProjectionPhase | null {
   for (const tab of tabs) {
     if (tab.kind === 'runtime-placeholder' && tab.runtimeType === runtimeType) return tab.projectionPhase
   }
@@ -427,7 +426,7 @@ export function workspacePaneRuntimeMaterializationPhase(
 export function workspacePaneRuntimeTabCreateBlockingPhase(
   model: WorkspacePaneTabModel,
   runtimeType: WorkspacePaneRuntimeTabType,
-): WorkspacePaneRuntimeTabUnreadyProjectionPhase | null {
+): WorkspacePaneRuntimeUnreadyProjectionPhase | null {
   if (model.tabEntriesProjectionPhase !== 'ready') return model.tabEntriesProjectionPhase
   return workspacePaneRuntimeMaterializationPhase(model.tabs, runtimeType)
 }
@@ -573,8 +572,7 @@ function runtimeTabStateByTypeFromInput(
   const runtimeTabStateByType: Partial<WorkspacePaneRuntimeTabStateByType> = {}
   for (const type of WORKSPACE_PANE_RUNTIME_TAB_TYPES) {
     const state = input.runtimeTabStateByType[type]
-    const projectionPhase: WorkspacePaneRuntimeTabProjectionPhase =
-      (input.tabEntriesProjectionPhase ?? 'ready') === 'ready' &&
+    const projectionPhase =
       state?.projectionPhase === 'ready' &&
       tabEntries.some(
         (entry) =>
@@ -582,7 +580,7 @@ function runtimeTabStateByTypeFromInput(
           entry.type === type &&
           !runtimeViewIdentities.has(runtimeTabEntryIdentity(entry)),
       )
-        ? 'inconsistent'
+        ? 'pending'
         : (state?.projectionPhase ?? 'pending')
     runtimeTabStateByType[type] = {
       type,

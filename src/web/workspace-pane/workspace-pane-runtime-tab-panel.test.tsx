@@ -34,7 +34,6 @@ interface CapturedTerminalSessionViewProps {
   selectedTerminalSessionId?: string | null
   projectionPhase?: string
   projectionErrorMessage?: string
-  projectionFailureLabel?: string
   retryProjection?: () => void
   createTerminalForSlot?: (base: TerminalSessionBase) => Promise<unknown>
 }
@@ -185,20 +184,10 @@ describe('workspace pane runtime tab panel', () => {
     expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
-  test('surfaces an inconsistent projection without offering a terminal retry', () => {
-    const { retryWorkspace } = renderPanel({ projectionPhase: 'inconsistent' })
-
-    expect(terminalSessionViewMocks.props[0]).toMatchObject({
-      projectionPhase: 'failed',
-      projectionFailureLabel: 'terminal.workspace-state-inconsistent',
-      retryProjection: undefined,
-    })
-    expect(retryWorkspace).not.toHaveBeenCalled()
-  })
 })
 
 function renderPanel(
-  input: { terminalContext?: TerminalSessionContextValue; projectionPhase?: 'failed' | 'inconsistent' } = {},
+  input: { terminalContext?: TerminalSessionContextValue; projectionPhase?: 'failed' } = {},
 ) {
   const navigation = navigationWith()
   const retryWorkspace = vi.fn()

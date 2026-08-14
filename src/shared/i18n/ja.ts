@@ -402,8 +402,6 @@ export const ja: Record<DictKey, string> = {
   'terminal.loading': 'ターミナルを読み込み中…',
   'terminal.retry-loading': 'ターミナルの読み込みを再試行',
   'terminal.load-failed': 'ターミナルを読み込めませんでした',
-  'terminal.workspace-state-inconsistent':
-    'ワークスペースのタブとターミナルの状態が一致していません。続行する前にページを再読み込みしてください。',
   'terminal.loading-tab': 'ターミナルを読み込み中…',
   'terminal.load-tab-failed': 'ターミナルを読み込めませんでした',
   'terminal.restarting': 'ターミナルを再起動しています…',
@@ -421,8 +419,6 @@ export const ja: Record<DictKey, string> = {
   'terminal.new-disabled-loading': 'ターミナルの読み込みが完了するまでお待ちください',
   'terminal.new-disabled-load-failed': '新規作成の前にターミナルの読み込みを再試行してください',
   'terminal.new-disabled-tabs-load-failed': '新しいターミナルを作成する前にタブの読み込みを再試行してください',
-  'terminal.new-disabled-state-inconsistent':
-    'ワークスペースのタブとターミナルの状態が一致していません。新しいターミナルを作成する前にページを再読み込みしてください。',
   'terminal.close': 'ターミナルを閉じる',
   'terminal.close-named': 'ターミナル {name} を閉じる',
   'terminal.confirm-close-running-title': '実行中のターミナルを閉じますか？',
@@ -666,8 +662,6 @@ export const ja: Record<DictKey, string> = {
   'error.terminal-create-failed': 'ターミナルを作成できませんでした',
   'error.terminal-create-blocked-loading': 'ワークスペースのタブとターミナルの読み込みが完了してから、もう一度お試しください。',
   'error.terminal-create-blocked-load-failed': '失敗したタブまたはターミナルの読み込みを再試行してから、もう一度お試しください。',
-  'error.workspace-pane-state-inconsistent':
-    'ワークスペースのタブとターミナルの状態が一致していません。続行する前にページを再読み込みしてください。',
   'error.workspace-tabs-close-blocked-loading': 'ターミナルの読み込みが完了してから閉じてください。',
   'error.workspace-tabs-close-blocked-load-failed': 'ターミナルの読み込みを再試行してから閉じてください。',
   'error.terminal-session-limit-reached':

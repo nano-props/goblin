@@ -151,7 +151,7 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('leaves an inconsistent settled terminal route unverified', () => {
+  test('waits for a canonical terminal view to catch up to its tab entry', () => {
     const terminalSessionId = 'term-111111111111111111111'
     const model = createBranchWorkspacePaneTabModel({
       workspaceId: REPO_ID,
@@ -168,8 +168,8 @@ describe('workspace pane route reconciliation', () => {
       requestedSessionIdByRuntimeType: { terminal: terminalSessionId },
     })
 
-    expect(model.runtimeTabStateByType.terminal.projectionPhase).toBe('inconsistent')
-    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId }, model)).toEqual({ kind: 'unverified' })
+    expect(model.runtimeTabStateByType.terminal.projectionPhase).toBe('pending')
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId }, model)).toEqual({ kind: 'pending' })
   })
 
   test('waits for tab entries before validating a routed static tab', () => {

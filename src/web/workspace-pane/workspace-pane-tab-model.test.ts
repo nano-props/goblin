@@ -547,7 +547,7 @@ describe('repo workspace pane tab model', () => {
     },
   )
 
-  test('fails fast when settled workspace tabs and runtime projections disagree', () => {
+  test('keeps a canonical runtime tab materializing while its view catches up', () => {
     const model = createModel({
       workspaceId: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -564,7 +564,7 @@ describe('repo workspace pane tab model', () => {
       ['workspace-pane:status', 'static'],
       ['terminal:term-111111111111111111111', 'runtime-placeholder'],
     ])
-    expect(model.runtimeTabStateByType.terminal.projectionPhase).toBe('inconsistent')
+    expect(model.runtimeTabStateByType.terminal.projectionPhase).toBe('pending')
   })
 
   test('falls back to the first materialized tab when the preferred worktree static tab is not open', () => {

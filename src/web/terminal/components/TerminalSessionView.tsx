@@ -55,7 +55,6 @@ interface TerminalSessionViewProps {
   selectedTerminalSessionId?: string | null
   projectionPhase?: TerminalProjectionHydrationPhase
   projectionErrorMessage?: string
-  projectionFailureLabel?: string
   retryProjection?: () => void
   createTerminalForSlot: (base: TerminalSessionBase) => Promise<unknown>
 }
@@ -71,7 +70,6 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
     'selectedTerminalSessionId',
     'projectionPhase',
     'projectionErrorMessage',
-    'projectionFailureLabel',
     'retryProjection',
     'createTerminalForSlot',
   ],
@@ -498,11 +496,9 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
       } else if (presentationRecovery === 'pending') {
         statusOverlayLabel = t('terminal.restoring')
       }
-      const projectionFailureLabel =
-        props.projectionFailureLabel ??
-        (props.projectionErrorMessage
-          ? `${t('terminal.load-failed')} (${props.projectionErrorMessage})`
-          : t('terminal.load-failed'))
+      const projectionFailureLabel = props.projectionErrorMessage
+        ? `${t('terminal.load-failed')} (${props.projectionErrorMessage})`
+        : t('terminal.load-failed')
 
       return (
         <div

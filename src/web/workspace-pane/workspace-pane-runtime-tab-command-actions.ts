@@ -18,6 +18,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.
 import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
 import type { FilesystemWorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { selectWorkspacePaneControllerTab } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import {
   workspacePaneActionTargetFromCoordinates,
   runWorkspacePaneAction,
@@ -122,7 +123,20 @@ export async function dispatchTerminalRuntimePrimaryAction(
   if (resolution.kind !== 'ready') return false
   const target = resolution.target
   const placeholderTab = terminalPlaceholderForEmptyProjection(target)
-  if (placeholderTab) return await selectWorkspacePaneControllerTab(target, placeholderTab, options.navigation)
+  if (placeholderTab) {
+    const routeTarget = workspacePaneTabsTargetForFilesystemTarget(options.target.filesystemTarget)
+    return await dispatchSelectWorkspacePaneTabByIdentityAction({
+      workspaceId: currentWorkspaceId,
+      workspaceRuntimeId: options.target.filesystemTarget.workspaceRuntimeId,
+      workspacePaneRoute: options.target.workspacePaneRoute,
+      routeTarget,
+      paneTarget: routeTarget,
+      worktreeHead:
+        options.target.filesystemTarget.kind === 'git-worktree' ? options.target.filesystemTarget.head : undefined,
+      identity: placeholderTab.identity,
+      navigation: options.navigation,
+    })
+  }
   const context = terminalRuntimeTabActionContext(options)
   return await runWorkspacePaneRuntimePrimaryAction('terminal', context)
 }

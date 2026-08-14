@@ -474,7 +474,11 @@ describe('server terminal runtime sessions', () => {
         sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
       ).toBe(true)
     })
-    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
+    const messages = sentSocketMessages(socket)
+    expect(messages.filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
+    expect(messages.findIndex((message) => message.type === 'sessions-changed')).toBeLessThan(
+      messages.findIndex((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+    )
     await expect(
       requestWorkspacePaneTabs(
         host,

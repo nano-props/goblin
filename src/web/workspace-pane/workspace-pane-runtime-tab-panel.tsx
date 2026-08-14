@@ -13,14 +13,11 @@ import {
   dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
   showCreatedTerminalWorkspacePaneRuntimeTab,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import type {
-  WorkspacePaneRuntimeProjectionPhase,
-  WorkspacePaneRuntimeTabProjectionPhase,
-} from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 
 export interface WorkspacePaneRuntimeTabPanelState {
-  projectionPhase: WorkspacePaneRuntimeTabProjectionPhase
+  projectionPhase: WorkspacePaneRuntimeProjectionPhase
   projectionErrorMessage?: string
 }
 
@@ -92,19 +89,14 @@ const TerminalWorkspacePaneRuntimeTabPanel = defineComponent<WorkspacePaneRuntim
             ? { target: runtimeTarget, presentation }
             : null
       if (!base) return null
-      const inconsistent = props.runtimeState.projectionPhase === 'inconsistent'
-      const terminalProjectionPhase = terminalSessionProjectionPhase(props.runtimeState.projectionPhase)
       return (
         <WorkspacePanePanelFrame id={`${props.workspacePaneId}-terminal-panel`} {...props.panelLabel}>
           <TerminalSessionView
             base={base}
             selectedTerminalSessionId={props.selectedSessionId}
-            projectionPhase={terminalProjectionPhase}
+            projectionPhase={props.runtimeState.projectionPhase}
             projectionErrorMessage={props.runtimeState.projectionErrorMessage}
-            projectionFailureLabel={inconsistent ? t('terminal.workspace-state-inconsistent') : undefined}
-            retryProjection={
-              inconsistent ? undefined : () => projectionRecovery.retryWorkspace(base.target.workspaceId)
-            }
+            retryProjection={() => projectionRecovery.retryWorkspace(base.target.workspaceId)}
             createTerminalForSlot={createTerminalForSlot}
           />
         </WorkspacePanePanelFrame>
@@ -112,12 +104,6 @@ const TerminalWorkspacePaneRuntimeTabPanel = defineComponent<WorkspacePaneRuntim
     }
   },
 })
-
-function terminalSessionProjectionPhase(
-  phase: WorkspacePaneRuntimeTabProjectionPhase,
-): WorkspacePaneRuntimeProjectionPhase {
-  return phase === 'inconsistent' ? 'failed' : phase
-}
 
 export function renderWorkspacePaneRuntimeTabPanel(input: WorkspacePaneRuntimeTabPanelRenderInput): VNodeChild {
   return (

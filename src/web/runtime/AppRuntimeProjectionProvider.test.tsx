@@ -307,6 +307,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
   test('recovers a catalog gap that an origin partial effect cannot cover', async () => {
     const repo = seedCurrentRepo()
+    const recoveredCatalog = Promise.withResolvers<TerminalSessionsSnapshot>()
     projectionMocks.terminalSessionsCatalogCoverageRevision.mockReturnValue(2)
     recoverSessionsMock.mockResolvedValueOnce({ revision: 2, sessions: [] })
     const result = renderRuntimeProvider(REPO_ID)
@@ -315,17 +316,22 @@ describe('AppRuntimeProjectionProvider', () => {
         expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
       )
       recoverSessionsMock.mockClear()
-      recoverSessionsMock.mockResolvedValueOnce({ revision: 3, sessions: [] })
+      recoverSessionsMock.mockReturnValueOnce(recoveredCatalog.promise)
 
       await flushTestUpdates(async () => {
         sessionsChangedHandler?.({ workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId, revision: 3 })
       })
 
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('pending')
       expect(recoverSessionsMock).toHaveBeenCalledWith({
         workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
       })
+      recoveredCatalog.resolve({ revision: 3, sessions: [] })
+      await vi.waitFor(() =>
+        expect(terminalProjectionHydrationStore.getState().hydrationByWorkspace.get(REPO_ID)?.phase).toBe('ready'),
+      )
     } finally {
       result.unmount()
     }

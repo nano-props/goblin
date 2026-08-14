@@ -96,6 +96,67 @@ describe('AppTerminalProjectionRecovery', () => {
     expect(reconcile).toHaveBeenCalledWith(TARGET, { revision: 2, sessions: [] }, 'client-test')
   })
 
+  test('marks a projection pending while recovering a revision the local catalog has not covered', async () => {
+    const catalog = Promise.withResolvers<TerminalSessionsSnapshot>()
+    let phase: 'ready' | 'pending' = 'ready'
+    const beginHydration = vi.fn(() => {
+      phase = 'pending'
+    })
+    const markReady = vi.fn()
+    const recovery = new AppTerminalProjectionRecovery({
+      projection: {
+        reconcileServerSessionsSnapshot: vi.fn(() => true),
+        resynchronizeConnectedViews: vi.fn(),
+        terminalSessionsCatalogCoverageRevision: vi.fn(() => 1),
+      },
+      readClientId: () => 'client-test',
+      recoverSessions: async () => await catalog.promise,
+      hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase }),
+      beginHydration,
+      markReady,
+      markFailed: vi.fn(),
+      isFocusRefreshDue: () => true,
+      logFailure: vi.fn(),
+    })
+
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'minimum-revision', revision: 2 })
+
+    expect(beginHydration).toHaveBeenCalledWith(TARGET.workspaceId, TARGET.workspaceRuntimeId)
+    expect(phase).toBe('pending')
+    catalog.resolve({ revision: 2, sessions: [] })
+    await vi.waitFor(() => expect(markReady).toHaveBeenCalledWith(TARGET.workspaceId, TARGET.workspaceRuntimeId))
+  })
+
+  test('records failure when recovery cannot reach a newly announced revision', async () => {
+    let phase: 'ready' | 'pending' = 'ready'
+    const beginHydration = vi.fn(() => {
+      phase = 'pending'
+    })
+    const markFailed = vi.fn()
+    const failure = new Error('catalog unavailable')
+    const recovery = new AppTerminalProjectionRecovery({
+      projection: {
+        reconcileServerSessionsSnapshot: vi.fn(() => true),
+        resynchronizeConnectedViews: vi.fn(),
+        terminalSessionsCatalogCoverageRevision: vi.fn(() => 1),
+      },
+      readClientId: () => 'client-test',
+      recoverSessions: async () => await Promise.reject(failure),
+      hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase }),
+      beginHydration,
+      markReady: vi.fn(),
+      markFailed,
+      isFocusRefreshDue: () => true,
+      logFailure: vi.fn(),
+    })
+
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'minimum-revision', revision: 2 })
+
+    await vi.waitFor(() =>
+      expect(markFailed).toHaveBeenCalledWith(TARGET.workspaceId, TARGET.workspaceRuntimeId, failure.message),
+    )
+  })
+
   test('records an initial recovery failure only while hydration is pending', async () => {
     const markFailed = vi.fn()
     const failure = new Error('catalog unavailable')
@@ -183,18 +244,19 @@ describe('AppTerminalProjectionRecovery', () => {
   })
 
   test('does not replace ready hydration after a background refresh fails', async () => {
+    const beginHydration = vi.fn()
     const markFailed = vi.fn()
     const logFailure = vi.fn()
     const recovery = new AppTerminalProjectionRecovery({
       projection: {
         reconcileServerSessionsSnapshot: vi.fn(() => true),
         resynchronizeConnectedViews: vi.fn(),
-        terminalSessionsCatalogCoverageRevision: vi.fn(() => null),
+        terminalSessionsCatalogCoverageRevision: vi.fn(() => 2),
       },
       readClientId: () => 'client-test',
       recoverSessions: async () => await Promise.reject(new Error('network unavailable')),
       hydrationEntry: () => ({ workspaceRuntimeId: TARGET.workspaceRuntimeId, phase: 'ready' }),
-      beginHydration: vi.fn(),
+      beginHydration,
       markReady: vi.fn(),
       markFailed,
       isFocusRefreshDue: () => true,
@@ -204,6 +266,7 @@ describe('AppTerminalProjectionRecovery', () => {
     recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'minimum-revision', revision: 0 })
 
     await vi.waitFor(() => expect(logFailure).toHaveBeenCalledOnce())
+    expect(beginHydration).not.toHaveBeenCalled()
     expect(markFailed).not.toHaveBeenCalled()
   })
 

@@ -67,6 +67,12 @@ export class AppTerminalProjectionRecovery implements TerminalProjectionRecovery
   }
 
   request(scope: RuntimeProjectionScope, requirement: TerminalProjectionRecoveryRequirement): void {
+    const currentRevision = this.dependencies.projection.terminalSessionsCatalogCoverageRevision(scope.target)
+    if (currentRevision === null || currentRevision < requirement.revision) {
+      scope.commit(() => {
+        this.dependencies.beginHydration(scope.target.workspaceId, scope.target.workspaceRuntimeId)
+      })
+    }
     this.run(scope, requirement, async () => await this.dependencies.recoverSessions(scope.target))
   }
 

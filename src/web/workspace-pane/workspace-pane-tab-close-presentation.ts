@@ -27,7 +27,7 @@ import { captureUnownedAppNavigationGeneration, type AppNavigationGeneration } f
 import { terminalLog } from '#/web/logger.ts'
 import { translate } from '#/web/stores/i18n-vue.ts'
 import { toast } from 'vue-sonner'
-import type { WorkspacePaneRuntimeTabUnreadyProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import type { WorkspacePaneRuntimeUnreadyProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 export interface WorkspacePaneTabClosePresentationEffects {
   onCommit(): void
@@ -60,7 +60,7 @@ type WorkspacePaneTabCloseFeedback =
   | { kind: 'outcome-uncertain' }
   | { kind: 'request-failed' }
   | { kind: 'presentation-failed' }
-  | { kind: 'blocked-runtime-materialization'; phase: WorkspacePaneRuntimeTabUnreadyProjectionPhase }
+  | { kind: 'blocked-runtime-materialization'; phase: WorkspacePaneRuntimeUnreadyProjectionPhase }
 
 const WORKSPACE_PANE_TAB_CLOSE_ERROR_KEYS = {
   invalidArguments: 'error.invalid-arguments',
@@ -145,11 +145,9 @@ export function surfaceWorkspacePaneTabCloseFeedback(feedback: WorkspacePaneTabC
   switch (feedback.kind) {
     case 'blocked-runtime-materialization': {
       const messageKey =
-        feedback.phase === 'inconsistent'
-          ? 'error.workspace-pane-state-inconsistent'
-          : feedback.phase === 'failed'
-            ? 'error.workspace-tabs-close-blocked-load-failed'
-            : 'error.workspace-tabs-close-blocked-loading'
+        feedback.phase === 'failed'
+          ? 'error.workspace-tabs-close-blocked-load-failed'
+          : 'error.workspace-tabs-close-blocked-loading'
       toast.error(translate(messageKey), { id: 'workspace-pane-tab-close-blocked' })
       return
     }

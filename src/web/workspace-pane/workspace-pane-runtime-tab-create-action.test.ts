@@ -158,7 +158,7 @@ describe('workspace pane runtime tab create action', () => {
     },
   )
 
-  test('fails fast when settled workspace tabs and terminals disagree', async () => {
+  test('fails fast while a canonical terminal view is still materializing', async () => {
     setWorkspacePaneTabsForTargetQueryData({
       ...PANE_TARGET,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
@@ -179,12 +179,12 @@ describe('workspace pane runtime tab create action', () => {
       }),
     ).resolves.toMatchObject({
       ok: false,
-      messageKey: 'error.workspace-pane-state-inconsistent',
+      messageKey: 'error.terminal-create-blocked-loading',
     })
 
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
     expect(terminalCreateFeedbackMocks.error).toHaveBeenCalledWith('action.result-error', {
-      description: 'error.workspace-pane-state-inconsistent',
+      description: 'error.terminal-create-blocked-loading',
     })
   })
 

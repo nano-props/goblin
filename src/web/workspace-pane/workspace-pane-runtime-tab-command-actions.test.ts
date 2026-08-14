@@ -659,11 +659,11 @@ describe('workspace pane runtime tab command actions', () => {
       scenario.resetBridge()
     }
 
-    expect(scenario.terminalFilesystemTargetSnapshot).toHaveBeenCalledOnce()
     expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
     expect(terminalCommandFeedbackMocks.error).toHaveBeenCalledWith('action.result-error', {
       description: 'error.terminal-create-blocked-loading',
     })
+    expect(scenario.terminalFilesystemTargetSnapshot).toHaveBeenCalledOnce()
   })
 
   test.each([
@@ -696,7 +696,57 @@ describe('workspace pane runtime tab command actions', () => {
       { kind: 'terminal', terminalSessionId },
       expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
-    expect(scenario.terminalFilesystemTargetSnapshot).toHaveBeenCalledOnce()
+    expect(scenario.terminalFilesystemTargetSnapshot).toHaveBeenCalled()
+    expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
+  })
+
+  test('primary terminal command queues placeholder selection behind target actions', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const scenario = terminalCommandScenario([terminalSessionId])
+    const coordinatorStarted = Promise.withResolvers<void>()
+    const releaseCoordinator = Promise.withResolvers<void>()
+    const coordinatorBlocker = runWorkspacePaneAction(
+      {
+        kind: 'git-worktree',
+        workspaceId: terminalCoordinates.workspaceId,
+        workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
+        worktreePath: terminalExecutionPath(terminalBase.target),
+      },
+      async () => {
+        coordinatorStarted.resolve()
+        await releaseCoordinator.promise
+      },
+    )
+    await coordinatorStarted.promise
+
+    const action = dispatchTerminalRuntimePrimaryAction(scenario.options)
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+
+    releaseCoordinator.resolve()
+    await coordinatorBlocker
+    try {
+      await expect(action).resolves.toBe(true)
+    } finally {
+      scenario.resetBridge()
+    }
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceRuntimeId: scenario.repo.workspaceRuntimeId }),
+      { kind: 'terminal', terminalSessionId },
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+    )
+  })
+
+  test('primary terminal command rejects placeholder selection while terminal creation is pending', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const scenario = terminalCommandScenario([terminalSessionId], null, true)
+
+    try {
+      await expect(dispatchTerminalRuntimePrimaryAction(scenario.options)).resolves.toBe(false)
+    } finally {
+      scenario.resetBridge()
+    }
+
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
   })
 
@@ -754,6 +804,7 @@ function terminalSession(terminalSessionId: string, selected: boolean) {
 function terminalCommandScenario(
   canonicalSessionIds: readonly string[] | null,
   materializedSessionId: string | null = null,
+  createPending = false,
 ) {
   const repo = seedRepoWithReadModelForTest({
     id: terminalBase.target.workspaceId,
@@ -777,7 +828,7 @@ function terminalCommandScenario(
     count: sessions.length,
     bellCount: 0,
     outputActiveCount: 0,
-    createPending: false,
+    createPending,
   }))
   const createTerminalWithAdmission = vi.fn()
   const resetBridge = setTerminalSessionCommandBridge({

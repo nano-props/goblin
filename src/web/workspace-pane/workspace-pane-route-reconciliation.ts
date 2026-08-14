@@ -53,7 +53,7 @@ function reconcileTerminalWorkspacePaneRoute(
   if (tabEntriesState) return tabEntriesState
   const terminalProjectionPhase = model.runtimeTabStateByType.terminal.projectionPhase
   if (terminalProjectionPhase === 'pending') return { kind: 'pending' }
-  if (terminalProjectionPhase === 'failed' || terminalProjectionPhase === 'inconsistent') return { kind: 'unverified' }
+  if (terminalProjectionPhase === 'failed') return { kind: 'unverified' }
   if (
     model.tabs.some(
       (tab) => tab.kind === 'runtime' && tab.runtimeType === 'terminal' && tab.sessionId === route.terminalSessionId,

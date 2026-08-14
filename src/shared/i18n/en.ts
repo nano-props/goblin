@@ -402,8 +402,6 @@ export const en = {
   'terminal.loading': 'Loading terminals…',
   'terminal.retry-loading': 'Retry loading terminals',
   'terminal.load-failed': 'Could not load terminals',
-  'terminal.workspace-state-inconsistent':
-    'Workspace tabs and terminals are out of sync. Refresh the page before continuing.',
   'terminal.loading-tab': 'Loading terminal…',
   'terminal.load-tab-failed': 'Could not load terminal',
   'terminal.restarting': 'Restarting terminal…',
@@ -421,8 +419,6 @@ export const en = {
   'terminal.new-disabled-loading': 'Wait for terminals to finish loading',
   'terminal.new-disabled-load-failed': 'Retry loading terminals before creating another',
   'terminal.new-disabled-tabs-load-failed': 'Retry loading tabs before creating another terminal',
-  'terminal.new-disabled-state-inconsistent':
-    'Workspace tabs and terminals are out of sync. Refresh the page before creating another terminal.',
   'terminal.close': 'Close terminal',
   'terminal.close-named': 'Close terminal {name}',
   'terminal.confirm-close-running-title': 'Close running terminal?',
@@ -661,8 +657,6 @@ export const en = {
   'error.terminal-create-failed': 'Terminal could not be created',
   'error.terminal-create-blocked-loading': 'Wait for workspace tabs and terminals to finish loading, then try again.',
   'error.terminal-create-blocked-load-failed': 'Retry the failed tab or terminal load before trying again.',
-  'error.workspace-pane-state-inconsistent':
-    'Workspace tabs and terminals are out of sync. Refresh the page before continuing.',
   'error.workspace-tabs-close-blocked-loading': 'Wait for the terminal to finish loading before closing it.',
   'error.workspace-tabs-close-blocked-load-failed': 'Retry loading the terminal before closing it.',
   'error.terminal-session-limit-reached': 'The 1,024-terminal limit has been reached. Close a terminal and try again.',
