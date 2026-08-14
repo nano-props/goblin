@@ -30,7 +30,7 @@ vi.mock('#/server/settings/source.ts', () => ({
   })),
 }))
 
-vi.mock('#/server/modules/repo-read-paths.ts', () => ({
+vi.mock('#/server/repos/read-paths.ts', () => ({
   readRepoSnapshot: mocks.readRepoSnapshot,
 }))
 

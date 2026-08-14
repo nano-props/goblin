@@ -13,7 +13,7 @@ describe('resolveRemoteWorkspaceTarget', () => {
   test('threads cancellation into SSH config resolution', async () => {
     const signal = new AbortController().signal
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
-    const { resolveRemoteWorkspaceTarget } = await import('#/server/modules/remote-repo-execution.ts')
+    const { resolveRemoteWorkspaceTarget } = await import('#/server/repos/remote-execution.ts')
 
     await resolveRemoteWorkspaceTarget(repoId, { workspaceRuntimeId: 'runtime-test' }, signal)
 
@@ -25,7 +25,7 @@ describe('getRepoSnapshot', () => {
   test('rejects a snapshot while worktree membership is changing', async () => {
     const started = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
-    const { enqueueRepoWriteOperation } = await import('#/server/modules/repo-write-operation-coordinator.ts')
+    const { enqueueRepoWriteOperation } = await import('#/server/repos/write-operation-coordinator.ts')
     const write = enqueueRepoWriteOperation(
       REPO_ID,
       undefined,
@@ -48,7 +48,7 @@ describe('getRepoSnapshot', () => {
     )
     await started.promise
     try {
-      const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+      const { getRepoSnapshot } = await import('#/server/repos/read-paths.ts')
       await expect(getRepoSnapshot(REPO_ID)).rejects.toThrow('error.repo-membership-changing')
       expect(mocks.readWorktreeMembership).not.toHaveBeenCalled()
     } finally {
@@ -72,7 +72,7 @@ describe('getRepoSnapshot', () => {
     mocks.getBranches.mockResolvedValueOnce(snapshot.branches)
     mocks.getRemoteInfo.mockResolvedValueOnce(snapshot.remote)
 
-    const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { getRepoSnapshot } = await import('#/server/repos/read-paths.ts')
     const result = await getRepoSnapshot(REPO_ID)
 
     expect(result).toEqual({
@@ -97,7 +97,7 @@ describe('getRepoSnapshot', () => {
     mocks.readWorktreeMembership.mockResolvedValueOnce([])
     mocks.getBranches.mockRejectedValueOnce(new Error('git unavailable'))
 
-    const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { getRepoSnapshot } = await import('#/server/repos/read-paths.ts')
 
     await expect(getRepoSnapshot(REPO_ID)).rejects.toThrow('git unavailable')
     expect(mocks.getRemoteInfo).not.toHaveBeenCalled()
@@ -109,7 +109,7 @@ describe('getRepoSnapshot', () => {
     mocks.getCurrentBranch.mockResolvedValueOnce('bare/main')
     mocks.getRemoteInfo.mockResolvedValueOnce(repoSnapshot().remote)
 
-    const { getRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { getRepoSnapshot } = await import('#/server/repos/read-paths.ts')
     await expect(getRepoSnapshot(REPO_ID)).resolves.toMatchObject({ current: 'bare/main', worktrees: [] })
 
     expect(mocks.getCurrentBranch).toHaveBeenCalledOnce()
@@ -136,7 +136,7 @@ describe('getWorkspacePaneTargetIdentities', () => {
       { branch: 'feature/no-worktree', worktreePath: null },
     ])
 
-    const { getWorkspacePaneTargetIdentities } = await import('#/server/modules/repo-read-paths.ts')
+    const { getWorkspacePaneTargetIdentities } = await import('#/server/repos/read-paths.ts')
     await expect(getWorkspacePaneTargetIdentities(REPO_ID)).resolves.toEqual([
       { branch: 'main', worktreePath: '/tmp/repo' },
       { branch: 'feature/no-worktree', worktreePath: null },
@@ -156,7 +156,7 @@ describe('getRepoPullRequests', () => {
   test('returns single-branch pull requests without publishing invalidation', async () => {
     mocks.getBranchPullRequests.mockResolvedValueOnce(new Map([['feature/a', pullRequest(2)]]))
 
-    const { getRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
+    const { getRepoPullRequests } = await import('#/server/repos/read-paths.ts')
     const result = await getRepoPullRequests(REPO_ID, { kind: 'branch-detail', branch: 'feature/a' })
 
     expect(result).toEqual([{ branch: 'feature/a', pullRequest: pullRequest(2) }])
@@ -171,7 +171,7 @@ describe('getRepoPullRequests', () => {
       ]),
     )
 
-    const { getRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
+    const { getRepoPullRequests } = await import('#/server/repos/read-paths.ts')
     const result = await getRepoPullRequests(REPO_ID, { kind: 'repository-summary' })
 
     expect(result).toEqual([

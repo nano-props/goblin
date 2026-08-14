@@ -54,7 +54,7 @@ describe('repo source runtime failure classification', () => {
       stderr: 'ssh: connect to host example.test port 22: Connection refused',
       message: 'connection refused',
     })
-    const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
+    const { getRepoLog } = await import('#/server/repos/read-paths.ts')
 
     await expect(
       getRepoLog(target.id, { kind: 'branch', branchName: 'main' }, { workspaceRuntimeId: 'repo-runtime-test' }),
@@ -73,7 +73,7 @@ describe('repo source runtime failure classification', () => {
       stderr: 'ssh: connect to host example.test port 22: Connection refused',
       message: 'connection refused',
     })
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
 
     await expect(fetchRepo(target.id, runtimeCapability('repo-runtime-test'), 'user', undefined)).rejects.toMatchObject(
       {
@@ -95,7 +95,7 @@ describe('repo source runtime failure classification', () => {
       remoteStarted: true,
     }
     mocks.runRemoteCommand.mockResolvedValue(commandResult)
-    const { createRemoteMutationAttempt } = await import('#/server/modules/remote-repo-execution.ts')
+    const { createRemoteMutationAttempt } = await import('#/server/repos/remote-execution.ts')
     const attempt = createRemoteMutationAttempt(target.id, 'repo-runtime-test', target)
 
     await expect(
@@ -149,7 +149,7 @@ describe('repo source runtime failure classification', () => {
           throw new Error(`unexpected remote command: ${command.type}`)
       }
     })
-    const { pushRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { pushRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     await expect(
       pushRepoBranch(target.id, 'feature/test', runtimeCapability('repo-runtime-test'), undefined),
@@ -213,7 +213,7 @@ describe('repo source runtime failure classification', () => {
         }
       },
     )
-    const { runWithRepoSource } = await import('#/server/modules/repo-source.ts')
+    const { runWithRepoSource } = await import('#/server/repos/source.ts')
 
     await expect(
       runWithRepoSource(
@@ -294,7 +294,7 @@ describe('repo source runtime failure classification', () => {
         }
       },
     )
-    const { runWithRepoSource } = await import('#/server/modules/repo-source.ts')
+    const { runWithRepoSource } = await import('#/server/repos/source.ts')
 
     await expect(
       runWithRepoSource(
@@ -340,14 +340,14 @@ describe('repo source runtime failure classification', () => {
       stderr: 'ssh: connect to host example.test port 22: Connection refused',
       message: 'connection refused',
     })
-    const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
+    const { getRepoLog } = await import('#/server/repos/read-paths.ts')
 
     await expect(getRepoLog(target.id, { kind: 'branch', branchName: 'main' })).rejects.toThrow('connection refused')
   })
 
   test('throws a typed remote runtime failure when target resolution fails under runtime context', async () => {
     mocks.resolveRemoteTarget.mockRejectedValueOnce(new Error('error.ssh-config-changed'))
-    const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
+    const { getRepoLog } = await import('#/server/repos/read-paths.ts')
 
     await expect(
       getRepoLog(target.id, { kind: 'branch', branchName: 'main' }, { workspaceRuntimeId: 'repo-runtime-test' }),

@@ -15,7 +15,7 @@ describe('fetchRepo canonical boundaries', () => {
   test('does not execute fetch when affected-worktree discovery fails', async () => {
     mocks.readWorktreeMembership.mockRejectedValueOnce(new Error('worktree discovery failed'))
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
 
     await expect(fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'user')).rejects.toThrow(
       'worktree discovery failed',
@@ -28,7 +28,7 @@ describe('fetchRepo canonical boundaries', () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     mocks.getRemoteRepoWorktreePaths.mockRejectedValueOnce(new Error('remote worktree discovery failed'))
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
 
     await expect(fetchRepo(repoId, repoRuntimeCapabilityForTest(repoId, 'test-runtime'), 'user')).rejects.toThrow(
       'remote worktree discovery failed',
@@ -43,7 +43,7 @@ describe('fetchRepo canonical boundaries', () => {
   ])('%s sync publishes snapshot invalidation after fetching with prune', async (_name, kind) => {
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const result = await fetchRepo(
       REPO_ID,
       repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
@@ -64,7 +64,7 @@ describe('fetchRepo canonical boundaries', () => {
       return { result: { ok: false, message: 'cancelled' }, execution: { status: 'cancelled' } }
     })
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const result = await fetchRepo(
       REPO_ID,
       repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'),
@@ -85,7 +85,7 @@ describe('fetchRepo canonical boundaries', () => {
       commandOutcomeForTest({ ok: false, message: 'git timed out after 90s' }, 'timed-out'),
     )
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const result = await fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'user')
 
     expect(result).toEqual({
@@ -106,7 +106,7 @@ describe('fetchRepo canonical boundaries', () => {
       ),
     )
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const result = await fetchRepo(repoId, repoRuntimeCapabilityForTest(repoId, 'test-runtime'), 'user')
 
     expect(result).toEqual({
@@ -120,7 +120,7 @@ describe('fetchRepo canonical boundaries', () => {
   test('publishes snapshot invalidation after a successful sync', async () => {
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const result = await fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'user')
 
     expect(result).toEqual({ ok: true, message: 'fetched', repoIdsToInvalidate: [REPO_ID] })
@@ -134,9 +134,9 @@ describe('fetchRepo canonical boundaries', () => {
       { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false },
     ])
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
-    const { resolveRepoWriteBoundaryForRead } = await import('#/server/modules/repo-write-operation-coordinator.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/repos/read-paths.ts')
+    const { resolveRepoWriteBoundaryForRead } = await import('#/server/repos/write-operation-coordinator.ts')
 
     await resolveRepoWriteBoundaryForRead(LINKED_REPO_ID, { workspaceRuntimeId: 'workspace-runtime-b' })
     await fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'workspace-runtime-a'), 'user', undefined)
@@ -154,7 +154,7 @@ describe('fetchRepo canonical boundaries', () => {
     ])
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const result = await fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'user')
 
     expect(result).toEqual({
@@ -177,7 +177,7 @@ describe('fetchRepo canonical boundaries', () => {
     mocks.fetchAll.mockImplementationOnce(() => fetch.promise)
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched by user' }))
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const background = fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'background')
     await vi.waitFor(() => {
       expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
@@ -209,7 +209,7 @@ describe('fetchRepo canonical boundaries', () => {
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await fetch.promise)
     mocks.fetchRemoteRepo.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched by user' }))
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const background = fetchRepo(repoId, repoRuntimeCapabilityForTest(repoId, 'test-runtime'), 'background')
     await vi.waitFor(() => {
       expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
@@ -237,7 +237,7 @@ describe('fetchRepo canonical boundaries', () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     mocks.resolveRemoteRepoCommonDir.mockResolvedValue(null)
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     await expect(fetchRepo(repoId, repoRuntimeCapabilityForTest(repoId, 'test-runtime'), 'user')).rejects.toThrow(
       'error.repository-boundary-unavailable',
     )
@@ -247,7 +247,7 @@ describe('fetchRepo canonical boundaries', () => {
   test('does not admit a local write without a confirmed canonical boundary', async () => {
     mocks.resolveRepoCommonDir.mockRejectedValueOnce(new Error('git unavailable'))
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     await expect(fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'user')).rejects.toThrow(
       'error.repository-boundary-unavailable',
     )
@@ -257,9 +257,8 @@ describe('fetchRepo canonical boundaries', () => {
   test('reads operation state from memory without canonical boundary resolution', async () => {
     mocks.resolveRepoCommonDir.mockRejectedValueOnce(new Error('git unavailable'))
 
-    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
-    const { repoWriteOperationCoordinatorStatsForTests } =
-      await import('#/server/modules/repo-write-operation-coordinator.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/repos/read-paths.ts')
+    const { repoWriteOperationCoordinatorStatsForTests } = await import('#/server/repos/write-operation-coordinator.ts')
     await expect(readRepoOperationsSnapshot(REPO_ID)).resolves.toMatchObject({ operations: [], lastFetchAt: null })
     expect(mocks.resolveRepoCommonDir).not.toHaveBeenCalled()
     expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
@@ -276,7 +275,7 @@ describe('fetchRepo canonical boundaries', () => {
       afterWorktreeRemoved: vi.fn(async () => ({ ok: true as const, message: '' })),
     }
     const [{ removeCapturedRepoWorktree }, { issuePhysicalWorktreeExecutionCapability }] = await Promise.all([
-      import('#/server/modules/repo-write-paths.ts'),
+      import('#/server/repos/write-paths.ts'),
       import('#/server/worktree-removal/physical-worktree-capability.ts'),
     ])
     const physicalWorktreeCapability = issuePhysicalWorktreeExecutionCapability(
@@ -312,8 +311,7 @@ describe('fetchRepo canonical boundaries', () => {
       cwd === '/tmp/repo' ? '/tmp/repo/.git' : '/tmp/other-repo/.git',
     )
     const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
-    const { repoWriteOperationCoordinatorStatsForTests } =
-      await import('#/server/modules/repo-write-operation-coordinator.ts')
+    const { repoWriteOperationCoordinatorStatsForTests } = await import('#/server/repos/write-operation-coordinator.ts')
 
     await expect(
       removeLocalRepoWorktreeForTest(
@@ -351,10 +349,10 @@ describe('fetchRepo canonical boundaries', () => {
     })
     const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
     const [writePaths, capabilityModule, workspaceRuntimes, coordinator] = await Promise.all([
-      import('#/server/modules/repo-write-paths.ts'),
+      import('#/server/repos/write-paths.ts'),
       import('#/server/worktree-removal/physical-worktree-capability.ts'),
       import('#/server/modules/workspace-runtimes.ts'),
-      import('#/server/modules/repo-write-operation-coordinator.ts'),
+      import('#/server/repos/write-operation-coordinator.ts'),
     ])
     workspaceRuntimes.clearWorkspaceRuntimesForUser(userId)
     const lease = workspaceRuntimes.acquireWorkspaceRuntimeLease(userId, REPO_ID, clientId)
@@ -414,7 +412,7 @@ describe('fetchRepo canonical boundaries', () => {
     const caller = new AbortController()
     caller.abort(new Error('client disconnected'))
 
-    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/repos/read-paths.ts')
     const read = readRepoOperationsSnapshot(REPO_ID, { signal: caller.signal })
 
     await expect(read).rejects.toThrow('client disconnected')

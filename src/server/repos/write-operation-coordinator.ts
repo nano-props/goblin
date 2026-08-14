@@ -5,10 +5,10 @@ import {
   runWithCapturedRepoWriteExecution,
   type RepoSource,
   type RepoWriteExecutionCapability,
-} from '#/server/modules/repo-source.ts'
-import { resolveRepoWriteBoundaryKey } from '#/server/modules/repo-write-boundary.ts'
+} from '#/server/repos/source.ts'
+import { resolveRepoWriteBoundaryKey } from '#/server/repos/write-boundary.ts'
 import { publishRepoReadInvalidation } from '#/server/modules/invalidation-broker.ts'
-import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import { isRepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
 import {
   isRemoteWorkspaceRuntimeFailure,
   type RemoteWorkspaceRuntimeFailureError,
@@ -31,8 +31,8 @@ import {
   repoWriteOperationFailureReason,
   repoWriteOperationTimestamp,
   type RepoWriteOperationListOptions,
-} from '#/server/modules/repo-write-operation-state.ts'
-import { RepoMembershipReadConflictError } from '#/server/modules/repo-membership-read-conflict.ts'
+} from '#/server/repos/write-operation-state.ts'
+import { RepoMembershipReadConflictError } from '#/server/repos/membership-read-conflict.ts'
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
 
 export interface RepoWriteOperationLifecycle {

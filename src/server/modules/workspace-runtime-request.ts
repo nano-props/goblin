@@ -9,16 +9,16 @@ import {
 } from '#/server/modules/workspace-runtimes.ts'
 import { isRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { settleRemoteWorkspaceRuntimeFailure } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
-import { isRepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
+import { isRepositoryBoundaryUnavailableError } from '#/server/repos/boundary-error.ts'
 import { isWorkspaceRuntimeAdmissionClosedError } from '#/server/modules/workspace-runtime-admission-error.ts'
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'
-import { isRepoMembershipReadConflictError } from '#/server/modules/repo-membership-read-conflict.ts'
-import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import { isRepoMembershipReadConflictError } from '#/server/repos/membership-read-conflict.ts'
+import { isRepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
 import {
   appendRepoMutationRecoveryMessageKey,
   type CreateWorktreeMutationResult,
   type RepoMutationResult,
-} from '#/server/modules/repo-mutation-impact.ts'
+} from '#/server/repos/mutation-impact.ts'
 import { stopBackgroundSyncRuntime } from '#/server/modules/background-sync.ts'
 import type { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 

@@ -1,5 +1,5 @@
 import { publishRepoReadInvalidation } from '#/server/modules/invalidation-broker.ts'
-import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
+import type { RepoMutationResult } from '#/server/repos/mutation-impact.ts'
 import type { RepoReadInvalidationDomain } from '#/shared/repo-read-invalidation.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 

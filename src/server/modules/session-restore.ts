@@ -16,7 +16,7 @@ import {
   type WorkspaceSessionEntry,
 } from '#/shared/remote-workspace.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
-import { readRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
+import { readRepoSnapshot } from '#/server/repos/read-paths.ts'
 import {
   acquireWorkspaceRuntimeLease,
   captureWorkspaceRuntimeMembershipCapability,

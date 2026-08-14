@@ -13,7 +13,7 @@ import {
   getRepoLog,
   getRepoPatch,
   getRepoWorktreeBootstrapPreview,
-} from '#/server/modules/repo-read-paths.ts'
+} from '#/server/repos/read-paths.ts'
 import {
   createRepoWorktree,
   deleteRepoBranch,
@@ -23,8 +23,8 @@ import {
   pullRepoBranch,
   pushRepoBranch,
   removeCapturedRepoWorktree,
-} from '#/server/modules/repo-write-paths.ts'
-import { cloneRepo } from '#/server/modules/repo-clone-write.ts'
+} from '#/server/repos/write-paths.ts'
+import { cloneRepo } from '#/server/repos/clone-write.ts'
 import { getServerFetchIntervalSec } from '#/server/settings/source.ts'
 import {
   publishRepoReadInvalidation,
@@ -49,7 +49,7 @@ import {
   runGitWorkspaceRuntimeRequest,
 } from '#/server/modules/workspace-runtime-request.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
-import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
+import type { RepoWorktreeRemovalLifecycle } from '#/server/repos/worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
@@ -58,13 +58,13 @@ import {
 } from '#/shared/git-types.ts'
 import { isRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
-import { resolveRepoSource } from '#/server/modules/repo-source.ts'
+import { resolveRepoSource } from '#/server/repos/source.ts'
 import {
   publicRepoMutationResult,
   type CreateWorktreeMutationResult,
   type RepoMutationResult,
-} from '#/server/modules/repo-mutation-impact.ts'
-import { publishRepoMutationInvalidations } from '#/server/modules/repo-mutation-invalidation.ts'
+} from '#/server/repos/mutation-impact.ts'
+import { publishRepoMutationInvalidations } from '#/server/repos/mutation-invalidation.ts'
 import type { RepoReadInvalidationDomain } from '#/shared/repo-read-invalidation.ts'
 
 export function createRepoRoutes(options: {

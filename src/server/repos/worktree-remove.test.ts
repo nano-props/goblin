@@ -15,7 +15,7 @@ import { repoRuntimeCapabilityForTest } from '#/server/test-utils/repo-module.ts
 describe('repo worktree removal', () => {
   async function removeRemoteWorktreeForTest() {
     const [{ removeCapturedRepoWorktree }, { issuePhysicalWorktreeExecutionCapability }] = await Promise.all([
-      import('#/server/modules/repo-write-paths.ts'),
+      import('#/server/repos/write-paths.ts'),
       import('#/server/worktree-removal/physical-worktree-capability.ts'),
     ])
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
@@ -71,7 +71,7 @@ describe('repo worktree removal', () => {
         isPrimary: false,
       },
     ])
-    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/repos/read-paths.ts')
     const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
     const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
 
@@ -248,7 +248,7 @@ describe('repo worktree removal', () => {
 
   test('prunes settings after an explicit removal lifecycle before propagating a preclassified carrier', async () => {
     const [{ RepoMutationRuntimeFailureError }, { RemoteWorkspaceRuntimeFailureError }] = await Promise.all([
-      import('#/server/modules/repo-mutation-runtime-failure.ts'),
+      import('#/server/repos/mutation-runtime-failure.ts'),
       import('#/server/modules/remote-workspace-runtime-failure.ts'),
     ])
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })

@@ -1,12 +1,12 @@
-import { runWithRepoSource, type RepoSource } from '#/server/modules/repo-source.ts'
+import { runWithRepoSource, type RepoSource } from '#/server/repos/source.ts'
 import type { WorkspacePaneTargetIdentity } from '#/shared/git-types.ts'
-import type { RepoSourceRuntimeContext } from '#/server/modules/remote-repo-execution.ts'
+import type { RepoSourceRuntimeContext } from '#/server/repos/remote-execution.ts'
 import {
   getRepoLastSuccessfulFetchAt,
   listRepoWriteOperationsForRepo,
   resolveRepoWriteBoundaryForRead,
   runWithRepoMembershipReadAdmission,
-} from '#/server/modules/repo-write-operation-coordinator.ts'
+} from '#/server/repos/write-operation-coordinator.ts'
 import { isValidWorkspaceLocatorInput } from '#/shared/input-validation.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { useFakeTimers } from '#/test-utils/timers.ts'
-import type { RepoSource } from '#/server/modules/repo-source.ts'
+import type { RepoSource } from '#/server/repos/source.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 import type { LogEntry, WorktreeStatus } from '#/shared/git-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -16,10 +16,10 @@ const mocks = vi.hoisted(() => ({
   resolveRepoWriteBoundaryForRead: vi.fn(),
 }))
 
-vi.mock('#/server/modules/repo-source.ts', () => ({
+vi.mock('#/server/repos/source.ts', () => ({
   runWithRepoSource: mocks.runWithRepoSource,
 }))
-vi.mock('#/server/modules/repo-write-operation-coordinator.ts', () => ({
+vi.mock('#/server/repos/write-operation-coordinator.ts', () => ({
   runWithRepoMembershipReadAdmission: mocks.runWithRepoMembershipReadAdmission,
   listRepoWriteOperationsForRepo: mocks.listRepoWriteOperationsForRepo,
   getRepoLastSuccessfulFetchAt: mocks.getRepoLastSuccessfulFetchAt,
@@ -95,7 +95,7 @@ describe('getRepoLog', () => {
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getLog }))),
     )
-    const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
+    const { getRepoLog } = await import('#/server/repos/read-paths.ts')
     const signal = new AbortController().signal
 
     await expect(
@@ -109,7 +109,7 @@ describe('getRepoLog', () => {
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getLog }))),
     )
-    const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
+    const { getRepoLog } = await import('#/server/repos/read-paths.ts')
 
     await expect(getRepoLog(WORKSPACE_ID, { kind: 'branch', branchName: 'feature/work' })).resolves.toEqual([])
     expect(getLog).toHaveBeenCalledWith(
@@ -138,7 +138,7 @@ describe('getRepoWorktreeBootstrapPreview', () => {
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getWorktreeBootstrapPreview }))),
     )
-    const { getRepoWorktreeBootstrapPreview } = await import('#/server/modules/repo-read-paths.ts')
+    const { getRepoWorktreeBootstrapPreview } = await import('#/server/repos/read-paths.ts')
     const signal = new AbortController().signal
 
     await expect(getRepoWorktreeBootstrapPreview(WORKSPACE_ID, { signal })).resolves.toMatchObject({
@@ -165,7 +165,7 @@ describe('independent repository reads', () => {
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getSnapshot, getPullRequests }))),
     )
-    const { readRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoSnapshot } = await import('#/server/repos/read-paths.ts')
 
     await expect(readRepoSnapshot(WORKSPACE_ID)).resolves.toEqual({ snapshot })
     expect(getSnapshot).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) })
@@ -174,7 +174,7 @@ describe('independent repository reads', () => {
   })
 
   test('rejects rather than fabricating a snapshot when the source has none', async () => {
-    const { readRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoSnapshot } = await import('#/server/repos/read-paths.ts')
     await expect(readRepoSnapshot(WORKSPACE_ID)).rejects.toThrow('repository snapshot unavailable')
   })
 
@@ -195,7 +195,7 @@ describe('independent repository reads', () => {
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getSnapshot, getPullRequests }))),
     )
-    const { readRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoPullRequests } = await import('#/server/repos/read-paths.ts')
     const scope = { kind: 'branch-detail' as const, branch: 'feature/a' }
 
     await expect(readRepoPullRequests(WORKSPACE_ID, scope)).resolves.toEqual({ pullRequests })
@@ -220,7 +220,7 @@ describe('independent repository reads', () => {
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getPullRequests }))),
     )
-    const { readRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoPullRequests } = await import('#/server/repos/read-paths.ts')
 
     await expect(readRepoPullRequests(WORKSPACE_ID, { kind: 'branch-detail', branch: 'feature/a' })).rejects.toThrow(
       'did not match requested branch',
@@ -233,7 +233,7 @@ describe('independent repository reads', () => {
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getStatus }))),
     )
-    const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoWorktreeStatus } = await import('#/server/repos/read-paths.ts')
 
     const result = await readRepoWorktreeStatus(WORKSPACE_ID, { workspaceRuntimeId: 'repo-runtime-test' })
     expect(result).toMatchObject({ workspaceRuntimeId: 'repo-runtime-test', status })
@@ -241,7 +241,7 @@ describe('independent repository reads', () => {
   })
 
   test('does not turn an aborted status read into an empty clean snapshot', async () => {
-    const { readRepoWorktreeStatus } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoWorktreeStatus } = await import('#/server/repos/read-paths.ts')
     const controller = new AbortController()
     controller.abort()
     await expect(
@@ -251,7 +251,7 @@ describe('independent repository reads', () => {
   })
 
   test('reads operation activity from coordinator memory without probing Git', async () => {
-    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/repos/read-paths.ts')
 
     const result = await readRepoOperationsSnapshot(WORKSPACE_ID, {
       workspaceRuntimeId: 'repo-runtime-test',
@@ -275,7 +275,7 @@ describe('independent repository read deadlines', () => {
         ),
       ),
     )
-    const { readRepoSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoSnapshot } = await import('#/server/repos/read-paths.ts')
     const rejected = expect(readRepoSnapshot(WORKSPACE_ID, { timeoutMs: 50 })).rejects.toThrow(
       'repository read timeout',
     )
@@ -294,7 +294,7 @@ describe('independent repository read deadlines', () => {
         ),
       ),
     )
-    const { readRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoPullRequests } = await import('#/server/repos/read-paths.ts')
     const rejected = expect(
       readRepoPullRequests(WORKSPACE_ID, { kind: 'repository-summary' }, { timeoutMs: 50 }),
     ).rejects.toThrow('repository read timeout')
@@ -315,7 +315,7 @@ describe('independent repository read deadlines', () => {
     mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
       task(asRepoSource(makeSource({ getPullRequests }))),
     )
-    const { readRepoPullRequests } = await import('#/server/modules/repo-read-paths.ts')
+    const { readRepoPullRequests } = await import('#/server/repos/read-paths.ts')
     const controller = new AbortController()
     const rejected = expect(
       readRepoPullRequests(WORKSPACE_ID, { kind: 'repository-summary' }, { signal: controller.signal }),

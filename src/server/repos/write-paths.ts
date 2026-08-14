@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
+import type { RepoWorktreeRemovalLifecycle } from '#/server/repos/worktree-removal-lifecycle.ts'
 import { serverNodeLog } from '#/node/logger.ts'
 import { publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import {
@@ -7,22 +7,22 @@ import {
   runWithRepoSource,
   type RepoSource,
   type RepoWriteExecutionCapability,
-} from '#/server/modules/repo-source.ts'
+} from '#/server/repos/source.ts'
 import {
   RepoMutationRuntimeFailureError,
   isRepoMutationRuntimeFailureError,
-} from '#/server/modules/repo-mutation-runtime-failure.ts'
+} from '#/server/repos/mutation-runtime-failure.ts'
 import {
   appendRepoMutationRecoveryMessageKey,
   type CreateWorktreeMutationResult,
   type RepoMutationResult,
-} from '#/server/modules/repo-mutation-impact.ts'
+} from '#/server/repos/mutation-impact.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { RemoteTrackingBranchIdentity } from '#/shared/worktree-create.ts'
 import {
   enqueueRepoWriteOperation,
   type RepoWriteOperationContext,
-} from '#/server/modules/repo-write-operation-coordinator.ts'
+} from '#/server/repos/write-operation-coordinator.ts'
 import {
   pruneServerWorkspaceSettingsForRemovedWorktree,
   setServerWorkspaceWorktreeBootstrapConfigTrust,

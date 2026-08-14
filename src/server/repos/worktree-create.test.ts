@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import type * as RepoWritePaths from '#/server/modules/repo-write-paths.ts'
+import type * as RepoWritePaths from '#/server/repos/write-paths.ts'
 import type { CommandOutcome } from '#/system/command-execution.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
@@ -32,7 +32,7 @@ describe('repo worktree creation', () => {
         repo.pushRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
     ],
   ])('%s returns snapshot invalidation impact after success', async (_name, run) => {
-    const repo = await import('#/server/modules/repo-write-paths.ts')
+    const repo = await import('#/server/repos/write-paths.ts')
 
     const result = await run(repo)
 
@@ -45,7 +45,7 @@ describe('repo worktree creation', () => {
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
       { path: '/tmp/repo-linked', branch: 'feature/b', isBare: false, isPrimary: false },
     ])
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       REPO_ID,
@@ -66,7 +66,7 @@ describe('repo worktree creation', () => {
     mocks.getRepoRoot.mockImplementation(async (input: string) =>
       input === '/tmp/nested/../repo-worktree' ? '/tmp/repo-worktree' : input,
     )
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       REPO_ID,
@@ -88,7 +88,7 @@ describe('repo worktree creation', () => {
       if (input === '/tmp/repo-worktree') return ''
       return input
     })
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       REPO_ID,
@@ -109,7 +109,7 @@ describe('repo worktree creation', () => {
 
   test('reports recovery when Git returns a path outside the app locator grammar', async () => {
     mocks.getRepoRoot.mockResolvedValueOnce('/tmp/repo\\worktree')
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       REPO_ID,
@@ -136,7 +136,7 @@ describe('repo worktree creation', () => {
     mocks.createWorktree.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'error.worktree-create-timeout-check-state' }, 'timed-out'),
     )
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       REPO_ID,
@@ -157,7 +157,7 @@ describe('repo worktree creation', () => {
     mocks.createWorktree.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'not-started'),
     )
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       REPO_ID,
@@ -175,7 +175,7 @@ describe('repo worktree creation', () => {
 
   test('createRepoWorktree reports uncertain state when cancellation happened after Git started', async () => {
     mocks.createWorktree.mockResolvedValueOnce(commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'cancelled'))
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       REPO_ID,
@@ -192,7 +192,7 @@ describe('repo worktree creation', () => {
   })
 
   test('createRepoWorktree skips bootstrap unless run is explicitly requested', async () => {
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       REPO_ID,
@@ -228,7 +228,7 @@ describe('repo worktree creation', () => {
 
   test('createRepoWorktree allows one-time bootstrap run requests without trusted repo settings', async () => {
     mocks.setServerWorkspaceWorktreeBootstrapConfigTrust.mockResolvedValueOnce(false)
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
 
@@ -257,7 +257,7 @@ describe('repo worktree creation', () => {
         skippedMissing: { count: 0, paths: [] },
       },
     })
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
 
@@ -274,7 +274,7 @@ describe('repo worktree creation', () => {
   })
 
   test('createRepoWorktree clears existing bootstrap trust when the create request leaves trust unchecked', async () => {
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
 
@@ -293,7 +293,7 @@ describe('repo worktree creation', () => {
 
   test('createRepoWorktree reports settings failure when clearing bootstrap trust fails after bootstrap succeeds', async () => {
     mocks.setServerWorkspaceWorktreeBootstrapConfigTrust.mockRejectedValueOnce(new Error('settings write failed'))
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
 
@@ -311,7 +311,7 @@ describe('repo worktree creation', () => {
   })
 
   test('createRepoWorktree stores bootstrap trust after bootstrap succeeds', async () => {
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: true })
 
@@ -339,8 +339,8 @@ describe('repo worktree creation', () => {
     mocks.createWorktree
       .mockImplementationOnce(async () => await firstCreate.promise)
       .mockImplementationOnce(async () => await secondCreate.promise)
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
-    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/repos/read-paths.ts')
 
     const first = createRepoWorktree(
       REPO_ID,
@@ -450,8 +450,8 @@ describe('repo worktree creation', () => {
     ])
     mocks.deleteBranch.mockImplementationOnce(async () => await firstDelete.promise)
     mocks.removeWorktree.mockImplementationOnce(async () => await secondRemove.promise)
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
-    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/repos/read-paths.ts')
 
     const first = deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
     await vi.waitFor(() => {
@@ -515,9 +515,9 @@ describe('repo worktree creation', () => {
     ])
     mocks.deleteBranch.mockImplementationOnce(async () => await firstDelete.promise)
     mocks.removeWorktree.mockImplementationOnce(async () => await secondRemove.promise)
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
-    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
-    const { resolveRepoWriteBoundaryForRead } = await import('#/server/modules/repo-write-operation-coordinator.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/repos/read-paths.ts')
+    const { resolveRepoWriteBoundaryForRead } = await import('#/server/repos/write-operation-coordinator.ts')
     await resolveRepoWriteBoundaryForRead(LINKED_REPO_ID)
 
     const first = deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
@@ -576,7 +576,7 @@ describe('repo worktree creation', () => {
     )
     mocks.deleteBranch.mockImplementationOnce(async () => await firstDelete.promise)
     mocks.pullBranch.mockImplementationOnce(async () => await secondPull.promise)
-    const { deleteRepoBranch, pullRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch, pullRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const first = deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
     await vi.waitFor(() => {
@@ -604,7 +604,7 @@ describe('repo worktree creation', () => {
 
   test('createRepoWorktree reports settings failure after creating and bootstrapping the worktree', async () => {
     mocks.setServerWorkspaceWorktreeBootstrapConfigTrust.mockRejectedValueOnce(new Error('settings write failed'))
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: true })
 

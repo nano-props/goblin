@@ -28,7 +28,7 @@ describe('fetchRepo coordination', () => {
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await firstFetch.promise)
     mocks.fetchRemoteRepo.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched second alias' }))
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const first = fetchRepo(firstRepoId, repoRuntimeCapabilityForTest(firstRepoId, 'test-runtime'), 'background')
     await vi.waitFor(() => expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1))
     const second = fetchRepo(secondRepoId, repoRuntimeCapabilityForTest(secondRepoId, 'test-runtime'), 'user')
@@ -73,7 +73,7 @@ describe('fetchRepo coordination', () => {
       target.alias === 'proxy-a' ? await firstFetch.promise : await secondFetch.promise,
     )
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const first = fetchRepo(firstRepoId, repoRuntimeCapabilityForTest(firstRepoId, 'test-runtime'), 'background')
     const second = fetchRepo(secondRepoId, repoRuntimeCapabilityForTest(secondRepoId, 'test-runtime'), 'background')
     await vi.waitFor(() => expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2))
@@ -117,7 +117,7 @@ describe('fetchRepo coordination', () => {
       return commandOutcomeForTest({ ok: true, message: 'fetched' })
     })
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const active = fetchRepo(repoId, repoRuntimeCapabilityForTest(repoId, 'test-runtime'), 'background')
     await vi.waitFor(() => {
       expect(fetchPaths).toEqual(['/srv/repo-a'])
@@ -140,8 +140,8 @@ describe('fetchRepo coordination', () => {
     mocks.deleteBranch.mockImplementationOnce(async () => await deleteBranch.promise)
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: true, message: 'fetched' }))
 
-    const { deleteRepoBranch, fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { deleteRepoBranch, fetchRepo } = await import('#/server/repos/write-paths.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/repos/read-paths.ts')
 
     const write = deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
     await vi.waitFor(() => {
@@ -193,7 +193,7 @@ describe('fetchRepo coordination', () => {
   test('does not publish invalidations after a failed sync', async () => {
     mocks.fetchAll.mockResolvedValueOnce(commandOutcomeForTest({ ok: false, message: 'fatal: offline' }, 'not-started'))
 
-    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { fetchRepo } = await import('#/server/repos/write-paths.ts')
     const result = await fetchRepo(REPO_ID, repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), 'background')
 
     expect(result).toEqual({ ok: false, message: 'fatal: offline' })
@@ -206,7 +206,7 @@ describe('cloneRepo cancellation', () => {
     const caller = new AbortController()
     caller.abort('client disconnected')
 
-    const { cloneRepo } = await import('#/server/modules/repo-clone-write.ts')
+    const { cloneRepo } = await import('#/server/repos/clone-write.ts')
     const result = await cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })
@@ -226,7 +226,7 @@ describe('cloneRepo cancellation', () => {
       },
     )
 
-    const { cloneRepo } = await import('#/server/modules/repo-clone-write.ts')
+    const { cloneRepo } = await import('#/server/repos/clone-write.ts')
     const result = await cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })

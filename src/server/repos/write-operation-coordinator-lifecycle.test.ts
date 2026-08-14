@@ -3,7 +3,7 @@ import {
   repoWriteOperationCoordinatorStatsForTests,
   resetRepoWriteOperationCoordinatorForTests,
   resolveRepoWriteBoundaryForRead,
-} from '#/server/modules/repo-write-operation-coordinator.ts'
+} from '#/server/repos/write-operation-coordinator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
     ((event: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string }) => void) | null,
 }))
 
-vi.mock('#/server/modules/repo-write-boundary.ts', () => ({
+vi.mock('#/server/repos/write-boundary.ts', () => ({
   resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
 }))
 

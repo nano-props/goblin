@@ -1,10 +1,10 @@
 import { promises as fs } from 'node:fs'
-import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
+import { RepositoryBoundaryUnavailableError } from '#/server/repos/boundary-error.ts'
 import {
   remoteRuntimeAwareGitRunner,
   resolveRemoteWorkspaceTarget,
   type RepoSourceRuntimeContext,
-} from '#/server/modules/remote-repo-execution.ts'
+} from '#/server/repos/remote-execution.ts'
 import { isRemoteWorkspaceId, type RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { parseWorkspaceLocator, type WorkspaceId, type WorkspaceLocatorPlatform } from '#/shared/workspace-locator.ts'
 import { resolveRepoCommonDir } from '#/system/git/branches.ts'

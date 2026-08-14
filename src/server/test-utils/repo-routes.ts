@@ -10,7 +10,7 @@ import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { isRemoteWorkspaceId, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import type { RepoOperationsReadOptions } from '#/server/modules/repo-read-paths.ts'
+import type { RepoOperationsReadOptions } from '#/server/repos/read-paths.ts'
 import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
@@ -63,7 +63,7 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
   getBackgroundSyncDiagnostics: vi.fn(),
   stopBackgroundSyncRuntime: mocks.stopBackgroundSyncRuntime,
 }))
-vi.mock('#/server/modules/repo-read-paths.ts', () => ({
+vi.mock('#/server/repos/read-paths.ts', () => ({
   getRepoLog: mocks.getRepoLog,
   getRepoPatch: mocks.getRepoPatch,
   readRepoSnapshot: mocks.readRepoSnapshot,
@@ -76,7 +76,7 @@ vi.mock('#/server/modules/workspace-probe.ts', () => ({
   probeLocalWorkspace: mocks.probeLocalWorkspace,
   probeWorkspace: mocks.probeWorkspace,
 }))
-vi.mock('#/server/modules/repo-write-paths.ts', () => ({
+vi.mock('#/server/repos/write-paths.ts', () => ({
   pullRepoBranch: mocks.pullRepoBranch,
   pushRepoBranch: mocks.pushRepoBranch,
   createRepoWorktree: mocks.createRepoWorktree,
@@ -85,7 +85,7 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   fetchRepo: mocks.fetchRepo,
   openRepoUrl: mocks.openRepoUrl,
 }))
-vi.mock('#/server/modules/repo-clone-write.ts', () => ({
+vi.mock('#/server/repos/clone-write.ts', () => ({
   cloneRepo: mocks.cloneRepo,
 }))
 vi.mock('#/server/settings/source.ts', () => ({
@@ -96,7 +96,7 @@ vi.mock('#/server/modules/invalidation-broker.ts', () => ({
   publishUserWorkspaceFilesystemInvalidation: mocks.publishUserWorkspaceFilesystemInvalidation,
   publishUserWorkspaceRuntimeInvalidation: mocks.publishUserWorkspaceRuntimeInvalidation,
 }))
-vi.mock('#/server/modules/repo-source.ts', () => ({
+vi.mock('#/server/repos/source.ts', () => ({
   resolveRepoSource: vi.fn(async () => ({ getSnapshot: mocks.getBackgroundSyncSnapshot })),
 }))
 vi.mock('#/server/common/identity.ts', () => ({

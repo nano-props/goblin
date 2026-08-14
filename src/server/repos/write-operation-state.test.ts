@@ -6,7 +6,7 @@ import {
   projectRepoWriteOperations,
   repoWriteOperationFailureReason,
   repoWriteOperationTimestamp,
-} from '#/server/modules/repo-write-operation-state.ts'
+} from '#/server/repos/write-operation-state.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
 

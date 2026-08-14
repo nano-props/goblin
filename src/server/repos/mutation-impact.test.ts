@@ -8,7 +8,7 @@ import {
   uniqueRepoMutationRecoveryMessageKeys,
   withRepoIdsToInvalidate,
   workspaceIdForLocalWorktreePath,
-} from '#/server/modules/repo-mutation-impact.ts'
+} from '#/server/repos/mutation-impact.ts'
 
 describe('repo mutation impact', () => {
   test('deduplicates affected repos while preserving the mutation result', () => {

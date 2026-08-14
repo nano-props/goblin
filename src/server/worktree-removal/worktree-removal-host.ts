@@ -1,5 +1,5 @@
-import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
-import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
+import type { RepoMutationResult } from '#/server/repos/mutation-impact.ts'
+import type { RepoWorktreeRemovalLifecycle } from '#/server/repos/worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-capability.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 

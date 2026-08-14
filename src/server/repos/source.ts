@@ -2,21 +2,21 @@ import path from 'node:path'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import { commandMayHaveRun } from '#/system/command-execution.ts'
 import type { CommandExecution } from '#/system/command-execution.ts'
-import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
-import { RepositoryBoundaryUnavailableError } from '#/server/modules/repository-boundary-error.ts'
+import type { RepoWorktreeRemovalLifecycle } from '#/server/repos/worktree-removal-lifecycle.ts'
+import { RepositoryBoundaryUnavailableError } from '#/server/repos/boundary-error.ts'
 import {
   createRemoteMutationAttempt,
   remoteRuntimeAwareGitRunner,
   resolveRemoteWorkspaceTarget,
   type RepoSourceRuntimeContext,
-} from '#/server/modules/remote-repo-execution.ts'
+} from '#/server/repos/remote-execution.ts'
 import {
   repoWriteBoundaryKey,
   resolveLocalRepoExecution,
   resolveLocalRepoWriteBoundaryForPath,
   resolveRemoteRepoWriteBoundaryForTarget,
   resolveRepoWriteBoundaryForLocator,
-} from '#/server/modules/repo-write-boundary.ts'
+} from '#/server/repos/write-boundary.ts'
 import {
   appendRepoMutationRecoveryMessageKey,
   localWorktreeRepoIds,
@@ -26,8 +26,8 @@ import {
   workspaceIdForLocalWorktreePath,
   type CreateWorktreeMutationResult,
   type RepoMutationResult,
-} from '#/server/modules/repo-mutation-impact.ts'
-import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+} from '#/server/repos/mutation-impact.ts'
+import { RepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
 import {
   deleteBranch,
   deleteUpstreamBranch,

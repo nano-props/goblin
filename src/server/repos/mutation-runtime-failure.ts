@@ -1,4 +1,4 @@
-import type { RepoMutationResult } from '#/server/modules/repo-mutation-impact.ts'
+import type { RepoMutationResult } from '#/server/repos/mutation-impact.ts'
 import type { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 
 /**

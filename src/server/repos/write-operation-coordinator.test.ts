@@ -8,11 +8,11 @@ import {
   resetRepoWriteOperationCoordinatorForTests,
   resolveRepoWriteBoundaryForRead,
   runWithRepoMembershipReadAdmission,
-} from '#/server/modules/repo-write-operation-coordinator.ts'
+} from '#/server/repos/write-operation-coordinator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { RepoWriteExecutionCapability } from '#/server/modules/repo-source.ts'
+import type { RepoWriteExecutionCapability } from '#/server/repos/source.ts'
 import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
-import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import { RepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
@@ -44,7 +44,7 @@ const mocks = vi.hoisted(() => ({
     ((event: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string }) => void) | null,
 }))
 
-vi.mock('#/server/modules/repo-source.ts', () => ({
+vi.mock('#/server/repos/source.ts', () => ({
   captureRepoWriteExecution: async (repoId: WorkspaceId, _runtime?: unknown, signal?: AbortSignal) => {
     return { boundaryKey: await mocks.resolveRepoWriteBoundaryKey(repoId, signal) }
   },
@@ -53,7 +53,7 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
     await task({}),
 }))
 
-vi.mock('#/server/modules/repo-write-boundary.ts', () => ({
+vi.mock('#/server/repos/write-boundary.ts', () => ({
   resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
 }))
 

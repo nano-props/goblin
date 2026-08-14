@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import type * as RepoWritePaths from '#/server/modules/repo-write-paths.ts'
+import type * as RepoWritePaths from '#/server/repos/write-paths.ts'
 import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import {
   LINKED_REPO_ID,
@@ -16,8 +16,8 @@ const SKIP_WORKTREE_BOOTSTRAP = { kind: 'skip' as const }
 
 describe('repo branch mutations', () => {
   test('deleteRepoBranch settles the write operation and returns its projection impact', async () => {
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
-    const { listRepoWriteOperationsForRepo } = await import('#/server/modules/repo-write-operation-coordinator.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
+    const { listRepoWriteOperationsForRepo } = await import('#/server/repos/write-operation-coordinator.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
@@ -39,8 +39,8 @@ describe('repo branch mutations', () => {
         repo.pushRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime')),
     ],
   ])('%s records the network mutation in the repo write coordinator', async (name, run) => {
-    const repo = await import('#/server/modules/repo-write-paths.ts')
-    const { listRepoWriteOperationsForRepo } = await import('#/server/modules/repo-write-operation-coordinator.ts')
+    const repo = await import('#/server/repos/write-paths.ts')
+    const { listRepoWriteOperationsForRepo } = await import('#/server/repos/write-operation-coordinator.ts')
 
     const result = await run(repo)
 
@@ -67,7 +67,7 @@ describe('repo branch mutations', () => {
         worktreePathsToInvalidate: ['/tmp/repo-worktree'],
       }),
     )
-    const { pullRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { pullRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await pullRepoBranch(
       REPO_ID,
@@ -90,7 +90,7 @@ describe('repo branch mutations', () => {
         'failed',
       ),
     )
-    const repo = await import('#/server/modules/repo-write-paths.ts')
+    const repo = await import('#/server/repos/write-paths.ts')
 
     const result = await repo.pullRepoBranch(
       REPO_ID,
@@ -124,7 +124,7 @@ describe('repo branch mutations', () => {
     ],
   ])('%s reports an uncertain result after timeout', async (_name, setup, run) => {
     setup()
-    const repo = await import('#/server/modules/repo-write-paths.ts')
+    const repo = await import('#/server/repos/write-paths.ts')
 
     const result = await run(repo)
 
@@ -170,7 +170,7 @@ describe('repo branch mutations', () => {
     ],
   ])('%s does not publish snapshot invalidation after failure', async (_name, setup, run) => {
     setup()
-    const repo = await import('#/server/modules/repo-write-paths.ts')
+    const repo = await import('#/server/repos/write-paths.ts')
 
     const result = await run(repo)
 
@@ -181,7 +181,7 @@ describe('repo branch mutations', () => {
     mocks.pushBranch.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'fatal: push failed' }, 'failed'),
     )
-    const { pushRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { pushRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await pushRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
@@ -196,7 +196,7 @@ describe('repo branch mutations', () => {
     mocks.pushRemoteBranch.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'connection closed after push' }, 'failed'),
     )
-    const { pushRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { pushRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await pushRepoBranch(repoId, 'feature/a', repoRuntimeCapabilityForTest(repoId, 'test-runtime'))
 
@@ -207,9 +207,9 @@ describe('repo branch mutations', () => {
   test('publishes primary SSH mutation impact before the runtime transport failure escapes', async () => {
     const [{ RepoMutationRuntimeFailureError }, { RemoteWorkspaceRuntimeFailureError }, { pushRepoBranch }] =
       await Promise.all([
-        import('#/server/modules/repo-mutation-runtime-failure.ts'),
+        import('#/server/repos/mutation-runtime-failure.ts'),
         import('#/server/modules/remote-workspace-runtime-failure.ts'),
-        import('#/server/modules/repo-write-paths.ts'),
+        import('#/server/repos/write-paths.ts'),
       ])
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
@@ -237,9 +237,9 @@ describe('repo branch mutations', () => {
   test('propagates mutation impact from a preclassified SSH branch runtime carrier', async () => {
     const [{ RepoMutationRuntimeFailureError }, { RemoteWorkspaceRuntimeFailureError }, { deleteRepoBranch }] =
       await Promise.all([
-        import('#/server/modules/repo-mutation-runtime-failure.ts'),
+        import('#/server/repos/mutation-runtime-failure.ts'),
         import('#/server/modules/remote-workspace-runtime-failure.ts'),
-        import('#/server/modules/repo-write-paths.ts'),
+        import('#/server/repos/write-paths.ts'),
       ])
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     const linkedRepoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo-feature' })
@@ -274,7 +274,7 @@ describe('repo branch mutations', () => {
     mocks.createWorktree.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'fatal: worktree failed' }, 'failed'),
     )
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       REPO_ID,
@@ -301,7 +301,7 @@ describe('repo branch mutations', () => {
         skippedMissing: { count: 0, paths: [] },
       },
     })
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
 
@@ -326,7 +326,7 @@ describe('repo branch mutations', () => {
 
   test('createRepoWorktree surfaces recovery when bootstrap is cancelled after creation', async () => {
     mocks.bootstrapWorktreeAfterCreate.mockResolvedValueOnce({ ok: false, message: 'cancelled' })
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: false })
 
@@ -352,7 +352,7 @@ describe('repo branch mutations', () => {
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
     })
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       repoId,
@@ -380,7 +380,7 @@ describe('repo branch mutations', () => {
   test('uses the remote physical path for a successfully created worktree', async () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     mocks.resolveRemoteWorktreePath.mockResolvedValueOnce('/srv/feature')
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       repoId,
@@ -403,7 +403,7 @@ describe('repo branch mutations', () => {
   test('reports recovery when the created remote target cannot be resolved', async () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     mocks.resolveRemoteWorktreePath.mockResolvedValueOnce(null)
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       repoId,
@@ -425,7 +425,7 @@ describe('repo branch mutations', () => {
   test('reports recovery when the remote target is outside the app locator grammar', async () => {
     const repoId = normalizeRemoteWorkspaceId({ alias: 'prod', remotePath: '/srv/repo' })
     mocks.resolveRemoteWorktreePath.mockResolvedValueOnce('/srv/repo\\feature')
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       repoId,
@@ -455,7 +455,7 @@ describe('repo branch mutations', () => {
       }),
     )
     mocks.bootstrapRemoteWorktreeAfterCreate.mockResolvedValueOnce({ ok: false, message: 'cancelled' })
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       repoId,
@@ -486,7 +486,7 @@ describe('repo branch mutations', () => {
     mocks.createRemoteWorktree.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'error.worktree-create-timeout-check-state' }, 'timed-out'),
     )
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       repoId,
@@ -508,7 +508,7 @@ describe('repo branch mutations', () => {
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
     })
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createLocalRepoWorktreeWithBootstrap(createRepoWorktree, { configTrusted: true })
 
@@ -522,7 +522,7 @@ describe('repo branch mutations', () => {
   })
 
   test('createRepoWorktree rejects non-absolute paths before calling git', async () => {
-    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { createRepoWorktree } = await import('#/server/repos/write-paths.ts')
 
     const result = await createRepoWorktree(
       REPO_ID,
@@ -540,8 +540,8 @@ describe('repo branch mutations', () => {
   })
 
   test('deleteRepoBranch publishes snapshot invalidation after success', async () => {
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
-    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/repos/read-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
@@ -564,7 +564,7 @@ describe('repo branch mutations', () => {
       message: 'cancelled',
       branchEffect: 'local-delete-confirmed',
     })
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(repoId, 'feature/a', repoRuntimeCapabilityForTest(repoId, 'test-runtime'), {
       deleteUpstream: true,
@@ -608,7 +608,7 @@ describe('repo branch mutations', () => {
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
       { path: '/tmp/repo-linked', branch: 'feature/b', isBare: false, isPrimary: false },
     ])
-    const repo = await import('#/server/modules/repo-write-paths.ts')
+    const repo = await import('#/server/repos/write-paths.ts')
 
     const result = await run(repo)
 
@@ -618,7 +618,7 @@ describe('repo branch mutations', () => {
 
   test('deleteRepoBranch refuses protected branches before touching git', async () => {
     mocks.getCurrentBranch.mockResolvedValueOnce('feature/current')
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'main', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
@@ -632,7 +632,7 @@ describe('repo branch mutations', () => {
     mocks.readWorktreeMembership.mockResolvedValueOnce([])
     mocks.isAncestor.mockImplementationOnce(async (_cwd, _branch, descendant) => descendant === 'release/1.0')
     mocks.getUpstream.mockResolvedValueOnce(null)
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
@@ -657,7 +657,7 @@ describe('repo branch mutations', () => {
         isLocked: false,
       },
     ])
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), {
       force: true,
@@ -676,7 +676,7 @@ describe('repo branch mutations', () => {
       source: { remote: 'origin', branch: 'feature/a' },
       deleteTarget: { remote: 'origin', branch: 'feature/a' },
     })
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
@@ -701,7 +701,7 @@ describe('repo branch mutations', () => {
         source: { remote: 'fork', branch: 'other' },
         deleteTarget: { remote: 'fork', branch: 'other' },
       })
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), {
       deleteUpstream: true,
@@ -725,7 +725,7 @@ describe('repo branch mutations', () => {
     mocks.deleteUpstreamBranch.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'not-started'),
     )
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), {
       deleteUpstream: true,
@@ -748,7 +748,7 @@ describe('repo branch mutations', () => {
       source: { remote: '.', branch: 'main' },
       deleteTarget: null,
     })
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     await expect(
       deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), {
@@ -766,7 +766,7 @@ describe('repo branch mutations', () => {
     mocks.deleteBranch.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'fatal: delete failed' }, 'not-started'),
     )
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
@@ -777,7 +777,7 @@ describe('repo branch mutations', () => {
     mocks.deleteBranch.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'connection closed' }, 'failed'),
     )
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
@@ -787,7 +787,7 @@ describe('repo branch mutations', () => {
 
   test('deleteRepoBranch surfaces cancellation after the delete command started', async () => {
     mocks.deleteBranch.mockResolvedValueOnce(commandOutcomeForTest({ ok: false, message: 'cancelled' }, 'cancelled'))
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
@@ -799,7 +799,7 @@ describe('repo branch mutations', () => {
     mocks.deleteBranch.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'git timed out after 180s' }, 'timed-out'),
     )
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 
@@ -818,7 +818,7 @@ describe('repo branch mutations', () => {
     mocks.deleteUpstreamBranch.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'upstream timeout' }, 'timed-out'),
     )
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'), {
       deleteUpstream: true,
@@ -841,7 +841,7 @@ describe('repo branch mutations', () => {
       branchEffect: 'may-have-changed',
       failureExecution: { status: 'timed-out' },
     })
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(repoId, 'feature/a', repoRuntimeCapabilityForTest(repoId, 'test-runtime'))
 
@@ -853,7 +853,7 @@ describe('repo branch mutations', () => {
     mocks.deleteBranch.mockResolvedValueOnce(
       commandOutcomeForTest({ ok: false, message: 'error: branch is not fully merged' }, 'failed'),
     )
-    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+    const { deleteRepoBranch } = await import('#/server/repos/write-paths.ts')
 
     const result = await deleteRepoBranch(REPO_ID, 'feature/a', repoRuntimeCapabilityForTest(REPO_ID, 'test-runtime'))
 

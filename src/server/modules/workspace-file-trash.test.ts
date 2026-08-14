@@ -22,7 +22,7 @@ vi.mock('#/system/trash.ts', () => ({
   movePathToTrash: mocks.movePathToTrash,
 }))
 
-vi.mock('#/server/modules/remote-repo-execution.ts', () => ({
+vi.mock('#/server/repos/remote-execution.ts', () => ({
   resolveRemoteWorkspaceTarget: mocks.resolveRemoteWorkspaceTarget,
   remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))

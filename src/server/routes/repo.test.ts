@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
 import { failRemoteWorkspaceLifecycle, runSerializedWorkspaceRefresh } from '#/server/modules/workspace-runtimes.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
+import { RepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
 
 const mocks = repoRouteMocks()
 

@@ -1,13 +1,13 @@
 import { Cron } from 'croner'
 import PQueue from 'p-queue'
-import { fetchRepo } from '#/server/modules/repo-write-paths.ts'
+import { fetchRepo } from '#/server/repos/write-paths.ts'
 import { serverNodeLog } from '#/node/logger.ts'
 import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/server/settings/source.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
 import { failRemoteWorkspaceRuntimeIfNeeded } from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
-import { isRepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
-import { publishRepoMutationInvalidations } from '#/server/modules/repo-mutation-invalidation.ts'
+import { isRepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
+import { publishRepoMutationInvalidations } from '#/server/repos/mutation-invalidation.ts'
 import {
   onWorkspaceRuntimeClosed,
   onWorkspaceRuntimeFailed,

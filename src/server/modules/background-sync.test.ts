@@ -56,7 +56,7 @@ const mocks = vi.hoisted(() => ({
   failRemoteWorkspaceRuntimeIfNeeded: vi.fn(),
 }))
 
-vi.mock('#/server/modules/repo-write-paths.ts', () => ({
+vi.mock('#/server/repos/write-paths.ts', () => ({
   fetchRepo: mocks.fetchRepo,
 }))
 

@@ -1,7 +1,7 @@
 import type { RestoredWorkspaceRuntime, WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
 import { CodedError } from '#/shared/coded-error.ts'
 import { isRemoteWorkspaceId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
-import { readRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
+import { readRepoSnapshot } from '#/server/repos/read-paths.ts'
 import {
   captureWorkspaceRuntimeMembershipCapability,
   runSerializedInitialWorkspaceProbe,
