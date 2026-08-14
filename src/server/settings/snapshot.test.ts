@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
+import { createNativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 
 const mocks = vi.hoisted(() => ({
   getUserSettings: vi.fn(),

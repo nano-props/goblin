@@ -4,7 +4,7 @@ import { getSettingsSnapshot } from '#/server/settings/snapshot.ts'
 import { addServerWorkspaceEntry, getUserSettings, removeServerWorkspaceEntry } from '#/server/settings/source.ts'
 import { restoreServerWorkspace } from '#/server/workspaces/restore/session.ts'
 import { restoreWorkspaceTabs } from '#/server/workspaces/restore/tabs.ts'
-import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
+import type { NativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import {

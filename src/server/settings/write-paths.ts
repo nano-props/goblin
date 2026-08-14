@@ -6,7 +6,7 @@ import {
   setServerWorkspaceExternalAppRecent,
   updateUserSettings,
 } from '#/server/settings/source.ts'
-import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
+import type { NativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import type { WorkspaceSettingsState, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
 import type { UserSettings } from '#/shared/settings.ts'

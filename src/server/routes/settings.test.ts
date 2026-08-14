@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
+import { createNativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type { RestoreWorkspaceTabsInput } from '#/server/workspaces/restore/tabs.ts'
 import type { WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'

@@ -1,5 +1,5 @@
 import { getServerRecentWorkspaces, getServerWorkspaceSettings, getUserSettings } from '#/server/settings/source.ts'
-import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
+import type { NativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 import { buildSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 
