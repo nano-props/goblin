@@ -6,12 +6,13 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { remoteGitOperationStateScript } from '#/system/ssh/remote-git-operation-state-script.ts'
 
 const tempDirectories: string[] = []
+const describePosix = process.platform === 'win32' ? describe.skip : describe
 
 afterEach(async () => {
   await Promise.all(tempDirectories.splice(0).map(async (directory) => await rm(directory, { recursive: true })))
 })
 
-describe('remote Git operation state script', () => {
+describePosix('remote Git operation state script', () => {
   test('fails when Git cannot resolve administrative paths', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'goblin remote operation failure '))
     tempDirectories.push(directory)

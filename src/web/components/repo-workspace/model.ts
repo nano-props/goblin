@@ -28,13 +28,8 @@ export function getCurrentGitWorkspacePane(workspace: GitWorkspacePaneProjection
   const changes = worktreeChanges(workspace.status, worktree?.path)
   const statusCount = changes?.changeCount
 
-  // The Git pane projection reads the target from the lifecycle
-  // union via `remoteWorkspaceTarget`; we don't mirror it on the
-  // `remote` shape anymore (Phase 4 removed the legacy
-  // `target` field). `workspaceId` is forwarded so consumers can
-  // re-resolve the live lifecycle via `workspacesStore` (the
-  // presentation object is a snapshot — it doesn't re-render on
-  // lifecycle transitions).
+  // The presentation is a snapshot, so consumers use workspaceId to
+  // resolve the current lifecycle target instead of caching it here.
   return {
     workspaceId: workspace.id,
     branch,
