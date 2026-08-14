@@ -34,7 +34,7 @@ import {
   EMPTY_TERMINAL_SNAPSHOT,
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
-} from '#/web/components/terminal/terminal-session-context.ts'
+} from '#/web/terminal/components/terminal-session-context.ts'
 import type {
   WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
@@ -51,7 +51,7 @@ import type {
   TerminalSessionSummary,
   TerminalDescriptor,
   TerminalFilesystemTargetSnapshot,
-} from '#/web/components/terminal/types.ts'
+} from '#/web/terminal/components/types.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
@@ -69,7 +69,7 @@ import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import { renderInJsdom as renderInJsdomWithoutWorkspaceView } from '#/test-utils/render.tsx'
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import { terminalSessionContextWithCreatedAdmissionForTest } from '#/web/test-utils/terminal-session-context.ts'

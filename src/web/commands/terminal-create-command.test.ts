@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
-import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/terminal/components/terminal-create-admission.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 
 const REPO_ID = 'goblin+file:///tmp/goblin-terminal-create-command-repo'

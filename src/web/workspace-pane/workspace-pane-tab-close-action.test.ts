@@ -25,7 +25,7 @@ import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/works
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import {
   observedAppNavigationActionsForTest,
   seedInitialObservedWorkspacePaneRouteForTest,

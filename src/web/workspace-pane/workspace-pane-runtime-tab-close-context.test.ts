@@ -4,7 +4,7 @@ import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import {
   setTerminalSessionCommandBridge,
   type TerminalSessionCommandBridge,
-} from '#/web/components/terminal/terminal-session-command-bridge.ts'
+} from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import { readWorkspacePaneRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'

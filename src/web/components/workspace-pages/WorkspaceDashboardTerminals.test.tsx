@@ -7,12 +7,12 @@ import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
-import { TerminalSessionReadScope } from '#/web/components/terminal/terminal-session-context.ts'
+import { TerminalSessionReadScope } from '#/web/terminal/components/terminal-session-context.ts'
 import { WorkspaceDashboardTerminals } from '#/web/components/workspace-pages/WorkspaceDashboardTerminals.tsx'
 import type {
   TerminalSessionReadContextValue,
   WorkspaceTerminalSessionSummary,
-} from '#/web/components/terminal/types.ts'
+} from '#/web/terminal/components/types.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import {
   provideTerminalProjectionRecoveryActions,

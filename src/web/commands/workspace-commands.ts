@@ -12,7 +12,7 @@ import {
   dispatchMoveWorkspacePaneTabAction,
   dispatchSelectWorkspacePaneTabByIndexAction,
 } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
-import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
+import type { TerminalCreateTranslator } from '#/web/terminal/components/terminal-create-feedback.ts'
 import { isWorkspacePaneStaticTabProvider, workspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneActionOutcomeHandled } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import {

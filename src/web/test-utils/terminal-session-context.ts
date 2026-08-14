@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import type { TerminalSessionContextValue } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionContextValue } from '#/web/terminal/components/types.ts'
 
 type TestTerminalSessionContextValue = Omit<
   TerminalSessionContextValue,

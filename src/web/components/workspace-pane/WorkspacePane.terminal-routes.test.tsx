@@ -15,8 +15,8 @@ import {
   EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
-} from '#/web/components/terminal/terminal-session-context.ts'
-import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+} from '#/web/terminal/components/terminal-session-context.ts'
+import type { TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
 import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
@@ -30,7 +30,7 @@ import {
   createTerminalWithAdmissionForContextTest,
   terminalSessionContextForTest,
 } from '#/web/test-utils/terminal-session-context.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import type { WorkspacePaneRoute } from '#/web/App.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {

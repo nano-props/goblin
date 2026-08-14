@@ -15,7 +15,7 @@ import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx
 import {
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
-} from '#/web/components/terminal/terminal-session-context.ts'
+} from '#/web/terminal/components/terminal-session-context.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { appQueryClient } from '#/web/app-query-client.ts'
 import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'

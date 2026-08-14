@@ -3,10 +3,10 @@ import type {
   TerminalSessionSummary,
   WorkspaceRuntimeScope,
 } from '#/shared/terminal-types.ts'
-import type { TerminalBellState } from '#/web/components/terminal/terminal-bell-state.ts'
-import type { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
-import type { TerminalSessionProjection } from '#/web/components/terminal/TerminalSessionProjection.ts'
-import type { TerminalDescriptor, TerminalSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalBellState } from '#/web/terminal/components/terminal-bell-state.ts'
+import type { TerminalSession } from '#/web/terminal/components/TerminalSession.ts'
+import type { TerminalSessionProjection } from '#/web/terminal/components/TerminalSessionProjection.ts'
+import type { TerminalDescriptor, TerminalSnapshot } from '#/web/terminal/components/types.ts'
 
 interface TerminalSessionProjectionTestAccess {
   readonly sessions: Map<string, TerminalSession>

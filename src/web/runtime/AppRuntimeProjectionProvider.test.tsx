@@ -47,7 +47,7 @@ const projectionMocks = vi.hoisted(() => ({
 
 vi.mock('#/web/client-page-id.ts', () => ({ readClientPageId: () => 'client_sharedterminal' }))
 
-vi.mock('#/web/components/terminal/use-terminal-session-projection.ts', () => ({
+vi.mock('#/web/terminal/components/use-terminal-session-projection.ts', () => ({
   useTerminalSessionProjection: () => projectionMocks,
 }))
 

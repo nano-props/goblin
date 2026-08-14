@@ -1,0 +1,90 @@
+import { describe, expect, test, vi } from 'vitest'
+import type { Mock } from 'vitest'
+import { buildTerminalFilesystemTargetSnapshot } from '#/web/terminal/components/terminal-session-filesystem-target-snapshot.ts'
+import type { TerminalDescriptor, TerminalSnapshot } from '#/web/terminal/components/types.ts'
+import { terminalDescriptorForTest } from '#/web/test-utils/terminal-model.ts'
+import { terminalDescriptorFilesystemTargetKey } from '#/web/terminal/components/terminal-descriptor.ts'
+import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/terminal-snapshot.ts'
+
+function makeDescriptor(terminalSessionId: string, index: number): TerminalDescriptor {
+  return terminalDescriptorForTest({
+    terminalSessionId: `/repo\0/repo\0${terminalSessionId}`,
+    index,
+    repoRoot: '/repo',
+    workspaceRuntimeId: 'repo-runtime-test',
+    branch: 'main',
+    worktreePath: '/repo',
+  })
+}
+
+function makeSession(
+  descriptor: TerminalDescriptor,
+  snapshot: TerminalSnapshot,
+): { descriptor: TerminalDescriptor; snapshot: () => TerminalSnapshot; snapshotSpy: Mock<() => TerminalSnapshot> } {
+  const snapshotSpy = vi.fn(() => snapshot)
+  return {
+    descriptor,
+    snapshot: snapshotSpy,
+    snapshotSpy,
+  }
+}
+
+describe('terminal session filesystem target snapshot helper', () => {
+  test('builds summaries and populates snapshot cache lazily', () => {
+    const descriptor = makeDescriptor('term-111111111111111111111', 1)
+    const session = makeSession(descriptor, {
+      phase: 'open',
+      message: null,
+      processName: 'bash',
+      composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
+      canonicalTitle: 'npm run dev',
+    })
+    const cache = new Map<string, TerminalSnapshot>()
+
+    const snapshot = buildTerminalFilesystemTargetSnapshot({
+      terminalFilesystemTargetKey: terminalDescriptorFilesystemTargetKey(descriptor),
+      selectedDescriptor: descriptor,
+      createPending: false,
+      sessions: [session],
+      selectedTerminalSessionId: descriptor.terminalSessionId,
+      getCachedSnapshot: (terminalSessionId) => cache.get(terminalSessionId) ?? null,
+      cacheSnapshot: (terminalSessionId, value) => cache.set(terminalSessionId, value),
+      hasBell: () => true,
+      hasRecentOutput: () => true,
+    })
+
+    expect(snapshot).toEqual({
+      terminalFilesystemTargetKey: terminalDescriptorFilesystemTargetKey(descriptor),
+      selectedDescriptor: descriptor,
+      sessions: [
+        expect.objectContaining({
+          type: 'terminal',
+          terminalSessionId: descriptor.terminalSessionId,
+          selected: true,
+          hasBell: true,
+          hasRecentOutput: true,
+          phase: 'open',
+          originalTitle: 'npm run dev',
+        }),
+      ],
+      count: 1,
+      bellCount: 1,
+      outputActiveCount: 1,
+      createPending: false,
+    })
+    expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
+
+    buildTerminalFilesystemTargetSnapshot({
+      terminalFilesystemTargetKey: terminalDescriptorFilesystemTargetKey(descriptor),
+      selectedDescriptor: descriptor,
+      createPending: false,
+      sessions: [session],
+      selectedTerminalSessionId: descriptor.terminalSessionId,
+      getCachedSnapshot: (terminalSessionId) => cache.get(terminalSessionId) ?? null,
+      cacheSnapshot: (terminalSessionId, value) => cache.set(terminalSessionId, value),
+      hasBell: () => false,
+      hasRecentOutput: () => false,
+    })
+    expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
+  })
+})

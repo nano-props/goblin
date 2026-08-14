@@ -8,7 +8,7 @@ import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-targe
 import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { useTerminalSessionContext } from '#/web/terminal/components/terminal-session-context.ts'
 import {
   WorkspaceExternalAppLauncher,
   useWorkspaceExternalAppItems,

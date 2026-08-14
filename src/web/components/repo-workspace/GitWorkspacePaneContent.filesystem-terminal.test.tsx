@@ -33,7 +33,7 @@ import { BranchActionSurfaceProvider } from '#/web/components/repo-workspace/bra
 import {
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
-} from '#/web/components/terminal/terminal-session-context.ts'
+} from '#/web/terminal/components/terminal-session-context.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
@@ -42,7 +42,7 @@ import type {
   TerminalFilesystemTargetSnapshot,
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
-} from '#/web/components/terminal/types.ts'
+} from '#/web/terminal/components/types.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'

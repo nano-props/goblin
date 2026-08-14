@@ -21,8 +21,8 @@ import { Badge } from '#/web/components/ui/badge.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { formatRelativeTimeOrNull } from '#/web/lib/dates.ts'
 import { worktreeChanges } from '#/web/stores/workspaces/worktree-state.ts'
-import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
-import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
+import { TerminalBellBadge } from '#/web/terminal/components/TerminalBellBadge.tsx'
+import { TerminalOutputActivityIndicator } from '#/web/terminal/components/TerminalOutputActivityIndicator.tsx'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
 export interface BranchSummaryInlineRepo {

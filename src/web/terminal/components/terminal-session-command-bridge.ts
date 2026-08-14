@@ -1,0 +1,38 @@
+import type {
+  TerminalCreateOptions,
+  TerminalFilesystemTargetSnapshot,
+  TerminalFocusRequest,
+} from '#/web/terminal/components/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/terminal/components/terminal-create-admission.ts'
+import type { WorkspacePaneTabCloseOutcome } from '#/web/workspace-pane/workspace-pane-tab-close-outcome.ts'
+
+export interface TerminalSessionCommandBridge {
+  terminalFilesystemTargetSnapshot: (terminalFilesystemTargetKey: string) => TerminalFilesystemTargetSnapshot
+  createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
+  createTerminalWithAdmission: (
+    base: TerminalSessionBase,
+    options?: TerminalCreateOptions,
+    placement?: WorkspacePaneRuntimeTabPlacement,
+  ) => Promise<TerminalCreateAdmissionResult>
+  selectTerminal: (terminalFilesystemTargetKey: string, terminalSessionId: string) => void
+  focusTerminal: (terminalSessionId: string, request?: TerminalFocusRequest) => boolean
+  closeTerminalByDescriptor: (
+    terminalSessionId: string,
+    base: TerminalSessionBase,
+  ) => Promise<WorkspacePaneTabCloseOutcome>
+}
+
+let bridge: TerminalSessionCommandBridge | null = null
+
+export function setTerminalSessionCommandBridge(next: TerminalSessionCommandBridge | null): () => void {
+  bridge = next
+  return () => {
+    if (bridge === next) bridge = null
+  }
+}
+
+export function readTerminalSessionCommandBridge(): TerminalSessionCommandBridge | null {
+  return bridge
+}

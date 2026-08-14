@@ -2,8 +2,8 @@ import { computed, toValue } from 'vue'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
-import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
+import { useTerminalSessionContext } from '#/web/terminal/components/terminal-session-context.ts'
+import type { TerminalCreateTranslator } from '#/web/terminal/components/terminal-create-feedback.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
   type CreatedTerminalRouteRequest,

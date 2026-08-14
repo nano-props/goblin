@@ -1,7 +1,7 @@
 import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
-import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import type { TerminalCreateTranslator } from '#/web/terminal/components/terminal-create-feedback.ts'
+import { readTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import type {
   ExistingTerminalPresentationRouteRequest,
   WorkspacePaneRuntimeTabCommandContext,

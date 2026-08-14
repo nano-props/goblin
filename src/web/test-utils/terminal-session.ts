@@ -20,8 +20,8 @@ import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/work
 import { waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { TerminalSession } from '#/web/components/terminal/TerminalSession.ts'
-import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
+import { TerminalSession } from '#/web/terminal/components/TerminalSession.ts'
+import type { TerminalDescriptor } from '#/web/terminal/components/types.ts'
 import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
 import { installTerminalThemeStyles } from '#/web/test-utils/terminal-theme.ts'
 
@@ -381,7 +381,7 @@ const geometryMocks = vi.hoisted(() => ({
   preloadTerminalFont: vi.fn(async () => {}),
 }))
 
-vi.mock('#/web/components/terminal/terminal-font.ts', () => ({
+vi.mock('#/web/terminal/components/terminal-font.ts', () => ({
   preloadTerminalFont: geometryMocks.preloadTerminalFont,
 }))
 export function terminalXtermMocks() {

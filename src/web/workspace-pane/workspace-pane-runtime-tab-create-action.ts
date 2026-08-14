@@ -13,9 +13,9 @@ import {
   type TerminalCreateCommandResult,
   type TerminalCreatedTabCommitResult,
 } from '#/web/commands/terminal-create-command.ts'
-import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
-import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
-import type { TerminalCreateOptions, TerminalFocusRequest } from '#/web/components/terminal/types.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/terminal/components/terminal-create-admission.ts'
+import type { TerminalCreateTranslator } from '#/web/terminal/components/terminal-create-feedback.ts'
+import type { TerminalCreateOptions, TerminalFocusRequest } from '#/web/terminal/components/types.ts'
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   gitWorktreePaneTargetLease,

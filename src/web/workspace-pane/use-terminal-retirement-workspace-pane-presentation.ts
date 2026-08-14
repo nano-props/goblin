@@ -2,7 +2,7 @@ import { onScopeDispose, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { useTerminalSessionProjection } from '#/web/components/terminal/use-terminal-session-projection.ts'
+import { useTerminalSessionProjection } from '#/web/terminal/components/use-terminal-session-projection.ts'
 import { runRetiredTerminalWorkspacePaneTabPresentationCommand } from '#/web/commands/workspace-commands.ts'
 import { terminalLog } from '#/web/logger.ts'
 

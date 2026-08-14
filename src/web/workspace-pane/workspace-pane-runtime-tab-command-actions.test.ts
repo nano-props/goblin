@@ -9,8 +9,8 @@ import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSession
 import {
   setTerminalSessionCommandBridge,
   type TerminalSessionCommandBridge,
-} from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
+} from '#/web/terminal/components/terminal-session-command-bridge.ts'
+import type { TerminalFocusRequest } from '#/web/terminal/components/types.ts'
 import {
   dispatchNewTerminalRuntimeTabAction,
   dispatchTerminalRuntimePrimaryAction,

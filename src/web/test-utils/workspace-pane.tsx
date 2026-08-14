@@ -7,12 +7,12 @@ import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-
 import {
   EMPTY_TERMINAL_SNAPSHOT,
   EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
-} from '#/web/components/terminal/terminal-session-context.ts'
+} from '#/web/terminal/components/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
   TerminalFilesystemTargetSnapshot,
-} from '#/web/components/terminal/types.ts'
+} from '#/web/terminal/components/types.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { createAppNavigationActions } from '#/web/app/navigation/actions.ts'

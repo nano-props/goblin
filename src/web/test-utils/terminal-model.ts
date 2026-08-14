@@ -1,7 +1,7 @@
 import { terminalGitWorktreePresentation, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import { terminalDescriptor } from '#/web/components/terminal/terminal-descriptor.ts'
-import type { TerminalDescriptor } from '#/web/components/terminal/types.ts'
+import { terminalDescriptor } from '#/web/terminal/components/terminal-descriptor.ts'
+import type { TerminalDescriptor } from '#/web/terminal/components/types.ts'
 
 export function terminalSessionBaseForTest(input: {
   repoRoot: string

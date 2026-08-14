@@ -19,13 +19,13 @@ import {
   useTerminalSessionReadContext,
   EMPTY_TERMINAL_SNAPSHOT,
   EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
-} from '#/web/components/terminal/terminal-session-context.ts'
+} from '#/web/terminal/components/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionSummary,
   TerminalSessionReadContextValue,
   TerminalFilesystemTargetSnapshot,
-} from '#/web/components/terminal/types.ts'
+} from '#/web/terminal/components/types.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'

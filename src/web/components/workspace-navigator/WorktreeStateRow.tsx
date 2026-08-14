@@ -6,12 +6,12 @@ import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { NavigatorRow } from '#/web/components/workspace-navigator/NavigatorRow.tsx'
-import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
-import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
+import { TerminalBellBadge } from '#/web/terminal/components/TerminalBellBadge.tsx'
+import { TerminalOutputActivityIndicator } from '#/web/terminal/components/TerminalOutputActivityIndicator.tsx'
 import {
   useTerminalFilesystemTargetBellCount,
   useTerminalFilesystemTargetOutputActive,
-} from '#/web/components/terminal/terminal-session-store.ts'
+} from '#/web/terminal/components/terminal-session-store.ts'
 import type { ElementRef } from '#/web/components/ui/refs.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { worktreePresentationLabel } from '#/web/repos/worktree-presentation.ts'

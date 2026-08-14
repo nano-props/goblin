@@ -12,7 +12,7 @@ import {
   runCloseWorkspacePaneTabCommand as runCloseWorkspacePaneTabCommandRaw,
   runConfirmCloseTerminalWorkspacePaneTabCommand,
 } from '#/web/commands/workspace-commands.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { terminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'

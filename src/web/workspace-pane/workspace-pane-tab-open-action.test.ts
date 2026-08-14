@@ -37,8 +37,8 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { repoPresentationFromQueryForTest } from '#/web/test-utils/repo-store.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
+import type { TerminalFilesystemTargetSnapshot } from '#/web/terminal/components/types.ts'
 import {
   observeWorkspacePaneRouteForTest,
   observedFilesystemWorkspacePaneRouteCommitForTest,

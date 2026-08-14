@@ -8,7 +8,7 @@ import {
   resetTerminalAutoFocusForTest,
   terminalHasKeyboardFocus,
 } from '#/web/terminal/focus.ts'
-import type { TerminalFocusRequest } from '#/web/components/terminal/types.ts'
+import type { TerminalFocusRequest } from '#/web/terminal/components/types.ts'
 import { keyboardEventForTest } from '#/web/test-utils/keyboard-event.ts'
 
 type RequiredTerminalFocusRequest = Required<TerminalFocusRequest>

@@ -10,7 +10,7 @@ import {
   runShowWorkspacePaneTabCommand as runShowWorkspacePaneTabCommandRaw,
   runTerminalPrimaryActionCommand as runTerminalPrimaryActionCommandRaw,
 } from '#/web/commands/workspace-commands.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -23,7 +23,7 @@ import {
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalFilesystemTargetSnapshot } from '#/web/terminal/components/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'

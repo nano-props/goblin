@@ -9,8 +9,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { Layout } from '#/web/Layout.tsx'
-import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
-import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+import { useWorkspaceTerminalBellCounts } from '#/web/terminal/components/terminal-session-store.ts'
+import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 
@@ -73,10 +73,10 @@ vi.mock('#/web/app/navigation/history-presentation.ts', async (importOriginal) =
   useAppHistoryPresentationObserver: () => undefined,
 }))
 
-vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
+vi.mock('#/web/terminal/components/TerminalSessionProvider.tsx', async () => {
   const { defineComponent } = await import('vue')
   const { TerminalSessionCommandScope, TerminalSessionReadScope } =
-    await import('#/web/components/terminal/terminal-session-context.ts')
+    await import('#/web/terminal/components/terminal-session-context.ts')
   const readContext: TerminalSessionReadContextValue = {
     terminalFilesystemTargetSnapshot: () => ({
       terminalFilesystemTargetKey: '',

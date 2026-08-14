@@ -47,7 +47,7 @@ vi.mock('#/web/components/workspace-navigator/WorktreeActionsMenu.tsx', () => ({
   ),
 }))
 
-vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
+vi.mock('#/web/terminal/components/terminal-session-store.ts', () => ({
   useTerminalFilesystemTargetOutputActive: () => false,
   useTerminalFilesystemTargetBellCount: () => 0,
 }))
