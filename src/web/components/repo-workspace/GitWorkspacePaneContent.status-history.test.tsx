@@ -25,7 +25,7 @@ import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import { BranchActionSurfaceProvider } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
-import { TerminalSessionReadScope } from '#/web/components/terminal/terminal-session-context.ts'
+import { TerminalSessionReadScope } from '#/web/terminal/components/terminal-session-context.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { useFakeTimers } from '#/test-utils/timers.ts'
@@ -33,7 +33,7 @@ import { getCurrentGitWorkspacePanePresentation as buildGitWorkspacePanePresenta
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 describe('GitWorkspacePaneContent status-history', () => {
   test('renders the changes row with the copy patch action in the status tab when the worktree is dirty', async () => {
     const onCopyPatch = vi.fn()

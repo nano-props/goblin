@@ -5,14 +5,14 @@ import {
   type WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   type WorkspacePanePreferenceState,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { workspacePaneTabsInteractionBlockedForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {

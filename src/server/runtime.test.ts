@@ -28,7 +28,7 @@ vi.mock('#/server/app-factory.ts', () => ({
   createApp: mocks.createApp,
 }))
 
-vi.mock('#/server/modules/background-sync.ts', () => ({
+vi.mock('#/server/background-sync/runtime.ts', () => ({
   stopBackgroundSync: mocks.stopBackgroundSync,
 }))
 

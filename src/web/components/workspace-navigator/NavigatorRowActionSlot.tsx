@@ -1,6 +1,6 @@
 import type { FunctionalComponent, VNodeChild } from 'vue'
-import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
-import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
+import { TerminalBellBadge } from '#/web/terminal/components/TerminalBellBadge.tsx'
+import { TerminalOutputActivityIndicator } from '#/web/terminal/components/TerminalOutputActivityIndicator.tsx'
 import { NAVIGATOR_ROW_ACTION_BOX_CLASS } from '#/web/components/workspace-navigator/navigator-row-metrics.ts'
 import { cn } from '#/web/lib/cn.ts'
 

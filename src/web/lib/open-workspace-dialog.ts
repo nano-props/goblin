@@ -1,5 +1,5 @@
 import { toast } from 'vue-sonner'
-import { chooseLocalWorkspacePath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
+import { chooseLocalWorkspacePath, hasNativeDirectoryPicker } from '#/web/app/shell-client.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { reportOpenWorkspacePostOpenEffects } from '#/web/lib/open-workspace-result-feedback.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'

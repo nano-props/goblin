@@ -6,7 +6,7 @@ import {
   captureWorkspaceRuntimeMembershipCapability,
   clearWorkspaceRuntimesForUser,
   releaseWorkspaceRuntime,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'

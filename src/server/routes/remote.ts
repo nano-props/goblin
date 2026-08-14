@@ -3,20 +3,20 @@ import {
   getServerSshHosts,
   resolveServerRemoteTarget,
   testServerRemoteWorkspace,
-} from '#/server/modules/remote-workspace.ts'
+} from '#/server/workspaces/runtime/remote-connection.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { REMOTE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
-import { runRemoteWorkspaceLifecycleWrite } from '#/server/modules/remote-workspace-lifecycle-write-paths.ts'
+import { runRemoteWorkspaceLifecycleWrite } from '#/server/workspaces/runtime/remote-lifecycle-write-paths.ts'
 import {
   commitGitCapabilityRemovalOrThrow,
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
-import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
+import { workspaceGitCleanupRequired } from '#/server/workspaces/runtime/capability-transition.ts'
 import {
   requireWorkspaceRuntimeEpochCapability,
   runWorkspaceRuntimeRequest,
-} from '#/server/modules/workspace-runtime-request.ts'
+} from '#/server/workspaces/runtime/request.ts'
 
 export function createRemoteRoutes(options: { workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost }) {
   const app = createRouteApp()

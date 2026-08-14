@@ -10,7 +10,7 @@ import {
   workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { defaultWorkspacePaneTabs, normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { goblinLog } from '#/web/logger.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'

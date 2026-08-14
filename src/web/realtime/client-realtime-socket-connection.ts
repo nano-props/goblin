@@ -1,4 +1,4 @@
-import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
+import { isAppQuitting, subscribeAppQuitting } from '#/web/app/lifecycle.ts'
 import { createWebSocketLifecycle } from '#/web/lib/websocket-lifecycle.ts'
 import {
   ClientRealtimeRequestError,

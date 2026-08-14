@@ -1,4 +1,4 @@
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'

@@ -6,8 +6,8 @@ import { fireEvent } from '@testing-library/vue'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { WebSettings } from '#/web/components/settings/pages/WebSettings.tsx'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
+import { lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import type { LanInfo } from '#/shared/api-types.ts'
 import type { AccessTokenProjection } from '#/shared/access-token.ts'
@@ -148,7 +148,7 @@ function seedWebBootstrap() {
   }
   // Web runtime: no `goblinNative` preload surface, no rotate
   // capability. The client falls through to the safe defaults
-  // in `client-bridge.ts`.
+  // in `#/web/bridge/client.ts`.
   delete testWindow.goblinNative
   setClientBridgeForTests({
     kind: () => 'web',

@@ -1,5 +1,8 @@
 import type { QueryClient } from '@tanstack/query-core'
-import type { ParsedBranchWorkspacePaneRouteTarget, ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type {
+  ParsedBranchWorkspacePaneRouteTarget,
+  ParsedWorkspacePaneRoute,
+} from '#/web/app/navigation/route-model.ts'
 import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import type {
   GitWorktreePaneFilesystemTarget,
@@ -14,8 +17,8 @@ import {
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { GitHead } from '#/shared/git-head.ts'
 import { gitHeadBranch } from '#/shared/git-head.ts'
-import type { WorkspaceRouteContext } from '#/web/app-layout-model.ts'
-import { repoSnapshotQueryKey } from '#/web/repo-query-keys.ts'
+import type { WorkspaceRouteContext } from '#/web/app/navigation/layout-model.ts'
+import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 

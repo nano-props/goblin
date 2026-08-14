@@ -34,7 +34,7 @@ import {
   EMPTY_TERMINAL_SNAPSHOT,
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
-} from '#/web/components/terminal/terminal-session-context.ts'
+} from '#/web/terminal/components/terminal-session-context.ts'
 import type {
   WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
@@ -51,13 +51,13 @@ import type {
   TerminalSessionSummary,
   TerminalDescriptor,
   TerminalFilesystemTargetSnapshot,
-} from '#/web/components/terminal/types.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+} from '#/web/terminal/components/types.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import type { WorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
@@ -65,16 +65,16 @@ import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-p
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { RepoRemoteInfo } from '#/shared/git-types.ts'
 import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import { renderInJsdom as renderInJsdomWithoutWorkspaceView } from '#/test-utils/render.tsx'
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'
 import { terminalSessionContextWithCreatedAdmissionForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
-import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import type { WorkspaceSettingsEntry } from '#/shared/workspace-settings.ts'
 import {
   observeWorkspacePaneRouteForTest,
@@ -123,7 +123,7 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   }),
 }))
 
-vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
+vi.mock('#/web/settings/runtime-external-apps.ts', () => ({
   useExternalAppSettings: () => ({
     get value() {
       return hoistedRuntimeExternalAppSettings.value
@@ -131,11 +131,11 @@ vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
   }),
 }))
 
-vi.mock('#/web/app-shell-client.ts', () => ({
+vi.mock('#/web/app/shell-client.ts', () => ({
   openExternalUrl: hoistedAppShellMocks.openExternalUrl,
 }))
 
-vi.mock('#/web/workspace-external-app-client.ts', () => ({
+vi.mock('#/web/external-apps/workspace-client.ts', () => ({
   openWorkspaceTerminal: hoistedWorkspaceExternalAppMocks.openWorkspaceTerminal,
   openWorkspaceEditor: hoistedWorkspaceExternalAppMocks.openWorkspaceEditor,
   openWorkspaceInFinder: hoistedWorkspaceExternalAppMocks.openWorkspaceInFinder,

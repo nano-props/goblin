@@ -7,7 +7,7 @@ import type {
   WorkspacePaneTabsWriteResult,
 } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspaceRuntimeMembershipCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeMembershipCapability } from '#/server/workspaces/runtime/authority.ts'
 
 export interface WorkspacePaneTabsActionService {
   listWorkspaceTabs(

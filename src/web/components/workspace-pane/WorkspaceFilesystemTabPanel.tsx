@@ -5,11 +5,11 @@ import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 import { workspacePaneStaticTabId } from '#/shared/workspace-pane.ts'
 import { workspacePaneFilesystemExecutionTargetKey } from '#/shared/workspace-runtime.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
+import { useTerminalSessionContext } from '#/web/terminal/components/terminal-session-context.ts'
 import { FiletreeView } from '#/web/components/workspace-pane/FiletreeView.tsx'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/workspace-pane/file-read-command.ts'
-import { downloadWorkspaceFile } from '#/web/file-download.ts'
+import { downloadWorkspaceFile } from '#/web/workspaces/filesystem/download.ts'
 import { useWorkspaceFilesystemTree } from '#/web/hooks/useWorkspaceFilesystemTree.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -19,7 +19,7 @@ import {
   filetreeInteractionScopeKey,
   filetreeInteractionStore,
 } from '#/web/stores/workspaces/filetree-interaction-state.ts'
-import { getWorkspaceFileViewer } from '#/web/workspace-filesystem-client.ts'
+import { getWorkspaceFileViewer } from '#/web/workspaces/filesystem/client.ts'
 import {
   workspacePaneFilesystemRootPath,
   workspacePaneFilesystemRuntimeTarget,

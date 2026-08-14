@@ -3,7 +3,7 @@ import { defineComponent, onErrorCaptured, shallowRef, watch } from 'vue'
 import type { PropType } from 'vue'
 import { Button } from '#/web/components/ui/button.tsx'
 import { goblinLog } from '#/web/logger.ts'
-import { markRenderErrorLogged } from '#/web/render-error-logging.ts'
+import { markRenderErrorLogged } from '#/web/app/errors/render-error-logging.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
 export const ErrorBoundary = defineComponent<{ resetKey?: string }>({

@@ -4,7 +4,7 @@ import {
   invalidateRepoMetadataQueries,
   invalidateRepoWorktreeStatusQueries,
   refreshActiveRepoPullRequestQueries,
-} from '#/web/repo-query-runtime.ts'
+} from '#/web/repos/query-runtime.ts'
 import { gitWorkspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import type { RepoRefreshStoreReader } from '#/web/stores/workspaces/refresh.ts'
 

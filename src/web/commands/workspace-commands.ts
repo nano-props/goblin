@@ -1,4 +1,4 @@
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import {
   dispatchCloseCurrentWorkspacePaneTabAction,
@@ -12,14 +12,14 @@ import {
   dispatchMoveWorkspacePaneTabAction,
   dispatchSelectWorkspacePaneTabByIndexAction,
 } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
-import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
+import type { TerminalCreateTranslator } from '#/web/terminal/components/terminal-create-feedback.ts'
 import { isWorkspacePaneStaticTabProvider, workspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneActionOutcomeHandled } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import {
   dispatchNewTerminalRuntimeTabAction,
   dispatchTerminalRuntimePrimaryAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   workspacePaneTabsTargetFromRuntime,

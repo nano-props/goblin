@@ -21,19 +21,19 @@ import { buildDashboardSummary } from '#/web/components/workspace-pages/workspac
 import type { DashboardPullRequestState } from '#/web/components/workspace-pages/workspace-dashboard-model.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
-import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
+import { repoQueryReadFailure } from '#/web/repos/read-failure.ts'
 import {
   useRepoPullRequestsReadModel,
   useRepoSnapshotReadModel,
   useRepoWorktreeStatusReadModel,
-} from '#/web/repo-queries.ts'
+} from '#/web/repos/queries.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { remoteWorkspaceTarget } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { useWorkspaceDirectoryOverview } from '#/web/workspace-directory-overview-query.ts'
+import { useWorkspaceDirectoryOverview } from '#/web/workspaces/filesystem/directory-overview-query.ts'
 
 interface WorkspaceDashboardPaneProps {
   workspaceId: WorkspaceId

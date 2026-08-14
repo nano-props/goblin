@@ -5,11 +5,11 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { useBranchActionDialogDisplay } from '#/web/hooks/useBranchActionDialogDisplay.ts'
 import type { BranchActionDialogTarget } from '#/web/hooks/useBranchActionDialogDisplay.ts'
-import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
-import { repoOperationsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { setRepoOperationsQueryData } from '#/web/repos/query-cache.ts'
+import { repoOperationsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import {
   branchActionDialogsStore,
   resetBranchActionDialogsStore,

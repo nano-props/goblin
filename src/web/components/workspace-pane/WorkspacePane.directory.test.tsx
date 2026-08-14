@@ -9,8 +9,8 @@ import type { WorkspacePaneRouteContext } from '#/web/components/workspace-pane/
 import {
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
-} from '#/web/components/terminal/terminal-session-context.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+} from '#/web/terminal/components/terminal-session-context.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {
@@ -18,13 +18,13 @@ import {
   createRepoWorktreeSnapshotForTest,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/repo-store.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import {
   getRepoSnapshotQueryData,
   setRepoSnapshotQueryData,
   setRepoWorktreeStatusQueryData,
-} from '#/web/repo-query-cache.ts'
-import { workspaceDirectoryOverviewQueryKey } from '#/web/workspace-directory-overview-query.ts'
+} from '#/web/repos/query-cache.ts'
+import { workspaceDirectoryOverviewQueryKey } from '#/web/workspaces/filesystem/directory-overview-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
@@ -36,8 +36,8 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/work
 import { gitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { externalAppsQueryKey } from '#/web/settings-query-cache.ts'
-import { repoLogQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { externalAppsQueryKey } from '#/web/settings/query-cache.ts'
+import { repoLogQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import {
   directoryWorkspaceProbe,

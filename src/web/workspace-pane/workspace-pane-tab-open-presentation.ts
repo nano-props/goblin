@@ -1,14 +1,14 @@
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
+import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
 import { selectWorkspacePaneControllerTab } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import {
   commitWorkspacePaneDestinationRoute,
   workspacePaneDestinationPresentationIsCurrent,
   type WorkspacePaneDestinationPresentation,
 } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
-import { appNavigationIsCurrent, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { appNavigationIsCurrent, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'

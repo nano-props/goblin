@@ -1,11 +1,11 @@
 import { describe, expect, test, vi } from 'vitest'
-import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
-import type * as RemoteWorkspaceFailureSettlement from '#/server/modules/remote-workspace-runtime-failure-settlement.ts'
-import type * as WorkspaceRuntimesModule from '#/server/modules/workspace-runtimes.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
+import type * as RemoteWorkspaceFailureSettlement from '#/server/workspaces/runtime/remote-failure-settlement.ts'
+import type * as WorkspaceRuntimesModule from '#/server/workspaces/runtime/authority.ts'
 import {
   WorkspaceRuntimeStaleError,
   type WorkspaceRuntimeMembershipCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import {
   paneTabsSnapshot,
   publishedTerminalResult,
@@ -38,11 +38,11 @@ const workspaceProbeStateForRuntimeMock = vi.hoisted(() =>
     diagnostics: [],
   })),
 )
-vi.mock('#/server/modules/remote-workspace-runtime-failure-settlement.ts', async (importActual) => {
+vi.mock('#/server/workspaces/runtime/remote-failure-settlement.ts', async (importActual) => {
   const actual = await importActual<typeof RemoteWorkspaceFailureSettlement>()
   return { ...actual, failRemoteWorkspaceRuntimeIfNeeded: failRemoteWorkspaceRuntimeIfNeededMock }
 })
-vi.mock('#/server/modules/workspace-runtimes.ts', async (importActual) => {
+vi.mock('#/server/workspaces/runtime/authority.ts', async (importActual) => {
   const actual = await importActual<typeof WorkspaceRuntimesModule>()
   return { ...actual, workspaceProbeStateForRuntime: workspaceProbeStateForRuntimeMock }
 })

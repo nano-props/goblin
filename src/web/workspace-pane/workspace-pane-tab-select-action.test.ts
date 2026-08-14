@@ -5,11 +5,11 @@ import {
   createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { WorkspacePaneRouteTarget } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
-import { currentAppNavigationGeneration, resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
+import { currentAppNavigationGeneration, resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import {
@@ -20,7 +20,7 @@ import {
   type ObservedAppNavigationActionsForTest,
   type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,

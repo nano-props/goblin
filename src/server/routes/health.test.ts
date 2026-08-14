@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('#/server/modules/background-sync.ts', () => ({
+vi.mock('#/server/background-sync/runtime.ts', () => ({
   getBackgroundSyncHealth: mocks.getBackgroundSyncHealth,
 }))
 

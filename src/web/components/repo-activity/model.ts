@@ -4,7 +4,7 @@ import {
   isBranchActionReason,
   type RepoOperationState,
 } from '#/web/stores/workspaces/operations.ts'
-import { repoServerOperationActive } from '#/web/repo-operation-state.ts'
+import { repoServerOperationActive } from '#/web/repos/operation-state.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import type { RepoOperationsSnapshot, RepoServerOperationState } from '#/shared/api-types.ts'
 type RepoActivityKind = 'branch-action'

@@ -10,7 +10,7 @@ import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-file
 import {
   useTerminalFilesystemTargetOutputActive,
   useTerminalFilesystemTargetBellCount,
-} from '#/web/components/terminal/terminal-session-store.ts'
+} from '#/web/terminal/components/terminal-session-store.ts'
 import { branchActionDisplayPhase } from '#/web/hooks/branch-action-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'

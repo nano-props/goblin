@@ -1,8 +1,8 @@
 import { computed, defineComponent, onScopeDispose, watch } from 'vue'
 import type { FunctionalComponent, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
-import type { WorkspaceRouteView } from '#/web/App.tsx'
+import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
+import type { WorkspaceRouteView } from '#/web/app/navigation/route-model.ts'
 import { WorkspaceLayoutPane } from '#/web/components/Layout.tsx'
 import {
   GitWorkspaceNavigatorSkeleton,
@@ -27,13 +27,13 @@ import { useRestoreWorkspaceTabsOnView } from '#/web/hooks/useRestoreWorkspaceTa
 import type { WorkspaceProjectionPromotionViewState } from '#/web/hooks/useRestoreWorkspaceTabsOnView.ts'
 import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
 import { formatWorkspaceDisplayLocation } from '#/web/lib/paths.ts'
-import { invalidateRepoMetadataQueries, invalidateRepoWorktreeStatusQueries } from '#/web/repo-query-runtime.ts'
+import { invalidateRepoMetadataQueries, invalidateRepoWorktreeStatusQueries } from '#/web/repos/query-runtime.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { uiTransitionStore } from '#/web/stores/ui-transition.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { gitWorkspaceCanExecute, isWorkspaceUnavailable } from '#/web/stores/workspaces/workspace-guards.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { gitBranchPaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 interface WorkspaceProjectionRestoreController {

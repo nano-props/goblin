@@ -22,7 +22,7 @@ const dialogProps = vi.hoisted(() => ({
 
 const actionMocks = vi.hoisted(() => ({ trashWorkspaceFile: vi.fn(), warning: vi.fn() }))
 
-vi.mock('#/web/workspace-filesystem-client.ts', () => ({ trashWorkspaceFile: actionMocks.trashWorkspaceFile }))
+vi.mock('#/web/workspaces/filesystem/client.ts', () => ({ trashWorkspaceFile: actionMocks.trashWorkspaceFile }))
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), warning: actionMocks.warning } }))
 
 vi.mock('#/web/components/ConfirmDialog.tsx', () => ({

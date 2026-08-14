@@ -8,7 +8,7 @@ import type { VNode } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { OpenWorkspaceDialog } from '#/web/components/OpenWorkspaceDialog.tsx'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
 import { currentNativeBridge } from '#/web/test-utils/current-native-bridge.ts'
@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   getLocalDirectoryPathSuggestions: vi.fn(),
 }))
 
-vi.mock('#/web/workspace-client.ts', () => ({
+vi.mock('#/web/workspaces/client.ts', () => ({
   getLocalDirectoryPathSuggestions: mocks.getLocalDirectoryPathSuggestions,
 }))
 

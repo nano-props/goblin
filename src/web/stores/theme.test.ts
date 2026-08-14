@@ -92,7 +92,7 @@ describe('theme store OS-appearance sync', () => {
     // wipe only because of how `vi.resetModules` is implemented, so
     // explicit teardown matches the reference pattern in
     // `web-invalidation-sync.test.ts`.
-    const { resetServerInvalidationIngressForTests } = await import('#/web/server-invalidation-ingress.ts')
+    const { resetServerInvalidationIngressForTests } = await import('#/web/realtime/invalidation-ingress.ts')
     resetServerInvalidationIngressForTests()
     vi.unstubAllGlobals()
   })
@@ -202,7 +202,7 @@ describe('theme store OS-appearance sync', () => {
 
   test('matchMedia unavailable: hydrate still completes and listener is a no-op', async () => {
     // Use `theme: 'light'` so `resolveThemeStateFromUserSettings` in
-    // `settings-client.ts` never dereferences `matchMedia` (the
+    // `settings/client.ts` never dereferences `matchMedia` (the
     // optional chain there yields `undefined` when matchMedia is
     // absent, and `.matches` would throw).
     installWindow({ matchMedia: 'absent' })
@@ -278,8 +278,8 @@ describe('theme store OS-appearance sync', () => {
 
   test('setPref syncs the settings snapshot query cache from the server response', async () => {
     installWindow({ matchMedia: createMediaQuery(false) })
-    const { appQueryClient } = await import('#/web/app-query-client.ts')
-    const { settingsSnapshotQueryKey } = await import('#/web/settings-query-cache.ts')
+    const { appQueryClient } = await import('#/web/app/query-client.ts')
+    const { settingsSnapshotQueryKey } = await import('#/web/settings/query-cache.ts')
     appQueryClient.setQueryData(
       settingsSnapshotQueryKey(),
       defaultSettingsSnapshot({ theme: 'auto', colorTheme: 'macos' }),

@@ -9,7 +9,7 @@ import {
   isRuntimeWorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionSummary } from '#/web/terminal/components/types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import { WorkspacePaneTabStripScrollMemoryProvider } from '#/web/components/workspace-pane/workspace-pane-tab-strip-scroll-memory.tsx'

@@ -13,9 +13,9 @@ import {
   type TerminalCreateCommandResult,
   type TerminalCreatedTabCommitResult,
 } from '#/web/commands/terminal-create-command.ts'
-import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
-import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
-import type { TerminalCreateOptions, TerminalFocusRequest } from '#/web/components/terminal/types.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/terminal/components/terminal-create-admission.ts'
+import type { TerminalCreateTranslator } from '#/web/terminal/components/terminal-create-feedback.ts'
+import type { TerminalCreateOptions, TerminalFocusRequest } from '#/web/terminal/components/types.ts'
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   gitWorktreePaneTargetLease,
@@ -30,9 +30,9 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
-import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
-import { claimTerminalAutoFocus } from '#/web/terminal-focus.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
+import { claimTerminalAutoFocus } from '#/web/terminal/focus.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 
 export interface CreatedTerminalRouteRequest {
   navigationGeneration: AppNavigationGeneration

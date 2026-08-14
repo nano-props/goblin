@@ -1,7 +1,7 @@
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { RepoReadFailureNotice, RepoStatusStaleNotice } from '#/web/components/RepoStatusFailureView.tsx'
-import type { RepoReadFailure } from '#/web/repo-read-failure.ts'
+import type { RepoReadFailure } from '#/web/repos/read-failure.ts'
 
 interface RepoReadNoticePresentation {
   message: string

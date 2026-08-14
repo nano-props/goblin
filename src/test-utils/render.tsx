@@ -11,7 +11,7 @@ import { afterEach } from 'vitest'
 import {
   consumeAppHistoryPresentationAction,
   createAppHistoryPresentationHistory,
-} from '#/web/app-history-presentation.ts'
+} from '#/web/app/navigation/history-presentation.ts'
 import { appI18n } from '#/web/stores/i18n-vue.ts'
 
 afterEach(cleanup)

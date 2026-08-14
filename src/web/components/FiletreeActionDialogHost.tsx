@@ -7,7 +7,7 @@ import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { filetreeActionDialogsStore } from '#/web/stores/workspaces/filetree-action-dialogs.ts'
-import { trashWorkspaceFile } from '#/web/workspace-filesystem-client.ts'
+import { trashWorkspaceFile } from '#/web/workspaces/filesystem/client.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
 
 interface Props {

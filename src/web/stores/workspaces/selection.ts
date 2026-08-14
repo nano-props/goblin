@@ -20,7 +20,7 @@ import {
   preferredWorkspacePaneTabByTargetRecordWith,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
-import { requireRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { requireRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { createWorkspaceNavigationHistoryActions } from '#/web/stores/workspaces/navigation-history-actions.ts'
 
 function createRestorableWorkspaceActions(set: WorkspacesSet): RestorableWorkspaceActions {

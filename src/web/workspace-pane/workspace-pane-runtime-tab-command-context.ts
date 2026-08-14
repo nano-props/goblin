@@ -1,13 +1,13 @@
 import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
-import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import type { TerminalCreateTranslator } from '#/web/terminal/components/terminal-create-feedback.ts'
+import { readTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import type {
   ExistingTerminalPresentationRouteRequest,
   WorkspacePaneRuntimeTabCommandContext,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'

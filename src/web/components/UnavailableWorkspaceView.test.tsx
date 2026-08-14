@@ -12,7 +12,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 
-vi.mock('#/web/app-navigation.tsx', () => ({
+vi.mock('#/web/app/navigation/context.tsx', () => ({
   useAppNavigation: () => ({
     closeWorkspace: vi.fn(async () => ({ ok: true })),
     openSettings: vi.fn(),

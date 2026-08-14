@@ -6,7 +6,7 @@ import type { WorkspaceRuntimeInvalidationEvent } from '#/shared/workspace-runti
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
 import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
-import { invalidateWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
+import { invalidateWorkspaceRuntimes } from '#/web/workspaces/runtime/query.ts'
 
 const workspaceId = workspaceIdForTest('goblin+ssh://example/workspace')
 const mocks = vi.hoisted(() => ({
@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   getState: vi.fn(),
 }))
 
-vi.mock('#/web/workspace-runtime-invalidation-ingress.ts', () => ({
+vi.mock('#/web/workspaces/runtime/invalidation-ingress.ts', () => ({
   subscribeWorkspaceRuntimeInvalidation(next: (event: WorkspaceRuntimeInvalidationEvent) => void) {
     mocks.listener = next
     return () => {
@@ -26,7 +26,7 @@ vi.mock('#/web/workspace-runtime-invalidation-ingress.ts', () => ({
 vi.mock('#/web/stores/workspaces/store.ts', () => ({
   workspacesStore: { getState: mocks.getState, setState: mocks.setState },
 }))
-vi.mock('#/web/workspace-runtime-query.ts', () => ({ invalidateWorkspaceRuntimes: vi.fn() }))
+vi.mock('#/web/workspaces/runtime/query.ts', () => ({ invalidateWorkspaceRuntimes: vi.fn() }))
 vi.mock('#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts', () => ({
   acceptRemoteWorkspaceLifecycleSnapshot: vi.fn(),
 }))

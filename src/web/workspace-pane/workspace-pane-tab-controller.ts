@@ -3,7 +3,7 @@ import type {
   ParsedBranchWorkspacePaneRouteTarget,
   ParsedWorkspacePaneRouteTarget,
   WorkspacePaneRouteTarget,
-} from '#/web/App.tsx'
+} from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   isWorkspacePaneRuntimeTabEntry,
@@ -13,7 +13,7 @@ import {
 import type {
   FilesystemWorkspacePaneRouteCommitActions,
   WorkspacePaneRouteCommitActions,
-} from '#/web/app-navigation-actions.ts'
+} from '#/web/app/navigation/actions.ts'
 import {
   isWorkspacePaneRuntimeTab,
   type WorkspacePaneModelTarget,
@@ -30,8 +30,8 @@ import {
   beginAppNavigation,
   appNavigationIsCurrent,
   type AppNavigationGeneration,
-} from '#/web/app-navigation-lifecycle.ts'
-import { claimTerminalPresentationFocus, type TerminalPresentationFocusEffects } from '#/web/terminal-focus.ts'
+} from '#/web/app/navigation/lifecycle.ts'
+import { claimTerminalPresentationFocus, type TerminalPresentationFocusEffects } from '#/web/terminal/focus.ts'
 
 export type WorkspacePaneTabControllerRoute = WorkspacePaneRouteTarget
 export interface WorkspacePaneControllerTarget {

@@ -3,7 +3,7 @@ import { SelectRoot } from 'reka-ui'
 import type { RemoteDiagnosticsResult, RemoteWorkspaceTarget, SshConfigHost } from '#/shared/remote-workspace.ts'
 import { isResolvableRemotePathInput, remoteWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import { isValidSshProfile } from '#/shared/workspace-locator.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { RemoteDiagnosticsPanel } from '#/web/components/RemoteDiagnosticsPanel.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
@@ -24,7 +24,7 @@ import {
   getRemoteSshHosts,
   resolveRemoteWorkspaceTarget,
   testRemoteWorkspaceConnection,
-} from '#/web/remote-workspace-client.ts'
+} from '#/web/workspaces/remote-client.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 

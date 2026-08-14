@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import type * as WorkspaceRuntimesModule from '#/server/modules/workspace-runtimes.ts'
+import type * as WorkspaceRuntimesModule from '#/server/workspaces/runtime/authority.ts'
 import {
   deferred,
   paneTabsSnapshot,
@@ -14,7 +14,7 @@ import {
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import type { ServerTerminalCreateSuccess } from '#/server/terminal/terminal-session-creator.ts'
-import { WorkspaceRuntimeStaleError } from '#/server/modules/workspace-runtimes.ts'
+import { WorkspaceRuntimeStaleError } from '#/server/workspaces/runtime/authority.ts'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
 import {
   createPhysicalWorktreeOperationCoordinator,
@@ -33,7 +33,7 @@ const workspaceProbeStateForRuntimeMock = vi.hoisted(() =>
     diagnostics: [],
   })),
 )
-vi.mock('#/server/modules/workspace-runtimes.ts', async (importActual) => {
+vi.mock('#/server/workspaces/runtime/authority.ts', async (importActual) => {
   const actual = await importActual<typeof WorkspaceRuntimesModule>()
   return { ...actual, workspaceProbeStateForRuntime: workspaceProbeStateForRuntimeMock }
 })

@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   pruneExpiredClipboardTempFiles: vi.fn(),
 }))
 
-vi.mock('#/server/modules/clipboard-write-paths.ts', () => ({
+vi.mock('#/server/clipboard/write-paths.ts', () => ({
   saveClipboardFiles: mocks.saveClipboardFiles,
   pruneStaleClipboardTempDirs: mocks.pruneStaleClipboardTempDirs,
   pruneExpiredClipboardTempFiles: mocks.pruneExpiredClipboardTempFiles,

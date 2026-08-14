@@ -14,7 +14,7 @@ vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => ({ value: false }),
 }))
 
-vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
+vi.mock('#/web/terminal/components/terminal-session-store.ts', () => ({
   useTerminalFilesystemTargetOutputActive: () => ({
     get value() {
       return terminalStoreMocks.outputActive

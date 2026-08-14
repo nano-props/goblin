@@ -4,12 +4,12 @@ import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-
 import { canonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
-import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { readTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import {
   useTerminalWorkspaceProjectionHydrationEntry,
   useTerminalSessionSummaries,
   useTerminalFilesystemTargetCreatePending,
-} from '#/web/components/terminal/terminal-session-store.ts'
+} from '#/web/terminal/components/terminal-session-store.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'

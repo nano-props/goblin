@@ -1,7 +1,7 @@
 import { computed, reactive, shallowRef, toValue, watch } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
-import { getRemotePathSuggestions } from '#/web/remote-workspace-client.ts'
-import { getLocalDirectoryPathSuggestions } from '#/web/workspace-client.ts'
+import { getRemotePathSuggestions } from '#/web/workspaces/remote-client.ts'
+import { getLocalDirectoryPathSuggestions } from '#/web/workspaces/client.ts'
 import { isResolvableRemotePathInput } from '#/shared/remote-workspace.ts'
 import { getPlatform } from '#/web/stores/host-info.ts'
 

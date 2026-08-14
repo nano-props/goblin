@@ -94,17 +94,17 @@ describe('architecture boundary rules', () => {
     expect(
       checkArchitectureSources([
         {
-          relativeFilePath: '/src/web/settings-queries.ts',
-          source: "import { setThemePref /* comment */ } from '#/web/settings-client.ts'\n",
+          relativeFilePath: '/src/web/settings/queries.ts',
+          source: "import { setThemePref /* comment */ } from '#/web/settings/client.ts'\n",
         },
         {
-          relativeFilePath: '/src/web/settings-queries.ts',
-          source: "import { setThemePref /* comment */ as getSettingsSnapshot } from '#/web/settings-client.ts'\n",
+          relativeFilePath: '/src/web/settings/queries.ts',
+          source: "import { setThemePref /* comment */ as getSettingsSnapshot } from '#/web/settings/client.ts'\n",
         },
       ]),
     ).toEqual([
-      expect.stringContaining('/src/web/settings-queries.ts: disallowed import "#/web/settings-client.ts"'),
-      expect.stringContaining('/src/web/settings-queries.ts: disallowed import "#/web/settings-client.ts"'),
+      expect.stringContaining('/src/web/settings/queries.ts: disallowed import "#/web/settings/client.ts"'),
+      expect.stringContaining('/src/web/settings/queries.ts: disallowed import "#/web/settings/client.ts"'),
     ])
   })
 
@@ -142,9 +142,9 @@ describe('architecture boundary rules', () => {
     expect(
       checkArchitectureSources([
         {
-          relativeFilePath: '/src/web/settings-queries.ts',
+          relativeFilePath: '/src/web/settings/queries.ts',
           source:
-            "const lazy = import('safe-module')\nconst url = import.meta.url\nimport { getSettingsSnapshot } from '#/web/settings-client.ts'\n",
+            "const lazy = import('safe-module')\nconst url = import.meta.url\nimport { getSettingsSnapshot } from '#/web/settings/client.ts'\n",
         },
       ]),
     ).toEqual([])
@@ -154,8 +154,8 @@ describe('architecture boundary rules', () => {
     expect(
       checkArchitectureSources([
         {
-          relativeFilePath: '/src/web/settings-queries.ts',
-          source: "import { getSettingsSnapshot } from '#/web/settings-client.ts'\n",
+          relativeFilePath: '/src/web/settings/queries.ts',
+          source: "import { getSettingsSnapshot } from '#/web/settings/client.ts'\n",
         },
       ]),
     ).toEqual([])
@@ -163,11 +163,11 @@ describe('architecture boundary rules', () => {
     expect(
       checkArchitectureSources([
         {
-          relativeFilePath: '/src/web/settings-queries.ts',
-          source: "import { getSettingsSnapshot, setThemePref } from '#/web/settings-client.ts'\n",
+          relativeFilePath: '/src/web/settings/queries.ts',
+          source: "import { getSettingsSnapshot, setThemePref } from '#/web/settings/client.ts'\n",
         },
       ]),
-    ).toEqual([expect.stringContaining('/src/web/settings-queries.ts: disallowed import "#/web/settings-client.ts"')])
+    ).toEqual([expect.stringContaining('/src/web/settings/queries.ts: disallowed import "#/web/settings/client.ts"')])
   })
 
   test('rejects settings-client imports from unapproved web files', () => {
@@ -175,12 +175,12 @@ describe('architecture boundary rules', () => {
       checkArchitectureSources([
         {
           relativeFilePath: '/src/web/components/settings/GeneralSettings.tsx',
-          source: "import { setThemePref } from '#/web/settings-client.ts'\n",
+          source: "import { setThemePref } from '#/web/settings/client.ts'\n",
         },
       ]),
     ).toEqual([
       expect.stringContaining(
-        '/src/web/components/settings/GeneralSettings.tsx: disallowed import "#/web/settings-client.ts"',
+        '/src/web/components/settings/GeneralSettings.tsx: disallowed import "#/web/settings/client.ts"',
       ),
     ])
   })
@@ -190,12 +190,12 @@ describe('architecture boundary rules', () => {
       checkArchitectureSources([
         {
           relativeFilePath: '/src/web/components/settings/GeneralSettings.tsx',
-          source: "import { setThemePref } from '../../settings-client.ts'\n",
+          source: "import { setThemePref } from '../../settings/client.ts'\n",
         },
       ]),
     ).toEqual([
       expect.stringContaining(
-        '/src/web/components/settings/GeneralSettings.tsx: disallowed import "../../settings-client.ts"',
+        '/src/web/components/settings/GeneralSettings.tsx: disallowed import "../../settings/client.ts"',
       ),
     ])
   })
@@ -243,23 +243,49 @@ describe('architecture boundary rules', () => {
     ])
   })
 
+  test('prevents system capabilities from depending on application runtimes', () => {
+    expect(
+      checkArchitectureSources([
+        {
+          relativeFilePath: '/src/system/ssh/adapter.ts',
+          source:
+            "import type { ServerRuntime } from '#/server/runtime.ts'\nimport { App } from '#/web/App.tsx'\nimport { register } from '#/main/ipc.ts'\n",
+        },
+        {
+          relativeFilePath: '/src/system/git/nested/adapter.ts',
+          source: "import { createServer } from '../../../server/bootstrap.ts'\n",
+        },
+        {
+          relativeFilePath: '/src/system/git/safe.ts',
+          source:
+            "import path from 'node:path'\nimport type { ExecResult } from '#/shared/git-types.ts'\nimport { parseLog } from '#/system/git/parsers.ts'\n",
+        },
+      ]),
+    ).toEqual([
+      expect.stringContaining('/src/system/ssh/adapter.ts: disallowed import "#/server/runtime.ts"'),
+      expect.stringContaining('/src/system/ssh/adapter.ts: disallowed import "#/web/App.tsx"'),
+      expect.stringContaining('/src/system/ssh/adapter.ts: disallowed import "#/main/ipc.ts"'),
+      expect.stringContaining('/src/system/git/nested/adapter.ts: disallowed import "../../../server/bootstrap.ts"'),
+    ])
+  })
+
   test('rejects legacy direct repo read surfaces in web code', () => {
     expect(
       checkArchitectureSources([
         {
-          relativeFilePath: '/src/web/repo-client.ts',
+          relativeFilePath: '/src/web/repos/client.ts',
           source: "await requestGoblin('repo.status', { cwd })\n",
         },
         {
-          relativeFilePath: '/src/web/repo-client.ts',
+          relativeFilePath: '/src/web/repos/client.ts',
           source: "await postServerJson('/api/repo/projection', { cwd })\n",
         },
         {
-          relativeFilePath: '/src/web/repo-client.ts',
+          relativeFilePath: '/src/web/repos/client.ts',
           source: 'await getRepoProjection(cwd)\n',
         },
         {
-          relativeFilePath: '/src/web/repo-client.ts',
+          relativeFilePath: '/src/web/repos/client.ts',
           source: 'const schema = REPO_PROCEDURE_SCHEMAS.status\n',
         },
         {

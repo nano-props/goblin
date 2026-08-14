@@ -8,7 +8,7 @@ import type {
   GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
-import type { RepoReadFailure } from '#/web/repo-read-failure.ts'
+import type { RepoReadFailure } from '#/web/repos/read-failure.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'

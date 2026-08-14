@@ -19,7 +19,7 @@ vi.mock('#/web/hooks/useBranchActions.tsx', () => ({
   useBranchActions: mocks.useBranchActions,
 }))
 
-vi.mock('#/web/app-navigation.tsx', () => ({
+vi.mock('#/web/app/navigation/context.tsx', () => ({
   useAppNavigation: () => ({
     showRepoBranchWorkspacePaneTab: vi.fn(),
   }),
@@ -29,7 +29,7 @@ vi.mock('#/web/workspace-pane/workspace-pane-tab-open-action.ts', () => ({
   dispatchShowWorkspacePaneStaticTabAction: mocks.dispatchShowWorkspacePaneStaticTabAction,
 }))
 
-vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
+vi.mock('#/web/settings/runtime-external-apps.ts', () => ({
   useExternalAppSettings: () => ({
     terminalAvailable: true,
     editorAvailable: true,

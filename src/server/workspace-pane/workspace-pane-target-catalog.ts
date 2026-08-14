@@ -1,5 +1,5 @@
-import { getWorkspacePaneTargetIdentities } from '#/server/modules/repo-read-paths.ts'
-import { workspaceRuntimeHasGitCapability } from '#/server/modules/workspace-runtimes.ts'
+import { getWorkspacePaneTargetIdentities } from '#/server/repos/read-paths.ts'
+import { workspaceRuntimeHasGitCapability } from '#/server/workspaces/runtime/authority.ts'
 import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'

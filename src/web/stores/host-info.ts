@@ -1,6 +1,6 @@
 // Client-side host info. Hydrated at boot from the public
 // `/api/host` endpoint (see `#/server/routes/host.ts` and
-// `#/server/modules/host-info.ts`). The server already knows its
+// `#/server/host-info.ts`). The server already knows its
 // own `process.platform` and `os.homedir()` — the Electron preload
 // used to ferry those over `goblin:get-home-dir` /
 // `goblin:get-platform` IPC. Moving to a public endpoint:

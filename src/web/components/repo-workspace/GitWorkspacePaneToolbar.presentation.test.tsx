@@ -3,7 +3,7 @@
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import {
   REPO_ID,
   WORKTREE_PATH,

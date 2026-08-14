@@ -1,5 +1,5 @@
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
-import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspace-filesystem-lazy-state.ts'
+import type { LazyWorkspaceFilesystemTreeAggregate } from '#/web/workspaces/filesystem/lazy-state.ts'
 
 export interface FiletreeRow {
   readonly id: string

@@ -2,14 +2,14 @@ import { afterEach, beforeEach, vi } from 'vitest'
 import {
   TerminalSessionProjection,
   setTerminalSessionProjectionForTests,
-} from '#/web/components/terminal/TerminalSessionProjection.ts'
+} from '#/web/terminal/components/TerminalSessionProjection.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
-import type { TerminalDescriptor, TerminalRuntimeMembershipIndex } from '#/web/components/terminal/types.ts'
+import type { TerminalDescriptor, TerminalRuntimeMembershipIndex } from '#/web/terminal/components/types.ts'
 import type { TerminalSessionClosedEvent, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import { runtimeMembershipIndexFromEntries } from '#/web/components/terminal/terminal-runtime-membership-index.ts'
+import { runtimeMembershipIndexFromEntries } from '#/web/terminal/components/terminal-runtime-membership-index.ts'
 
 // Projection tests share one singleton lifecycle and canonical runtime binding fixture.
 const hoistedWorkspacePaneRuntimeMocks = vi.hoisted(() => ({

@@ -14,14 +14,14 @@ import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx
 import {
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
-} from '#/web/components/terminal/terminal-session-context.ts'
-import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+} from '#/web/terminal/components/terminal-session-context.ts'
+import type { TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'

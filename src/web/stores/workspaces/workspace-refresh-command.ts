@@ -1,6 +1,6 @@
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
-import { requestWorkspaceCapabilityRefresh } from '#/web/workspace-capability-refresh.ts'
+import { requestWorkspaceCapabilityRefresh } from '#/web/workspaces/runtime/capability-refresh.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/workspaces/refresh-sync.ts'
@@ -9,7 +9,7 @@ import { acceptWorkspaceProbeState, updateIfFresh } from '#/web/stores/workspace
 import { appendRepoEvent, errorEvent } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { gitWorkspaceClientState, isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import { runExclusiveOperation } from '#/web/stores/workspaces/operation-runner.ts'
-import { refreshActiveRepoPullRequestQueries } from '#/web/repo-query-runtime.ts'
+import { refreshActiveRepoPullRequestQueries } from '#/web/repos/query-runtime.ts'
 import { goblinLog } from '#/web/logger.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 

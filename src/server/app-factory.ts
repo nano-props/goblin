@@ -22,8 +22,8 @@ import { createSettingsRoutes } from '#/server/routes/settings.ts'
 import { createWorkspaceRoutes } from '#/server/routes/workspace.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
-import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
+import { createNativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
+import { getServerI18nSnapshot } from '#/server/i18n.ts'
 import { MAX_PASTE_HTTP_BODY_BYTES } from '#/shared/clipboard-paste.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
@@ -283,7 +283,7 @@ export function createApp(options: ServerAppOptions): Hono {
   // interval keeps the event loop alive.
   const periodic = setInterval(
     () => {
-      void import('#/server/modules/clipboard-write-paths.ts')
+      void import('#/server/clipboard/write-paths.ts')
         .then((m) => Promise.all([m.pruneStaleClipboardTempDirs(), m.pruneExpiredClipboardTempFiles()]))
         .catch((err) => console.warn('[clipboard] periodic prune failed', err))
     },

@@ -8,7 +8,7 @@ import {
   useRepoOperationsReadModel,
   useRepoSnapshotReadModel,
   useRepoWorktreeStatusReadModel,
-} from '#/web/repo-queries.ts'
+} from '#/web/repos/queries.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoOperationState } from '#/web/stores/workspaces/operations.ts'

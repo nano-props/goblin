@@ -1,5 +1,5 @@
-import { getClientBridge } from '#/web/client-bridge.ts'
-import type { ClientWorkspacePaneRuntime } from '#/web/client-bridge-types.ts'
+import { getClientBridge } from '#/web/bridge/client.ts'
+import type { ClientWorkspacePaneRuntime } from '#/web/bridge/types.ts'
 
 function getWorkspacePaneRuntimeClient(): ClientWorkspacePaneRuntime {
   return getClientBridge().workspacePaneRuntime()

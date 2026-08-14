@@ -12,7 +12,7 @@ import {
   createTerminalBellIntentPlan,
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
-import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import type { BranchSnapshotInfo, RepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

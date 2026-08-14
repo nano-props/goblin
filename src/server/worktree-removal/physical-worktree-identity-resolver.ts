@@ -4,7 +4,7 @@ import path from 'node:path'
 import { parseWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 import { resolveRemoteTargetWithConfigFingerprint } from '#/system/ssh/config.ts'
-import { resolveRemoteWorktree } from '#/system/ssh/git.ts'
+import { resolveRemoteWorktree } from '#/system/ssh/git/worktrees.ts'
 import { runRemoteCommand, type RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import { resolveKnownWorktree } from '#/shared/worktree-guards.ts'
 import { isRemoteWorkspaceId, normalizeRemoteWorkspaceRef, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
@@ -13,10 +13,10 @@ import {
   onWorkspaceRuntimeClosed,
   WorkspaceRuntimeStaleError,
   type WorkspaceRuntimeClosedEvent,
-} from '#/server/modules/workspace-runtimes.ts'
-import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/modules/remote-workspace-runtime-failure.ts'
+} from '#/server/workspaces/runtime/authority.ts'
+import { remoteWorkspaceRuntimeFailureFromCommandResult } from '#/server/workspaces/runtime/remote-failure.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
-import { localWorkspaceNativePath } from '#/server/modules/workspace-path.ts'
+import { localWorkspaceNativePath } from '#/server/workspaces/path.ts'
 import {
   issuePhysicalWorktreeExecutionCapability,
   type PhysicalWorktreeExecutionBinding,

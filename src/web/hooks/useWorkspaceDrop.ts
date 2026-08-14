@@ -1,7 +1,7 @@
 import { ref, toValue, watch } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { toast } from 'vue-sonner'
-import { pathForDroppedFile } from '#/web/app-shell-client.ts'
+import { pathForDroppedFile } from '#/web/app/shell-client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
@@ -10,7 +10,7 @@ import {
   reportOpenWorkspacePostOpenError,
   reportOpenWorkspaceUncertainty,
 } from '#/web/lib/open-workspace-result-feedback.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 
 interface Options {
   /** True when an overlay (Settings/Help) is up. While blocked, the

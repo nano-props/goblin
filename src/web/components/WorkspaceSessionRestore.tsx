@@ -4,7 +4,7 @@ import type { PropType } from 'vue'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
-import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authenticated.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
 export const WorkspaceSessionRestorePlaceholder = defineComponent({

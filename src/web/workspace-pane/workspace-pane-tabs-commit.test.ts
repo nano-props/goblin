@@ -23,7 +23,7 @@ import {
 } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { createWorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { workspacePaneTabTargetBlocksInteraction } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 

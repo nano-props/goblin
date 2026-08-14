@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspaceTerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import type { WorkspaceTerminalSessionSummary } from '#/web/terminal/components/types.ts'
 import { orderWorkspaceDashboardTerminals } from '#/web/components/workspace-pages/workspace-dashboard-terminal-order.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 

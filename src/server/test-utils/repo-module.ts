@@ -3,9 +3,9 @@ import type { PullRequestInfo, WorktreeInfo } from '#/shared/git-types.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
+import type { RepoWorktreeRemovalLifecycle } from '#/server/repos/worktree-removal-lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import type * as RepoWritePaths from '#/server/modules/repo-write-paths.ts'
+import type * as RepoWritePaths from '#/server/repos/write-paths.ts'
 import { commandOutcomeForTest } from '#/test-utils/command-outcome.ts'
 import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
 
@@ -62,7 +62,7 @@ export async function removeRepoWorktreeForTest(
   signal?: AbortSignal,
 ) {
   const [{ removeCapturedRepoWorktree }, physicalWorktreeCapability] = await Promise.all([
-    import('#/server/modules/repo-write-paths.ts'),
+    import('#/server/repos/write-paths.ts'),
     physicalWorktreeCapabilityForTest(cwd, input.worktreePath),
   ])
   return await removeCapturedRepoWorktree(
@@ -247,7 +247,7 @@ vi.mock('#/shared/input-validation.ts', () => ({
   toSafeWorkspaceLocator: (value: unknown) => (typeof value === 'string' ? value : null),
 }))
 
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   getServerWorkspaceSettings: hoistedMocks.getServerWorkspaceSettings,
   getServerFetchIntervalSec: hoistedMocks.getServerFetchIntervalSec,
   subscribeServerFetchInterval: hoistedMocks.subscribeServerFetchInterval,
@@ -263,32 +263,50 @@ vi.mock('#/system/ssh/diagnostics.ts', () => ({
   testRemoteWorkspace: vi.fn(),
 }))
 
-vi.mock('#/system/ssh/git.ts', () => ({
+vi.mock('#/system/ssh/git/worktree-bootstrap.ts', () => ({
   bootstrapRemoteWorktreeAfterCreate: hoistedMocks.bootstrapRemoteWorktreeAfterCreate,
+  getRemoteWorktreeBootstrapPreview: hoistedMocks.getRemoteWorktreeBootstrapPreview,
+}))
+
+vi.mock('#/system/ssh/git/worktrees.ts', () => ({
   createRemoteWorktree: hoistedMocks.createRemoteWorktree,
-  deleteRemoteBranch: hoistedMocks.deleteRemoteBranch,
-  fetchRemoteRepo: hoistedMocks.fetchRemoteRepo,
-  getRemoteBrowserUrl: vi.fn(),
-  getRemoteLog: vi.fn(),
-  getRemotePatch: vi.fn(),
   getRemoteRepoWorktreePaths: hoistedMocks.getRemoteRepoWorktreePaths,
-  getRemoteWorkspacePaneTargetIdentities: hoistedMocks.getRemoteWorkspacePaneTargetIdentities,
   resolveRemoteRepoCommonDir: hoistedMocks.resolveRemoteRepoCommonDir,
   resolveRemoteWorktreePath: hoistedMocks.resolveRemoteWorktreePath,
-  getRemoteSnapshot: hoistedMocks.getRemoteSnapshot,
-  getRemoteStatus: vi.fn(),
-  getRemoteTrackingBranches: vi.fn(),
-  getRemoteWorktreeBootstrapPreview: hoistedMocks.getRemoteWorktreeBootstrapPreview,
-  pullRemoteBranch: hoistedMocks.pullRemoteBranch,
-  pushRemoteBranch: hoistedMocks.pushRemoteBranch,
   removeRemoteWorktree: hoistedMocks.removeRemoteWorktree,
+}))
+
+vi.mock('#/system/ssh/git/branches.ts', () => ({
+  deleteRemoteBranch: hoistedMocks.deleteRemoteBranch,
+  getRemoteLog: vi.fn(),
+  pullRemoteBranch: hoistedMocks.pullRemoteBranch,
+}))
+
+vi.mock('#/system/ssh/git/remote.ts', () => ({
+  fetchRemoteRepo: hoistedMocks.fetchRemoteRepo,
+  getRemoteBrowserUrl: vi.fn(),
+  getRemoteTrackingBranches: vi.fn(),
+  pushRemoteBranch: hoistedMocks.pushRemoteBranch,
+}))
+
+vi.mock('#/system/ssh/git/patch.ts', () => ({
+  getRemotePatch: vi.fn(),
+}))
+
+vi.mock('#/system/ssh/git/snapshot.ts', () => ({
+  getRemoteWorkspacePaneTargetIdentities: hoistedMocks.getRemoteWorkspacePaneTargetIdentities,
+  getRemoteSnapshot: hoistedMocks.getRemoteSnapshot,
+}))
+
+vi.mock('#/system/ssh/git/status.ts', () => ({
+  getRemoteStatus: vi.fn(),
 }))
 
 vi.mock('#/system/git/pull-requests.ts', () => ({
   getBranchPullRequests: hoistedMocks.getBranchPullRequests,
 }))
 
-vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
   publishRepoReadInvalidation: hoistedMocks.publishRepoReadInvalidation,
   publishSettingsInvalidation: hoistedMocks.publishSettingsInvalidation,
 }))
@@ -296,8 +314,7 @@ vi.mock('#/server/modules/invalidation-broker.ts', () => ({
 export const mocks = hoistedMocks
 
 beforeEach(async () => {
-  const { resetRepoWriteOperationCoordinatorForTests } =
-    await import('#/server/modules/repo-write-operation-coordinator.ts')
+  const { resetRepoWriteOperationCoordinatorForTests } = await import('#/server/repos/write-operation-coordinator.ts')
   resetRepoWriteOperationCoordinatorForTests()
   vi.clearAllMocks()
   hoistedMocks.checkGitAvailable.mockResolvedValue({ ok: true, message: '' })

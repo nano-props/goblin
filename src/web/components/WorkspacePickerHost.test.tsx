@@ -10,13 +10,13 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
-vi.mock('#/web/runtime-settings-shortcuts.ts', () => ({
+vi.mock('#/web/settings/runtime-shortcuts.ts', () => ({
   useShortcutSettings: () => ({ value: { shortcutsDisabled: false } }),
 }))
-vi.mock('#/web/components/terminal/terminal-session-store.ts', () => ({
+vi.mock('#/web/terminal/components/terminal-session-store.ts', () => ({
   useWorkspaceTerminalBellCounts: () => ({ value: {} }),
 }))
-vi.mock('#/web/app-navigation.tsx', () => ({
+vi.mock('#/web/app/navigation/context.tsx', () => ({
   useAppNavigation: () => ({
     activateWorkspace: vi.fn(),
     closeWorkspace: vi.fn(async () => ({ ok: true })),

@@ -70,12 +70,12 @@ describe('client bootstrap seeding', () => {
       pref: 'en',
       dict: Object.freeze({ hello: 'hello' }),
     })
-    vi.doMock('#/web/settings-client.ts', () => ({
+    vi.doMock('#/web/settings/client.ts', () => ({
       getI18nSnapshot: vi.fn(async () => nextSnapshot),
       setI18nPref: vi.fn(async () => nextSnapshot),
     }))
-    const { appQueryClient } = await import('#/web/app-query-client.ts')
-    const { settingsSnapshotQueryKey } = await import('#/web/settings-query-cache.ts')
+    const { appQueryClient } = await import('#/web/app/query-client.ts')
+    const { settingsSnapshotQueryKey } = await import('#/web/settings/query-cache.ts')
     appQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ lang: 'auto' }))
 
     const { i18nStore } = await import('#/web/stores/i18n.ts')

@@ -3,7 +3,7 @@ import type { ServerTerminalCreateSuccess } from '#/server/terminal/terminal-ses
 import type { WorkspacePaneRuntimeTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { terminalGitWorktreePresentation, type TerminalCreateSuccess } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import type { WorkspaceRuntimeMembershipCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeMembershipCapability } from '#/server/workspaces/runtime/authority.ts'
 
 function requiredWorkspaceLocator(value: string) {
   const locator = canonicalWorkspaceLocator(value)

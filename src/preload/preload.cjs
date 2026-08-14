@@ -1,7 +1,7 @@
 // Preload bridge. Exposes low-level IPC under `window.goblinNative` to the
 // client. The client no longer needs a bootstrap roundtrip here — the
 // server renders the full bootstrap JSON into the HTML response
-// (`<script id="goblin-bootstrap">`), which is read by `web/bootstrap.ts`
+// (`<script id="goblin-bootstrap">`), which is read by `web/bridge/bootstrap.ts`
 // after page load. The preload is now strictly an IPC bridge: every
 // function it exposes corresponds to a capability that the client
 // could not get from the server (open settings window, send IPC

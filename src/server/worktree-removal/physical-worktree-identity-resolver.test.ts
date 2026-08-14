@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import { normalizeRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import { WorkspaceRuntimeStaleError, type WorkspaceRuntimeClosedEvent } from '#/server/modules/workspace-runtimes.ts'
+import { WorkspaceRuntimeStaleError, type WorkspaceRuntimeClosedEvent } from '#/server/workspaces/runtime/authority.ts'
 import { PhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { OperationCancelledError } from '#/shared/operation-cancelled.ts'

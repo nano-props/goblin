@@ -8,10 +8,10 @@ import {
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
-import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
-import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
+import type { TerminalCreateTranslator } from '#/web/terminal/components/terminal-create-feedback.ts'
+import type { TerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
+import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
 import type { FilesystemWorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { selectWorkspacePaneControllerTab } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import {
@@ -38,12 +38,12 @@ import {
   workspacePaneFilesystemRootPath,
   workspacePaneTabsTargetForFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
+import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import {
   claimTerminalAutoFocus,
   type TerminalAutoFocusLease,
   type TerminalPresentationFocusEffects,
-} from '#/web/terminal-focus.ts'
+} from '#/web/terminal/focus.ts'
 
 export interface ExistingTerminalPresentationRouteRequest extends TerminalPresentationFocusEffects {
   navigationGeneration: AppNavigationGeneration

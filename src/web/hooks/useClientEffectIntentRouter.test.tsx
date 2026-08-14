@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'vue-sonner'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { themeStore } from '#/web/stores/theme.ts'
@@ -32,15 +32,15 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { repoPresentationFromQueryForTest } from '#/web/test-utils/repo-store.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
-import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
-import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
+import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authenticated.ts'
+import type { TerminalFilesystemTargetSnapshot } from '#/web/terminal/components/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -59,7 +59,7 @@ const appDataClientMocks = vi.hoisted(() => ({
   removeWorkspaceFromSession: vi.fn(async () => {}),
 }))
 
-vi.mock('#/web/settings-actions.ts', () => ({
+vi.mock('#/web/settings/actions.ts', () => ({
   clearRecentWorkspaceHistory: appDataClientMocks.clearRecentWorkspaceHistory,
   removeWorkspaceFromSession: appDataClientMocks.removeWorkspaceFromSession,
 }))

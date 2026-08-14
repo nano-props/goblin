@@ -11,10 +11,10 @@ import {
   type BranchActionRepo,
   type BranchCopyPatchAction,
 } from '#/web/hooks/branch-action-state.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import type { WorkspacePaneBranchTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { workspacePaneTargetActionItems } from '#/web/components/workspace-pane/workspace-pane-target-action-items.tsx'
 export interface BranchActionItem {
   id: BranchActionItemId

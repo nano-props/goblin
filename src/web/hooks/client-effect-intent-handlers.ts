@@ -1,11 +1,11 @@
 import { toast } from 'vue-sonner'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
-import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
+import { presentWorkspaceRefreshOutcome } from '#/web/workspaces/runtime/refresh-feedback.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import { themeStore } from '#/web/stores/theme.ts'
 import { i18nStore } from '#/web/stores/i18n.ts'
-import { clearRecentWorkspaceHistory } from '#/web/settings-actions.ts'
+import { clearRecentWorkspaceHistory } from '#/web/settings/actions.ts'
 import { openWorkspaceFromDialog } from '#/web/lib/open-workspace-dialog.ts'
 import {
   reportCloseWorkspaceFailure,
@@ -13,7 +13,7 @@ import {
   reportOpenWorkspacePostOpenEffects,
   reportOpenWorkspaceUncertainty,
 } from '#/web/lib/open-workspace-result-feedback.ts'
-import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
+import { consumeExternalOpenPaths } from '#/web/app/shell-client.ts'
 import { openWorkspacePaths } from '#/web/lib/open-workspace-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
 import {
@@ -31,11 +31,11 @@ import {
   type ClientWorkspaceIntent,
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { OpenWorkspaceResult, WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoOperationsQueryData, getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import {
   workspacePaneCommandCoordinates,
@@ -43,7 +43,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { commitWorkspacePaneTerminalDestination } from '#/web/workspace-pane/workspace-pane-terminal-destination-navigation.ts'
 import { surfaceWorkspacePaneTerminalDestinationOutcome } from '#/web/workspace-pane/workspace-pane-terminal-destination-feedback.ts'
-import { appNavigationIsCurrent, beginAppNavigation } from '#/web/app-navigation-lifecycle.ts'
+import { appNavigationIsCurrent, beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
 
 interface TerminalBellIntentDeps {
   navigation: AppNavigationActions

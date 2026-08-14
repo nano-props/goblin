@@ -7,7 +7,7 @@ const hostInfoMock = vi.hoisted(() => ({
   pid: 999,
 }))
 
-vi.mock('#/server/modules/host-info.ts', () => ({
+vi.mock('#/server/host-info.ts', () => ({
   getServerHostInfo: () => hostInfoMock,
 }))
 

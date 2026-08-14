@@ -2,7 +2,7 @@ import { computed, defineComponent } from 'vue'
 import type { WorkspaceGitReadyProbeState } from '#/shared/workspace-runtime.ts'
 import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { GitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import {
   RepoReadFailureNotice,
@@ -19,7 +19,7 @@ import { WorktreeStatusOverview } from '#/web/components/workspace-pane/Worktree
 import { EmptyGitHistoryPanel, GitHistoryPanel } from '#/web/components/repo-workspace/GitHistoryPanel.tsx'
 import { GitWorkspacePane } from '#/web/components/workspace-pane/GitWorkspacePane.tsx'
 import type { GitWorkspacePaneShell } from '#/web/components/workspace-pane/workspace-pane-types.ts'
-import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repo-queries.ts'
+import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repos/queries.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import type { RepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
 import { useFilesystemWorkspacePaneRouteController } from '#/web/workspace-pane/filesystem-workspace-pane-route-controller.ts'
@@ -27,8 +27,8 @@ import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { useGitWorktreeWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import type { WorkspacePaneRuntimeContext } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
-import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { repoQueryReadFailure } from '#/web/repos/read-failure.ts'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 
 interface GitWorktreePaneProps {

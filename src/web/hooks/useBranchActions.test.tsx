@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent, ref } from 'vue'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -34,17 +34,17 @@ const mocks = vi.hoisted(() => ({
   toastWarning: vi.fn(),
 }))
 
-vi.mock('#/web/repo-client.ts', () => ({
+vi.mock('#/web/repos/client.ts', () => ({
   getRepoPatch: mocks.getRepoPatch,
 }))
 
-vi.mock('#/web/workspace-external-app-client.ts', () => ({
+vi.mock('#/web/external-apps/workspace-client.ts', () => ({
   openWorkspaceEditor: mocks.openWorkspaceEditor,
   openWorkspaceInFinder: mocks.openWorkspaceInFinder,
   openWorkspaceTerminal: mocks.openWorkspaceTerminal,
 }))
 
-vi.mock('#/web/app-shell-client.ts', () => ({
+vi.mock('#/web/app/shell-client.ts', () => ({
   openExternalUrl: mocks.openExternalUrl,
 }))
 

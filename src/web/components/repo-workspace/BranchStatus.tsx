@@ -42,7 +42,7 @@ import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
 import type { CurrentGitWorkspacePanePresentation } from '#/web/components/repo-workspace/model.ts'
 import { CommitHashLink } from '#/web/components/repo-workspace/repo-link-actions.tsx'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { dispatchOpenWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 interface Props {

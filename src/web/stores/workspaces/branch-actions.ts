@@ -31,7 +31,7 @@ import {
   pullRepoBranch,
   pushRepoBranch,
   removeRepoWorktree,
-} from '#/web/repo-client.ts'
+} from '#/web/repos/client.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { isGitWorkspace } from '#/web/stores/workspaces/git-workspace-client-state.ts'
 import { isSilentBranchActionCancellation } from '#/web/stores/workspaces/branch-action-result.ts'

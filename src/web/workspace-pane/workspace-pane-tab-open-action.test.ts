@@ -15,7 +15,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
@@ -37,8 +37,8 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { repoPresentationFromQueryForTest } from '#/web/test-utils/repo-store.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
+import type { TerminalFilesystemTargetSnapshot } from '#/web/terminal/components/types.ts'
 import {
   observeWorkspacePaneRouteForTest,
   observedFilesystemWorkspacePaneRouteCommitForTest,
@@ -46,8 +46,8 @@ import {
   seedInitialObservedWorkspacePaneRouteForTest,
   type ObservedBranchRouteNavigationForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { beginAppNavigation, currentAppNavigationGeneration } from '#/web/app-navigation-lifecycle.ts'
-import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app-navigation-actions.ts'
+import { beginAppNavigation, currentAppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
+import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import {
   runtimeWorkspacePaneTargetForTest,

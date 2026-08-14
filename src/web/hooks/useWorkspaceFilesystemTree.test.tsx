@@ -17,20 +17,20 @@ import {
 import {
   startWorkspaceFilesystemQueryInvalidationSync,
   workspaceFilesystemTreeChildrenQueryKey,
-} from '#/web/workspace-filesystem-query.ts'
+} from '#/web/workspaces/filesystem/query.ts'
 
 const mocks = vi.hoisted(() => ({
   getWorkspaceFilesystemTree: vi.fn(),
 }))
 
-vi.mock('#/web/workspace-filesystem-client.ts', () => ({
+vi.mock('#/web/workspaces/filesystem/client.ts', () => ({
   getWorkspaceFilesystemTree: mocks.getWorkspaceFilesystemTree,
 }))
 
 const listeners = new Set<(event: unknown) => void>()
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-lazy-tree-test'
 
-vi.mock('#/web/workspace-filesystem-invalidation-ingress.ts', () => ({
+vi.mock('#/web/workspaces/filesystem/invalidation-ingress.ts', () => ({
   subscribeWorkspaceFilesystemInvalidation(listener: (event: unknown) => void) {
     listeners.add(listener)
     return () => listeners.delete(listener)

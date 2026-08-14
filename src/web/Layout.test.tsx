@@ -9,9 +9,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { Layout } from '#/web/Layout.tsx'
-import { useWorkspaceTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
-import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
-import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import { useWorkspaceTerminalBellCounts } from '#/web/terminal/components/terminal-session-store.ts'
+import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
+import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authenticated.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
@@ -35,11 +35,11 @@ vi.mock('#/web/components/TokenGate.tsx', () => ({
   }),
 }))
 
-vi.mock('#/web/hooks/useAuthenticatedAppBootstrap.ts', () => ({
+vi.mock('#/web/app/bootstrap/authenticated.ts', () => ({
   useAuthenticatedAppBootstrap: () => ({ state: authenticatedBootstrapState, retry: authenticatedBootstrapMock.retry }),
 }))
 
-vi.mock('#/web/client-ingress.ts', () => ({
+vi.mock('#/web/bridge/ingress.ts', () => ({
   subscribeClientEffectIntent: (listener: (intent: { type: string }) => void) => {
     clientIntentIngress.subscriptionStarts += 1
     clientIntentIngress.listeners.add(listener)
@@ -51,7 +51,7 @@ vi.mock('#/web/hooks/useClientWorkspacePersistence.ts', () => ({
   useClientWorkspacePersistence: clientWorkspacePersistence,
 }))
 
-vi.mock('#/web/server-client-intent-ingress.ts', () => ({
+vi.mock('#/web/realtime/client-intent-ingress.ts', () => ({
   subscribeServerClientIntentIngress: () => () => {},
 }))
 
@@ -68,15 +68,15 @@ vi.mock('#/web/components/WorkspaceOpenDialog.tsx', async () => {
   }
 })
 
-vi.mock('#/web/app-history-presentation.ts', async (importOriginal) => ({
+vi.mock('#/web/app/navigation/history-presentation.ts', async (importOriginal) => ({
   ...(await importOriginal()),
   useAppHistoryPresentationObserver: () => undefined,
 }))
 
-vi.mock('#/web/components/terminal/TerminalSessionProvider.tsx', async () => {
+vi.mock('#/web/terminal/components/TerminalSessionProvider.tsx', async () => {
   const { defineComponent } = await import('vue')
   const { TerminalSessionCommandScope, TerminalSessionReadScope } =
-    await import('#/web/components/terminal/terminal-session-context.ts')
+    await import('#/web/terminal/components/terminal-session-context.ts')
   const readContext: TerminalSessionReadContextValue = {
     terminalFilesystemTargetSnapshot: () => ({
       terminalFilesystemTargetKey: '',

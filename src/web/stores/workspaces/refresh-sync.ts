@@ -8,7 +8,7 @@ import {
   shouldAttemptFetch,
 } from '#/web/stores/workspaces/refresh-state.ts'
 import { canStartRemoteFetch } from '#/web/stores/workspaces/sync-state.ts'
-import { fetchRepo } from '#/web/repo-client.ts'
+import { fetchRepo } from '#/web/repos/client.ts'
 import type { RepoOperationReason } from '#/web/stores/workspaces/operations.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'
 import type { RepoMutationExecResult } from '#/shared/git-types.ts'

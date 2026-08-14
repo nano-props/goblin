@@ -13,7 +13,7 @@ import {
   WorkspaceRuntimeStaleError,
   type WorkspaceRuntimeEpochCapability,
   type WorkspaceRuntimeMembershipCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,

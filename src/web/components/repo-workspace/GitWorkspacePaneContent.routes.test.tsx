@@ -23,10 +23,10 @@ import { screen } from '@testing-library/vue'
 import { describe, expect, test, vi } from 'vitest'
 import { BranchActionSurfaceProvider } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
-import { TerminalSessionReadScope } from '#/web/components/terminal/terminal-session-context.ts'
+import { TerminalSessionReadScope } from '#/web/terminal/components/terminal-session-context.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 describe('GitWorkspacePaneContent routes', () => {
   test('offers a compact return to the branch list when the last routed branch no longer exists', async () => {
     const repo = seedRepoWithReadModelForTest({

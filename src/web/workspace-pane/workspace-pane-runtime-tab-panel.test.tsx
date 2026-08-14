@@ -12,10 +12,10 @@ import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
-import { TerminalSessionCommandScope } from '#/web/components/terminal/terminal-session-context.ts'
-import type { TerminalSessionContextValue } from '#/web/components/terminal/types.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { TerminalSessionCommandScope } from '#/web/terminal/components/terminal-session-context.ts'
+import type { TerminalSessionContextValue } from '#/web/terminal/components/types.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import {
   observeWorkspacePaneRouteForTest,
   observedAppNavigationActionsForTest,
@@ -43,7 +43,7 @@ const terminalCreateCommandMocks = vi.hoisted(() => ({
   })),
 }))
 
-vi.mock('#/web/components/terminal/TerminalSessionView.tsx', () => ({
+vi.mock('#/web/terminal/components/TerminalSessionView.tsx', () => ({
   TerminalSessionView: (props: CapturedTerminalSessionViewProps) => {
     terminalSessionViewMocks.props.push(props)
     return <div data-testid="terminal-session-view" />

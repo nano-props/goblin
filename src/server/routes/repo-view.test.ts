@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import * as v from 'valibot'
-import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/server/modules/client-intent-broker.ts'
+import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/server/realtime/client-intent-broker.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createApp } from '#/server/app-factory.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'

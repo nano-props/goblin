@@ -1,7 +1,7 @@
 import { defineComponent } from 'vue'
 import { toast } from 'vue-sonner'
 import { OpenWorkspaceDialog } from '#/web/components/OpenWorkspaceDialog.tsx'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 interface WorkspaceOpenDialogProps {

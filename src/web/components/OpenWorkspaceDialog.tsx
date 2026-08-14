@@ -1,6 +1,6 @@
 import { computed, defineComponent, ref, watch } from 'vue'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'
-import { chooseLocalWorkspacePath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
+import { chooseLocalWorkspacePath, hasNativeDirectoryPicker } from '#/web/app/shell-client.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'

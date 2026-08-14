@@ -6,7 +6,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import { createRuntimeWorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionSummary } from '#/web/terminal/components/types.ts'
 import { TestWorkspacePaneTabStrip, flushTimers, render, session } from '#/web/test-utils/workspace-pane-tab-strip.tsx'
 
 describe('WorkspacePaneTabStrip presentation and interaction', () => {

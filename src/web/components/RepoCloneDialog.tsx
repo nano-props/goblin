@@ -1,7 +1,7 @@
 import { defineComponent } from 'vue'
 import { toast } from 'vue-sonner'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { CloneRepositoryDialog } from '#/web/components/CloneRepositoryDialog.tsx'
 import type { CloneRepositoryInput } from '#/web/components/CloneRepositoryDialog.tsx'
 import {
@@ -9,7 +9,7 @@ import {
   reportOpenWorkspaceUncertainty,
 } from '#/web/lib/open-workspace-result-feedback.ts'
 import { sessionLog } from '#/web/logger.ts'
-import { cloneRepository as runCloneRepository } from '#/web/repo-client.ts'
+import { cloneRepository as runCloneRepository } from '#/web/repos/client.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { OpenWorkspaceResult } from '#/web/stores/workspaces/types.ts'

@@ -6,25 +6,25 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { terminalExecutionPath } from '#/shared/terminal-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
-import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.tsx'
-import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
+import { TerminalBellBadge } from '#/web/terminal/components/TerminalBellBadge.tsx'
+import { TerminalOutputActivityIndicator } from '#/web/terminal/components/TerminalOutputActivityIndicator.tsx'
 import {
   useTerminalWorkspaceProjectionHydrationEntry,
   useWorkspaceTerminalSessions,
-} from '#/web/components/terminal/terminal-session-store.ts'
-import type { WorkspaceTerminalSessionSummary } from '#/web/components/terminal/types.ts'
+} from '#/web/terminal/components/terminal-session-store.ts'
+import type { WorkspaceTerminalSessionSummary } from '#/web/terminal/components/types.ts'
 import { DashboardEmptySection, DashboardSection } from '#/web/components/workspace-pages/dashboard-ui.tsx'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { useRepoSnapshotReadModel } from '#/web/repo-queries.ts'
+import { useRepoSnapshotReadModel } from '#/web/repos/queries.ts'
 import { useWorkspacePaneTabsQuery } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { orderWorkspaceDashboardTerminals } from '#/web/components/workspace-pages/workspace-dashboard-terminal-order.ts'
-import { worktreePresentationLabel } from '#/web/worktree-presentation.ts'
+import { worktreePresentationLabel } from '#/web/repos/worktree-presentation.ts'
 import {
   gitWorktreePaneTargetLease,
   workspaceRootPaneTargetLease,

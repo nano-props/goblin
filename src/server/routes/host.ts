@@ -1,5 +1,5 @@
 import { createRouteApp } from '#/server/common/http-validate.ts'
-import { getServerHostInfo, type HostInfo } from '#/server/modules/host-info.ts'
+import { getServerHostInfo, type HostInfo } from '#/server/host-info.ts'
 
 /**
  * Public host-info endpoint.

@@ -4,22 +4,22 @@ import { vi } from 'vitest'
 import { waitForNextMacrotask } from '#/test-utils/microtasks.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST } from '#/web/test-utils/terminal-snapshot.ts'
-import { TerminalSessionView as TerminalSessionViewComponent } from '#/web/components/terminal/TerminalSessionView.tsx'
+import { TerminalSessionView as TerminalSessionViewComponent } from '#/web/terminal/components/TerminalSessionView.tsx'
 import {
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
-} from '#/web/components/terminal/terminal-session-context.ts'
+} from '#/web/terminal/components/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
   TerminalSessionSummary,
   TerminalFilesystemTargetSnapshot,
   TerminalSnapshot,
-} from '#/web/components/terminal/types.ts'
+} from '#/web/terminal/components/types.ts'
 import { canonicalWorkspaceLocator, formatWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
-vi.mock('#/web/app-shell-client.ts', () => ({
+vi.mock('#/web/app/shell-client.ts', () => ({
   pathForDroppedFile: vi.fn(() => ''),
   saveClipboardFiles: vi.fn(() => Promise.resolve([])),
 }))

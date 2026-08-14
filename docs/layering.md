@@ -37,7 +37,7 @@ Use only the layers the feature needs.
 Typical files:
 
 - `src/server/routes/*`
-- `src/web/*-client.ts` (feature-scoped, not global buckets)
+- `src/web/<feature>/client.ts`
 
 #### 2. Read layer
 
@@ -47,9 +47,9 @@ Typical files:
 
 Typical files:
 
-- `src/web/*-queries.ts`
-- `src/web/*-snapshot.ts`
-- `src/server/modules/*-read.ts` (server-side read projection when needed)
+- `src/web/<feature>/queries.ts`
+- `src/web/<feature>/snapshot.ts`
+- `src/server/<feature>/read-paths.ts` (server-side read projection when needed)
 - read-side selectors or projection readers
 
 #### 3. Write layer
@@ -65,8 +65,8 @@ Typical files:
 
 Typical files:
 
-- `src/server/modules/*-write-paths.ts`
-- `src/web/*-write-paths.ts`
+- `src/server/<feature>/write-paths.ts`
+- `src/web/<feature>/write-paths.ts`
 - focused mutation orchestration modules
 
 #### 4. Source layer
@@ -78,7 +78,7 @@ Typical files:
 
 Typical files:
 
-- `src/server/modules/*-source.ts`
+- `src/server/<feature>/source.ts`
 - storage adapters
 
 #### 5. Runtime facade layer
@@ -92,7 +92,7 @@ Typical files:
 
 Typical files:
 
-- `src/web/runtime-*.ts` (only when read + write are both present)
+- `src/web/<feature>/runtime.ts` (only when read + write are both present)
 
 ## Default flow
 
@@ -107,18 +107,18 @@ Do not mix read and write concerns unless the feature is still trivial.
 
 Server-side features follow the same layering logic as the client side. Do not let route files accumulate business orchestration just because they are on the server.
 
-| Layer    | Server responsibility                                    | Typical files                                                         |
-| -------- | -------------------------------------------------------- | --------------------------------------------------------------------- |
-| Boundary | Parse HTTP input, call next layer, return JSON           | `src/server/routes/*.ts`                                              |
-| Read     | Query authoritative state, return snapshots              | `src/server/modules/*-read.ts` or direct source call for simple cases |
-| Write    | Orchestrate mutations, publish invalidation, call source | `src/server/modules/*-write-paths.ts`                                 |
-| Source   | Persistence, external system calls, file I/O             | `src/server/modules/*-source.ts`                                      |
+| Layer    | Server responsibility                                    | Typical files                                                            |
+| -------- | -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Boundary | Parse HTTP input, call next layer, return JSON           | `src/server/routes/<feature>.ts`                                         |
+| Read     | Query authoritative state, return snapshots              | `src/server/<feature>/read-paths.ts` or a direct source call when simple |
+| Write    | Orchestrate mutations, publish invalidation, call source | `src/server/<feature>/write-paths.ts`                                    |
+| Source   | Persistence, external system calls, file I/O             | `src/server/<feature>/source.ts`                                         |
 
 Rules:
 
 - A route file should not exceed input validation + delegating to the next layer.
-- If a feature has complex mutations, extract `src/server/modules/<feature>-write-paths.ts`.
-- If a feature has multiple read paths shared by routes or other modules, extract `src/server/modules/<feature>-read.ts`.
+- If a feature has complex mutations, extract `src/server/<feature>/write-paths.ts`.
+- If a feature has multiple read paths shared by routes or other modules, extract `src/server/<feature>/read-paths.ts`.
 - Choose server layers from server responsibilities. Do not mirror the client
   structure merely for symmetry.
 
@@ -169,10 +169,10 @@ Use those distinctions to decide control first, then choose the layer.
 Prefer:
 
 - `routes/settings.ts`
-- `settings-queries.ts`
-- `settings-write-paths.ts`
-- `settings-source.ts`
-- `runtime-settings-external-apps.ts` (only if it exposes read + write)
+- `settings/queries.ts`
+- `settings/write-paths.ts`
+- `settings/source.ts`
+- `settings/runtime-external-apps.ts` (only if it exposes read + write)
 
 Avoid broad catch-all names like:
 

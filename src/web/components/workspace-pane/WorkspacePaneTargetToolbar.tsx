@@ -5,10 +5,10 @@ import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
-import { useAppNavigation } from '#/web/app-navigation.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
+import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { useTerminalSessionContext } from '#/web/terminal/components/terminal-session-context.ts'
 import {
   WorkspaceExternalAppLauncher,
   useWorkspaceExternalAppItems,
@@ -20,7 +20,7 @@ import { isPendingWorkspacePaneTabItem } from '#/web/components/workspace-pane/w
 import type { WorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import type { WorkspaceExternalAppItem } from '#/web/external-workspace-apps.tsx'
+import type { WorkspaceExternalAppItem } from '#/web/external-apps/catalog.tsx'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type {
   WorkspacePaneFilesystemTarget,

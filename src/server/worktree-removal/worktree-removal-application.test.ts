@@ -9,9 +9,9 @@ import {
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import { RemoteWorkspaceRuntimeFailureError } from '#/server/modules/remote-workspace-runtime-failure.ts'
-import { RepoMutationRuntimeFailureError } from '#/server/modules/repo-mutation-runtime-failure.ts'
-import { WorkspaceRuntimeStaleError } from '#/server/modules/workspace-runtimes.ts'
+import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
+import { RepoMutationRuntimeFailureError } from '#/server/repos/mutation-runtime-failure.ts'
+import { WorkspaceRuntimeStaleError } from '#/server/workspaces/runtime/authority.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 

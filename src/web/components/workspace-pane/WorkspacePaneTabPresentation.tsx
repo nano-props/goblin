@@ -23,7 +23,7 @@ import { WorkspacePaneTabTitle } from '#/web/components/workspace-pane/Workspace
 import { cn } from '#/web/lib/cn.ts'
 import { toButtonVNodeRef } from '#/web/components/ui/refs.ts'
 import type { ElementRef } from '#/web/components/ui/refs.ts'
-import { terminalHasKeyboardFocus } from '#/web/terminal-focus.ts'
+import { terminalHasKeyboardFocus } from '#/web/terminal/focus.ts'
 
 export type WorkspacePaneT = (key: string, params?: Record<string, string | number>) => string
 

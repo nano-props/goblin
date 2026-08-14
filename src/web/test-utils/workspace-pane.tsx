@@ -7,21 +7,21 @@ import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-
 import {
   EMPTY_TERMINAL_SNAPSHOT,
   EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
-} from '#/web/components/terminal/terminal-session-context.ts'
+} from '#/web/terminal/components/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
   TerminalFilesystemTargetSnapshot,
-} from '#/web/components/terminal/types.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+} from '#/web/terminal/components/types.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
-import { createAppNavigationActions } from '#/web/app-navigation-actions.ts'
-import type { AppRouteNavigation } from '#/web/app-route-navigation.ts'
+import { createAppNavigationActions } from '#/web/app/navigation/actions.ts'
+import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
@@ -30,7 +30,7 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
-import { resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
+import { resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
 
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-workspace-container-repo')
 

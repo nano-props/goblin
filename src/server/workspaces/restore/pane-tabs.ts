@@ -1,0 +1,127 @@
+import type { RestoredWorkspaceRuntime, ServerWorkspaceState } from '#/shared/api-types.ts'
+import { workspaceSessionEntryId, type WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
+import type { RestorableWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { ServerWorkspaceMatchOutcome } from '#/server/settings/source.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type { WorkspaceRuntimeMembershipCapability } from '#/server/workspaces/runtime/authority.ts'
+import { repoWorktreeMaterializedBranch } from '#/shared/git-types.ts'
+
+interface WorkspacePaneTabsRestoreInput {
+  userId: string
+  clientId: string
+  workspacePaneTabsHost: ServerWorkspacePaneTabsHost
+  signal?: AbortSignal
+}
+
+type WorkspacePaneTabsRestoreWorkspace = RestoredWorkspaceRuntime & {
+  runtimeCapability: WorkspaceRuntimeMembershipCapability
+}
+
+export async function restoreWorkspacePaneTabsForMemberships(input: {
+  restoreInput: WorkspacePaneTabsRestoreInput
+  workspaces: WorkspacePaneTabsRestoreWorkspace[]
+  confirmMembership: () => Promise<ServerWorkspaceMatchOutcome>
+  membershipPolicy: 'transaction-authoritative' | 'confirm-after-restore'
+}): Promise<
+  | {
+      matched: true
+      snapshots: Array<{ workspaceId: WorkspaceId; workspaceRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
+      repaired: boolean
+    }
+  | { matched: false; latestWorkspace: ServerWorkspaceState }
+> {
+  input.restoreInput.signal?.throwIfAborted()
+  for (;;) {
+    const restored = await restoreWorkspacePaneTabsForWorkspaces(input.restoreInput, input.workspaces)
+    if (restored.kind === 'restored') {
+      input.restoreInput.signal?.throwIfAborted()
+      if (input.membershipPolicy === 'confirm-after-restore') {
+        const committed = await input.confirmMembership()
+        if (!committed.matched) return committed
+      }
+      return { matched: true, snapshots: restored.snapshots, repaired: restored.repaired }
+    }
+    const latest = await input.confirmMembership()
+    if (!latest.matched) return latest
+  }
+}
+
+async function restoreWorkspacePaneTabsForWorkspaces(
+  input: WorkspacePaneTabsRestoreInput,
+  workspaces: WorkspacePaneTabsRestoreWorkspace[],
+) {
+  const snapshots: Array<{
+    workspaceId: WorkspaceId
+    workspaceRuntimeId: string
+    snapshot: WorkspacePaneTabsSnapshot
+  }> = []
+  let repaired = false
+  for (const workspace of workspaces) {
+    input.signal?.throwIfAborted()
+    const admission = workspacePaneLayoutRestoreAdmission(workspace)
+    if (admission.kind === 'deferred') continue
+    const result = await input.workspacePaneTabsHost.restoreTabs(
+      input.userId,
+      {
+        workspaceId: workspace.workspaceId,
+        workspaceRuntimeId: workspace.workspaceRuntimeId,
+        expectedWorkspaceEntry: workspace.entry,
+        targets: admission.targets,
+      },
+      workspace.runtimeCapability,
+    )
+    if (result.kind === 'membership-conflict') return result
+    snapshots.push({
+      workspaceId: workspace.workspaceId,
+      workspaceRuntimeId: workspace.workspaceRuntimeId,
+      snapshot: result.snapshot,
+    })
+    if (result.repaired) repaired = true
+  }
+  return { kind: 'restored' as const, snapshots, repaired }
+}
+
+type WorkspacePaneLayoutRestoreAdmission =
+  { kind: 'ready'; targets: RestorableWorkspacePaneTarget[] } | { kind: 'deferred' }
+
+function workspacePaneLayoutRestoreAdmission(workspace: RestoredWorkspaceRuntime): WorkspacePaneLayoutRestoreAdmission {
+  if (workspace.repoSnapshot) {
+    const worktreeTargets = workspace.repoSnapshot.worktrees.flatMap((worktree) => {
+      const target = restorableWorktreeTarget(workspace.workspaceId, worktree.path)
+      return target ? [target] : []
+    })
+    const materializedBranches = new Set(
+      workspace.repoSnapshot.worktrees.flatMap((worktree) => {
+        const branchName = repoWorktreeMaterializedBranch(worktree)
+        return branchName ? [branchName] : []
+      }),
+    )
+    const branchTargets: RestorableWorkspacePaneTarget[] = workspace.repoSnapshot.branches
+      .filter((branch) => !materializedBranches.has(branch.name))
+      .map((branch) => ({ kind: 'git-branch', branch: branch.name }))
+    const gitTargets = [...worktreeTargets, ...branchTargets]
+    return { kind: 'ready', targets: [{ kind: 'workspace-root' }, ...gitTargets] }
+  }
+  return workspace.workspaceProbe.status === 'ready'
+    ? { kind: 'ready', targets: [{ kind: 'workspace-root' }] }
+    : { kind: 'deferred' }
+}
+
+function restorableWorktreeTarget(workspaceId: WorkspaceId, nativePath: string): RestorableWorkspacePaneTarget | null {
+  const workspace = parseCanonicalWorkspaceLocator(workspaceId)
+  if (!workspace) return null
+  const root = formatWorkspaceLocator(
+    workspace.transport === 'ssh'
+      ? { transport: 'ssh', profile: workspace.profile, path: nativePath }
+      : { transport: 'file', platform: workspace.platform, path: nativePath },
+    workspace.transport === 'file' ? workspace.platform : 'posix',
+  )
+  return root ? { kind: 'git-worktree', root } : null
+}
+
+export function workspaceEntry(workspace: ServerWorkspaceState, workspaceId: WorkspaceId) {
+  return workspace.openWorkspaceEntries.find((entry) => workspaceSessionEntryId(entry) === workspaceId) ?? null
+}

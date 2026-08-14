@@ -1,4 +1,4 @@
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { GitWorkspacePaneProjection } from '#/web/components/repo-workspace/model.ts'
 import type { WorkspaceReadyProbeState } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'

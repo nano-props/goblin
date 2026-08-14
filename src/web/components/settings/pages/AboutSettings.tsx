@@ -4,7 +4,7 @@ import { toast } from 'vue-sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { GitHubMark } from '#/web/components/GitHubMark.tsx'
 import { SettingsCard, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { openProjectGitHub } from '#/web/app-shell-client.ts'
+import { openProjectGitHub } from '#/web/app/shell-client.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { cn } from '#/web/lib/cn.ts'
 const appIconUrl = new URL('../../../../../assets/icon.png', import.meta.url).href

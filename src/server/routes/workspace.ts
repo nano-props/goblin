@@ -8,28 +8,24 @@ import {
   runSerializedInitialWorkspaceProbe,
   runSerializedWorkspaceRefresh,
   withWorkspaceRuntimeAdmission,
-} from '#/server/modules/workspace-runtimes.ts'
-import { readWorkspaceFilesystemTree } from '#/server/modules/workspace-filesystem-tree.ts'
-import { readWorkspaceFileViewer } from '#/server/modules/workspace-file-viewer.ts'
-import { readWorkspaceDirectoryOverview } from '#/server/modules/workspace-directory-overview.ts'
-import { trashWorkspaceFile } from '#/server/modules/workspace-file-trash.ts'
-import { openWorkspaceFileDownload } from '#/server/modules/workspace-file-download.ts'
-import {
-  openWorkspaceEditor,
-  openWorkspaceInFinder,
-  openWorkspaceTerminal,
-} from '#/server/modules/workspace-external-apps.ts'
+} from '#/server/workspaces/runtime/authority.ts'
+import { readWorkspaceFilesystemTree } from '#/server/workspaces/filesystem/tree.ts'
+import { readWorkspaceFileViewer } from '#/server/workspaces/filesystem/file-viewer.ts'
+import { readWorkspaceDirectoryOverview } from '#/server/workspaces/filesystem/directory-overview.ts'
+import { trashWorkspaceFile } from '#/server/workspaces/filesystem/file-trash.ts'
+import { openWorkspaceFileDownload } from '#/server/workspaces/filesystem/file-download.ts'
+import { openWorkspaceEditor, openWorkspaceInFinder, openWorkspaceTerminal } from '#/server/external-apps/workspace.ts'
 import {
   requireCurrentWorkspaceRuntime,
   requireWorkspaceRuntimeEpochCapability,
   runWorkspaceRuntimeRequest,
-} from '#/server/modules/workspace-runtime-request.ts'
+} from '#/server/workspaces/runtime/request.ts'
 import {
   publishUserRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation,
-} from '#/server/modules/invalidation-broker.ts'
-import { probeLocalWorkspace, probeWorkspace } from '#/server/modules/workspace-probe.ts'
-import { workspaceGitCleanupRequired } from '#/server/modules/workspace-capability-transition.ts'
+} from '#/server/realtime/invalidation-broker.ts'
+import { probeLocalWorkspace, probeWorkspace } from '#/server/workspaces/probe.ts'
+import { workspaceGitCleanupRequired } from '#/server/workspaces/runtime/capability-transition.ts'
 import {
   commitGitCapabilityRemovalOrThrow,
   type WorkspaceCapabilityTransitionHost,
@@ -40,8 +36,8 @@ import type { WorkspaceId, WorkspaceLocatorPlatform } from '#/shared/workspace-l
 import { homedir } from 'node:os'
 import { canonicalRuntimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-validators.ts'
 import type { RuntimeWorkspacePaneTarget, WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
-import { getLocalPathSuggestions } from '#/server/modules/local-path-suggestions.ts'
-import { workspaceLocatorFromNativeCommandInput } from '#/server/modules/native-workspace-input.ts'
+import { getLocalPathSuggestions } from '#/server/workspaces/local-path-suggestions.ts'
+import { workspaceLocatorFromNativeCommandInput } from '#/server/workspaces/native-input.ts'
 
 export function createWorkspaceRoutes(options: {
   workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost

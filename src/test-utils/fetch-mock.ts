@@ -1,7 +1,7 @@
 // `fetch` mocking helper.
 //
 // Many web tests want to stub `globalThis.fetch` so that the client code
-// under test (e.g. `repo-client.ts`, `settings-client.ts`) doesn't actually
+// under test (e.g. a repository or settings client) doesn't actually
 // hit the embedded server. Each test wants a slightly different response —
 // some want to assert call shape, some want to return canned data per
 // `mockResolvedValueOnce`, others want a single canned response for the

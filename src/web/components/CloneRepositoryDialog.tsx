@@ -1,7 +1,7 @@
 import { computed, defineComponent, ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
-import { chooseCloneParentPath, hasNativeDirectoryPicker, homeDirectory } from '#/web/app-shell-client.ts'
+import { chooseCloneParentPath, hasNativeDirectoryPicker, homeDirectory } from '#/web/app/shell-client.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'

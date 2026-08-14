@@ -11,22 +11,22 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { CreateWorktreePagePane } from '#/web/components/workspace-pages/CreateWorktreePagePane.tsx'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
-import { getRepoOperations, getRepoSnapshot, getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
-import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
+import { getRepoOperations, getRepoSnapshot, getRepoWorktreeBootstrapPreview } from '#/web/repos/client.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
 import type { CreateWorktreeExecResult } from '#/shared/git-types.ts'
 import type { RepoSnapshotResponse } from '#/shared/api-types.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
-import { getSettingsSnapshot } from '#/web/settings-client.ts'
+import { getSettingsSnapshot } from '#/web/settings/client.ts'
 import { DEFAULT_LOADING_DELAY_MS, DEFAULT_MIN_LOADING_VISIBLE_MS } from '#/web/hooks/useLoadingVisibility.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import {
   beginAppNavigation,
   currentAppNavigationGeneration,
   resetAppNavigationForTest,
-} from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/lifecycle.ts'
 import { repoOperationsForTest } from '#/web/test-utils/repo-query-runtime.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///workspace')
@@ -38,7 +38,7 @@ const surfaceMocks = vi.hoisted(() => ({
   } satisfies CreateWorktreeRequest,
 }))
 
-vi.mock('#/web/settings-client.ts', () => ({ getSettingsSnapshot: vi.fn() }))
+vi.mock('#/web/settings/client.ts', () => ({ getSettingsSnapshot: vi.fn() }))
 
 const mockedGetSettingsSnapshot = vi.mocked(getSettingsSnapshot)
 
@@ -83,7 +83,7 @@ vi.mock('#/web/components/workspace-toolbar-chrome.tsx', () => {
   }
 })
 
-vi.mock('#/web/repo-client.ts', () => ({
+vi.mock('#/web/repos/client.ts', () => ({
   getRepoSnapshot: vi.fn(),
   getRepoWorktreeBootstrapPreview: vi.fn(async () => ({ ok: false, message: 'error.failed-read-repo' })),
   getRepoOperations: vi.fn(),

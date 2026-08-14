@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
+import { createNativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import type { RestoreWorkspaceTabsInput } from '#/server/modules/workspace-tabs-restore.ts'
+import type { RestoreWorkspaceTabsInput } from '#/server/workspaces/restore/tabs.ts'
 import type { WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -25,25 +25,25 @@ const mocks = vi.hoisted(() => ({
   removeServerWorkspaceEntry: vi.fn(),
 }))
 
-vi.mock('#/server/modules/external-apps.ts', () => ({
+vi.mock('#/server/external-apps/catalog.ts', () => ({
   getServerExternalAppsSnapshot: mocks.getServerExternalAppsSnapshot,
 }))
 
-vi.mock('#/server/modules/github-cli.ts', () => ({
+vi.mock('#/server/external-apps/github-cli.ts', () => ({
   getServerGitHubCliState: mocks.getServerGitHubCliState,
 }))
 
-vi.mock('#/server/modules/settings-snapshot.ts', () => ({
+vi.mock('#/server/settings/snapshot.ts', () => ({
   getSettingsSnapshot: mocks.getSettingsSnapshot,
 }))
 
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
   addServerWorkspaceEntry: mocks.addServerWorkspaceEntry,
   removeServerWorkspaceEntry: mocks.removeServerWorkspaceEntry,
 }))
 
-vi.mock('#/server/modules/settings-write-paths.ts', () => ({
+vi.mock('#/server/settings/write-paths.ts', () => ({
   handleSetFetchInterval: mocks.handleSetFetchInterval,
   handleSetGlobalShortcutRegistered: mocks.handleSetGlobalShortcutRegistered,
   handleAddRecentWorkspace: mocks.handleAddRecentWorkspace,
@@ -52,11 +52,11 @@ vi.mock('#/server/modules/settings-write-paths.ts', () => ({
   handleUpdateUserSettings: mocks.handleUpdateUserSettings,
 }))
 
-vi.mock('#/server/modules/session-restore.ts', () => ({
+vi.mock('#/server/workspaces/restore/session.ts', () => ({
   restoreServerWorkspace: mocks.restoreServerWorkspace,
 }))
 
-vi.mock('#/server/modules/workspace-tabs-restore.ts', () => ({
+vi.mock('#/server/workspaces/restore/tabs.ts', () => ({
   restoreWorkspaceTabs: mocks.restoreWorkspaceTabs,
 }))
 

@@ -17,7 +17,7 @@ import type {
   GitWorkspacePaneShell,
   WorkspacePaneRouteContext,
 } from '#/web/components/workspace-pane/workspace-pane-types.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.tsx'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
@@ -27,9 +27,9 @@ import {
   useRepoPullRequestsReadModel,
   useRepoSnapshotReadModel,
   useRepoWorktreeStatusReadModel,
-} from '#/web/repo-queries.ts'
-import { repoQueryReadFailure } from '#/web/repo-read-failure.ts'
-import type { RepoReadFailure } from '#/web/repo-read-failure.ts'
+} from '#/web/repos/queries.ts'
+import { repoQueryReadFailure } from '#/web/repos/read-failure.ts'
+import type { RepoReadFailure } from '#/web/repos/read-failure.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { useGitWorkspacePaneRouteController } from '#/web/components/repo-workspace/git-workspace-pane-route-controller.ts'

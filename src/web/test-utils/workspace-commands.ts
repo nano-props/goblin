@@ -1,6 +1,6 @@
 import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
 import { afterEach, beforeEach, vi } from 'vitest'
-import type { WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { WorkspacePaneRouteTarget } from '#/web/app/navigation/route-model.ts'
 import {
   runCloseCurrentWorkspacePaneTabCommand as runCloseCurrentWorkspacePaneTabCommandRaw,
   runCloseWorkspacePaneTabCommand as runCloseWorkspacePaneTabCommandRaw,
@@ -10,9 +10,9 @@ import {
   runShowWorkspacePaneTabCommand as runShowWorkspacePaneTabCommandRaw,
   runTerminalPrimaryActionCommand as runTerminalPrimaryActionCommandRaw,
 } from '#/web/commands/workspace-commands.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { resetTerminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
@@ -23,9 +23,9 @@ import {
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import type { TerminalFilesystemTargetSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalFilesystemTargetSnapshot } from '#/web/terminal/components/types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import {
   gitWorktreePaneFilesystemTarget,
@@ -39,7 +39,7 @@ import {
   formatTerminalFilesystemTargetKey,
   formatTerminalFilesystemTargetKeyForPath,
 } from '#/shared/terminal-filesystem-target-key.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   observedAppNavigationActionsForTest,
@@ -49,8 +49,8 @@ import {
   type ObservedAppNavigationActionsForTest,
   type AppNavigationOverridesForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { resetAppNavigationForTest } from '#/web/app-navigation-lifecycle.ts'
-import { resetTerminalAutoFocusForTest } from '#/web/terminal-focus.ts'
+import { resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
+import { resetTerminalAutoFocusForTest } from '#/web/terminal/focus.ts'
 
 // Command tests need one target, navigation, tab-store, and terminal-projection fixture boundary.
 interface WorkspaceCommandFixtureOptions {

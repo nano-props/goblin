@@ -2,10 +2,10 @@ import { onScopeDispose, shallowRef, toValue, watch } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { shallow } from 'zustand/vanilla/shallow'
 import type { ClientWorkspaceState } from '#/shared/api-types.ts'
-import { writeClientWorkspaceState } from '#/web/client-workspace-state.ts'
-import { subscribeAppQuitting } from '#/web/app-lifecycle.ts'
+import { writeClientWorkspaceState } from '#/web/workspaces/persistence/client-state.ts'
+import { subscribeAppQuitting } from '#/web/app/lifecycle.ts'
 import { sessionLog } from '#/web/logger.ts'
-import { clientWorkspaceStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
+import { clientWorkspaceStateFromRestorableWorkspaceState } from '#/web/workspaces/persistence/restorable-state.ts'
 import { filetreeInteractionStore } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import {
   restorableWorkspaceStateFromStore,

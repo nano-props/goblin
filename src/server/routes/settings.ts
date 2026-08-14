@@ -1,14 +1,10 @@
-import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
-import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
-import { getSettingsSnapshot } from '#/server/modules/settings-snapshot.ts'
-import {
-  addServerWorkspaceEntry,
-  getUserSettings,
-  removeServerWorkspaceEntry,
-} from '#/server/modules/settings-source.ts'
-import { restoreServerWorkspace } from '#/server/modules/session-restore.ts'
-import { restoreWorkspaceTabs } from '#/server/modules/workspace-tabs-restore.ts'
-import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
+import { getServerExternalAppsSnapshot } from '#/server/external-apps/catalog.ts'
+import { getServerGitHubCliState } from '#/server/external-apps/github-cli.ts'
+import { getSettingsSnapshot } from '#/server/settings/snapshot.ts'
+import { addServerWorkspaceEntry, getUserSettings, removeServerWorkspaceEntry } from '#/server/settings/source.ts'
+import { restoreServerWorkspace } from '#/server/workspaces/restore/session.ts'
+import { restoreWorkspaceTabs } from '#/server/workspaces/restore/tabs.ts'
+import type { NativeShortcutRegistrationState } from '#/server/settings/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type { WorkspaceCapabilityTransitionHost } from '#/server/workspace-capability-transition-host.ts'
 import {
@@ -18,7 +14,7 @@ import {
   handleClearRecentWorkspaces,
   handleSetWorkspaceExternalAppRecent,
   handleUpdateUserSettings,
-} from '#/server/modules/settings-write-paths.ts'
+} from '#/server/settings/write-paths.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
 import type { LanInfo } from '#/shared/api-types.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'

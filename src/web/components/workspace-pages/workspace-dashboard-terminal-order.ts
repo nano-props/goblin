@@ -7,7 +7,7 @@ import {
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspaceTerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import type { WorkspaceTerminalSessionSummary } from '#/web/terminal/components/types.ts'
 
 interface WorkspaceDashboardTerminalOrderInput {
   workspaceId: WorkspaceId

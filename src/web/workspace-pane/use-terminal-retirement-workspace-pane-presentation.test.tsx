@@ -2,7 +2,7 @@
 
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { AcceptedTerminalRetirement } from '#/web/components/terminal/TerminalSessionProjection.ts'
+import type { AcceptedTerminalRetirement } from '#/web/terminal/components/TerminalSessionProjection.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   runPresentation: vi.fn(async () => true),
 }))
 
-vi.mock('#/web/components/terminal/use-terminal-session-projection.ts', () => ({
+vi.mock('#/web/terminal/components/use-terminal-session-projection.ts', () => ({
   useTerminalSessionProjection: () => ({
     subscribeAcceptedRetirement(listener: (retirement: AcceptedTerminalRetirement) => void) {
       mocks.listener = listener

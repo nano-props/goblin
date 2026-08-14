@@ -7,9 +7,9 @@ import {
 import {
   resolveServerRemoteWorkspaceConnection,
   type RemoteWorkspaceConnectionDeps,
-} from '#/server/modules/remote-workspace.ts'
+} from '#/server/workspaces/runtime/remote-connection.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'

@@ -7,12 +7,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoDataQueryKey } from '#/web/repo-query-keys.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
+import { repoDataQueryKey } from '#/web/repos/query-keys.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
-import { repoSnapshotQueryOptions } from '#/web/repo-query-options.ts'
+import { repoSnapshotQueryOptions } from '#/web/repos/query-options.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepoSnapshot: vi.fn(),
@@ -20,7 +20,7 @@ const repoClientMocks = vi.hoisted(() => ({
   getRepoWorktreeStatus: vi.fn(),
 }))
 
-vi.mock('#/web/repo-client.ts', () => repoClientMocks)
+vi.mock('#/web/repos/client.ts', () => repoClientMocks)
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 
@@ -45,7 +45,7 @@ const storeState = {
   },
 }
 
-vi.mock('#/web/repo-read-invalidation-ingress.ts', () => ({
+vi.mock('#/web/repos/read-invalidation-ingress.ts', () => ({
   subscribeRepoReadInvalidation(listener: (event: any) => void, onOpen?: () => void) {
     listeners.add(listener)
     if (onOpen) openListeners.add(onOpen)

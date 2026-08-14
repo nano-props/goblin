@@ -18,7 +18,7 @@ import {
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
-import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
+import { settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
 import {
   REPO_ID,
   WORKTREE_PATH,

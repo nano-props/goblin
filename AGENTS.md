@@ -162,6 +162,7 @@
   - `src/main/**` does not import `src/web/**` or `src/server/**`.
   - `src/web/**` does not import `src/main/**`.
   - `src/server/**` and `src/shared/**` do not import `electron`.
+  - `src/system/**` does not import `src/server/**`, `src/web/**`, or `src/main/**`.
 - Prefer server-first application behavior. Add IPC only for an Electron-only
   capability that cannot reasonably use the server/browser path, and document
   that reason at the call site.

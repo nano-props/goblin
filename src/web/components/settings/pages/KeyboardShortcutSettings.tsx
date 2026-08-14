@@ -3,7 +3,7 @@ import type { PropType } from 'vue'
 import { ShortcutSettings } from '#/web/components/settings/ShortcutSettings.tsx'
 import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import { SettingsCard, SettingsGroup, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
-import { useShortcutSettings } from '#/web/runtime-settings-shortcuts.ts'
+import { useShortcutSettings } from '#/web/settings/runtime-shortcuts.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { helpShortcutSections, type HelpShortcutRow, type HelpShortcutSection } from '#/web/keyboard/help-shortcuts.ts'
 

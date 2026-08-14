@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { getRepoSnapshotQueryData } from '#/web/repo-query-cache.ts'
+import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import {

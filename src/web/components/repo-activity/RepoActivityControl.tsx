@@ -15,7 +15,7 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { useVisibleLoadingValue } from '#/web/hooks/useLoadingVisibility.ts'
 import { cn } from '#/web/lib/cn.ts'
 import { formatRelativeTime } from '#/web/lib/dates.ts'
-import { useRepoOperationsReadModel } from '#/web/repo-queries.ts'
+import { useRepoOperationsReadModel } from '#/web/repos/queries.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { i18nStore } from '#/web/stores/i18n.ts'
@@ -24,7 +24,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
-import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
+import { presentWorkspaceRefreshOutcome } from '#/web/workspaces/runtime/refresh-feedback.ts'
 
 interface Props {
   repoId: WorkspaceId

@@ -6,7 +6,7 @@ import {
   createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
@@ -19,7 +19,7 @@ import {
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
-import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'

@@ -15,10 +15,10 @@ import { WorkspacePane } from '#/web/components/workspace-pane/WorkspacePane.tsx
 import {
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
-} from '#/web/components/terminal/terminal-session-context.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
-import { appQueryClient } from '#/web/app-query-client.ts'
-import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repo-query-keys.ts'
+} from '#/web/terminal/components/terminal-session-context.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
+import { appQueryClient } from '#/web/app/query-client.ts'
+import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
   REPO_ID,

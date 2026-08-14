@@ -5,7 +5,7 @@ import { userEvent } from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { ObservedBranchRouteNavigationForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
   REPO_ID,

@@ -15,14 +15,14 @@ import {
   EMPTY_TERMINAL_FILESYSTEM_TARGET_SNAPSHOT,
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
-} from '#/web/components/terminal/terminal-session-context.ts'
-import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+} from '#/web/terminal/components/terminal-session-context.ts'
+import type { TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
 import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
@@ -30,8 +30,8 @@ import {
   createTerminalWithAdmissionForContextTest,
   terminalSessionContextForTest,
 } from '#/web/test-utils/terminal-session-context.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import type { WorkspacePaneRoute } from '#/web/App.tsx'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
+import type { WorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
   REPO_ID,

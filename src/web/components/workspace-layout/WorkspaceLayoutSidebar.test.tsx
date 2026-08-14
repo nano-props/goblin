@@ -8,11 +8,11 @@ import { fireEvent } from '@testing-library/vue'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { WorkspaceLayoutSidebar } from '#/web/components/workspace-layout/WorkspaceLayoutSidebar.tsx'
 import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { navigation } from '#/web/test-utils/workspace-pane.tsx'
 
 vi.mock('#/web/components/WorkspacePickerHost.tsx', () => ({

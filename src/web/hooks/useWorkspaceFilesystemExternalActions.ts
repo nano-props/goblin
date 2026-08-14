@@ -5,7 +5,7 @@ import {
   openWorkspaceEditor,
   openWorkspaceInFinder,
   openWorkspaceTerminal,
-} from '#/web/workspace-external-app-client.ts'
+} from '#/web/external-apps/workspace-client.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { workspacePaneFilesystemRuntimeTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { runWorkspaceUiAction } from '#/web/stores/workspaces/workspace-ui-action.ts'

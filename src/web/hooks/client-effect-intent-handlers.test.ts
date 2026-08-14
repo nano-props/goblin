@@ -26,9 +26,9 @@ import {
   type ObservedAppNavigationActionsForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
-import { setRepoOperationsQueryData } from '#/web/repo-query-cache.ts'
-import { repoOperationsQueryKey } from '#/web/repo-query-keys.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
+import { setRepoOperationsQueryData } from '#/web/repos/query-cache.ts'
+import { repoOperationsQueryKey } from '#/web/repos/query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'

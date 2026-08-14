@@ -4,13 +4,13 @@ import {
   clearWorkspaceRuntimesForUser,
   listWorkspaceRuntimes,
   runRemoteWorkspaceLifecycle,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { settleWorkspaceProbeForTest } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { isRemoteWorkspaceId, parseRemoteWorkspaceId } from '#/shared/remote-workspace.ts'
-import type { RepoOperationsReadOptions } from '#/server/modules/repo-read-paths.ts'
+import type { RepoOperationsReadOptions } from '#/server/repos/read-paths.ts'
 import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
@@ -54,7 +54,7 @@ const mocks = vi.hoisted(() => ({
   stopBackgroundSyncRuntime: vi.fn(),
 }))
 
-vi.mock('#/server/modules/background-sync.ts', () => ({
+vi.mock('#/server/background-sync/runtime.ts', () => ({
   beginBackgroundSyncRegistration: mocks.beginBackgroundSyncRegistration,
   commitBackgroundSyncRegistration: mocks.commitBackgroundSyncRegistration,
   finishBackgroundSyncRegistration: mocks.finishBackgroundSyncRegistration,
@@ -63,7 +63,7 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
   getBackgroundSyncDiagnostics: vi.fn(),
   stopBackgroundSyncRuntime: mocks.stopBackgroundSyncRuntime,
 }))
-vi.mock('#/server/modules/repo-read-paths.ts', () => ({
+vi.mock('#/server/repos/read-paths.ts', () => ({
   getRepoLog: mocks.getRepoLog,
   getRepoPatch: mocks.getRepoPatch,
   readRepoSnapshot: mocks.readRepoSnapshot,
@@ -72,11 +72,11 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   readRepoOperationsSnapshot: mocks.readRepoOperationsSnapshot,
   getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
 }))
-vi.mock('#/server/modules/workspace-probe.ts', () => ({
+vi.mock('#/server/workspaces/probe.ts', () => ({
   probeLocalWorkspace: mocks.probeLocalWorkspace,
   probeWorkspace: mocks.probeWorkspace,
 }))
-vi.mock('#/server/modules/repo-write-paths.ts', () => ({
+vi.mock('#/server/repos/write-paths.ts', () => ({
   pullRepoBranch: mocks.pullRepoBranch,
   pushRepoBranch: mocks.pushRepoBranch,
   createRepoWorktree: mocks.createRepoWorktree,
@@ -85,18 +85,18 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   fetchRepo: mocks.fetchRepo,
   openRepoUrl: mocks.openRepoUrl,
 }))
-vi.mock('#/server/modules/repo-clone-write.ts', () => ({
+vi.mock('#/server/repos/clone-write.ts', () => ({
   cloneRepo: mocks.cloneRepo,
 }))
-vi.mock('#/server/modules/settings-source.ts', () => ({
+vi.mock('#/server/settings/source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
 }))
-vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+vi.mock('#/server/realtime/invalidation-broker.ts', () => ({
   publishRepoReadInvalidation: mocks.publishRepoReadInvalidation,
   publishUserWorkspaceFilesystemInvalidation: mocks.publishUserWorkspaceFilesystemInvalidation,
   publishUserWorkspaceRuntimeInvalidation: mocks.publishUserWorkspaceRuntimeInvalidation,
 }))
-vi.mock('#/server/modules/repo-source.ts', () => ({
+vi.mock('#/server/repos/source.ts', () => ({
   resolveRepoSource: vi.fn(async () => ({ getSnapshot: mocks.getBackgroundSyncSnapshot })),
 }))
 vi.mock('#/server/common/identity.ts', () => ({

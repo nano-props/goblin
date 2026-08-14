@@ -1,6 +1,6 @@
 import type { TerminalSessionsSnapshot } from '#/shared/terminal-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { TerminalSessionProjection } from '#/web/components/terminal/TerminalSessionProjection.ts'
+import type { TerminalSessionProjection } from '#/web/terminal/components/TerminalSessionProjection.ts'
 import type { RuntimeProjectionScope, RuntimeProjectionTarget } from '#/web/runtime/runtime-projection-scope.ts'
 
 const TERMINAL_PROJECTION_REFRESH_LANE = 'terminal-projection-refresh'

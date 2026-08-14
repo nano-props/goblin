@@ -1,6 +1,6 @@
 import { computed, toValue, watch } from 'vue'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
-import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRouteTarget, WorkspacePaneRouteTarget } from '#/web/app/navigation/route-model.ts'
 import {
   reconcileWorkspacePaneRoute,
   workspacePaneRouteHistoryResolution,
@@ -13,7 +13,7 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/work
 import {
   useWorkspaceNavigationHistory,
   type WorkspaceNavigationRouteContext,
-} from '#/web/workspace-navigation-history.ts'
+} from '#/web/app/navigation/workspace-history.ts'
 
 // Filesystem routes follow the same authority rule as Git routes: the URL
 // selects a pane, and projection state only validates whether it can render.

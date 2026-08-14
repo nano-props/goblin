@@ -16,7 +16,7 @@ import {
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionSummary } from '#/web/terminal/components/types.ts'
 
 // RTL has no reusable harness for tab-strip geometry, scroll memory, and terminal item adaptation.
 const testHostEnvironment = globalThis as typeof globalThis & {

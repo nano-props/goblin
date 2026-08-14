@@ -14,7 +14,7 @@ import {
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import {
   dispatchCloseWorkspacePaneTabAction as dispatchCloseWorkspacePaneTabActionRaw,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction as dispatchConfirmCloseTerminalWorkspacePaneTabActionRaw,
@@ -23,9 +23,9 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/terminal/components/terminal-session-command-bridge.ts'
 import {
   observedAppNavigationActionsForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
@@ -44,13 +44,13 @@ import {
   claimTerminalAutoFocus,
   fulfillTerminalPresentationFocus,
   resetTerminalAutoFocusForTest,
-} from '#/web/terminal-focus.ts'
+} from '#/web/terminal/focus.ts'
 import {
   beginAppNavigation,
   appNavigationIsCurrent,
   registerAppNavigation,
   resetAppNavigationForTest,
-} from '#/web/app-navigation-lifecycle.ts'
+} from '#/web/app/navigation/lifecycle.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 

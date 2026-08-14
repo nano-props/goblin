@@ -12,13 +12,13 @@ import {
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import {
   getRepoSnapshotQueryData,
   getRepoWorktreeStatusQueryData,
   setRepoSnapshotQueryData,
   setRepoWorktreeStatusQueryData,
-} from '#/web/repo-query-cache.ts'
+} from '#/web/repos/query-cache.ts'
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { GitWorkspaceClientState, WorkspaceState } from '#/web/stores/workspaces/types.ts'

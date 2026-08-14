@@ -8,7 +8,7 @@
 // still projects the server-owned preference into native host state,
 // but it is not the business source of truth.
 // Theme hydration can read the transport snapshot directly; theme writes go
-// through settings-actions.
+// through `#/web/settings/actions.ts`.
 
 import { createStore } from 'zustand/vanilla'
 import type { StoreApi } from 'zustand/vanilla'
@@ -16,9 +16,9 @@ import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
 import type { ThemeState } from '#/shared/api-types.ts'
 import type { ResolvedTheme, ThemePref } from '#/shared/settings.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import { getThemeState } from '#/web/settings-client.ts'
-import { createSettingsProjectionOwner } from '#/web/settings-projection-owner.ts'
-import { setThemeColorThemePreference, setThemePreference } from '#/web/settings-actions.ts'
+import { getThemeState } from '#/web/settings/client.ts'
+import { createSettingsProjectionOwner } from '#/web/settings/projection-owner.ts'
+import { setThemeColorThemePreference, setThemePreference } from '#/web/settings/actions.ts'
 
 interface ThemeStore extends ThemeState {
   setPref: (pref: ThemePref) => Promise<void>

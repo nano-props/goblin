@@ -1,13 +1,13 @@
 import { terminalLog } from '#/web/logger.ts'
-import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
+import type { TerminalCreateOptions } from '#/web/terminal/components/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
-import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/terminal/components/terminal-create-admission.ts'
 import {
   showTerminalCreateErrorToast,
   terminalCreateErrorKey,
   type TerminalCreateTranslator,
-} from '#/web/components/terminal/terminal-create-feedback.ts'
+} from '#/web/terminal/components/terminal-create-feedback.ts'
 export type TerminalCreatePresentationStatus = TerminalCreatedTabCommitResult['status'] | 'presentation-failed'
 
 export type TerminalCreateCommandResult =

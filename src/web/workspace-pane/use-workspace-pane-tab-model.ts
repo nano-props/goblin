@@ -2,7 +2,7 @@ import { computed, toValue } from 'vue'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { CurrentGitWorkspacePanePresentation } from '#/web/components/repo-workspace/model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { ParsedWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import {
   createWorkspacePaneTabModel,
   workspacePaneTabModelBlocksTabInteraction,

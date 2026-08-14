@@ -1,0 +1,119 @@
+// @vitest-environment jsdom
+
+import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
+import { defineComponent } from 'vue'
+import { beforeEach, describe, expect, test } from 'vitest'
+import { DEFAULT_COLOR_THEME } from '#/shared/color-theme.ts'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
+import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings/query-cache.ts'
+import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { renderComposableInJsdom } from '#/test-utils/render.tsx'
+import { useExternalAppSettings } from '#/web/settings/runtime-external-apps.ts'
+import { useFetchSettings } from '#/web/settings/runtime-fetch.ts'
+import { useLanSettings } from '#/web/settings/runtime-lan.ts'
+import { useRuntimeRecentWorkspaces } from '#/web/settings/read-projection.ts'
+import { useShortcutSettings } from '#/web/settings/runtime-shortcuts.ts'
+import { i18nStore } from '#/web/stores/i18n.ts'
+import { themeStore } from '#/web/stores/theme.ts'
+
+beforeEach(() => {
+  appQueryClient.clear()
+  themeStore.setState({
+    pref: 'auto',
+    resolved: 'light',
+    colorTheme: DEFAULT_COLOR_THEME,
+    hydrate: async () => {},
+    setPref: async () => {},
+    setColorTheme: async () => {},
+  })
+  i18nStore.setState({
+    lang: 'en',
+    pref: 'auto',
+    dict: {},
+    hydrate: async () => {},
+    setPref: async () => {},
+  })
+})
+
+describe('runtime settings hooks', () => {
+  test('reads fetch, shortcut, and lan settings from the runtime settings snapshot', async () => {
+    appQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({
+        fetchIntervalSec: 300,
+        terminalNotificationsEnabled: true,
+        shortcutsDisabled: true,
+        globalShortcutDisabled: true,
+        globalShortcut: 'CommandOrControl+Shift+K',
+        globalShortcutRegistered: true,
+        lanEnabled: true,
+      }),
+    )
+    const { result } = renderComposableInJsdom(
+      () => ({
+        fetch: useFetchSettings(),
+        shortcuts: useShortcutSettings(),
+        lan: useLanSettings(),
+      }),
+      { wrapper: AppVueQueryClientScope },
+    )
+
+    expect(result.value.fetch.value).toMatchObject({
+      fetchIntervalSec: 300,
+      terminalNotificationsEnabled: true,
+    })
+    expect(result.value.shortcuts.value).toMatchObject({
+      shortcutsDisabled: true,
+      globalShortcutDisabled: true,
+      globalShortcut: 'CommandOrControl+Shift+K',
+      globalShortcutRegistered: true,
+    })
+    expect(result.value.lan.value).toMatchObject({
+      lanEnabled: true,
+    })
+  })
+
+  test('reads external app runtime settings from the runtime external apps snapshot', async () => {
+    appQueryClient.setQueryData(externalAppsQueryKey(), {
+      terminal: {
+        available: true,
+        appAvailability: { ghostty: true, terminal: false, windowsTerminal: false },
+        detectedAt: 1,
+      },
+      editor: {
+        available: true,
+        appAvailability: { vscode: true },
+        detectedAt: 1,
+      },
+    })
+    const { result } = renderComposableInJsdom(() => useExternalAppSettings(), { wrapper: AppVueQueryClientScope })
+
+    expect(result.value.value).toMatchObject({
+      terminalAvailable: true,
+      editorAvailable: true,
+    })
+  })
+
+  test('reads recent repos from the runtime recent repos state', async () => {
+    appQueryClient.setQueryData(
+      settingsSnapshotQueryKey(),
+      defaultSettingsSnapshot({
+        recentWorkspaces: [
+          { id: workspaceIdForTest('goblin+file:///tmp/repo-a') },
+          { id: workspaceIdForTest('goblin+file:///tmp/repo-b') },
+        ],
+      }),
+    )
+    const { result } = renderComposableInJsdom(() => useRuntimeRecentWorkspaces(), { wrapper: AppVueQueryClientScope })
+
+    expect(result.value.value).toEqual([{ id: 'goblin+file:///tmp/repo-a' }, { id: 'goblin+file:///tmp/repo-b' }])
+  })
+})
+
+const AppVueQueryClientScope = defineComponent({
+  name: 'AppVueQueryClientScope',
+  setup(_props, { slots }) {
+    return () => <VueQueryClientScope client={appQueryClient}>{slots.default?.()}</VueQueryClientScope>
+  },
+})

@@ -132,7 +132,7 @@ describe('server websocket ingress', () => {
     const dispose = ingress.subscribe(() => {})
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing socket')
-    const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const { markAppQuitting } = await import('#/web/app/lifecycle.ts')
 
     await markAppQuitting()
     await advanceTimersAndFlush(300)

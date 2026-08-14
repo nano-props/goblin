@@ -5,14 +5,14 @@ import { userEvent } from '@testing-library/user-event'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { AppNavigationProvider } from '#/web/app-navigation.tsx'
-import type { AppNavigationActions } from '#/web/app-navigation-actions.ts'
-import { TerminalSessionReadScope } from '#/web/components/terminal/terminal-session-context.ts'
+import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
+import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
+import { TerminalSessionReadScope } from '#/web/terminal/components/terminal-session-context.ts'
 import { WorkspaceDashboardTerminals } from '#/web/components/workspace-pages/WorkspaceDashboardTerminals.tsx'
 import type {
   TerminalSessionReadContextValue,
   WorkspaceTerminalSessionSummary,
-} from '#/web/components/terminal/types.ts'
+} from '#/web/terminal/components/types.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import {
   provideTerminalProjectionRecoveryActions,
@@ -28,7 +28,7 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'

@@ -11,7 +11,7 @@ import {
   workspacePaneTabsTargetFromRestorable,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspaceRuntimeEpochCapability } from '#/server/modules/workspace-runtimes.ts'
+import type { WorkspaceRuntimeEpochCapability } from '#/server/workspaces/runtime/authority.ts'
 
 export interface WorkspacePaneLayoutRepositorySnapshot {
   layout: WorkspacePaneDurableLayout

@@ -45,7 +45,7 @@ import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/worksp
 import {
   serverWorkspacePaneLayoutRepository,
   serverWorkspacePaneLayoutRestoreTransaction,
-} from '#/server/modules/settings-source.ts'
+} from '#/server/settings/source.ts'
 import { isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { isValidTerminalClientId } from '#/shared/terminal-validators.ts'
 import { TerminalSessionManager, type TerminalSessionCloseReason } from '#/server/terminal/terminal-session-manager.ts'
@@ -59,7 +59,7 @@ import {
   onWorkspaceRuntimeClosed,
   retainWorkspaceRuntimeResource,
   type WorkspaceRuntimeEpochCapability,
-} from '#/server/modules/workspace-runtimes.ts'
+} from '#/server/workspaces/runtime/authority.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'

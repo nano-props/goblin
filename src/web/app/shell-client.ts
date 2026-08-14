@@ -1,0 +1,113 @@
+import type { ExecResult } from '#/shared/git-types.ts'
+import type { SettingsPage } from '#/shared/settings-pages.ts'
+import { getClientBridge } from '#/web/bridge/client.ts'
+import { waitForPromiseWithSignal } from '#/web/lib/abort.ts'
+import { homeDirectory as hostInfoHomeDirectory } from '#/web/stores/host-info.ts'
+const PROJECT_GITHUB_URL = 'https://github.com/nano-props/goblin'
+
+interface DirectoryPickerOptions {
+  signal?: AbortSignal
+}
+
+function nativeHost() {
+  return getClientBridge().host()
+}
+
+function requiredNativeHost() {
+  const host = nativeHost()
+  if (!host) throw new Error('Native host bridge is unavailable')
+  return host
+}
+
+export function hasNativeDirectoryPicker(): boolean {
+  return getClientBridge().hasCapability('open-directory-dialog')
+}
+
+export function canOpenAppSettings(): boolean {
+  return getClientBridge().hasCapability('open-settings-window')
+}
+
+export function canUseGlobalShortcutSettings(): boolean {
+  return getClientBridge().hasCapability('global-shortcut')
+}
+
+export function homeDirectory(): string {
+  // The entrypoint establishes host info before mounting the application.
+  return hostInfoHomeDirectory()
+}
+
+export function pathForDroppedFile(file: File): string {
+  return getClientBridge().pathForFile(file)
+}
+
+/**
+ * Persist clipboard / drop blobs through the shared server endpoint.
+ * Transport, HTTP, and response-contract failures reject.
+ */
+export async function saveClipboardFiles(files: File[]): Promise<string[]> {
+  return await getClientBridge().saveClipboardFiles(files)
+}
+
+function isAllowedExternalUrl(url: string, allowHttp: boolean): boolean {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:' || (allowHttp && parsed.protocol === 'http:')
+  } catch {
+    return false
+  }
+}
+
+function openBrowserUrl(url: string): ExecResult {
+  // window.open() with `noopener` returns null by spec even when the new tab
+  // does open — that is the whole point of `noopener`: sever the opener's
+  // reference to prevent reverse tabnabbing. Popup blockers and sandboxed
+  // iframes also surface as null. With noopener required for security, we
+  // cannot distinguish "opened" from "blocked" synchronously, so trust the
+  // browser. The URL has already been validated by isAllowedExternalUrl.
+  // Mirrors shell-ipc.ts's desktop behaviour, which likewise reports
+  // success based on the platform call rather than an observable side effect.
+  window.open(url, '_blank', 'noopener,noreferrer')
+  return { ok: true, message: url }
+}
+
+function openExternalUrlInBrowser(url: string, allowHttp: boolean): ExecResult {
+  return isAllowedExternalUrl(url, allowHttp) ? openBrowserUrl(url) : { ok: false, message: 'error.invalid-url' }
+}
+
+async function openExternalUrlWithPolicy(url: string, allowHttp: boolean): Promise<ExecResult> {
+  const bridge = getClientBridge()
+  if (bridge.kind() === 'electron') return await requiredNativeHost().openExternalUrl({ url, allowHttp })
+  return openExternalUrlInBrowser(url, allowHttp)
+}
+
+export async function openAppSettings(page: SettingsPage = 'general'): Promise<boolean> {
+  return await requiredNativeHost().openSettingsWindow({ page })
+}
+
+export async function openProjectGitHub(): Promise<ExecResult> {
+  return await openExternalUrlWithPolicy(PROJECT_GITHUB_URL, false)
+}
+
+export async function openExternalUrl(url: string): Promise<ExecResult> {
+  return await openExternalUrlWithPolicy(url, true)
+}
+
+export async function chooseLocalWorkspacePath(options: DirectoryPickerOptions = {}): Promise<string | null> {
+  return await chooseDirectoryPath('Open Workspace', options)
+}
+
+export async function chooseCloneParentPath(options: DirectoryPickerOptions = {}): Promise<string | null> {
+  return await chooseDirectoryPath('Choose Clone Destination', options)
+}
+
+async function chooseDirectoryPath(title: string, options: DirectoryPickerOptions): Promise<string | null> {
+  options.signal?.throwIfAborted()
+  const selection = requiredNativeHost().openDirectoryDialog({ title })
+  return options.signal ? await waitForPromiseWithSignal(selection, options.signal) : await selection
+}
+
+export async function consumeExternalOpenPaths(): Promise<string[]> {
+  const bridge = getClientBridge()
+  if (bridge.kind() === 'web') return []
+  return await requiredNativeHost().consumeExternalOpenPaths()
+}

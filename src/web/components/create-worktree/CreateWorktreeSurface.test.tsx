@@ -13,8 +13,8 @@ import type { VNode } from 'vue'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreePageBody } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
 import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
-import { getRepoRemoteBranches } from '#/web/repo-client.ts'
-import { appQueryClient } from '#/web/app-query-client.ts'
+import { getRepoRemoteBranches } from '#/web/repos/client.ts'
+import { appQueryClient } from '#/web/app/query-client.ts'
 import type { RepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
 import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -23,7 +23,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo')
 const WORKTREE_PATH = '/tmp/goblin-repo'
 
-vi.mock('#/web/repo-client.ts', () => ({ getRepoRemoteBranches: vi.fn() }))
+vi.mock('#/web/repos/client.ts', () => ({ getRepoRemoteBranches: vi.fn() }))
 
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 
