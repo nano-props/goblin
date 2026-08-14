@@ -3,12 +3,12 @@ import { normalizeRemoteTarget } from '#/shared/remote-workspace.ts'
 import { runRemoteWorkspaceConnection } from '#/web/stores/workspaces/remote-workspace-connection-command.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { resolveRemoteWorkspaceConnection } from '#/web/remote-workspace-client.ts'
+import { resolveRemoteWorkspaceConnection } from '#/web/workspaces/remote-client.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { CodedError } from '#/shared/coded-error.ts'
 
-vi.mock('#/web/remote-workspace-client.ts', () => ({ resolveRemoteWorkspaceConnection: vi.fn() }))
+vi.mock('#/web/workspaces/remote-client.ts', () => ({ resolveRemoteWorkspaceConnection: vi.fn() }))
 vi.mock('#/web/stores/workspaces/refresh.ts', () => ({ requestRepoSnapshotRefresh: vi.fn(async () => {}) }))
 
 const workspaceId = workspaceIdForTest('goblin+ssh://example/repo')

@@ -12,7 +12,7 @@ import {
 import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { sameWorkspaceProbeState, type WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
-import { nextRestoredWorkspaceIdAfterWorkspaceClose } from '#/web/open-workspace-state.ts'
+import { nextRestoredWorkspaceIdAfterWorkspaceClose } from '#/web/workspaces/persistence/open-state.ts'
 import { markRemoteLifecycleReady } from '#/web/stores/workspaces/remote-workspace-admission.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'

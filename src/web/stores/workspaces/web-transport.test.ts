@@ -84,7 +84,7 @@ describe('repo web transport helpers', () => {
         },
       }),
     }))
-    const { resolveRemoteWorkspaceTarget } = await import('#/web/remote-workspace-client.ts')
+    const { resolveRemoteWorkspaceTarget } = await import('#/web/workspaces/remote-client.ts')
 
     await expect(
       resolveRemoteWorkspaceTarget({

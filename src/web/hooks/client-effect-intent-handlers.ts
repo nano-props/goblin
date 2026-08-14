@@ -1,6 +1,6 @@
 import { toast } from 'vue-sonner'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
-import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
+import { presentWorkspaceRefreshOutcome } from '#/web/workspaces/runtime/refresh-feedback.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import { themeStore } from '#/web/stores/theme.ts'

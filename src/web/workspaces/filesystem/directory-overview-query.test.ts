@@ -2,10 +2,10 @@ import { QueryClient, QueryObserver } from '@tanstack/query-core'
 import { describe, expect, test, vi } from 'vitest'
 import type { WorkspaceDirectoryOverview } from '#/shared/workspace-overview.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { getWorkspaceDirectoryOverview } from '#/web/workspace-client.ts'
+import { getWorkspaceDirectoryOverview } from '#/web/workspaces/client.ts'
 import { workspaceDirectoryOverviewQueryOptions } from '#/web/workspaces/filesystem/directory-overview-query.ts'
 
-vi.mock('#/web/workspace-client.ts', () => ({
+vi.mock('#/web/workspaces/client.ts', () => ({
   getWorkspaceDirectoryOverview: vi.fn(),
 }))
 

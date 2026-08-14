@@ -24,7 +24,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { latestRepoSyncTime } from '#/web/stores/workspaces/sync-time.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
-import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
+import { presentWorkspaceRefreshOutcome } from '#/web/workspaces/runtime/refresh-feedback.ts'
 
 interface Props {
   repoId: WorkspaceId

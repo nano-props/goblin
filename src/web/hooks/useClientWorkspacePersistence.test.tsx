@@ -22,7 +22,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 
 const writePresentationMock = vi.fn()
 
-vi.mock('#/web/client-workspace-state.ts', () => ({
+vi.mock('#/web/workspaces/persistence/client-state.ts', () => ({
   writeClientWorkspaceState: (presentation: unknown) => writePresentationMock(presentation),
 }))
 

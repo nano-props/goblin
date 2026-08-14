@@ -2,7 +2,7 @@ import { computed, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { getWorkspaceDirectoryOverview } from '#/web/workspace-client.ts'
+import { getWorkspaceDirectoryOverview } from '#/web/workspaces/client.ts'
 
 export function workspaceDirectoryOverviewQueryKey(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
   return ['workspace-directory-overview', workspaceId, workspaceRuntimeId] as const

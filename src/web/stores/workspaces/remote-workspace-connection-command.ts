@@ -4,7 +4,7 @@ import {
   type RemoteWorkspaceLifecycleCommandResult,
   type RemoteWorkspaceTarget,
 } from '#/shared/remote-workspace.ts'
-import { resolveRemoteWorkspaceConnection } from '#/web/remote-workspace-client.ts'
+import { resolveRemoteWorkspaceConnection } from '#/web/workspaces/remote-client.ts'
 import { acceptRemoteWorkspaceRuntimeProjection } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import type { WorkspacesGet, WorkspacesSet } from '#/web/stores/workspaces/types.ts'

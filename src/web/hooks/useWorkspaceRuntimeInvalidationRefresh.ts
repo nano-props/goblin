@@ -2,8 +2,8 @@ import { onScopeDispose } from 'vue'
 import { goblinLog } from '#/web/logger.ts'
 import { acceptRemoteWorkspaceLifecycleSnapshot } from '#/web/stores/workspaces/remote-workspace-lifecycle-projection.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { invalidateWorkspaceRuntimes } from '#/web/workspace-runtime-query.ts'
-import { subscribeWorkspaceRuntimeInvalidation } from '#/web/workspace-runtime-invalidation-ingress.ts'
+import { invalidateWorkspaceRuntimes } from '#/web/workspaces/runtime/query.ts'
+import { subscribeWorkspaceRuntimeInvalidation } from '#/web/workspaces/runtime/invalidation-ingress.ts'
 
 export function useWorkspaceRuntimeInvalidationRefresh(): void {
   let active = true

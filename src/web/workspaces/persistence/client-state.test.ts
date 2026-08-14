@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { readClientWorkspaceState, writeClientWorkspaceState } from '#/web/client-workspace-state.ts'
+import { readClientWorkspaceState, writeClientWorkspaceState } from '#/web/workspaces/persistence/client-state.ts'
 import type { ClientWorkspaceState } from '#/shared/api-types.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

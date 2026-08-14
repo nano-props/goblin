@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   getLocalDirectoryPathSuggestions: vi.fn(),
 }))
 
-vi.mock('#/web/workspace-client.ts', () => ({
+vi.mock('#/web/workspaces/client.ts', () => ({
   getLocalDirectoryPathSuggestions: mocks.getLocalDirectoryPathSuggestions,
 }))
 

@@ -14,18 +14,18 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 import { useDirectoryPathSuggestions } from '#/web/hooks/useDirectoryPathSuggestions.ts'
 
-vi.mock('#/web/remote-workspace-client.ts', () => ({
+vi.mock('#/web/workspaces/remote-client.ts', () => ({
   getRemotePathSuggestions: vi.fn(),
 }))
-vi.mock('#/web/workspace-client.ts', () => ({
+vi.mock('#/web/workspaces/client.ts', () => ({
   getLocalDirectoryPathSuggestions: vi.fn(),
 }))
 vi.mock('#/web/stores/host-info.ts', () => ({
   getPlatform: () => 'linux',
 }))
 
-import { getRemotePathSuggestions } from '#/web/remote-workspace-client.ts'
-import { getLocalDirectoryPathSuggestions } from '#/web/workspace-client.ts'
+import { getRemotePathSuggestions } from '#/web/workspaces/remote-client.ts'
+import { getLocalDirectoryPathSuggestions } from '#/web/workspaces/client.ts'
 
 const mockedFetch = vi.mocked(getRemotePathSuggestions)
 const mockedLocalFetch = vi.mocked(getLocalDirectoryPathSuggestions)

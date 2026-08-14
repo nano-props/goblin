@@ -1,14 +1,14 @@
 import PQueue from 'p-queue'
 import { disposeRepoOperationScheduler } from '#/web/stores/workspaces/repo-operation-scheduler.ts'
-import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspace-capability-refresh.ts'
+import { cancelWorkspaceCapabilityRefreshes } from '#/web/workspaces/runtime/capability-refresh.ts'
 import { requestInitialRepoSnapshotLoad, requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
-import { closeWorkspaceRuntime, openWorkspaceRuntime, openWorkspaceRuntimeForInput } from '#/web/workspace-client.ts'
+import { closeWorkspaceRuntime, openWorkspaceRuntime, openWorkspaceRuntimeForInput } from '#/web/workspaces/client.ts'
 import { addWorkspaceToSession, recordRecentWorkspace, removeWorkspaceFromSession } from '#/web/settings/actions.ts'
 import {
   removeWorkspaceRuntimeFromCache,
   refreshWorkspaceRuntimes,
   updateWorkspaceRuntimeCache,
-} from '#/web/workspace-runtime-query.ts'
+} from '#/web/workspaces/runtime/query.ts'
 import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacesLog } from '#/web/logger.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'

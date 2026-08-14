@@ -1,6 +1,6 @@
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
-import { requestWorkspaceCapabilityRefresh } from '#/web/workspace-capability-refresh.ts'
+import { requestWorkspaceCapabilityRefresh } from '#/web/workspaces/runtime/capability-refresh.ts'
 import { requestRepoSnapshotRefresh } from '#/web/stores/workspaces/refresh.ts'
 import { refreshRepoWorktreeStatus } from '#/web/stores/workspaces/worktree-status-refresh.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/workspaces/refresh-sync.ts'

@@ -1,6 +1,6 @@
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspaceRefreshResult } from '#/shared/workspace-runtime.ts'
-import { refreshWorkspace } from '#/web/workspace-client.ts'
+import { refreshWorkspace } from '#/web/workspaces/client.ts'
 import { hasErrorCode } from '#/shared/error-code.ts'
 
 export type WorkspaceCapabilityRefreshOutcome =

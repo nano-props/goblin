@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { getLocalDirectoryPathSuggestions, refreshWorkspace } from '#/web/workspace-client.ts'
+import { getLocalDirectoryPathSuggestions, refreshWorkspace } from '#/web/workspaces/client.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const mocks = vi.hoisted(() => ({ postServerCommandJson: vi.fn(), postServerJson: vi.fn() }))

@@ -4,7 +4,7 @@ import {
   restoredWorkspaceIdAfterWorkspaceHydration,
   nextRestoredWorkspaceIdAfterWorkspaceClose,
   persistedOpenWorkspaceEntries,
-} from '#/web/open-workspace-state.ts'
+} from '#/web/workspaces/persistence/open-state.ts'
 
 const REPO_A = workspaceIdForTest('goblin+file:///tmp/repo-a')
 const REPO_B = workspaceIdForTest('goblin+file:///tmp/repo-b')

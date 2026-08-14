@@ -6,7 +6,7 @@ import { Tip } from '#/web/components/Tip.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { runWorkspaceRefresh } from '#/web/stores/workspaces/workspace-refresh-command.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { presentWorkspaceRefreshOutcome } from '#/web/workspace-refresh-feedback.ts'
+import { presentWorkspaceRefreshOutcome } from '#/web/workspaces/runtime/refresh-feedback.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 
 export const WorkspaceRefreshAction = defineComponent<{ workspaceId: string }>({

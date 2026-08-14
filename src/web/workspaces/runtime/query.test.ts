@@ -6,12 +6,12 @@ import {
   removeWorkspaceRuntimeFromCache,
   workspaceRuntimesQueryKey,
   updateWorkspaceRuntimeCache,
-} from '#/web/workspace-runtime-query.ts'
+} from '#/web/workspaces/runtime/query.ts'
 import type { WorkspaceRuntimesSnapshot } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { listWorkspaceRuntimes } from '#/web/workspace-client.ts'
+import { listWorkspaceRuntimes } from '#/web/workspaces/client.ts'
 
-vi.mock('#/web/workspace-client.ts', () => ({ listWorkspaceRuntimes: vi.fn() }))
+vi.mock('#/web/workspaces/client.ts', () => ({ listWorkspaceRuntimes: vi.fn() }))
 
 describe('workspace runtime query cache', () => {
   beforeEach(() => vi.clearAllMocks())

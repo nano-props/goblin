@@ -34,7 +34,7 @@ import type {
   SettingsSnapshot,
   WorkspaceRuntimeRestoreSnapshot,
 } from '#/shared/api-types.ts'
-import { readClientWorkspaceState, writeClientWorkspaceState } from '#/web/client-workspace-state.ts'
+import { readClientWorkspaceState, writeClientWorkspaceState } from '#/web/workspaces/persistence/client-state.ts'
 import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -50,7 +50,7 @@ vi.mock('#/web/settings/actions.ts', () => ({
   restoreWorkspaceAtBoot: vi.fn(),
 }))
 
-vi.mock('#/web/client-workspace-state.ts', () => ({
+vi.mock('#/web/workspaces/persistence/client-state.ts', () => ({
   readClientWorkspaceState: vi.fn(),
   writeClientWorkspaceState: vi.fn(),
 }))

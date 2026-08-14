@@ -24,7 +24,7 @@ import {
   getRemoteSshHosts,
   resolveRemoteWorkspaceTarget,
   testRemoteWorkspaceConnection,
-} from '#/web/remote-workspace-client.ts'
+} from '#/web/workspaces/remote-client.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 

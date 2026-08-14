@@ -1,6 +1,6 @@
 import { computed, ref, shallowRef, toValue, watch } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
-import { runWorkspaceProjectionPromotion } from '#/web/workspace-projection-promotion-command.ts'
+import { runWorkspaceProjectionPromotion } from '#/web/workspaces/runtime/projection-promotion-command.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'

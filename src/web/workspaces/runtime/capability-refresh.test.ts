@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { CodedError } from '#/shared/coded-error.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { refreshWorkspace } from '#/web/workspace-client.ts'
+import { refreshWorkspace } from '#/web/workspaces/client.ts'
 import {
   cancelWorkspaceCapabilityRefreshes,
   requestWorkspaceCapabilityRefresh,
-} from '#/web/workspace-capability-refresh.ts'
+} from '#/web/workspaces/runtime/capability-refresh.ts'
 
-vi.mock('#/web/workspace-client.ts', () => ({ refreshWorkspace: vi.fn() }))
+vi.mock('#/web/workspaces/client.ts', () => ({ refreshWorkspace: vi.fn() }))
 
 describe('workspace capability refresh outcome', () => {
   beforeEach(() => {

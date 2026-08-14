@@ -9,7 +9,7 @@ import { localWorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
 import {
   restoreRestorableWorkspaceStateFromClientWorkspace,
   clientWorkspaceStateFromRestorableWorkspaceState,
-} from '#/web/restorable-workspace-state.ts'
+} from '#/web/workspaces/persistence/restorable-state.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
