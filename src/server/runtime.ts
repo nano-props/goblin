@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import { createApp, type ServerAppOptions } from '#/server/app-factory.ts'
-import { stopBackgroundSync } from '#/server/modules/background-sync.ts'
+import { stopBackgroundSync } from '#/server/background-sync/runtime.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'

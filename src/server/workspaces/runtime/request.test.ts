@@ -15,7 +15,7 @@ const stopBackgroundSyncRuntimeMock = vi.hoisted(() => vi.fn())
 vi.mock('#/server/workspaces/runtime/remote-failure-settlement.ts', () => ({
   settleRemoteWorkspaceRuntimeFailure: settleRemoteWorkspaceRuntimeFailureMock,
 }))
-vi.mock('#/server/modules/background-sync.ts', () => ({
+vi.mock('#/server/background-sync/runtime.ts', () => ({
   stopBackgroundSyncRuntime: stopBackgroundSyncRuntimeMock,
 }))
 

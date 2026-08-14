@@ -23,7 +23,7 @@ import {
   uniqueRegisteredBackgroundSyncTargets,
   type BackgroundSyncTargetIdentity,
   type RegisteredGitBackgroundSyncTarget,
-} from '#/server/modules/background-sync-policy.ts'
+} from '#/server/background-sync/policy.ts'
 import type { WorkspaceRuntimeEpochCapability } from '#/server/workspaces/runtime/authority.ts'
 
 interface AdmittedGitBackgroundSyncTarget extends GitBackgroundSyncTarget {

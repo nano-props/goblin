@@ -12,7 +12,7 @@ const RUNTIME_ID = 'background-convergence-runtime'
 
 describe('background sync projection convergence', () => {
   afterEach(async () => {
-    const { resetBackgroundSyncForTests } = await import('#/server/modules/background-sync.ts')
+    const { resetBackgroundSyncForTests } = await import('#/server/background-sync/runtime.ts')
     resetBackgroundSyncForTests()
   })
 
@@ -51,7 +51,7 @@ describe('background sync projection convergence', () => {
     try {
       await vi.waitFor(() => expect(observer.getCurrentResult().data).toBe('before-fetch'))
       const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, prepareBackgroundSync } =
-        await import('#/server/modules/background-sync.ts')
+        await import('#/server/background-sync/runtime.ts')
       await prepareBackgroundSync()
       const admission = beginBackgroundSyncRegistration(USER_ID, CLIENT_ID, 1, [
         {

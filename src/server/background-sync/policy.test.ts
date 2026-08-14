@@ -8,7 +8,7 @@ import {
   shouldBackoffBackgroundSyncFailure,
   uniqueBackgroundSyncTargets,
   uniqueRegisteredBackgroundSyncTargets,
-} from '#/server/modules/background-sync-policy.ts'
+} from '#/server/background-sync/policy.ts'
 
 const WORKSPACE_A = workspaceIdForTest('goblin+file:///workspace-a')
 const WORKSPACE_B = workspaceIdForTest('goblin+file:///workspace-b')

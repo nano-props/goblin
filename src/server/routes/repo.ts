@@ -4,7 +4,7 @@ import {
   finishBackgroundSyncRegistration,
   getBackgroundSyncRepos,
   prepareBackgroundSync,
-} from '#/server/modules/background-sync.ts'
+} from '#/server/background-sync/runtime.ts'
 import {
   readRepoPullRequests,
   readRepoSnapshot,

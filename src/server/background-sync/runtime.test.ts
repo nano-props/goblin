@@ -3,7 +3,7 @@ import { useFakeTimers } from '#/test-utils/timers.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitBackgroundSyncTarget } from '#/shared/git-background-sync.ts'
-import type { BackgroundSyncRegistrationAdmission } from '#/server/modules/background-sync.ts'
+import type { BackgroundSyncRegistrationAdmission } from '#/server/background-sync/runtime.ts'
 import { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
 import type { WorkspaceRuntimeEpochCapability } from '#/server/workspaces/runtime/authority.ts'
@@ -40,7 +40,7 @@ function requiredAdmission(admission: BackgroundSyncRegistrationAdmission | null
 
 async function registerRepos(workspaceIds: WorkspaceId[]): Promise<void> {
   const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, prepareBackgroundSync } =
-    await import('#/server/modules/background-sync.ts')
+    await import('#/server/background-sync/runtime.ts')
   await prepareBackgroundSync()
   const targets = workspaceIds.map((workspaceId) => ({ workspaceId, workspaceRuntimeId: RUNTIME_ID }))
   const admission = requiredAdmission(
@@ -82,7 +82,7 @@ describe('server background sync scheduler', () => {
   })
 
   afterEach(async () => {
-    const { resetBackgroundSyncForTests } = await import('#/server/modules/background-sync.ts')
+    const { resetBackgroundSyncForTests } = await import('#/server/background-sync/runtime.ts')
     resetBackgroundSyncForTests()
     vi.resetModules()
   })
@@ -126,7 +126,7 @@ describe('server background sync scheduler', () => {
     })
     mocks.fetchRepo.mockRejectedValueOnce(failure)
 
-    const { getBackgroundSyncDiagnostics } = await import('#/server/modules/background-sync.ts')
+    const { getBackgroundSyncDiagnostics } = await import('#/server/background-sync/runtime.ts')
     await registerRepos([REMOTE_REPO])
     await vi.runOnlyPendingTimersAsync()
 
@@ -145,7 +145,7 @@ describe('server background sync scheduler', () => {
     })
     mocks.fetchRepo.mockRejectedValueOnce(failure)
     mocks.failRemoteWorkspaceRuntimeIfNeeded.mockRejectedValueOnce(new Error('settlement failed'))
-    const { getBackgroundSyncDiagnostics } = await import('#/server/modules/background-sync.ts')
+    const { getBackgroundSyncDiagnostics } = await import('#/server/background-sync/runtime.ts')
 
     await registerRepos([REMOTE_REPO])
     await vi.runOnlyPendingTimersAsync()
@@ -161,7 +161,7 @@ describe('server background sync scheduler', () => {
       await import('#/server/workspaces/runtime/authority.ts')
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, REMOTE_REPO, CLIENT_ID)
     const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, getBackgroundSyncDiagnostics } =
-      await import('#/server/modules/background-sync.ts')
+      await import('#/server/background-sync/runtime.ts')
     await registerRepos([])
     const admission = requiredAdmission(
       beginBackgroundSyncRegistration(
@@ -193,7 +193,7 @@ describe('server background sync scheduler', () => {
     })
     mocks.fetchRepo.mockRejectedValueOnce(failure)
     const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration } =
-      await import('#/server/modules/background-sync.ts')
+      await import('#/server/background-sync/runtime.ts')
     await registerRepos([REMOTE_REPO])
     const pending = requiredAdmission(
       beginBackgroundSyncRegistration(
@@ -314,7 +314,7 @@ describe('server background sync scheduler', () => {
 
   test('only re-fetches a repo on re-activation once its previous fetch is overdue', async () => {
     mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
-    const { getBackgroundSyncDiagnostics } = await import('#/server/modules/background-sync.ts')
+    const { getBackgroundSyncDiagnostics } = await import('#/server/background-sync/runtime.ts')
 
     await registerRepos([REPO_A])
     await vi.runOnlyPendingTimersAsync()
@@ -443,7 +443,7 @@ describe('server background sync scheduler', () => {
       }
       return { ok: true, message: 'ok' }
     })
-    const { getBackgroundSyncDiagnostics } = await import('#/server/modules/background-sync.ts')
+    const { getBackgroundSyncDiagnostics } = await import('#/server/background-sync/runtime.ts')
 
     await registerRepos([REPO_A])
     await vi.runOnlyPendingTimersAsync()
@@ -495,7 +495,7 @@ describe('server background sync scheduler', () => {
     mocks.fetchRepo
       .mockRejectedValueOnce(new Error('error.repository-boundary-unavailable'))
       .mockResolvedValue({ ok: true, message: 'ok' })
-    const { getBackgroundSyncDiagnostics } = await import('#/server/modules/background-sync.ts')
+    const { getBackgroundSyncDiagnostics } = await import('#/server/background-sync/runtime.ts')
 
     await registerRepos([REPO])
     await vi.runOnlyPendingTimersAsync()
@@ -516,7 +516,7 @@ describe('server background sync scheduler', () => {
 
   test('reports diagnostics for registered repos', async () => {
     mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
-    const { getBackgroundSyncDiagnostics } = await import('#/server/modules/background-sync.ts')
+    const { getBackgroundSyncDiagnostics } = await import('#/server/background-sync/runtime.ts')
 
     await registerRepos([REPO_A])
     await vi.runOnlyPendingTimersAsync()
@@ -540,7 +540,7 @@ describe('server background sync scheduler', () => {
   test('keeps registrations isolated by authenticated user', async () => {
     mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, getBackgroundSyncRepos } =
-      await import('#/server/modules/background-sync.ts')
+      await import('#/server/background-sync/runtime.ts')
     const secondUserId = 'background-sync-user-b'
     const secondRuntimeId = 'workspace-runtime-background-sync-b'
 
@@ -581,7 +581,7 @@ describe('server background sync scheduler', () => {
       commitBackgroundSyncRegistration,
       getBackgroundSyncRepos,
       prepareBackgroundSync,
-    } = await import('#/server/modules/background-sync.ts')
+    } = await import('#/server/background-sync/runtime.ts')
     await prepareBackgroundSync()
 
     const firstClient = 'client_background_sync_first'
@@ -614,7 +614,7 @@ describe('server background sync scheduler', () => {
       commitBackgroundSyncRegistration,
       getBackgroundSyncRepos,
       prepareBackgroundSync,
-    } = await import('#/server/modules/background-sync.ts')
+    } = await import('#/server/background-sync/runtime.ts')
     await prepareBackgroundSync()
 
     const olderAdmission = requiredAdmission(
@@ -646,7 +646,7 @@ describe('server background sync scheduler', () => {
       commitBackgroundSyncRegistration,
       getBackgroundSyncRepos,
       prepareBackgroundSync,
-    } = await import('#/server/modules/background-sync.ts')
+    } = await import('#/server/background-sync/runtime.ts')
     await prepareBackgroundSync()
 
     const latestAdmission = requiredAdmission(
@@ -676,7 +676,7 @@ describe('server background sync scheduler', () => {
       commitBackgroundSyncRegistration,
       getBackgroundSyncRepos,
       prepareBackgroundSync,
-    } = await import('#/server/modules/background-sync.ts')
+    } = await import('#/server/background-sync/runtime.ts')
     await prepareBackgroundSync()
 
     const firstPage = requiredAdmission(
@@ -708,7 +708,7 @@ describe('server background sync scheduler', () => {
       commitBackgroundSyncRegistration,
       getBackgroundSyncRepos,
       prepareBackgroundSync,
-    } = await import('#/server/modules/background-sync.ts')
+    } = await import('#/server/background-sync/runtime.ts')
     const { acquireWorkspaceRuntime, releaseWorkspaceRuntime } =
       await import('#/server/workspaces/runtime/authority.ts')
     const clientId = 'background-sync-client'
@@ -735,7 +735,7 @@ describe('server background sync scheduler', () => {
       commitBackgroundSyncRegistration,
       getBackgroundSyncRepos,
       prepareBackgroundSync,
-    } = await import('#/server/modules/background-sync.ts')
+    } = await import('#/server/background-sync/runtime.ts')
     const { acquireWorkspaceRuntime, releaseWorkspaceRuntime, retainWorkspaceRuntimeResource } =
       await import('#/server/workspaces/runtime/authority.ts')
     const ownerClientId = 'background-sync-owner-client'
@@ -763,7 +763,7 @@ describe('server background sync scheduler', () => {
 
   test('aborts pending admission when its Workspace membership is released', async () => {
     const { beginBackgroundSyncRegistration, commitBackgroundSyncRegistration, prepareBackgroundSync } =
-      await import('#/server/modules/background-sync.ts')
+      await import('#/server/background-sync/runtime.ts')
     const { acquireWorkspaceRuntime, releaseWorkspaceRuntime } =
       await import('#/server/workspaces/runtime/authority.ts')
     const clientId = 'background-sync-pending-client'

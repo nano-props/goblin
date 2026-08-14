@@ -19,7 +19,7 @@ import {
   type CreateWorktreeMutationResult,
   type RepoMutationResult,
 } from '#/server/repos/mutation-impact.ts'
-import { stopBackgroundSyncRuntime } from '#/server/modules/background-sync.ts'
+import { stopBackgroundSyncRuntime } from '#/server/background-sync/runtime.ts'
 import type { RemoteWorkspaceRuntimeFailureError } from '#/server/workspaces/runtime/remote-failure.ts'
 
 const workspaceRuntimeRequestLogger = serverNodeLog.child({ module: 'workspace-runtime-request' })

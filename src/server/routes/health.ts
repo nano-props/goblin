@@ -1,4 +1,4 @@
-import { getBackgroundSyncHealth } from '#/server/modules/background-sync.ts'
+import { getBackgroundSyncHealth } from '#/server/background-sync/runtime.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import { createRouteApp } from '#/server/common/http-validate.ts'
 

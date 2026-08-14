@@ -54,7 +54,7 @@ const mocks = vi.hoisted(() => ({
   stopBackgroundSyncRuntime: vi.fn(),
 }))
 
-vi.mock('#/server/modules/background-sync.ts', () => ({
+vi.mock('#/server/background-sync/runtime.ts', () => ({
   beginBackgroundSyncRegistration: mocks.beginBackgroundSyncRegistration,
   commitBackgroundSyncRegistration: mocks.commitBackgroundSyncRegistration,
   finishBackgroundSyncRegistration: mocks.finishBackgroundSyncRegistration,
