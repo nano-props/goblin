@@ -20,6 +20,7 @@ import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { repoPullRequestsQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   REPO_ID,
   navigation,
@@ -337,6 +338,13 @@ describe('WorkspacePane status presentation', () => {
     seedRepoQueryDataForTest(repo, {
       branches: [createBranchSnapshot('feature/query')],
       currentBranch: 'feature/query',
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      branchName: 'feature/query',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('status')],
     })
 
     const { container } = render(

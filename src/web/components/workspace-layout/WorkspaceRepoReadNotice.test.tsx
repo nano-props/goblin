@@ -67,7 +67,7 @@ describe('WorkspaceRepoReadNotice', () => {
     })
   })
 
-  test('leaves initial dependent read failures to the local blocking surface', async () => {
+  test('waits for the workspace snapshot before owning dependent read failures', async () => {
     const readSnapshot = vi.fn(async () => {
       throw new Error('snapshot failed')
     })
@@ -91,5 +91,43 @@ describe('WorkspaceRepoReadNotice', () => {
     })
     expect(screen.queryByRole('status')).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  test('owns status recovery once the workspace snapshot is available', async () => {
+    seedRepoQueryDataForTest(
+      { id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+      {
+        branches: [createRepoBranch('main')],
+        currentBranch: 'main',
+      },
+    )
+    const statusQuery = appQueryClient.getQueryCache().find({
+      queryKey: repoWorktreeStatusQueryKey(WORKSPACE_ID, WORKSPACE_RUNTIME_ID),
+      exact: true,
+    })
+    if (!statusQuery) throw new Error('missing status query fixture')
+    statusQuery.setState({
+      ...statusQuery.state,
+      data: undefined,
+      dataUpdatedAt: 0,
+      status: 'error',
+      error: new Error('status failed'),
+    })
+    const readStatus = vi.fn(async () => {
+      throw new Error('status failed')
+    })
+    installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
+
+    renderInJsdom(
+      <VueQueryClientScope client={appQueryClient}>
+        <WorkspaceRepoReadNotice workspaceId={WORKSPACE_ID} workspaceRuntimeId={WORKSPACE_RUNTIME_ID} />
+      </VueQueryClientScope>,
+    )
+
+    expect(await screen.findAllByRole('alert')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'error.try-again' })).toHaveLength(1)
+    const readsBeforeRetry = readStatus.mock.calls.length
+    await flushTestUpdates(() => screen.getByRole<HTMLElement>('button', { name: 'error.try-again' }).click())
+    expect(readStatus).toHaveBeenCalledTimes(readsBeforeRetry + 1)
   })
 })

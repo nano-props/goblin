@@ -9,7 +9,10 @@ import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSession
 import { workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import {
+  failWorkspacePaneTabsQueryForTest,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   setTerminalSessionCommandBridge,
   type TerminalSessionCommandBridge,
@@ -767,6 +770,25 @@ describe('workspace pane runtime tab command actions', () => {
       expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
     expect(scenario.terminalFilesystemTargetSnapshot).toHaveBeenCalled()
+    expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
+  })
+
+  test('primary terminal command navigates to an accepted terminal while canonical tabs are stale', async () => {
+    const terminalSessionId = 'term-111111111111111111111'
+    const scenario = terminalCommandScenario([terminalSessionId], terminalSessionId)
+    await failWorkspacePaneTabsQueryForTest(terminalCoordinates.workspaceId, scenario.repo.workspaceRuntimeId)
+
+    try {
+      await expect(dispatchTerminalRuntimePrimaryAction(scenario.options)).resolves.toBe(true)
+    } finally {
+      scenario.resetBridge()
+    }
+
+    expect(scenario.options.navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceRuntimeId: scenario.repo.workspaceRuntimeId }),
+      { kind: 'terminal', terminalSessionId },
+      expect.objectContaining({ navigationGeneration: expect.any(Number) }),
+    )
     expect(scenario.createTerminalWithAdmission).not.toHaveBeenCalled()
   })
 

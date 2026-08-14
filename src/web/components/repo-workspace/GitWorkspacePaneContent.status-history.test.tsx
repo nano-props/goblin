@@ -610,6 +610,9 @@ describe('GitWorkspacePaneContent status-history', () => {
       ],
       currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/no-worktree': [staticEntry('status')],
+      },
     })
     const detail = getTestGitWorkspacePanePresentation(gitWorkspacePaneProjection(repo))
 

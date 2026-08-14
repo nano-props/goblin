@@ -84,15 +84,18 @@ export function useGitWorkspacePaneTabModelInput(
       ? requiredGitWorkspacePaneTabsTarget(currentWorkspace.id, currentBranchName, currentWorktreePath)
       : null
     const routedWorktree = target?.kind === 'git-worktree'
-    const tabEntries = workspacePaneTabsForTargetFromQueryData(
-      workspacePaneTabsQuery.data.value ?? { revision: 0, entries: [] },
-      target ?? {
-        kind: 'inactive',
-        workspaceId: currentWorkspace.id,
-        branchName: null,
-        worktreePath: null,
-      },
-    )
+    const tabsSnapshot = workspacePaneTabsQuery.data.value
+    const tabEntries = tabsSnapshot
+      ? workspacePaneTabsForTargetFromQueryData(
+          tabsSnapshot,
+          target ?? {
+            kind: 'inactive',
+            workspaceId: currentWorkspace.id,
+            branchName: null,
+            worktreePath: null,
+          },
+        )
+      : []
     const preferredTab =
       route?.kind === 'static'
         ? route.tab
@@ -140,10 +143,8 @@ export function useWorkspaceRootTabModel(
     const current = currentWorkspace.value
     const route = toValue(workspacePaneRoute)
     const target = { kind: 'workspace-root' as const, workspaceId: current.id }
-    const tabEntries = workspacePaneTabsForTargetFromQueryData(
-      tabsQuery.data.value ?? { revision: 0, entries: [] },
-      target,
-    )
+    const tabsSnapshot = tabsQuery.data.value
+    const tabEntries = tabsSnapshot ? workspacePaneTabsForTargetFromQueryData(tabsSnapshot, target) : []
     const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
     const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
     const preferredTab = route
@@ -193,10 +194,8 @@ export function useGitWorktreeWorkspacePaneTabModel(
     const currentRuntime = currentWorkspaceRuntime.value
     const current = currentTarget.value
     const route = toValue(workspacePaneRoute)
-    const tabEntries = workspacePaneTabsForTargetFromQueryData(
-      tabsQuery.data.value ?? { revision: 0, entries: [] },
-      current,
-    )
+    const tabsSnapshot = tabsQuery.data.value
+    const tabEntries = tabsSnapshot ? workspacePaneTabsForTargetFromQueryData(tabsSnapshot, current) : []
     const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
     const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
     const preferredTab = route

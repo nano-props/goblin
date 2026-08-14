@@ -4,10 +4,7 @@ import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '
 import type { GitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
-import {
-  RepoReadFailureNotice,
-  RepoStatusFailureView,
-} from '#/web/components/RepoStatusFailureView.tsx'
+import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
 import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
@@ -108,11 +105,6 @@ export const GitWorktreePane = defineComponent<GitWorktreePaneProps>({
         )
       }
       const currentWorktreeStatus = worktreeStatus.value
-      const statusError = statusReadModel.isError.value
-        ? statusReadModel.error.value instanceof Error
-          ? statusReadModel.error.value.message
-          : String(statusReadModel.error.value)
-        : null
       return (
         <GitWorktreePaneReady
           workspaceRuntime={{ workspaceRuntimeId: props.repo.workspaceRuntimeId, ui: props.repo.ui }}
@@ -120,9 +112,6 @@ export const GitWorktreePane = defineComponent<GitWorktreePaneProps>({
           worktree={currentWorktree}
           status={currentWorktreeStatus}
           statusPending={!statusReadModel.data.value && statusReadModel.isPending.value}
-          statusError={statusError}
-          statusRetrying={statusReadModel.isFetching.value}
-          onRetryStatus={() => void statusReadModel.refetch()}
           target={currentTarget}
           route={props.route}
           workspacePaneId={props.workspacePaneId}
@@ -140,9 +129,6 @@ interface GitWorktreePaneReadyProps {
   worktree: RepoWorktreeSnapshot
   status?: WorktreeStatus
   statusPending: boolean
-  statusError: string | null
-  statusRetrying: boolean
-  onRetryStatus: () => void
   target: GitWorktreeWorkspacePaneTabsTarget
   route: ParsedWorkspacePaneRoute | null
   workspacePaneId: string
@@ -158,9 +144,6 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
     'worktree',
     'status',
     'statusPending',
-    'statusError',
-    'statusRetrying',
-    'onRetryStatus',
     'target',
     'route',
     'workspacePaneId',
@@ -227,13 +210,6 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
             <EmptyState title={t('workspace-route.not-found-title')} />
           ) : selection?.tab === 'status' ? (
             <WorkspacePanePanelFrame id={`${props.workspacePaneId}-status-panel`} label={t('tab.status')}>
-              {!props.status && props.statusError ? (
-                <RepoReadFailureNotice
-                  messageKey={props.statusError}
-                  retrying={props.statusRetrying}
-                  onRetry={props.onRetryStatus}
-                />
-              ) : null}
               <ScrollPane>
                 <WorktreeStatusOverview
                   worktree={props.worktree}
@@ -254,11 +230,7 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
               ) : props.statusPending ? (
                 <div class="min-h-0 flex-1" aria-busy="true" />
               ) : (
-                <RepoStatusFailureView
-                  messageKey={props.statusError ?? 'error.failed-read-repo'}
-                  retrying={props.statusRetrying}
-                  onRetry={props.onRetryStatus}
-                />
+                <EmptyState title={t('worktree-status.changes-unavailable')} />
               )}
             </WorkspacePanePanelFrame>
           ) : selection?.tab === 'history' ? (

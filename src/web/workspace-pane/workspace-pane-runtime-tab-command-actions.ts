@@ -231,7 +231,7 @@ async function showTerminalRuntimeTab(
 ): Promise<boolean> {
   if (type !== 'terminal') return abandonExistingTerminalPresentation(routeRequest)
   const resolution = resolveExistingTerminalTabTarget(filesystemTarget, workspacePaneRoute)
-  if (resolution.kind !== 'ready') return abandonExistingTerminalPresentation(routeRequest)
+  if (resolution.kind === 'missing') return abandonExistingTerminalPresentation(routeRequest)
   const target = resolution.target
   const tab = target.tabs.find(
     (candidate) => candidate.identity === terminalWorkspacePaneTabProvider.identity(sessionId),

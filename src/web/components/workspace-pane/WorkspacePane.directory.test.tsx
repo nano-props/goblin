@@ -226,11 +226,17 @@ describe('WorkspacePane directory workspaces', () => {
 
   test('keeps the selected workspace-root pane when Git capability becomes available', async () => {
     const workspaceId = workspaceIdForTest('goblin+ssh://example/workspace')
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      workspaceId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
     })
 
     render(
@@ -503,7 +509,7 @@ describe('WorkspacePane directory workspaces', () => {
     expect(screen.queryByText('error.failed-read-repo')).toBeNull()
   })
 
-  test('renders a retryable error when detached worktree status initially fails', async () => {
+  test('leaves detached worktree status recovery to the workspace notice', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace/repo-failed-status')
     const worktreePath = '/workspace/detached-failed-status'
     const repo = seedRepoWithReadModelForTest({
@@ -532,10 +538,10 @@ describe('WorkspacePane directory workspaces', () => {
       route: { kind: 'static', tab: 'status' },
     })
 
-    expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'error.try-again' })).toBeTruthy()
+    expect(await screen.findByTestId('worktree-pane')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'error.try-again' })).toBeNull()
     expect(screen.getByText('111111111111')).toBeTruthy()
-    expect(screen.getByText('worktree-status.changes-unavailable')).toBeTruthy()
   })
 
   test('keeps detached worktree target status separate from file changes', async () => {
@@ -908,6 +914,12 @@ describe('WorkspacePane directory workspaces', () => {
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
     })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      workspaceId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+    })
     workspacesStore
       .getState()
       .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: workspaceId }, 'status')
@@ -956,6 +968,12 @@ describe('WorkspacePane directory workspaces', () => {
       branches: [],
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      workspaceId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
     })
     workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
     appQueryClient.setQueryData(workspaceDirectoryOverviewQueryKey(workspaceId, repo.workspaceRuntimeId), {
@@ -1041,11 +1059,17 @@ describe('WorkspacePane directory workspaces', () => {
 
   test('keeps the saved workspace-root preference on a bare filesystem route', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-bare-workspace')
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
       currentBranchName: null,
       workspaceProbe: directoryWorkspaceProbe(),
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      workspaceId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
     })
     workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId }, 'status')
 
@@ -1074,7 +1098,7 @@ describe('WorkspacePane directory workspaces', () => {
 
   test('does not expose a terminal surface when the workspace capability is unavailable', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/terminal-unavailable-workspace')
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       id: workspaceId,
       branches: [],
       currentBranchName: null,
@@ -1082,6 +1106,12 @@ describe('WorkspacePane directory workspaces', () => {
         filesWritable: false,
         terminalAvailable: false,
       }),
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      workspaceId,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
     })
 
     render(

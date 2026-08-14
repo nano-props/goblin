@@ -116,6 +116,41 @@ describe('workspace pane tabs query', () => {
     )
   })
 
+  test('does not fabricate default tabs before the first snapshot is accepted', async () => {
+    const queryClient = new QueryClient()
+    vi.mocked(workspacePaneTabsClient.list).mockRejectedValueOnce(new Error('tabs unavailable'))
+
+    await expect(
+      refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient }),
+    ).rejects.toThrow('tabs unavailable')
+
+    const target = {
+      kind: 'git-branch' as const,
+      workspaceId: REPO_ROOT,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      branchName: 'feature/a',
+    }
+    expect(readWorkspacePaneTabsProjectionForTarget(target, queryClient)).toEqual({ phase: 'failed', tabs: [] })
+    expect(readWorkspacePaneTabsForTarget(target, queryClient)).toEqual([])
+  })
+
+  test('applies default tabs only after a successful snapshot confirms the target is absent', () => {
+    const queryClient = new QueryClient()
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(1, []), queryClient)
+
+    expect(
+      readWorkspacePaneTabsProjectionForTarget(
+        {
+          kind: 'git-branch',
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          branchName: 'feature/a',
+        },
+        queryClient,
+      ),
+    ).toEqual({ phase: 'ready', tabs: [workspacePaneStaticTabEntry('status')] })
+  })
+
   test('normalizes the complete snapshot and keeps no-worktree targets static-only', () => {
     const queryClient = new QueryClient()
     const accepted = writeWorkspacePaneTabsSnapshotQueryData(

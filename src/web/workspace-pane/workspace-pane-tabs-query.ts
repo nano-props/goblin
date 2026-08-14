@@ -82,7 +82,7 @@ export function readWorkspacePaneTabsForTarget(
   const snapshot = queryClient.getQueryData<WorkspacePaneTabsQueryData>(
     workspacePaneTabsQueryKey(target.workspaceId, target.workspaceRuntimeId),
   )
-  return workspacePaneTabsForTargetFromQueryData(snapshot ?? emptyWorkspacePaneTabsSnapshot(), target)
+  return snapshot ? workspacePaneTabsForTargetFromQueryData(snapshot, target) : []
 }
 
 export function readWorkspacePaneTabsProjectionForTarget(
@@ -95,13 +95,13 @@ export function readWorkspacePaneTabsProjectionForTarget(
   if (state?.status === 'error') {
     return {
       phase: 'failed',
-      tabs: workspacePaneTabsForTargetFromQueryData(state.data ?? emptyWorkspacePaneTabsSnapshot(), target),
+      tabs: state.data ? workspacePaneTabsForTargetFromQueryData(state.data, target) : [],
     }
   }
   if (state?.status !== 'success') return { phase: 'pending', tabs: [] }
   return {
     phase: 'ready',
-    tabs: workspacePaneTabsForTargetFromQueryData(state.data ?? emptyWorkspacePaneTabsSnapshot(), target),
+    tabs: state.data ? workspacePaneTabsForTargetFromQueryData(state.data, target) : [],
   }
 }
 
@@ -317,10 +317,6 @@ function normalizeWorkspacePaneTabsQueryEntries(entries: readonly WorkspacePaneT
 
 function workspacePaneTargetHasExecutionRoot(target: WorkspacePaneTabsTarget): boolean {
   return target.kind !== 'git-branch'
-}
-
-function emptyWorkspacePaneTabsSnapshot(): WorkspacePaneTabsSnapshot {
-  return { revision: 0, entries: [] }
 }
 
 function workspacePaneTabsEntryForTarget(

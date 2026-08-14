@@ -71,6 +71,21 @@ describe('workspace pane tab select action', () => {
     )
   })
 
+  test('does not select fabricated defaults when the first canonical tabs read fails', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [createBranchSnapshot('feature/worktree')],
+      worktrees: [createRepoWorktreeSnapshotForTest('feature/worktree', WORKTREE_PATH)],
+      currentBranchName: 'feature/worktree',
+    })
+    const navigation = navigationWith()
+    await failWorkspacePaneTabsQueryForTest(REPO_ID, repo.workspaceRuntimeId)
+
+    await expect(selectTab('workspace-pane:status', navigation)).resolves.toBe(false)
+
+    expect(navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+  })
+
   test('rejects a missing tab before starting navigation', async () => {
     seedTarget(['status'])
     const generation = currentAppNavigationGeneration()
