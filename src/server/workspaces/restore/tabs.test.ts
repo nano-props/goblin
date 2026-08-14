@@ -157,7 +157,7 @@ describe('restoreWorkspaceTabs', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost({ snapshot: { revision: 5, entries: [] } })
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: USER_ID,
@@ -205,7 +205,7 @@ describe('restoreWorkspaceTabs', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: USER_ID,
@@ -239,7 +239,7 @@ describe('restoreWorkspaceTabs', () => {
     mocks.probeWorkspace.mockResolvedValue(plainWorkspaceProbe())
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: USER_ID,
@@ -283,7 +283,7 @@ describe('restoreWorkspaceTabs', () => {
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: USER_ID,
@@ -330,7 +330,7 @@ describe('restoreWorkspaceTabs', () => {
     mocks.workspaceProbeStateForRuntime.mockReturnValue(plainWorkspaceProbe())
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: USER_ID,
@@ -363,7 +363,7 @@ describe('restoreWorkspaceTabs', () => {
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValue(false)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
@@ -385,7 +385,7 @@ describe('restoreWorkspaceTabs', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
@@ -411,7 +411,7 @@ describe('restoreWorkspaceTabs', () => {
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
     workspacePaneTabsHost.restoreTabs.mockResolvedValue({ kind: 'membership-conflict' })
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
@@ -433,7 +433,7 @@ describe('restoreWorkspaceTabs', () => {
     mocks.readRepoSnapshot.mockRejectedValue(new Error('snapshot unavailable'))
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
@@ -473,7 +473,7 @@ describe('restoreWorkspaceTabs', () => {
     mocks.readRepoSnapshot.mockRejectedValue(new Error('snapshot unavailable'))
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
@@ -507,7 +507,7 @@ describe('restoreWorkspaceTabs', () => {
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: USER_ID,
@@ -548,7 +548,7 @@ describe('restoreWorkspaceTabs', () => {
       .mockReturnValue(false)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
@@ -574,7 +574,7 @@ describe('restoreWorkspaceTabs', () => {
       .mockReturnValueOnce(false)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
@@ -602,7 +602,7 @@ describe('restoreWorkspaceTabs', () => {
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     await expect(
       restoreWorkspaceTabs({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,

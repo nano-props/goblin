@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import type { RestoredWorkspaceRuntime } from '#/shared/api-types.ts'
-import { restoreWorkspacePaneTabsForMemberships } from '#/server/modules/workspace-pane-tabs-restore.ts'
+import { restoreWorkspacePaneTabsForMemberships } from '#/server/workspaces/restore/pane-tabs.ts'
 import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 import { testWorkspaceRuntimeEpochCapability } from '#/server/test-utils/workspace-runtime-capability.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'

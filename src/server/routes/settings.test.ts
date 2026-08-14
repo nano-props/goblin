@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import type { RestoreWorkspaceTabsInput } from '#/server/modules/workspace-tabs-restore.ts'
+import type { RestoreWorkspaceTabsInput } from '#/server/workspaces/restore/tabs.ts'
 import type { WorkspaceTabsRestoreResult } from '#/shared/api-types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -52,11 +52,11 @@ vi.mock('#/server/settings/write-paths.ts', () => ({
   handleUpdateUserSettings: mocks.handleUpdateUserSettings,
 }))
 
-vi.mock('#/server/modules/session-restore.ts', () => ({
+vi.mock('#/server/workspaces/restore/session.ts', () => ({
   restoreServerWorkspace: mocks.restoreServerWorkspace,
 }))
 
-vi.mock('#/server/modules/workspace-tabs-restore.ts', () => ({
+vi.mock('#/server/workspaces/restore/tabs.ts', () => ({
   restoreWorkspaceTabs: mocks.restoreWorkspaceTabs,
 }))
 

@@ -156,7 +156,7 @@ describe('restoreServerWorkspace', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost({ snapshot: { revision: 1, entries: [] } })
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     const result = await restoreServerWorkspace({
       userId: USER_ID,
       clientId: CLIENT_ID,
@@ -203,7 +203,7 @@ describe('restoreServerWorkspace', () => {
     mocks.probeWorkspace.mockResolvedValue(plainWorkspaceProbe())
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     const result = await restoreServerWorkspace({
       userId: USER_ID,
       clientId: CLIENT_ID,
@@ -243,7 +243,7 @@ describe('restoreServerWorkspace', () => {
       repaired: true,
     })
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     const result = await restoreServerWorkspace({
       userId: USER_ID,
       clientId: CLIENT_ID,
@@ -280,7 +280,7 @@ describe('restoreServerWorkspace', () => {
     mocks.readRepoSnapshot.mockRejectedValue(new Error('snapshot unavailable'))
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     await expect(
       restoreServerWorkspace({
         userId: USER_ID,
@@ -302,7 +302,7 @@ describe('restoreServerWorkspace', () => {
     mocks.probeWorkspace.mockResolvedValue({ status: 'unavailable', reason: 'error.workspace-permission-denied' })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     const result = await restoreServerWorkspace({
       userId: USER_ID,
       clientId: CLIENT_ID,
@@ -333,7 +333,7 @@ describe('restoreServerWorkspace', () => {
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValueOnce(true).mockReturnValue(false)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     await expect(
       restoreServerWorkspace({
         userId: USER_ID,
@@ -368,7 +368,7 @@ describe('restoreServerWorkspace', () => {
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     const result = await restoreServerWorkspace({
       userId: USER_ID,
       clientId: CLIENT_ID,
@@ -400,7 +400,7 @@ describe('restoreServerWorkspace', () => {
     })
     mocks.isCurrentWorkspaceRuntimeMembership.mockReturnValueOnce(true).mockReturnValue(false)
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     await expect(
       restoreServerWorkspace({
         userId: USER_ID,
@@ -431,7 +431,7 @@ describe('restoreServerWorkspace', () => {
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
     workspacePaneTabsHost.restoreTabs.mockRejectedValue(commitError)
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     await expect(
       restoreServerWorkspace({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
@@ -493,7 +493,7 @@ describe('restoreServerWorkspace', () => {
     })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     await expect(
       restoreServerWorkspace({
         workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
@@ -523,7 +523,7 @@ describe('restoreServerWorkspace', () => {
     mocks.runRemoteWorkspaceLifecycleWrite.mockImplementation(() => new Promise(() => {}))
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     const restore = restoreServerWorkspace({
       userId: USER_ID,
       clientId: CLIENT_ID,
@@ -572,7 +572,7 @@ describe('restoreServerWorkspace', () => {
       .mockResolvedValueOnce({ matched: true, workspace: currentWorkspace })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/workspaces/restore/session.ts')
     const result = await restoreServerWorkspace({
       userId: USER_ID,
       clientId: CLIENT_ID,

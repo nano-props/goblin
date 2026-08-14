@@ -86,7 +86,7 @@ describe('session restore runtime ownership', () => {
     expect(isCurrentWorkspaceRuntimeMembership(USER_ID, REPO_ROOT, lease.workspaceRuntimeId, CLIENT_ID)).toBe(true)
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
-    const { restoreWorkspaceTabs } = await import('#/server/modules/workspace-tabs-restore.ts')
+    const { restoreWorkspaceTabs } = await import('#/server/workspaces/restore/tabs.ts')
     const result = await restoreWorkspaceTabs({
       workspaceCapabilityTransitionHost: TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST,
       userId: USER_ID,
