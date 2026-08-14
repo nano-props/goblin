@@ -64,31 +64,26 @@ export const RepoStatusStaleNotice = defineComponent<RepoStatusNoticeProps>({
 
   setup(props) {
     const t = useT()
-    return () => {
-      if (props.messageKey === REPO_MEMBERSHIP_READ_CONFLICT_KEY) {
-        return <RepoMembershipChangingNotice retrying={props.retrying} onRetry={props.onRetry} />
-      }
-      return (
-        <div
-          role="status"
-          class="flex items-center justify-between gap-3 border-b border-warning-border bg-warning-surface px-4 py-2 text-xs text-warning"
-        >
-          <div class="min-w-0">
-            <span class="font-medium">{t('status.stale-title')}</span>
-            <span class="break-words text-muted-foreground">
-              {' — '}
-              {t(props.messageKey)}
-            </span>
-          </div>
-          {props.onRetry ? (
-            <Button type="button" size="sm" variant="ghost" disabled={props.retrying} onClick={props.onRetry}>
-              <RefreshCw class={props.retrying ? 'animate-spin' : undefined} />
-              {t('error.try-again')}
-            </Button>
-          ) : null}
+    return () => (
+      <div
+        role="status"
+        class="flex items-center justify-between gap-3 border-b border-warning-border bg-warning-surface px-4 py-2 text-xs text-warning"
+      >
+        <div class="min-w-0">
+          <span class="font-medium">{t('status.stale-title')}</span>
+          <span class="break-words text-muted-foreground">
+            {' — '}
+            {t(props.messageKey)}
+          </span>
         </div>
-      )
-    }
+        {props.onRetry ? (
+          <Button type="button" size="sm" variant="ghost" disabled={props.retrying} onClick={props.onRetry}>
+            <RefreshCw class={props.retrying ? 'animate-spin' : undefined} />
+            {t('error.try-again')}
+          </Button>
+        ) : null}
+      </div>
+    )
   },
 })
 
@@ -102,25 +97,20 @@ export const RepoReadFailureNotice = defineComponent<RepoStatusNoticeProps>({
 
   setup(props) {
     const t = useT()
-    return () => {
-      if (props.messageKey === REPO_MEMBERSHIP_READ_CONFLICT_KEY) {
-        return <RepoMembershipChangingNotice retrying={props.retrying} onRetry={props.onRetry} />
-      }
-      return (
-        <div
-          role="alert"
-          class="flex items-center justify-between gap-3 border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-xs text-destructive"
-        >
-          <span class="min-w-0 break-words">{t(props.messageKey)}</span>
-          {props.onRetry ? (
-            <Button type="button" size="sm" variant="ghost" disabled={props.retrying} onClick={props.onRetry}>
-              <RefreshCw class={props.retrying ? 'animate-spin' : undefined} />
-              {t('error.try-again')}
-            </Button>
-          ) : null}
-        </div>
-      )
-    }
+    return () => (
+      <div
+        role="alert"
+        class="flex items-center justify-between gap-3 border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-xs text-destructive"
+      >
+        <span class="min-w-0 break-words">{t(props.messageKey)}</span>
+        {props.onRetry ? (
+          <Button type="button" size="sm" variant="ghost" disabled={props.retrying} onClick={props.onRetry}>
+            <RefreshCw class={props.retrying ? 'animate-spin' : undefined} />
+            {t('error.try-again')}
+          </Button>
+        ) : null}
+      </div>
+    )
   },
 })
 
@@ -150,7 +140,7 @@ const RepoMembershipChangingView = defineComponent<{ retrying: boolean; onRetry:
   },
 })
 
-const RepoMembershipChangingNotice = defineComponent<{ retrying?: boolean; onRetry?: () => void }>({
+export const RepoMembershipChangingNotice = defineComponent<{ retrying?: boolean; onRetry?: () => void }>({
   name: 'RepoMembershipChangingNotice',
   props: {
     retrying: Boolean,

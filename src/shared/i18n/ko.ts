@@ -72,6 +72,7 @@ export const ko: Record<DictKey, string> = {
   'app-chrome.menu': '메뉴',
   'app-chrome.settings': '설정 (⌘,)',
   'app-chrome.settings-tooltip': '설정',
+  'app-chrome.notifications': '알림',
 
   // ---- Dependencies ------------------------------------------------------
 
@@ -365,6 +366,7 @@ export const ko: Record<DictKey, string> = {
   'status.main-worktree': '메인',
   'status.worktree-clean': '깨끗',
   'status.stale-title': '오래된 변경 내용을 표시 중',
+  'status.dismiss-notification': '알림 닫기',
   'status.copy-patch': '패치',
   'status.copy-patch-label': '패치 복사',
   'status.copy-patch-title': '패치 복사',

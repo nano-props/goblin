@@ -83,6 +83,7 @@ export const en = {
   'app-chrome.menu': 'Menu',
   'app-chrome.settings': 'Settings (⌘,)',
   'app-chrome.settings-tooltip': 'Settings',
+  'app-chrome.notifications': 'Notifications',
 
   // ---- Dependencies -------------------------------------------------------
 
@@ -375,6 +376,7 @@ export const en = {
   'status.main-worktree': 'main',
   'status.worktree-clean': 'clean',
   'status.stale-title': 'Showing stale changes',
+  'status.dismiss-notification': 'Dismiss notification',
   'status.copy-patch': 'Patch',
   'status.copy-patch-label': 'Copy patch',
   'status.copy-patch-title': 'Copy patch',

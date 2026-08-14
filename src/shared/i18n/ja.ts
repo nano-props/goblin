@@ -80,6 +80,7 @@ export const ja: Record<DictKey, string> = {
   'app-chrome.menu': 'メニュー',
   'app-chrome.settings': '設定 (⌘,)',
   'app-chrome.settings-tooltip': '設定',
+  'app-chrome.notifications': '通知',
 
   // ---- Dependencies ------------------------------------------------------
 
@@ -375,6 +376,7 @@ export const ja: Record<DictKey, string> = {
   'status.main-worktree': 'メイン',
   'status.worktree-clean': 'クリーン',
   'status.stale-title': '古い変更データを表示しています',
+  'status.dismiss-notification': '通知を閉じる',
   'status.copy-patch': 'パッチ',
   'status.copy-patch-label': 'パッチをコピー',
   'status.copy-patch-title': 'パッチをコピー',

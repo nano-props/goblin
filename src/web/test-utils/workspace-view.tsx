@@ -43,9 +43,21 @@ const restoreWorkspaceTabsMocks = vi.hoisted(() => ({
   useRepoToasts: vi.fn(),
 }))
 
-vi.mock('#/web/components/workspace-layout/WorkspaceRepoReadNotice.tsx', () => ({
-  WorkspaceRepoReadNotice: () => null,
+const workspaceRepoReadNotificationHostMocks = vi.hoisted(() => ({
+  render: vi.fn<(props: { workspaceId: string; workspaceRuntimeId: string }) => void>(),
 }))
+
+vi.mock('#/web/components/repo-workspace/WorkspaceRepoReadNotificationHost.tsx', () => {
+  function WorkspaceRepoReadNotificationHost(props: { workspaceId: string; workspaceRuntimeId: string }) {
+    workspaceRepoReadNotificationHostMocks.render({
+      workspaceId: props.workspaceId,
+      workspaceRuntimeId: props.workspaceRuntimeId,
+    })
+    return null
+  }
+  WorkspaceRepoReadNotificationHost.props = ['workspaceId', 'workspaceRuntimeId']
+  return { WorkspaceRepoReadNotificationHost }
+})
 const workspacePaneMocks = vi.hoisted(() => ({
   scrollMemoryProbe: false,
 }))
@@ -342,6 +354,7 @@ beforeEach(() => {
   gitWorkspaceNavigatorMocks.activate.mockImplementation(() => {})
   restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockClear()
   restoreWorkspaceTabsMocks.useRepoToasts.mockClear()
+  workspaceRepoReadNotificationHostMocks.render.mockClear()
   restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mockReturnValue({
     state: { value: { phase: 'idle' } },
     retry: vi.fn(),
@@ -362,6 +375,7 @@ export {
   createWorktreePageMocks,
   restoreWorkspaceTabsMocks,
   workspacePaneMocks,
+  workspaceRepoReadNotificationHostMocks,
   REPO_ID,
   filesystemWorkspaceProbe,
   branchWorkspaceView,
