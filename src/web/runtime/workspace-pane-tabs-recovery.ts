@@ -1,15 +1,10 @@
-import type {
-  WorkspacePaneTabsSnapshot,
-  WorkspacePaneTabsChangedRealtimeMessage,
-} from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsChangedRealtimeMessage } from '#/shared/workspace-pane-tabs.ts'
 import type { RuntimeProjectionScope } from '#/web/runtime/runtime-projection-scope.ts'
 
 const WORKSPACE_TABS_REFRESH_LANE = 'workspace-tabs-refresh'
 
 export interface WorkspacePaneTabsRecoveryDependencies {
-  list: (target: RuntimeProjectionScope['target']) => Promise<WorkspacePaneTabsSnapshot>
-  commit: (target: RuntimeProjectionScope['target'], snapshot: WorkspacePaneTabsSnapshot) => void
-  markFailed: (target: RuntimeProjectionScope['target'], error: unknown) => void
+  refresh: (target: RuntimeProjectionScope['target']) => Promise<void>
   currentRevision: (target: RuntimeProjectionScope['target']) => number | null
   logFailure: (target: RuntimeProjectionScope['target'], error: unknown) => void
 }
@@ -28,12 +23,9 @@ export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActio
   request(scope: RuntimeProjectionScope): void {
     scope.runLatest(
       WORKSPACE_TABS_REFRESH_LANE,
-      async () => await this.dependencies.list(scope.target),
-      (snapshot) => this.dependencies.commit(scope.target, snapshot),
-      (error) => {
-        this.dependencies.markFailed(scope.target, error)
-        this.dependencies.logFailure(scope.target, error)
-      },
+      async () => await this.dependencies.refresh(scope.target),
+      () => {},
+      (error) => this.dependencies.logFailure(scope.target, error),
     )
   }
 

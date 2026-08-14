@@ -16,7 +16,10 @@ import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
-import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
+  readWorkspacePaneTabsForTarget,
+  workspacePaneTabsQueryKey,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   type WorkspacePaneTabsReorderMutationInput,
@@ -26,7 +29,11 @@ import {
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
-import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import {
+  resetWorkspacePaneActionQueueForTest,
+  runWorkspacePaneAction,
+  workspacePaneActionTargetFromCoordinates,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
@@ -157,6 +164,42 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs]))
 
     expect(updateWorkspaceTabs).not.toHaveBeenCalled()
+  })
+
+  test('fails fast when the tabs projection becomes unavailable while the reorder is queued', async () => {
+    const updateWorkspaceTabs = vi.fn(async () => [] as WorkspacePaneTabEntry[])
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    seedWorkspacePaneTabs(sourceTabs)
+    renderMutationHook({ canonicalTabs: sourceTabs })
+    const blocker = Promise.withResolvers<void>()
+    void runWorkspacePaneAction(
+      workspacePaneActionTargetFromCoordinates({
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+      }),
+      async () => await blocker.promise,
+    )
+    const onSettled = vi.fn()
+
+    await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs].reverse(), onSettled))
+    await expect(
+      queryClient.fetchQuery({
+        queryKey: workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID),
+        queryFn: async () => await Promise.reject(new Error('tabs unavailable')),
+        staleTime: 0,
+        retry: false,
+      }),
+    ).rejects.toThrow('tabs unavailable')
+    blocker.resolve()
+
+    await vi.waitFor(() => expect(onSettled).toHaveBeenCalledOnce())
+    expect(updateWorkspaceTabs).not.toHaveBeenCalled()
+    expect(feedbackMocks.warning).toHaveBeenCalledWith('error.workspace-tabs-reorder-unavailable', {
+      id: 'workspace-pane-tabs-reorder-unavailable',
+    })
   })
 
   test('uses the latest workspace runtime after the hook target changes', async () => {

@@ -251,6 +251,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
             workspacePaneId={props.workspacePaneId}
             activeTabIdentity={activeTabIdentity.value}
             createAction={props.target.capabilities.terminal.available ? runtimeTabCreateAction.value : null}
+            reorderEnabled={props.model.tabEntriesProjectionPhase === 'ready'}
             trafficLightOffset={props.trafficLightOffset ?? false}
             onBackToNavigator={props.onBackToNavigator}
             trailingActions={

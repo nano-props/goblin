@@ -41,6 +41,7 @@ interface WorkspacePaneTabStripProps {
   focusRegistry?: FocusRegistry<string, HTMLButtonElement>
   emptyFocusKey?: string
   createAction?: WorkspacePaneTabCreateAction | null
+  reorderEnabled?: boolean
   onSelect: (item: WorkspacePaneTabItem) => void
   onReselect: (item: WorkspacePaneTabItem) => void
   onClose: (item: WorkspacePaneTabItem, presentationEffects: WorkspacePaneTabClosePresentationEffects | null) => void
@@ -63,6 +64,7 @@ export const WorkspacePaneTabStrip = defineComponent<WorkspacePaneTabStripProps>
     'focusRegistry',
     'emptyFocusKey',
     'createAction',
+    'reorderEnabled',
     'onSelect',
     'onReselect',
     'onClose',
@@ -99,7 +101,7 @@ export const WorkspacePaneTabStrip = defineComponent<WorkspacePaneTabStripProps>
     })
     const tabDnd = useWorkspacePaneTabDnd({
       sortableItems: () => sortableItems.value,
-      disabled: () => !!props.createAction?.blocksTabInteraction,
+      disabled: () => props.reorderEnabled === false || !!props.createAction?.blocksTabInteraction,
       viewport: () => viewportRef.value,
       rightBoundary: () => newButtonRef.value,
       onReorder: (tabs) => props.onReorder(tabs),

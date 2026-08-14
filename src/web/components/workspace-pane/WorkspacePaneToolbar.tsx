@@ -28,6 +28,7 @@ interface WorkspacePaneToolbarProps {
   items: WorkspacePaneTabItem[]
   activeTabIdentity: string | null
   createAction: WorkspacePaneTabCreateAction | null
+  reorderEnabled?: boolean
   trafficLightOffset?: boolean
   onBackToNavigator?: () => void
   trailingActions?: VNodeChild
@@ -45,6 +46,7 @@ export const WorkspacePaneToolbar = defineComponent<WorkspacePaneToolbarProps>({
     'items',
     'activeTabIdentity',
     'createAction',
+    'reorderEnabled',
     'trafficLightOffset',
     'onBackToNavigator',
     'trailingActions',
@@ -91,6 +93,7 @@ export const WorkspacePaneToolbar = defineComponent<WorkspacePaneToolbarProps>({
                 focusRegistry={focusRegistry}
                 emptyFocusKey={EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY}
                 createAction={props.createAction}
+                reorderEnabled={props.reorderEnabled}
                 onSelect={props.onSelect}
                 onReselect={props.onReselect}
                 onClose={props.onClose}

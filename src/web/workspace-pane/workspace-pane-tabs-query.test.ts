@@ -5,7 +5,6 @@ import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  markWorkspacePaneTabsProjectionFailed,
   readWorkspacePaneTabsForTarget,
   readWorkspacePaneTabsProjectionForTarget,
   refreshWorkspacePaneTabsQueryData,
@@ -85,16 +84,14 @@ describe('workspace pane tabs query', () => {
     expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)).toBe(true)
   })
 
-  test('preserves stale tabs while exposing a failed recovery until a snapshot succeeds', () => {
+  test('preserves stale tabs while exposing a failed query until a snapshot succeeds', async () => {
     const queryClient = new QueryClient()
     const current = snapshot(4, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])])
     writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)
+    vi.mocked(workspacePaneTabsClient.list).mockRejectedValueOnce(new Error('tabs unavailable'))
 
-    markWorkspacePaneTabsProjectionFailed(
-      REPO_ROOT,
-      WORKSPACE_RUNTIME_ID,
-      new Error('tabs unavailable'),
-      queryClient,
+    await expect(refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)).rejects.toThrow(
+      'tabs unavailable',
     )
 
     expect(queryClient.getQueryData(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))).toEqual(current)
@@ -164,6 +161,39 @@ describe('workspace pane tabs query', () => {
     expect(readTabs(queryClient, 'feature/b', null)).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
+  test('does not let a rejected snapshot write clear a query failure', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(8, []), queryClient)
+    vi.mocked(workspacePaneTabsClient.list).mockRejectedValueOnce(new Error('tabs unavailable'))
+
+    await expect(refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)).rejects.toThrow(
+      'tabs unavailable',
+    )
+
+    expect(
+      writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(7, []), queryClient),
+    ).toBe(false)
+    expect(queryClient.getQueryState(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))?.status).toBe('error')
+  })
+
+  test('authoritative snapshot success supersedes an older in-flight query failure', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const request = Promise.withResolvers<WorkspacePaneTabsSnapshot>()
+    vi.mocked(workspacePaneTabsClient.list).mockImplementationOnce(async () => await request.promise)
+    const refresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
+    await vi.waitFor(() => expect(workspacePaneTabsClient.list).toHaveBeenCalledOnce())
+
+    const committed = snapshot(9, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])])
+    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, committed, queryClient)).toBe(true)
+    await expect(refresh).resolves.toBeUndefined()
+    request.reject(new Error('stale query failure'))
+
+    expect(queryClient.getQueryData(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))).toEqual(committed)
+    expect(queryClient.getQueryState(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))?.status).toBe(
+      'success',
+    )
+  })
+
   test('accepts an equal revision as the canonical complete snapshot', () => {
     const queryClient = new QueryClient()
     writeWorkspacePaneTabsSnapshotQueryData(
@@ -184,7 +214,7 @@ describe('workspace pane tabs query', () => {
     expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
   })
 
-  test('manual refresh uses server revisions when responses resolve out of order', async () => {
+  test('coalesces concurrent refreshes through the query lifecycle', async () => {
     const queryClient = new QueryClient()
     const requests: Array<ReturnType<typeof Promise.withResolvers<WorkspacePaneTabsSnapshot>>> = []
     vi.mocked(workspacePaneTabsClient.list).mockImplementation(async () => {
@@ -193,15 +223,14 @@ describe('workspace pane tabs query', () => {
       return await request.promise
     })
 
-    const olderRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
+    const firstRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
     await vi.waitFor(() => expect(requests).toHaveLength(1))
-    const newerRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
-    await vi.waitFor(() => expect(requests).toHaveLength(2))
+    const secondRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(requests).toHaveLength(1)
 
-    requests[1]!.resolve(snapshot(12, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])]))
-    await newerRequest
-    requests[0]!.resolve(snapshot(11, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]))
-    await olderRequest
+    requests[0]!.resolve(snapshot(12, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])]))
+    await Promise.all([firstRefresh, secondRefresh])
 
     expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
   })

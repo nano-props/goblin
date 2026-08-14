@@ -116,34 +116,17 @@ export function writeWorkspacePaneTabsSnapshotQueryData(
   queryClient: QueryClient = appQueryClient,
 ): boolean {
   if (!snapshot) return false
-  let accepted = false
-  queryClient.setQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId),
-    (current) => {
-      const next = acceptedWorkspacePaneTabsSnapshot(current, snapshot)
-      accepted = next !== current
-      return next
-    },
-  )
-  if (accepted) notifyWorkspacePaneTabsPersistenceChanged()
-  return accepted
-}
-
-export function markWorkspacePaneTabsProjectionFailed(
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-  error: unknown,
-  queryClient: QueryClient = appQueryClient,
-): void {
   const queryKey = workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId)
-  const query =
-    queryClient.getQueryCache().find({ queryKey, exact: true }) ??
-    queryClient.getQueryCache().build(queryClient, workspacePaneTabsQueryOptions(workspaceId, workspaceRuntimeId))
-  query.setState({
-    ...query.state,
-    status: 'error',
-    error: error instanceof Error ? error : new Error(String(error)),
-  })
+  const current = queryClient.getQueryData<WorkspacePaneTabsQueryData>(queryKey)
+  const next = acceptedWorkspacePaneTabsSnapshot(current, snapshot)
+  if (next === current) return false
+
+  // A successful authoritative write supersedes any older list request. Query
+  // cancellation is synchronous; the returned promise only observes cleanup.
+  void queryClient.cancelQueries({ queryKey, exact: true })
+  queryClient.setQueryData<WorkspacePaneTabsQueryData>(queryKey, next)
+  notifyWorkspacePaneTabsPersistenceChanged()
+  return true
 }
 
 export function refreshWorkspacePaneTabs(
@@ -161,8 +144,10 @@ export async function refreshWorkspacePaneTabsQueryData(
   workspaceRuntimeId: string,
   queryClient: QueryClient = appQueryClient,
 ): Promise<void> {
-  const snapshot = await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId)
-  writeWorkspacePaneTabsSnapshotQueryData(workspaceId, workspaceRuntimeId, snapshot, queryClient)
+  await queryClient.fetchQuery({
+    ...workspacePaneTabsQueryOptions(workspaceId, workspaceRuntimeId),
+    staleTime: 0,
+  })
 }
 
 export function clearWorkspacePaneTabsProjectionState(workspaceId: WorkspaceId, workspaceRuntimeId: string): void {

@@ -16,6 +16,7 @@ type SortableWorkspacePaneTabItem =
   WorkspacePaneStaticTabItem | WorkspacePaneRuntimeTabItem | WorkspacePaneRuntimePlaceholderTabItem
 
 export interface WorkspacePaneTabDnd {
+  disabled: () => boolean
   modifiers: DragDropProviderProps['modifiers']
   plugins: DragDropProviderProps['plugins']
   sensors: DragDropProviderProps['sensors']
@@ -66,6 +67,7 @@ export function useWorkspacePaneTabDnd(input: {
   onReorder: (tabs: WorkspacePaneTabEntry[]) => void
 }): WorkspacePaneTabDnd {
   return {
+    disabled: input.disabled,
     modifiers: [
       createRestrictToTabStripBounds({
         viewport: input.viewport,

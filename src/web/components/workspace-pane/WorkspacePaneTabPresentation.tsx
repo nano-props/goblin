@@ -382,6 +382,7 @@ WorkspacePaneTab.props = [
 interface SortableWorkspacePaneTabProps extends WorkspacePaneTabProps {
   sortableIdentity: string
   sortableIndex: number
+  sortableDisabled: boolean
 }
 
 export const SortableWorkspacePaneTab = defineComponent<SortableWorkspacePaneTabProps>({
@@ -389,6 +390,7 @@ export const SortableWorkspacePaneTab = defineComponent<SortableWorkspacePaneTab
   props: [
     'sortableIdentity',
     'sortableIndex',
+    'sortableDisabled',
     'item',
     'isActive',
     'isSelected',
@@ -412,7 +414,7 @@ export const SortableWorkspacePaneTab = defineComponent<SortableWorkspacePaneTab
       () => props.sortableIdentity,
       () => props.sortableIndex,
       {
-        disabled: () => props.interactionDisabled,
+        disabled: () => props.interactionDisabled || props.sortableDisabled,
         onButtonRef: (node) => props.focusRegistry.setRef(props.item.identity)(node),
       },
     )

@@ -24,6 +24,7 @@ import {
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { translate } from '#/web/stores/i18n-vue.ts'
 import { toast } from 'vue-sonner'
+import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 export type WorkspacePaneTabsReorderMutationInput = WorkspacePaneTabsTarget & {
   workspaceRuntimeId: string
@@ -100,6 +101,11 @@ async function runWorkspacePaneTabsReorderInQueue(
   queryClient: QueryClient,
 ): Promise<void> {
   try {
+    if (readWorkspacePaneTabsProjectionForTarget(target, queryClient).phase !== 'ready') {
+      const messageKey = 'error.workspace-tabs-reorder-unavailable'
+      toast.warning(translate(messageKey), { id: 'workspace-pane-tabs-reorder-unavailable' })
+      return
+    }
     const result = await updateWorkspacePaneTabsOnServer({
       ...target,
       operation: { type: 'reorder', tabIdentities: draggedTabs.map(workspacePaneTabEntryIdentity) },
