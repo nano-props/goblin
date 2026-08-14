@@ -177,15 +177,20 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       const action = runtimeTabCreateAction.value
       if (!action) return null
       const blockingPhase = workspacePaneRuntimeTabCreateBlockingPhase(props.model, 'terminal')
+      const disabledReason =
+        blockingPhase === 'inconsistent'
+          ? t('terminal.new-disabled-state-inconsistent')
+          : props.model.tabEntriesProjectionPhase === 'failed'
+            ? t('terminal.new-disabled-tabs-load-failed')
+            : blockingPhase === 'failed'
+              ? t('terminal.new-disabled-load-failed')
+              : blockingPhase === 'pending'
+                ? t('terminal.new-disabled-loading')
+                : undefined
       return {
         ...action,
         disabled: blockingPhase !== null,
-        disabledReason:
-          blockingPhase === 'failed'
-            ? t('terminal.new-disabled-load-failed')
-            : blockingPhase === 'pending'
-              ? t('terminal.new-disabled-loading')
-              : undefined,
+        disabledReason,
       }
     })
     const items = computed(() =>

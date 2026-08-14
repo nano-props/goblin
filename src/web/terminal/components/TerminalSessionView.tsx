@@ -55,6 +55,7 @@ interface TerminalSessionViewProps {
   selectedTerminalSessionId?: string | null
   projectionPhase?: TerminalProjectionHydrationPhase
   projectionErrorMessage?: string
+  projectionFailureLabel?: string
   retryProjection?: () => void
   createTerminalForSlot: (base: TerminalSessionBase) => Promise<unknown>
 }
@@ -70,6 +71,7 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
     'selectedTerminalSessionId',
     'projectionPhase',
     'projectionErrorMessage',
+    'projectionFailureLabel',
     'retryProjection',
     'createTerminalForSlot',
   ],
@@ -486,8 +488,6 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
         ((currentSessionPhase === 'opening' && !descriptor.value) || (!attaching && presentationRecovery === 'pending'))
       const showEmptyCta =
         currentSessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !createPending.value
-      const showProjectionPendingRecovery =
-        currentSessionPhase === 'opening' && !descriptor.value && projectionPending && !!props.retryProjection
       const showStatusOverlay =
         (attaching && !showEmptyCta && !(currentSessionPhase === 'opening' && !descriptor.value && projectionFailed)) ||
         (!showErrorChip && !attaching && presentationRecovery === 'pending' && !projectionFailed)
@@ -498,9 +498,11 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
       } else if (presentationRecovery === 'pending') {
         statusOverlayLabel = t('terminal.restoring')
       }
-      const projectionFailureLabel = props.projectionErrorMessage
-        ? `${t('terminal.load-failed')} (${props.projectionErrorMessage})`
-        : t('terminal.load-failed')
+      const projectionFailureLabel =
+        props.projectionFailureLabel ??
+        (props.projectionErrorMessage
+          ? `${t('terminal.load-failed')} (${props.projectionErrorMessage})`
+          : t('terminal.load-failed'))
 
       return (
         <div
@@ -609,13 +611,7 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
             />
           ) : null}
           {showUnownedOverlay ? <AttachmentOverlay badge={t('terminal.unowned')} snapshot={currentSnapshot} /> : null}
-          {showStatusOverlay ? (
-            <StatusOverlay
-              label={statusOverlayLabel}
-              retryLabel={showProjectionPendingRecovery ? t('terminal.retry-loading') : undefined}
-              onRetry={showProjectionPendingRecovery ? props.retryProjection : undefined}
-            />
-          ) : null}
+          {showStatusOverlay ? <StatusOverlay label={statusOverlayLabel} /> : null}
           {showProjectionRecoveryFailure ? (
             <PresentationFailureOverlay
               label={projectionFailureLabel}

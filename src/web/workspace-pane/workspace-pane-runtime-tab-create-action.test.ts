@@ -158,6 +158,36 @@ describe('workspace pane runtime tab create action', () => {
     },
   )
 
+  test('fails fast when settled workspace tabs and terminals disagree', async () => {
+    setWorkspacePaneTabsForTargetQueryData({
+      ...PANE_TARGET,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', TERMINAL_SESSION_ID)],
+    })
+    terminalProjectionHydrationStore
+      .getState()
+      .markProjectionReady(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID)
+
+    await expect(
+      dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+        base: BASE,
+        createTerminal: vi.fn(),
+        openerIdentity: null,
+        showCreatedTerminalTab: vi.fn(),
+        focusTerminal: vi.fn(),
+        t: translate,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      messageKey: 'error.workspace-pane-state-inconsistent',
+    })
+
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
+    expect(terminalCreateFeedbackMocks.error).toHaveBeenCalledWith('action.result-error', {
+      description: 'error.workspace-pane-state-inconsistent',
+    })
+  })
+
   test('rechecks canonical materialization after waiting in the target queue', async () => {
     const queuedActionMayRun = Promise.withResolvers<void>()
     const coordinatorTarget = workspacePaneActionTargetFromFilesystemTarget(BASE.target)

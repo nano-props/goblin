@@ -16,8 +16,8 @@ import {
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import type {
-  WorkspacePaneRuntimeProjectionPhase,
-  WorkspacePaneRuntimeUnreadyProjectionPhase,
+  WorkspacePaneRuntimeTabProjectionPhase,
+  WorkspacePaneRuntimeTabUnreadyProjectionPhase,
 } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 type T = (key: string, params?: Record<string, string | number>) => string
@@ -27,7 +27,7 @@ export type WorkspacePaneTabProviderKind = 'static' | 'runtime'
 export interface WorkspacePaneRuntimeTabAvailability {
   sessionCount: number
   createPending: boolean
-  projectionPhase: WorkspacePaneRuntimeProjectionPhase
+  projectionPhase: WorkspacePaneRuntimeTabProjectionPhase
 }
 
 export type WorkspacePaneRuntimeTabAvailabilityByType = Partial<
@@ -57,12 +57,12 @@ export interface WorkspacePaneRuntimeTabMetadataInput<
 export interface WorkspacePanePendingTabMetadataInput {
   t: T
   createPending: boolean
-  projectionPhase: WorkspacePaneRuntimeProjectionPhase
+  projectionPhase: WorkspacePaneRuntimeTabProjectionPhase
 }
 
 export interface WorkspacePaneRuntimePlaceholderTabMetadataInput {
   t: T
-  projectionPhase: WorkspacePaneRuntimeUnreadyProjectionPhase
+  projectionPhase: WorkspacePaneRuntimeTabUnreadyProjectionPhase
 }
 
 export interface WorkspacePaneRuntimeTabAttention {
@@ -231,7 +231,8 @@ class FilesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'file
 
 function terminalPendingLabelKey(
   input: WorkspacePanePendingTabMetadataInput,
-): 'terminal.load-failed' | 'terminal.opening' | 'terminal.loading' {
+): 'terminal.load-failed' | 'terminal.opening' | 'terminal.loading' | 'terminal.workspace-state-inconsistent' {
+  if (input.projectionPhase === 'inconsistent') return 'terminal.workspace-state-inconsistent'
   if (input.projectionPhase === 'failed') return 'terminal.load-failed'
   if (input.createPending || input.projectionPhase === 'ready') return 'terminal.opening'
   return 'terminal.loading'
@@ -239,7 +240,8 @@ function terminalPendingLabelKey(
 
 function terminalPlaceholderLabelKey(
   input: WorkspacePaneRuntimePlaceholderTabMetadataInput,
-): 'terminal.load-tab-failed' | 'terminal.loading-tab' {
+): 'terminal.load-tab-failed' | 'terminal.loading-tab' | 'terminal.workspace-state-inconsistent' {
+  if (input.projectionPhase === 'inconsistent') return 'terminal.workspace-state-inconsistent'
   return input.projectionPhase === 'failed' ? 'terminal.load-tab-failed' : 'terminal.loading-tab'
 }
 

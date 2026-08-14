@@ -44,7 +44,6 @@ import {
   render,
   routeNavigation,
   retryWorkspacePaneTabsForTest,
-  retryTerminalProjectionForTest,
   terminalCommandContext,
   terminalReadContext,
   terminalReadContextWithSession,
@@ -113,6 +112,7 @@ describe('WorkspacePane terminal routes', () => {
 
     const newTerminalButton = await screen.findByRole('button', { name: 'terminal.new' })
     expect(newTerminalButton.getAttribute('aria-disabled')).toBe('true')
+    expect(newTerminalButton.getAttribute('title')).toBe('terminal.new-disabled-tabs-load-failed')
     const retryButton = screen.getByRole('button', { name: 'workspace-pane-tabs.retry-loading' })
     await flushTestUpdates(() => retryButton.click())
     expect(retryWorkspacePaneTabsForTest).toHaveBeenCalledWith(workspaceId)
@@ -169,9 +169,7 @@ describe('WorkspacePane terminal routes', () => {
     const loadingStatus = document.body.querySelector('.goblin-terminal-session__status-overlay')
     expect(loadingStatus?.textContent).toContain('terminal.loading')
     expect(loadingStatus?.textContent).not.toContain('terminal.opening')
-    const retryLoading = screen.getByRole('button', { name: 'terminal.retry-loading' })
-    await flushTestUpdates(() => retryLoading.click())
-    expect(retryTerminalProjectionForTest).toHaveBeenCalledWith(workspaceId)
+    expect(screen.queryByRole('button', { name: 'terminal.retry-loading' })).toBeNull()
 
     const tabIds = [...document.body.querySelectorAll<HTMLElement>('[role="tab"][id]')].map((tab) => tab.id)
     expect(new Set(tabIds).size).toBe(tabIds.length)
@@ -196,12 +194,13 @@ describe('WorkspacePane terminal routes', () => {
     terminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
     await waitFor(() => {
       expect(screen.queryByRole('tab', { name: 'terminal.load-tab-failed' })).toBeNull()
-      expect(screen.getByRole('button', { name: 'terminal.new' }).getAttribute('aria-disabled')).toBe('true')
-      expect(screen.getByRole('button', { name: 'terminal.retry-loading' })).toBeTruthy()
+      expect(screen.getByRole('tab', { name: 'terminal.workspace-state-inconsistent' })).toBeTruthy()
+      const blockedNewTerminal = screen.getByRole('button', { name: 'terminal.new' })
+      expect(blockedNewTerminal.getAttribute('aria-disabled')).toBe('true')
+      expect(blockedNewTerminal.getAttribute('title')).toBe('terminal.new-disabled-state-inconsistent')
+      expect(screen.queryByRole('button', { name: 'terminal.retry-loading' })).toBeNull()
+      expect(screen.getByRole('alert').textContent).toContain('terminal.workspace-state-inconsistent')
     })
-    retryTerminalProjectionForTest.mockClear()
-    await flushTestUpdates(() => screen.getByRole<HTMLElement>('button', { name: 'terminal.retry-loading' }).click())
-    expect(retryTerminalProjectionForTest).toHaveBeenCalledWith(workspaceId)
 
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',

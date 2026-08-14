@@ -38,7 +38,7 @@ import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navi
 import { claimTerminalAutoFocus } from '#/web/terminal/focus.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { workspacePaneRuntimeTabCreateBlockingPhase } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import type { WorkspacePaneRuntimeUnreadyProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import type { WorkspacePaneRuntimeTabUnreadyProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 export interface CreatedTerminalRouteRequest {
   navigationGeneration: AppNavigationGeneration
@@ -272,7 +272,7 @@ function terminalCreateTargetIsCurrent(base: TerminalSessionBase): boolean {
 
 function terminalCreateAdmission(
   base: TerminalSessionBase,
-): 'ready' | 'stale' | WorkspacePaneRuntimeUnreadyProjectionPhase {
+): 'ready' | 'stale' | WorkspacePaneRuntimeTabUnreadyProjectionPhase {
   if (!terminalCreateTargetIsCurrent(base)) return 'stale'
   const paneTarget = workspacePaneTabsTargetFromRuntime(base.target)
   if (!paneTarget) return 'stale'
@@ -295,11 +295,15 @@ function staleTerminalCreateResult(): TerminalCreateCommandResult {
 }
 
 function blockedTerminalCreateResult(
-  phase: WorkspacePaneRuntimeUnreadyProjectionPhase,
+  phase: WorkspacePaneRuntimeTabUnreadyProjectionPhase,
   t: TerminalCreateTranslator | undefined,
 ): TerminalCreateCommandResult {
   const messageKey =
-    phase === 'failed' ? 'error.terminal-create-blocked-load-failed' : 'error.terminal-create-blocked-loading'
+    phase === 'inconsistent'
+      ? 'error.workspace-pane-state-inconsistent'
+      : phase === 'failed'
+        ? 'error.terminal-create-blocked-load-failed'
+        : 'error.terminal-create-blocked-loading'
   const error = new Error(messageKey)
   if (t) showTerminalCreateErrorToast(error, t)
   return { ok: false, error, messageKey }
