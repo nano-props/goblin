@@ -355,20 +355,21 @@ describe('workspace pane runtime tab create action', () => {
     expect(presentedTerminalSessionIds).toEqual(terminalSessionIds)
   })
 
-  test('keeps accepted queued creates but rejects presentation after the router leaves the target', async () => {
+  test('continues queued creates but rejects presentation after the router leaves the target', async () => {
     const terminalSessionIds = ['term-111111111111111111111', 'term-222222222222222222222']
-    const firstCommandMayFinish = Promise.withResolvers<void>()
-    const firstPresentationCommitted = Promise.withResolvers<void>()
+    const firstCommandMayPresent = Promise.withResolvers<void>()
+    const firstAdmissionReady = Promise.withResolvers<void>()
     let commandIndex = 0
     terminalCreateCommandMocks.runCreateTerminalTabCommand.mockImplementation(async (commandInput) => {
       const terminalSessionId = terminalSessionIds[commandIndex]
       commandIndex += 1
       if (!terminalSessionId) throw new Error('unexpected terminal create command')
-      const commit = await commandInput.commitCreatedTerminalTab(createAdmission(terminalSessionId))
+      const admission = createAdmission(terminalSessionId)
       if (terminalSessionId === terminalSessionIds[0]) {
-        firstPresentationCommitted.resolve()
-        await firstCommandMayFinish.promise
+        firstAdmissionReady.resolve()
+        await firstCommandMayPresent.promise
       }
+      const commit = await commandInput.commitCreatedTerminalTab(admission)
       return {
         ok: true,
         terminalSessionId,
@@ -394,22 +395,17 @@ describe('workspace pane runtime tab create action', () => {
       }),
     )
 
-    await firstPresentationCommitted.promise
+    await firstAdmissionReady.promise
     routerPresentsTarget = false
-    firstCommandMayFinish.resolve()
+    firstCommandMayPresent.resolve()
 
-    await expect(Promise.all(dispatches)).resolves.toEqual([
-      {
+    await expect(Promise.all(dispatches)).resolves.toEqual(
+      terminalSessionIds.map((terminalSessionId) => ({
         ok: true,
-        terminalSessionId: terminalSessionIds[0],
-        presentationStatus: 'committed',
-      },
-      {
-        ok: true,
-        terminalSessionId: terminalSessionIds[1],
+        terminalSessionId,
         presentationStatus: 'navigation-rejected',
-      },
-    ])
+      })),
+    )
     expect(presentationAttempts).toEqual(terminalSessionIds)
   })
 
