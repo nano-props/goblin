@@ -37,18 +37,8 @@ export function workspacePaneTabsQueryOptions(workspaceId: WorkspaceId, workspac
   const queryKey = workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId)
   return {
     queryKey,
-    queryFn: async ({ client }: { client: QueryClient }) => {
-      const dataUpdateCount = client.getQueryState<WorkspacePaneTabsQueryData>(queryKey)?.dataUpdateCount ?? 0
-      try {
-        return await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId)
-      } catch (error) {
-        const current = client.getQueryState<WorkspacePaneTabsQueryData>(queryKey)
-        // A full authoritative snapshot committed after this read began makes
-        // its failure stale; the cache already contains the newer projection.
-        if (current?.data !== undefined && current.dataUpdateCount !== dataUpdateCount) return current.data
-        throw error
-      }
-    },
+    queryFn: async ({ client }: { client: QueryClient }) =>
+      await fetchWorkspacePaneTabsSnapshotForQuery(workspaceId, workspaceRuntimeId, client),
     structuralSharing: (oldData: unknown, newData: unknown) =>
       acceptedWorkspacePaneTabsSnapshot(
         oldData as WorkspacePaneTabsSnapshot | undefined,
@@ -143,7 +133,7 @@ export function refreshWorkspacePaneTabs(
   workspaceRuntimeId: string,
   queryClient: QueryClient = appQueryClient,
 ): void {
-  void refreshWorkspacePaneTabsQueryData(workspaceId, workspaceRuntimeId, queryClient).catch((err) => {
+  void refreshWorkspacePaneTabsQueryData(workspaceId, workspaceRuntimeId, { queryClient }).catch((err) => {
     goblinLog.warn('workspace pane tabs refresh failed', { workspaceId, workspaceRuntimeId, err })
   })
 }
@@ -151,10 +141,34 @@ export function refreshWorkspacePaneTabs(
 export async function refreshWorkspacePaneTabsQueryData(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
-  queryClient: QueryClient = appQueryClient,
+  options: { queryClient?: QueryClient; minimumRevision?: number | null } = {},
 ): Promise<void> {
+  const queryClient = options.queryClient ?? appQueryClient
+  const queryOptions = workspacePaneTabsQueryOptions(workspaceId, workspaceRuntimeId)
   await queryClient.fetchQuery({
-    ...workspacePaneTabsQueryOptions(workspaceId, workspaceRuntimeId),
+    ...queryOptions,
+    staleTime: 0,
+  })
+  const minimumRevision = options.minimumRevision
+  if (minimumRevision === undefined || minimumRevision === null) return
+  if (workspacePaneTabsQueryRevision(queryClient, queryOptions.queryKey) >= minimumRevision) return
+
+  // A revision event can join a request that started before the server
+  // committed that revision. Once the joined request settles, perform one
+  // fresh read. A second stale snapshot violates the published watermark and
+  // fails the Query instead of starting an unbounded retry loop.
+  await queryClient.fetchQuery({
+    ...queryOptions,
+    queryFn: async ({ client }: { client: QueryClient }) => {
+      const snapshot = await fetchWorkspacePaneTabsSnapshotForQuery(workspaceId, workspaceRuntimeId, client)
+      const acceptedRevision = Math.max(snapshot.revision, workspacePaneTabsQueryRevision(client, queryOptions.queryKey))
+      if (acceptedRevision < minimumRevision) {
+        throw new Error(
+          `Workspace pane tabs recovery did not reach required revision ${minimumRevision}; received ${acceptedRevision}`,
+        )
+      }
+      return snapshot
+    },
     staleTime: 0,
   })
 }
@@ -214,6 +228,31 @@ async function fetchWorkspacePaneTabsSnapshot(
   return normalizeWorkspacePaneTabsSnapshot(
     await workspacePaneTabsClient.list({ workspaceId: workspaceId, workspaceRuntimeId: workspaceRuntimeId }),
   )
+}
+
+async function fetchWorkspacePaneTabsSnapshotForQuery(
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+  queryClient: QueryClient,
+): Promise<WorkspacePaneTabsSnapshot> {
+  const queryKey = workspacePaneTabsQueryKey(workspaceId, workspaceRuntimeId)
+  const dataUpdateCount = queryClient.getQueryState<WorkspacePaneTabsQueryData>(queryKey)?.dataUpdateCount ?? 0
+  try {
+    return await fetchWorkspacePaneTabsSnapshot(workspaceId, workspaceRuntimeId)
+  } catch (error) {
+    const current = queryClient.getQueryState<WorkspacePaneTabsQueryData>(queryKey)
+    // A full authoritative snapshot committed after this read began makes its
+    // failure stale; the cache already contains the newer projection.
+    if (current?.data !== undefined && current.dataUpdateCount !== dataUpdateCount) return current.data
+    throw error
+  }
+}
+
+function workspacePaneTabsQueryRevision(
+  queryClient: QueryClient,
+  queryKey: ReturnType<typeof workspacePaneTabsQueryKey>,
+): number {
+  return queryClient.getQueryData<WorkspacePaneTabsQueryData>(queryKey)?.revision ?? -1
 }
 
 /** The single revision acceptance rule for every server-snapshot cache entry. */

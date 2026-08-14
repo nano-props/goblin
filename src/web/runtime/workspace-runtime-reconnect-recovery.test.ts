@@ -32,7 +32,9 @@ describe('WorkspaceRuntimeReconnectRecovery', () => {
 
     recovery.request()
 
-    await vi.waitFor(() => expect(workspaceTabsRecovery.request).toHaveBeenCalled())
+    await vi.waitFor(() =>
+      expect(workspaceTabsRecovery.request).toHaveBeenCalledWith(expect.anything(), { kind: 'latest' }),
+    )
     expect(order).toEqual(['membership', 'terminal-begin', 'tabs-recover'])
     expect(terminalRecovery.begin).toHaveBeenCalledWith(expect.anything(), { kind: 'reconnect' })
     expect(terminalRecovery.request).not.toHaveBeenCalled()

@@ -90,7 +90,9 @@ describe('workspace pane tabs query', () => {
     writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)
     vi.mocked(workspacePaneTabsClient.list).mockRejectedValueOnce(new Error('tabs unavailable'))
 
-    await expect(refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)).rejects.toThrow(
+    await expect(
+      refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient }),
+    ).rejects.toThrow(
       'tabs unavailable',
     )
 
@@ -166,7 +168,9 @@ describe('workspace pane tabs query', () => {
     writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(8, []), queryClient)
     vi.mocked(workspacePaneTabsClient.list).mockRejectedValueOnce(new Error('tabs unavailable'))
 
-    await expect(refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)).rejects.toThrow(
+    await expect(
+      refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient }),
+    ).rejects.toThrow(
       'tabs unavailable',
     )
 
@@ -180,7 +184,7 @@ describe('workspace pane tabs query', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const request = Promise.withResolvers<WorkspacePaneTabsSnapshot>()
     vi.mocked(workspacePaneTabsClient.list).mockImplementationOnce(async () => await request.promise)
-    const refresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
+    const refresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })
     await vi.waitFor(() => expect(workspacePaneTabsClient.list).toHaveBeenCalledOnce())
 
     const committed = snapshot(9, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])])
@@ -200,7 +204,7 @@ describe('workspace pane tabs query', () => {
     writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)
     const request = Promise.withResolvers<WorkspacePaneTabsSnapshot>()
     vi.mocked(workspacePaneTabsClient.list).mockImplementationOnce(async () => await request.promise)
-    const refresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
+    const refresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })
     await vi.waitFor(() => expect(workspacePaneTabsClient.list).toHaveBeenCalledOnce())
 
     expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)).toBe(true)
@@ -244,9 +248,9 @@ describe('workspace pane tabs query', () => {
       return await request.promise
     })
 
-    const firstRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
+    const firstRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })
     await vi.waitFor(() => expect(requests).toHaveLength(1))
-    const secondRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, queryClient)
+    const secondRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(requests).toHaveLength(1)
 
@@ -254,6 +258,62 @@ describe('workspace pane tabs query', () => {
     await Promise.all([firstRefresh, secondRefresh])
 
     expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
+  })
+
+  test('performs one fresh read when a minimum revision joined an older query', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const requests: Array<ReturnType<typeof Promise.withResolvers<WorkspacePaneTabsSnapshot>>> = []
+    vi.mocked(workspacePaneTabsClient.list).mockImplementation(async () => {
+      const request = Promise.withResolvers<WorkspacePaneTabsSnapshot>()
+      requests.push(request)
+      return await request.promise
+    })
+
+    const initial = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })
+    await vi.waitFor(() => expect(requests).toHaveLength(1))
+    const required = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, {
+      queryClient,
+      minimumRevision: 5,
+    })
+    requests[0]!.resolve(snapshot(4, []))
+    await initial
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+
+    requests[1]!.resolve(snapshot(5, []))
+    await required
+
+    expect(
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(
+        workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID),
+      )?.revision,
+    ).toBe(5)
+  })
+
+  test('fails after one fresh read cannot satisfy a published minimum revision', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const requests: Array<ReturnType<typeof Promise.withResolvers<WorkspacePaneTabsSnapshot>>> = []
+    vi.mocked(workspacePaneTabsClient.list).mockImplementation(async () => {
+      const request = Promise.withResolvers<WorkspacePaneTabsSnapshot>()
+      requests.push(request)
+      return await request.promise
+    })
+
+    const initial = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })
+    await vi.waitFor(() => expect(requests).toHaveLength(1))
+    const required = refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, {
+      queryClient,
+      minimumRevision: 5,
+    })
+    requests[0]!.resolve(snapshot(4, []))
+    await initial
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+
+    requests[1]!.resolve(snapshot(4, []))
+    await expect(required).rejects.toThrow('required revision 5; received 4')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(requests).toHaveLength(2)
+    expect(queryClient.getQueryState(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))?.status).toBe('error')
   })
 
   test('query structural sharing rejects a lower-revision fetch result', async () => {

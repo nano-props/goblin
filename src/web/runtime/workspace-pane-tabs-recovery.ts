@@ -4,14 +4,21 @@ import type { RuntimeProjectionScope } from '#/web/runtime/runtime-projection-sc
 const WORKSPACE_TABS_REFRESH_LANE = 'workspace-tabs-refresh'
 
 export interface WorkspacePaneTabsRecoveryDependencies {
-  refresh: (target: RuntimeProjectionScope['target']) => Promise<void>
+  refresh: (
+    target: RuntimeProjectionScope['target'],
+    requirement: WorkspacePaneTabsRecoveryRequirement,
+  ) => Promise<void>
   currentRevision: (target: RuntimeProjectionScope['target']) => number | null
   logFailure: (target: RuntimeProjectionScope['target'], error: unknown) => void
 }
 
 export interface WorkspacePaneTabsRecoveryActions {
-  request(scope: RuntimeProjectionScope): void
+  request(scope: RuntimeProjectionScope, requirement: WorkspacePaneTabsRecoveryRequirement): void
 }
+
+export type WorkspacePaneTabsRecoveryRequirement =
+  | { kind: 'latest' }
+  | { kind: 'minimum-revision'; revision: number }
 
 export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActions {
   private readonly dependencies: WorkspacePaneTabsRecoveryDependencies
@@ -20,10 +27,10 @@ export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActio
     this.dependencies = dependencies
   }
 
-  request(scope: RuntimeProjectionScope): void {
+  request(scope: RuntimeProjectionScope, requirement: WorkspacePaneTabsRecoveryRequirement): void {
     scope.runLatest(
       WORKSPACE_TABS_REFRESH_LANE,
-      async () => await this.dependencies.refresh(scope.target),
+      async () => await this.dependencies.refresh(scope.target, requirement),
       () => {},
       (error) => this.dependencies.logFailure(scope.target, error),
     )
@@ -37,6 +44,10 @@ export class WorkspacePaneTabsRecovery implements WorkspacePaneTabsRecoveryActio
     ) {
       return
     }
-    this.request(scope)
+    const requirement: WorkspacePaneTabsRecoveryRequirement =
+      message.change === 'revision' && message.workspaceRuntimeId === scope.target.workspaceRuntimeId
+        ? { kind: 'minimum-revision', revision: message.revision }
+        : { kind: 'latest' }
+    this.request(scope, requirement)
   }
 }

@@ -17,8 +17,8 @@ describe('WorkspacePaneTabsRecovery', () => {
       logFailure: vi.fn(),
     })
 
-    recovery.request(new RuntimeProjectionScope(TARGET, () => true))
-    await vi.waitFor(() => expect(refresh).toHaveBeenCalledWith(TARGET))
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'latest' })
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledWith(TARGET, { kind: 'latest' }))
   })
 
   test('skips a revision event already represented by the cache', () => {
@@ -58,7 +58,7 @@ describe('WorkspacePaneTabsRecovery', () => {
       revision: 1,
     })
 
-    await vi.waitFor(() => expect(refresh).toHaveBeenCalled())
+    await vi.waitFor(() => expect(refresh).toHaveBeenCalledWith(TARGET, { kind: 'latest' }))
   })
 
   test('reruns after an in-flight refresh when a newer revision is announced', async () => {
@@ -71,7 +71,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     })
     const scope = new RuntimeProjectionScope(TARGET, () => true)
 
-    recovery.request(scope)
+    recovery.request(scope, { kind: 'latest' })
     await vi.waitFor(() => expect(refresh).toHaveBeenCalledOnce())
     recovery.handleChanged(scope, {
       type: 'workspace-pane-tabs.changed',
@@ -83,6 +83,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     firstRefresh.resolve()
 
     await vi.waitFor(() => expect(refresh).toHaveBeenCalledTimes(2))
+    expect(refresh).toHaveBeenLastCalledWith(TARGET, { kind: 'minimum-revision', revision: 5 })
   })
 
   test('logs a query-owned refresh failure for the active runtime scope', async () => {
@@ -94,7 +95,7 @@ describe('WorkspacePaneTabsRecovery', () => {
       logFailure,
     })
 
-    recovery.request(new RuntimeProjectionScope(TARGET, () => true))
+    recovery.request(new RuntimeProjectionScope(TARGET, () => true), { kind: 'latest' })
 
     await vi.waitFor(() => expect(logFailure).toHaveBeenCalledWith(TARGET, error))
   })
@@ -110,7 +111,7 @@ describe('WorkspacePaneTabsRecovery', () => {
     })
     const scope = new RuntimeProjectionScope(TARGET, () => current)
 
-    recovery.request(scope)
+    recovery.request(scope, { kind: 'latest' })
     current = false
     request.reject(new Error('stale failure'))
     await new Promise((resolve) => setTimeout(resolve, 0))

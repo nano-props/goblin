@@ -59,8 +59,12 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
         appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { error }),
     })
     const workspaceTabsRecovery = new WorkspacePaneTabsRecovery({
-      refresh: async (target) =>
-        await refreshWorkspacePaneTabsQueryData(target.workspaceId, target.workspaceRuntimeId),
+      refresh: async (target, requirement) =>
+        await refreshWorkspacePaneTabsQueryData(
+          target.workspaceId,
+          target.workspaceRuntimeId,
+          { minimumRevision: requirement.kind === 'minimum-revision' ? requirement.revision : null },
+        ),
       currentRevision: (target) => workspacePaneTabsProjectionRevision(target.workspaceId, target.workspaceRuntimeId),
       logFailure: (target, error) => {
         appRuntimeProjectionLog.debug('failed to refresh workspace pane tabs', { ...target, error })
@@ -92,7 +96,7 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
     provideWorkspacePaneTabsRetryActions({
       retryWorkspace(workspaceId) {
         const scope = projectionScopeForWorkspace(workspaceId)
-        if (scope) workspaceTabsRecovery.request(scope)
+        if (scope) workspaceTabsRecovery.request(scope, { kind: 'latest' })
       },
     })
 

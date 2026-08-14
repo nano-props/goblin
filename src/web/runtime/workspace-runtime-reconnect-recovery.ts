@@ -43,7 +43,7 @@ export class WorkspaceRuntimeReconnectRecovery {
         if (this.dependencies.currentWorkspaceRuntimeId(target.workspaceId) !== target.workspaceRuntimeId) continue
         const scope = this.dependencies.scopeRegistry.scopeFor(target)
         this.dependencies.terminalRecovery.begin(scope, { kind: 'reconnect' })
-        this.dependencies.workspaceTabsRecovery.request(scope)
+        this.dependencies.workspaceTabsRecovery.request(scope, { kind: 'latest' })
       }
     } catch (error) {
       if (generation === this.generation) this.dependencies.logFailure(error)
