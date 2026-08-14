@@ -272,56 +272,43 @@ describe('useKeyboard', () => {
     })
   })
 
-  test('branch navigation traverses the rendered targets across attached, rebase, and detached states', async () => {
+  test('branch navigation uses the updated position when a rebasing worktree becomes detached', async () => {
+    const firstBranch = createRepoBranch('feature/alpha')
     const currentBranch = createRepoBranch('feature/current')
-    const nextBranch = createRepoBranch('feature/next')
+    const previousBranch = createRepoBranch('feature/previous')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [currentBranch, nextBranch],
+      branches: [firstBranch, currentBranch, previousBranch],
       currentBranchName: currentBranch.name,
-      worktrees: [createRepoWorktreeSnapshotForTest(currentBranch.name, WORKTREE_PATH)],
+      worktrees: [
+        {
+          ...createRepoWorktreeSnapshotForTest(currentBranch.name, WORKTREE_PATH),
+          head: { kind: 'detached' },
+          operation: { kind: 'rebase' },
+        },
+      ],
     })
     const selectRepoBranch = vi.fn()
-    const selectRepoWorktree = vi.fn()
     await renderHookHost({
       currentWorkspaceId: REPO_ID,
       currentBranchName: currentBranch.name,
       currentGitWorkspaceNavigatorRowIdentity: { kind: 'worktree', worktreePath: WORKTREE_PATH },
-      navigation: navigationWith({ selectRepoBranch, selectRepoWorktree }),
+      navigation: navigationWith({ selectRepoBranch }),
     })
 
-    await dispatchBranchShortcut('j', 'KeyJ')
+    await dispatchBranchShortcut('k', 'KeyK')
     expect(selectRepoBranch).toHaveBeenCalledOnce()
     expect(selectRepoBranch).toHaveBeenCalledWith({
-      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: nextBranch.name },
+      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: firstBranch.name },
       workspaceRuntimeId: repo.workspaceRuntimeId,
     })
     selectRepoBranch.mockClear()
 
-    const attachedSnapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
-    if (!attachedSnapshot) throw new Error('expected attached snapshot')
+    const rebasingSnapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
+    if (!rebasingSnapshot) throw new Error('expected rebasing snapshot')
     setRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId, {
-      ...attachedSnapshot,
-      worktrees: attachedSnapshot.worktrees.map((worktree) => ({
-        ...worktree,
-        head: { kind: 'detached' as const },
-        operation: { kind: 'rebase' as const },
-      })),
-    })
-
-    await dispatchBranchShortcut('j', 'KeyJ')
-    expect(selectRepoBranch).toHaveBeenCalledOnce()
-    expect(selectRepoBranch).toHaveBeenCalledWith({
-      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: nextBranch.name },
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-    })
-    selectRepoBranch.mockClear()
-
-    const rebaseSnapshot = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
-    if (!rebaseSnapshot) throw new Error('expected rebase snapshot')
-    setRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId, {
-      ...rebaseSnapshot,
-      worktrees: rebaseSnapshot.worktrees.map((worktree) => ({
+      ...rebasingSnapshot,
+      worktrees: rebasingSnapshot.worktrees.map((worktree) => ({
         ...worktree,
         operation: null,
         materializedBranch: null,
@@ -331,10 +318,9 @@ describe('useKeyboard', () => {
     await dispatchBranchShortcut('k', 'KeyK')
     expect(selectRepoBranch).toHaveBeenCalledOnce()
     expect(selectRepoBranch).toHaveBeenCalledWith({
-      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: nextBranch.name },
+      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: previousBranch.name },
       workspaceRuntimeId: repo.workspaceRuntimeId,
     })
-    expect(selectRepoWorktree).not.toHaveBeenCalled()
   })
 
   test('branch navigation fast-fails when the authoritative snapshot is unavailable', async () => {

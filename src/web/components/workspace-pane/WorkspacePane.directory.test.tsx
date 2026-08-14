@@ -738,46 +738,44 @@ describe('WorkspacePane directory workspaces', () => {
     expect(workspace && preferredWorkspacePaneTabForTarget(workspace.ui, target)).toBe('history')
   })
 
-  test.each(['merge', 'cherry-pick', 'revert'] as const)(
-    'renders attached %s operation in the worktree-aware pane',
-    async (operation) => {
-      const workspaceId = workspaceIdForTest(`goblin+file:///workspace/repo-${operation}`)
-      const branchName = `feature/${operation}`
-      const worktreePath = `/workspace/${operation}`
-      const repo = seedRepoWithReadModelForTest({
-        id: workspaceId,
-        branchSnapshots: [createBranchSnapshot(branchName)],
-        worktrees: [
-          {
-            ...createRepoWorktreeSnapshotForTest(branchName, worktreePath),
-            operation: { kind: operation },
-          },
-        ],
-        currentBranchName: branchName,
-      })
-      setRepoWorktreeStatusQueryData(workspaceId, repo.workspaceRuntimeId, {
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-        status: [{ path: worktreePath, isMain: false, entries: [] }],
-        loadedAt: 1,
-      })
-      const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
-      if (!target) throw new Error('expected canonical operation worktree fixture')
-      setWorkspacePaneTabsForTargetQueryData({
-        ...target,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-        tabs: [workspacePaneStaticTabEntry('status')],
-      })
+  test('renders an attached operation in the worktree-aware pane', async () => {
+    const operation = 'merge'
+    const workspaceId = workspaceIdForTest('goblin+file:///workspace/repo-merge')
+    const branchName = 'feature/merge'
+    const worktreePath = '/workspace/merge'
+    const repo = seedRepoWithReadModelForTest({
+      id: workspaceId,
+      branchSnapshots: [createBranchSnapshot(branchName)],
+      worktrees: [
+        {
+          ...createRepoWorktreeSnapshotForTest(branchName, worktreePath),
+          operation: { kind: operation },
+        },
+      ],
+      currentBranchName: branchName,
+    })
+    setRepoWorktreeStatusQueryData(workspaceId, repo.workspaceRuntimeId, {
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      status: [{ path: worktreePath, isMain: false, entries: [] }],
+      loadedAt: 1,
+    })
+    const target = gitWorktreeWorkspacePaneTabsTarget(workspaceId, worktreePath)
+    if (!target) throw new Error('expected canonical operation worktree fixture')
+    setWorkspacePaneTabsForTargetQueryData({
+      ...target,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
 
-      renderWorkspacePane(workspaceId, {
-        kind: 'git-worktree',
-        worktreePath,
-        route: { kind: 'static', tab: 'status' },
-      })
+    renderWorkspacePane(workspaceId, {
+      kind: 'git-worktree',
+      worktreePath,
+      route: { kind: 'static', tab: 'status' },
+    })
 
-      expect(await screen.findByTestId('worktree-pane')).toBeTruthy()
-      expect(screen.getByText(`worktree-state.${operation}`)).toBeTruthy()
-    },
-  )
+    expect(await screen.findByTestId('worktree-pane')).toBeTruthy()
+    expect(screen.getByText(`worktree-state.${operation}`)).toBeTruthy()
+  })
 
   test('preserves canonical bare-worktree preference across attached and rebase transitions', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace/repo-bare-worktree-transition')

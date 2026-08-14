@@ -273,12 +273,16 @@ describe('repo response schemas', () => {
         { ...worktree, head: { kind: 'detached' }, operation: { kind: 'rebase' }, materializedBranch: 'missing' },
       ]),
     ).toBe(false)
-    expect(
-      parses([
-        worktree,
-        { ...worktree, path: '/workspace/linked', head: { kind: 'detached' }, materializedBranch: 'main' },
-      ]),
-    ).toBe(false)
+    const duplicateMaterializedBranchWorktree = {
+      ...worktree,
+      path: '/workspace/linked',
+      head: { kind: 'detached' as const },
+      operation: { kind: 'rebase' as const },
+      materializedBranch: 'main',
+      isPrimary: false,
+    }
+    expect(parses([duplicateMaterializedBranchWorktree])).toBe(true)
+    expect(parses([worktree, duplicateMaterializedBranchWorktree])).toBe(false)
     expect(
       parses([
         worktree,

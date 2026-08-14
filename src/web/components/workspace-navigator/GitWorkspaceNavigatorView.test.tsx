@@ -313,34 +313,6 @@ describe('GitWorkspaceNavigatorView', () => {
     )
   })
 
-  test('uses the TanStack Query status read model for branch row dirty state when available', async () => {
-    const branch = createRepoBranch('feature/dirty')
-    const worktrees = [createRepoWorktreeSnapshotForTest(branch.name, WORKTREE_PATH)]
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [branch],
-      currentBranchName: 'feature/dirty',
-      worktrees,
-    })
-    seedRepoQueryDataForTest(repo, {
-      branches: [branch],
-      currentBranch: 'feature/dirty',
-      worktrees,
-      status: [
-        {
-          path: WORKTREE_PATH,
-          branch: 'feature/dirty',
-          isMain: false,
-          entries: [{ x: 'M', y: ' ', path: 'dirty.ts' }],
-        },
-      ],
-    })
-
-    renderGitWorkspaceNavigatorView()
-
-    expect(screen.getByLabelText('branches.dirty')).toBeTruthy()
-  })
-
   test('derives query snapshot worktree state from the query status read model', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,

@@ -772,53 +772,6 @@ describe('openWorkspacePaneTab', () => {
     expect(openers[openerScopeKey(REPO_ID, 'feature/b', null)]).toBeUndefined()
   })
 
-  test('does not record an opener when the server rejects a stale workspace runtime commit', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branchSnapshots: [createBranchSnapshot('feature/a')],
-      worktrees: [createRepoWorktreeSnapshotForTest('feature/a', WORKTREE_PATH)],
-      currentBranchName: 'feature/a',
-      preferredWorkspacePaneTab: 'files',
-      workspacePaneTabsByBranch: {
-        'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
-      },
-    })
-    let rejectCommit!: (error: unknown) => void
-    let resolveCommitStarted!: () => void
-    const commitStarted = new Promise<void>((resolve) => {
-      resolveCommitStarted = resolve
-    })
-    installWorkspacePaneTabsTestBridge({
-      updateWorkspaceTabs: () => {
-        resolveCommitStarted()
-        return new Promise((_, reject) => {
-          rejectCommit = reject
-        })
-      },
-    })
-
-    const openPromise = openWorkspacePaneTab({
-      workspacePaneRoute: undefined,
-      workspaceId: REPO_ID,
-      branchName: 'feature/a',
-      worktreePath: WORKTREE_PATH,
-      type: 'changes',
-      navigation: navigationWithStoreActions(),
-    })
-    await commitStarted
-
-    await workspacesStore.getState().closeWorkspace(REPO_ID)
-    rejectCommit(new Error('error.workspace-runtime-stale'))
-    await expect(openPromise).resolves.toBe(false)
-
-    expect(
-      workspacesStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)],
-    ).toBeUndefined()
-    expect(feedbackMocks.error).toHaveBeenCalledWith('error.workspace-operation-failed', {
-      id: 'workspace-pane-tab-open-failed',
-    })
-  })
-
   test('surfaces an indeterminate static tab mutation and stops presentation', async () => {
     seedWorktreeRepo('status')
     installWorkspacePaneTabsTestBridge({
@@ -889,6 +842,7 @@ describe('openWorkspacePaneTab', () => {
       type: 'changes',
       navigation: navigationWithStoreActions(showRepoBranchWorkspacePaneTab),
     })
+    const staleOpenerScopeKey = openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)
     await commitStarted
 
     await workspacesStore.getState().closeWorkspace(REPO_ID)
@@ -908,6 +862,10 @@ describe('openWorkspacePaneTab', () => {
 
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(preferredWorkspacePaneTab('feature/reopened')).toBe('status')
+    expect(workspacesStore.getState().tabOpenerIdentityByScope[staleOpenerScopeKey]).toBeUndefined()
+    expect(feedbackMocks.error).toHaveBeenCalledWith('error.workspace-operation-failed', {
+      id: 'workspace-pane-tab-open-failed',
+    })
   })
 
   test('does not select a stale opened tab when the old workspace runtime commit succeeds after reopen', async () => {
