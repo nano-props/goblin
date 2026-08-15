@@ -6,7 +6,7 @@ import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
-import { provideFullscreenLoadingPresentation } from '#/web/app/bootstrap/fullscreen-loading-presentation.ts'
+import { provideBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { postServerCommandJson } from '#/web/lib/server-fetch.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
@@ -40,35 +40,35 @@ describe('TokenGate', () => {
     renderTokenGate()
 
     expect(screen.getByText('private app')).toBeTruthy()
-    expect(screen.getByTestId('fullscreen-loading-active').textContent).toBe('true')
+    expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('true')
   })
 
-  test('leaves the initial loading presentation mounted while authentication is checking', () => {
+  test('leaves the bootstrap loading presentation visible while authentication is checking', () => {
     authMock.status.state = 'checking'
 
     const result = renderTokenGate()
 
     expect(result.container.querySelector('[role="status"]')).toBeNull()
-    expect(screen.getByTestId('fullscreen-loading-active').textContent).toBe('true')
+    expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('true')
   })
 
-  test('settles the initial loading presentation before showing login', async () => {
+  test('hides the bootstrap loading presentation before showing login', async () => {
     renderTokenGate()
 
     expect(screen.getByRole('button', { name: 'auth.gate.sign-in' })).toBeTruthy()
-    await waitFor(() => expect(screen.getByTestId('fullscreen-loading-active').textContent).toBe('false'))
+    await waitFor(() => expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('false'))
   })
 
   test('reactivates loading for login auth checking and leaves it active for the workspace handoff', async () => {
     renderTokenGate()
-    await waitFor(() => expect(screen.getByTestId('fullscreen-loading-active').textContent).toBe('false'))
+    await waitFor(() => expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('false'))
 
     authMock.status.state = 'checking'
-    await waitFor(() => expect(screen.getByTestId('fullscreen-loading-active').textContent).toBe('true'))
+    await waitFor(() => expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('true'))
 
     authMock.status.state = 'authenticated'
     await waitFor(() => expect(screen.getByText('private app')).toBeTruthy())
-    expect(screen.getByTestId('fullscreen-loading-active').textContent).toBe('true')
+    expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('true')
   })
 
   test('shows an empty-token error without calling the server', async () => {
@@ -146,21 +146,21 @@ function renderLoginForm() {
 
 function renderTokenGate() {
   return renderInJsdom(
-    <FullscreenLoadingTestScope>
+    <BootstrapLoadingTestScope>
       <TokenGate>
         <div>private app</div>
       </TokenGate>
-    </FullscreenLoadingTestScope>,
+    </BootstrapLoadingTestScope>,
   )
 }
 
-const FullscreenLoadingTestScope = defineComponent({
-  name: 'FullscreenLoadingTestScope',
+const BootstrapLoadingTestScope = defineComponent({
+  name: 'BootstrapLoadingTestScope',
   setup(_props, { slots }) {
-    const fullscreenLoading = provideFullscreenLoadingPresentation()
+    const bootstrapLoading = provideBootstrapLoadingPresentation()
     return () => (
       <>
-        <span data-testid="fullscreen-loading-active">{String(fullscreenLoading.active.value)}</span>
+        <span data-testid="bootstrap-loading-visible">{String(bootstrapLoading.visible.value)}</span>
         {slots.default?.()}
       </>
     )

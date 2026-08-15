@@ -10,8 +10,8 @@ let hydrateI18n: ReturnType<typeof vi.fn>
 let hydrateHostInfo: ReturnType<typeof vi.fn>
 let appMount: ReturnType<typeof vi.fn>
 let appUnmount: ReturnType<typeof vi.fn>
-let beginFullscreenLoading: (() => void) | null
-let finishFullscreenLoading: (() => void) | null
+let showBootstrapLoading: (() => void) | null
+let hideBootstrapLoading: (() => void) | null
 let routerRenderError: Error | null
 let disposeWebApp: (() => void) | null
 
@@ -23,8 +23,8 @@ beforeEach(() => {
   hydrateHostInfo = vi.fn().mockResolvedValue(undefined)
   appMount = vi.fn()
   appUnmount = vi.fn()
-  beginFullscreenLoading = null
-  finishFullscreenLoading = null
+  showBootstrapLoading = null
+  hideBootstrapLoading = null
   routerRenderError = null
   disposeWebApp = null
 
@@ -48,15 +48,15 @@ beforeEach(() => {
     goblinLog: { error: vi.fn() },
   }))
   vi.doMock('#/web/app/navigation/router.tsx', async () => {
-    const { useFullscreenLoadingPresentation } = await import('#/web/app/bootstrap/fullscreen-loading-presentation.ts')
+    const { useBootstrapLoadingPresentation } = await import('#/web/app/bootstrap/bootstrap-loading-presentation.ts')
     return {
       appRouter: { install: vi.fn() },
       AppRouterProvider: defineComponent({
         name: 'TestAppRouterProvider',
         setup() {
-          const fullscreenLoading = useFullscreenLoadingPresentation()
-          beginFullscreenLoading = fullscreenLoading.begin
-          finishFullscreenLoading = fullscreenLoading.finish
+          const bootstrapLoading = useBootstrapLoadingPresentation()
+          showBootstrapLoading = bootstrapLoading.show
+          hideBootstrapLoading = bootstrapLoading.hide
           onMounted(appMount)
           onUnmounted(appUnmount)
           return () => {
@@ -137,6 +137,7 @@ describe('client entrypoint', () => {
     const initialSpinner = initialStatus?.querySelector('svg')
     expect(initialStatus).not.toBeNull()
     expect(initialSpinner).not.toBeNull()
+    expect(initialStatus?.parentElement?.className).toContain('z-40')
 
     hydration.resolve()
     await hydration.promise
@@ -146,23 +147,23 @@ describe('client entrypoint', () => {
     expect(document.querySelector('[role="status"]')).toBe(initialStatus)
     expect(document.querySelector('[role="status"] svg')).toBe(initialSpinner)
 
-    finishFullscreenLoading?.()
+    hideBootstrapLoading?.()
     await waitFor(() => expect(document.querySelector('[role="status"]')).toBeNull())
   })
 
-  test('uses the same loading node across a re-entrant authentication and workspace handoff', async () => {
+  test('keeps a re-shown loading node mounted across repeated show requests', async () => {
     await loadMain()
     await waitFor(() => expect(document.body.textContent).toContain('app mounted'))
 
     const initialStatus = document.querySelector('[role="status"]')
-    finishFullscreenLoading?.()
+    hideBootstrapLoading?.()
     await waitFor(() => expect(document.querySelector('[role="status"]')).toBeNull())
 
-    beginFullscreenLoading?.()
+    showBootstrapLoading?.()
     await waitFor(() => expect(document.querySelector('[role="status"]')).not.toBeNull())
     const reenteredStatus = document.querySelector('[role="status"]')
 
-    beginFullscreenLoading?.()
+    showBootstrapLoading?.()
     expect(document.querySelector('[role="status"]')).toBe(reenteredStatus)
     expect(reenteredStatus).not.toBe(initialStatus)
   })
@@ -174,6 +175,20 @@ describe('client entrypoint', () => {
 
     await waitFor(() => expect(document.body.textContent).toContain('router render failed'))
     expect(document.querySelector('[role="status"]')).toBeNull()
+  })
+
+  test('removes an active bootstrap loading presentation when the app unmounts', async () => {
+    const hydration = Promise.withResolvers<void>()
+    hydrateI18n.mockReturnValue(hydration.promise)
+
+    await loadMain()
+
+    expect(document.querySelector('[role="status"]')).not.toBeNull()
+    disposeWebApp?.()
+    disposeWebApp = null
+    expect(document.getElementById('root')?.childElementCount).toBe(0)
+
+    hydration.resolve()
   })
 
   test('offers retry when the initial hydration fails', async () => {

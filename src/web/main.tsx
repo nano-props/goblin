@@ -11,7 +11,7 @@ import { i18nStore } from '#/web/stores/i18n.ts'
 import { appI18n, startI18nProjection } from '#/web/stores/i18n-vue.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { createWebBootstrapOwner, startWebBootstrap } from '#/web/app/bootstrap/lifecycle.ts'
-import { provideFullscreenLoadingPresentation } from '#/web/app/bootstrap/fullscreen-loading-presentation.ts'
+import { provideBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { vueAppErrorHandler } from '#/web/app/errors/vue-error-handler.ts'
@@ -35,7 +35,7 @@ const phase = shallowRef<BootstrapPhase>({ kind: 'loading' })
 const Root = defineComponent({
   name: 'Root',
   setup() {
-    const fullscreenLoading = provideFullscreenLoadingPresentation()
+    const bootstrapLoading = provideBootstrapLoadingPresentation()
     return () => {
       const currentPhase = phase.value
       const content =
@@ -51,15 +51,15 @@ const Root = defineComponent({
             {import.meta.env.DEV ? <VueQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" /> : null}
           </>
         ) : null
-      const showInitialLoading =
-        currentPhase.kind === 'loading' || (currentPhase.kind === 'ready' && fullscreenLoading.active.value)
+      const showBootstrapLoading =
+        currentPhase.kind === 'loading' || (currentPhase.kind === 'ready' && bootstrapLoading.visible.value)
 
       return (
         <ErrorBoundary>
           <div class="relative h-full">
             {content}
-            {showInitialLoading ? (
-              <div key="fullscreen-loading" class="absolute inset-0 z-40">
+            {showBootstrapLoading ? (
+              <div key="bootstrap-loading" class="absolute inset-0 z-40">
                 <BootLoading />
               </div>
             ) : null}

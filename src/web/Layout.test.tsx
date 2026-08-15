@@ -2,7 +2,7 @@
 
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { QueryClient } from '@tanstack/vue-query'
-import { defineComponent, ref } from 'vue'
+import { defineComponent, reactive, ref } from 'vue'
 import { userEvent } from '@testing-library/user-event'
 import { waitFor } from '@testing-library/vue'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -13,12 +13,20 @@ import { useWorkspaceTerminalBellCounts } from '#/web/terminal/components/termin
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authenticated.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
-import { provideFullscreenLoadingPresentation } from '#/web/app/bootstrap/fullscreen-loading-presentation.ts'
+import { provideBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
+import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 const authenticatedBootstrapMock = vi.hoisted(() => ({
   retry: vi.fn(),
 }))
+const authMock = vi.hoisted(() => ({
+  status: null as unknown as {
+    state: 'checking' | 'authenticated' | 'unauthenticated'
+    refresh: ReturnType<typeof vi.fn>
+  },
+}))
+const workspaceOpenDialogMock = vi.hoisted(() => ({ renderError: null as Error | null }))
 const authenticatedBootstrapState = ref<AuthenticatedAppBootstrapState>({ status: 'ready' })
 const clientIntentIngress = vi.hoisted(() => ({
   listeners: new Set<(intent: { type: string }) => void>(),
@@ -27,13 +35,8 @@ const clientIntentIngress = vi.hoisted(() => ({
 const clientWorkspacePersistence = vi.hoisted(() => vi.fn())
 const layoutQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
-vi.mock('#/web/components/TokenGate.tsx', () => ({
-  TokenGate: defineComponent({
-    name: 'TokenGateMock',
-    setup(_props, { slots }) {
-      return () => slots.default?.()
-    },
-  }),
+vi.mock('#/web/auth/AuthProvider.tsx', () => ({
+  useAuth: () => authMock.status,
 }))
 
 vi.mock('#/web/app/bootstrap/authenticated.ts', () => ({
@@ -63,7 +66,10 @@ vi.mock('#/web/components/WorkspaceOpenDialog.tsx', async () => {
       name: 'WorkspaceOpenDialogMock',
       props: ['open'],
       setup(props) {
-        return () => (props.open ? <span data-testid="workspace-open-dialog" /> : null)
+        return () => {
+          if (workspaceOpenDialogMock.renderError) throw workspaceOpenDialogMock.renderError
+          return props.open ? <span data-testid="workspace-open-dialog" /> : null
+        }
       },
     }),
   }
@@ -156,6 +162,11 @@ const SettingsRetainedOutletTerminalConsumer = defineComponent({
 })
 
 beforeEach(() => {
+  authMock.status = reactive({
+    state: 'authenticated' as 'checking' | 'authenticated' | 'unauthenticated',
+    refresh: vi.fn(),
+  })
+  workspaceOpenDialogMock.renderError = null
   authenticatedBootstrapState.value = { status: 'ready' }
   authenticatedBootstrapMock.retry.mockReset()
   clientIntentIngress.listeners.clear()
@@ -205,7 +216,7 @@ describe('Layout shell providers', () => {
     expect(getByTestId('settings-retained-terminal-consumer').textContent).toBe('4')
   })
 
-  test('keeps root loading active before mounting the workspace shell', async () => {
+  test('keeps bootstrap loading visible before mounting the workspace shell', async () => {
     authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     const router = createRouter({
       history: createMemoryHistory(),
@@ -215,7 +226,7 @@ describe('Layout shell providers', () => {
     await router.isReady()
     const { queryByText } = renderLayout(router)
 
-    expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('true')
+    expect(document.querySelector('[data-testid="bootstrap-loading-visible"]')?.textContent).toBe('true')
     expect(queryByText('workspace')).toBeNull()
   })
 
@@ -227,16 +238,16 @@ describe('Layout shell providers', () => {
     })
     await router.push('/')
     await router.isReady()
-    const { queryByText } = renderLayout(router, { fullscreenLoadingActive: false })
+    const { queryByText } = renderLayout(router, { bootstrapLoadingVisible: false })
 
     expect(queryByText('Restoring workspace')).toBeNull()
     expect(queryByText('workspace')).toBeNull()
     await waitFor(() =>
-      expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('true'),
+      expect(document.querySelector('[data-testid="bootstrap-loading-visible"]')?.textContent).toBe('true'),
     )
   })
 
-  test('finishes root loading when workspace restore completes', async () => {
+  test('hides bootstrap loading when workspace restore completes', async () => {
     authenticatedBootstrapState.value = { status: 'ready' }
     const router = createRouter({
       history: createMemoryHistory(),
@@ -248,11 +259,11 @@ describe('Layout shell providers', () => {
 
     expect(getByText('workspace')).toBeDefined()
     await waitFor(() =>
-      expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('false'),
+      expect(document.querySelector('[data-testid="bootstrap-loading-visible"]')?.textContent).toBe('false'),
     )
   })
 
-  test('finishes root loading when the settings surface can take over', async () => {
+  test('hides bootstrap loading when the settings surface can take over', async () => {
     authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     const router = createRouter({
       history: createMemoryHistory(),
@@ -264,7 +275,7 @@ describe('Layout shell providers', () => {
 
     expect(getByText('settings')).toBeDefined()
     await waitFor(() =>
-      expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('false'),
+      expect(document.querySelector('[data-testid="bootstrap-loading-visible"]')?.textContent).toBe('false'),
     )
   })
 
@@ -279,13 +290,13 @@ describe('Layout shell providers', () => {
     })
     await router.push('/settings-unknown')
     await router.isReady()
-    const { getByText, queryByText } = renderLayout(router)
+    const { queryByText } = renderLayout(router)
 
-    expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('true')
+    expect(document.querySelector('[data-testid="bootstrap-loading-visible"]')?.textContent).toBe('true')
     expect(queryByText('settings')).toBeNull()
   })
 
-  test('reactivates root loading when leaving settings before workspace restore completes', async () => {
+  test('shows bootstrap loading when leaving settings before workspace restore completes', async () => {
     authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     const router = createRouter({
       history: createMemoryHistory(),
@@ -298,57 +309,132 @@ describe('Layout shell providers', () => {
     await router.isReady()
     renderLayout(router)
     await waitFor(() =>
-      expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('false'),
+      expect(document.querySelector('[data-testid="bootstrap-loading-visible"]')?.textContent).toBe('false'),
     )
 
     await flushTestUpdates(async () => await router.push('/'))
 
-    expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('true')
+    expect(document.querySelector('[data-testid="bootstrap-loading-visible"]')?.textContent).toBe('true')
   })
 
-  test('shows workspace restore failure and exposes the authoritative retry action', async () => {
-    const user = userEvent.setup()
-    authenticatedBootstrapState.value = { status: 'failed', message: 'Workspace restore failed for test' }
+  test('keeps one loading node across the authentication and workspace restore handoff', async () => {
+    authMock.status.state = 'unauthenticated'
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', name: 'home', component: { template: '<div>workspace</div>' } }],
     })
     await router.push('/')
     await router.isReady()
-    const { getByRole, getByText } = renderLayout(router)
+    renderLayout(router)
+
+    await waitFor(() => expect(document.querySelector('[role="status"]')).toBeNull())
+
+    await flushTestUpdates(() => {
+      authMock.status.state = 'checking'
+    })
+    const authenticationStatus = document.querySelector('[role="status"]')
+    const authenticationSpinner = authenticationStatus?.querySelector('svg')
+    expect(authenticationStatus).not.toBeNull()
+    expect(authenticationSpinner).not.toBeNull()
+
+    await flushTestUpdates(() => {
+      authMock.status.state = 'authenticated'
+    })
+
+    expect(document.querySelector('[role="status"]')).toBe(authenticationStatus)
+    expect(document.querySelector('[role="status"] svg')).toBe(authenticationSpinner)
+
+    await flushTestUpdates(() => {
+      authenticatedBootstrapState.value = { status: 'ready' }
+    })
+
+    await waitFor(() => expect(document.querySelector('[role="status"]')).toBeNull())
+  })
+
+  test('shows loading throughout workspace restore retry and hides it when ready', async () => {
+    const user = userEvent.setup()
+    authenticatedBootstrapState.value = { status: 'failed', message: 'Workspace restore failed for test' }
+    authenticatedBootstrapMock.retry.mockImplementationOnce(() => {
+      authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', name: 'home', component: { template: '<div>workspace</div>' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+    const { getByRole, getByText, queryByText } = renderLayout(router)
 
     expect(getByText('Workspace restore failed for test')).toBeDefined()
     await waitFor(() =>
-      expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('false'),
+      expect(document.querySelector('[data-testid="bootstrap-loading-visible"]')?.textContent).toBe('false'),
     )
     await user.click(getByRole('button'))
     expect(authenticatedBootstrapMock.retry).toHaveBeenCalledOnce()
+    await waitFor(() => expect(document.querySelector('[role="status"]')).not.toBeNull())
+    expect(queryByText('Workspace restore failed for test')).toBeNull()
+
+    await flushTestUpdates(() => {
+      authenticatedBootstrapState.value = { status: 'ready' }
+    })
+
+    expect(getByText('workspace')).toBeDefined()
+    await waitFor(() => expect(document.querySelector('[role="status"]')).toBeNull())
+  })
+
+  test('reveals an inner render failure and restores loading when the boundary retries', async () => {
+    const user = userEvent.setup()
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    workspaceOpenDialogMock.renderError = new Error('layout overlay render failed')
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', name: 'home', component: { template: '<div>workspace</div>' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+    const { getByRole, getByText, queryByText } = renderLayout(router)
+
+    await waitFor(() => expect(getByText('layout overlay render failed')).toBeDefined())
+    expect(document.querySelector('[role="status"]')).toBeNull()
+
+    workspaceOpenDialogMock.renderError = null
+    await user.click(getByRole('button'))
+
+    await waitFor(() => expect(document.querySelector('[role="status"]')).not.toBeNull())
+    expect(queryByText('layout overlay render failed')).toBeNull()
+
+    await flushTestUpdates(() => {
+      authenticatedBootstrapState.value = { status: 'ready' }
+    })
+    await waitFor(() => expect(document.querySelector('[role="status"]')).toBeNull())
   })
 })
 
-function renderLayout(router: ReturnType<typeof createRouter>, options: { fullscreenLoadingActive?: boolean } = {}) {
+function renderLayout(router: ReturnType<typeof createRouter>, options: { bootstrapLoadingVisible?: boolean } = {}) {
   return renderInJsdom(
-    <FullscreenLoadingTestScope active={options.fullscreenLoadingActive ?? true}>
+    <BootstrapLoadingTestScope visible={options.bootstrapLoadingVisible ?? true}>
       <VueQueryClientScope client={layoutQueryClient}>
         <Layout />
       </VueQueryClientScope>
-    </FullscreenLoadingTestScope>,
+    </BootstrapLoadingTestScope>,
     { global: { plugins: [router] } },
   )
 }
 
-const FullscreenLoadingTestScope = defineComponent<{ active: boolean }>({
-  name: 'FullscreenLoadingTestScope',
+const BootstrapLoadingTestScope = defineComponent<{ visible: boolean }>({
+  name: 'BootstrapLoadingTestScope',
   props: {
-    active: { type: Boolean, required: true },
+    visible: { type: Boolean, required: true },
   },
   setup(props, { slots }) {
-    const fullscreenLoading = provideFullscreenLoadingPresentation()
-    if (!props.active) fullscreenLoading.finish()
+    const bootstrapLoading = provideBootstrapLoadingPresentation()
+    if (!props.visible) bootstrapLoading.hide()
     return () => (
       <>
-        <span data-testid="fullscreen-loading-active">{String(fullscreenLoading.active.value)}</span>
+        <span data-testid="bootstrap-loading-visible">{String(bootstrapLoading.visible.value)}</span>
         {slots.default?.()}
+        {bootstrapLoading.visible.value ? <CenteredLoadingStatus label="Loading" /> : null}
       </>
     )
   },

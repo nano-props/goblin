@@ -3,7 +3,7 @@ import type { PropType } from 'vue'
 import { decodeWith } from '#/shared/http-response-schema.ts'
 import { OkResponseSchema } from '#/shared/settings-response-schema.ts'
 import { useAuth } from '#/web/auth/AuthProvider.tsx'
-import { useFullscreenLoadingPresentation } from '#/web/app/bootstrap/fullscreen-loading-presentation.ts'
+import { useBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { postServerCommandJson } from '#/web/lib/server-fetch.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -14,12 +14,12 @@ export const TokenGate = defineComponent({
   name: 'TokenGate',
   setup(_props, { slots }) {
     const auth = useAuth()
-    const fullscreenLoading = useFullscreenLoadingPresentation()
+    const bootstrapLoading = useBootstrapLoadingPresentation()
     watch(
       () => auth.state,
       (state) => {
-        if (state === 'checking') fullscreenLoading.begin()
-        else if (state === 'unauthenticated') fullscreenLoading.finish()
+        if (state === 'checking') bootstrapLoading.show()
+        else if (state === 'unauthenticated') bootstrapLoading.hide()
       },
       { immediate: true, flush: 'sync' },
     )

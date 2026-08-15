@@ -8,7 +8,7 @@ import { TerminalSessionProvider } from '#/web/terminal/components/TerminalSessi
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/app/bootstrap/authenticated.ts'
-import { useFullscreenLoadingPresentation } from '#/web/app/bootstrap/fullscreen-loading-presentation.ts'
+import { useBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspaceFilesystemInvalidationSync.ts'
@@ -62,11 +62,11 @@ export const Layout = defineComponent({
   name: 'Layout',
   setup() {
     const route = useRoute()
-    const fullscreenLoading = useFullscreenLoadingPresentation()
+    const bootstrapLoading = useBootstrapLoadingPresentation()
     useAppHistoryPresentationObserver()
 
     return () => (
-      <ErrorBoundary resetKey={route.fullPath} onError={fullscreenLoading.finish}>
+      <ErrorBoundary resetKey={route.fullPath} onError={bootstrapLoading.hide}>
         <TokenGate>
           <AuthenticatedAppShell />
         </TokenGate>
@@ -78,7 +78,7 @@ export const Layout = defineComponent({
 const AuthenticatedAppShell = defineComponent({
   name: 'AuthenticatedAppShell',
   setup() {
-    const fullscreenLoading = useFullscreenLoadingPresentation()
+    const bootstrapLoading = useBootstrapLoadingPresentation()
     useWorkspaceFilesystemInvalidationSync()
     const route = useRoute()
     const queryClient = useQueryClient()
@@ -160,8 +160,8 @@ const AuthenticatedAppShell = defineComponent({
     watch(
       () => [route.name, bootstrap.state.value.status] as const,
       ([routeName, status]) => {
-        if (routeName !== 'settings' && status === 'restoring-workspace') fullscreenLoading.begin()
-        else fullscreenLoading.finish()
+        if (routeName !== 'settings' && status === 'restoring-workspace') bootstrapLoading.show()
+        else bootstrapLoading.hide()
       },
       { immediate: true, flush: 'sync' },
     )
