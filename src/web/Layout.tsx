@@ -1,4 +1,4 @@
-import { computed, defineComponent } from 'vue'
+import { computed, defineComponent, watch } from 'vue'
 import type { ComputedRef, PropType, VNode } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { useQueryClient } from '@tanstack/vue-query'
@@ -8,6 +8,7 @@ import { TerminalSessionProvider } from '#/web/terminal/components/TerminalSessi
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/app/bootstrap/authenticated.ts'
+import { useBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import { useWorkspaceFilesystemInvalidationSync } from '#/web/hooks/useWorkspaceFilesystemInvalidationSync.ts'
@@ -27,10 +28,7 @@ import {
   workspaceNavigationRouteContext,
   workspaceRouteContextFromVueRoute,
 } from '#/web/app/navigation/layout-model.ts'
-import {
-  WorkspaceSessionRestoreError,
-  WorkspaceSessionRestorePlaceholder,
-} from '#/web/components/WorkspaceSessionRestore.tsx'
+import { WorkspaceSessionRestoreError } from '#/web/components/WorkspaceSessionRestore.tsx'
 import { AppGlobalOverlays, WorkspaceContextOverlays } from '#/web/components/AppOverlays.tsx'
 import { AuthenticatedWorkspaceSideEffects } from '#/web/components/AuthenticatedWorkspaceSideEffects.tsx'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
@@ -64,10 +62,11 @@ export const Layout = defineComponent({
   name: 'Layout',
   setup() {
     const route = useRoute()
+    const bootstrapLoading = useBootstrapLoadingPresentation()
     useAppHistoryPresentationObserver()
 
     return () => (
-      <ErrorBoundary resetKey={route.fullPath}>
+      <ErrorBoundary resetKey={route.fullPath} onError={bootstrapLoading.hide}>
         <TokenGate>
           <AuthenticatedAppShell />
         </TokenGate>
@@ -79,6 +78,7 @@ export const Layout = defineComponent({
 const AuthenticatedAppShell = defineComponent({
   name: 'AuthenticatedAppShell',
   setup() {
+    const bootstrapLoading = useBootstrapLoadingPresentation()
     useWorkspaceFilesystemInvalidationSync()
     const route = useRoute()
     const queryClient = useQueryClient()
@@ -157,6 +157,14 @@ const AuthenticatedAppShell = defineComponent({
     }
     const bootstrap = useAuthenticatedAppBootstrap({ activeWorkspaceId: routedWorkspaceId })
     useClientWorkspacePersistence({ routedWorkspaceId })
+    watch(
+      () => [route.name, bootstrap.state.value.status] as const,
+      ([routeName, status]) => {
+        if (routeName !== 'settings' && status === 'restoring-workspace') bootstrapLoading.show()
+        else bootstrapLoading.hide()
+      },
+      { immediate: true, flush: 'sync' },
+    )
 
     provideLayoutOverlayActions({
       openWorkspacePathDialog: overlays.openWorkspacePathDialog,
@@ -179,14 +187,14 @@ const AuthenticatedAppShell = defineComponent({
       isWorkspaceShortcutSuppressed: () => overlays.anyOpen.value,
     })
 
-    const renderShellContent = (): VNode => {
+    const renderShellContent = (): VNode | null => {
       if (route.name === 'settings') return <AuthenticatedSettingsShell />
 
       const bootstrapState = bootstrap.state.value
 
       switch (bootstrapState.status) {
         case 'restoring-workspace':
-          return <WorkspaceSessionRestorePlaceholder />
+          return null
         case 'failed':
           return <WorkspaceSessionRestoreError state={bootstrapState} retry={bootstrap.retry} />
         case 'ready':

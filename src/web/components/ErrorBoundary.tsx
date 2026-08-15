@@ -6,9 +6,12 @@ import { goblinLog } from '#/web/logger.ts'
 import { markRenderErrorLogged } from '#/web/app/errors/render-error-logging.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
-export const ErrorBoundary = defineComponent<{ resetKey?: string }>({
+export const ErrorBoundary = defineComponent<{ resetKey?: string; onError?: (error: unknown) => void }>({
   name: 'ErrorBoundary',
-  props: ['resetKey'],
+  props: {
+    resetKey: String,
+    onError: Function as PropType<(error: unknown) => void>,
+  },
   setup(props, { slots }) {
     const error = shallowRef<unknown | null>(null)
 
@@ -17,6 +20,7 @@ export const ErrorBoundary = defineComponent<{ resetKey?: string }>({
       // belongs to the next outer boundary (or the application handler).
       if (error.value !== null) return
       if (!markRenderErrorLogged(caught)) goblinLog.error('render crash', { error: caught, componentTrace: info })
+      props.onError?.(caught)
       error.value = caught
       return false
     })
@@ -48,7 +52,7 @@ const ErrorFallback = defineComponent<{ error: unknown; onReset: () => void }>({
     return () => {
       const message = props.error instanceof Error ? props.error.message : t('error.render-crash-unknown')
       return (
-        <div class="flex flex-1 items-center justify-center p-8">
+        <div class="flex h-full flex-1 items-center justify-center p-8">
           <div class="max-w-md space-y-3 text-center">
             <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-danger-surface text-danger">
               <AlertTriangle size={22} />

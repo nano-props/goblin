@@ -1,17 +1,19 @@
 // @vitest-environment jsdom
 
 import { screen, waitFor } from '@testing-library/vue'
+import { defineComponent, reactive } from 'vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { userEvent } from '@testing-library/user-event'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
+import { provideBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
 import { postServerCommandJson } from '#/web/lib/server-fetch.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const authMock = vi.hoisted(() => ({
-  status: {
-    state: 'unauthenticated' as 'checking' | 'authenticated' | 'unauthenticated',
-    refresh: vi.fn(),
+  status: null as unknown as {
+    state: 'checking' | 'authenticated' | 'unauthenticated'
+    refresh: ReturnType<typeof vi.fn>
   },
 }))
 
@@ -24,8 +26,10 @@ vi.mock('#/web/lib/server-fetch.ts', () => ({
 }))
 
 beforeEach(() => {
-  authMock.status.state = 'unauthenticated'
-  authMock.status.refresh = vi.fn()
+  authMock.status = reactive({
+    state: 'unauthenticated' as 'checking' | 'authenticated' | 'unauthenticated',
+    refresh: vi.fn(),
+  })
   vi.mocked(postServerCommandJson).mockReset()
 })
 
@@ -33,13 +37,38 @@ describe('TokenGate', () => {
   test('passes through authenticated children', () => {
     authMock.status.state = 'authenticated'
 
-    renderInJsdom(
-      <TokenGate>
-        <div>private app</div>
-      </TokenGate>,
-    )
+    renderTokenGate()
 
     expect(screen.getByText('private app')).toBeTruthy()
+    expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('true')
+  })
+
+  test('leaves the bootstrap loading presentation visible while authentication is checking', () => {
+    authMock.status.state = 'checking'
+
+    const result = renderTokenGate()
+
+    expect(result.container.querySelector('[role="status"]')).toBeNull()
+    expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('true')
+  })
+
+  test('hides the bootstrap loading presentation before showing login', async () => {
+    renderTokenGate()
+
+    expect(screen.getByRole('button', { name: 'auth.gate.sign-in' })).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('false'))
+  })
+
+  test('reactivates loading for login auth checking and leaves it active for the workspace handoff', async () => {
+    renderTokenGate()
+    await waitFor(() => expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('false'))
+
+    authMock.status.state = 'checking'
+    await waitFor(() => expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('true'))
+
+    authMock.status.state = 'authenticated'
+    await waitFor(() => expect(screen.getByText('private app')).toBeTruthy())
+    expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('true')
   })
 
   test('shows an empty-token error without calling the server', async () => {
@@ -112,9 +141,28 @@ describe('TokenGate', () => {
 })
 
 function renderLoginForm() {
+  return renderTokenGate()
+}
+
+function renderTokenGate() {
   return renderInJsdom(
-    <TokenGate>
-      <div>private app</div>
-    </TokenGate>,
+    <BootstrapLoadingTestScope>
+      <TokenGate>
+        <div>private app</div>
+      </TokenGate>
+    </BootstrapLoadingTestScope>,
   )
 }
+
+const BootstrapLoadingTestScope = defineComponent({
+  name: 'BootstrapLoadingTestScope',
+  setup(_props, { slots }) {
+    const bootstrapLoading = provideBootstrapLoadingPresentation()
+    return () => (
+      <>
+        <span data-testid="bootstrap-loading-visible">{String(bootstrapLoading.visible.value)}</span>
+        {slots.default?.()}
+      </>
+    )
+  },
+})
