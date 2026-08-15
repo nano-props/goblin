@@ -72,6 +72,7 @@ export const ko: Record<DictKey, string> = {
   'app-chrome.menu': '메뉴',
   'app-chrome.settings': '설정 (⌘,)',
   'app-chrome.settings-tooltip': '설정',
+  'app-chrome.notifications': '알림',
 
   // ---- Dependencies ------------------------------------------------------
 

@@ -12,6 +12,7 @@ import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import type { useWorkspaceDrop } from '#/web/hooks/useWorkspaceDrop.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { useT } from '#/web/stores/i18n-vue.ts'
 
 interface AppGlobalOverlaysProps {
   overlays: ReturnType<typeof useAppOverlays>
@@ -31,6 +32,7 @@ export const AppGlobalOverlays = defineComponent<AppGlobalOverlaysProps>({
   props: ['overlays'],
 
   setup(props) {
+    const t = useT()
     return () => (
       <>
         <WorkspaceOpenDialog
@@ -42,7 +44,7 @@ export const AppGlobalOverlays = defineComponent<AppGlobalOverlaysProps>({
           open={props.overlays.state.value.openRemoteWorkspace.open}
           onOpenChange={props.overlays.setOpenRemoteWorkspaceOpen}
         />
-        <Toaster position="bottom-right" closeButton />
+        <Toaster position="bottom-right" closeButton containerAriaLabel={t('app-chrome.notifications')} />
       </>
     )
   },

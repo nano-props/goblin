@@ -71,6 +71,7 @@ export const zh: Record<DictKey, string> = {
   'app-chrome.menu': '菜单',
   'app-chrome.settings': '设置 (⌘,)',
   'app-chrome.settings-tooltip': '设置',
+  'app-chrome.notifications': '通知',
 
   // ---- Dependencies ------------------------------------------------------
 
