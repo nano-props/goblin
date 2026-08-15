@@ -208,9 +208,9 @@ user.
 - Deselecting disposes the xterm and addons without closing the session.
 - Inactive sessions keep no parked xterm DOM, warm xterm instance, client
   render cache, or geometry simulation.
-- Client xterm serialization is never a reattach or recovery authority.
-  Server-authored render state is the only cross-view recovery source.
-- Recreating a view may take time, but performance optimizations must not add a
+- Client xterm serialization is never a reattach or recovery authority;
+  server-authored render state is the only cross-view recovery source. View
+  recreation may take time, but performance optimizations must not add a
   second hidden render authority.
 - A session group with no terminal sessions presents an explicit create action;
   the user never has to infer an invisible click target.
@@ -248,9 +248,27 @@ Recovery distinguishes fresh streaming from replay:
 - Fresh output received before presentation is queued without parsing, then
   flushed after the fitted viewport is revealed.
 
-Presentation becomes eligible for automatic focus only after the fitted view
-has rendered its viewport and passed its final geometry check. A quiet process
-does not block presentation waiting for output.
+While the view remains hidden, the client discloses the current operation
+delaying local presentation:
+
+- Preparing the terminal font precedes xterm creation and fitting.
+- A server restart remains identified as restarting; attach and recovery waits
+  are identified as session synchronization.
+- A snapshot frame is identified as content loading while its authoritative
+  screen and sequence checkpoint are replayed.
+- The final wait is identified as rendering while the client requests a full
+  viewport render and performs another geometry check. Only then may the view
+  be revealed or receive automatic focus.
+
+Only one wait is current. Completing a restart or attach replaces its label
+with content loading when snapshot replay is required, then with rendering;
+the earlier server-operation label does not remain active through later local
+work.
+
+These labels describe an already-admitted operation; publishing or clearing
+them must not activate authoritative hydration, initiate server work, retry an
+operation, or change controller ownership. A quiet process does not block
+presentation waiting for output.
 
 Presentation is best-effort, but not silent when it affects user intent. A
 stable local recovery failure offers explicit retry. Cancellation, stale work,

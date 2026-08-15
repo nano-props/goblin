@@ -704,6 +704,8 @@ describe('TerminalSession attachment and presentation', () => {
     const term = xtermMocks.terminals[0]!
     expect(term.dispose).toHaveBeenCalledOnce()
     expect(term.scrollToBottom).not.toHaveBeenCalled()
+    expect(session.snapshot().presentationRecovery).toBeUndefined()
+    expect(session.snapshot().presentationPendingOperation).toBeUndefined()
   })
 
   test('activates Unicode 11 and exposes terminal search', async () => {
