@@ -833,7 +833,7 @@ describe('TerminalSessionView presentation and focus', () => {
     try {
       const status = view.container.querySelector('[role="status"]')
       expect(status?.textContent).toContain('terminal.restoring')
-      expect(status?.getAttribute('aria-busy')).toBe('true')
+      expect(status?.hasAttribute('aria-busy')).toBe(false)
       expect(view.container.querySelector('[role="alert"]')).toBeNull()
     } finally {
       await view.cleanup()
