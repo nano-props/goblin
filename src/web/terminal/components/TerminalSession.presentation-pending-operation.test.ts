@@ -21,7 +21,7 @@ const xtermMocks = terminalXtermMocks()
 
 beforeEach(resetTerminalSessionHarness)
 
-describe('TerminalSession presentation wait disclosure', () => {
+describe('TerminalSession presentation pending operation disclosure', () => {
   test('projects font loading while that local operation is pending', async () => {
     const preload = Promise.withResolvers<void>()
     geometryMocks.preloadTerminalFont.mockReturnValueOnce(preload.promise)
