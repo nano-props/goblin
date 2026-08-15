@@ -263,6 +263,20 @@ describe('repo-client', () => {
     )
   })
 
+  test('preserves a stale runtime read so the caller can offer runtime recovery', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    mockFetch(async () => ({
+      ok: false,
+      status: 400,
+      json: async () => ({ ok: false, code: 'BAD_REQUEST', message: 'error.workspace-runtime-stale' }),
+    }))
+    const { getRepoWorktreeStatus } = await import('#/web/repos/client.ts')
+
+    await expect(getRepoWorktreeStatus(workspaceId, workspaceRuntimeId)).rejects.toThrow(
+      'error.workspace-runtime-stale',
+    )
+  })
+
   test('leaves Git network deadlines to the server and preserves post-delivery cancellation as uncertain', async () => {
     useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))

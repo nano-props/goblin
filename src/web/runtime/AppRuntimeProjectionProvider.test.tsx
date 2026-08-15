@@ -46,6 +46,8 @@ const projectionMocks = vi.hoisted(() => ({
   terminalSessionsCatalogCoverageRevision: vi.fn(() => 0),
   resynchronizeConnectedViews: vi.fn(),
   reconcileOpenWorkspaceRuntimeMemberships: vi.fn(),
+  resyncActiveRepoReadQueries: vi.fn(),
+  repoInvalidationConnectionOpen: null as (() => void) | null,
 }))
 
 vi.mock('#/web/bridge/page-id.ts', () => ({ readClientPageId: () => 'client_sharedterminal' }))
@@ -57,6 +59,16 @@ vi.mock('#/web/terminal/components/use-terminal-session-projection.ts', () => ({
 vi.mock('#/web/stores/workspaces/workspace-runtime-membership-recovery.ts', () => ({
   reconcileOpenWorkspaceRuntimeMemberships: (...args: unknown[]) =>
     projectionMocks.reconcileOpenWorkspaceRuntimeMemberships(...args),
+}))
+
+vi.mock('#/web/hooks/useRepoStoreInvalidationRefresh.ts', () => ({
+  useRepoStoreInvalidationRefresh(onConnectionOpen: () => void) {
+    projectionMocks.repoInvalidationConnectionOpen = onConnectionOpen
+  },
+}))
+
+vi.mock('#/web/stores/workspaces/repo-refresh-actions.ts', () => ({
+  resyncActiveRepoReadQueries: (...args: unknown[]) => projectionMocks.resyncActiveRepoReadQueries(...args),
 }))
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-runtime-provider-repo')
@@ -95,6 +107,9 @@ describe('AppRuntimeProjectionProvider', () => {
       })),
       changedTargets: [],
     }))
+    projectionMocks.resyncActiveRepoReadQueries.mockReset()
+    projectionMocks.resyncActiveRepoReadQueries.mockResolvedValue(undefined)
+    projectionMocks.repoInvalidationConnectionOpen = null
     recoverSessionsMock.mockReset()
     recoverSessionsMock.mockResolvedValue({ revision: 0, sessions: [] })
     listWorkspaceTabsMock.mockReset()
@@ -564,6 +579,23 @@ describe('AppRuntimeProjectionProvider', () => {
       await flushTestUpdates(() => document.querySelector<HTMLElement>('[data-retry-terminal-projection]')?.click())
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
       expect(listWorkspaceTabsMock).not.toHaveBeenCalled()
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('routes invalidation reconnect through membership recovery before repo resync', async () => {
+    seedCurrentRepo()
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockClear()
+      projectionMocks.resyncActiveRepoReadQueries.mockClear()
+
+      await flushTestUpdates(() => projectionMocks.repoInvalidationConnectionOpen?.())
+
+      await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce())
+      await vi.waitFor(() => expect(projectionMocks.resyncActiveRepoReadQueries).toHaveBeenCalledOnce())
     } finally {
       result.unmount()
     }

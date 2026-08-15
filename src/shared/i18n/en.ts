@@ -83,7 +83,6 @@ export const en = {
   'app-chrome.menu': 'Menu',
   'app-chrome.settings': 'Settings (⌘,)',
   'app-chrome.settings-tooltip': 'Settings',
-  'app-chrome.notifications': 'Notifications',
 
   // ---- Dependencies -------------------------------------------------------
 

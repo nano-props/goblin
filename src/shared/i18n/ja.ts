@@ -80,7 +80,6 @@ export const ja: Record<DictKey, string> = {
   'app-chrome.menu': 'メニュー',
   'app-chrome.settings': '設定 (⌘,)',
   'app-chrome.settings-tooltip': '設定',
-  'app-chrome.notifications': '通知',
 
   // ---- Dependencies ------------------------------------------------------
 
