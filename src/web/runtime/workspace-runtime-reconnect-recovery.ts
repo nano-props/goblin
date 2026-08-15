@@ -12,6 +12,7 @@ export interface WorkspaceRuntimeReconnectRecoveryDependencies {
   currentWorkspaceRuntimeId: (workspaceId: WorkspaceId) => string | null
   terminalRecovery: TerminalProjectionRecoveryActions
   workspaceTabsRecovery: WorkspacePaneTabsRecoveryActions
+  resyncRepoReads: () => Promise<void>
   logFailure: (error: unknown) => void
 }
 
@@ -35,8 +36,7 @@ export class WorkspaceRuntimeReconnectRecovery {
   private async run(generation: number): Promise<void> {
     try {
       const recovery = await this.dependencies.reconcileMemberships()
-      // The latest recovered event owns presentation; #359 accepts that it does
-      // not join an older generation's in-flight Refresh.
+      // Only the latest reconnect may publish recovered projections.
       if (generation !== this.generation || recovery.kind === 'superseded') return
       this.dependencies.scopeRegistry.disposeScopes()
       for (const target of recovery.targets) {
@@ -45,6 +45,7 @@ export class WorkspaceRuntimeReconnectRecovery {
         this.dependencies.terminalRecovery.begin(scope, { kind: 'reconnect' })
         this.dependencies.workspaceTabsRecovery.request(scope, { kind: 'fresh' })
       }
+      await this.dependencies.resyncRepoReads()
     } catch (error) {
       if (generation === this.generation) this.dependencies.logFailure(error)
     }

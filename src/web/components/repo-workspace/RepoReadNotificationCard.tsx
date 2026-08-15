@@ -26,7 +26,7 @@ const BORDER_CLASS_BY_KIND: Record<RepoReadConditionKind, string> = {
   unavailable: 'border-danger-border',
 }
 
-export interface RepoReadNotificationToastProps {
+export interface RepoReadNotificationCardProps {
   kind: RepoReadConditionKind
   title: string
   description?: string
@@ -34,11 +34,11 @@ export interface RepoReadNotificationToastProps {
   dismissLabel: string
   retrying: boolean
   onRetry?: () => void
-  onCloseToast?: () => void
+  onDismiss: () => void
 }
 
-export const RepoReadNotificationToast = defineComponent<RepoReadNotificationToastProps>({
-  name: 'RepoReadNotificationToast',
+export const RepoReadNotificationCard = defineComponent<RepoReadNotificationCardProps>({
+  name: 'RepoReadNotificationCard',
   props: {
     kind: { type: String as PropType<RepoReadConditionKind>, required: true },
     title: { type: String, required: true },
@@ -47,7 +47,7 @@ export const RepoReadNotificationToast = defineComponent<RepoReadNotificationToa
     dismissLabel: { type: String, required: true },
     retrying: { type: Boolean, required: true },
     onRetry: Function as PropType<() => void>,
-    onCloseToast: Function as PropType<() => void>,
+    onDismiss: { type: Function as PropType<() => void>, required: true },
   },
 
   setup(props) {
@@ -90,7 +90,7 @@ export const RepoReadNotificationToast = defineComponent<RepoReadNotificationToa
             variant="ghost"
             class="-mr-1 -mt-1 text-muted-foreground"
             aria-label={props.dismissLabel}
-            onClick={props.onCloseToast}
+            onClick={props.onDismiss}
           >
             <X />
           </Button>

@@ -3,7 +3,6 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
-import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { useWorkspaceRuntimeInvalidationRefresh } from '#/web/hooks/useWorkspaceRuntimeInvalidationRefresh.ts'
 import { useSettingsQueryInvalidationSync } from '#/web/settings/queries.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/app/navigation/workspace-history.ts'
@@ -68,7 +67,6 @@ export const AuthenticatedWorkspaceSideEffects = defineComponent<AuthenticatedWo
       openCreateWorktree: () => props.navigation.openCreateWorktree(),
     })
     useWorkspaceNavigationHistory({ routeContext: () => props.routeContext })
-    useRepoStoreInvalidationRefresh()
     useWorkspaceRuntimeInvalidationRefresh()
     useSettingsQueryInvalidationSync()
 

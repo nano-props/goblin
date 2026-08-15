@@ -23,6 +23,7 @@ const repoClientMocks = vi.hoisted(() => ({
 vi.mock('#/web/repos/client.ts', () => repoClientMocks)
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
+const connectionOpen = vi.fn()
 
 const listeners = new Set<(event: any) => void>()
 const openListeners = new Set<() => void>()
@@ -66,7 +67,7 @@ vi.mock('#/web/stores/workspaces/store.ts', () => ({
 const Harness = defineComponent({
   name: 'RepoStoreInvalidationHarness',
   setup() {
-    useRepoStoreInvalidationRefresh()
+    useRepoStoreInvalidationRefresh(connectionOpen)
     return () => null
   },
 })
@@ -74,7 +75,7 @@ const Harness = defineComponent({
 const ProjectionObserverHarness = defineComponent({
   name: 'RepoStoreInvalidationProjectionObserver',
   setup() {
-    useRepoStoreInvalidationRefresh()
+    useRepoStoreInvalidationRefresh(connectionOpen)
     const projection = useQuery(repoSnapshotQueryOptions(WORKSPACE_ID, 'repo-runtime-test-7'), appQueryClient)
     return () => <output>{projection.data.value?.snapshot.current ?? 'loading'}</output>
   },
@@ -86,6 +87,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     listeners.clear()
     openListeners.clear()
+    connectionOpen.mockClear()
     appQueryClient.clear()
     storeState.workspaces[WORKSPACE_ID] = workspace()
   })
@@ -157,58 +159,14 @@ describe('useRepoStoreInvalidationRefresh', () => {
     })
   })
 
-  test('connection open invalidates an in-flight projection and accepts a current read', async () => {
-    let resolveFirstRead!: (value: Awaited<ReturnType<typeof repoClientMocks.getRepoSnapshot>>) => void
-    let projectionReads = 0
-    repoClientMocks.getRepoSnapshot.mockImplementation(async () => {
-      projectionReads += 1
-      if (projectionReads === 1) {
-        return await new Promise((resolve) => {
-          resolveFirstRead = resolve
-        })
-      }
-      return {
-        snapshot: {
-          branches: [],
-          current: 'after-connect',
-          remote: {
-            remotes: [],
-            hasRemotes: false,
-            hasBrowserRemote: false,
-            remoteProviders: {},
-            hasGitHubRemote: false,
-          },
-        },
-      }
-    })
-    renderInJsdom(
-      <VueQueryClientScope client={appQueryClient}>
-        <ProjectionObserverHarness />
-      </VueQueryClientScope>,
-    )
-    await vi.waitFor(() => expect(projectionReads).toBe(1))
+  test('forwards connection open to the runtime recovery owner', async () => {
+    renderInJsdom(<Harness />)
 
-    await flushTestUpdates(async () => {
+    await flushTestUpdates(() => {
       for (const listener of openListeners) listener()
-      resolveFirstRead({
-        snapshot: {
-          branches: [],
-          current: 'before-connect',
-          remote: {
-            remotes: [],
-            hasRemotes: false,
-            hasBrowserRemote: false,
-            remoteProviders: {},
-            hasGitHubRemote: false,
-          },
-        },
-      })
     })
 
-    await vi.waitFor(() => {
-      expect(projectionReads).toBe(2)
-      expect(document.body.textContent).toContain('after-connect')
-    })
+    expect(connectionOpen).toHaveBeenCalledOnce()
   })
 
   test('limits repo-runtime invalidations to operation queries', async () => {

@@ -56,6 +56,7 @@ async function runRepoReadWithStableErrorKey<T>(read: () => Promise<T>, signal?:
     if (signal?.aborted) throw err
     if (err instanceof Error && err.message === SERVER_REQUEST_TIMEOUT_ERROR) throw err
     if (err instanceof Error && err.message === REPO_MEMBERSHIP_READ_CONFLICT_KEY) throw err
+    if (err instanceof Error && err.message === 'error.workspace-runtime-stale') throw err
     throw new Error('error.failed-read-repo', { cause: err })
   }
 }

@@ -22,6 +22,9 @@ import { WorkspaceRuntimeReconnectRecovery } from '#/web/runtime/workspace-runti
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { provideTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 import { provideWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
+import { provideWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
+import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
+import { resyncActiveRepoReadQueries } from '#/web/stores/workspaces/repo-refresh-actions.ts'
 
 export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId: WorkspaceId | null }>({
   name: 'AppRuntimeProjectionProvider',
@@ -73,12 +76,18 @@ export const AppRuntimeProjectionProvider = defineComponent<{ currentWorkspaceId
       currentWorkspaceRuntimeId: workspaceRuntimeIdForRoot,
       terminalRecovery,
       workspaceTabsRecovery,
+      resyncRepoReads: () =>
+        resyncActiveRepoReadQueries({
+          get: workspacesStore.getState,
+        }),
       logFailure: (error) => {
-        appRuntimeProjectionLog.warn('failed to reconcile workspace runtime memberships after realtime recovery', {
-          error,
-        })
+        appRuntimeProjectionLog.warn('failed to recover runtime projections after reconnect', { error })
       },
     })
+    useRepoStoreInvalidationRefresh(() => {
+      if (workspacesStore.getState().workspaceMembershipReady) reconnectRecovery.request()
+    })
+    provideWorkspaceRuntimeRecoveryActions({ request: () => reconnectRecovery.request() })
     const projectionScopeForWorkspace = (workspaceId: WorkspaceId) => {
       const workspaceRuntimeId = workspaceRuntimeIdForRoot(workspaceId)
       return workspaceRuntimeId ? scopeRegistry.scopeFor({ workspaceId, workspaceRuntimeId }) : null

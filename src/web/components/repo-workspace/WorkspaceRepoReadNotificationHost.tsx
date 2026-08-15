@@ -1,14 +1,15 @@
-import { computed, defineComponent, onScopeDispose, ref, watch } from 'vue'
-import { toast } from 'vue-sonner'
+import { computed, defineComponent, ref, Teleport } from 'vue'
 import { REPO_MEMBERSHIP_READ_CONFLICT_KEY } from '#/shared/repo-membership-read.ts'
+import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { RepoReadNotificationToast } from '#/web/components/repo-workspace/RepoReadNotificationToast.tsx'
-import type { RepoReadNotificationToastProps } from '#/web/components/repo-workspace/RepoReadNotificationToast.tsx'
+import { RepoReadNotificationCard } from '#/web/components/repo-workspace/RepoReadNotificationCard.tsx'
+import type { RepoReadNotificationCardProps } from '#/web/components/repo-workspace/RepoReadNotificationCard.tsx'
 import { combineRepoReadFailures } from '#/web/repos/read-condition.ts'
 import type { RepoReadCondition } from '#/web/repos/read-condition.ts'
 import { repoQueryReadFailure } from '#/web/repos/read-failure.ts'
 import type { RepoReadFailure } from '#/web/repos/read-failure.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repos/queries.ts'
+import { useWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
 interface WorkspaceRepoReadNotificationHostProps {
@@ -16,12 +17,7 @@ interface WorkspaceRepoReadNotificationHostProps {
   workspaceRuntimeId: string
 }
 
-interface DesiredRepoReadNotification extends Omit<RepoReadNotificationToastProps, 'onCloseToast'> {
-  conditionKey: string
-}
-
-interface PresentedToast {
-  id: string | number
+interface DesiredRepoReadNotification extends Omit<RepoReadNotificationCardProps, 'onDismiss'> {
   conditionKey: string
 }
 
@@ -30,15 +26,14 @@ const TITLE_KEY_BY_CONDITION: Record<RepoReadCondition['kind'], string> = {
   stale: 'status.stale-title',
   unavailable: 'error.failed-read-repo',
 }
-
 export const WorkspaceRepoReadNotificationHost = defineComponent<WorkspaceRepoReadNotificationHostProps>({
   name: 'WorkspaceRepoReadNotificationHost',
   props: ['workspaceId', 'workspaceRuntimeId'],
 
   setup(props) {
     const t = useT()
+    const runtimeRecovery = useWorkspaceRuntimeRecoveryActions()
     const dismissedConditionKey = ref<string | null>(null)
-    let presentedToast: PresentedToast | null = null
     const snapshot = useRepoSnapshotReadModel(
       () => props.workspaceId,
       () => props.workspaceRuntimeId,
@@ -98,61 +93,41 @@ export const WorkspaceRepoReadNotificationHost = defineComponent<WorkspaceRepoRe
         retryLabel: t('error.try-again'),
         dismissLabel: t('status.dismiss-notification'),
         retrying: currentCondition.retrying,
-        onRetry: currentCondition.retry,
+        onRetry: failures.value.some((failure) => failure.message === 'error.workspace-runtime-stale')
+          ? runtimeRecovery.request
+          : currentCondition.retry,
       }
     })
 
-    function retirePresentedToast(): void {
-      const currentToast = presentedToast
-      if (!currentToast) return
-      presentedToast = null
-      toast.dismiss(currentToast.id)
+    return () => {
+      const notification = desiredNotification.value
+      if (!notification) return null
+      return (
+        <Teleport to="body">
+          <div
+            data-testid="workspace-repo-read-notification"
+            role={notification.kind === 'unavailable' ? 'alert' : 'status'}
+            aria-live={notification.kind === 'unavailable' ? 'assertive' : 'polite'}
+            class="fixed left-4 right-4 z-40 min-[601px]:left-auto min-[601px]:w-[420px]"
+            style={{ top: `${TITLE_BAR_HEIGHT_PX + 12}px` }}
+          >
+            <RepoReadNotificationCard
+              kind={notification.kind}
+              title={notification.title}
+              description={notification.description}
+              retryLabel={notification.retryLabel}
+              dismissLabel={notification.dismissLabel}
+              retrying={notification.retrying}
+              onRetry={notification.onRetry}
+              onDismiss={() => {
+                if (conditionKey.value === notification.conditionKey) {
+                  dismissedConditionKey.value = notification.conditionKey
+                }
+              }}
+            />
+          </div>
+        </Teleport>
+      )
     }
-
-    function presentNotification(notification: DesiredRepoReadNotification): void {
-      if (presentedToast && presentedToast.conditionKey !== notification.conditionKey) retirePresentedToast()
-
-      const currentToast = presentedToast
-      let publishedToastId: string | number | null = currentToast?.id ?? null
-      const dismissCurrentCondition = () => {
-        if (publishedToastId === null || presentedToast?.id !== publishedToastId) return
-        presentedToast = null
-        if (conditionKey.value === notification.conditionKey) {
-          dismissedConditionKey.value = notification.conditionKey
-        }
-      }
-      publishedToastId = toast.custom(RepoReadNotificationToast, {
-        id: currentToast?.id,
-        position: 'top-right',
-        duration: Number.POSITIVE_INFINITY,
-        dismissible: true,
-        onDismiss: dismissCurrentCondition,
-        class: 'min-[601px]:w-[420px]',
-        componentProps: {
-          kind: notification.kind,
-          title: notification.title,
-          description: notification.description,
-          retryLabel: notification.retryLabel,
-          dismissLabel: notification.dismissLabel,
-          retrying: notification.retrying,
-          onRetry: notification.onRetry,
-        },
-      })
-      presentedToast = { id: publishedToastId, conditionKey: notification.conditionKey }
-    }
-
-    // Query state is authoritative; this watch is the sole imperative boundary
-    // that owns the Sonner handle actually returned by toast.custom().
-    watch(
-      desiredNotification,
-      (notification) => {
-        if (notification) presentNotification(notification)
-        else retirePresentedToast()
-      },
-      { immediate: true },
-    )
-
-    onScopeDispose(retirePresentedToast)
-    return () => null
   },
 })
