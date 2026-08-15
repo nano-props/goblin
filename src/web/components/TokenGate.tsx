@@ -1,9 +1,9 @@
-import { defineComponent, onScopeDispose, ref } from 'vue'
+import { defineComponent, onScopeDispose, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { decodeWith } from '#/shared/http-response-schema.ts'
 import { OkResponseSchema } from '#/shared/settings-response-schema.ts'
 import { useAuth } from '#/web/auth/AuthProvider.tsx'
-import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
+import { useFullscreenLoadingPresentation } from '#/web/app/bootstrap/fullscreen-loading-presentation.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { postServerCommandJson } from '#/web/lib/server-fetch.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -14,8 +14,17 @@ export const TokenGate = defineComponent({
   name: 'TokenGate',
   setup(_props, { slots }) {
     const auth = useAuth()
+    const fullscreenLoading = useFullscreenLoadingPresentation()
+    watch(
+      () => auth.state,
+      (state) => {
+        if (state === 'checking') fullscreenLoading.begin()
+        else if (state === 'unauthenticated') fullscreenLoading.finish()
+      },
+      { immediate: true, flush: 'sync' },
+    )
     return () => {
-      if (auth.state === 'checking') return <CenteredLoadingStatus label="Checking authentication" />
+      if (auth.state === 'checking') return null
       if (auth.state === 'unauthenticated') return <LoginForm onSuccess={auth.refresh} />
       return slots.default?.()
     }

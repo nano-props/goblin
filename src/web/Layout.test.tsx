@@ -13,6 +13,7 @@ import { useWorkspaceTerminalBellCounts } from '#/web/terminal/components/termin
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authenticated.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
+import { provideFullscreenLoadingPresentation } from '#/web/app/bootstrap/fullscreen-loading-presentation.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///example-workspace')
 const authenticatedBootstrapMock = vi.hoisted(() => ({
@@ -204,7 +205,7 @@ describe('Layout shell providers', () => {
     expect(getByTestId('settings-retained-terminal-consumer').textContent).toBe('4')
   })
 
-  test('shows workspace restore progress before mounting the workspace shell', async () => {
+  test('keeps root loading active before mounting the workspace shell', async () => {
     authenticatedBootstrapState.value = { status: 'restoring-workspace' }
     const router = createRouter({
       history: createMemoryHistory(),
@@ -212,10 +213,59 @@ describe('Layout shell providers', () => {
     })
     await router.push('/')
     await router.isReady()
-    const { getByText, queryByText } = renderLayout(router)
+    const { queryByText } = renderLayout(router)
 
-    expect(getByText('Restoring workspace')).toBeDefined()
+    expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('true')
     expect(queryByText('workspace')).toBeNull()
+  })
+
+  test('delegates workspace restore progress to the root loading presentation', async () => {
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', name: 'home', component: { template: '<div>workspace</div>' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+    const { queryByText } = renderLayout(router, { fullscreenLoadingActive: false })
+
+    expect(queryByText('Restoring workspace')).toBeNull()
+    expect(queryByText('workspace')).toBeNull()
+    await waitFor(() =>
+      expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('true'),
+    )
+  })
+
+  test('finishes root loading when workspace restore completes', async () => {
+    authenticatedBootstrapState.value = { status: 'ready' }
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', name: 'home', component: { template: '<div>workspace</div>' } }],
+    })
+    await router.push('/')
+    await router.isReady()
+    const { getByText } = renderLayout(router)
+
+    expect(getByText('workspace')).toBeDefined()
+    await waitFor(() =>
+      expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('false'),
+    )
+  })
+
+  test('finishes root loading when the settings surface can take over', async () => {
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/settings/general', name: 'settings', component: { template: '<div>settings</div>' } }],
+    })
+    await router.push('/settings/general')
+    await router.isReady()
+    const { getByText } = renderLayout(router)
+
+    expect(getByText('settings')).toBeDefined()
+    await waitFor(() =>
+      expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('false'),
+    )
   })
 
   test('does not classify a similarly prefixed not-found route as settings', async () => {
@@ -231,8 +281,29 @@ describe('Layout shell providers', () => {
     await router.isReady()
     const { getByText, queryByText } = renderLayout(router)
 
-    expect(getByText('Restoring workspace')).toBeDefined()
+    expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('true')
     expect(queryByText('settings')).toBeNull()
+  })
+
+  test('reactivates root loading when leaving settings before workspace restore completes', async () => {
+    authenticatedBootstrapState.value = { status: 'restoring-workspace' }
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/settings/general', name: 'settings', component: { template: '<div>settings</div>' } },
+        { path: '/', name: 'home', component: { template: '<div>workspace</div>' } },
+      ],
+    })
+    await router.push('/settings/general')
+    await router.isReady()
+    renderLayout(router)
+    await waitFor(() =>
+      expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('false'),
+    )
+
+    await flushTestUpdates(async () => await router.push('/'))
+
+    expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('true')
   })
 
   test('shows workspace restore failure and exposes the authoritative retry action', async () => {
@@ -247,16 +318,38 @@ describe('Layout shell providers', () => {
     const { getByRole, getByText } = renderLayout(router)
 
     expect(getByText('Workspace restore failed for test')).toBeDefined()
+    await waitFor(() =>
+      expect(document.querySelector('[data-testid="fullscreen-loading-active"]')?.textContent).toBe('false'),
+    )
     await user.click(getByRole('button'))
     expect(authenticatedBootstrapMock.retry).toHaveBeenCalledOnce()
   })
 })
 
-function renderLayout(router: ReturnType<typeof createRouter>) {
+function renderLayout(router: ReturnType<typeof createRouter>, options: { fullscreenLoadingActive?: boolean } = {}) {
   return renderInJsdom(
-    <VueQueryClientScope client={layoutQueryClient}>
-      <Layout />
-    </VueQueryClientScope>,
+    <FullscreenLoadingTestScope active={options.fullscreenLoadingActive ?? true}>
+      <VueQueryClientScope client={layoutQueryClient}>
+        <Layout />
+      </VueQueryClientScope>
+    </FullscreenLoadingTestScope>,
     { global: { plugins: [router] } },
   )
 }
+
+const FullscreenLoadingTestScope = defineComponent<{ active: boolean }>({
+  name: 'FullscreenLoadingTestScope',
+  props: {
+    active: { type: Boolean, required: true },
+  },
+  setup(props, { slots }) {
+    const fullscreenLoading = provideFullscreenLoadingPresentation()
+    if (!props.active) fullscreenLoading.finish()
+    return () => (
+      <>
+        <span data-testid="fullscreen-loading-active">{String(fullscreenLoading.active.value)}</span>
+        {slots.default?.()}
+      </>
+    )
+  },
+})

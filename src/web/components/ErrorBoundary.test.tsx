@@ -18,6 +18,27 @@ vi.mock('#/web/components/ui/button.tsx', () => ({
 }))
 
 describe('ErrorBoundary', () => {
+  test('reports a captured error so presentation owners can reveal the fallback', async () => {
+    const renderError = new Error('render failed')
+    const onError = vi.fn()
+    const CrashingChild = defineComponent({
+      setup() {
+        return () => {
+          throw renderError
+        }
+      },
+    })
+
+    const view = renderInJsdom(
+      <ErrorBoundary onError={onError}>
+        <CrashingChild />
+      </ErrorBoundary>,
+    )
+
+    await waitFor(() => expect(view.getByText('render failed')).toBeTruthy())
+    expect(onError).toHaveBeenCalledWith(renderError)
+  })
+
   test('lets an error in its fallback propagate to the outer boundary', async () => {
     const renderError = new Error('inner render failed')
     const fallbackError = new Error('inner fallback failed')

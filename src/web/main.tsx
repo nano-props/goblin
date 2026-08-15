@@ -11,7 +11,9 @@ import { i18nStore } from '#/web/stores/i18n.ts'
 import { appI18n, startI18nProjection } from '#/web/stores/i18n-vue.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import { createWebBootstrapOwner, startWebBootstrap } from '#/web/app/bootstrap/lifecycle.ts'
+import { provideFullscreenLoadingPresentation } from '#/web/app/bootstrap/fullscreen-loading-presentation.ts'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
+import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { vueAppErrorHandler } from '#/web/app/errors/vue-error-handler.ts'
 import { startNativeAppQuitIngress } from '#/web/app/lifecycle.ts'
 
@@ -33,18 +35,36 @@ const phase = shallowRef<BootstrapPhase>({ kind: 'loading' })
 const Root = defineComponent({
   name: 'Root',
   setup() {
+    const fullscreenLoading = provideFullscreenLoadingPresentation()
     return () => {
-      if (phase.value.kind === 'loading') return <BootLoading />
-      if (phase.value.kind === 'error') return <BootError onRetry={phase.value.retry} />
+      const currentPhase = phase.value
+      const content =
+        currentPhase.kind === 'error' ? (
+          <BootError onRetry={currentPhase.retry} />
+        ) : currentPhase.kind === 'ready' ? (
+          <>
+            <ResponsiveUiProvider>
+              <AuthProvider>
+                <AppRouterProvider />
+              </AuthProvider>
+            </ResponsiveUiProvider>
+            {import.meta.env.DEV ? <VueQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" /> : null}
+          </>
+        ) : null
+      const showInitialLoading =
+        currentPhase.kind === 'loading' || (currentPhase.kind === 'ready' && fullscreenLoading.active.value)
+
       return (
-        <>
-          <ResponsiveUiProvider>
-            <AuthProvider>
-              <AppRouterProvider />
-            </AuthProvider>
-          </ResponsiveUiProvider>
-          {import.meta.env.DEV ? <VueQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" /> : null}
-        </>
+        <ErrorBoundary>
+          <div class="relative h-full">
+            {content}
+            {showInitialLoading ? (
+              <div key="fullscreen-loading" class="absolute inset-0 z-40">
+                <BootLoading />
+              </div>
+            ) : null}
+          </div>
+        </ErrorBoundary>
       )
     }
   },

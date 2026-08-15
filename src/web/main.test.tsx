@@ -10,6 +10,9 @@ let hydrateI18n: ReturnType<typeof vi.fn>
 let hydrateHostInfo: ReturnType<typeof vi.fn>
 let appMount: ReturnType<typeof vi.fn>
 let appUnmount: ReturnType<typeof vi.fn>
+let beginFullscreenLoading: (() => void) | null
+let finishFullscreenLoading: (() => void) | null
+let routerRenderError: Error | null
 let disposeWebApp: (() => void) | null
 
 beforeEach(() => {
@@ -20,6 +23,9 @@ beforeEach(() => {
   hydrateHostInfo = vi.fn().mockResolvedValue(undefined)
   appMount = vi.fn()
   appUnmount = vi.fn()
+  beginFullscreenLoading = null
+  finishFullscreenLoading = null
+  routerRenderError = null
   disposeWebApp = null
 
   vi.doMock('#/web/stores/i18n.ts', () => ({
@@ -35,21 +41,32 @@ beforeEach(() => {
   vi.doMock('#/web/stores/i18n-vue.ts', () => ({
     appI18n: { install: vi.fn() },
     startI18nProjection: () => vi.fn(),
+    useT: () => (key: string) => key,
   }))
   vi.doMock('#/web/logger.ts', () => ({
     bootstrapLog: { error: vi.fn(), warn: vi.fn() },
+    goblinLog: { error: vi.fn() },
   }))
-  vi.doMock('#/web/app/navigation/router.tsx', () => ({
-    appRouter: { install: vi.fn() },
-    AppRouterProvider: defineComponent({
-      name: 'TestAppRouterProvider',
-      setup() {
-        onMounted(appMount)
-        onUnmounted(appUnmount)
-        return () => <div>app mounted</div>
-      },
-    }),
-  }))
+  vi.doMock('#/web/app/navigation/router.tsx', async () => {
+    const { useFullscreenLoadingPresentation } = await import('#/web/app/bootstrap/fullscreen-loading-presentation.ts')
+    return {
+      appRouter: { install: vi.fn() },
+      AppRouterProvider: defineComponent({
+        name: 'TestAppRouterProvider',
+        setup() {
+          const fullscreenLoading = useFullscreenLoadingPresentation()
+          beginFullscreenLoading = fullscreenLoading.begin
+          finishFullscreenLoading = fullscreenLoading.finish
+          onMounted(appMount)
+          onUnmounted(appUnmount)
+          return () => {
+            if (routerRenderError) throw routerRenderError
+            return <div>app mounted</div>
+          }
+        },
+      }),
+    }
+  })
 })
 
 afterEach(() => {
@@ -108,6 +125,55 @@ describe('client entrypoint', () => {
     await waitFor(() => expect(document.body.textContent).toContain('app mounted'))
     expect(appMount).toHaveBeenCalledTimes(1)
     expect(appUnmount).not.toHaveBeenCalled()
+  })
+
+  test('keeps one loading status mounted until the app accepts the initial presentation', async () => {
+    const hydration = Promise.withResolvers<void>()
+    hydrateI18n.mockReturnValue(hydration.promise)
+
+    await loadMain()
+
+    const initialStatus = document.querySelector('[role="status"]')
+    const initialSpinner = initialStatus?.querySelector('svg')
+    expect(initialStatus).not.toBeNull()
+    expect(initialSpinner).not.toBeNull()
+
+    hydration.resolve()
+    await hydration.promise
+    await waitFor(() => expect(document.body.textContent).toContain('app mounted'))
+
+    expect(document.querySelectorAll('[role="status"]')).toHaveLength(1)
+    expect(document.querySelector('[role="status"]')).toBe(initialStatus)
+    expect(document.querySelector('[role="status"] svg')).toBe(initialSpinner)
+
+    finishFullscreenLoading?.()
+    await waitFor(() => expect(document.querySelector('[role="status"]')).toBeNull())
+  })
+
+  test('uses the same loading node across a re-entrant authentication and workspace handoff', async () => {
+    await loadMain()
+    await waitFor(() => expect(document.body.textContent).toContain('app mounted'))
+
+    const initialStatus = document.querySelector('[role="status"]')
+    finishFullscreenLoading?.()
+    await waitFor(() => expect(document.querySelector('[role="status"]')).toBeNull())
+
+    beginFullscreenLoading?.()
+    await waitFor(() => expect(document.querySelector('[role="status"]')).not.toBeNull())
+    const reenteredStatus = document.querySelector('[role="status"]')
+
+    beginFullscreenLoading?.()
+    expect(document.querySelector('[role="status"]')).toBe(reenteredStatus)
+    expect(reenteredStatus).not.toBe(initialStatus)
+  })
+
+  test('lets the root error boundary replace an active loading overlay', async () => {
+    routerRenderError = new Error('router render failed')
+
+    await loadMain()
+
+    await waitFor(() => expect(document.body.textContent).toContain('router render failed'))
+    expect(document.querySelector('[role="status"]')).toBeNull()
   })
 
   test('offers retry when the initial hydration fails', async () => {
