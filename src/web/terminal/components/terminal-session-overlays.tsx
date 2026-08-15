@@ -71,10 +71,12 @@ const STATUS_DOT_CLASS = cn('goblin-terminal-session__status-dot', 'animate-puls
 
 // Transient status chip rendered while a terminal is opening or
 // restarting. Its parent owns the aria-live visibility contract; this
-// component keeps the live-region node stable while its label changes.
+// component keeps the live-region node stable while its label changes. Do not
+// mark this live region busy: presentation removes it on completion, so assistive
+// technology needs to announce each best-effort operation update while mounted.
 export const StatusOverlay: FunctionalComponent<StatusOverlayProps> = (props) => {
   return (
-    <div class="goblin-terminal-session__status-overlay" role="status" aria-live="polite" aria-busy="true">
+    <div class="goblin-terminal-session__status-overlay" role="status" aria-live="polite">
       <span class={STATUS_DOT_CLASS} />
       <span>{props.label}</span>
     </div>

@@ -48,7 +48,7 @@ import type {
   TerminalFocusRequest,
   TerminalInputWriter,
   TerminalPresentationRecovery,
-  TerminalPresentationWait,
+  TerminalPresentationPendingOperation,
   TerminalSessionHydrationInput,
   TerminalSearchResult,
   TerminalVirtualKey,
@@ -106,7 +106,7 @@ export class TerminalSession {
   private readonly view: TerminalSessionView
   private takeoverOperation: Promise<boolean> | null = null
   private presentationRecovery: TerminalPresentationRecovery | undefined
-  private presentationWait: TerminalPresentationWait | undefined
+  private presentationPendingOperation: TerminalPresentationPendingOperation | undefined
   private startEpoch = 0
   private presentationAbortController: AbortController | null = null
   private resizeDispatch: TerminalResizeDispatch = { kind: 'idle' }
@@ -250,7 +250,7 @@ export class TerminalSession {
     if (this.disposed) return
     this.disposed = true
     this.presentationRecovery = undefined
-    this.presentationWait = undefined
+    this.presentationPendingOperation = undefined
     this.presentationAbortController?.abort()
     this.presentationAbortController = null
     this.view.blurIfFocused()
@@ -261,12 +261,14 @@ export class TerminalSession {
 
   snapshot() {
     const snapshot = this.runtime.snapshot()
-    if (!this.takeoverOperation && !this.presentationRecovery && !this.presentationWait) return snapshot
+    if (!this.takeoverOperation && !this.presentationRecovery && !this.presentationPendingOperation) return snapshot
     return {
       ...snapshot,
       ...(this.takeoverOperation ? { takeoverPending: true } : {}),
       ...(this.presentationRecovery ? { presentationRecovery: this.presentationRecovery } : {}),
-      ...(this.presentationWait ? { presentationWait: this.presentationWait } : {}),
+      ...(this.presentationPendingOperation
+        ? { presentationPendingOperation: this.presentationPendingOperation }
+        : {}),
     }
   }
 
@@ -742,7 +744,7 @@ export class TerminalSession {
 
   private async startAsync(epoch: number, attempt: TerminalRuntimeAttemptToken): Promise<void> {
     if (this.runtime.phase() === 'open') this.publishPresentationState('pending', 'font-load')
-    else this.setPresentationWait('font-load')
+    else this.setPresentationPendingOperation('font-load')
     const presentationAbortController = this.beginPendingPresentation()
     let term: XTermTerminal
     try {
@@ -770,7 +772,7 @@ export class TerminalSession {
     let currentAttempt = attempt
     try {
       binding: for (;;) {
-        this.setPresentationWait(currentAttempt.operation === 'restart' ? 'server-restart' : 'server-sync')
+        this.setPresentationPendingOperation(currentAttempt.operation === 'restart' ? 'server-restart' : 'server-sync')
         const result = await this.ipcPhase(epoch, currentAttempt, term)
         if (!result) {
           this.assertCurrentStart(epoch, term)
@@ -782,7 +784,7 @@ export class TerminalSession {
           continue
         }
         if (result.frame === 'snapshot') {
-          this.setPresentationWait('snapshot-replay')
+          this.setPresentationPendingOperation('snapshot-replay')
           await this.replayPhase(epoch, term, result)
         }
         this.assertCurrentStart(epoch, term)
@@ -800,7 +802,7 @@ export class TerminalSession {
           continue
         }
         this.assertCurrentStart(epoch, term)
-        this.setPresentationWait('viewport-render')
+        this.setPresentationPendingOperation('viewport-render')
         const presentation = await this.view.present(term, presentationAbortController.signal)
         if (presentation === 'cancelled') throw new StartCancelledError()
         if (presentation === 'presented') break binding
@@ -890,6 +892,12 @@ export class TerminalSession {
     }
     this.assertCurrentStart(epoch, term)
     if (result) return operation.originEpoch === epoch ? result : null
+    // This is best-effort presentation feedback, not start authority. Clear the
+    // known stale label at this existing failure boundary before view teardown
+    // invalidates the epoch. Failure UI already takes precedence and later work
+    // overwrites the label, so an attempt-owned cleanup protocol would add
+    // coordination without protecting lifecycle, authority, or accepted input.
+    this.setPresentationPendingOperation(undefined)
     if (this.runtime.currentAttemptIsIndeterminate()) {
       this.suspendActiveViewForAuthoritativeRecovery()
     } else {
@@ -1023,30 +1031,34 @@ export class TerminalSession {
   }
 
   private setPresentationRecovery(next: TerminalPresentationRecovery | undefined): void {
-    const nextWait = next === 'pending' ? this.presentationWait : undefined
-    this.publishPresentationState(next, nextWait)
+    const nextPendingOperation = next === 'pending' ? this.presentationPendingOperation : undefined
+    this.publishPresentationState(next, nextPendingOperation)
   }
 
-  private setPresentationWait(next: TerminalPresentationWait | undefined): void {
+  private setPresentationPendingOperation(next: TerminalPresentationPendingOperation | undefined): void {
     this.publishPresentationState(this.presentationRecovery, next)
   }
 
   private publishPresentationState(
     recovery: TerminalPresentationRecovery | undefined,
-    wait: TerminalPresentationWait | undefined,
+    pendingOperation: TerminalPresentationPendingOperation | undefined,
   ): void {
     const recoveryChanged = this.presentationRecovery !== recovery
-    if (!this.updatePresentationState(recovery, wait)) return
+    if (!this.updatePresentationState(recovery, pendingOperation)) return
     this.notify(recoveryChanged ? 'metadata' : 'snapshot')
   }
 
   private updatePresentationState(
     recovery: TerminalPresentationRecovery | undefined,
-    wait: TerminalPresentationWait | undefined,
+    pendingOperation: TerminalPresentationPendingOperation | undefined,
   ): boolean {
-    if (this.presentationRecovery === recovery && this.presentationWait === wait) return false
+    if (
+      this.presentationRecovery === recovery &&
+      this.presentationPendingOperation === pendingOperation
+    )
+      return false
     this.presentationRecovery = recovery
-    this.presentationWait = wait
+    this.presentationPendingOperation = pendingOperation
     return true
   }
 

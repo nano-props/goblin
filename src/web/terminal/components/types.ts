@@ -83,7 +83,7 @@ export interface TerminalComposerSessionState {
 }
 
 export type TerminalPresentationRecovery = 'pending' | 'failed'
-export type TerminalPresentationWait =
+export type TerminalPresentationPendingOperation =
   | 'font-load'
   | 'server-restart'
   | 'server-sync'
@@ -104,8 +104,12 @@ export interface TerminalSnapshot {
   takeoverPending?: boolean
   /** Client-only feedback for rebuilding an already-open local terminal view. */
   presentationRecovery?: TerminalPresentationRecovery
-  /** Current local operation delaying terminal presentation. */
-  presentationWait?: TerminalPresentationWait
+  /**
+   * Best-effort client projection of the current local operation delaying presentation.
+   * It selects feedback text only and must not gate input, retries, lifecycle, or authority.
+   * Failure UI and later presentation work may supersede it without stronger coordination.
+   */
+  presentationPendingOperation?: TerminalPresentationPendingOperation
 }
 
 export interface TerminalSearchResult {

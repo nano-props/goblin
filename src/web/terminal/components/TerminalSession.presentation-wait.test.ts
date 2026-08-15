@@ -29,12 +29,12 @@ describe('TerminalSession presentation wait disclosure', () => {
     session.attach(createTerminalHost())
 
     await waitForMicrotaskCondition(() => geometryMocks.preloadTerminalFont.mock.calls.length === 1)
-    expect(session.snapshot().presentationWait).toBe('font-load')
+    expect(session.snapshot().presentationPendingOperation).toBe('font-load')
     expect(terminalCalls.attach).not.toHaveBeenCalled()
 
     preload.resolve()
     await flushTerminalStart()
-    expect(session.snapshot().presentationWait).toBeUndefined()
+    expect(session.snapshot().presentationPendingOperation).toBeUndefined()
   })
 
   test('projects each serial operation after font loading until rendering completes', async () => {
@@ -45,22 +45,22 @@ describe('TerminalSession presentation wait disclosure', () => {
     session.attach(createTerminalHost())
 
     await waitForMicrotaskCondition(() => terminalCalls.attach.mock.calls.length === 1)
-    expect(session.snapshot().presentationWait).toBe('server-sync')
+    expect(session.snapshot().presentationPendingOperation).toBe('server-sync')
     expect(notify).toHaveBeenLastCalledWith('snapshot')
 
     const term = xtermMocks.terminals[0]!
     xtermMocks.deferWriteCallbacks(true)
     attach.resolve(attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'restored prompt' }))
     await waitForMicrotaskCondition(() => term.write.mock.calls.length === 1)
-    expect(session.snapshot().presentationWait).toBe('snapshot-replay')
+    expect(session.snapshot().presentationPendingOperation).toBe('snapshot-replay')
 
     xtermMocks.deferWriteCallbacks(false)
     xtermMocks.flushDeferredWriteCallbacks()
     await waitForMicrotaskCondition(() => term.refresh.mock.calls.length === 1)
-    expect(session.snapshot().presentationWait).toBe('viewport-render')
+    expect(session.snapshot().presentationPendingOperation).toBe('viewport-render')
 
     await flushTerminalStart()
-    expect(session.snapshot().presentationWait).toBeUndefined()
+    expect(session.snapshot().presentationPendingOperation).toBeUndefined()
   })
 
   test('distinguishes a restart request from an attach synchronization', async () => {
@@ -73,11 +73,11 @@ describe('TerminalSession presentation wait disclosure', () => {
     session.restart()
 
     await waitForMicrotaskCondition(() => terminalCalls.restart.mock.calls.length === 1)
-    expect(session.snapshot().presentationWait).toBe('server-restart')
+    expect(session.snapshot().presentationPendingOperation).toBe('server-restart')
 
     restart.resolve(restartResult('pty_session_1_aaaaaaaaa'))
     await flushTerminalStart()
-    expect(session.snapshot().presentationWait).toBeUndefined()
+    expect(session.snapshot().presentationPendingOperation).toBeUndefined()
   })
 })
 

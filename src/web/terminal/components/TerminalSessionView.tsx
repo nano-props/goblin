@@ -29,7 +29,10 @@ import {
   useTerminalFilesystemTargetSessionDescriptor,
   useTerminalSnapshot,
 } from '#/web/terminal/components/terminal-session-store.ts'
-import type { TerminalInputWriter, TerminalPresentationWait } from '#/web/terminal/components/types.ts'
+import type {
+  TerminalInputWriter,
+  TerminalPresentationPendingOperation,
+} from '#/web/terminal/components/types.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { terminalLog } from '#/web/logger.ts'
@@ -46,13 +49,13 @@ const TERMINAL_PASTE_FILE_ERROR_KEYS = {
   count: 'terminal.paste-file-too-many',
 } as const satisfies Record<PasteFileLimitError['kind'], string>
 
-const TERMINAL_PRESENTATION_WAIT_LABEL_KEYS = {
+const TERMINAL_PRESENTATION_PENDING_OPERATION_LABEL_KEYS = {
   'font-load': 'terminal.loading-font',
   'server-restart': 'terminal.restarting',
   'server-sync': 'terminal.syncing-session',
   'snapshot-replay': 'terminal.loading-content',
   'viewport-render': 'terminal.rendering',
-} as const satisfies Record<TerminalPresentationWait, DictKey>
+} as const satisfies Record<TerminalPresentationPendingOperation, DictKey>
 
 function terminalPasteFileErrorKey(error: unknown): string {
   if (!(error instanceof PasteFileLimitError)) return 'terminal.paste-file-failed'
@@ -496,11 +499,11 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
       const showStatusOverlay =
         (attaching && !showEmptyCta && !(currentSessionPhase === 'opening' && !descriptor.value && projectionFailed)) ||
         (!showErrorChip && !attaching && presentationRecovery === 'pending' && !projectionFailed)
-      const presentationWaitLabelKey = currentSnapshot.presentationWait
-        ? TERMINAL_PRESENTATION_WAIT_LABEL_KEYS[currentSnapshot.presentationWait]
+      const presentationPendingOperationLabelKey = currentSnapshot.presentationPendingOperation
+        ? TERMINAL_PRESENTATION_PENDING_OPERATION_LABEL_KEYS[currentSnapshot.presentationPendingOperation]
         : null
       let statusOverlayLabel = t('terminal.opening')
-      if (presentationWaitLabelKey) statusOverlayLabel = t(presentationWaitLabelKey)
+      if (presentationPendingOperationLabelKey) statusOverlayLabel = t(presentationPendingOperationLabelKey)
       else if (currentSessionPhase === 'restarting') statusOverlayLabel = t('terminal.restarting')
       else if (currentSessionPhase === 'opening' && !descriptor.value && projectionPending) {
         statusOverlayLabel = t('terminal.loading')

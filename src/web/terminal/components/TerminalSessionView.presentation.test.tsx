@@ -846,7 +846,9 @@ describe('TerminalSessionView presentation and focus', () => {
     ['server-sync', 'terminal.syncing-session'],
     ['snapshot-replay', 'terminal.loading-content'],
     ['viewport-render', 'terminal.rendering'],
-  ] as const)('shows the concrete %s operation during presentation recovery', async (presentationWait, label) => {
+  ] as const)(
+    'shows the concrete %s operation during presentation recovery',
+    async (presentationPendingOperation, label) => {
     const view = await renderTerminalSession(
       {},
       {
@@ -857,7 +859,7 @@ describe('TerminalSessionView presentation and focus', () => {
           composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
           attachment: { role: 'controller' },
           presentationRecovery: 'pending',
-          presentationWait,
+          presentationPendingOperation,
         },
       },
     )
@@ -867,7 +869,8 @@ describe('TerminalSessionView presentation and focus', () => {
     } finally {
       await view.cleanup()
     }
-  })
+    },
+  )
 
   test('shows an accessible attach-only retry and replaces it when recovery becomes pending', async () => {
     const retryPresentation = vi.fn(() => true)
