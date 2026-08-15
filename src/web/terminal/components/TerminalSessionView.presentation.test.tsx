@@ -840,6 +840,35 @@ describe('TerminalSessionView presentation and focus', () => {
     }
   })
 
+  test.each([
+    ['font-load', 'terminal.loading-font'],
+    ['server-restart', 'terminal.restarting'],
+    ['server-sync', 'terminal.syncing-session'],
+    ['snapshot-replay', 'terminal.loading-content'],
+    ['viewport-render', 'terminal.rendering'],
+  ] as const)('shows the concrete %s operation during presentation recovery', async (presentationWait, label) => {
+    const view = await renderTerminalSession(
+      {},
+      {
+        snapshot: {
+          phase: 'open',
+          message: null,
+          processName: 'zsh',
+          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
+          attachment: { role: 'controller' },
+          presentationRecovery: 'pending',
+          presentationWait,
+        },
+      },
+    )
+
+    try {
+      expect(view.container.querySelector('[role="status"]')?.textContent).toContain(label)
+    } finally {
+      await view.cleanup()
+    }
+  })
+
   test('shows an accessible attach-only retry and replaces it when recovery becomes pending', async () => {
     const retryPresentation = vi.fn(() => true)
     const view = await renderTerminalSession(

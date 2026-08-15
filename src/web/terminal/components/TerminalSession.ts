@@ -48,6 +48,7 @@ import type {
   TerminalFocusRequest,
   TerminalInputWriter,
   TerminalPresentationRecovery,
+  TerminalPresentationWait,
   TerminalSessionHydrationInput,
   TerminalSearchResult,
   TerminalVirtualKey,
@@ -105,6 +106,7 @@ export class TerminalSession {
   private readonly view: TerminalSessionView
   private takeoverOperation: Promise<boolean> | null = null
   private presentationRecovery: TerminalPresentationRecovery | undefined
+  private presentationWait: TerminalPresentationWait | undefined
   private startEpoch = 0
   private presentationAbortController: AbortController | null = null
   private resizeDispatch: TerminalResizeDispatch = { kind: 'idle' }
@@ -248,6 +250,7 @@ export class TerminalSession {
     if (this.disposed) return
     this.disposed = true
     this.presentationRecovery = undefined
+    this.presentationWait = undefined
     this.presentationAbortController?.abort()
     this.presentationAbortController = null
     this.view.blurIfFocused()
@@ -258,11 +261,12 @@ export class TerminalSession {
 
   snapshot() {
     const snapshot = this.runtime.snapshot()
-    if (!this.takeoverOperation && !this.presentationRecovery) return snapshot
+    if (!this.takeoverOperation && !this.presentationRecovery && !this.presentationWait) return snapshot
     return {
       ...snapshot,
       ...(this.takeoverOperation ? { takeoverPending: true } : {}),
       ...(this.presentationRecovery ? { presentationRecovery: this.presentationRecovery } : {}),
+      ...(this.presentationWait ? { presentationWait: this.presentationWait } : {}),
     }
   }
 
@@ -737,7 +741,8 @@ export class TerminalSession {
   }
 
   private async startAsync(epoch: number, attempt: TerminalRuntimeAttemptToken): Promise<void> {
-    if (this.runtime.phase() === 'open') this.setPresentationRecovery('pending')
+    if (this.runtime.phase() === 'open') this.publishPresentationState('pending', 'font-load')
+    else this.setPresentationWait('font-load')
     const presentationAbortController = this.beginPendingPresentation()
     let term: XTermTerminal
     try {
@@ -765,20 +770,24 @@ export class TerminalSession {
     let currentAttempt = attempt
     try {
       binding: for (;;) {
+        this.setPresentationWait(currentAttempt.operation === 'restart' ? 'server-restart' : 'server-sync')
         const result = await this.ipcPhase(epoch, currentAttempt, term)
         if (!result) {
           this.assertCurrentStart(epoch, term)
           if (!this.runtime.isController()) {
-            this.destroyActiveView({ preserveTransientState: true })
+            this.discardPresentationWithoutController()
             return false
           }
           currentAttempt = this.runtime.startAttaching()
           continue
         }
-        if (result.frame === 'snapshot') await this.replayPhase(epoch, term, result)
+        if (result.frame === 'snapshot') {
+          this.setPresentationWait('snapshot-replay')
+          await this.replayPhase(epoch, term, result)
+        }
         this.assertCurrentStart(epoch, term)
         if (!this.runtime.isController()) {
-          this.destroyActiveView({ preserveTransientState: true })
+          this.discardPresentationWithoutController()
           return false
         }
         if (!this.view.fitNow()) throw new StartCancelledError()
@@ -791,6 +800,7 @@ export class TerminalSession {
           continue
         }
         this.assertCurrentStart(epoch, term)
+        this.setPresentationWait('viewport-render')
         const presentation = await this.view.present(term, presentationAbortController.signal)
         if (presentation === 'cancelled') throw new StartCancelledError()
         if (presentation === 'presented') break binding
@@ -817,14 +827,21 @@ export class TerminalSession {
     if (!this.isCurrentStartEpoch(epoch)) return
     const indeterminate = this.runtime.currentAttemptIsIndeterminate()
     const resolution = this.runtime.cancelStartAttempt(attempt)
+    const nextPresentationRecovery = (() => {
+      if (resolution !== 'restored' || this.presentationRecovery !== 'pending' || indeterminate) {
+        return this.presentationRecovery
+      }
+      return error instanceof StartCancelledError ? undefined : 'failed'
+    })()
+    const presentationStateChanged = this.updatePresentationState(nextPresentationRecovery, undefined)
     if (resolution === 'staged') {
       this.applySettledStagedHydration()
     }
     this.destroyActiveView({ preserveTransientState: true })
-    if (resolution === 'restored' && this.presentationRecovery === 'pending' && !indeterminate) {
-      this.setPresentationRecovery(error instanceof StartCancelledError ? undefined : 'failed')
-    } else if (resolution === 'restored') {
+    if (resolution === 'restored') {
       this.notify('metadata')
+    } else if (resolution !== 'staged' && presentationStateChanged) {
+      this.notify('snapshot')
     }
     if (!(error instanceof StartCancelledError)) {
       terminalLog.warn('terminal presentation failed', {
@@ -1006,9 +1023,36 @@ export class TerminalSession {
   }
 
   private setPresentationRecovery(next: TerminalPresentationRecovery | undefined): void {
-    if (this.presentationRecovery === next) return
-    this.presentationRecovery = next
-    this.notify('metadata')
+    const nextWait = next === 'pending' ? this.presentationWait : undefined
+    this.publishPresentationState(next, nextWait)
+  }
+
+  private setPresentationWait(next: TerminalPresentationWait | undefined): void {
+    this.publishPresentationState(this.presentationRecovery, next)
+  }
+
+  private publishPresentationState(
+    recovery: TerminalPresentationRecovery | undefined,
+    wait: TerminalPresentationWait | undefined,
+  ): void {
+    const recoveryChanged = this.presentationRecovery !== recovery
+    if (!this.updatePresentationState(recovery, wait)) return
+    this.notify(recoveryChanged ? 'metadata' : 'snapshot')
+  }
+
+  private updatePresentationState(
+    recovery: TerminalPresentationRecovery | undefined,
+    wait: TerminalPresentationWait | undefined,
+  ): boolean {
+    if (this.presentationRecovery === recovery && this.presentationWait === wait) return false
+    this.presentationRecovery = recovery
+    this.presentationWait = wait
+    return true
+  }
+
+  private discardPresentationWithoutController(): void {
+    this.destroyActiveView({ preserveTransientState: true })
+    this.setPresentationRecovery(undefined)
   }
 
   private async replayPhase(
