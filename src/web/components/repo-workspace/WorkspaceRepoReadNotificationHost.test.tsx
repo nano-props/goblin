@@ -10,18 +10,21 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { WorkspaceRepoReadNotificationHost } from '#/web/components/repo-workspace/WorkspaceRepoReadNotificationHost.tsx'
 import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
+import { provideWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 import { createRepoBranch, resetWorkspacesStore, seedRepoQueryDataForTest } from '#/web/test-utils/repo-store.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/example-workspace')
 const WORKSPACE_RUNTIME_ID = 'workspace-runtime'
+const requestRuntimeRecovery = vi.fn()
 
 describe('WorkspaceRepoReadNotificationHost', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     appQueryClient.clear()
     resetWorkspacesStore()
+    requestRuntimeRecovery.mockClear()
   })
 
   test('projects concurrent stale reads as one persistent right-top notice', async () => {
@@ -53,12 +56,13 @@ describe('WorkspaceRepoReadNotificationHost', () => {
     expect(host.getAttribute('role')).toBe('status')
     expect(host.style.top).toBe(`${TITLE_BAR_HEIGHT_PX + 12}px`)
     expect(host.textContent).toContain('status.stale-title')
+    const snapshotReadsBeforeRetry = readSnapshot.mock.calls.length
+    const statusReadsBeforeRetry = readStatus.mock.calls.length
 
     await flushTestUpdates(() => screen.getByRole<HTMLButtonElement>('button', { name: 'error.try-again' }).click())
-    await vi.waitFor(() => {
-      expect(readSnapshot).toHaveBeenCalledOnce()
-      expect(readStatus).toHaveBeenCalledOnce()
-    })
+    expect(requestRuntimeRecovery).toHaveBeenCalledOnce()
+    expect(readSnapshot).toHaveBeenCalledTimes(snapshotReadsBeforeRetry)
+    expect(readStatus).toHaveBeenCalledTimes(statusReadsBeforeRetry)
   })
 
   test('waits for a workspace snapshot before surfacing dependent read failures', async () => {
@@ -84,7 +88,10 @@ describe('WorkspaceRepoReadNotificationHost', () => {
 
   test('surfaces an unavailable status read after the workspace snapshot is ready', async () => {
     seedReadyRepoQueries(WORKSPACE_RUNTIME_ID)
-    installGoblinTestBridge({})
+    const readStatus = vi.fn(async () => {
+      throw new Error('status failed')
+    })
+    installGoblinTestBridge({ 'repo.worktreeStatus': readStatus })
     renderNotification(WORKSPACE_RUNTIME_ID)
     setQueryError(repoWorktreeStatusQueryKey(WORKSPACE_ID, WORKSPACE_RUNTIME_ID), new Error('status failed'), 1, false)
 
@@ -92,6 +99,10 @@ describe('WorkspaceRepoReadNotificationHost', () => {
     expect(host.getAttribute('role')).toBe('alert')
     expect(host.textContent).toContain('error.failed-read-repo')
     expect(screen.getByTestId('repo-read-notification').getAttribute('data-kind')).toBe('unavailable')
+
+    await flushTestUpdates(() => screen.getByRole<HTMLButtonElement>('button', { name: 'error.try-again' }).click())
+    await vi.waitFor(() => expect(readStatus).toHaveBeenCalledOnce())
+    expect(requestRuntimeRecovery).not.toHaveBeenCalled()
   })
 
   test('presents membership changes as a neutral transition', async () => {
@@ -148,15 +159,25 @@ describe('WorkspaceRepoReadNotificationHost', () => {
 
 function notificationTree(workspaceRuntimeId: string) {
   return (
-    <VueQueryClientScope client={appQueryClient}>
-      <WorkspaceRepoReadNotificationHost
-        key={workspaceRuntimeId}
-        workspaceId={WORKSPACE_ID}
-        workspaceRuntimeId={workspaceRuntimeId}
-      />
-    </VueQueryClientScope>
+    <WorkspaceRuntimeRecoveryTestScope>
+      <VueQueryClientScope client={appQueryClient}>
+        <WorkspaceRepoReadNotificationHost
+          key={workspaceRuntimeId}
+          workspaceId={WORKSPACE_ID}
+          workspaceRuntimeId={workspaceRuntimeId}
+        />
+      </VueQueryClientScope>
+    </WorkspaceRuntimeRecoveryTestScope>
   )
 }
+
+const WorkspaceRuntimeRecoveryTestScope = defineComponent({
+  name: 'WorkspaceRuntimeRecoveryTestScope',
+  setup(_, { slots }) {
+    provideWorkspaceRuntimeRecoveryActions({ request: requestRuntimeRecovery })
+    return () => slots.default?.()
+  },
+})
 
 function renderNotification(workspaceRuntimeId: string) {
   return renderInJsdom(notificationTree(workspaceRuntimeId))

@@ -40,6 +40,7 @@ import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 import { useWorkspacePaneTabsRetryActions } from '#/web/runtime/workspace-pane-tabs-recovery-context.ts'
+import { useWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
 
 const projectionMocks = vi.hoisted(() => ({
   reconcileServerSessionsSnapshot: vi.fn(() => true),
@@ -601,6 +602,23 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
+  test('routes explicit runtime recovery through the same reconnect owner', async () => {
+    seedCurrentRepo()
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      projectionMocks.reconcileOpenWorkspaceRuntimeMemberships.mockClear()
+      projectionMocks.resyncActiveRepoReadQueries.mockClear()
+
+      await flushTestUpdates(() => document.querySelector<HTMLElement>('[data-retry-runtime-recovery]')?.click())
+
+      await vi.waitFor(() => expect(projectionMocks.reconcileOpenWorkspaceRuntimeMemberships).toHaveBeenCalledOnce())
+      await vi.waitFor(() => expect(projectionMocks.resyncActiveRepoReadQueries).toHaveBeenCalledOnce())
+    } finally {
+      result.unmount()
+    }
+  })
+
   test('does not publish a pending recovery after provider unmount', async () => {
     const repo = seedCurrentRepo()
     const recovery = Promise.withResolvers<TerminalSessionsSnapshot>()
@@ -672,8 +690,10 @@ const RuntimeProjectionRecoveryProbe = defineComponent<{ workspaceId: WorkspaceI
   setup(props) {
     const terminalRecovery = useTerminalProjectionRecoveryActions()
     const workspaceTabsRetry = useWorkspacePaneTabsRetryActions()
+    const runtimeRecovery = useWorkspaceRuntimeRecoveryActions()
     return () => (
       <>
+        <button data-retry-runtime-recovery="" onClick={runtimeRecovery.request} />
         <button
           data-retry-terminal-projection=""
           onClick={() => props.workspaceId && terminalRecovery.retryWorkspace(props.workspaceId)}

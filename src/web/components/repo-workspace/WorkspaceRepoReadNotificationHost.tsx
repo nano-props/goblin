@@ -9,6 +9,7 @@ import type { RepoReadCondition } from '#/web/repos/read-condition.ts'
 import { repoQueryReadFailure } from '#/web/repos/read-failure.ts'
 import type { RepoReadFailure } from '#/web/repos/read-failure.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repos/queries.ts'
+import { useWorkspaceRuntimeRecoveryActions } from '#/web/runtime/workspace-runtime-recovery-context.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 
 interface WorkspaceRepoReadNotificationHostProps {
@@ -31,6 +32,7 @@ export const WorkspaceRepoReadNotificationHost = defineComponent<WorkspaceRepoRe
 
   setup(props) {
     const t = useT()
+    const runtimeRecovery = useWorkspaceRuntimeRecoveryActions()
     const dismissedConditionKey = ref<string | null>(null)
     const snapshot = useRepoSnapshotReadModel(
       () => props.workspaceId,
@@ -91,7 +93,9 @@ export const WorkspaceRepoReadNotificationHost = defineComponent<WorkspaceRepoRe
         retryLabel: t('error.try-again'),
         dismissLabel: t('status.dismiss-notification'),
         retrying: currentCondition.retrying,
-        onRetry: currentCondition.retry,
+        onRetry: failures.value.some((failure) => failure.message === 'error.workspace-runtime-stale')
+          ? runtimeRecovery.request
+          : currentCondition.retry,
       }
     })
 
