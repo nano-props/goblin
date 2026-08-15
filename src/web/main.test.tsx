@@ -13,6 +13,7 @@ let appUnmount: ReturnType<typeof vi.fn>
 let showBootstrapLoading: (() => void) | null
 let hideBootstrapLoading: (() => void) | null
 let routerRenderError: Error | null
+let renderTestDialog: boolean
 let disposeWebApp: (() => void) | null
 
 beforeEach(() => {
@@ -26,6 +27,7 @@ beforeEach(() => {
   showBootstrapLoading = null
   hideBootstrapLoading = null
   routerRenderError = null
+  renderTestDialog = false
   disposeWebApp = null
 
   vi.doMock('#/web/stores/i18n.ts', () => ({
@@ -49,6 +51,8 @@ beforeEach(() => {
   }))
   vi.doMock('#/web/app/navigation/router.tsx', async () => {
     const { useBootstrapLoadingPresentation } = await import('#/web/app/bootstrap/bootstrap-loading-presentation.ts')
+    const { DialogDescription, DialogRoot, DialogTitle } = await import('reka-ui')
+    const { DialogContent } = await import('#/web/components/ui/dialog.tsx')
     return {
       appRouter: { install: vi.fn() },
       AppRouterProvider: defineComponent({
@@ -61,7 +65,19 @@ beforeEach(() => {
           onUnmounted(appUnmount)
           return () => {
             if (routerRenderError) throw routerRenderError
-            return <div>app mounted</div>
+            return (
+              <>
+                <div>app mounted</div>
+                {renderTestDialog ? (
+                  <DialogRoot open>
+                    <DialogContent>
+                      <DialogTitle>Layer test dialog</DialogTitle>
+                      <DialogDescription>Verifies the application overlay stacking contract.</DialogDescription>
+                    </DialogContent>
+                  </DialogRoot>
+                ) : null}
+              </>
+            )
           }
         },
       }),
@@ -166,6 +182,17 @@ describe('client entrypoint', () => {
     showBootstrapLoading?.()
     expect(document.querySelector('[role="status"]')).toBe(reenteredStatus)
     expect(reenteredStatus).not.toBe(initialStatus)
+  })
+
+  test('renders dialogs above an active bootstrap loading layer in the same document', async () => {
+    renderTestDialog = true
+
+    await loadMain()
+
+    await waitFor(() => expect(document.querySelector('[data-slot="dialog-content"]')).not.toBeNull())
+    expect(document.querySelector('[role="status"]')?.parentElement?.className).toContain('z-40')
+    expect(document.querySelector('[data-slot="dialog-overlay"]')?.className).toContain('z-50')
+    expect(document.querySelector('[data-slot="dialog-content"]')?.className).toContain('z-50')
   })
 
   test('lets the root error boundary replace an active loading overlay', async () => {
