@@ -20,7 +20,7 @@ export interface MockWebSocketInstance {
   addEventListener: (type: string, cb: (event: unknown) => void) => void
   removeEventListener: (type: string, cb: (event: unknown) => void) => void
   send: (data: string) => void
-  close: () => void
+  close: (code?: number, reason?: string) => void
   emitOpen: () => void
   emitMessage: (data: unknown) => void
   emitError: () => void
@@ -95,9 +95,9 @@ export function installWebSocketMock(options: { autoOpen?: boolean } = {}): WebS
       this.sent.push(data)
     }
 
-    close() {
+    close(code = 1000, reason = '') {
       this.readyState = CLOSED
-      this.emit('close', {})
+      this.emit('close', { code, reason })
     }
 
     emitOpen() {

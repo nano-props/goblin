@@ -84,12 +84,13 @@ export function createWebSocketLifecycle<TConnection>(
       options.onMessage?.(event, entry)
     })
     socket.addEventListener('close', (event) => {
-      if (!isActive(socket, generation)) return
-      handleDisconnect(entry, closeReason, event)
+      if (!retireEntry(entry)) return
+      notifyDisconnect(entry, formatWebSocketCloseReason(closeReason, event), event)
     })
     socket.addEventListener('error', (event) => {
-      if (!isActive(socket, generation)) return
-      handleDisconnect(entry, errorReason, event)
+      if (!retireEntry(entry)) return
+      closeEntry(entry)
+      notifyDisconnect(entry, errorReason, event)
     })
 
     return entry
@@ -111,8 +112,9 @@ export function createWebSocketLifecycle<TConnection>(
   function disconnect(reason: string, socket: WebSocket | null = activeEntry?.socket ?? null): void {
     const entry = activeEntry
     if (!entry || entry.socket !== socket) return
-    handleDisconnect(entry, reason)
+    if (!retireEntry(entry)) return
     closeEntry(entry)
+    notifyDisconnect(entry, reason)
   }
 
   function forgetUnavailableSocket(): void {
@@ -138,10 +140,14 @@ export function createWebSocketLifecycle<TConnection>(
     } catch {}
   }
 
-  function handleDisconnect(entry: WebSocketLifecycleEntry<TConnection>, reason: string, event?: Event): void {
-    if (activeEntry !== entry) return
+  function retireEntry(entry: WebSocketLifecycleEntry<TConnection>): boolean {
+    if (activeEntry !== entry) return false
     activeEntry = null
     entry.phase = 'closing'
+    return true
+  }
+
+  function notifyDisconnect(entry: WebSocketLifecycleEntry<TConnection>, reason: string, event?: Event): void {
     options.onDisconnect?.(entry, { reason, idleClose: entry.closeWhenIdle, event })
   }
 
@@ -155,4 +161,9 @@ export function createWebSocketLifecycle<TConnection>(
     forgetUnavailableSocket,
     closeAndForget,
   }
+}
+
+function formatWebSocketCloseReason(reason: string, event: CloseEvent): string {
+  const detail = event.reason ? `${event.code}: ${event.reason}` : String(event.code)
+  return `${reason} (${detail})`
 }

@@ -1,5 +1,6 @@
 import { Hono, type Context, type Next } from 'hono'
 import { upgradeWebSocket } from '@hono/node-server'
+import { serverNodeLog } from '#/node/logger.ts'
 import {
   InvalidationSocketLimitError,
   registerInvalidationSocket,
@@ -22,6 +23,10 @@ interface RealtimeRouteOptions {
   appRealtimeHost: ServerAppRealtimeHost
 }
 
+type RealtimeSubscriberChannel = 'invalidation' | 'client-intent' | 'app'
+
+const realtimeRoutesLogger = serverNodeLog.child({ module: 'realtime-routes' })
+
 // Cap each app realtime WS message. Terminal paste is currently the largest
 // legitimate payload, but the limit belongs to the shared transport now that
 // runtime capabilities are siblings.
@@ -38,6 +43,14 @@ interface RealtimeRouteOptions {
 // happens in the client's existing `useClientEffectIntentRouter`,
 // which already handles the same intents coming from Electron IPC.
 export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeRouteOptions) {
+  const warnedSubscriberLimits = new Set<RealtimeSubscriberChannel>()
+
+  function warnSubscriberLimitOnce(channel: RealtimeSubscriberChannel, err: Error): void {
+    if (warnedSubscriberLimits.has(channel)) return
+    warnedSubscriberLimits.add(channel)
+    realtimeRoutesLogger.warn({ channel, err }, 'realtime subscriber limit reached')
+  }
+
   // Accepted tradeoff: WS upgrades do not validate Origin. They still require
   // the access token, and SameSite=Lax blocks normal cross-site cookie use;
   // the residual same-site risk is accepted for loopback/trusted-LAN use.
@@ -83,6 +96,7 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
               try {
                 ws.close(1013, 'subscriber limit reached')
               } catch {}
+              warnSubscriberLimitOnce('invalidation', err)
               return
             }
             throw err
@@ -116,6 +130,7 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
               try {
                 ws.close(1013, 'subscriber limit reached')
               } catch {}
+              warnSubscriberLimitOnce('client-intent', err)
               return
             }
             throw err
@@ -152,6 +167,7 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
             try {
               socket.close(1013, 'subscriber limit reached')
             } catch {}
+            warnSubscriberLimitOnce('app', err)
             return
           }
           socket.terminate()

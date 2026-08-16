@@ -79,4 +79,48 @@ describe('websocket lifecycle', () => {
     expect(onMessage).toHaveBeenCalledTimes(1)
     expect(onMessage.mock.calls[0]?.[0].data).toBe('fresh')
   })
+
+  test('closes a socket after an error releases its lifecycle ownership', () => {
+    const onDisconnect = vi.fn()
+    const lifecycle = createWebSocketLifecycle({
+      resolveConnection: () => ({ url: 'ws://example.test/socket' }),
+      createSocket: (connection) => new WebSocket(connection.url),
+      shouldOpen: () => true,
+      shouldKeepOpen: () => true,
+      onDisconnect,
+    })
+
+    lifecycle.ensureSocket()
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing socket')
+    socket.emitOpen()
+    socket.emitError()
+
+    expect(lifecycle.active()).toBeNull()
+    expect(socket.readyState).toBe(wsMock.CLOSED)
+    expect(onDisconnect).toHaveBeenCalledTimes(1)
+  })
+
+  test('preserves a server close code and reason in the disconnect context', () => {
+    const onDisconnect = vi.fn()
+    const lifecycle = createWebSocketLifecycle({
+      resolveConnection: () => ({ url: 'ws://example.test/socket' }),
+      createSocket: (connection) => new WebSocket(connection.url),
+      shouldOpen: () => true,
+      shouldKeepOpen: () => true,
+      closeReason: 'app socket closed',
+      onDisconnect,
+    })
+
+    lifecycle.ensureSocket()
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing socket')
+    socket.emitOpen()
+    socket.emit('close', { code: 1011, reason: 'realtime transition failed' })
+
+    expect(onDisconnect).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ reason: 'app socket closed (1011: realtime transition failed)' }),
+    )
+  })
 })
