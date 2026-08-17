@@ -1,9 +1,9 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { GitHead } from '#/shared/git-head.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { workspacePaneTabEntryIdentity, type WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/workspace-pane-tab-navigation.ts'
 import {
@@ -20,7 +20,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-close-target.ts'
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
-  workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromLocation,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { captureUnownedAppNavigationGeneration, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
@@ -38,9 +38,7 @@ export interface RetiredTerminalWorkspacePaneTabPresentationOptions {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  routeTarget: WorkspacePaneTabsTarget
-  paneTarget: WorkspacePaneTabsTarget
-  worktreeHead?: GitHead
+  location: WorkspacePaneLocation
   navigation: AppNavigationActions
   terminalSessionId: string
   tabsBeforeRetirement: WorkspacePaneTabEntry[]
@@ -212,12 +210,8 @@ export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
   clearWorkspacePaneTabOpener(workspacePaneTabsTargetForClose(target), target.workspaceRuntimeId, closingIdentity)
   const presentationLease = transition.presentationLease
   if (!presentationLease) return Promise.resolve(false)
-  const queueTarget = workspacePaneActionTargetFromCoordinates({
-    workspaceId: target.workspaceId,
-    workspaceRuntimeId: target.workspaceRuntimeId,
-    branchName: target.branchName,
-    worktreePath: target.worktreePath,
-  })
+  if (!target.location) return Promise.resolve(false)
+  const queueTarget = workspacePaneActionTargetFromLocation(target.location)
   return runWorkspacePaneAction(queueTarget, async () => {
     try {
       if (!workspacePaneTabControllerTargetIsCurrent(target)) return false

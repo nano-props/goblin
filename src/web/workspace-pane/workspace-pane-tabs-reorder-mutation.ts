@@ -12,7 +12,7 @@ import {
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   runWorkspacePaneAction,
-  workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromPaneTarget,
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
@@ -137,10 +137,5 @@ async function runWorkspacePaneTabsReorderInQueue(
 type WorkspacePaneTabsReorderTarget = WorkspacePaneTabsTarget & { workspaceRuntimeId: string }
 
 function workspacePaneReorderActionTarget(target: WorkspacePaneTabsReorderTarget): WorkspacePaneActionTarget {
-  return workspacePaneActionTargetFromCoordinates({
-    workspaceId: target.workspaceId,
-    workspaceRuntimeId: target.workspaceRuntimeId,
-    branchName: workspacePaneTabsBranchIdentity(target),
-    worktreePath: workspacePaneTabsTargetWorktreePath(target),
-  })
+  return workspacePaneActionTargetFromPaneTarget(target, target.workspaceRuntimeId)
 }

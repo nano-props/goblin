@@ -58,7 +58,7 @@ export const TerminalActionDialogHost = defineComponent<Props>({
           await runConfirmCloseTerminalWorkspacePaneTabCommand({
             workspaceId: payload.workspaceId,
             workspacePaneRoute: payload.workspacePaneRoute,
-            routeTarget: payload.routeTarget,
+            location: payload.location,
             currentWorkspacePaneRoute: props.currentWorkspacePaneRoute,
             navigation: props.navigation,
             targetIdentity: payload.targetIdentity,

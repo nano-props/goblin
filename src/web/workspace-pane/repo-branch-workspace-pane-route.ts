@@ -8,15 +8,16 @@ import {
   isMaterializedWorkspacePaneRuntimeTab,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
-import {
-  preferredWorkspacePaneTabForTarget,
-  workspacePaneTabsTargetForRepoBranch,
-} from '#/web/stores/workspaces/workspace-pane-preferences.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { repoWorktreeForBranch } from '#/shared/git-types.ts'
+import {
+  workspacePaneLocationForBranch,
+  workspacePaneLocationExecutionTarget,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export type WorkspacePaneRouteResolution =
   | { kind: 'missing' }
@@ -32,11 +33,14 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
   if (!repo || repo.capability.kind !== 'git') return { kind: 'missing' }
   const branchModel = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)
   if (!branchModel) return { kind: 'unavailable', reason: 'snapshot-unavailable' }
-  const target = workspacePaneTabsTargetForRepoBranch(
-    { workspaceId: repo.id, branches: branchModel.branches, worktrees: branchModel.worktrees },
+  if (!branchModel.branches.some((branch) => branch.name === branchName)) return { kind: 'missing' }
+  const location = workspacePaneLocationForBranch(
+    repo.id,
+    repo.workspaceRuntimeId,
     branchName,
+    repoWorktreeForBranch(branchModel.worktrees, branchName) ?? null,
   )
-  if (!target) return { kind: 'missing' }
+  const target = location.paneTarget
   const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
     ...target,
     workspaceRuntimeId: repo.workspaceRuntimeId,
@@ -50,17 +54,12 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
-    filesystemTarget:
-      target.kind === 'git-worktree'
-        ? gitWorktreeFilesystemExecutionTarget(repo.id, repo.workspaceRuntimeId, target.worktreePath)
-        : null,
+    filesystemTarget: location.kind === 'branch' ? null : workspacePaneLocationExecutionTarget(location),
   })
   const model = createWorkspacePaneTabModel({
     workspaceId: repo.id,
     workspaceRuntimeId: repo.workspaceRuntimeId,
-    routeTarget: target,
-    worktreeHead: target.kind === 'git-worktree' ? { kind: 'branch', branchName } : undefined,
-    paneTarget: target,
+    location,
     preferredTab: preferredWorkspacePaneTabForTarget(repo.ui, target),
     allowPreferredTabFallback: true,
     tabEntries: tabEntriesProjection.tabs,
@@ -69,14 +68,18 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
     runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
   })
   const activeTab = model.activeTab
-  if (!activeTab) return { kind: 'route', target, route: null }
+  if (!activeTab) return { kind: 'route', target: location.routeTarget, route: null }
   if (isMaterializedWorkspacePaneRuntimeTab(activeTab)) {
     if (activeTab.runtimeType === 'terminal') {
-      return { kind: 'route', target, route: { kind: 'terminal', terminalSessionId: activeTab.sessionId } }
+      return {
+        kind: 'route',
+        target: location.routeTarget,
+        route: { kind: 'terminal', terminalSessionId: activeTab.sessionId },
+      }
     }
-    return { kind: 'route', target, route: null }
+    return { kind: 'route', target: location.routeTarget, route: null }
   }
-  return { kind: 'route', target, route: { kind: 'static', tab: activeTab.type } }
+  return { kind: 'route', target: location.routeTarget, route: { kind: 'static', tab: activeTab.type } }
 }
 
 export function openWorkspacePaneRoute(

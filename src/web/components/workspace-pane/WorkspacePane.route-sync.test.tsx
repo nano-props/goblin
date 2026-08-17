@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { workspacePaneLocationForLinkedWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 import {
   createRepoWorktreeSnapshotForTest,
   seedRepoWithReadModelForTest,
@@ -499,8 +500,13 @@ describe('WorkspacePane route synchronization', () => {
     const closePromise = runCloseWorkspacePaneTabCommand({
       workspaceId: REPO_ID,
       target: {
+        location: workspacePaneLocationForLinkedWorktree(
+          { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath },
+          repo.workspaceRuntimeId,
+          { kind: 'branch', branchName },
+        ),
         workspacePaneRoute: { kind: 'static', tab: 'files' },
-        filesystemTarget: gitWorktreeFilesystemTarget(repo, worktreePath, branchName),
+        capabilities: gitWorktreeFilesystemTarget(repo, worktreePath, branchName).capabilities,
       },
       navigation: actions,
     })

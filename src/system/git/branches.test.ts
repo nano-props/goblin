@@ -68,21 +68,23 @@ describe('getBranchWorktreeIdentities', () => {
           materializedBranch: 'feature/linked',
         },
       ]),
-    ).resolves.toEqual([
-      {
-        kind: 'git-worktree',
-        worktreePath: '/repo',
-        head: { kind: 'branch', branchName: 'main' },
-        materializedBranch: 'main',
-      },
-      {
-        kind: 'git-worktree',
-        worktreePath: '/worktrees/linked',
-        head: { kind: 'branch', branchName: 'feature/linked' },
-        materializedBranch: 'feature/linked',
-      },
-      { kind: 'git-branch', branchName: 'feature/free' },
-    ])
+    ).resolves.toEqual({
+      worktrees: [
+        {
+          kind: 'git-worktree',
+          worktreePath: '/repo',
+          head: { kind: 'branch', branchName: 'main' },
+          materializedBranch: 'main',
+        },
+        {
+          kind: 'git-worktree',
+          worktreePath: '/worktrees/linked',
+          head: { kind: 'branch', branchName: 'feature/linked' },
+          materializedBranch: 'feature/linked',
+        },
+      ],
+      branches: [{ kind: 'git-branch', branchName: 'feature/free' }],
+    })
     expect(git).toHaveBeenCalledWith('/repo', ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'], {
       signal: undefined,
     })
@@ -110,14 +112,17 @@ describe('getBranchWorktreeIdentities', () => {
           materializedBranch: null,
         },
       ]),
-    ).resolves.toEqual([
-      {
-        kind: 'git-worktree',
-        worktreePath: '/repo',
-        head: { kind: 'detached' },
-        materializedBranch: null,
-      },
-    ])
+    ).resolves.toEqual({
+      worktrees: [
+        {
+          kind: 'git-worktree',
+          worktreePath: '/repo',
+          head: { kind: 'detached' },
+          materializedBranch: null,
+        },
+      ],
+      branches: [],
+    })
   })
 
   test('does not expose the branch retained by a detached worktree', async () => {
@@ -132,15 +137,17 @@ describe('getBranchWorktreeIdentities', () => {
           materializedBranch: 'feature/in-progress',
         },
       ]),
-    ).resolves.toEqual([
-      {
-        kind: 'git-worktree',
-        worktreePath: '/repo',
-        head: { kind: 'detached' },
-        materializedBranch: 'feature/in-progress',
-      },
-      { kind: 'git-branch', branchName: 'main' },
-    ])
+    ).resolves.toEqual({
+      worktrees: [
+        {
+          kind: 'git-worktree',
+          worktreePath: '/repo',
+          head: { kind: 'detached' },
+          materializedBranch: 'feature/in-progress',
+        },
+      ],
+      branches: [{ kind: 'git-branch', branchName: 'main' }],
+    })
   })
 
   test('rejects a committed materialized branch missing from local refs', async () => {

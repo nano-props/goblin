@@ -19,14 +19,15 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { useWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
 import { useSyncWorkspacePaneRuntimeTabProviderSelection } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
-import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { GitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import type { GitHead } from '#/shared/git-head.ts'
+import type { WorkspaceRepoWorktreeSnapshot } from '#/shared/git-types.ts'
+import { workspaceRootFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import {
-  gitWorktreeFilesystemExecutionTarget,
-  workspaceRootFilesystemExecutionTarget,
-} from '#/shared/workspace-runtime.ts'
+  workspacePaneLocationForBranch,
+  workspacePaneLocationExecutionTarget,
+  workspacePaneLocationForWorktree,
+  workspacePaneLocationForRoot,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export interface WorkspacePaneModelWorkspace {
   id: WorkspaceId
@@ -57,17 +58,21 @@ export function useGitWorkspacePaneTabModelInput(
 ): ComputedRef<WorkspacePaneTabModelInput> {
   const workspace = computed(() => toValue(gitWorkspace))
   const branchName = computed(() => toValue(detail).branch?.name ?? null)
-  const worktreePath = computed(() => toValue(detail).worktree?.path ?? null)
+  const worktree = computed(() => toValue(detail).worktree ?? null)
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     workspaceId: () => workspace.value.id,
     workspaceRuntimeId: () => workspace.value.workspaceRuntimeId,
     filesystemTarget: () =>
-      worktreePath.value
-        ? gitWorktreeFilesystemExecutionTarget(
-            workspace.value.id,
-            workspace.value.workspaceRuntimeId,
-            worktreePath.value,
-          )
+      branchName.value
+        ? (() => {
+            const context = workspacePaneLocationForBranch(
+              workspace.value.id,
+              workspace.value.workspaceRuntimeId,
+              branchName.value,
+              worktree.value,
+            )
+            return context.kind === 'branch' ? null : workspacePaneLocationExecutionTarget(context)
+          })()
         : null,
   })
   const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(
@@ -78,17 +83,22 @@ export function useGitWorkspacePaneTabModelInput(
   return computed(() => {
     const currentWorkspace = workspace.value
     const currentBranchName = branchName.value
-    const currentWorktreePath = worktreePath.value
+    const currentWorktree = worktree.value
     const route = toValue(workspacePaneRoute)
-    const target = currentBranchName
-      ? requiredGitWorkspacePaneTabsTarget(currentWorkspace.id, currentBranchName, currentWorktreePath)
+    const location = currentBranchName
+      ? workspacePaneLocationForBranch(
+          currentWorkspace.id,
+          currentWorkspace.workspaceRuntimeId,
+          currentBranchName,
+          currentWorktree,
+        )
       : null
-    const routedWorktree = target?.kind === 'git-worktree'
+    const routedWorktree = location?.kind === 'source-worktree' || location?.kind === 'linked-worktree'
     const tabEntriesProjectionPhase = workspacePaneTabsProjectionPhase(workspacePaneTabsQuery.status.value)
     const tabEntries = projectWorkspacePaneTabsForTarget(
       workspacePaneTabsQuery.data.value,
       tabEntriesProjectionPhase,
-      target ?? {
+      location?.paneTarget ?? {
         kind: 'inactive',
         workspaceId: currentWorkspace.id,
         branchName: null,
@@ -102,16 +112,13 @@ export function useGitWorkspacePaneTabModelInput(
           ? 'terminal'
           : route?.kind === 'invalid-static' || (route === null && !routedWorktree)
             ? null
-            : (preferredWorkspacePaneTabForTarget(currentWorkspace.ui, target) ?? tabEntries[0]?.type ?? null)
+            : (preferredWorkspacePaneTabForTarget(currentWorkspace.ui, location?.paneTarget) ??
+              tabEntries[0]?.type ??
+              null)
     return {
       workspaceId: currentWorkspace.id,
       workspaceRuntimeId: currentWorkspace.workspaceRuntimeId,
-      routeTarget: target ?? { kind: 'inactive', workspaceId: currentWorkspace.id },
-      paneTarget: target ?? { kind: 'inactive', workspaceId: currentWorkspace.id },
-      worktreeHead:
-        currentBranchName && currentWorktreePath
-          ? { kind: 'branch' as const, branchName: currentBranchName }
-          : undefined,
+      location,
       preferredTab,
       allowPreferredTabFallback: route === undefined || (route === null && routedWorktree),
       tabEntries,
@@ -141,13 +148,10 @@ export function useWorkspaceRootTabModel(
   return computed(() => {
     const current = currentWorkspace.value
     const route = toValue(workspacePaneRoute)
-    const target = { kind: 'workspace-root' as const, workspaceId: current.id }
+    const location = workspacePaneLocationForRoot(current.id, current.workspaceRuntimeId)
+    const target = location.paneTarget
     const tabEntriesProjectionPhase = workspacePaneTabsProjectionPhase(tabsQuery.status.value)
-    const tabEntries = projectWorkspacePaneTabsForTarget(
-      tabsQuery.data.value,
-      tabEntriesProjectionPhase,
-      target,
-    ).tabs
+    const tabEntries = projectWorkspacePaneTabsForTarget(tabsQuery.data.value, tabEntriesProjectionPhase, target).tabs
     const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
     const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
     const preferredTab = route
@@ -158,8 +162,7 @@ export function useWorkspaceRootTabModel(
     return createWorkspacePaneTabModel({
       workspaceId: current.id,
       workspaceRuntimeId: current.workspaceRuntimeId,
-      routeTarget: target,
-      paneTarget: target,
+      location,
       preferredTab,
       allowPreferredTabFallback: route === null,
       tabEntries,
@@ -172,37 +175,36 @@ export function useWorkspaceRootTabModel(
 }
 
 export function useGitWorktreeWorkspacePaneTabModel(
+  workspaceId: MaybeRefOrGetter<WorkspaceId>,
   workspaceRuntime: MaybeRefOrGetter<WorkspacePaneRuntimeContext>,
-  target: MaybeRefOrGetter<GitWorktreeWorkspacePaneTabsTarget>,
-  worktreeHead: MaybeRefOrGetter<GitHead>,
+  worktree: MaybeRefOrGetter<WorkspaceRepoWorktreeSnapshot>,
   workspacePaneRoute: MaybeRefOrGetter<ParsedWorkspacePaneRoute | null>,
 ): ComputedRef<WorkspacePaneTabModel> {
+  const currentWorkspaceId = computed(() => toValue(workspaceId))
   const currentWorkspaceRuntime = computed(() => toValue(workspaceRuntime))
-  const currentTarget = computed(() => toValue(target))
+  const currentWorktree = computed(() => toValue(worktree))
+  const currentLocation = computed(() =>
+    workspacePaneLocationForWorktree(
+      currentWorkspaceId.value,
+      currentWorkspaceRuntime.value.workspaceRuntimeId,
+      currentWorktree.value,
+    ),
+  )
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
-    workspaceId: () => currentTarget.value.workspaceId,
+    workspaceId: () => currentWorkspaceId.value,
     workspaceRuntimeId: () => currentWorkspaceRuntime.value.workspaceRuntimeId,
-    filesystemTarget: () =>
-      gitWorktreeFilesystemExecutionTarget(
-        currentTarget.value.workspaceId,
-        currentWorkspaceRuntime.value.workspaceRuntimeId,
-        currentTarget.value.worktreePath,
-      ),
+    filesystemTarget: () => workspacePaneLocationExecutionTarget(currentLocation.value),
   })
   const tabsQuery = useWorkspacePaneTabsQuery(
-    () => currentTarget.value.workspaceId,
+    () => currentWorkspaceId.value,
     () => currentWorkspaceRuntime.value.workspaceRuntimeId,
   )
   return computed(() => {
     const currentRuntime = currentWorkspaceRuntime.value
-    const current = currentTarget.value
+    const current = currentLocation.value.paneTarget
     const route = toValue(workspacePaneRoute)
     const tabEntriesProjectionPhase = workspacePaneTabsProjectionPhase(tabsQuery.status.value)
-    const tabEntries = projectWorkspacePaneTabsForTarget(
-      tabsQuery.data.value,
-      tabEntriesProjectionPhase,
-      current,
-    ).tabs
+    const tabEntries = projectWorkspacePaneTabsForTarget(tabsQuery.data.value, tabEntriesProjectionPhase, current).tabs
     const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
     const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
     const preferredTab = route
@@ -213,9 +215,7 @@ export function useGitWorktreeWorkspacePaneTabModel(
     return createWorkspacePaneTabModel({
       workspaceId: current.workspaceId,
       workspaceRuntimeId: currentRuntime.workspaceRuntimeId,
-      routeTarget: current,
-      paneTarget: current,
-      worktreeHead: toValue(worktreeHead),
+      location: currentLocation.value,
       preferredTab,
       allowPreferredTabFallback: route === null,
       tabEntries,

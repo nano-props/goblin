@@ -16,7 +16,6 @@ import type {
 } from '#/web/app/navigation/actions.ts'
 import {
   isWorkspacePaneRuntimeTabProjection,
-  type WorkspacePaneModelTarget,
   type WorkspacePaneTab,
   type WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
@@ -32,15 +31,11 @@ import {
   type AppNavigationGeneration,
 } from '#/web/app/navigation/lifecycle.ts'
 import { claimTerminalPresentationFocus, type TerminalPresentationFocusEffects } from '#/web/terminal/focus.ts'
+import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export type WorkspacePaneTabControllerRoute = WorkspacePaneRouteTarget
 export interface WorkspacePaneControllerTarget {
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
-  routeTarget: WorkspacePaneModelTarget
-  branchName: string | null
-  worktreePath: string | null
-  paneTarget: WorkspacePaneModelTarget
+  location: WorkspacePaneLocation | null
 }
 export type WorkspacePaneTabControllerObservedRoute = ParsedWorkspacePaneRouteTarget
 type WorkspacePaneControllerRoutePrecondition =
@@ -88,12 +83,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   if (!workspacePaneTabControllerTargetIsCurrent(input.target)) return null
   const navigationGeneration = input.navigationGeneration ?? beginAppNavigation()
   const target: WorkspacePaneControllerTarget = {
-    workspaceId: input.target.workspaceId,
-    workspaceRuntimeId: input.target.workspaceRuntimeId,
-    routeTarget: input.target.routeTarget,
-    branchName: input.target.branchName,
-    worktreePath: input.target.worktreePath,
-    paneTarget: input.target.paneTarget,
+    location: input.target.location,
   }
   return {
     navigationGeneration,
@@ -207,11 +197,12 @@ async function commitWorkspacePaneControllerTargetRoute(
   navigationGeneration: AppNavigationGeneration,
   fromRoute?: WorkspacePaneTabControllerObservedRoute,
 ): Promise<boolean> {
-  if (target.routeTarget.kind === 'inactive') {
+  const location = target.location
+  if (!location) {
     options?.onAbandon?.()
     return false
   }
-  if (target.routeTarget.kind === 'git-branch') {
+  if (location.kind === 'branch') {
     if (route?.kind === 'terminal' || fromRoute?.kind === 'terminal') {
       options?.onAbandon?.()
       return false
@@ -264,7 +255,7 @@ export async function commitWorkspacePaneCurrentTargetRoute(
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
   navigationGeneration?: AppNavigationGeneration,
 ): Promise<boolean> {
-  if (!target.branchName || !workspacePaneTabControllerTargetIsCurrent(target)) {
+  if (target.location?.kind !== 'branch' || !workspacePaneTabControllerTargetIsCurrent(target)) {
     options?.onAbandon?.()
     return false
   }
@@ -294,24 +285,30 @@ async function commitWorkspacePaneValidatedTargetRoute(
     options?.onAbandon?.()
     return false
   }
-  const branchName = target.branchName
-  if (!branchName || !targetIsCurrent(target)) {
+  const location = target.location
+  if (location?.kind !== 'branch' || !targetIsCurrent(target)) {
     options?.onAbandon?.()
     return false
   }
   let completed = false
   try {
-    const committed = await commitWorkspacePaneControllerRoute(target.workspaceId, branchName, route, navigation, {
-      replace: options?.replace,
-      navigationGeneration,
-      ...routeOptions,
-    })
+    const committed = await commitWorkspacePaneControllerRoute(
+      location.workspaceId,
+      location.branchName,
+      route,
+      navigation,
+      {
+        replace: options?.replace,
+        navigationGeneration,
+        ...routeOptions,
+      },
+    )
     const supplementCommitted =
       committed &&
       commitSupplement(
         {
-          workspaceRuntimeId: target.workspaceRuntimeId,
-          routeTarget: { kind: 'git-branch', workspaceId: target.workspaceId, branchName },
+          workspaceRuntimeId: location.workspaceRuntimeId,
+          routeTarget: location.routeTarget,
         },
         route,
       )
@@ -337,7 +334,7 @@ export async function commitWorkspacePaneExactTargetRoute(
   options?: { replace?: boolean; onCommit?: () => void; onAbandon?: () => void },
   navigationGeneration?: AppNavigationGeneration,
 ): Promise<boolean> {
-  if (!target.branchName || !workspacePaneTabControllerTargetIsCurrent(target)) {
+  if (target.location?.kind !== 'branch' || !workspacePaneTabControllerTargetIsCurrent(target)) {
     options?.onAbandon?.()
     return false
   }
@@ -354,29 +351,15 @@ export async function commitWorkspacePaneExactTargetRoute(
 }
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneControllerTarget): boolean {
-  if (
-    target.routeTarget.kind === 'inactive' ||
-    target.paneTarget.kind === 'inactive' ||
-    target.routeTarget.workspaceId !== target.workspaceId ||
-    target.paneTarget.workspaceId !== target.workspaceId
-  ) {
-    return false
-  }
-  if (target.routeTarget.kind !== 'git-branch') {
+  const location = target.location
+  if (!location) return false
+  if (location.kind !== 'branch') {
     const lease = filesystemWorkspacePaneTargetLeaseForModel(target)
     return lease !== null && filesystemWorkspacePaneTargetLeaseIsCurrent(lease)
   }
-  if (
-    target.paneTarget.kind !== 'git-branch' ||
-    target.branchName !== target.routeTarget.branchName ||
-    target.paneTarget.branchName !== target.routeTarget.branchName ||
-    target.worktreePath !== null
-  ) {
-    return false
-  }
   return workspacePaneTargetLeaseIsCurrent({
-    workspaceRuntimeId: target.workspaceRuntimeId,
-    routeTarget: target.routeTarget,
+    workspaceRuntimeId: location.workspaceRuntimeId,
+    routeTarget: location.routeTarget,
   })
 }
 

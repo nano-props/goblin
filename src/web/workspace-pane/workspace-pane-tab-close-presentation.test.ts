@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { workspacePaneLocationForRoot } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
@@ -67,8 +68,7 @@ describe('workspace pane tab close presentation', () => {
     const input = {
       workspaceId: REPO_ID,
       workspacePaneRoute: sourceRoute,
-      routeTarget: paneTarget,
-      paneTarget,
+      location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
       terminalSessionId,
       tabsBeforeRetirement: [
         workspacePaneStaticTabEntry('status'),
@@ -125,8 +125,7 @@ describe('workspace pane tab close presentation', () => {
       dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
         workspaceId: REPO_ID,
         workspacePaneRoute: { kind: 'static', tab: 'status' },
-        routeTarget: paneTarget,
-        paneTarget,
+        location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
         navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
         terminalSessionId,
         tabsBeforeRetirement: [
@@ -160,8 +159,7 @@ describe('workspace pane tab close presentation', () => {
       dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
         workspaceId: REPO_ID,
         workspacePaneRoute: sourceRoute,
-        routeTarget: paneTarget,
-        paneTarget,
+        location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
         navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
         terminalSessionId,
         tabsBeforeRetirement: [

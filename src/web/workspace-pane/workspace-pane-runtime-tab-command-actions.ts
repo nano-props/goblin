@@ -20,30 +20,30 @@ import type { FilesystemWorkspacePaneCommandTarget } from '#/web/workspace-pane/
 import { selectWorkspacePaneControllerTab } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import {
-  workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromFilesystemTarget,
   runWorkspacePaneAction,
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
+  filesystemWorkspacePaneTargetLeaseForModel,
   filesystemWorkspacePaneTargetLeaseIsCurrent,
-  gitWorktreePaneTargetLease,
   resolveWorkspacePaneTabTargetForPaneTarget,
-  workspaceRootPaneTargetLease,
   scopeWorkspacePaneTabTargetResolutionToRuntime,
   type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import {
   dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
+  showCreatedTerminalWorkspacePaneRuntimeTab,
   type CreatedTerminalRouteRequest,
   type CreatedTerminalNavigation,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
-  workspacePaneFilesystemRootPath,
-  workspacePaneTabsTargetForFilesystemTarget,
-} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+  workspacePaneLocationTerminalBase,
+  type FilesystemWorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import {
   claimTerminalAutoFocus,
@@ -57,6 +57,7 @@ export interface ExistingTerminalPresentationRouteRequest extends TerminalPresen
 
 export interface WorkspacePaneRuntimeTabCommandContext {
   terminal?: {
+    location: FilesystemWorkspacePaneLocation
     base: TerminalSessionBase | null
     bridge: TerminalSessionCommandBridge | null
     openerIdentity: string | null
@@ -86,17 +87,14 @@ interface WorkspacePaneRuntimeTabCommandActions {
 }
 
 function resolveExistingTerminalTabTarget(
-  filesystemTarget: WorkspacePaneFilesystemTarget,
+  target: FilesystemWorkspacePaneCommandTarget,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ): WorkspacePaneTabTargetResolution {
-  const routeTarget = workspacePaneTabsTargetForFilesystemTarget(filesystemTarget)
   const resolution = resolveWorkspacePaneTabTargetForPaneTarget({
-    paneTarget: routeTarget,
-    routeTarget,
+    location: target.location,
     workspacePaneRoute,
-    worktreeHead: filesystemTarget.kind === 'git-worktree' ? filesystemTarget.head : undefined,
   })
-  return scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, filesystemTarget.workspaceRuntimeId)
+  return scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, target.location.workspaceRuntimeId)
 }
 
 const WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE: Record<
@@ -113,25 +111,18 @@ export async function dispatchTerminalRuntimePrimaryAction(
   options: WorkspacePaneTerminalRuntimeCommandOptions,
 ): Promise<boolean> {
   const currentWorkspaceId = options.currentWorkspaceId
-  if (!currentWorkspaceId || currentWorkspaceId !== options.target.filesystemTarget.workspaceId) return false
-  if (!terminalCommandTargetIsCurrent(options.target.filesystemTarget)) return false
-  const resolution = resolveExistingTerminalTabTarget(
-    options.target.filesystemTarget,
-    options.target.workspacePaneRoute,
-  )
+  if (!currentWorkspaceId || currentWorkspaceId !== options.target.location.workspaceId) return false
+  if (!terminalCommandTargetIsCurrent(options.target)) return false
+  const resolution = resolveExistingTerminalTabTarget(options.target, options.target.workspacePaneRoute)
   if (resolution.kind === 'missing') return false
   const target = resolution.target
   const placeholderTab = terminalPlaceholderForEmptyProjection(target)
   if (placeholderTab) {
-    const routeTarget = workspacePaneTabsTargetForFilesystemTarget(options.target.filesystemTarget)
     return await dispatchSelectWorkspacePaneTabByIdentityAction({
       workspaceId: currentWorkspaceId,
-      workspaceRuntimeId: options.target.filesystemTarget.workspaceRuntimeId,
+      workspaceRuntimeId: options.target.location.workspaceRuntimeId,
       workspacePaneRoute: options.target.workspacePaneRoute,
-      routeTarget,
-      paneTarget: routeTarget,
-      worktreeHead:
-        options.target.filesystemTarget.kind === 'git-worktree' ? options.target.filesystemTarget.head : undefined,
+      location: options.target.location,
       identity: placeholderTab.identity,
       navigation: options.navigation,
     })
@@ -144,8 +135,8 @@ export async function dispatchNewTerminalRuntimeTabAction(
   options: WorkspacePaneTerminalRuntimeCommandOptions,
 ): Promise<boolean> {
   const currentWorkspaceId = options.currentWorkspaceId
-  if (!currentWorkspaceId || currentWorkspaceId !== options.target.filesystemTarget.workspaceId) return false
-  if (!terminalCommandTargetIsCurrent(options.target.filesystemTarget)) return false
+  if (!currentWorkspaceId || currentWorkspaceId !== options.target.location.workspaceId) return false
+  if (!terminalCommandTargetIsCurrent(options.target)) return false
   const context = terminalRuntimeTabActionContext(options)
   return await runWorkspacePaneRuntimeNewAction('terminal', context)
 }
@@ -165,19 +156,9 @@ function terminalPlaceholderForEmptyProjection(
   )
 }
 
-function terminalCommandTargetIsCurrent(filesystemTarget: WorkspacePaneFilesystemTarget): boolean {
-  const routeTarget = workspacePaneTabsTargetForFilesystemTarget(filesystemTarget)
-  return routeTarget.kind === 'workspace-root'
-    ? filesystemWorkspacePaneTargetLeaseIsCurrent(
-        workspaceRootPaneTargetLease(routeTarget.workspaceId, filesystemTarget.workspaceRuntimeId),
-      )
-    : filesystemWorkspacePaneTargetLeaseIsCurrent(
-        gitWorktreePaneTargetLease(
-          routeTarget.workspaceId,
-          filesystemTarget.workspaceRuntimeId,
-          routeTarget.worktreePath,
-        ),
-      )
+function terminalCommandTargetIsCurrent(target: FilesystemWorkspacePaneCommandTarget): boolean {
+  const lease = filesystemWorkspacePaneTargetLeaseForModel(target)
+  return lease !== null && filesystemWorkspacePaneTargetLeaseIsCurrent(lease)
 }
 
 function terminalRuntimeTabActionContext({
@@ -185,23 +166,16 @@ function terminalRuntimeTabActionContext({
   navigation,
   t,
 }: WorkspacePaneTerminalRuntimeCommandOptions): WorkspacePaneRuntimeTabCommandContext {
-  const { filesystemTarget, workspacePaneRoute } = target
-  const workspaceId = filesystemTarget.workspaceId
+  const { capabilities, workspacePaneRoute } = target
+  const workspaceId = target.location.workspaceId
   return workspacePaneRuntimeTabCommandContext({
-    filesystemTarget,
+    location: target.location,
+    capabilities,
     workspacePaneRoute,
     showRuntimeTab: (type, sessionId, navigationGeneration) =>
-      showTerminalRuntimeTab(type, sessionId, filesystemTarget, workspacePaneRoute, navigation, navigationGeneration),
+      showTerminalRuntimeTab(type, sessionId, target, workspacePaneRoute, navigation, navigationGeneration),
     showCreatedRuntimeTab: (type, sessionId, presentation, routeRequest) =>
-      showCreatedTerminalRuntimeTab(
-        type,
-        sessionId,
-        filesystemTarget,
-        presentation,
-        workspacePaneRoute,
-        navigation,
-        routeRequest,
-      ),
+      showCreatedTerminalRuntimeTab(type, sessionId, target, presentation, navigation, routeRequest),
     terminalCreateTranslator: t,
   })
 }
@@ -223,13 +197,13 @@ export async function runWorkspacePaneRuntimeNewAction(
 async function showTerminalRuntimeTab(
   type: WorkspacePaneRuntimeTabType,
   sessionId: string,
-  filesystemTarget: WorkspacePaneFilesystemTarget,
+  targetScope: FilesystemWorkspacePaneCommandTarget,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   navigation: FilesystemWorkspacePaneRouteCommitActions,
   routeRequest: ExistingTerminalPresentationRouteRequest,
 ): Promise<boolean> {
   if (type !== 'terminal') return abandonExistingTerminalPresentation(routeRequest)
-  const resolution = resolveExistingTerminalTabTarget(filesystemTarget, workspacePaneRoute)
+  const resolution = resolveExistingTerminalTabTarget(targetScope, workspacePaneRoute)
   if (resolution.kind === 'missing') return abandonExistingTerminalPresentation(routeRequest)
   const target = resolution.target
   const tab = target.tabs.find(
@@ -251,42 +225,20 @@ function abandonExistingTerminalPresentation(routeRequest: ExistingTerminalPrese
 function showCreatedTerminalRuntimeTab(
   type: WorkspacePaneRuntimeTabType,
   sessionId: string,
-  filesystemTarget: WorkspacePaneFilesystemTarget,
+  targetScope: FilesystemWorkspacePaneCommandTarget,
   presentation: TerminalPresentation,
-  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   navigation: CreatedTerminalNavigation,
   routeRequest: CreatedTerminalRouteRequest,
 ): boolean | Promise<boolean> {
   if (type !== 'terminal') return false
-  if (presentation.kind === 'git-worktree') {
-    if (filesystemTarget.kind !== 'git-worktree') return false
-    return navigation.commitFilesystemWorkspacePaneRoute(
-      gitWorktreePaneTargetLease(
-        filesystemTarget.workspaceId,
-        filesystemTarget.workspaceRuntimeId,
-        workspacePaneFilesystemRootPath(filesystemTarget),
-      ),
-      { kind: 'terminal', terminalSessionId: sessionId },
-      routeRequest,
-    )
-  }
-  if (filesystemTarget.kind === 'workspace-root') {
-    if (presentation.kind !== 'workspace-root') return false
-    const resolution = resolveExistingTerminalTabTarget(filesystemTarget, workspacePaneRoute)
-    if (resolution.kind !== 'ready') return false
-    const target = resolution.target
-    const tab = target.tabs.find(
-      (candidate) => candidate.identity === terminalWorkspacePaneTabProvider.identity(sessionId),
-    )
-    if (!tab) return false
-    return navigation.commitWorkspaceRootTerminalSession(
-      filesystemTarget.workspaceId,
-      target.workspaceRuntimeId,
-      sessionId,
-      routeRequest,
-    )
-  }
-  return false
+  if (workspacePaneLocationTerminalBase(targetScope.location)?.presentation.kind !== presentation.kind) return false
+  return showCreatedTerminalWorkspacePaneRuntimeTab(
+    targetScope.location,
+    presentation,
+    sessionId,
+    navigation,
+    routeRequest,
+  )
 }
 
 async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandContext): Promise<boolean> {
@@ -325,7 +277,7 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   }
   if (worktree.createPending) return true
   const result = await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-    base,
+    location: terminal.location,
     createTerminal: bridge.createTerminalWithAdmission,
     openerIdentity: terminal.openerIdentity,
     showCreatedTerminalTab: (terminalSessionId, presentation, routeRequest) =>
@@ -343,7 +295,7 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
   if (!terminal.bridge) return false
   const { base, bridge } = terminal
   const result = await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-    base,
+    location: terminal.location,
     createTerminal: bridge.createTerminalWithAdmission,
     openerIdentity: terminal.openerIdentity,
     showCreatedTerminalTab: (terminalSessionId, presentation, routeRequest) =>
@@ -355,14 +307,7 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
 }
 
 function terminalCoordinatorTarget(base: TerminalSessionBase): WorkspacePaneActionTarget | null {
-  const coordinates = terminalExecutionCoordinates(base.target)
-  const workspaceRoot = base.target.kind === 'workspace-root'
-  return workspacePaneActionTargetFromCoordinates({
-    workspaceId: coordinates.workspaceId,
-    workspaceRuntimeId: coordinates.workspaceRuntimeId,
-    branchName: null,
-    worktreePath: workspaceRoot ? null : terminalExecutionPath(base.target),
-  })
+  return workspacePaneActionTargetFromFilesystemTarget(base.target)
 }
 
 function existingTerminalPresentationRouteRequest(

@@ -155,6 +155,7 @@ function repo(branch: BranchSnapshotInfo, withWorktree: boolean): BranchActionRe
               operation: null,
               materializedBranch: branch.name,
               isPrimary: false,
+              isSource: false,
               isLocked: false,
             },
           ]

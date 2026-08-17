@@ -66,13 +66,14 @@ import {
   type PullRequestInfo,
   repoWorktreeForBranch,
   repoWorktreeMaterializedBranch,
+  workspacePaneTargetMembership,
   type RepoMutationExecResult,
   type RepoLogTarget,
   type RepoWorktreeSnapshot,
   type RepoUrlTarget,
   type WorktreeInfo,
   type WorktreeStatus,
-  type WorkspacePaneTargetIdentity,
+  type WorkspacePaneTargetMembership,
 } from '#/shared/git-types.ts'
 import { resolveKnownWorktree, resolveRemovableWorktree } from '#/shared/worktree-guards.ts'
 import { isValidCwd } from '#/shared/input-validation.ts'
@@ -96,7 +97,7 @@ import {
   pushRemoteBranch,
 } from '#/system/ssh/git/remote.ts'
 import { getRemotePatch } from '#/system/ssh/git/patch.ts'
-import { getRemoteWorkspacePaneTargetIdentities, getRemoteSnapshot } from '#/system/ssh/git/snapshot.ts'
+import { getRemoteSnapshot, getRemoteWorkspacePaneTargetMembership } from '#/system/ssh/git/snapshot.ts'
 import { getRemoteStatus } from '#/system/ssh/git/status.ts'
 import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import type { RemoteWorktreeRemovalResult } from '#/system/ssh/git/worktrees.ts'
@@ -132,7 +133,7 @@ export interface RepoSource {
   id: string
   kind: 'local' | 'remote'
   getSnapshot(options?: RepoMembershipReadOptions): Promise<RepoSnapshot | null>
-  getWorkspacePaneTargetIdentities(options?: RepoMembershipReadOptions): Promise<WorkspacePaneTargetIdentity[]>
+  getWorkspacePaneTargetMembership(options?: RepoMembershipReadOptions): Promise<WorkspacePaneTargetMembership>
   getStatus(options?: RepoMembershipReadOptions): Promise<WorktreeStatus[]>
   getPullRequests(scope: RepoPullRequestScope, options?: { signal?: AbortSignal }): Promise<PullRequestEntry[] | null>
   getLog(target: RepoLogTarget, options?: { count?: number; skip?: number; signal?: AbortSignal }): Promise<LogEntry[]>
@@ -583,13 +584,27 @@ function createLocalRepoSource(
         : (sourceWorktree.branch ?? '')
       const remote = await getRemoteInfo(repoId, options?.signal)
       options?.signal?.throwIfAborted()
-      return { branches, worktrees, current, remote }
+      return {
+        branches,
+        worktrees: worktrees.map((worktree) => ({
+          ...worktree,
+          isSource: path.normalize(worktree.path) === path.normalize(sourceWorktree.path),
+        })),
+        current,
+        remote,
+      }
     },
-    async getWorkspacePaneTargetIdentities(options) {
+    async getWorkspacePaneTargetMembership(options) {
       const membership = await readWorktreeMembership(repoId, options?.signal)
       options?.signal?.throwIfAborted()
-      const worktrees = await readRepoWorktreeSnapshots(repoId, membership, options?.signal)
-      return await getBranchWorktreeIdentities(repoId, worktrees, { signal: options?.signal })
+      const [sourcePath, worktrees] = await Promise.all([
+        resolveGitWorkspacePath(repoId, { signal: options?.signal }),
+        readRepoWorktreeSnapshots(repoId, membership, options?.signal),
+      ])
+      const sourceWorktree = membership.find((worktree) => path.normalize(worktree.path) === sourcePath)
+      if (!sourceWorktree) throw new Error('error.failed-read-repo')
+      const identities = await getBranchWorktreeIdentities(repoId, worktrees, { signal: options?.signal })
+      return workspacePaneTargetMembership(sourceWorktree, identities)
     },
     async getStatus(options) {
       if (!isValidCwd(repoId)) throw new Error('error.invalid-path')
@@ -830,8 +845,8 @@ async function createRemoteRepoSource(
       options?.signal?.throwIfAborted()
       return remoteSnapshot
     },
-    async getWorkspacePaneTargetIdentities(options) {
-      return await getRemoteWorkspacePaneTargetIdentities(target, { ...options, run })
+    async getWorkspacePaneTargetMembership(options) {
+      return await getRemoteWorkspacePaneTargetMembership(target, { ...options, run })
     },
     async getStatus(options) {
       return await getRemoteStatus(target, { ...options, run })

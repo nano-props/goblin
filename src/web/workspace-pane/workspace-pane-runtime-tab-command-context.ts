@@ -8,15 +8,19 @@ import type {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
-import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import { workspacePaneFilesystemTerminalBase } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import type { WorkspaceCapabilities } from '#/shared/workspace-runtime.ts'
 import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import type { CreatedTerminalRouteRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import {
+  workspacePaneLocationTerminalBase,
+  type FilesystemWorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
 export interface WorkspacePaneRuntimeTabCommandContextInput {
-  filesystemTarget: WorkspacePaneFilesystemTarget
+  location: FilesystemWorkspacePaneLocation
+  capabilities: WorkspaceCapabilities
   workspacePaneRoute: WorkspacePaneCommandRoute
   showRuntimeTab: (
     type: WorkspacePaneRuntimeTabType,
@@ -59,9 +63,10 @@ function assignTerminalRuntimeTabCommandContext(
   context: WorkspacePaneRuntimeTabCommandContext,
   input: WorkspacePaneRuntimeTabCommandContextInput,
 ): void {
-  const base = workspacePaneFilesystemTerminalBase(input.filesystemTarget)
+  const base = input.capabilities.terminal.available ? workspacePaneLocationTerminalBase(input.location) : null
   const paneTarget = base ? workspacePaneTabsTargetFromRuntime(base.target) : null
   context.terminal = {
+    location: input.location,
     base,
     bridge: readTerminalSessionCommandBridge(),
     openerIdentity:

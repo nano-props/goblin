@@ -1,5 +1,6 @@
 import os from 'node:os'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { git } from '#/system/git/git-exec.ts'
@@ -9,6 +10,10 @@ import { readWorktreeMembership } from '#/system/git/worktrees.ts'
 let repoPath = ''
 let gitDir = ''
 let offlineWorktreePath = ''
+const relativeWorktreeHelp = spawnSync('git', ['worktree', 'add', '-h'], { encoding: 'utf8' })
+const supportsRelativeWorktreePaths = `${relativeWorktreeHelp.stdout}\n${relativeWorktreeHelp.stderr}`.includes(
+  '--relative-paths',
+)
 
 beforeEach(async () => {
   repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin-worktree-state-'))
@@ -210,7 +215,7 @@ test('rejects an operation on an unborn attached worktree', async () => {
 
 test.each([
   ['absolute', []],
-  ['relative', ['--relative-paths']],
+  ...(supportsRelativeWorktreePaths ? ([['relative', ['--relative-paths']]] as const) : []),
 ] as const)(
   'reads a locked linked worktree with a %s administrative pointer while its path is offline',
   async (_, flags) => {

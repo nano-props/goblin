@@ -29,7 +29,8 @@ import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import {
   gitWorktreePaneFilesystemTarget,
-  workspaceRootPaneFilesystemTarget,
+  workspacePaneFilesystemRootPath,
+  type WorkspacePaneFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
@@ -51,20 +52,53 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
 import { resetTerminalAutoFocusForTest } from '#/web/terminal/focus.ts'
+import {
+  workspacePaneLocationForBranchTarget,
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+  workspacePaneLocationForWorktree,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 // Command tests need one target, navigation, tab-store, and terminal-projection fixture boundary.
 interface WorkspaceCommandFixtureOptions {
   workspaceId: string | null
   branchName: string | null
   workspacePaneRoute: WorkspacePaneRouteTarget | null | undefined
-  filesystemTarget?: ReturnType<typeof filesystemTargetForTest> | null
+  filesystemTarget?: WorkspacePaneFilesystemTarget | null
 }
 
 function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): WorkspacePaneCommandTarget {
   if (options.filesystemTarget) {
+    const filesystemTarget = options.filesystemTarget
+    const repo = workspacesStore.getState().workspaces[filesystemTarget.workspaceId]
+    const worktree =
+      filesystemTarget.kind === 'git-worktree' && repo
+        ? getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.worktrees.find(
+            (candidate) => candidate.path === workspacePaneFilesystemRootPath(filesystemTarget),
+          )
+        : null
+    const location =
+      filesystemTarget.kind === 'workspace-root'
+        ? workspacePaneLocationForRoot(filesystemTarget.workspaceId, filesystemTarget.workspaceRuntimeId)
+        : worktree
+          ? workspacePaneLocationForWorktree(
+              filesystemTarget.workspaceId,
+              filesystemTarget.workspaceRuntimeId,
+              worktree,
+            )
+          : workspacePaneLocationForLinkedWorktree(
+              {
+                kind: 'git-worktree',
+                workspaceId: filesystemTarget.workspaceId,
+                worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
+              },
+              filesystemTarget.workspaceRuntimeId,
+              filesystemTarget.head,
+            )
     return {
+      location,
       workspacePaneRoute: options.workspacePaneRoute,
-      filesystemTarget: options.filesystemTarget,
+      capabilities: filesystemTarget.capabilities,
     }
   }
   if (options.branchName) {
@@ -83,14 +117,9 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
         : undefined
     if (repo?.capability.kind === 'git' && worktree) {
       return {
+        location: workspacePaneLocationForWorktree(repo.id, repo.workspaceRuntimeId, worktree),
         workspacePaneRoute: options.workspacePaneRoute,
-        filesystemTarget: gitWorktreePaneFilesystemTarget({
-          workspaceId: repo.id,
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          worktreePath: worktree.path,
-          head: { kind: 'branch', branchName: options.branchName },
-          capabilities: repo.capability.probe.capabilities,
-        }),
+        capabilities: repo.capability.probe.capabilities,
       }
     }
     if (!options.workspaceId) throw new Error('expected workspace id for branch command fixture')
@@ -99,25 +128,23 @@ function commandTargetForFixture(options: WorkspaceCommandFixtureOptions): Works
       throw new Error('branch command fixture cannot present a runtime tab')
     }
     return {
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      routeTarget: {
-        kind: 'git-branch',
-        workspaceId: workspaceIdForTest(options.workspaceId),
-        branchName: options.branchName,
-      },
+      location: workspacePaneLocationForBranchTarget(
+        {
+          kind: 'git-branch',
+          workspaceId: workspaceIdForTest(options.workspaceId),
+          branchName: options.branchName,
+        },
+        repo.workspaceRuntimeId,
+      ),
       workspacePaneRoute: options.workspacePaneRoute,
-      filesystemTarget: null,
     }
   }
   const repo = options.workspaceId ? workspacesStore.getState().workspaces[options.workspaceId] : null
   if (!repo || repo.capability.probe.status !== 'ready') throw new Error('expected ready workspace command fixture')
   return {
+    location: workspacePaneLocationForRoot(repo.id, repo.workspaceRuntimeId),
     workspacePaneRoute: options.workspacePaneRoute,
-    filesystemTarget: workspaceRootPaneFilesystemTarget({
-      workspaceId: repo.id,
-      workspaceRuntimeId: repo.workspaceRuntimeId,
-      capabilities: repo.capability.probe.capabilities,
-    }),
+    capabilities: repo.capability.probe.capabilities,
   }
 }
 

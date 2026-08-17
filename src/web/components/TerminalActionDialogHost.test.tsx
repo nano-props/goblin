@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
 
+import {
+  workspacePaneLocationForBranchTarget,
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 import { cleanup } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -54,7 +59,11 @@ describe('TerminalActionDialogHost', () => {
     await flushTestUpdates(() => {
       terminalActionDialogsStore.getState().openCloseConfirm({
         workspaceId: WORKSPACE_ID,
-        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/repo-worktree' },
+        location: workspacePaneLocationForLinkedWorktree(
+          { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/repo-worktree' },
+          'repo-runtime-test',
+          { kind: 'branch', branchName: 'main' },
+        ),
         targetIdentity: 'terminal:term-111111111111111111111',
         selectedIdentity: 'terminal:term-111111111111111111111',
         workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
@@ -99,7 +108,7 @@ describe('TerminalActionDialogHost', () => {
     await flushTestUpdates(() => {
       terminalActionDialogsStore.getState().openCloseConfirm({
         workspaceId: WORKSPACE_ID,
-        routeTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
+        location: workspacePaneLocationForRoot(WORKSPACE_ID, 'workspace-runtime-test'),
         targetIdentity: 'terminal:term-111111111111111111111',
         selectedIdentity: 'terminal:term-111111111111111111111',
         workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },

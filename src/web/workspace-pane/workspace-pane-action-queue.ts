@@ -1,37 +1,27 @@
 import PQueue from 'p-queue'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 export type WorkspacePaneActionTarget =
   | { kind: 'workspace-root'; workspaceId: WorkspaceId; workspaceRuntimeId: string }
   | { kind: 'git-branch'; workspaceId: WorkspaceId; workspaceRuntimeId: string; branchName: string }
   | { kind: 'git-worktree'; workspaceId: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }
 
-export function workspacePaneActionTargetFromCoordinates(coordinates: {
-  workspaceId: WorkspaceId
-  workspaceRuntimeId: string
-  branchName: string | null
-  worktreePath: string | null
-}): WorkspacePaneActionTarget {
-  if (coordinates.worktreePath !== null) {
-    return {
-      kind: 'git-worktree',
-      workspaceId: coordinates.workspaceId,
-      workspaceRuntimeId: coordinates.workspaceRuntimeId,
-      worktreePath: coordinates.worktreePath,
-    }
+export function workspacePaneActionTargetFromPaneTarget(
+  target: WorkspacePaneTabsTarget,
+  workspaceRuntimeId: string,
+): WorkspacePaneActionTarget {
+  if (target.kind === 'workspace-root') {
+    return { kind: target.kind, workspaceId: target.workspaceId, workspaceRuntimeId }
   }
-  return coordinates.branchName === null
-    ? {
-        kind: 'workspace-root',
-        workspaceId: coordinates.workspaceId,
-        workspaceRuntimeId: coordinates.workspaceRuntimeId,
-      }
-    : {
-        kind: 'git-branch',
-        workspaceId: coordinates.workspaceId,
-        workspaceRuntimeId: coordinates.workspaceRuntimeId,
-        branchName: coordinates.branchName,
-      }
+  return target.kind === 'git-branch'
+    ? { kind: target.kind, workspaceId: target.workspaceId, workspaceRuntimeId, branchName: target.branchName }
+    : { kind: target.kind, workspaceId: target.workspaceId, workspaceRuntimeId, worktreePath: target.worktreePath }
+}
+
+export function workspacePaneActionTargetFromLocation(location: WorkspacePaneLocation): WorkspacePaneActionTarget {
+  return workspacePaneActionTargetFromPaneTarget(location.paneTarget, location.workspaceRuntimeId)
 }
 
 export function workspacePaneActionTargetFromFilesystemTarget(

@@ -1,5 +1,9 @@
 // @vitest-environment jsdom
 import {
+  workspacePaneLocationForBranchTarget,
+  workspacePaneLocationForLinkedWorktree,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
+import {
   createRepoWorktreeSnapshotForTest,
   createRepoBranch,
   resetWorkspacesStore,
@@ -942,18 +946,28 @@ function currentWorkspacePaneCommandTarget(): WorkspacePaneCommandTarget | null 
   if (!workspace) return null
   if (currentFilesystemTarget?.kind === 'git-worktree') {
     return {
+      location: workspacePaneLocationForLinkedWorktree(
+        {
+          kind: 'git-worktree',
+          workspaceId: currentFilesystemTarget.workspaceId,
+          worktreePath: workspacePaneFilesystemRootPath(currentFilesystemTarget),
+        },
+        currentFilesystemTarget.workspaceRuntimeId,
+        currentFilesystemTarget.head,
+      ),
       workspacePaneRoute: currentWorkspacePaneRoute,
-      filesystemTarget: currentFilesystemTarget,
+      capabilities: currentFilesystemTarget.capabilities,
     }
   }
   if (currentWorkspacePaneRoute?.kind === 'terminal') {
     throw new Error('branch command target cannot present a runtime tab')
   }
   return {
-    routeTarget: { kind: 'git-branch', workspaceId: currentWorkspaceId, branchName: currentBranchName },
-    workspaceRuntimeId: workspace.workspaceRuntimeId,
+    location: workspacePaneLocationForBranchTarget(
+      { kind: 'git-branch', workspaceId: currentWorkspaceId, branchName: currentBranchName },
+      workspace.workspaceRuntimeId,
+    ),
     workspacePaneRoute: currentWorkspacePaneRoute,
-    filesystemTarget: null,
   }
 }
 

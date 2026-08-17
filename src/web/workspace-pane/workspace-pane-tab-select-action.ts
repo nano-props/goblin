@@ -1,11 +1,6 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
-import type {
-  AppNavigationActions,
-  FilesystemWorkspacePaneRouteCommitActions,
-} from '#/web/app/navigation/actions.ts'
+import type { AppNavigationActions, FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { adjacentWorkspacePaneTab } from '#/web/workspace-pane/workspace-pane-tab-navigation.ts'
 import {
@@ -22,18 +17,20 @@ import {
   type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
-  workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromLocation,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
+import {
+  workspacePaneLocationBranchName,
+  type WorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export interface SelectWorkspacePaneTabByIndexActionOptions {
   workspaceId: WorkspaceId | null
   workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  routeTarget: WorkspacePaneTabsTarget
-  paneTarget: WorkspacePaneTabsTarget
-  worktreeHead?: GitHead
+  location: WorkspacePaneLocation
   tabIndex: number
   navigation: AppNavigationActions
 }
@@ -42,9 +39,7 @@ export interface MoveWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
   workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  routeTarget: WorkspacePaneTabsTarget
-  paneTarget: WorkspacePaneTabsTarget
-  worktreeHead?: GitHead
+  location: WorkspacePaneLocation
   direction: 1 | -1
   navigation: AppNavigationActions
 }
@@ -53,9 +48,7 @@ export interface SelectWorkspacePaneTabByIdentityActionOptions {
   workspaceId: WorkspaceId | null
   workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  routeTarget: WorkspacePaneTabsTarget
-  paneTarget: WorkspacePaneTabsTarget
-  worktreeHead?: GitHead
+  location: WorkspacePaneLocation
   identity: string
   navigation: FilesystemWorkspacePaneRouteCommitActions
   onTerminalReselect?: (terminalSessionId: string) => void
@@ -179,7 +172,7 @@ async function moveWorkspacePaneTabAction(
 ): Promise<boolean> {
   const { workspaceId, direction, navigation } = options
   if (!workspaceId) return false
-  const branchName = paneTargetPresentationBranch(options.paneTarget, options.worktreeHead)
+  const branchName = workspacePaneLocationBranchName(options.location)
   const currentRoute = branchName ? navigation.currentWorkspacePaneRoute(workspaceId, branchName) : undefined
   if (branchName && currentRoute === undefined) return false
   const target = selectableWorkspacePaneTarget(
@@ -205,18 +198,14 @@ function queuedWorkspacePaneTargetMatches(queued: WorkspacePaneTabModel, current
 function resolveSelectableWorkspacePaneTarget(
   input: {
     workspaceId: WorkspaceId | null
-    routeTarget: WorkspacePaneTabsTarget
-    paneTarget: WorkspacePaneTabsTarget
-    worktreeHead?: GitHead
+    location: WorkspacePaneLocation
   },
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ): WorkspacePaneTabTargetResolution {
   if (!input.workspaceId) return { kind: 'missing' }
   return resolveWorkspacePaneTabTargetForPaneTarget({
-    paneTarget: input.paneTarget,
-    routeTarget: input.routeTarget,
+    location: input.location,
     workspacePaneRoute,
-    worktreeHead: input.worktreeHead,
   })
 }
 
@@ -228,19 +217,7 @@ function selectableWorkspacePaneTarget(
   return scoped.kind === 'missing' ? null : scoped.target
 }
 
-function paneTargetPresentationBranch(
-  target: WorkspacePaneTabsTarget,
-  worktreeHead: GitHead | undefined,
-): string | null {
-  if (target.kind === 'git-branch') return target.branchName
-  return target.kind === 'git-worktree' && worktreeHead ? gitHeadBranch(worktreeHead) : null
-}
-
 function workspacePaneQueuedActionTarget(model: WorkspacePaneTabModel) {
-  return workspacePaneActionTargetFromCoordinates({
-    workspaceId: model.workspaceId,
-    workspaceRuntimeId: model.workspaceRuntimeId,
-    branchName: model.branchName,
-    worktreePath: model.worktreePath,
-  })
+  if (!model.location) throw new Error('selectable workspace pane target requires a location')
+  return workspacePaneActionTargetFromLocation(model.location)
 }

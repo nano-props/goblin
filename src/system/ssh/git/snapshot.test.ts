@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { getRemoteSnapshot, getRemoteWorkspacePaneTargetIdentities } from '#/system/ssh/git/snapshot.ts'
+import { getRemoteSnapshot, getRemoteWorkspacePaneTargetMembership } from '#/system/ssh/git/snapshot.ts'
 import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import {
@@ -10,6 +10,18 @@ import {
   okRemoteResult,
   worktreePorcelain,
 } from '#/system/ssh/git/test-utils.ts'
+
+function sourceMembership(
+  identity: {
+    kind: 'git-worktree'
+    worktreePath: string
+    head: { kind: 'branch'; branchName: string } | { kind: 'detached' }
+    materializedBranch: string | null
+  },
+  branches: { kind: 'git-branch'; branchName: string }[] = [],
+) {
+  return { source: { kind: 'worktree', identity }, linkedWorktrees: [], branches }
+}
 
 describe('remote Git snapshot', () => {
   test('includes remote metadata in remote snapshots', async () => {
@@ -230,15 +242,17 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).resolves.toEqual([
-      {
-        kind: 'git-worktree',
-        worktreePath: '/srv/repo',
-        head: { kind: 'branch', branchName: 'main' },
-        materializedBranch: 'main',
-      },
-      { kind: 'git-branch', branchName: 'feature/no-worktree' },
-    ])
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run: run })).resolves.toEqual(
+      sourceMembership(
+        {
+          kind: 'git-worktree',
+          worktreePath: '/srv/repo',
+          head: { kind: 'branch', branchName: 'main' },
+          materializedBranch: 'main',
+        },
+        [{ kind: 'git-branch', branchName: 'feature/no-worktree' }],
+      ),
+    )
     expect(run).toHaveBeenCalledTimes(4)
     expect(run).toHaveBeenCalledWith({ type: 'gitLocalBranches', path: '/srv/repo' }, TARGET, {
       signal: undefined,
@@ -256,7 +270,7 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('accepts an attached remote worktree while bisect is waiting for boundary commits', async () => {
@@ -268,14 +282,14 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).resolves.toEqual([
-      {
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).resolves.toEqual(
+      sourceMembership({
         kind: 'git-worktree',
         worktreePath: '/srv/repo',
         head: { kind: 'branch', branchName: 'main' },
         materializedBranch: 'main',
-      },
-    ])
+      }),
+    )
   })
 
   test.each([
@@ -294,15 +308,17 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).resolves.toEqual([
-      {
-        kind: 'git-worktree',
-        worktreePath: '/srv/repo',
-        head: { kind: 'detached' },
-        materializedBranch: 'feature/in-progress',
-      },
-      { kind: 'git-branch', branchName: 'main' },
-    ])
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).resolves.toEqual(
+      sourceMembership(
+        {
+          kind: 'git-worktree',
+          worktreePath: '/srv/repo',
+          head: { kind: 'detached' },
+          materializedBranch: 'feature/in-progress',
+        },
+        [{ kind: 'git-branch', branchName: 'main' }],
+      ),
+    )
   })
 
   test('rejects a detached-HEAD display value in the remote state protocol', async () => {
@@ -320,7 +336,7 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('rejects a plain branch name from the remote rebase protocol', async () => {
@@ -338,7 +354,7 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('rejects a ref-prefixed branch outside the remote rebase protocol', async () => {
@@ -352,7 +368,7 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('rejects detached ownership without an operation at the remote producer boundary', async () => {
@@ -368,7 +384,7 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('rejects duplicate materialized branches at the remote producer boundary', async () => {
@@ -396,7 +412,7 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('rejects a committed materialized branch missing from remote refs', async () => {
@@ -414,7 +430,7 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('rejects an empty branch ref from the remote rebase protocol', async () => {
@@ -432,7 +448,7 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
   test('retains a remote bisect branch while presenting a concurrent cherry-pick', async () => {
@@ -450,15 +466,17 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).resolves.toEqual([
-      {
-        kind: 'git-worktree',
-        worktreePath: '/srv/repo',
-        head: { kind: 'detached' },
-        materializedBranch: 'feature/in-progress',
-      },
-      { kind: 'git-branch', branchName: 'main' },
-    ])
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).resolves.toEqual(
+      sourceMembership(
+        {
+          kind: 'git-worktree',
+          worktreePath: '/srv/repo',
+          head: { kind: 'detached' },
+          materializedBranch: 'feature/in-progress',
+        },
+        [{ kind: 'git-branch', branchName: 'main' }],
+      ),
+    )
   })
 
   test('does not turn a failed authoritative remote snapshot into missing data', async () => {
@@ -562,7 +580,7 @@ describe('remote Git snapshot', () => {
         : okRemoteResult(''),
     )
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).rejects.toThrow('worktree list failed')
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run: run })).rejects.toThrow('worktree list failed')
   })
 
   test('returns an attached worktree identity without a commit for an unborn repository', async () => {
@@ -576,14 +594,14 @@ describe('remote Git snapshot', () => {
             : okRemoteResult(''),
     )
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run: run })).resolves.toEqual([
-      {
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run: run })).resolves.toEqual(
+      sourceMembership({
         kind: 'git-worktree',
         worktreePath: '/srv/repo',
         head: { kind: 'branch', branchName: 'main' },
         materializedBranch: 'main',
-      },
-    ])
+      }),
+    )
     expect(run).toHaveBeenCalledTimes(4)
   })
 
@@ -601,6 +619,6 @@ describe('remote Git snapshot', () => {
             : okRemoteResult(''),
     )
 
-    await expect(getRemoteWorkspacePaneTargetIdentities(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 })

@@ -17,6 +17,7 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { workspacePaneLocationForLinkedWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   type WorkspacePaneStaticTabType,
@@ -56,7 +57,7 @@ import {
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
-  workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
@@ -146,11 +147,10 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       dispatchOpenWorkspacePaneTargetStaticTabAction({
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: staleRuntimeId,
-        routeTarget: paneTarget,
-        paneTarget,
-        worktreeHead: { kind: 'branch', branchName: 'feature/worktree' },
+        location: workspacePaneLocationForLinkedWorktree(paneTarget, staleRuntimeId, {
+          kind: 'branch',
+          branchName: 'feature/worktree',
+        }),
         type: 'history',
         workspacePaneRoute: undefined,
         navigation: navigationWithStoreActions(),
@@ -175,23 +175,20 @@ describe('openWorkspacePaneTab', () => {
     const workspaceRuntimeId = currentRuntimeId()
     const blocker = Promise.withResolvers<void>()
     const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromCoordinates({
-        workspaceId: REPO_ID,
+      workspacePaneActionTargetFromPaneTarget(
+        { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
         workspaceRuntimeId,
-        branchName: 'feature/worktree',
-        worktreePath: WORKTREE_PATH,
-      }),
+      ),
       () => blocker.promise,
     )
     const updateWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('status')])
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
     const paneTarget = { kind: 'git-worktree' as const, workspaceId: REPO_ID, worktreePath: WORKTREE_PATH }
     const dispatch = dispatchOpenWorkspacePaneTargetStaticTabAction({
-      workspaceId: REPO_ID,
-      workspaceRuntimeId,
-      routeTarget: paneTarget,
-      paneTarget,
-      worktreeHead: { kind: 'branch', branchName: 'feature/worktree' },
+      location: workspacePaneLocationForLinkedWorktree(paneTarget, workspaceRuntimeId, {
+        kind: 'branch',
+        branchName: 'feature/worktree',
+      }),
       type: 'history',
       workspacePaneRoute: undefined,
       navigation: navigationWithStoreActions(),
@@ -427,11 +424,10 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       dispatchOpenWorkspacePaneTargetStaticTabAction({
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-        routeTarget: paneTarget,
-        paneTarget,
-        worktreeHead: { kind: 'branch', branchName },
+        location: workspacePaneLocationForLinkedWorktree(paneTarget, repo.workspaceRuntimeId, {
+          kind: 'branch',
+          branchName,
+        }),
         type: 'changes',
         workspacePaneRoute: { kind: 'static', tab: 'files' },
         navigation: navigationWithStoreActions(),
@@ -466,11 +462,7 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       dispatchShowWorkspacePaneTargetStaticTabAction({
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-        routeTarget: paneTarget,
-        paneTarget,
-        worktreeHead: worktree.head,
+        location: workspacePaneLocationForLinkedWorktree(paneTarget, repo.workspaceRuntimeId, worktree.head),
         type: 'status',
         workspacePaneRoute: undefined,
         navigation: navigationWithStoreActions(),

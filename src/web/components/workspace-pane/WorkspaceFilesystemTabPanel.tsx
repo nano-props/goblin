@@ -3,8 +3,12 @@ import type { FunctionalComponent, ShallowRef } from 'vue'
 import { toast } from 'vue-sonner'
 import type { WorkspaceFilesystemNode } from '#/shared/api-types.ts'
 import { workspacePaneStaticTabId } from '#/shared/workspace-pane.ts'
-import { workspacePaneFilesystemExecutionTargetKey } from '#/shared/workspace-runtime.ts'
-import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
+import {
+  workspacePaneFilesystemExecutionPath,
+  workspacePaneFilesystemExecutionTargetKey,
+  type WorkspaceCapabilities,
+  type WorkspacePaneFilesystemExecutionTarget,
+} from '#/shared/workspace-runtime.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { useTerminalSessionContext } from '#/web/terminal/components/terminal-session-context.ts'
 import { FiletreeView } from '#/web/components/workspace-pane/FiletreeView.tsx'
@@ -20,31 +24,31 @@ import {
   filetreeInteractionStore,
 } from '#/web/stores/workspaces/filetree-interaction-state.ts'
 import { getWorkspaceFileViewer } from '#/web/workspaces/filesystem/client.ts'
-import {
-  workspacePaneFilesystemRootPath,
-  workspacePaneFilesystemRuntimeTarget,
-  workspacePaneFilesystemTerminalBase,
-} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
-import type { WorkspacePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { showCreatedWorkspacePaneFilesystemTerminal } from '#/web/workspace-pane/workspace-pane-filesystem-terminal.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import {
+  workspacePaneLocationExecutionTarget,
+  type FilesystemWorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 interface WorkspaceFilesystemTabPanelProps {
-  target: WorkspacePaneFilesystemTarget
+  location: FilesystemWorkspacePaneLocation
+  capabilities: WorkspaceCapabilities
 }
 
 export const WorkspaceFilesystemTabPanel: FunctionalComponent<WorkspaceFilesystemTabPanelProps> = (props) => {
-  const executionTarget = workspacePaneFilesystemRuntimeTarget(props.target)
+  const executionTarget = workspacePaneLocationExecutionTarget(props.location)
   return (
     <ExecutionTargetFilesystemTabPanel
       key={workspacePaneFilesystemExecutionTargetKey(executionTarget)}
-      target={props.target}
+      location={props.location}
+      capabilities={props.capabilities}
       executionTarget={executionTarget}
     />
   )
 }
 
-WorkspaceFilesystemTabPanel.props = ['target']
+WorkspaceFilesystemTabPanel.props = ['location', 'capabilities']
 
 interface ExecutionTargetFilesystemTabPanelProps extends WorkspaceFilesystemTabPanelProps {
   executionTarget: WorkspacePaneFilesystemExecutionTarget
@@ -52,15 +56,15 @@ interface ExecutionTargetFilesystemTabPanelProps extends WorkspaceFilesystemTabP
 
 const ExecutionTargetFilesystemTabPanel = defineComponent<ExecutionTargetFilesystemTabPanelProps>({
   name: 'ExecutionTargetFilesystemTabPanel',
-  props: ['target', 'executionTarget'],
+  props: ['location', 'capabilities', 'executionTarget'],
 
   setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
     const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
     const { openTrashFileConfirm } = filetreeActionDialogsStore.getState()
-    const rootPath = workspacePaneFilesystemRootPath(props.target)
-    const interactionScopeKey = filetreeInteractionScopeKey(props.target.workspaceId, rootPath)
+    const rootPath = workspacePaneFilesystemExecutionPath(props.executionTarget)
+    const interactionScopeKey = filetreeInteractionScopeKey(props.location.workspaceId, rootPath)
     const interactionByScope = useStoreSelector(filetreeInteractionStore, (state) => state.interactionByScope)
     const interactionSnapshot = computed(
       () => interactionByScope.value[interactionScopeKey] ?? emptyFiletreeInteractionSnapshot(),
@@ -109,18 +113,15 @@ const ExecutionTargetFilesystemTabPanel = defineComponent<ExecutionTargetFilesys
       const openingFileKey = `${openingFileKeyPrefix}${node.id}`
       if (!pendingOpeningFileKeys.beginPending(openingFileKey)) return
       try {
-        const target = props.target
         const executionTarget = props.executionTarget
         const openerIdentity = workspacePaneStaticTabId('files')
-        const base = workspacePaneFilesystemTerminalBase(target)
-        if (!base) throw new Error('error.workspace-tabs-target-invalid')
         await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-          base,
+          location: props.location,
           createTerminal: createTerminalWithAdmission,
           openerIdentity,
           showCreatedTerminalTab: (terminalSessionId, canonicalBranch, routeRequest) =>
             showCreatedWorkspacePaneFilesystemTerminal(
-              target,
+              props.location,
               terminalSessionId,
               canonicalBranch,
               navigation,
@@ -166,7 +167,7 @@ const ExecutionTargetFilesystemTabPanel = defineComponent<ExecutionTargetFilesys
         scrollRestoreReady={result.expandedDirectoryReadsSettled}
         onTopVisibleRowIndexChange={updateTopVisibleRowIndex}
         onOpenFile={
-          props.target.capabilities.terminal.available
+          props.capabilities.terminal.available
             ? (node) => {
                 void openFileInTerminal(node).catch((error) => {
                   const errorMessageKey = error instanceof Error ? error.message : 'error.terminal-create-failed'
@@ -178,7 +179,7 @@ const ExecutionTargetFilesystemTabPanel = defineComponent<ExecutionTargetFilesys
         onDownloadFile={(node) => {
           if (node.kind === 'file') downloadWorkspaceFile(props.executionTarget, node.path)
         }}
-        onRequestTrashFile={props.target.capabilities.files.write ? requestTrashFile : undefined}
+        onRequestTrashFile={props.capabilities.files.write ? requestTrashFile : undefined}
       />
     )
   },

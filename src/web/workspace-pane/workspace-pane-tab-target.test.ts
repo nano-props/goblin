@@ -24,6 +24,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { workspacePaneLocationForLinkedWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-target-repo')
@@ -70,11 +71,13 @@ describe('workspace pane tab target read model', () => {
     })
     appQueryClient.removeQueries({ queryKey: repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId) })
     const paneTarget = requiredGitWorkspacePaneTabsTarget(REPO_ID, 'feature/query', WORKTREE_PATH)
+    if (paneTarget.kind !== 'git-worktree') throw new Error('expected worktree target')
     const input = {
-      paneTarget,
-      routeTarget: paneTarget,
+      location: workspacePaneLocationForLinkedWorktree(paneTarget, repo.workspaceRuntimeId, {
+        kind: 'branch' as const,
+        branchName: 'feature/query',
+      }),
       workspacePaneRoute: undefined,
-      worktreeHead: { kind: 'branch' as const, branchName: 'feature/query' },
     }
     const resolution = resolveWorkspacePaneTabTargetForPaneTarget(input)
     expect(resolution).toMatchObject({
@@ -165,10 +168,12 @@ describe('workspace pane tab target read model', () => {
 
     const paneTarget = requiredGitWorkspacePaneTabsTarget(REPO_ID, 'feature/renamed', WORKTREE_PATH)
     const target = workspacePaneTabTargetForPaneTarget({
-      paneTarget,
-      routeTarget: paneTarget,
+      location: workspacePaneLocationForLinkedWorktree(
+        { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+        repo.workspaceRuntimeId,
+        { kind: 'branch', branchName: 'feature/renamed' },
+      ),
       workspacePaneRoute: undefined,
-      worktreeHead: { kind: 'branch', branchName: 'feature/renamed' },
     })
 
     expect(target?.branchName).toBe('feature/renamed')
@@ -176,7 +181,7 @@ describe('workspace pane tab target read model', () => {
   })
 
   test('treats an explicit empty worktree route as an empty workspace pane', () => {
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest('feature/query', WORKTREE_PATH)],
       id: REPO_ID,
       branches: [createRepoBranch('feature/query')],
@@ -189,10 +194,12 @@ describe('workspace pane tab target read model', () => {
 
     const paneTarget = requiredGitWorkspacePaneTabsTarget(REPO_ID, 'feature/query', WORKTREE_PATH)
     const target = workspacePaneTabTargetForPaneTarget({
-      paneTarget,
-      routeTarget: paneTarget,
+      location: workspacePaneLocationForLinkedWorktree(
+        { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+        repo.workspaceRuntimeId,
+        { kind: 'branch', branchName: 'feature/query' },
+      ),
       workspacePaneRoute: null,
-      worktreeHead: { kind: 'branch', branchName: 'feature/query' },
     })
 
     expect(target?.tabs.map((tab) => tab.identity)).toEqual(['workspace-pane:status', 'workspace-pane:history'])

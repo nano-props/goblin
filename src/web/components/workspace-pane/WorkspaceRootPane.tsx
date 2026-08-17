@@ -17,6 +17,7 @@ import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspa
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { useWorkspaceRootTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { selectedWorkspacePaneRuntimeSessionId } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { workspacePaneLocationForRoot } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 interface WorkspaceRootPaneProps {
   workspace: FilesystemWorkspacePaneProjection
@@ -39,6 +40,9 @@ export const WorkspaceRootPane = defineComponent<WorkspaceRootPaneProps>({
     )
     useFilesystemWorkspacePaneRouteController({ route: () => props.route, model })
     const target = computed(() => ({ kind: 'workspace-root' as const, workspaceId: props.workspace.id }))
+    const location = computed(() =>
+      workspacePaneLocationForRoot(props.workspace.id, props.workspace.workspaceRuntimeId),
+    )
     const runtimeTarget = computed(() => runtimeWorkspacePaneTarget(target.value, props.workspace.workspaceRuntimeId))
     const activePanel = computed(() => model.value.selection?.tab ?? null)
     const surfaceTarget = computed(() =>
@@ -51,10 +55,7 @@ export const WorkspaceRootPane = defineComponent<WorkspaceRootPaneProps>({
 
     const openFilesTab = () => {
       void dispatchOpenWorkspacePaneTargetStaticTabAction({
-        workspaceId: props.workspace.id,
-        workspaceRuntimeId: props.workspace.workspaceRuntimeId,
-        routeTarget: target.value,
-        paneTarget: target.value,
+        location: model.value.location!,
         type: 'files',
         workspacePaneRoute: { kind: 'static', tab: 'status' },
         navigation,
@@ -87,17 +88,14 @@ export const WorkspaceRootPane = defineComponent<WorkspaceRootPaneProps>({
             />
           ) : currentActivePanel === 'files' ? (
             <WorkspacePanePanelFrame id={`${props.workspacePaneId}-files-panel`} label={t('tab.files')}>
-              <WorkspaceFilesystemTabPanel target={surfaceTarget.value} />
+              <WorkspaceFilesystemTabPanel location={location.value} capabilities={surfaceTarget.value.capabilities} />
             </WorkspacePanePanelFrame>
           ) : currentActivePanel === 'terminal' && runtimeTarget.value ? (
             renderWorkspacePaneRuntimeTabPanel({
               type: 'terminal',
               workspacePaneId: props.workspacePaneId,
               panelLabel: { label: t('tab.terminal') },
-              target: {
-                runtimeTarget: runtimeTarget.value,
-                presentation: { kind: 'workspace-root' },
-              },
+              target: { location: location.value },
               selectedSessionId: selectedTerminalSessionId,
               runtimeState: currentModel.runtimeTabStateByType.terminal,
             })

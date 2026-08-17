@@ -8,6 +8,7 @@ import { getRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
+import { workspacePaneLocationForBranch } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface ObservedBranchRouteNavigationForTest {
@@ -257,12 +258,9 @@ export function workspacePaneTabModelForBranchForTest(
   if (!snapshot) return null
   const worktree = repoWorktreeForBranch(snapshot.worktrees, branchName)
   if (!worktree && !snapshot.branches.some((branch) => branch.name === branchName)) return null
-  const paneTarget = requiredGitWorkspacePaneTabsTarget(workspaceId, branchName, worktree?.path ?? null)
   return workspacePaneTabTargetForPaneTarget({
-    paneTarget,
-    routeTarget: paneTarget,
+    location: workspacePaneLocationForBranch(workspaceId, workspace.workspaceRuntimeId, branchName, worktree ?? null),
     workspacePaneRoute,
-    worktreeHead: worktree?.head,
   })
 }
 

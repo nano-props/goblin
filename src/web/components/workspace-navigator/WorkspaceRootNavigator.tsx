@@ -18,7 +18,7 @@ import { cn } from '#/web/lib/cn.ts'
 import { useStoreSelector } from '#/web/stores/store-selector.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import { workspacePaneLocationForRoot } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 interface WorkspaceRootNavigatorProps {
   workspaceId: WorkspaceId
@@ -50,15 +50,10 @@ export const WorkspaceRootNavigator = defineComponent<WorkspaceRootNavigatorProp
     const commandTarget = computed(() => {
       const current = workspace.value
       if (!current.workspaceRuntimeId || !current.capabilities) return null
-      const filesystemTarget = workspaceRootPaneFilesystemTarget({
-        workspaceId: props.workspaceId,
-        workspaceRuntimeId: current.workspaceRuntimeId,
-        capabilities: current.capabilities,
-      })
       return {
-        routeTarget: { kind: 'workspace-root' as const, workspaceId: props.workspaceId },
+        location: workspacePaneLocationForRoot(props.workspaceId, current.workspaceRuntimeId),
         workspacePaneRoute: null,
-        filesystemTarget,
+        capabilities: current.capabilities,
       }
     })
 

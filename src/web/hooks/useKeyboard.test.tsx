@@ -1,4 +1,10 @@
 // @vitest-environment jsdom
+import {
+  workspacePaneLocationForBranchTarget,
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+  workspacePaneLocationForWorktree,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 import {
   createRepoWorktreeSnapshotForTest,
@@ -51,10 +57,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitWorkspaceNavigatorRowIdentity } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal/focus.ts'
-import {
-  gitWorktreePaneFilesystemTarget,
-  workspaceRootPaneFilesystemTarget,
-} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import {} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const branchShortcutMocks = vi.hoisted(() => ({
@@ -346,7 +349,7 @@ describe('useKeyboard', () => {
     expect(selectRepoWorktree).not.toHaveBeenCalled()
   })
 
-  test('branch navigation selects a detached worktree with its runtime lease', async () => {
+  test('branch navigation selects a detached source through its Git route', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('main')],
@@ -359,6 +362,7 @@ describe('useKeyboard', () => {
           operation: null,
           materializedBranch: null,
           isPrimary: false,
+          isSource: true,
           isLocked: false,
         },
       ],
@@ -636,16 +640,13 @@ describe('useKeyboard', () => {
       currentWorkspaceId: REPO_ID,
       currentBranchName: null,
       currentWorkspacePaneCommandTarget: {
+        location: workspacePaneLocationForRoot(REPO_ID, workspaceRuntimeIdForTest()),
         workspacePaneRoute: null,
-        filesystemTarget: workspaceRootPaneFilesystemTarget({
-          workspaceId: REPO_ID,
-          workspaceRuntimeId: workspaceRuntimeIdForTest(),
-          capabilities: {
-            files: { read: true, write: true },
-            terminal: { available: true },
-            git: { status: 'unavailable' },
-          },
-        }),
+        capabilities: {
+          files: { read: true, write: true },
+          terminal: { available: true },
+          git: { status: 'unavailable' },
+        },
       },
     })
 
@@ -955,14 +956,13 @@ function seedTabbedWorktreeRepoForTest(preferredWorkspacePaneTab: 'status' | 'te
 
 function currentTerminalPaneCommandTargetForTest(): WorkspacePaneCommandTarget {
   return {
+    location: workspacePaneLocationForLinkedWorktree(
+      { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      workspaceRuntimeIdForTest(),
+      { kind: 'branch', branchName: 'feature/worktree' },
+    ),
     workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-    filesystemTarget: gitWorktreePaneFilesystemTarget({
-      workspaceId: REPO_ID,
-      workspaceRuntimeId: workspaceRuntimeIdForTest(),
-      worktreePath: WORKTREE_PATH,
-      head: { kind: 'branch', branchName: 'feature/worktree' },
-      capabilities: FILESYSTEM_CAPABILITIES,
-    }),
+    capabilities: FILESYSTEM_CAPABILITIES,
   }
 }
 
@@ -1047,25 +1047,21 @@ const HookHost = defineComponent<Partial<HookHostOptions>>({
     const defaultCommandTarget =
       repo?.capability.kind === 'git' && overrides.currentBranchName && worktree
         ? {
+            location: workspacePaneLocationForWorktree(repo.id, repo.workspaceRuntimeId, worktree),
             workspacePaneRoute: null,
-            filesystemTarget: gitWorktreePaneFilesystemTarget({
-              workspaceId: repo.id,
-              workspaceRuntimeId: repo.workspaceRuntimeId,
-              worktreePath: worktree.path,
-              head: { kind: 'branch' as const, branchName: overrides.currentBranchName },
-              capabilities: repo.capability.probe.capabilities,
-            }),
+            capabilities: repo.capability.probe.capabilities,
           }
         : overrides.currentBranchName
           ? {
-              routeTarget: {
-                kind: 'git-branch' as const,
-                workspaceId: repo?.id ?? REPO_ID,
-                branchName: overrides.currentBranchName,
-              },
-              workspaceRuntimeId: repo?.workspaceRuntimeId ?? workspaceRuntimeIdForTest(),
+              location: workspacePaneLocationForBranchTarget(
+                {
+                  kind: 'git-branch',
+                  workspaceId: repo?.id ?? REPO_ID,
+                  branchName: overrides.currentBranchName,
+                },
+                repo?.workspaceRuntimeId ?? workspaceRuntimeIdForTest(),
+              ),
               workspacePaneRoute: null,
-              filesystemTarget: null,
             }
           : null
     useKeyboard({

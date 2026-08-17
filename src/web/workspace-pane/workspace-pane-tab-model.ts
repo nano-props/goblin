@@ -11,14 +11,9 @@ import {
   type WorkspacePaneTabEntry,
   type WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import {
-  runtimeWorkspacePaneTarget,
-  workspacePaneTabsTargetWorktreePath,
-  type WorkspacePaneTabsTarget,
-} from '#/shared/workspace-pane-tabs-target.ts'
-import { gitHeadBranch, type GitHead } from '#/shared/git-head.ts'
-import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import { terminalGitWorktreePresentation, type TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { type WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 
 import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
 import type {
@@ -42,10 +37,15 @@ import {
 } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneRuntimeTabTargetKey } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-key.ts'
 import {
-  gitWorktreeFilesystemExecutionTarget,
-  workspaceRootFilesystemExecutionTarget,
+  workspacePaneFilesystemExecutionPath,
   type WorkspacePaneFilesystemExecutionTarget,
 } from '#/shared/workspace-runtime.ts'
+import {
+  workspacePaneLocationBranchName,
+  workspacePaneLocationExecutionTarget,
+  workspacePaneLocationTerminalBase,
+  type WorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 import {
   workspacePaneRuntimeTabTargetKeyByType,
   type WorkspacePaneRuntimeTabTargetKeyByType,
@@ -140,10 +140,12 @@ export type WorkspacePaneSelection =
 export interface WorkspacePaneTabModel {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  /** Canonical URL target owned by the current pane. */
+  location: WorkspacePaneLocation | null
+  /** Read-only route projection derived from location. */
   routeTarget: WorkspacePaneModelTarget
   branchName: string | null
   worktreePath: string | null
+  /** Read-only persistence projection derived from location. */
   paneTarget: WorkspacePaneModelTarget
   runtimeTabTargetKeyByType: WorkspacePaneRuntimeTabTargetKeyByType
   runtimeTabTargetKey: string | null
@@ -173,24 +175,15 @@ export interface WorkspacePaneTabModel {
 
 /** Derives terminal execution from the model's authoritative pane target. */
 export function workspacePaneTerminalBaseForTabModel(
-  model: Pick<WorkspacePaneTabModel, 'workspaceRuntimeId' | 'paneTarget' | 'branchName'>,
+  model: Pick<WorkspacePaneTabModel, 'location'>,
 ): TerminalSessionBase | null {
-  if (model.paneTarget.kind === 'inactive' || model.paneTarget.kind === 'git-branch') return null
-  const target = runtimeWorkspacePaneTarget(model.paneTarget, model.workspaceRuntimeId)
-  if (!target) return null
-  if (target.kind === 'workspace-root') return { target, presentation: { kind: 'workspace-root' } }
-  if (target.kind === 'git-worktree') {
-    return { target, presentation: terminalGitWorktreePresentation() }
-  }
-  return null
+  return model.location ? workspacePaneLocationTerminalBase(model.location) : null
 }
 
 export interface WorkspacePaneTabModelInput {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
-  routeTarget: WorkspacePaneModelTarget
-  paneTarget: WorkspacePaneModelTarget
-  worktreeHead?: GitHead
+  location: WorkspacePaneLocation | null
   preferredTab: WorkspacePaneTabType | null
   /**
    * Persisted preferences may fall back to the first materialized tab when
@@ -209,27 +202,17 @@ export interface WorkspacePaneTabModelInput {
 function paneTargetFilesystemExecutionTarget(
   input: WorkspacePaneTabModelInput,
 ): WorkspacePaneFilesystemExecutionTarget | null {
-  if (input.paneTarget.kind === 'workspace-root') {
-    return workspaceRootFilesystemExecutionTarget(input.workspaceId, input.workspaceRuntimeId)
-  }
-  if (input.paneTarget.kind === 'git-worktree') {
-    return gitWorktreeFilesystemExecutionTarget(
-      input.workspaceId,
-      input.workspaceRuntimeId,
-      input.paneTarget.worktreePath,
-    )
-  }
-  return null
+  const context = input.location
+  return context && context.kind !== 'branch' ? workspacePaneLocationExecutionTarget(context) : null
 }
 
 export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): WorkspacePaneTabModel {
-  const worktreePath = paneTargetFilesystemPath(input.paneTarget)
+  const paneTarget = input.location?.paneTarget ?? null
   const filesystemTarget = paneTargetFilesystemExecutionTarget(input)
-  const branchName = paneTargetPresentationBranch(input.paneTarget, input.worktreeHead)
-  const normalizedTabEntries =
-    input.paneTarget.kind === 'inactive'
-      ? []
-      : normalizeWorkspacePaneTabs(input.tabEntries, { hasWorktree: worktreePath !== null })
+  const worktreePath = filesystemTarget ? workspacePaneFilesystemExecutionPath(filesystemTarget) : null
+  const branchName = input.location ? workspacePaneLocationBranchName(input.location) : null
+  const hasWorktree = filesystemTarget !== null
+  const normalizedTabEntries = paneTarget === null ? [] : normalizeWorkspacePaneTabs(input.tabEntries, { hasWorktree })
   const tabEntries = normalizedTabEntries
   const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({
     workspaceId: input.workspaceId,
@@ -241,7 +224,6 @@ export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): 
     workspaceRuntimeId: input.workspaceRuntimeId,
     filesystemTarget,
   })
-  const hasWorktree = !!worktreePath
   const runtimeViews = input.runtimeTabViews.filter((view) => !!runtimeTabTargetKeyByType[view.type])
   const runtimeTabStateByType = runtimeTabStateByTypeFromInput(input, tabEntries, runtimeViews)
   const runtimeViewsByType = runtimeViewsByTypeFromViews(runtimeViews)
@@ -287,10 +269,11 @@ export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): 
   return {
     workspaceId: input.workspaceId,
     workspaceRuntimeId: input.workspaceRuntimeId,
-    routeTarget: input.routeTarget,
+    location: input.location,
+    routeTarget: input.location?.routeTarget ?? { kind: 'inactive', workspaceId: input.workspaceId },
     branchName,
     worktreePath,
-    paneTarget: input.paneTarget,
+    paneTarget: input.location?.paneTarget ?? { kind: 'inactive', workspaceId: input.workspaceId },
     runtimeTabTargetKeyByType,
     runtimeTabTargetKey,
     runtimeTabStateByType,
@@ -306,20 +289,6 @@ export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): 
     selectedEntry,
     selectedIdentity: selectedEntry ? workspacePaneTabEntryIdentity(selectedEntry) : null,
   }
-}
-
-function paneTargetFilesystemPath(target: WorkspacePaneModelTarget): string | null {
-  if (target.kind === 'inactive' || target.kind === 'git-branch') return null
-  if (target.kind === 'git-worktree') return workspacePaneTabsTargetWorktreePath(target)
-  return parseCanonicalWorkspaceLocator(target.workspaceId)?.path ?? null
-}
-
-function paneTargetPresentationBranch(
-  target: WorkspacePaneModelTarget,
-  worktreeHead: GitHead | undefined,
-): string | null {
-  if (target.kind === 'git-branch') return target.branchName
-  return target.kind === 'git-worktree' && worktreeHead ? gitHeadBranch(worktreeHead) : null
 }
 
 function staticWorkspacePaneTab(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTab {

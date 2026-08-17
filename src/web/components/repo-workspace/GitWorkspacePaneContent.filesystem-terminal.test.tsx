@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { workspacePaneLocationForRoot } from '#/web/workspace-pane/workspace-pane-location.ts'
 import {
   GitWorkspacePaneContentHarness,
   REPO_ID,
@@ -28,7 +29,6 @@ import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
-import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { BranchActionSurfaceProvider } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import {
   TerminalSessionCommandScope,
@@ -133,15 +133,12 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
         <AppNavigationProvider value={navigationWith({})}>
           <TerminalSessionCommandScope value={terminalCommandContextWith()}>
             <WorkspaceFilesystemTabPanel
-              target={workspaceRootPaneFilesystemTarget({
-                workspaceId,
-                workspaceRuntimeId,
-                capabilities: {
-                  files: { read: true, write: false },
-                  terminal: { available: false },
-                  git: { status: 'unavailable' },
-                },
-              })}
+              location={workspacePaneLocationForRoot(workspaceId, workspaceRuntimeId)}
+              capabilities={{
+                files: { read: true, write: false },
+                terminal: { available: false },
+                git: { status: 'unavailable' },
+              }}
             />
           </TerminalSessionCommandScope>
         </AppNavigationProvider>
@@ -567,15 +564,12 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
         <AppNavigationProvider value={navigationWith({ commitWorkspaceRootTerminalSession })}>
           <TerminalSessionCommandScope value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
-              target={workspaceRootPaneFilesystemTarget({
-                workspaceId,
-                workspaceRuntimeId: repo.workspaceRuntimeId,
-                capabilities: {
-                  files: { read: true, write: true },
-                  terminal: { available: true },
-                  git: { status: 'unavailable' },
-                },
-              })}
+              location={workspacePaneLocationForRoot(workspaceId, repo.workspaceRuntimeId)}
+              capabilities={{
+                files: { read: true, write: true },
+                terminal: { available: true },
+                git: { status: 'unavailable' },
+              }}
             />
           </TerminalSessionCommandScope>
         </AppNavigationProvider>
@@ -635,15 +629,12 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
         <AppNavigationProvider value={navigationWith({})}>
           <TerminalSessionCommandScope value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
-              target={workspaceRootPaneFilesystemTarget({
-                workspaceId,
-                workspaceRuntimeId: repo.workspaceRuntimeId,
-                capabilities: {
-                  files: { read: true, write: false },
-                  terminal: { available: false },
-                  git: { status: 'unavailable' },
-                },
-              })}
+              location={workspacePaneLocationForRoot(workspaceId, repo.workspaceRuntimeId)}
+              capabilities={{
+                files: { read: true, write: false },
+                terminal: { available: false },
+                git: { status: 'unavailable' },
+              }}
             />
           </TerminalSessionCommandScope>
         </AppNavigationProvider>

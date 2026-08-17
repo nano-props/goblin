@@ -1,6 +1,5 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { GitHead } from '#/shared/git-head.ts'
 import { isWorkspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import {
@@ -34,7 +33,7 @@ import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs
 import { readWorkspacePaneRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 import type { WorkspacePaneRuntimeTabCloseConfirmRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 import {
-  workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromLocation,
   workspacePaneActionTargetFromFilesystemTarget,
   runWorkspacePaneAction,
   type WorkspacePaneActionTarget,
@@ -56,14 +55,13 @@ import {
 import type { WorkspacePaneTabCloseOutcome } from '#/web/workspace-pane/workspace-pane-tab-close-outcome.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { surfaceWorkspacePaneTabTargetUnavailable } from '#/web/workspace-pane/workspace-pane-tab-action-feedback.ts'
+import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export interface CloseWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
   workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  routeTarget: WorkspacePaneTabsTarget
-  paneTarget: WorkspacePaneTabsTarget
-  worktreeHead?: GitHead
+  location: WorkspacePaneLocation
   selectedIdentity?: string | null
   navigation: AppNavigationActions
   targetIdentity?: string
@@ -103,18 +101,12 @@ export async function dispatchCloseWorkspacePaneTabAction(
     const coordinatorTarget = admitCloseWorkspacePaneTarget(
       resolveCloseWorkspacePaneTarget(ownedOptions, ownedOptions.workspacePaneRoute),
     )
-    if (!coordinatorTarget) {
+    if (!coordinatorTarget?.location) {
       presentationEffects?.onAbandon()
       return false
     }
-    return await runWorkspacePaneAction(
-      workspacePaneActionTargetFromCoordinates({
-        workspaceId: coordinatorTarget.workspaceId,
-        workspaceRuntimeId: coordinatorTarget.workspaceRuntimeId,
-        branchName: coordinatorTarget.branchName,
-        worktreePath: coordinatorTarget.worktreePath,
-      }),
-      () => closeWorkspacePaneTabAction(ownedOptions),
+    return await runWorkspacePaneAction(workspacePaneActionTargetFromLocation(coordinatorTarget.location), () =>
+      closeWorkspacePaneTabAction(ownedOptions),
     )
   } catch (error) {
     presentationEffects?.onAbandon()
@@ -275,10 +267,11 @@ function beginCloseWorkspacePaneTabAction(
       view: runtimeView,
       target: terminalBase,
     })
+    if (!target.location) return { kind: 'done', result: false }
     if (
       openWorkspacePaneRuntimeCloseConfirm(
         target.workspaceId,
-        workspacePaneRouteTargetForClose(target),
+        target.location,
         closeConfirm,
         workspacePaneRoute,
         options.selectedIdentity ?? target.selectedIdentity,
@@ -326,7 +319,7 @@ function admitCloseWorkspacePaneTarget(resolution: WorkspacePaneTabTargetResolut
 
 function openWorkspacePaneRuntimeCloseConfirm(
   workspaceId: WorkspaceId,
-  routeTarget: WorkspacePaneTabsTarget,
+  location: WorkspacePaneLocation,
   request: WorkspacePaneRuntimeTabCloseConfirmRequest | null,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   selectedIdentity: string | null,
@@ -336,7 +329,7 @@ function openWorkspacePaneRuntimeCloseConfirm(
   if (request.processName) {
     terminalActionDialogsStore.getState().openCloseConfirm({
       workspaceId,
-      routeTarget,
+      location,
       targetIdentity: request.identity,
       selectedIdentity,
       workspacePaneRoute,

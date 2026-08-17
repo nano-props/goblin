@@ -93,6 +93,7 @@ const RepoSnapshotObjectSchema = v.strictObject({
       operation: v.nullable(GitOperationSchema),
       materializedBranch: v.nullable(v.string()),
       isPrimary: v.boolean(),
+      isSource: v.boolean(),
       isLocked: v.boolean(),
     }),
   ),
@@ -111,6 +112,7 @@ function hasValidWorktreeProjection(snapshot: v.InferOutput<typeof RepoSnapshotO
   if (snapshot.current !== '' && !isSafeBranchName(snapshot.current)) return false
   if (!hasUniqueRepoWorktreeMaterializedBranches(snapshot.worktrees)) return false
   if (snapshot.worktrees.filter((worktree) => worktree.isPrimary).length > 1) return false
+  if (snapshot.worktrees.filter((worktree) => worktree.isSource).length > 1) return false
   if (new Set(snapshot.branches.map((branch) => branch.name)).size !== snapshot.branches.length) return false
   const worktreePaths = new Set<string>()
   const branchNames = new Set(snapshot.branches.map((branch) => branch.name))

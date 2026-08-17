@@ -2,8 +2,13 @@ import path from 'node:path'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { isValidRemotePath, parseRemoteSnapshot } from '#/system/ssh/git/codec.ts'
 import type { RemoteRepoSnapshot } from '#/system/ssh/git/codec.ts'
-import { repoWorktreeMaterializedBranch } from '#/shared/git-types.ts'
-import type { WorkspacePaneTargetIdentity, WorktreeInfo } from '#/shared/git-types.ts'
+import { repoWorktreeMaterializedBranch, workspacePaneTargetMembership } from '#/shared/git-types.ts'
+import type {
+  WorkspacePaneBranchTargetIdentity,
+  WorkspacePaneTargetMembership,
+  WorkspacePaneWorktreeTargetIdentity,
+  WorktreeInfo,
+} from '#/shared/git-types.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
@@ -30,7 +35,12 @@ export async function getRemoteSnapshot(
   const snapshot = parseRemoteSnapshot(result.stdout)
   if (!snapshot) throw new Error('error.failed-read-repo')
   const current = sourceWorktree.isBare ? snapshot.current : (sourceWorktree.branch ?? '')
-  return { ...snapshot, current, worktrees, remote }
+  return {
+    ...snapshot,
+    current,
+    worktrees: worktrees.map((worktree) => ({ ...worktree, isSource: worktree.path === sourceWorktree.path })),
+    remote,
+  }
 }
 
 async function resolveRemoteSnapshotSourceWorktree(
@@ -52,13 +62,16 @@ async function resolveRemoteSnapshotSourceWorktree(
   return sourceWorktree
 }
 
-export async function getRemoteWorkspacePaneTargetIdentities(
+export async function getRemoteWorkspacePaneTargetMembership(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteCommandRunner } = {},
-): Promise<WorkspacePaneTargetIdentity[]> {
+): Promise<WorkspacePaneTargetMembership> {
   const run: RemoteCommandRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const membership = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
-  const worktrees = await readRemoteRepoWorktreeSnapshots(target, membership, { signal: options.signal, run })
+  const [sourceWorktree, worktrees] = await Promise.all([
+    resolveRemoteSnapshotSourceWorktree(target, membership, { signal: options.signal, run }),
+    readRemoteRepoWorktreeSnapshots(target, membership, { signal: options.signal, run }),
+  ])
   const result = await run({ type: 'gitLocalBranches', path: target.remotePath }, target, {
     signal: options.signal,
   })
@@ -85,15 +98,16 @@ export async function getRemoteWorkspacePaneTargetIdentities(
       return branchName ? [branchName] : []
     }),
   )
-  return [
-    ...worktrees.map((worktree): WorkspacePaneTargetIdentity => ({
+  const identities = {
+    worktrees: worktrees.map((worktree): WorkspacePaneWorktreeTargetIdentity => ({
       kind: 'git-worktree',
       worktreePath: worktree.path,
       head: worktree.head,
       materializedBranch: worktree.materializedBranch,
     })),
-    ...branches
+    branches: branches
       .filter((branch) => !materializedBranches.has(branch))
-      .map((branch): WorkspacePaneTargetIdentity => ({ kind: 'git-branch', branchName: branch })),
-  ]
+      .map((branch): WorkspacePaneBranchTargetIdentity => ({ kind: 'git-branch', branchName: branch })),
+  }
+  return workspacePaneTargetMembership(sourceWorktree, identities)
 }

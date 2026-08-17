@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { BranchSnapshotInfo, RepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
+import type { BranchSnapshotInfo, WorkspaceRepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import { buildDashboardSummary } from '#/web/components/workspace-pages/workspace-dashboard-model.ts'
 
@@ -37,7 +37,7 @@ describe('workspace dashboard model', () => {
   })
 })
 
-function snapshot(worktrees: RepoWorktreeSnapshot[]): RepoSnapshot {
+function snapshot(worktrees: WorkspaceRepoWorktreeSnapshot[]): RepoSnapshot {
   return {
     branches: [branch('main')],
     worktrees,
@@ -67,9 +67,9 @@ function branch(name: string): BranchSnapshotInfo {
 
 function worktree(
   path: string,
-  head: RepoWorktreeSnapshot['head'],
+  head: WorkspaceRepoWorktreeSnapshot['head'],
   materializedBranch: string | null,
-): RepoWorktreeSnapshot {
+): WorkspaceRepoWorktreeSnapshot {
   return {
     path,
     head,
@@ -77,6 +77,7 @@ function worktree(
     operation: null,
     materializedBranch,
     isPrimary: path === '/repo',
+    isSource: false,
     isLocked: false,
   }
 }

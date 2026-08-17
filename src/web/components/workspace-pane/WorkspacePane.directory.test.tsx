@@ -74,6 +74,7 @@ function detachedWorktreeSnapshot(path: string) {
     operation: null,
     materializedBranch: null,
     isPrimary: false,
+    isSource: false,
     isLocked: false,
   }
 }
@@ -387,6 +388,7 @@ describe('WorkspacePane directory workspaces', () => {
             operation: { kind: 'rebase' },
             materializedBranch: branchName,
             isPrimary: false,
+            isSource: false,
             isLocked: false,
           },
         ],

@@ -45,6 +45,7 @@ import {
   resetAppNavigationForTest,
 } from '#/web/app/navigation/lifecycle.ts'
 import { resetTerminalAutoFocusForTest } from '#/web/terminal/focus.ts'
+import { workspacePaneLocationForLinkedWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 const terminalBase = {
   target: {
@@ -59,6 +60,11 @@ const terminalPaneTargetCandidate = workspacePaneTabsTargetFromRuntime(terminalB
 if (terminalPaneTargetCandidate?.kind !== 'git-worktree') throw new Error('expected Git worktree pane target')
 const terminalPaneTarget = terminalPaneTargetCandidate
 const BRANCH_NAME = 'main'
+const terminalLocation = workspacePaneLocationForLinkedWorktree(
+  terminalPaneTarget,
+  terminalBase.target.workspaceRuntimeId,
+  { kind: 'branch', branchName: BRANCH_NAME },
+)
 
 const terminalCoordinates = terminalSessionCoordinates(terminalBase)
 const terminalCommandFeedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
@@ -144,17 +150,12 @@ describe('workspace pane runtime tab command actions', () => {
     const showCreatedRuntimeTab = vi.fn(() => true)
     const routeRequest = createdTerminalRouteRequest()
     const context = workspacePaneRuntimeTabCommandContext({
-      filesystemTarget: gitWorktreePaneFilesystemTarget({
-        workspaceId: terminalBase.target.workspaceId,
-        workspaceRuntimeId: terminalBase.target.workspaceRuntimeId,
-        worktreePath: terminalExecutionPath(terminalBase.target),
-        head: { kind: 'branch', branchName: BRANCH_NAME },
-        capabilities: {
-          files: { read: true, write: true },
-          terminal: { available: true },
-          git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-        },
-      }),
+      location: terminalLocation,
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
       workspacePaneRoute: null,
       showRuntimeTab: vi.fn(() => true),
       showCreatedRuntimeTab,
@@ -209,6 +210,7 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
+          location: terminalLocation,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -267,6 +269,7 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
+          location: terminalLocation,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -337,6 +340,7 @@ describe('workspace pane runtime tab command actions', () => {
 
     const actionPromise = runWorkspacePaneRuntimePrimaryAction('terminal', {
       terminal: {
+        location: terminalLocation,
         base: terminalBase,
         bridge,
         openerIdentity: null,
@@ -398,6 +402,7 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
+          location: terminalLocation,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -434,6 +439,7 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
+          location: terminalLocation,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -500,6 +506,7 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimeNewAction('terminal', {
         terminal: {
+          location: terminalLocation,
           base: terminalBase,
           bridge,
           openerIdentity: null,
@@ -529,6 +536,7 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
+          location: terminalLocation,
           base: terminalBase,
           bridge: null,
           openerIdentity: null,
@@ -563,17 +571,16 @@ describe('workspace pane runtime tab command actions', () => {
         run({
           currentWorkspaceId: canonicalWorkspaceLocator('goblin+file:///different-workspace')!,
           target: {
-            filesystemTarget: gitWorktreePaneFilesystemTarget({
-              workspaceId: terminalBase.target.workspaceId,
-              workspaceRuntimeId: terminalBase.target.workspaceRuntimeId,
-              worktreePath: terminalExecutionPath(terminalBase.target),
-              head: { kind: 'branch', branchName: BRANCH_NAME },
-              capabilities: {
-                files: { read: true, write: true },
-                terminal: { available: true },
-                git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-              },
-            }),
+            location: workspacePaneLocationForLinkedWorktree(
+              terminalPaneTarget,
+              terminalCoordinates.workspaceRuntimeId,
+              { kind: 'branch', branchName: BRANCH_NAME },
+            ),
+            capabilities: {
+              files: { read: true, write: true },
+              terminal: { available: true },
+              git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+            } as const,
             workspacePaneRoute: null,
           },
           navigation: {
@@ -624,17 +631,16 @@ describe('workspace pane runtime tab command actions', () => {
         run({
           currentWorkspaceId: repo.id,
           target: {
-            filesystemTarget: gitWorktreePaneFilesystemTarget({
-              workspaceId: repo.id,
-              workspaceRuntimeId: repo.workspaceRuntimeId,
-              worktreePath: terminalExecutionPath(terminalBase.target),
-              head: { kind: 'branch', branchName: BRANCH_NAME },
-              capabilities: {
-                files: { read: true, write: true },
-                terminal: { available: true },
-                git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
-              },
-            }),
+            location: workspacePaneLocationForLinkedWorktree(
+              terminalPaneTarget,
+              terminalCoordinates.workspaceRuntimeId,
+              { kind: 'branch', branchName: BRANCH_NAME },
+            ),
+            capabilities: {
+              files: { read: true, write: true },
+              terminal: { available: true },
+              git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+            } as const,
             workspacePaneRoute: null,
           },
           navigation: {
@@ -655,9 +661,7 @@ describe('workspace pane runtime tab command actions', () => {
     const scenario = terminalCommandScenario([terminalSessionId])
 
     try {
-      await expect(
-        dispatchNewTerminalRuntimeTabAction({ ...scenario.options, t: (key) => key }),
-      ).resolves.toBe(false)
+      await expect(dispatchNewTerminalRuntimeTabAction({ ...scenario.options, t: (key) => key })).resolves.toBe(false)
     } finally {
       scenario.resetBridge()
     }
@@ -844,6 +848,7 @@ describe('workspace pane runtime tab command actions', () => {
     await expect(
       runWorkspacePaneRuntimeNewAction('terminal', {
         terminal: {
+          location: terminalLocation,
           base: null,
           bridge: null,
           openerIdentity: null,
@@ -922,17 +927,15 @@ function terminalCommandOptions(workspaceRuntimeId: string) {
   return {
     currentWorkspaceId: terminalBase.target.workspaceId,
     target: {
-      filesystemTarget: gitWorktreePaneFilesystemTarget({
-        workspaceId: terminalBase.target.workspaceId,
-        workspaceRuntimeId,
-        worktreePath: terminalExecutionPath(terminalBase.target),
-        head: { kind: 'branch' as const, branchName: BRANCH_NAME },
-        capabilities: {
-          files: { read: true, write: true },
-          terminal: { available: true },
-          git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
-        },
+      location: workspacePaneLocationForLinkedWorktree(terminalPaneTarget, workspaceRuntimeId, {
+        kind: 'branch',
+        branchName: BRANCH_NAME,
       }),
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } },
+      } as const,
       workspacePaneRoute: null,
     },
     navigation: {

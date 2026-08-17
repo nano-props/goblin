@@ -54,6 +54,13 @@ import {
 } from '#/web/app/navigation/lifecycle.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import type { GitHead } from '#/shared/git-head.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  workspacePaneLocationForBranchTarget,
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
 
@@ -74,19 +81,45 @@ function currentRuntimeId(workspaceId = REPO_ID): string {
   return runtimeId
 }
 
-function dispatchCloseWorkspacePaneTabAction(options: Omit<CloseWorkspacePaneTabActionOptions, 'workspaceRuntimeId'>) {
+type LegacyCloseOptions = Omit<CloseWorkspacePaneTabActionOptions, 'workspaceRuntimeId' | 'location'> & {
+  routeTarget: WorkspacePaneTabsTarget
+  paneTarget: WorkspacePaneTabsTarget
+  worktreeHead?: GitHead
+}
+
+function locationForLegacyTarget(options: LegacyCloseOptions, workspaceRuntimeId: string) {
+  if (options.routeTarget.kind === 'workspace-root') {
+    return workspacePaneLocationForRoot(options.routeTarget.workspaceId, workspaceRuntimeId)
+  }
+  if (options.routeTarget.kind === 'git-branch') {
+    return workspacePaneLocationForBranchTarget(options.routeTarget, workspaceRuntimeId)
+  }
+  if (options.paneTarget.kind !== 'git-worktree') throw new Error('source target requires an explicit location')
+  return workspacePaneLocationForLinkedWorktree(
+    options.routeTarget,
+    workspaceRuntimeId,
+    options.worktreeHead ?? { kind: 'detached' },
+  )
+}
+
+function dispatchCloseWorkspacePaneTabAction(options: LegacyCloseOptions) {
+  const workspaceRuntimeId = currentRuntimeId(options.workspaceId ?? REPO_ID)
   return dispatchCloseWorkspacePaneTabActionRaw({
     ...options,
-    workspaceRuntimeId: currentRuntimeId(options.workspaceId ?? REPO_ID),
+    location: locationForLegacyTarget(options, workspaceRuntimeId),
+    workspaceRuntimeId,
   })
 }
 
 function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
-  options: Omit<ConfirmCloseTerminalWorkspacePaneTabActionOptions, 'workspaceRuntimeId'>,
+  options: Omit<ConfirmCloseTerminalWorkspacePaneTabActionOptions, 'workspaceRuntimeId' | 'location'> &
+    LegacyCloseOptions,
 ) {
+  const workspaceRuntimeId = options.confirmedTerminal.base.target.workspaceRuntimeId
   return dispatchConfirmCloseTerminalWorkspacePaneTabActionRaw({
     ...options,
-    workspaceRuntimeId: options.confirmedTerminal.base.target.workspaceRuntimeId,
+    location: locationForLegacyTarget(options, workspaceRuntimeId),
+    workspaceRuntimeId,
   })
 }
 
@@ -174,9 +207,10 @@ describe('workspace pane tab close action', () => {
 
     await expect(
       dispatchConfirmCloseTerminalWorkspacePaneTabActionRaw({
-        routeTarget: WORKTREE_PANE_TARGET,
-        paneTarget: WORKTREE_PANE_TARGET,
-        worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+        location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+          kind: 'branch',
+          branchName: BRANCH_NAME,
+        }),
         workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         workspacePaneRoute: route,
@@ -217,9 +251,10 @@ describe('workspace pane tab close action', () => {
 
     await expect(
       dispatchCloseWorkspacePaneTabActionRaw({
-        routeTarget: WORKTREE_PANE_TARGET,
-        paneTarget: WORKTREE_PANE_TARGET,
-        worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+        location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+          kind: 'branch',
+          branchName: BRANCH_NAME,
+        }),
         workspaceId: REPO_ID,
         workspaceRuntimeId: repo.workspaceRuntimeId,
         workspacePaneRoute: { kind: 'static', tab: 'files' },
@@ -752,6 +787,7 @@ describe('workspace pane tab close action', () => {
           headOid: '1111111111111111111111111111111111111111',
           operation: null,
           materializedBranch: null,
+          isSource: false,
           isPrimary: false,
           isLocked: false,
         },

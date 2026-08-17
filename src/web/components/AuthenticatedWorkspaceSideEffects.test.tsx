@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
 
+import {
+  workspacePaneLocationForBranchTarget,
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 import { defineComponent, ref } from 'vue'
 import { describe, expect, test, vi } from 'vitest'
 import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
@@ -41,16 +46,18 @@ const WORKSPACE_RUNTIME_ID = 'workspace-runtime-side-effects'
 describe('AuthenticatedWorkspaceSideEffects', () => {
   test('keeps one owner while route inputs change and resolves the command target at event time', async () => {
     const firstTarget: WorkspacePaneCommandTarget = {
-      routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature/first' },
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      location: workspacePaneLocationForBranchTarget(
+        { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature/first' },
+        WORKSPACE_RUNTIME_ID,
+      ),
       workspacePaneRoute: null,
-      filesystemTarget: null,
     }
     const secondTarget: WorkspacePaneCommandTarget = {
-      routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature/second' },
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      location: workspacePaneLocationForBranchTarget(
+        { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature/second' },
+        WORKSPACE_RUNTIME_ID,
+      ),
       workspacePaneRoute: { kind: 'static', tab: 'history' },
-      filesystemTarget: null,
     }
     const currentBranchName = ref('feature/first')
     const currentGitWorkspaceNavigatorRowIdentity = ref({ kind: 'branch' as const, branchName: 'feature/first' })
