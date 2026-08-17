@@ -64,39 +64,36 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
       nativeWorktreePath: workspace.path,
     }
     const membership = await this.dependencies.readMembership(workspaceId, { workspaceRuntimeId })
-    const sourceWorktreePath = membership.source.kind === 'worktree' ? membership.source.worktreePath : null
-    const workspaceRootWorktrees = membership.identities.filter(
-      (identity) => identity.kind === 'git-worktree' && identity.worktreePath === sourceWorktreePath,
-    )
-    if (sourceWorktreePath !== null && workspaceRootWorktrees.length !== 1) {
-      throw new Error('error.workspace-tabs-target-invalid')
-    }
-    const rootIsWorktree = sourceWorktreePath !== null
+    const sourceProjection: WorkspacePaneTargetProjection =
+      membership.source.kind === 'worktree'
+        ? {
+            target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root: workspaceId },
+            nativeWorktreePath: membership.source.identity.worktreePath,
+          }
+        : workspaceTarget
     return [
-      ...(rootIsWorktree ? [] : [workspaceTarget]),
-      ...membership.identities.map((identity): WorkspacePaneTargetProjection =>
-        identity.kind === 'git-worktree'
-          ? {
-              target: {
-                kind: 'git-worktree',
-                workspaceId,
-                workspaceRuntimeId,
-                root:
-                  identity.worktreePath === sourceWorktreePath
-                    ? workspaceId
-                    : workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
-              },
-              nativeWorktreePath: identity.worktreePath,
-            }
-          : {
-              target: {
-                kind: 'git-branch',
-                workspaceId,
-                workspaceRuntimeId,
-                branch: identity.branchName,
-              },
-              nativeWorktreePath: null,
-            },
+      sourceProjection,
+      ...membership.linkedWorktrees.map(
+        (identity): WorkspacePaneTargetProjection => ({
+          target: {
+            kind: 'git-worktree',
+            workspaceId,
+            workspaceRuntimeId,
+            root: workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
+          },
+          nativeWorktreePath: identity.worktreePath,
+        }),
+      ),
+      ...membership.branches.map(
+        (identity): WorkspacePaneTargetProjection => ({
+          target: {
+            kind: 'git-branch',
+            workspaceId,
+            workspaceRuntimeId,
+            branch: identity.branchName,
+          },
+          nativeWorktreePath: null,
+        }),
       ),
     ]
   }

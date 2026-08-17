@@ -66,6 +66,7 @@ import {
   type PullRequestInfo,
   repoWorktreeForBranch,
   repoWorktreeMaterializedBranch,
+  workspacePaneTargetMembership,
   type RepoMutationExecResult,
   type RepoLogTarget,
   type RepoWorktreeSnapshot,
@@ -597,12 +598,7 @@ function createLocalRepoSource(
       const identities = await getBranchWorktreeIdentities(repoId, worktrees, {
         signal: options?.signal,
       })
-      return {
-        source: sourceWorktree.isBare
-          ? { kind: 'bare-repository', repositoryPath: sourceWorktree.path }
-          : { kind: 'worktree', worktreePath: sourceWorktree.path },
-        identities,
-      }
+      return workspacePaneTargetMembership(sourceWorktree, identities)
     },
     async getStatus(options) {
       if (!isValidCwd(repoId)) throw new Error('error.invalid-path')

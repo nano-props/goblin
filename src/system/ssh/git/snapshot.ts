@@ -2,8 +2,13 @@ import path from 'node:path'
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { isValidRemotePath, parseRemoteSnapshot } from '#/system/ssh/git/codec.ts'
 import type { RemoteRepoSnapshot } from '#/system/ssh/git/codec.ts'
-import { repoWorktreeMaterializedBranch } from '#/shared/git-types.ts'
-import type { WorkspacePaneTargetIdentity, WorkspacePaneTargetMembership, WorktreeInfo } from '#/shared/git-types.ts'
+import { repoWorktreeMaterializedBranch, workspacePaneTargetMembership } from '#/shared/git-types.ts'
+import type {
+  WorkspacePaneBranchTargetIdentity,
+  WorkspacePaneTargetMembership,
+  WorkspacePaneWorktreeTargetIdentity,
+  WorktreeInfo,
+} from '#/shared/git-types.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
@@ -88,21 +93,16 @@ export async function getRemoteWorkspacePaneTargetMembership(
       return branchName ? [branchName] : []
     }),
   )
-  const identities = [
-    ...worktrees.map((worktree): WorkspacePaneTargetIdentity => ({
+  const identities = {
+    worktrees: worktrees.map((worktree): WorkspacePaneWorktreeTargetIdentity => ({
       kind: 'git-worktree',
       worktreePath: worktree.path,
       head: worktree.head,
       materializedBranch: worktree.materializedBranch,
     })),
-    ...branches
+    branches: branches
       .filter((branch) => !materializedBranches.has(branch))
-      .map((branch): WorkspacePaneTargetIdentity => ({ kind: 'git-branch', branchName: branch })),
-  ]
-  return {
-    source: sourceWorktree.isBare
-      ? { kind: 'bare-repository', repositoryPath: sourceWorktree.path }
-      : { kind: 'worktree', worktreePath: sourceWorktree.path },
-    identities,
+      .map((branch): WorkspacePaneBranchTargetIdentity => ({ kind: 'git-branch', branchName: branch })),
   }
+  return workspacePaneTargetMembership(sourceWorktree, identities)
 }

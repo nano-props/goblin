@@ -9,16 +9,17 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 describe('WorkspacePaneTargetCatalog', () => {
   test('captures only identity data for a Git runtime', async () => {
     const readMembership = vi.fn(async () => ({
-      source: { kind: 'worktree' as const, worktreePath: '/repo' },
-      identities: [
-        {
+      source: {
+        kind: 'worktree' as const,
+        identity: {
           kind: 'git-worktree' as const,
           worktreePath: '/repo',
           head: { kind: 'branch' as const, branchName: 'main' },
           materializedBranch: 'main',
         },
-        { kind: 'git-branch' as const, branchName: 'feature/no-worktree' },
-      ],
+      },
+      linkedWorktrees: [],
+      branches: [{ kind: 'git-branch' as const, branchName: 'feature/no-worktree' }],
     }))
     const catalog = new WorkspacePaneTargetCatalog({
       gitCapabilityState: () => 'available',
@@ -79,15 +80,17 @@ describe('WorkspacePaneTargetCatalog', () => {
     const catalog = new WorkspacePaneTargetCatalog({
       gitCapabilityState: () => 'available',
       readMembership: async () => ({
-        source: { kind: 'worktree', worktreePath: '/repo' },
-        identities: [
-          {
+        source: {
+          kind: 'worktree',
+          identity: {
             kind: 'git-worktree',
             worktreePath: '/repo',
             head: { kind: 'detached' },
             materializedBranch: null,
           },
-        ],
+        },
+        linkedWorktrees: [],
+        branches: [],
       }),
     })
     await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
@@ -107,15 +110,17 @@ describe('WorkspacePaneTargetCatalog', () => {
     const catalog = new WorkspacePaneTargetCatalog({
       gitCapabilityState: () => 'available',
       readMembership: async () => ({
-        source: { kind: 'worktree', worktreePath: '/physical/repo' },
-        identities: [
-          {
+        source: {
+          kind: 'worktree',
+          identity: {
             kind: 'git-worktree' as const,
             worktreePath: '/physical/repo',
             head: { kind: 'branch' as const, branchName: 'feature' },
             materializedBranch: 'feature',
           },
-        ],
+        },
+        linkedWorktrees: [],
+        branches: [],
       }),
     })
 
@@ -136,15 +141,17 @@ describe('WorkspacePaneTargetCatalog', () => {
     const catalog = new WorkspacePaneTargetCatalog({
       gitCapabilityState: () => 'available',
       readMembership: async () => ({
-        source: { kind: 'worktree', worktreePath: '/repo' },
-        identities: [
-          {
+        source: {
+          kind: 'worktree',
+          identity: {
             kind: 'git-worktree',
             worktreePath: '/repo',
             head: { kind: 'detached' },
             materializedBranch: 'feature/in-progress',
           },
-        ],
+        },
+        linkedWorktrees: [],
+        branches: [],
       }),
     })
 
