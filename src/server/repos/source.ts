@@ -588,8 +588,13 @@ function createLocalRepoSource(
     async getWorkspacePaneTargetIdentities(options) {
       const membership = await readWorktreeMembership(repoId, options?.signal)
       options?.signal?.throwIfAborted()
-      const worktrees = await readRepoWorktreeSnapshots(repoId, membership, options?.signal)
-      return await getBranchWorktreeIdentities(repoId, worktrees, { signal: options?.signal })
+      const [sourceWorktreePath, worktrees] = await Promise.all([
+        resolveGitWorkspacePath(repoId, { signal: options?.signal }),
+        readRepoWorktreeSnapshots(repoId, membership, options?.signal),
+      ])
+      return await getBranchWorktreeIdentities(repoId, worktrees, sourceWorktreePath, {
+        signal: options?.signal,
+      })
     },
     async getStatus(options) {
       if (!isValidCwd(repoId)) throw new Error('error.invalid-path')

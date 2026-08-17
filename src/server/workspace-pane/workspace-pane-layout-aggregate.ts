@@ -155,11 +155,13 @@ export type PaneCapabilityTransitionResult<T> =
   | {
       kind: 'committed'
       durableLayoutChanged: boolean
+      affectedUserIds: string[]
       authorityResult: T
     }
   | {
       kind: 'authority-commit-failed'
       durableLayoutChanged: boolean
+      affectedUserIds: string[]
       error: unknown
     }
 
@@ -280,7 +282,7 @@ export class WorkspacePaneLayoutAggregate {
       const replacement = normalizeWorkspacePaneDurableLayout(input.workspaceId, replacementFor(current.layout))
       assertWorkspaceRuntimeEpochCapability(input.epochCapability, input)
       if (workspacePaneDurableLayoutsEqual(input.workspaceId, current.layout, replacement)) {
-        return commitCapabilityTransitionAuthority(false, commit)
+        return commitCapabilityTransitionAuthority(false, this.affectedUserIds(input, false, [input.userId]), commit)
       }
       const outcome = await this.repository.compareAndSwap({
         workspaceId: input.workspaceId,
@@ -291,7 +293,11 @@ export class WorkspacePaneLayoutAggregate {
       if (outcome.kind === 'write-failure') throw outcome.error
       if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
       if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
-      return commitCapabilityTransitionAuthority(outcome.changed, commit)
+      return commitCapabilityTransitionAuthority(
+        outcome.changed,
+        this.affectedUserIds(input, outcome.changed, [input.userId]),
+        commit,
+      )
     }
   }
 
@@ -603,11 +609,12 @@ function cloneCanonicalClock(clock: CanonicalClockState): CanonicalClockState {
 
 function commitCapabilityTransitionAuthority<T>(
   durableLayoutChanged: boolean,
+  affectedUserIds: string[],
   commit: () => T,
 ): PaneCapabilityTransitionResult<T> {
   try {
-    return { kind: 'committed', durableLayoutChanged, authorityResult: commit() }
+    return { kind: 'committed', durableLayoutChanged, affectedUserIds, authorityResult: commit() }
   } catch (error) {
-    return { kind: 'authority-commit-failed', durableLayoutChanged, error }
+    return { kind: 'authority-commit-failed', durableLayoutChanged, affectedUserIds, error }
   }
 }

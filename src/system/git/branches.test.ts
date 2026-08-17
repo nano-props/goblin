@@ -67,17 +67,19 @@ describe('getBranchWorktreeIdentities', () => {
           headOid: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
           materializedBranch: 'feature/linked',
         },
-      ]),
+      ], '/repo'),
     ).resolves.toEqual([
       {
         kind: 'git-worktree',
         worktreePath: '/repo',
+        isWorkspaceRoot: true,
         head: { kind: 'branch', branchName: 'main' },
         materializedBranch: 'main',
       },
       {
         kind: 'git-worktree',
         worktreePath: '/worktrees/linked',
+        isWorkspaceRoot: false,
         head: { kind: 'branch', branchName: 'feature/linked' },
         materializedBranch: 'feature/linked',
       },
@@ -90,13 +92,13 @@ describe('getBranchWorktreeIdentities', () => {
 
   test('does not turn a failed authority read into an empty catalog', async () => {
     vi.mocked(git).mockRejectedValueOnce(new Error('git unavailable'))
-    await expect(getBranchWorktreeIdentities('/repo', [])).rejects.toThrow('git unavailable')
+    await expect(getBranchWorktreeIdentities('/repo', [], '/repo')).rejects.toThrow('git unavailable')
   })
 
   test('rejects whitespace-normalized branch identities', async () => {
     vi.mocked(git).mockResolvedValueOnce(' main')
 
-    await expect(getBranchWorktreeIdentities('/repo', [])).rejects.toThrow('Git returned invalid branch identities')
+    await expect(getBranchWorktreeIdentities('/repo', [], '/repo')).rejects.toThrow('Git returned invalid branch identities')
   })
 
   test('keeps a detached local worktree without a branch ref', async () => {
@@ -109,11 +111,12 @@ describe('getBranchWorktreeIdentities', () => {
           headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           materializedBranch: null,
         },
-      ]),
+      ], '/repo'),
     ).resolves.toEqual([
       {
         kind: 'git-worktree',
         worktreePath: '/repo',
+        isWorkspaceRoot: true,
         head: { kind: 'detached' },
         materializedBranch: null,
       },
@@ -131,11 +134,12 @@ describe('getBranchWorktreeIdentities', () => {
           headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           materializedBranch: 'feature/in-progress',
         },
-      ]),
+      ], '/repo'),
     ).resolves.toEqual([
       {
         kind: 'git-worktree',
         worktreePath: '/repo',
+        isWorkspaceRoot: true,
         head: { kind: 'detached' },
         materializedBranch: 'feature/in-progress',
       },
@@ -154,7 +158,7 @@ describe('getBranchWorktreeIdentities', () => {
           headOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           materializedBranch: 'feature/missing',
         },
-      ]),
+      ], '/repo'),
     ).rejects.toThrow('Git worktree materialized branch is unavailable')
   })
 })

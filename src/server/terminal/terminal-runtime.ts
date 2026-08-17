@@ -406,12 +406,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
                   manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
                 ),
           () => {
-            if (
-              paneTransition.durableLayoutChanged ||
-              paneTransition.kind === 'authority-commit-failed' ||
-              paneTransition.authorityResult.changedCount > 0
-            ) {
-              publishWorkspaceTabsChanged(userId, workspaceId)
+            for (const affectedUserId of paneTransition.affectedUserIds) {
+              publishWorkspaceTabsChanged(affectedUserId, workspaceId)
             }
           },
         ],
@@ -475,6 +471,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
                 userId,
                 manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
               )
+            }
+          },
+          () => {
+            for (const affectedUserId of paneTransition.affectedUserIds) {
+              publishWorkspaceTabsChanged(affectedUserId, workspaceId)
             }
           },
         ],

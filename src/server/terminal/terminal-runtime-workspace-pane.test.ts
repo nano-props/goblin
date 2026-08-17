@@ -57,16 +57,13 @@ const captureWorkspaceRootTarget: WorkspacePaneTargetProjectionProvider['capture
   _userId,
   workspaceId,
   scope,
-) => [
-  {
-    target: {
-      kind: 'workspace-root',
-      workspaceId,
-      workspaceRuntimeId: scope.slice(scope.lastIndexOf('\0') + 1),
-    },
-    nativeWorktreePath: '/repo',
-  },
-]
+  purpose,
+) => {
+  const workspaceRuntimeId = scope.slice(scope.lastIndexOf('\0') + 1)
+  return purpose === 'git-capability-promotion'
+    ? [{ target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root: workspaceId }, nativeWorktreePath: '/repo' }]
+    : [{ target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId }, nativeWorktreePath: '/repo' }]
+}
 
 describe('server terminal runtime workspace panes', () => {
   test('Git capability promotion replaces the root target while preserving layout and live terminals', async () => {
@@ -135,7 +132,9 @@ describe('server terminal runtime workspace panes', () => {
   })
 
   test('fails Git capability promotion before commit when the durable layout write fails', async () => {
-    const { workspaceCapabilityTransitionHost, shutdown } = await buildRuntime()
+    const { workspaceCapabilityTransitionHost, shutdown } = await buildRuntime({
+      captureTargets: captureWorkspaceRootTarget,
+    })
     setTestWorkspacePaneLayout({
       entries: [
         {
@@ -159,6 +158,61 @@ describe('server terminal runtime workspace panes', () => {
         },
       ],
     })
+    shutdown()
+  })
+
+  test('publishes Git capability promotion to every active workspace user', async () => {
+    const { host, workspaceCapabilityTransitionHost, shutdown } = await buildRuntime({
+      captureTargets: captureWorkspaceRootTarget,
+    })
+    const socketA = appRealtimeSocket()
+    const socketB = appRealtimeSocket()
+    host.registerSocket('client_a', USER_1, socketA)
+    host.registerSocket('client_b', USER_2, socketB)
+    setTestWorkspacePaneLayout({
+      entries: [
+        {
+          target: { kind: 'workspace-root' },
+          tabs: [workspacePaneStaticTabEntry('files')],
+        },
+      ],
+    })
+
+    await requestWorkspacePaneTabs(
+      host,
+      socketA,
+      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+      workspacePaneTabsListInput(WORKSPACE_RUNTIME_ID),
+      'req_list_promotion_user_a',
+    )
+    await requestWorkspacePaneTabs(
+      host,
+      socketB,
+      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+      workspacePaneTabsListInput(USER_2_WORKSPACE_RUNTIME_ID),
+      'req_list_promotion_user_b',
+      { clientId: 'client_b', userId: USER_2 },
+    )
+    socketA.send.mockClear()
+    socketB.send.mockClear()
+
+    await expect(
+      workspaceCapabilityTransitionHost.commitGitCapabilityPromotion({
+        runtimeCapability: workspaceRuntimeCapability(),
+      }),
+    ).resolves.toEqual({ kind: 'committed' })
+
+    await vi.waitFor(() => {
+      expect(
+        sentSocketMessages(socketA).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toBe(true)
+      expect(
+        sentSocketMessages(socketB).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toBe(true)
+    })
+
+    host.unregisterSocket('client_a', USER_1, socketA)
+    host.unregisterSocket('client_b', USER_2, socketB)
     shutdown()
   })
 

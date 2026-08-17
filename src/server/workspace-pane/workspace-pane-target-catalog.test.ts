@@ -12,6 +12,7 @@ describe('WorkspacePaneTargetCatalog', () => {
       {
         kind: 'git-worktree' as const,
         worktreePath: '/repo',
+        isWorkspaceRoot: true,
         head: { kind: 'branch' as const, branchName: 'main' },
         materializedBranch: 'main',
       },
@@ -79,6 +80,7 @@ describe('WorkspacePaneTargetCatalog', () => {
         {
           kind: 'git-worktree',
           worktreePath: '/repo',
+          isWorkspaceRoot: true,
           head: { kind: 'detached' },
           materializedBranch: null,
         },
@@ -97,13 +99,14 @@ describe('WorkspacePaneTargetCatalog', () => {
     ])
   })
 
-  test('keeps the workspace root only when Git worktrees use different paths', async () => {
+  test('maps a physical source worktree path alias to the logical workspace root', async () => {
     const catalog = new WorkspacePaneTargetCatalog({
       gitCapabilityState: () => 'available',
       readIdentities: async () => [
         {
           kind: 'git-worktree' as const,
-          worktreePath: '/repo-linked',
+          worktreePath: '/physical/repo',
+          isWorkspaceRoot: true,
           head: { kind: 'branch' as const, branchName: 'feature' },
           materializedBranch: 'feature',
         },
@@ -113,20 +116,12 @@ describe('WorkspacePaneTargetCatalog', () => {
     await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
       {
         target: {
-          kind: 'workspace-root',
-          workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
-          workspaceRuntimeId: 'runtime-a',
-        },
-        nativeWorktreePath: '/repo',
-      },
-      {
-        target: {
           kind: 'git-worktree',
           workspaceId: 'goblin+file:///repo',
           workspaceRuntimeId: 'runtime-a',
-          root: 'goblin+file:///repo-linked',
+          root: canonicalWorkspaceLocator('goblin+file:///repo')!,
         },
-        nativeWorktreePath: '/repo-linked',
+        nativeWorktreePath: '/physical/repo',
       },
     ])
   })
@@ -138,6 +133,7 @@ describe('WorkspacePaneTargetCatalog', () => {
         {
           kind: 'git-worktree',
           worktreePath: '/repo',
+          isWorkspaceRoot: true,
           head: { kind: 'detached' },
           materializedBranch: 'feature/in-progress',
         },

@@ -131,6 +131,7 @@ describe('getWorkspacePaneTargetIdentities', () => {
     ]
     mocks.readWorktreeMembership.mockResolvedValueOnce(worktrees)
     mocks.readRepoWorktreeSnapshots.mockResolvedValueOnce(worktreeSnapshots)
+    mocks.resolveGitWorkspacePath.mockResolvedValueOnce('/tmp/repo')
     mocks.getBranchWorktreeIdentities.mockResolvedValueOnce([
       { branch: 'main', worktreePath: '/tmp/repo' },
       { branch: 'feature/no-worktree', worktreePath: null },
@@ -143,7 +144,7 @@ describe('getWorkspacePaneTargetIdentities', () => {
     ])
 
     expect(mocks.readWorktreeMembership).toHaveBeenCalledWith('/tmp/repo', undefined)
-    expect(mocks.getBranchWorktreeIdentities).toHaveBeenCalledWith('/tmp/repo', worktreeSnapshots, {
+    expect(mocks.getBranchWorktreeIdentities).toHaveBeenCalledWith('/tmp/repo', worktreeSnapshots, '/tmp/repo', {
       signal: undefined,
     })
     expect(mocks.getBranches).not.toHaveBeenCalled()

@@ -37,6 +37,7 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
     userId: string,
     workspaceId: WorkspaceId,
     scope: string,
+    purpose: 'projection' | 'git-capability-promotion' = 'projection',
   ): Promise<readonly WorkspacePaneTargetProjection[]> {
     const workspaceRuntimeId = runtimeIdFromScope(scope)
     const workspace = parseCanonicalWorkspaceLocator(workspaceId)
@@ -46,13 +47,16 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
       nativeWorktreePath: workspace.path,
     }
     const gitCapabilityState = this.dependencies.gitCapabilityState(userId, workspaceId, workspaceRuntimeId)
-    if (gitCapabilityState === 'transitioning') throw new WorkspaceRuntimeStaleError()
-    if (gitCapabilityState === 'unavailable') return [workspaceTarget]
+    if (gitCapabilityState === 'transitioning' && purpose !== 'git-capability-promotion') {
+      throw new WorkspaceRuntimeStaleError()
+    }
+    if (gitCapabilityState === 'unavailable' && purpose !== 'git-capability-promotion') return [workspaceTarget]
     const identities = await this.dependencies.readIdentities(workspaceId, { workspaceRuntimeId })
-    const rootWorktreePath = workspace.path
-    const rootIsWorktree = identities.some(
-      (identity) => identity.kind === 'git-worktree' && identity.worktreePath === rootWorktreePath,
+    const workspaceRootWorktrees = identities.filter(
+      (identity) => identity.kind === 'git-worktree' && identity.isWorkspaceRoot,
     )
+    if (workspaceRootWorktrees.length > 1) throw new Error('error.workspace-tabs-target-invalid')
+    const rootIsWorktree = workspaceRootWorktrees.length === 1
     return [
       ...(rootIsWorktree ? [] : [workspaceTarget]),
       ...identities.map((identity): WorkspacePaneTargetProjection =>
@@ -62,7 +66,9 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
                 kind: 'git-worktree',
                 workspaceId,
                 workspaceRuntimeId,
-                root: workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
+                root: identity.isWorkspaceRoot
+                  ? workspaceId
+                  : workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
               },
               nativeWorktreePath: identity.worktreePath,
             }

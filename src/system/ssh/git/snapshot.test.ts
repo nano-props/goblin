@@ -234,6 +234,7 @@ describe('remote Git snapshot', () => {
       {
         kind: 'git-worktree',
         worktreePath: '/srv/repo',
+        isWorkspaceRoot: true,
         head: { kind: 'branch', branchName: 'main' },
         materializedBranch: 'main',
       },
@@ -272,6 +273,7 @@ describe('remote Git snapshot', () => {
       {
         kind: 'git-worktree',
         worktreePath: '/srv/repo',
+        isWorkspaceRoot: true,
         head: { kind: 'branch', branchName: 'main' },
         materializedBranch: 'main',
       },
@@ -298,6 +300,7 @@ describe('remote Git snapshot', () => {
       {
         kind: 'git-worktree',
         worktreePath: '/srv/repo',
+        isWorkspaceRoot: true,
         head: { kind: 'detached' },
         materializedBranch: 'feature/in-progress',
       },
@@ -454,6 +457,7 @@ describe('remote Git snapshot', () => {
       {
         kind: 'git-worktree',
         worktreePath: '/srv/repo',
+        isWorkspaceRoot: true,
         head: { kind: 'detached' },
         materializedBranch: 'feature/in-progress',
       },
@@ -580,6 +584,7 @@ describe('remote Git snapshot', () => {
       {
         kind: 'git-worktree',
         worktreePath: '/srv/repo',
+        isWorkspaceRoot: true,
         head: { kind: 'branch', branchName: 'main' },
         materializedBranch: 'main',
       },

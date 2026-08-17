@@ -155,7 +155,7 @@ describe('workspace pane layout aggregate', () => {
     releaseOperation.resolve()
     await expect(Promise.all([pendingOperation, promotion])).resolves.toEqual([
       undefined,
-      { kind: 'committed', durableLayoutChanged: true, authorityResult: undefined },
+      { kind: 'committed', durableLayoutChanged: true, affectedUserIds: ['user-a'], authorityResult: undefined },
     ])
     expect(order).toEqual(['operation-started', 'operation-finished', 'promotion-committed'])
     expect(repository.layout).toEqual({
@@ -180,7 +180,12 @@ describe('workspace pane layout aggregate', () => {
           },
         ),
       ),
-    ).resolves.toEqual({ kind: 'authority-commit-failed', durableLayoutChanged: true, error: authorityError })
+    ).resolves.toEqual({
+      kind: 'authority-commit-failed',
+      durableLayoutChanged: true,
+      affectedUserIds: ['user-a'],
+      error: authorityError,
+    })
     expect(repository.layout).toEqual({
       entries: [{ target: { kind: 'git-worktree', root: WORKSPACE_ID }, tabs: [files] }],
     })

@@ -49,6 +49,7 @@ export type WorkspacePaneTargetIdentity =
   | {
       kind: 'git-worktree'
       worktreePath: string
+      isWorkspaceRoot: boolean
       head: GitHead
       materializedBranch: string | null
     }
