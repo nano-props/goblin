@@ -16,10 +16,9 @@ import { abortableWorkspaceRestore } from '#/server/workspaces/restore/utils.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { probeWorkspace } from '#/server/workspaces/probe.ts'
 import {
-  commitGitCapabilityRemovalOrThrow,
+  commitWorkspaceCapabilityTransitionOrThrow,
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
-import { workspaceGitCleanupRequired } from '#/server/workspaces/runtime/capability-transition.ts'
 import {
   workspaceGitAvailable,
   type WorkspaceProbeState,
@@ -92,9 +91,10 @@ async function projectWorkspace(
         },
         {
           beforeCapabilityCommit: async ({ before, after }) => {
-            if (!workspaceGitCleanupRequired(before, after)) return
-            await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
+            await commitWorkspaceCapabilityTransitionOrThrow(input.workspaceCapabilityTransitionHost, {
               runtimeCapability,
+              before,
+              after,
             })
           },
         },
@@ -150,9 +150,10 @@ async function projectWorkspace(
           signal: input.signal,
         }),
       beforeCommit: async ({ before, after }) => {
-        if (!workspaceGitCleanupRequired(before, after)) return
-        await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
+        await commitWorkspaceCapabilityTransitionOrThrow(input.workspaceCapabilityTransitionHost, {
           runtimeCapability,
+          before,
+          after,
         })
       },
     })

@@ -38,6 +38,7 @@ const worktreeRemovalApplication = {
 }
 
 const TEST_WORKSPACE_CAPABILITY_TRANSITION_HOST = {
+  commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
   commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
 }
 

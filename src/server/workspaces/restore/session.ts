@@ -42,10 +42,9 @@ import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/worksp
 import { abortableWorkspaceRestore } from '#/server/workspaces/restore/utils.ts'
 import { restoreWorkspacePaneTabsForMemberships } from '#/server/workspaces/restore/pane-tabs.ts'
 import {
-  commitGitCapabilityRemovalOrThrow,
+  commitWorkspaceCapabilityTransitionOrThrow,
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
-import { workspaceGitCleanupRequired } from '#/server/workspaces/runtime/capability-transition.ts'
 import { CodedError } from '#/shared/coded-error.ts'
 
 export interface RestoreServerWorkspaceInput {
@@ -250,8 +249,11 @@ async function openWorkspaceRuntime(
         workspaceRuntimeId: lease.workspaceRuntimeId,
         probe: async () => await probeWorkspace(entry.id, serverLocatorPlatform(), { signal: input.signal }),
         beforeCommit: async ({ before, after }) => {
-          if (!workspaceGitCleanupRequired(before, after)) return
-          await commitGitCapabilityRemoval(input, runtimeCapability)
+          await commitWorkspaceCapabilityTransitionOrThrow(input.workspaceCapabilityTransitionHost, {
+            runtimeCapability,
+            before,
+            after,
+          })
         },
       })
     }
@@ -367,19 +369,13 @@ function remoteCapabilityTransitionOptions(
       before: WorkspaceProbeState
       after: WorkspaceSettledProbeState
     }) => {
-      if (!workspaceGitCleanupRequired(before, after)) return
-      await commitGitCapabilityRemoval(input, runtimeCapability)
+      await commitWorkspaceCapabilityTransitionOrThrow(input.workspaceCapabilityTransitionHost, {
+        runtimeCapability,
+        before,
+        after,
+      })
     },
   }
-}
-
-async function commitGitCapabilityRemoval(
-  input: RestoreServerWorkspaceInput,
-  runtimeCapability: WorkspaceRuntimeMembershipCapability,
-): Promise<void> {
-  await commitGitCapabilityRemovalOrThrow(input.workspaceCapabilityTransitionHost, {
-    runtimeCapability,
-  })
 }
 
 async function withAcquiredWorkspaceRuntimeLease<T>(

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
-  workspaceGitCleanupRequired,
+  workspaceGitCapabilityTransition,
   workspaceGitProbeConclusion,
 } from '#/server/workspaces/runtime/capability-transition.ts'
 import type { WorkspaceProbeState } from '#/shared/workspace-runtime.ts'
@@ -35,11 +35,25 @@ describe('workspace Git probe conclusion', () => {
   test('requires a settled conclusion before cleanup', () => {
     expect(workspaceGitProbeConclusion({ status: 'probing' })).toBe('inconclusive')
     expect(
-      workspaceGitCleanupRequired(
+      workspaceGitCapabilityTransition(
         { status: 'probing' },
         { ...PLAIN_PROBE, diagnostics: [{ scope: 'git', message: 'Git probe timed out' }] },
       ),
-    ).toBe(false)
-    expect(workspaceGitCleanupRequired({ status: 'probing' }, PLAIN_PROBE)).toBe(true)
+    ).toBeNull()
+    expect(workspaceGitCapabilityTransition({ status: 'probing' }, PLAIN_PROBE)).toBe('removal')
+  })
+
+  test('classifies capability promotion and removal', () => {
+    const gitProbe: WorkspaceProbeState = {
+      ...PLAIN_PROBE,
+      capabilities: {
+        ...PLAIN_PROBE.capabilities,
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+    }
+    expect(workspaceGitCapabilityTransition(PLAIN_PROBE, gitProbe)).toBe('promotion')
+    expect(workspaceGitCapabilityTransition(gitProbe, PLAIN_PROBE)).toBe('removal')
+    expect(workspaceGitCapabilityTransition(gitProbe, gitProbe)).toBeNull()
+    expect(workspaceGitCapabilityTransition({ status: 'probing' }, gitProbe)).toBe('promotion')
   })
 })

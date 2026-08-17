@@ -4,6 +4,8 @@ import {
   closeWorkspaceRuntimesForDurableRemoval,
   type WorkspaceRuntimeEpochCapability,
 } from '#/server/workspaces/runtime/authority.ts'
+import { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
+import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import {
   WORKSPACE_PANE_TABS_REALTIME_EVENTS,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
@@ -51,7 +53,182 @@ function workspaceRuntimeCapability(assertCurrent: () => void = () => {}): Works
   }
 }
 
+const captureWorkspaceRootTarget: WorkspacePaneTargetProjectionProvider['captureTargets'] = async (
+  _userId,
+  workspaceId,
+  scope,
+) => [
+  {
+    target: {
+      kind: 'workspace-root',
+      workspaceId,
+      workspaceRuntimeId: scope.slice(scope.lastIndexOf('\0') + 1),
+    },
+    nativeWorktreePath: '/repo',
+  },
+]
+
 describe('server terminal runtime workspace panes', () => {
+  test('Git capability promotion replaces the root target while preserving layout and live terminals', async () => {
+    const { host, workspaceCapabilityTransitionHost, shutdown } = await buildRuntime({
+      captureTargets: captureWorkspaceRootTarget,
+    })
+    const created = await createAdmittedTerminal(host, 'client_a', USER_1, {
+      repoRoot: REPO_ROOT,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      branch: 'main',
+      worktreePath: '/repo',
+      kind: 'primary',
+      target: {
+        kind: 'workspace-root',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      },
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    setTestWorkspacePaneLayout({
+      entries: [
+        {
+          target: { kind: 'workspace-root' },
+          tabs: [workspacePaneStaticTabEntry('files')],
+        },
+        {
+          target: { kind: 'git-worktree', root: REPO_ROOT },
+          tabs: [workspacePaneStaticTabEntry('history')],
+        },
+      ],
+    })
+
+    await expect(
+      workspaceCapabilityTransitionHost.commitGitCapabilityPromotion({
+        runtimeCapability: workspaceRuntimeCapability(),
+      }),
+    ).resolves.toEqual({ kind: 'committed' })
+
+    await expect(
+      host.listSessions('client_a', USER_1, {
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        terminalSessionId: created.terminalSessionId,
+        target: {
+          kind: 'git-worktree',
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          root: REPO_ROOT,
+        },
+        presentation: { kind: 'git-worktree' },
+      }),
+    ])
+    expect(testWorkspacePaneLayout).toEqual({
+      entries: [
+        {
+          target: { kind: 'git-worktree', root: REPO_ROOT },
+          tabs: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('history')],
+        },
+      ],
+    })
+    shutdown()
+  })
+
+  test('fails Git capability promotion before commit when the durable layout write fails', async () => {
+    const { workspaceCapabilityTransitionHost, shutdown } = await buildRuntime()
+    setTestWorkspacePaneLayout({
+      entries: [
+        {
+          target: { kind: 'workspace-root' },
+          tabs: [workspacePaneStaticTabEntry('files')],
+        },
+      ],
+    })
+    setTestWorkspacePaneLayoutWriteError(new Error('layout write failed'))
+
+    const result = await workspaceCapabilityTransitionHost.commitGitCapabilityPromotion({
+      runtimeCapability: workspaceRuntimeCapability(),
+    })
+
+    expect(result).toEqual({ kind: 'failed-before-commit', error: testWorkspacePaneLayoutWriteError })
+    expect(testWorkspacePaneLayout).toEqual({
+      entries: [
+        {
+          target: { kind: 'workspace-root' },
+          tabs: [workspacePaneStaticTabEntry('files')],
+        },
+      ],
+    })
+    shutdown()
+  })
+
+  test('keeps Git capability promotion committed when projection publication fails', async () => {
+    const { host, workspaceCapabilityTransitionHost, shutdown } = await buildRuntime({
+      captureTargets: captureWorkspaceRootTarget,
+    })
+    const created = await createAdmittedTerminal(host, 'client_a', USER_1, {
+      repoRoot: REPO_ROOT,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      branch: 'main',
+      worktreePath: '/repo',
+      kind: 'primary',
+      target: {
+        kind: 'workspace-root',
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      },
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    setTestWorkspacePaneLayout({
+      entries: [
+        {
+          target: { kind: 'workspace-root' },
+          tabs: [workspacePaneStaticTabEntry('files')],
+        },
+      ],
+    })
+    const broadcastToUser = vi.spyOn(RealtimeBroker.prototype, 'broadcastToUser')
+    broadcastToUser.mockImplementationOnce(() => {
+      throw new Error('projection unavailable')
+    })
+
+    await expect(
+      workspaceCapabilityTransitionHost.commitGitCapabilityPromotion({
+        runtimeCapability: workspaceRuntimeCapability(),
+      }),
+    ).resolves.toEqual({ kind: 'committed' })
+
+    expect(broadcastToUser.mock.calls.length).toBeGreaterThanOrEqual(2)
+    await expect(
+      host.listSessions('client_a', USER_1, {
+        workspaceId: REPO_ROOT,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        terminalSessionId: created.terminalSessionId,
+        target: {
+          kind: 'git-worktree',
+          workspaceId: REPO_ROOT,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          root: REPO_ROOT,
+        },
+        presentation: { kind: 'git-worktree' },
+      }),
+    ])
+    expect(testWorkspacePaneLayout).toEqual({
+      entries: [
+        {
+          target: { kind: 'git-worktree', root: REPO_ROOT },
+          tabs: [workspacePaneStaticTabEntry('files')],
+        },
+      ],
+    })
+    broadcastToUser.mockRestore()
+    shutdown()
+  })
+
   test('broadcasts an accepted durable pane layout change to every active user projection', async () => {
     const { host, shutdown } = await buildRuntime()
     const socketA = appRealtimeSocket()

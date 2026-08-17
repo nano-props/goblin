@@ -1,6 +1,7 @@
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
 
 export type WorkspaceGitProbeConclusion = 'available' | 'conclusive-unavailable' | 'inconclusive'
+export type WorkspaceGitCapabilityTransition = 'promotion' | 'removal'
 
 export function workspaceGitProbeConclusion(probe: WorkspaceProbeState): WorkspaceGitProbeConclusion {
   if (probe.status !== 'ready') return 'inconclusive'
@@ -8,9 +9,13 @@ export function workspaceGitProbeConclusion(probe: WorkspaceProbeState): Workspa
   return probe.diagnostics.some((diagnostic) => diagnostic.scope === 'git') ? 'inconclusive' : 'conclusive-unavailable'
 }
 
-export function workspaceGitCleanupRequired(before: WorkspaceProbeState, after: WorkspaceSettledProbeState): boolean {
-  return (
-    workspaceGitProbeConclusion(before) !== 'conclusive-unavailable' &&
-    workspaceGitProbeConclusion(after) === 'conclusive-unavailable'
-  )
+export function workspaceGitCapabilityTransition(
+  before: WorkspaceProbeState,
+  after: WorkspaceSettledProbeState,
+): WorkspaceGitCapabilityTransition | null {
+  const beforeConclusion = workspaceGitProbeConclusion(before)
+  const afterConclusion = workspaceGitProbeConclusion(after)
+  if (afterConclusion === 'available' && beforeConclusion !== 'available') return 'promotion'
+  if (afterConclusion === 'conclusive-unavailable' && beforeConclusion !== 'conclusive-unavailable') return 'removal'
+  return null
 }

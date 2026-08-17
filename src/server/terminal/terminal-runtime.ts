@@ -24,7 +24,6 @@ import {
 import { WorkspacePaneTargetCatalog } from '#/server/workspace-pane/workspace-pane-target-catalog.ts'
 import { WorkspacePaneLayoutAggregate } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
-import { workspacePaneDurableLayoutsEqual } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
@@ -360,16 +359,86 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   terminalRuntimeLogger.info({ ptyMode: ptySupervisor.getDiagnostics().mode }, 'server terminal runtime created')
 
   const workspaceCapabilityTransitionHost: WorkspaceCapabilityTransitionHost = {
+    async commitGitCapabilityPromotion({ runtimeCapability }) {
+      const { userId, workspaceId, workspaceRuntimeId } = runtimeCapability
+      const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
+      const promotionAttempt = await (async () => {
+        try {
+          runtimeCapability.assertCurrent()
+          const validation = manager.validateWorkspaceRootSessionPromotion(userId, scope, workspaceId)
+          const paneTransition = await workspaceTabsCoordinator.commitGitCapabilityPromotion(
+            { userId, workspaceId, scope, epochCapability: runtimeCapability },
+            () =>
+              manager.commitWorkspaceRootSessionPromotion(
+                userId,
+                scope,
+                validation,
+                workspaceRuntimeId,
+              ),
+          )
+          return { kind: 'accepted' as const, paneTransition }
+        } catch (error) {
+          return { kind: 'failed-before-commit' as const, error }
+        }
+      })()
+      if (promotionAttempt.kind === 'failed-before-commit') return promotionAttempt
+      const { paneTransition } = promotionAttempt
+
+      // The accepted durable CAS is the capability-promotion commit point.
+      // All expected validation has completed, so the synchronous authority
+      // mutation below must finish before any best-effort projection effects.
+      retireInvalidatedScopeProjection({ userId, workspaceId, workspaceRuntimeId, scope })
+      if (paneTransition.kind === 'authority-commit-failed') {
+        terminalRuntimeLogger.error(
+          { userId, workspaceId, workspaceRuntimeId, transition: 'promotion', err: paneTransition.error },
+          'workspace capability transition committed with terminal authority failure',
+        )
+      }
+      publishCommittedCapabilityEffects(
+        'promotion',
+        { userId, workspaceId, workspaceRuntimeId },
+        [
+          paneTransition.kind === 'committed'
+            ? paneTransition.authorityResult.publishEffects
+            : () =>
+                broadcastTerminalSessionsChanged(
+                  userId,
+                  manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
+                ),
+          () => {
+            if (
+              paneTransition.durableLayoutChanged ||
+              paneTransition.kind === 'authority-commit-failed' ||
+              paneTransition.authorityResult.changedCount > 0
+            ) {
+              publishWorkspaceTabsChanged(userId, workspaceId)
+            }
+          },
+        ],
+      )
+      if (paneTransition.kind === 'authority-commit-failed') {
+        return { kind: 'committed-authority-uncertain', error: paneTransition.error }
+      }
+      return { kind: 'committed' }
+    },
     async commitGitCapabilityRemoval({ runtimeCapability }) {
       const { userId, workspaceId, workspaceRuntimeId } = runtimeCapability
       const scope = terminalSessionRuntimeScope(workspaceId, workspaceRuntimeId)
-      let durableLayoutChanged: boolean
-      try {
-        runtimeCapability.assertCurrent()
-        durableLayoutChanged = await clearWorkspacePaneDurableLayout(workspacePaneLayoutRepository, runtimeCapability)
-      } catch (error) {
-        return { kind: 'failed-before-commit', error }
-      }
+      const removalAttempt = await (async () => {
+        try {
+          runtimeCapability.assertCurrent()
+          manager.validateGitSessionInvalidation(userId, scope)
+          const paneTransition = await workspaceTabsCoordinator.commitGitCapabilityRemoval(
+            { userId, workspaceId, scope, epochCapability: runtimeCapability },
+            () => manager.commitGitSessionInvalidation(userId, scope),
+          )
+          return { kind: 'accepted' as const, paneTransition }
+        } catch (error) {
+          return { kind: 'failed-before-commit' as const, error }
+        }
+      })()
+      if (removalAttempt.kind === 'failed-before-commit') return removalAttempt
+      const { paneTransition } = removalAttempt
 
       // The accepted durable CAS is the capability-removal commit point.
       // Register overlay retirement before detaching terminal authority; the
@@ -380,23 +449,58 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         workspaceRuntimeId: workspaceRuntimeId,
         scope,
       })
-      const terminalInvalidation = manager.commitGitSessionInvalidation(userId, scope)
-      terminalInvalidation.publishEffects()
-      if (durableLayoutChanged || terminalInvalidation.removedCount > 0) {
-        try {
-          broadcastTerminalSessionsChanged(
-            userId,
-            manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
-          )
-        } catch (error) {
-          terminalRuntimeLogger.warn(
-            { userId, workspaceId, workspaceRuntimeId, err: error },
-            'failed to publish committed terminal invalidation',
-          )
-        }
+      if (paneTransition.kind === 'authority-commit-failed') {
+        terminalRuntimeLogger.error(
+          { userId, workspaceId, workspaceRuntimeId, transition: 'removal', err: paneTransition.error },
+          'workspace capability transition committed with terminal authority failure',
+        )
+      }
+      publishCommittedCapabilityEffects(
+        'removal',
+        { userId, workspaceId, workspaceRuntimeId },
+        [
+          paneTransition.kind === 'committed'
+            ? paneTransition.authorityResult.publishEffects
+            : () =>
+                broadcastTerminalSessionsChanged(
+                  userId,
+                  manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
+                ),
+          () => {
+            if (
+              paneTransition.kind === 'committed' &&
+              (paneTransition.durableLayoutChanged || paneTransition.authorityResult.removedCount > 0)
+            ) {
+              broadcastTerminalSessionsChanged(
+                userId,
+                manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
+              )
+            }
+          },
+        ],
+      )
+      if (paneTransition.kind === 'authority-commit-failed') {
+        return { kind: 'committed-authority-uncertain', error: paneTransition.error }
       }
       return { kind: 'committed' }
     },
+  }
+
+  function publishCommittedCapabilityEffects(
+    transition: 'promotion' | 'removal',
+    coordinates: { userId: string; workspaceId: WorkspaceId; workspaceRuntimeId: string },
+    effects: readonly (() => void)[],
+  ): void {
+    for (const publish of effects) {
+      try {
+        publish()
+      } catch (error) {
+        terminalRuntimeLogger.warn(
+          { ...coordinates, transition, err: error },
+          'failed to publish committed workspace capability transition',
+        )
+      }
+    }
   }
 
   return {
@@ -443,51 +547,25 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     // session retirement has no such command boundary, so it reconciles here
     // from the complete live-session projection.
     if (reason === 'workspace-pane') return
-    return sessionService
-      .reconcileTerminalTabsForSession(userId, session)
-      .then(
-        (result) => {
-          if (result.kind === 'runtime-stale') return
-          publishWorkspaceTabsChanged(userId, coordinates.workspaceId)
-        },
-        (err) => {
-          terminalRuntimeLogger.warn(
-            {
-              userId,
-              terminalRuntimeSessionId: session.terminalRuntimeSessionId,
-              workspaceId: coordinates.workspaceId,
-              err,
-            },
-            'failed to reconcile workspace tabs after terminal session close',
-          )
-          // Session retirement is already authoritative. Invalidate the stale
-          // tabs projection once even when this eager projection fails.
-          publishWorkspaceTabsChanged(userId, coordinates.workspaceId)
-        },
-      )
+    return sessionService.reconcileTerminalTabsForSession(userId, session).then(
+      (result) => {
+        if (result.kind === 'runtime-stale') return
+        publishWorkspaceTabsChanged(userId, coordinates.workspaceId)
+      },
+      (err) => {
+        terminalRuntimeLogger.warn(
+          {
+            userId,
+            terminalRuntimeSessionId: session.terminalRuntimeSessionId,
+            workspaceId: coordinates.workspaceId,
+            err,
+          },
+          'failed to reconcile workspace tabs after terminal session close',
+        )
+        // Session retirement is already authoritative. Invalidate the stale
+        // tabs projection once even when this eager projection fails.
+        publishWorkspaceTabsChanged(userId, coordinates.workspaceId)
+      },
+    )
   }
-}
-
-async function clearWorkspacePaneDurableLayout(
-  repository: WorkspacePaneLayoutRepository,
-  runtimeCapability: WorkspaceRuntimeEpochCapability,
-): Promise<boolean> {
-  const { workspaceId } = runtimeCapability
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const current = await repository.load(workspaceId)
-    const replacement = {
-      entries: current.layout.entries.filter((entry) => entry.target.kind === 'workspace-root'),
-    }
-    runtimeCapability.assertCurrent()
-    if (workspacePaneDurableLayoutsEqual(workspaceId, current.layout, replacement)) return false
-    const outcome = await repository.compareAndSwap({
-      workspaceId,
-      expected: current.layout,
-      replacement,
-      epochCapability: runtimeCapability,
-    })
-    if (outcome.kind === 'accepted') return outcome.changed
-    if (outcome.kind === 'write-failure') throw outcome.error
-  }
-  throw new Error('workspace pane layout cleanup was superseded')
 }

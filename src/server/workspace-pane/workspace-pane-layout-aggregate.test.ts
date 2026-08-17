@@ -127,6 +127,65 @@ describe('workspace pane layout aggregate', () => {
     expect(repository.layout).toEqual(current)
   })
 
+  test('serializes Git capability promotion with workspace layout operations', async () => {
+    const files = workspacePaneStaticTabEntry('files')
+    const repository = memoryRepository({
+      entries: [{ target: { kind: 'workspace-root' }, tabs: [files] }],
+    })
+    const aggregate = aggregateFor(repository)
+    const operationStarted = Promise.withResolvers<void>()
+    const releaseOperation = Promise.withResolvers<void>()
+    const order: string[] = []
+    const pendingOperation = aggregate.runExclusive(scope.workspaceId, async () => {
+      order.push('operation-started')
+      operationStarted.resolve()
+      await releaseOperation.promise
+      order.push('operation-finished')
+    })
+    await operationStarted.promise
+
+    const promotion = aggregate.runExclusive(scope.workspaceId, async (operation) =>
+      await operation.commitGitCapabilityPromotion({ ...scope, epochCapability: testEpochCapability }, () => {
+        order.push('promotion-committed')
+      }),
+    )
+    await Promise.resolve()
+    expect(order).toEqual(['operation-started'])
+
+    releaseOperation.resolve()
+    await expect(Promise.all([pendingOperation, promotion])).resolves.toEqual([
+      undefined,
+      { kind: 'committed', durableLayoutChanged: true, authorityResult: undefined },
+    ])
+    expect(order).toEqual(['operation-started', 'operation-finished', 'promotion-committed'])
+    expect(repository.layout).toEqual({
+      entries: [{ target: { kind: 'git-worktree', root: WORKSPACE_ID }, tabs: [files] }],
+    })
+  })
+
+  test('reports an authority failure after preserving an accepted capability layout commit', async () => {
+    const files = workspacePaneStaticTabEntry('files')
+    const repository = memoryRepository({
+      entries: [{ target: { kind: 'workspace-root' }, tabs: [files] }],
+    })
+    const aggregate = aggregateFor(repository)
+    const authorityError = new Error('terminal authority commit failed')
+
+    await expect(
+      aggregate.runExclusive(scope.workspaceId, async (operation) =>
+        await operation.commitGitCapabilityPromotion(
+          { ...scope, epochCapability: testEpochCapability },
+          () => {
+            throw authorityError
+          },
+        ),
+      ),
+    ).resolves.toEqual({ kind: 'authority-commit-failed', durableLayoutChanged: true, error: authorityError })
+    expect(repository.layout).toEqual({
+      entries: [{ target: { kind: 'git-worktree', root: WORKSPACE_ID }, tabs: [files] }],
+    })
+  })
+
   test('re-reads and replans the original update intent after a CAS conflict', async () => {
     const repository = memoryRepository({
       entries: [
@@ -669,6 +728,37 @@ describe('workspace pane layout aggregate', () => {
         ),
       }),
     ).rejects.toThrow('error.workspace-tabs-target-invalid')
+  })
+
+  test('projects a live runtime only to its authoritative target when two targets share a path', async () => {
+    const workspaceRoot = {
+      target: {
+        kind: 'workspace-root' as const,
+        workspaceId: scope.workspaceId,
+        workspaceRuntimeId: scope.workspaceRuntimeId,
+      },
+      nativeWorktreePath: target.worktreePath,
+    }
+    const aggregate = aggregateFor(
+      memoryRepository({
+        entries: [
+          {
+            target: { kind: 'workspace-root' },
+            tabs: [workspacePaneStaticTabEntry('files')],
+          },
+        ],
+      }),
+    )
+
+    const snapshot = await readSnapshot(aggregate, scope, [workspaceRoot, worktreeProjection()], providers)
+
+    expect(snapshot.entries).toEqual([
+      { target: workspaceRoot.target, tabs: [workspacePaneStaticTabEntry('files')] },
+      {
+        target: worktreeProjection().target,
+        tabs: [workspacePaneStaticTabEntry('status'), terminal],
+      },
+    ])
   })
 
   test('does not treat persistence failure as repair authority', async () => {

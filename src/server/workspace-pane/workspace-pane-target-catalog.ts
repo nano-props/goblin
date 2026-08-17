@@ -1,12 +1,20 @@
 import { getWorkspacePaneTargetIdentities } from '#/server/repos/read-paths.ts'
-import { workspaceRuntimeHasGitCapability } from '#/server/workspaces/runtime/authority.ts'
+import {
+  WorkspaceRuntimeStaleError,
+  workspaceRuntimeGitCapabilityState,
+} from '#/server/workspaces/runtime/authority.ts'
+import type { WorkspaceRuntimeGitCapabilityState } from '#/server/workspaces/runtime/authority.ts'
 import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { WorkspacePaneTargetIdentity } from '#/shared/git-types.ts'
 
 interface WorkspacePaneTargetCatalogDependencies {
-  hasGitCapability(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
+  gitCapabilityState(
+    userId: string,
+    workspaceId: WorkspaceId,
+    workspaceRuntimeId: string,
+  ): WorkspaceRuntimeGitCapabilityState
   readIdentities(
     workspaceId: WorkspaceId,
     options: { workspaceRuntimeId: string },
@@ -14,7 +22,7 @@ interface WorkspacePaneTargetCatalogDependencies {
 }
 
 const defaultDependencies: WorkspacePaneTargetCatalogDependencies = {
-  hasGitCapability: workspaceRuntimeHasGitCapability,
+  gitCapabilityState: workspaceRuntimeGitCapabilityState,
   readIdentities: getWorkspacePaneTargetIdentities,
 }
 
@@ -37,10 +45,16 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
       target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId },
       nativeWorktreePath: workspace.path,
     }
-    if (!this.dependencies.hasGitCapability(userId, workspaceId, workspaceRuntimeId)) return [workspaceTarget]
+    const gitCapabilityState = this.dependencies.gitCapabilityState(userId, workspaceId, workspaceRuntimeId)
+    if (gitCapabilityState === 'transitioning') throw new WorkspaceRuntimeStaleError()
+    if (gitCapabilityState === 'unavailable') return [workspaceTarget]
     const identities = await this.dependencies.readIdentities(workspaceId, { workspaceRuntimeId })
+    const rootWorktreePath = workspace.path
+    const rootIsWorktree = identities.some(
+      (identity) => identity.kind === 'git-worktree' && identity.worktreePath === rootWorktreePath,
+    )
     return [
-      workspaceTarget,
+      ...(rootIsWorktree ? [] : [workspaceTarget]),
       ...identities.map((identity): WorkspacePaneTargetProjection =>
         identity.kind === 'git-worktree'
           ? {

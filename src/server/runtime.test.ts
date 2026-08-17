@@ -75,6 +75,7 @@ function makePtySupervisor(): PtySupervisor {
 }
 
 const workspaceCapabilityTransitionHost = {
+  commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
   commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
 }
 

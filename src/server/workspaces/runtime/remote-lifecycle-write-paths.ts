@@ -3,7 +3,7 @@ import { resolveServerRemoteWorkspaceConnection } from '#/server/workspaces/runt
 import { isCurrentWorkspaceRuntime, runRemoteWorkspaceLifecycle } from '#/server/workspaces/runtime/authority.ts'
 import { isRemoteWorkspaceId, type RemoteWorkspaceLifecycleCommandResult } from '#/shared/remote-workspace.ts'
 import type { WorkspaceProbeState, WorkspaceSettledProbeState } from '#/shared/workspace-runtime.ts'
-import { workspaceGitCleanupRequired } from '#/server/workspaces/runtime/capability-transition.ts'
+import { workspaceGitCapabilityTransition } from '#/server/workspaces/runtime/capability-transition.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 
 export interface RunRemoteWorkspaceLifecycleInput {
@@ -63,8 +63,11 @@ export async function runRemoteWorkspaceLifecycleWrite(
           mode: 'refresh',
           probe,
           beforeCommit: async (transition) => {
-            if (workspaceGitCleanupRequired(transition.before, transition.after) && !options.beforeCapabilityCommit) {
-              throw new Error('workspace capability downgrade requires transactional cleanup')
+            if (
+              workspaceGitCapabilityTransition(transition.before, transition.after) &&
+              !options.beforeCapabilityCommit
+            ) {
+              throw new Error('workspace capability transition requires transactional cleanup')
             }
             await options.beforeCapabilityCommit?.(transition)
           },

@@ -251,6 +251,38 @@ describe('open admission', () => {
     )
   })
 
+  test('aborts a prepared terminal when final target revalidation observes a capability transition', async () => {
+    const runtime = terminalCreateSuccess()
+    const createAdmitted = vi.fn(async () => runtime)
+    const ensureRuntimeTabForSession = vi.fn(async () => {
+      throw new WorkspaceRuntimeStaleError()
+    })
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: {
+        capture: async () => testPhysicalWorktreeExecutionCapability(request.worktreePath),
+      },
+      terminalSessions: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted, close: () => ({ kind: 'failed' as const }) },
+      workspaceTabsCoordinator: runtimeTabsCoordinator({ ensureRuntimeTabForSession }),
+      captureWorkspaceRuntimeMembershipCapability: () => workspaceRuntimeMembershipCapability(),
+      invalidateWorkspaceTabs: vi.fn(),
+      broadcastWorkspaceTabsChanged,
+    })
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'error.workspace-runtime-stale',
+    })
+    expect(createAdmitted).toHaveBeenCalledOnce()
+    expect(ensureRuntimeTabForSession).toHaveBeenCalledOnce()
+    expect(runtime.admission.commit).not.toHaveBeenCalled()
+    expect(runtime.admission.abort).toHaveBeenCalledOnce()
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
+  })
+
   test('does not touch tabs when the provider create fails', async () => {
     const ensureRuntimeTabForSession = vi.fn()
     const broadcastWorkspaceTabsChanged = vi.fn()

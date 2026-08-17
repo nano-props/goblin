@@ -9,10 +9,9 @@ import { REMOTE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import { runRemoteWorkspaceLifecycleWrite } from '#/server/workspaces/runtime/remote-lifecycle-write-paths.ts'
 import {
-  commitGitCapabilityRemovalOrThrow,
+  commitWorkspaceCapabilityTransitionOrThrow,
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
-import { workspaceGitCleanupRequired } from '#/server/workspaces/runtime/capability-transition.ts'
 import {
   requireWorkspaceRuntimeEpochCapability,
   runWorkspaceRuntimeRequest,
@@ -43,9 +42,10 @@ export function createRemoteRoutes(options: { workspaceCapabilityTransitionHost:
             { userId, workspaceId, workspaceRuntimeId, mode: mode ?? 'restart' },
             {
               beforeCapabilityCommit: async ({ before, after }) => {
-                if (!workspaceGitCleanupRequired(before, after)) return
-                await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
+                await commitWorkspaceCapabilityTransitionOrThrow(options.workspaceCapabilityTransitionHost, {
                   runtimeCapability,
+                  before,
+                  after,
                 })
               },
             },

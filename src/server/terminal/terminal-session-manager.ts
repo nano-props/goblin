@@ -169,6 +169,15 @@ export interface TerminalSessionInvalidationCommit {
   publishEffects(): void
 }
 
+export interface TerminalSessionPromotionCommit {
+  changedCount: number
+  publishEffects(): void
+}
+
+export interface TerminalSessionPromotionValidation {
+  canonicalWorkspaceId: WorkspaceId
+}
+
 /**
  * Authoritative owner of terminal directory membership and PTY resources.
  *
@@ -926,6 +935,62 @@ export class TerminalSessionManager<TUser extends string | number> {
     return this.commitSessionInvalidation(
       this.directory.entriesForScope(userId, scope).filter((session) => session.target.kind !== 'workspace-root'),
     )
+  }
+
+  validateGitSessionInvalidation(userId: TUser, scope: string): void {
+    const sessions = this.directory
+      .entriesForScope(userId, scope)
+      .filter((session) => session.target.kind !== 'workspace-root')
+    for (const session of sessions) this.assertSessionInvalidationCandidate(session)
+  }
+
+  validateWorkspaceRootSessionPromotion(
+    userId: TUser,
+    scope: string,
+    workspaceId: WorkspaceId,
+  ): TerminalSessionPromotionValidation {
+    const canonicalWorkspaceId = canonicalWorkspaceLocator(workspaceId)
+    if (!canonicalWorkspaceId) throw new Error('error.workspace-tabs-target-invalid')
+    const sessions = this.directory
+      .entriesForScope(userId, scope)
+      .filter((session) => session.target.kind === 'workspace-root')
+    for (const session of sessions) {
+      if (session.executionRootId !== canonicalWorkspaceId || session.presentation?.kind !== 'workspace-root') {
+        throw new Error('terminal session promotion target mismatch')
+      }
+    }
+    return { canonicalWorkspaceId }
+  }
+
+  commitWorkspaceRootSessionPromotion(
+    userId: TUser,
+    scope: string,
+    validation: TerminalSessionPromotionValidation,
+    workspaceRuntimeId: string,
+  ): TerminalSessionPromotionCommit {
+    const sessions = this.directory
+      .entriesForScope(userId, scope)
+      .filter((session) => session.target.kind === 'workspace-root')
+    for (const session of sessions) {
+      this.directory.change(session, () => {
+        session.target = {
+          kind: 'git-worktree',
+          workspaceId: validation.canonicalWorkspaceId,
+          workspaceRuntimeId,
+          root: validation.canonicalWorkspaceId,
+        }
+        session.presentation = { kind: 'git-worktree' }
+      })
+    }
+    let effectsPublished = false
+    return {
+      changedCount: sessions.length,
+      publishEffects: () => {
+        if (effectsPublished || sessions.length === 0) return
+        effectsPublished = true
+        this.sink.onSessionsProjectionChanged?.(userId, this.sessionsChangedEvent(sessions[0]!))
+      },
+    }
   }
 
   private commitSessionInvalidation(

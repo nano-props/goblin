@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { WorkspacePaneTargetCatalog } from '#/server/workspace-pane/workspace-pane-target-catalog.ts'
+import { WorkspaceRuntimeStaleError } from '#/server/workspaces/runtime/authority.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
@@ -17,19 +18,11 @@ describe('WorkspacePaneTargetCatalog', () => {
       { kind: 'git-branch' as const, branchName: 'feature/no-worktree' },
     ])
     const catalog = new WorkspacePaneTargetCatalog({
-      hasGitCapability: () => true,
+      gitCapabilityState: () => 'available',
       readIdentities,
     })
 
     await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
-      {
-        target: {
-          kind: 'workspace-root',
-          workspaceId: 'goblin+file:///repo',
-          workspaceRuntimeId: 'runtime-a',
-        },
-        nativeWorktreePath: '/repo',
-      },
       {
         target: {
           kind: 'git-worktree',
@@ -56,7 +49,7 @@ describe('WorkspacePaneTargetCatalog', () => {
   test('does not query Git identity for a plain workspace runtime', async () => {
     const readIdentities = vi.fn()
     const catalog = new WorkspacePaneTargetCatalog({
-      hasGitCapability: () => false,
+      gitCapabilityState: () => 'unavailable',
       readIdentities,
     })
 
@@ -66,9 +59,22 @@ describe('WorkspacePaneTargetCatalog', () => {
     expect(readIdentities).not.toHaveBeenCalled()
   })
 
+  test('fast-fails target capture while Git capability is transitioning', async () => {
+    const readIdentities = vi.fn()
+    const catalog = new WorkspacePaneTargetCatalog({
+      gitCapabilityState: () => 'transitioning',
+      readIdentities,
+    })
+
+    await expect(
+      catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a'),
+    ).rejects.toBeInstanceOf(WorkspaceRuntimeStaleError)
+    expect(readIdentities).not.toHaveBeenCalled()
+  })
+
   test('retains a detached worktree even when the repository has no branch refs', async () => {
     const catalog = new WorkspacePaneTargetCatalog({
-      hasGitCapability: () => true,
+      gitCapabilityState: () => 'available',
       readIdentities: async () => [
         {
           kind: 'git-worktree',
@@ -78,6 +84,32 @@ describe('WorkspacePaneTargetCatalog', () => {
         },
       ],
     })
+    await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
+      {
+        target: {
+          kind: 'git-worktree',
+          workspaceId: 'goblin+file:///repo',
+          workspaceRuntimeId: 'runtime-a',
+          root: 'goblin+file:///repo',
+        },
+        nativeWorktreePath: '/repo',
+      },
+    ])
+  })
+
+  test('keeps the workspace root only when Git worktrees use different paths', async () => {
+    const catalog = new WorkspacePaneTargetCatalog({
+      gitCapabilityState: () => 'available',
+      readIdentities: async () => [
+        {
+          kind: 'git-worktree' as const,
+          worktreePath: '/repo-linked',
+          head: { kind: 'branch' as const, branchName: 'feature' },
+          materializedBranch: 'feature',
+        },
+      ],
+    })
+
     await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
       {
         target: {
@@ -92,16 +124,16 @@ describe('WorkspacePaneTargetCatalog', () => {
           kind: 'git-worktree',
           workspaceId: 'goblin+file:///repo',
           workspaceRuntimeId: 'runtime-a',
-          root: 'goblin+file:///repo',
+          root: 'goblin+file:///repo-linked',
         },
-        nativeWorktreePath: '/repo',
+        nativeWorktreePath: '/repo-linked',
       },
     ])
   })
 
   test('retains the canonical target for a detached worktree', async () => {
     const catalog = new WorkspacePaneTargetCatalog({
-      hasGitCapability: () => true,
+      gitCapabilityState: () => 'available',
       readIdentities: async () => [
         {
           kind: 'git-worktree',
@@ -114,7 +146,7 @@ describe('WorkspacePaneTargetCatalog', () => {
 
     const targets = await catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')
 
-    expect(targets[1]).toEqual({
+    expect(targets).toContainEqual({
       target: {
         kind: 'git-worktree',
         workspaceId: 'goblin+file:///repo',

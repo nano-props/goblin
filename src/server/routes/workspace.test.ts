@@ -108,7 +108,12 @@ describe('workspace routes', () => {
   })
 
   test('returns bounded local path suggestions from a validated POST body', async () => {
-    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval: vi.fn() } })
+    const app = createWorkspaceRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
+        commitGitCapabilityRemoval: vi.fn(),
+      },
+    })
     const response = await post(app, '/path-suggestions', { prefix: '/srv/re' })
 
     expect(response.status).toBe(200)
@@ -119,7 +124,12 @@ describe('workspace routes', () => {
   test.each([`/srv/${'a'.repeat(4096)}`, '/srv/line\nbreak'])(
     'rejects an invalid local path suggestion prefix',
     async (prefix) => {
-      const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval: vi.fn() } })
+      const app = createWorkspaceRoutes({
+        workspaceCapabilityTransitionHost: {
+          commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
+          commitGitCapabilityRemoval: vi.fn(),
+        },
+      })
       expect((await post(app, '/path-suggestions', { prefix })).status).toBe(400)
       expect(mocks.getLocalPathSuggestions).not.toHaveBeenCalled()
     },
@@ -127,7 +137,12 @@ describe('workspace routes', () => {
 
   test('opens a command input as one canonical workspace runtime', async () => {
     const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
-    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval } })
+    const app = createWorkspaceRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
+        commitGitCapabilityRemoval,
+      },
+    })
     const response = await post(app, '/runtime-open', {
       workspaceInput: '/tmp/workspace-route',
       clientId: CLIENT_ID,
@@ -148,7 +163,12 @@ describe('workspace routes', () => {
 
   test('reads a directory overview through the current Workspace runtime', async () => {
     const workspaceRuntimeId = acquireWorkspaceRuntime(USER_ID, WORKSPACE_ID, CLIENT_ID)
-    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval: vi.fn() } })
+    const app = createWorkspaceRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
+        commitGitCapabilityRemoval: vi.fn(),
+      },
+    })
 
     const response = await post(app, '/directory-overview', { workspaceId: WORKSPACE_ID, workspaceRuntimeId })
 
@@ -168,6 +188,7 @@ describe('workspace routes', () => {
     const cleanupError = new Error('durable layout write failed')
     const app = createWorkspaceRoutes({
       workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
         commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'failed-before-commit' as const, error: cleanupError })),
       },
     })
@@ -185,6 +206,7 @@ describe('workspace routes', () => {
   test('maps a stale runtime during initial capability cleanup to an actionable HTTP rejection', async () => {
     const app = createWorkspaceRoutes({
       workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
         commitGitCapabilityRemoval: vi.fn(async () => ({
           kind: 'failed-before-commit' as const,
           error: new WorkspaceRuntimeStaleError(),
@@ -208,6 +230,7 @@ describe('workspace routes', () => {
     const cleanupError = new Error('durable layout write failed')
     const app = createWorkspaceRoutes({
       workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
         commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'failed-before-commit' as const, error: cleanupError })),
       },
     })
@@ -237,7 +260,12 @@ describe('workspace routes', () => {
         return { kind: 'failed-before-commit' as const, error: new Error('first cleanup failed') }
       })
       .mockResolvedValueOnce({ kind: 'failed-before-commit' as const, error: new Error('second cleanup failed') })
-    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval } })
+    const app = createWorkspaceRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
+        commitGitCapabilityRemoval,
+      },
+    })
 
     const first = post(app, '/runtime-open', { workspaceInput: '/tmp/workspace-route', clientId: CLIENT_ID })
     await cleanupStarted.promise
@@ -256,6 +284,7 @@ describe('workspace routes', () => {
     let cleanupCommitted = false
     const app = createWorkspaceRoutes({
       workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
         commitGitCapabilityRemoval: vi.fn(async ({ runtimeCapability }) => {
           cleanupStarted.resolve()
           await finishCleanup.promise
@@ -320,7 +349,12 @@ describe('workspace routes', () => {
       diagnostics: [{ scope: 'git', message: 'Git probe timed out' }],
     })
     const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
-    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval } })
+    const app = createWorkspaceRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
+        commitGitCapabilityRemoval,
+      },
+    })
     const opened = (await (
       await post(app, '/runtime-open', { workspaceInput: '/tmp/workspace-route', clientId: CLIENT_ID })
     ).json()) as { workspaceRuntimeId: string }
@@ -398,7 +432,12 @@ describe('workspace routes', () => {
 
   test('refreshes the current workspace capability projection', async () => {
     const commitGitCapabilityRemoval = vi.fn(async () => ({ kind: 'committed' as const }))
-    const app = createWorkspaceRoutes({ workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval } })
+    const app = createWorkspaceRoutes({
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
+        commitGitCapabilityRemoval,
+      },
+    })
     const opened = (await (
       await post(app, '/runtime-open', { workspaceId: WORKSPACE_ID, clientId: CLIENT_ID })
     ).json()) as { workspaceRuntimeId: string }
@@ -431,6 +470,7 @@ describe('workspace routes', () => {
   test('maps runtime expiry at the refresh commit boundary to an actionable HTTP rejection', async () => {
     const app = createWorkspaceRoutes({
       workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
         commitGitCapabilityRemoval: vi.fn(async () => ({
           kind: 'failed-before-commit' as const,
           error: new WorkspaceRuntimeStaleError(),
@@ -649,6 +689,7 @@ describe('workspace routes', () => {
 function createTestWorkspaceRoutes() {
   return createWorkspaceRoutes({
     workspaceCapabilityTransitionHost: {
+      commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
       commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
     },
   })

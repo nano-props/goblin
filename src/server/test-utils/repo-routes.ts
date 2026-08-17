@@ -145,6 +145,7 @@ export function createTestRepoRoutes(
     },
   },
   workspaceCapabilityTransitionHost: Parameters<typeof createRepoRoutes>[0]['workspaceCapabilityTransitionHost'] = {
+    commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
     commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
   },
 ) {

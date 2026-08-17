@@ -51,6 +51,7 @@ describe('remote lifecycle route', () => {
 
     const response = await createRemoteRoutes({
       workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
         commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
       },
     }).request(
@@ -83,7 +84,10 @@ describe('remote lifecycle route', () => {
   test('uses only alias and prefix for remote directory suggestions', async () => {
     mocks.getServerRemotePathSuggestions.mockResolvedValue(['/srv/repo'])
     const response = await createRemoteRoutes({
-      workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval: vi.fn() },
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
+        commitGitCapabilityRemoval: vi.fn(),
+      },
     }).request(
       new Request('http://localhost/path-suggestions', {
         method: 'POST',
@@ -153,7 +157,10 @@ describe('remote lifecycle route', () => {
     })
 
     const response = await createRemoteRoutes({
-      workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval },
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
+        commitGitCapabilityRemoval,
+      },
     }).request(
       new Request('http://localhost/lifecycle', {
         method: 'POST',
@@ -178,7 +185,10 @@ describe('remote lifecycle route', () => {
     clearWorkspaceRuntimesForUser(USER_ID)
 
     const response = await createRemoteRoutes({
-      workspaceCapabilityTransitionHost: { commitGitCapabilityRemoval: vi.fn() },
+      workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
+        commitGitCapabilityRemoval: vi.fn(),
+      },
     }).request(
       new Request('http://localhost/lifecycle', {
         method: 'POST',
@@ -195,6 +205,7 @@ describe('remote lifecycle route', () => {
   test('returns validation errors before invoking the write path', async () => {
     const response = await createRemoteRoutes({
       workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
         commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
       },
     }).request(
@@ -212,6 +223,7 @@ describe('remote lifecycle route', () => {
   test('rejects a local workspace before invoking the remote lifecycle write path', async () => {
     const response = await createRemoteRoutes({
       workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
         commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
       },
     }).request(

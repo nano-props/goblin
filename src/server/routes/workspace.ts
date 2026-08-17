@@ -25,9 +25,8 @@ import {
   publishUserWorkspaceFilesystemInvalidation,
 } from '#/server/realtime/invalidation-broker.ts'
 import { probeLocalWorkspace, probeWorkspace } from '#/server/workspaces/probe.ts'
-import { workspaceGitCleanupRequired } from '#/server/workspaces/runtime/capability-transition.ts'
 import {
-  commitGitCapabilityRemovalOrThrow,
+  commitWorkspaceCapabilityTransitionOrThrow,
   type WorkspaceCapabilityTransitionHost,
 } from '#/server/workspace-capability-transition-host.ts'
 import { CodedError } from '#/shared/coded-error.ts'
@@ -70,9 +69,10 @@ export function createWorkspaceRoutes(options: {
             workspaceRuntimeId,
             probe: () => probeWorkspace(workspaceId, platform, { signal: c.req.raw.signal }),
             beforeCommit: async ({ before, after }) => {
-              if (!workspaceGitCleanupRequired(before, after)) return
-              await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
+              await commitWorkspaceCapabilityTransitionOrThrow(options.workspaceCapabilityTransitionHost, {
                 runtimeCapability,
+                before,
+                after,
               })
             },
           }),
@@ -107,9 +107,10 @@ export function createWorkspaceRoutes(options: {
                 workspaceRuntimeId,
                 probe: async () => probe,
                 beforeCommit: async ({ before, after }) => {
-                  if (!workspaceGitCleanupRequired(before, after)) return
-                  await commitGitCapabilityRemovalOrThrow(options.workspaceCapabilityTransitionHost, {
+                  await commitWorkspaceCapabilityTransitionOrThrow(options.workspaceCapabilityTransitionHost, {
                     runtimeCapability,
+                    before,
+                    after,
                   })
                 },
               })

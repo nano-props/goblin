@@ -635,14 +635,26 @@ export function workspaceRuntimeHasGitCapability(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): boolean {
-  const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
-  if (isRemoteWorkspaceId(workspaceId) && state?.remoteLifecycle.kind !== 'ready') return false
   return (
-    state?.currentWorkspaceRuntimeId === workspaceRuntimeId &&
-    state.pendingWorkspaceProbeTransition === null &&
-    state.workspaceProbe.status === 'ready' &&
-    state.workspaceProbe.capabilities.git.status === 'available'
+    workspaceRuntimeGitCapabilityState(userId, workspaceId, workspaceRuntimeId) ===
+    'available'
   )
+}
+
+export type WorkspaceRuntimeGitCapabilityState = 'available' | 'unavailable' | 'transitioning'
+
+export function workspaceRuntimeGitCapabilityState(
+  userId: string,
+  workspaceId: WorkspaceId,
+  workspaceRuntimeId: string,
+): WorkspaceRuntimeGitCapabilityState {
+  const state = workspaceRuntimesByUser.get(userId)?.get(workspaceId)
+  if (state?.currentWorkspaceRuntimeId !== workspaceRuntimeId) return 'unavailable'
+  if (state.pendingWorkspaceProbeTransition !== null) return 'transitioning'
+  if (isRemoteWorkspaceId(workspaceId) && state.remoteLifecycle.kind !== 'ready') return 'unavailable'
+  return state.workspaceProbe.status === 'ready' && state.workspaceProbe.capabilities.git.status === 'available'
+    ? 'available'
+    : 'unavailable'
 }
 
 export function workspaceProbeStateForRuntime(

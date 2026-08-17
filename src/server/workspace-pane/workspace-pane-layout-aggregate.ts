@@ -1,6 +1,7 @@
 import PQueue from 'p-queue'
 import {
   isWorkspacePaneRuntimeTabEntry,
+  workspacePaneTabEntryIdentity,
   workspacePaneTabsWithRuntimeTab,
   type WorkspacePaneRuntimeTabType,
   type WorkspacePaneStaticTabEntry,
@@ -24,6 +25,7 @@ import {
 } from '#/server/workspace-pane/workspace-pane-epoch-overlay.ts'
 import {
   normalizeWorkspacePaneDurableLayout,
+  workspacePaneDurableLayoutsEqual,
   type WorkspacePaneLayoutRepository,
 } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneRuntimeTabsProviderSnapshot } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
@@ -125,6 +127,14 @@ export interface WorkspacePaneLayoutOperation {
     },
     admissionCallback: () => void,
   ): Promise<WorkspacePaneTabsSnapshot>
+  commitGitCapabilityPromotion<T>(
+    input: WorkspacePaneCapabilityTransitionInput,
+    commit: () => T,
+  ): Promise<PaneCapabilityTransitionResult<T>>
+  commitGitCapabilityRemoval<T>(
+    input: WorkspacePaneCapabilityTransitionInput,
+    commit: () => T,
+  ): Promise<PaneCapabilityTransitionResult<T>>
   closeEpoch(scope: WorkspacePaneEpochScope): void
   commitProjectionTargets(
     input: WorkspacePaneEpochScope & {
@@ -136,6 +146,22 @@ export interface WorkspacePaneLayoutOperation {
   indexedAdmissionLeases(scope: WorkspacePaneEpochScope): PhysicalWorktreeAdmissionLease[]
   clearPhysicalIdentity(workspaceId: WorkspaceId, lease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[]
 }
+
+export type WorkspacePaneCapabilityTransitionInput = WorkspacePaneEpochScope & {
+  epochCapability: WorkspaceRuntimeEpochCapability
+}
+
+export type PaneCapabilityTransitionResult<T> =
+  | {
+      kind: 'committed'
+      durableLayoutChanged: boolean
+      authorityResult: T
+    }
+  | {
+      kind: 'authority-commit-failed'
+      durableLayoutChanged: boolean
+      error: unknown
+    }
 
 export class WorkspacePaneLayoutAggregate {
   private readonly repository: WorkspacePaneLayoutRepository
@@ -172,6 +198,10 @@ export class WorkspacePaneLayoutAggregate {
           validateMembershipAndSnapshot: async (input) => await this.validateMembershipAndSnapshot(input),
           commitRuntimeTabPlacement: async (input, admissionCallback) =>
             await this.commitRuntimeTabPlacement(input, admissionCallback),
+          commitGitCapabilityPromotion: async (input, commit) =>
+            await this.commitGitCapabilityPromotion(input, commit),
+          commitGitCapabilityRemoval: async (input, commit) =>
+            await this.commitGitCapabilityRemoval(input, commit),
           closeEpoch: (scope) => this.closeEpoch(scope),
           commitProjectionTargets: (input) => this.commitProjectionTargets(input),
           indexedAdmissionLeases: (scope) => this.overlay.indexedAdmissionLeases(scope),
@@ -189,6 +219,80 @@ export class WorkspacePaneLayoutAggregate {
 
   private async update(input: WorkspacePaneLayoutUpdateInput): Promise<WorkspacePaneLayoutCommitResult> {
     return await this.mutate(input, (current) => workspacePaneTabsWithUpdateOperation(current, input.operation))
+  }
+
+  private async commitGitCapabilityPromotion<T>(
+    input: WorkspacePaneCapabilityTransitionInput,
+    commit: () => T,
+  ): Promise<PaneCapabilityTransitionResult<T>> {
+    return await this.commitCapabilityLayoutTransition(
+      input,
+      (layout) => {
+        const rootEntry = layout.entries.find((entry) => entry.target.kind === 'workspace-root')
+        if (!rootEntry) return layout
+        const worktreeEntry = layout.entries.find(
+          (entry) => entry.target.kind === 'git-worktree' && entry.target.root === input.workspaceId,
+        )
+        const tabs = [...rootEntry.tabs]
+        const identities = new Set(tabs.map(workspacePaneTabEntryIdentity))
+        for (const tab of worktreeEntry?.tabs ?? []) {
+          const identity = workspacePaneTabEntryIdentity(tab)
+          if (identities.has(identity)) continue
+          identities.add(identity)
+          tabs.push(tab)
+        }
+        return {
+          entries: [
+            ...layout.entries.filter(
+              (entry) =>
+                entry.target.kind !== 'workspace-root' &&
+                !(entry.target.kind === 'git-worktree' && entry.target.root === input.workspaceId),
+            ),
+            { target: { kind: 'git-worktree', root: input.workspaceId }, tabs },
+          ],
+        }
+      },
+      commit,
+    )
+  }
+
+  private async commitGitCapabilityRemoval<T>(
+    input: WorkspacePaneCapabilityTransitionInput,
+    commit: () => T,
+  ): Promise<PaneCapabilityTransitionResult<T>> {
+    return await this.commitCapabilityLayoutTransition(
+      input,
+      (layout) => ({
+        entries: layout.entries.filter((entry) => entry.target.kind === 'workspace-root'),
+      }),
+      commit,
+    )
+  }
+
+  private async commitCapabilityLayoutTransition<T>(
+    input: WorkspacePaneCapabilityTransitionInput,
+    replacementFor: (layout: WorkspacePaneDurableLayout) => WorkspacePaneDurableLayout,
+    commit: () => T,
+  ): Promise<PaneCapabilityTransitionResult<T>> {
+    for (let conflicts = 0; ; conflicts += 1) {
+      assertWorkspaceRuntimeEpochCapability(input.epochCapability, input)
+      const current = await this.repository.load(input.workspaceId)
+      const replacement = normalizeWorkspacePaneDurableLayout(input.workspaceId, replacementFor(current.layout))
+      assertWorkspaceRuntimeEpochCapability(input.epochCapability, input)
+      if (workspacePaneDurableLayoutsEqual(input.workspaceId, current.layout, replacement)) {
+        return commitCapabilityTransitionAuthority(false, commit)
+      }
+      const outcome = await this.repository.compareAndSwap({
+        workspaceId: input.workspaceId,
+        expected: current.layout,
+        replacement,
+        epochCapability: input.epochCapability,
+      })
+      if (outcome.kind === 'write-failure') throw outcome.error
+      if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
+      if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
+      return commitCapabilityTransitionAuthority(outcome.changed, commit)
+    }
   }
 
   private async snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot> {
@@ -495,4 +599,15 @@ function cloneCanonicalClocks(source: ReadonlyMap<string, CanonicalClockState>):
 
 function cloneCanonicalClock(clock: CanonicalClockState): CanonicalClockState {
   return { ...clock, providerRevisions: new Map(clock.providerRevisions) }
+}
+
+function commitCapabilityTransitionAuthority<T>(
+  durableLayoutChanged: boolean,
+  commit: () => T,
+): PaneCapabilityTransitionResult<T> {
+  try {
+    return { kind: 'committed', durableLayoutChanged, authorityResult: commit() }
+  } catch (error) {
+    return { kind: 'authority-commit-failed', durableLayoutChanged, error }
+  }
 }

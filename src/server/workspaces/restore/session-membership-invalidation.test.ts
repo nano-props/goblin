@@ -78,6 +78,7 @@ describe('session restore membership invalidation', () => {
       activeWorkspaceId: retainedWorkspaceId,
       workspacePaneTabsHost: createTestWorkspacePaneTabsHost(),
       workspaceCapabilityTransitionHost: {
+        commitGitCapabilityPromotion: vi.fn(async () => ({ kind: 'committed' as const })),
         commitGitCapabilityRemoval: vi.fn(async () => ({ kind: 'committed' as const })),
       },
     })

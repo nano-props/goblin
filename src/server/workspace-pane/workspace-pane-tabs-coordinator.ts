@@ -41,6 +41,7 @@ import {
 } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
 
 import type {
+  PaneCapabilityTransitionResult,
   WorkspacePaneLayoutAggregate,
   WorkspacePaneLayoutCommitResult,
   WorkspacePaneLayoutOperation,
@@ -421,6 +422,38 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     await this.runWorkspaceTabsOperation(workspaceId, (layout) => {
       layout.closeEpoch(aggregateScope(input.userId, workspaceId, input.scope))
     })
+  }
+
+  async commitGitCapabilityPromotion<T>(
+    input: {
+      userId: string
+      workspaceId: WorkspaceId
+      scope: string
+      epochCapability: WorkspaceRuntimeEpochCapability
+    },
+    commit: () => T,
+  ): Promise<PaneCapabilityTransitionResult<T>> {
+    const scope = aggregateScope(input.userId, input.workspaceId, input.scope)
+    assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
+    return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) =>
+      await layout.commitGitCapabilityPromotion({ ...scope, epochCapability: input.epochCapability }, commit),
+    )
+  }
+
+  async commitGitCapabilityRemoval<T>(
+    input: {
+      userId: string
+      workspaceId: WorkspaceId
+      scope: string
+      epochCapability: WorkspaceRuntimeEpochCapability
+    },
+    commit: () => T,
+  ): Promise<PaneCapabilityTransitionResult<T>> {
+    const scope = aggregateScope(input.userId, input.workspaceId, input.scope)
+    assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
+    return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) =>
+      await layout.commitGitCapabilityRemoval({ ...scope, epochCapability: input.epochCapability }, commit),
+    )
   }
 
   physicalWorktreeTargets(target: PhysicalWorktreeExecutionCapability | PhysicalWorktreeIdentity) {

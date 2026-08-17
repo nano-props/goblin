@@ -19,6 +19,7 @@ import {
   runSerializedInitialWorkspaceProbe,
   runSerializedWorkspaceRefresh,
   runRemoteWorkspaceLifecycle,
+  workspaceRuntimeGitCapabilityState,
   workspaceRuntimeHasGitCapability,
   withWorkspaceRuntimeAdmission,
   WorkspaceRuntimeStaleError,
@@ -337,6 +338,7 @@ describe('workspace runtimes', () => {
     // half-cleaned plain-workspace projection.
     expect(listWorkspaceRuntimes(USER_ID)[0]?.workspaceProbe).toEqual({ status: 'probing' })
     expect(workspaceRuntimeHasGitCapability(USER_ID, REPO_ROOT, runtimeId)).toBe(false)
+    expect(workspaceRuntimeGitCapabilityState(USER_ID, REPO_ROOT, runtimeId)).toBe('transitioning')
     expect(releaseWorkspaceRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({
       released: true,
       runtimeClosed: false,
