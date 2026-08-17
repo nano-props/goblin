@@ -383,9 +383,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       if (promotionAttempt.kind === 'failed-before-commit') return promotionAttempt
       const { paneTransition } = promotionAttempt
 
-      // The accepted durable CAS is the capability-promotion commit point.
-      // All expected validation has completed, so the synchronous authority
-      // mutation below must finish before any best-effort projection effects.
+      // The durable CAS and terminal authority commit are complete. Retire the
+      // invalidated overlay before publishing best-effort projection effects.
       await retireInvalidatedScopeProjection({ userId, workspaceId, workspaceRuntimeId, scope })
       if (paneTransition.kind === 'authority-commit-failed') {
         terminalRuntimeLogger.error(
@@ -435,9 +434,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       if (removalAttempt.kind === 'failed-before-commit') return removalAttempt
       const { paneTransition } = removalAttempt
 
-      // The accepted durable CAS is the capability-removal commit point.
-      // Register overlay retirement before detaching terminal authority; the
-      // queued effect cannot run until this synchronous commit returns.
+      // The durable CAS and terminal authority commit are complete. Retire the
+      // invalidated overlay before publishing best-effort projection effects.
       await retireInvalidatedScopeProjection({
         userId,
         workspaceId,
