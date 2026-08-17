@@ -73,16 +73,16 @@ describe('workspace pane tab close presentation', () => {
       'workspace-pane:changes',
     )
 
-    const transition = prepareWorkspacePaneClosePresentation(
-      model,
-      'workspace-pane:status',
-      { kind: 'static', tab: 'status' },
-    )
+    const transition = prepareWorkspacePaneClosePresentation({
+      target: model,
+      closingIdentity: 'workspace-pane:status',
+      workspacePaneRoute: { kind: 'static', tab: 'status' },
+    })
 
     expect(transition.nextEntry).toEqual(workspacePaneStaticTabEntry('files'))
   })
 
-  test('presents a naturally exited terminal from the server-captured before-state', async () => {
+  test("projects a retired terminal's canonical before-state through the workspace-root surface", async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
@@ -90,7 +90,11 @@ describe('workspace pane tab close presentation', () => {
     setWorkspacePaneTabsForTargetQueryData({
       ...paneTarget,
       workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('history'),
+        workspacePaneStaticTabEntry('files'),
+      ],
     })
     const sourceRoute = { kind: 'terminal' as const, terminalSessionId }
     const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
@@ -107,6 +111,7 @@ describe('workspace pane tab close presentation', () => {
       tabsBeforeRetirement: [
         workspacePaneStaticTabEntry('status'),
         workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+        workspacePaneStaticTabEntry('history'),
         workspacePaneStaticTabEntry('files'),
       ],
     }

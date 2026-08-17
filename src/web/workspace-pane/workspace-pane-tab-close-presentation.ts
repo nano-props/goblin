@@ -4,6 +4,7 @@ import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { workspacePaneTabEntryIdentity, type WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
+import { workspacePaneSurfaceTabEntries } from '#/web/workspace-pane/workspace-pane-location.ts'
 import {
   workspacePaneTabModelWorkspaceRuntimeId,
   type WorkspacePaneTabModel,
@@ -89,16 +90,27 @@ export function createWorkspacePaneTabClosePresentationLease(
   }
 }
 
+interface PrepareWorkspacePaneClosePresentationInput {
+  target: WorkspacePaneTabModel
+  closingIdentity: string
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  selectedIdentity?: string | null
+  navigationGeneration?: AppNavigationGeneration
+  /** Complete authoritative layout captured before the close committed. */
+  canonicalTabEntriesBeforeClose?: readonly WorkspacePaneTabEntry[]
+}
+
 export function prepareWorkspacePaneClosePresentation(
-  target: WorkspacePaneTabModel,
-  closingIdentity: string,
-  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
-  selectedIdentity: string | null | undefined = target.selectedIdentity,
-  navigationGeneration?: AppNavigationGeneration,
-  tabEntries: readonly WorkspacePaneTabEntry[] = target.surfaceTabEntries,
+  input: PrepareWorkspacePaneClosePresentationInput,
 ): WorkspacePaneCloseTransition {
+  const { target, closingIdentity, workspacePaneRoute, navigationGeneration } = input
+  const selectedIdentity = input.selectedIdentity === undefined ? target.selectedIdentity : input.selectedIdentity
   const wasActive = selectedIdentity === closingIdentity
   if (!wasActive) return { wasActive: false, nextEntry: null, presentationLease: null }
+  const canonicalTabEntriesBeforeClose = input.canonicalTabEntriesBeforeClose ?? target.tabEntries
+  const tabEntries = target.location
+    ? workspacePaneSurfaceTabEntries(target.location, canonicalTabEntriesBeforeClose)
+    : []
   const openerIdentity = workspacePaneTabOpener(
     workspacePaneTabsTargetForClose(target),
     workspacePaneTabModelWorkspaceRuntimeId(target),
@@ -206,14 +218,14 @@ export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
     )
     return Promise.resolve(false)
   }
-  const transition = prepareWorkspacePaneClosePresentation(
+  const transition = prepareWorkspacePaneClosePresentation({
     target,
     closingIdentity,
-    options.workspacePaneRoute,
-    closingIdentity,
+    workspacePaneRoute: options.workspacePaneRoute,
+    selectedIdentity: closingIdentity,
     navigationGeneration,
-    options.tabsBeforeRetirement,
-  )
+    canonicalTabEntriesBeforeClose: options.tabsBeforeRetirement,
+  })
   clearWorkspacePaneTabOpener(
     workspacePaneTabsTargetForClose(target),
     workspacePaneTabModelWorkspaceRuntimeId(target),

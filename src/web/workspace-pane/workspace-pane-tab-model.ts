@@ -43,7 +43,7 @@ import {
 import {
   workspacePaneLocationBranchName,
   workspacePaneLocationExecutionTarget,
-  workspacePaneLocationSupportsTab,
+  workspacePaneSurfaceTabEntries,
   workspacePaneLocationTerminalBase,
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
@@ -251,9 +251,7 @@ export function createWorkspacePaneTabModel(input: WorkspacePaneTabModelInput): 
   const normalizedTabEntries = paneTarget === null ? [] : normalizeWorkspacePaneTabs(input.tabEntries, { hasWorktree })
   const tabEntries = normalizedTabEntries
   const location = input.location
-  const surfaceTabEntries = location
-    ? tabEntries.filter((entry) => workspacePaneLocationSupportsTab(location, entry.type))
-    : []
+  const surfaceTabEntries = location ? workspacePaneSurfaceTabEntries(location, tabEntries) : []
   const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({
     workspaceId,
     workspaceRuntimeId,

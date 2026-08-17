@@ -198,12 +198,12 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
     return false
   }
   const transition = closeTarget
-    ? prepareWorkspacePaneClosePresentation(
-        closeTarget,
-        confirmedIdentity,
-        options.currentWorkspacePaneRoute,
-        options.selectedIdentity,
-      )
+    ? prepareWorkspacePaneClosePresentation({
+        target: closeTarget,
+        closingIdentity: confirmedIdentity,
+        workspacePaneRoute: options.currentWorkspacePaneRoute,
+        selectedIdentity: options.selectedIdentity,
+      })
     : null
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
   const completion = closeContext
@@ -282,12 +282,12 @@ function beginCloseWorkspacePaneTabAction(
     }
   }
 
-  const transition = prepareWorkspacePaneClosePresentation(
+  const transition = prepareWorkspacePaneClosePresentation({
     target,
     closingIdentity,
     workspacePaneRoute,
-    options.selectedIdentity,
-  )
+    selectedIdentity: options.selectedIdentity,
+  })
   let close
   try {
     close = beginWorkspacePaneTabEntryClose(target, tabEntry)

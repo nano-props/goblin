@@ -10,7 +10,7 @@ import {
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   gitWorktreeFilesystemExecutionTarget,
@@ -205,6 +205,14 @@ export function workspacePaneLocationSupportsTab(
   }
   if (location.kind === 'branch') return type === 'status' || type === 'history'
   return true
+}
+
+/** Projects one canonical layout into the entries presentable on this location's surface. */
+export function workspacePaneSurfaceTabEntries(
+  location: WorkspacePaneLocation,
+  entries: readonly WorkspacePaneTabEntry[],
+): WorkspacePaneTabEntry[] {
+  return entries.filter((entry) => workspacePaneLocationSupportsTab(location, entry.type))
 }
 
 export function workspacePaneLocationExecutionTarget(
