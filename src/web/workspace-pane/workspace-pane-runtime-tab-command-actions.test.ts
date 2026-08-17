@@ -45,7 +45,10 @@ import {
   resetAppNavigationForTest,
 } from '#/web/app/navigation/lifecycle.ts'
 import { resetTerminalAutoFocusForTest } from '#/web/terminal/focus.ts'
-import { workspacePaneLocationForLinkedWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
+import {
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 const terminalBase = {
   target: {
@@ -101,7 +104,7 @@ describe('workspace pane runtime tab command actions', () => {
     workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: repo.id }, 'files')
 
     expect(
-      captureWorkspacePaneActiveTabIdentity({ kind: 'workspace-root', workspaceId: repo.id }, repo.workspaceRuntimeId, {
+      captureWorkspacePaneActiveTabIdentity(workspacePaneLocationForRoot(repo.id, repo.workspaceRuntimeId), {
         workspacePaneRoute: undefined,
       }),
     ).toBeNull()
@@ -132,7 +135,7 @@ describe('workspace pane runtime tab command actions', () => {
       currentBranchName: branchName,
     })
     expect(
-      captureWorkspacePaneActiveTabIdentity(terminalPaneTarget, terminalCoordinates.workspaceRuntimeId, {
+      captureWorkspacePaneActiveTabIdentity(terminalLocation, {
         workspacePaneRoute: undefined,
       }),
     ).toBeNull()

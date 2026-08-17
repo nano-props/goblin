@@ -43,6 +43,7 @@ import {
 import {
   workspacePaneLocationBranchName,
   workspacePaneLocationForBranchTarget,
+  workspacePaneLocationSupportsTab,
   workspacePaneLocationWorktreePath,
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
@@ -82,12 +83,7 @@ async function dispatchWorkspacePaneTargetStaticTabAction(
   const workspaceRuntimeId = location.workspaceRuntimeId
   const worktreePath = workspacePaneLocationWorktreePath(location)
   const branchName = workspacePaneLocationBranchName(location)
-  const placement = workspacePaneStaticTabPlacement(
-    location.paneTarget,
-    workspaceRuntimeId,
-    input.workspacePaneRoute,
-    placementKind,
-  )
+  const placement = workspacePaneStaticTabPlacement(location, input.workspacePaneRoute, placementKind)
   const resolvedInput: ResolvedWorkspacePaneStaticTabOpenInput = {
     workspaceId: location.workspaceId,
     workspaceRuntimeId,
@@ -131,14 +127,11 @@ type WorkspacePaneStaticTabPlacement =
   { kind: 'after-opener'; openerIdentity: string } | { kind: 'append'; openerIdentity: string | null }
 
 function workspacePaneStaticTabPlacement(
-  paneTarget: WorkspacePaneTabsTarget,
-  workspaceRuntimeId: string,
+  location: WorkspacePaneLocation,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   placementKind: WorkspacePaneTargetStaticTabPlacement,
 ): WorkspacePaneStaticTabPlacement {
-  const openerIdentity = captureWorkspacePaneActiveTabIdentity(paneTarget, workspaceRuntimeId, {
-    workspacePaneRoute,
-  })
+  const openerIdentity = captureWorkspacePaneActiveTabIdentity(location, { workspacePaneRoute })
   return placementKind === 'after-opener' && openerIdentity
     ? { kind: 'after-opener', openerIdentity }
     : { kind: 'append', openerIdentity }
@@ -177,8 +170,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
     'location' in lease
       ? lease.location
       : workspacePaneLocationForBranchTarget(lease.routeTarget, lease.workspaceRuntimeId)
-  const paneTarget = location.paneTarget
-  const placement = workspacePaneStaticTabPlacement(paneTarget, lease.workspaceRuntimeId, workspacePaneRoute, 'append')
+  const placement = workspacePaneStaticTabPlacement(location, workspacePaneRoute, 'append')
   const input: ResolvedWorkspacePaneStaticTabOpenInput = {
     workspaceId,
     workspaceRuntimeId: lease.workspaceRuntimeId,
@@ -221,8 +213,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
     'location' in destination
       ? destination.location
       : workspacePaneLocationForBranchTarget(destination.routeTarget, workspaceRuntimeId)
-  const paneTarget = location.paneTarget
-  const placement = workspacePaneStaticTabPlacement(paneTarget, workspaceRuntimeId, sourceRoute, 'after-opener')
+  const placement = workspacePaneStaticTabPlacement(location, sourceRoute, 'after-opener')
   const resolvedInput: ResolvedWorkspacePaneStaticTabOpenInput = {
     workspaceId: input.workspaceId,
     workspaceRuntimeId,
@@ -252,6 +243,9 @@ function workspacePaneStaticTabOpenAdmission(
   if (!provider.canOpen({ hasWorktree: input.location.kind !== 'branch' })) {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
+  if (!workspacePaneLocationSupportsTab(input.location, input.type)) {
+    return { kind: 'unsupported', reason: 'surface-unavailable' }
+  }
   if (!workspacePaneStaticTabOpenTargetIsCurrent(input)) return { kind: 'target-missing' }
   if (workspacePaneTargetBlocksInteraction(input.location.paneTarget, input.workspaceRuntimeId))
     return { kind: 'blocked' }
@@ -275,6 +269,9 @@ async function openWorkspacePaneStaticTabAction(
   const provider = workspacePaneStaticTabProvider(input.type)
   if (!provider.canOpen({ hasWorktree: input.location.kind !== 'branch' })) {
     return { kind: 'unsupported', reason: 'worktree-required' }
+  }
+  if (!workspacePaneLocationSupportsTab(input.location, input.type)) {
+    return { kind: 'unsupported', reason: 'surface-unavailable' }
   }
   if (!workspacePaneStaticTabTransactionIsCurrent(transaction)) return { kind: 'superseded' }
   const state = workspacesStore.getState()

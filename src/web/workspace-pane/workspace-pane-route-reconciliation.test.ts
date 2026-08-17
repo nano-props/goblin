@@ -22,31 +22,30 @@ const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/tmp/goblin-route-reconciliation-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
-type RouteModelInput = Omit<WorkspacePaneTabModelInput, 'location'> & {
+type RouteModelInput = Omit<Extract<WorkspacePaneTabModelInput, { location: null }>, 'location'> & {
   branchName: string | null
   worktreePath: string | null
 }
 
 function createBranchWorkspacePaneTabModel(input: RouteModelInput) {
-  const { branchName, worktreePath, ...modelInput } = input
+  const { branchName, worktreePath, workspaceId, workspaceRuntimeId, ...modelInput } = input
   const location = branchName
     ? worktreePath
       ? workspacePaneLocationForLinkedWorktree(
-          { kind: 'git-worktree', workspaceId: input.workspaceId, worktreePath },
-          input.workspaceRuntimeId,
+          { kind: 'git-worktree', workspaceId, worktreePath },
+          workspaceRuntimeId,
           { kind: 'branch', branchName },
         )
       : workspacePaneLocationForBranchTarget(
-          { kind: 'git-branch', workspaceId: input.workspaceId, branchName },
-          input.workspaceRuntimeId,
+          { kind: 'git-branch', workspaceId, branchName },
+          workspaceRuntimeId,
         )
-    : worktreePath === input.workspaceId
-      ? workspacePaneLocationForRoot(input.workspaceId, input.workspaceRuntimeId)
+    : worktreePath === workspaceId
+      ? workspacePaneLocationForRoot(workspaceId, workspaceRuntimeId)
       : null
-  return createWorkspacePaneTabModel({
-    ...modelInput,
-    location,
-  })
+  return location
+    ? createWorkspacePaneTabModel({ ...modelInput, location })
+    : createWorkspacePaneTabModel({ ...modelInput, location: null, workspaceId, workspaceRuntimeId })
 }
 
 describe('workspace pane route reconciliation', () => {
@@ -223,8 +222,6 @@ describe('workspace pane route reconciliation', () => {
     'defers a detached-worktree History route while tab entries are %s',
     (tabEntriesProjectionPhase) => {
       const model = createWorkspacePaneTabModel({
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
         location: workspacePaneLocationForLinkedWorktree(
           { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
           WORKSPACE_RUNTIME_ID,
@@ -245,8 +242,6 @@ describe('workspace pane route reconciliation', () => {
 
   test('accepts a materialized Changes route for a detached worktree', () => {
     const model = createWorkspacePaneTabModel({
-      workspaceId: REPO_ID,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       location: workspacePaneLocationForLinkedWorktree(
         { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
         WORKSPACE_RUNTIME_ID,

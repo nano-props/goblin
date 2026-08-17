@@ -193,7 +193,7 @@ describe('remote ssh command builders', () => {
         path: workspacePath,
       })
       await expect(execa('sh', ['-lc', invocation.script])).resolves.toMatchObject({
-        stdout: realpathSync(workspacePath),
+        stdout: `${realpathSync(workspacePath)}\0`,
       })
     }
   })

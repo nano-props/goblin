@@ -55,8 +55,9 @@ async function resolveRemoteSnapshotSourceWorktree(
   })
   options.signal?.throwIfAborted()
   if (!result.ok) throw new Error(result.message || 'error.failed-read-repo')
-  const sourcePath = result.stdout.endsWith('\n') ? result.stdout.slice(0, -1) : result.stdout
-  if (!isValidRemotePath(sourcePath) || /[\r\n]/u.test(sourcePath)) throw new Error('error.failed-read-repo')
+  if (!result.stdout.endsWith('\0')) throw new Error('error.failed-read-repo')
+  const sourcePath = result.stdout.slice(0, -1)
+  if (!isValidRemotePath(sourcePath) || /[\0\r\n]/u.test(sourcePath)) throw new Error('error.failed-read-repo')
   const sourceWorktree = membership.find((worktree) => worktree.path === sourcePath)
   if (!sourceWorktree) throw new Error('error.failed-read-repo')
   return sourceWorktree

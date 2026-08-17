@@ -1,7 +1,7 @@
 export type WorkspacePaneActionOutcome =
   | { kind: 'completed'; changed: boolean; presentation: 'router-settled' | 'observed' | 'superseded' }
   | { kind: 'already-current' }
-  | { kind: 'unsupported'; reason: 'worktree-required' }
+  | { kind: 'unsupported'; reason: 'surface-unavailable' | 'worktree-required' }
   | { kind: 'superseded' }
   | { kind: 'target-missing' }
   | { kind: 'blocked' }

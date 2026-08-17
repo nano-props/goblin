@@ -9,7 +9,11 @@ import {
   type WorkspacePaneTabType,
   workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
-import { parseWorkspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  parseWorkspacePaneTabsTargetIdentityKey,
+  workspacePaneTabsLayoutTargetForWorktree,
+  workspacePaneTabsTargetIdentityKey,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import { parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
 import { parseTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
 import type { RestorableWorkspaceState, WorkspaceSessionState, WorkspaceState } from '#/web/stores/workspaces/types.ts'
@@ -51,6 +55,7 @@ interface ClientWorkspaceWorktreeTarget {
   path: string
   head: GitHead
   materializedBranch: string | null
+  isSource: boolean
 }
 
 interface ClientWorkspaceTargetProjection {
@@ -248,7 +253,8 @@ function preferredWorkspacePaneTabsForClientWorkspace(
       if (!target) continue
       if (tab !== null && !isWorkspacePaneSessionTabType(tab)) continue
       if (tab !== null && target.kind === 'branch' && workspacePaneTabRequiresWorktree(tab)) continue
-      const targetTabs = workspacePaneTabsByTargetByWorkspace[id]?.[targetKey] ?? defaultWorkspacePaneTabs()
+      const layoutTargetKey = workspacePaneLayoutTargetKeyForPreference(targetKey, target, id, workspace)
+      const targetTabs = workspacePaneTabsByTargetByWorkspace[id]?.[layoutTargetKey] ?? defaultWorkspacePaneTabs()
       if (
         tab !== null &&
         isWorkspacePaneStaticTabType(tab) &&
@@ -260,6 +266,26 @@ function preferredWorkspacePaneTabsForClientWorkspace(
     if (Object.keys(byTarget).length > 0) byWorkspace[id] = byTarget
   }
   return byWorkspace
+}
+
+function workspacePaneLayoutTargetKeyForPreference(
+  preferenceTargetKey: string,
+  target: NonNullable<ReturnType<typeof parseWorkspacePaneTabsTargetIdentityKey>>,
+  workspaceId: WorkspaceId,
+  workspace: ClientWorkspaceTargetProjection,
+): string {
+  if (target.kind !== 'worktree') return preferenceTargetKey
+  const worktreePath = parseCanonicalWorkspaceLocator(target.worktreeId)?.path
+  const worktree = worktreePath
+    ? workspace.gitTargets?.worktrees.find((candidate) => candidate.path === worktreePath)
+    : null
+  if (!worktreePath || !worktree) return preferenceTargetKey
+  return workspacePaneTabsTargetIdentityKey(
+    workspacePaneTabsLayoutTargetForWorktree(
+      { kind: 'git-worktree', workspaceId, worktreePath },
+      worktree.isSource,
+    ),
+  )
 }
 
 export function restoredPreferredWorkspacePaneTabByTarget(

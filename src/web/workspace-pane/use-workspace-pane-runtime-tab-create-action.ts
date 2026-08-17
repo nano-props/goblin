@@ -12,7 +12,6 @@ import {
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
-import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   workspacePaneLocationTerminalBase,
   type FilesystemWorkspacePaneLocation,
@@ -37,14 +36,12 @@ export function useWorkspacePaneRuntimeTabCreateAction(
   const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
   const captureOpenerIdentity = () => {
     const location = toValue(input.location)
-    const terminalBase = location ? workspacePaneLocationTerminalBase(location) : null
+    if (!location) return null
+    const terminalBase = workspacePaneLocationTerminalBase(location)
     if (!terminalBase) return null
-    const paneTarget = workspacePaneTabsTargetFromRuntime(terminalBase.target)
-    return paneTarget
-      ? captureWorkspacePaneActiveTabIdentity(paneTarget, terminalBase.target.workspaceRuntimeId, {
-          workspacePaneRoute: toValue(input.workspacePaneRoute),
-        })
-      : null
+    return captureWorkspacePaneActiveTabIdentity(location, {
+      workspacePaneRoute: toValue(input.workspacePaneRoute),
+    })
   }
 
   return computed(() => {

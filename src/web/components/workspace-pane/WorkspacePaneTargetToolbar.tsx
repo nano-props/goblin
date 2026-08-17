@@ -42,7 +42,11 @@ import {
   workspacePaneTabItems,
 } from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import type { WorkspacePaneModelTarget, WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import {
+  requiredWorkspacePaneTabModelLocation,
+  workspacePaneTabModelBranchName,
+  type WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -56,7 +60,6 @@ interface WorkspacePaneTargetToolbarProps {
   statusCount: number | undefined
   trafficLightOffset?: boolean
   onBackToNavigator?: () => void
-  staticTabAvailable?: Parameters<typeof workspacePaneTabItems>[0]['staticTabAvailable']
 }
 
 type WorkspacePaneFilesystemTargetToolbarProps = Omit<WorkspacePaneTargetToolbarProps, 'target'> & {
@@ -78,7 +81,6 @@ WorkspacePaneTargetToolbar.props = [
   'statusCount',
   'trafficLightOffset',
   'onBackToNavigator',
-  'staticTabAvailable',
 ]
 
 const WorkspacePaneFilesystemTargetToolbar = defineComponent<WorkspacePaneFilesystemTargetToolbarProps>({
@@ -91,7 +93,6 @@ const WorkspacePaneFilesystemTargetToolbar = defineComponent<WorkspacePaneFilesy
     'statusCount',
     'trafficLightOffset',
     'onBackToNavigator',
-    'staticTabAvailable',
   ],
 
   setup(props) {
@@ -114,7 +115,6 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
     'statusCount',
     'trafficLightOffset',
     'onBackToNavigator',
-    'staticTabAvailable',
     'externalAppItems',
   ],
 
@@ -130,8 +130,8 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       })),
     )
     const { scrollToBottom } = useTerminalSessionContext()
-    const routeTarget = computed(() => requiredWorkspacePaneModelTarget(props.model.routeTarget, 'route'))
-    const persistenceTarget = computed(() => requiredWorkspacePaneModelTarget(props.model.paneTarget, 'persistence'))
+    const routeTarget = computed(() => requiredWorkspacePaneTabModelLocation(props.model).routeTarget)
+    const persistenceTarget = computed(() => requiredWorkspacePaneTabModelLocation(props.model).paneTarget)
     const commandTarget = computed(() =>
       workspacePaneCommandTargetForSurface(props.model.location, props.target, props.workspacePaneRoute),
     )
@@ -165,10 +165,9 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       workspacePaneTabItems({
         model: props.model,
         workspacePaneId: props.workspacePaneId,
-        branchName: props.model.branchName,
+        branchName: workspacePaneTabModelBranchName(props.model),
         statusCount: props.statusCount,
         t,
-        staticTabAvailable: props.staticTabAvailable,
       }),
     )
     const dragPreviewOwner = shallowRef<WorkspacePaneTabDragPreviewOwner | null>(null)
@@ -341,14 +340,6 @@ function tabsMutationInput(
     workspaceRuntimeId,
     canonicalTabs,
   }
-}
-
-function requiredWorkspacePaneModelTarget(
-  target: WorkspacePaneModelTarget,
-  role: 'route' | 'persistence',
-): WorkspacePaneTabsTarget {
-  if (target.kind === 'inactive') throw new Error(`inactive workspace pane has no ${role} target`)
-  return target
 }
 
 function workspacePaneCommandTargetForSurface(

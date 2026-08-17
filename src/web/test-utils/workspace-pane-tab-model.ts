@@ -32,7 +32,7 @@ export function requiredEntryIdentity(entry: WorkspacePaneTabEntry | null): stri
 }
 
 type WorkspacePaneTabModelTestInput = Omit<
-  WorkspacePaneTabModelInput,
+  Extract<WorkspacePaneTabModelInput, { location: null }>,
   'workspaceRuntimeId' | 'runtimeTabStateByType' | 'location'
 > & {
   branchName: string | null
@@ -57,28 +57,28 @@ export function createModel(input: WorkspacePaneTabModelTestInput): WorkspacePan
     selectedTerminalSessionId,
     ...modelInput
   } = input
+  const { workspaceId, ...projectionInput } = modelInput
   const terminalState = runtimeTabStateByType?.terminal
   const runtimeId = workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID
   const location = branchName
     ? worktreePath
       ? workspacePaneLocationForLinkedWorktree(
-          { kind: 'git-worktree', workspaceId: modelInput.workspaceId, worktreePath },
+          { kind: 'git-worktree', workspaceId, worktreePath },
           runtimeId,
           { kind: 'branch', branchName },
         )
       : workspacePaneLocationForBranchTarget(
-          { kind: 'git-branch', workspaceId: modelInput.workspaceId, branchName },
+          { kind: 'git-branch', workspaceId, branchName },
           runtimeId,
         )
-    : worktreePath === modelInput.workspaceId
-      ? workspacePaneLocationForRoot(modelInput.workspaceId, runtimeId)
+    : worktreePath === workspaceId
+      ? workspacePaneLocationForRoot(workspaceId, runtimeId)
       : null
   const hasSelectedTerminalSession = terminalState
     ? Object.prototype.hasOwnProperty.call(terminalState, 'selectedSessionId')
     : false
-  return createWorkspacePaneTabModel({
-    workspaceRuntimeId: runtimeId,
-    ...modelInput,
+  const projection = {
+    ...projectionInput,
     location,
     runtimeTabStateByType: {
       ...runtimeTabStateByType,
@@ -91,7 +91,10 @@ export function createModel(input: WorkspacePaneTabModelTestInput): WorkspacePan
           : (selectedTerminalSessionId ?? null),
       },
     },
-  })
+  }
+  return location
+    ? createWorkspacePaneTabModel({ ...projection, location })
+    : createWorkspacePaneTabModel({ ...projection, location: null, workspaceId, workspaceRuntimeId: runtimeId })
 }
 
 export function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {

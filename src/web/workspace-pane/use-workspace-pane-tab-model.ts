@@ -112,13 +112,10 @@ export function useGitWorkspacePaneTabModelInput(
           ? 'terminal'
           : route?.kind === 'invalid-static' || (route === null && !routedWorktree)
             ? null
-            : (preferredWorkspacePaneTabForTarget(currentWorkspace.ui, location?.paneTarget) ??
+            : (preferredWorkspacePaneTabForTarget(currentWorkspace.ui, location?.routeTarget) ??
               tabEntries[0]?.type ??
               null)
-    return {
-      workspaceId: currentWorkspace.id,
-      workspaceRuntimeId: currentWorkspace.workspaceRuntimeId,
-      location,
+    const projection = {
       preferredTab,
       allowPreferredTabFallback: route === undefined || (route === null && routedWorktree),
       tabEntries,
@@ -127,6 +124,14 @@ export function useGitWorkspacePaneTabModelInput(
       runtimeTabStateByType: runtimeProjection.value.runtimeTabStateByType,
       requestedSessionIdByRuntimeType: route?.kind === 'terminal' ? { terminal: route.terminalSessionId } : undefined,
     }
+    return location
+      ? { ...projection, location }
+      : {
+          ...projection,
+          location: null,
+          workspaceId: currentWorkspace.id,
+          workspaceRuntimeId: currentWorkspace.workspaceRuntimeId,
+        }
   })
 }
 
@@ -160,8 +165,6 @@ export function useWorkspaceRootTabModel(
         ? (preferredWorkspacePaneTabForTarget(current.ui, target) ?? tabEntries[0]!.type)
         : null
     return createWorkspacePaneTabModel({
-      workspaceId: current.id,
-      workspaceRuntimeId: current.workspaceRuntimeId,
       location,
       preferredTab,
       allowPreferredTabFallback: route === null,
@@ -201,7 +204,8 @@ export function useGitWorktreeWorkspacePaneTabModel(
   )
   return computed(() => {
     const currentRuntime = currentWorkspaceRuntime.value
-    const current = currentLocation.value.paneTarget
+    const location = currentLocation.value
+    const current = location.paneTarget
     const route = toValue(workspacePaneRoute)
     const tabEntriesProjectionPhase = workspacePaneTabsProjectionPhase(tabsQuery.status.value)
     const tabEntries = projectWorkspacePaneTabsForTarget(tabsQuery.data.value, tabEntriesProjectionPhase, current).tabs
@@ -210,12 +214,10 @@ export function useGitWorktreeWorkspacePaneTabModel(
     const preferredTab = route
       ? requestedTab
       : tabEntries.length > 0
-        ? (preferredWorkspacePaneTabForTarget(currentRuntime.ui, current) ?? tabEntries[0]!.type)
+        ? (preferredWorkspacePaneTabForTarget(currentRuntime.ui, location.routeTarget) ?? tabEntries[0]!.type)
         : null
     return createWorkspacePaneTabModel({
-      workspaceId: current.workspaceId,
-      workspaceRuntimeId: currentRuntime.workspaceRuntimeId,
-      location: currentLocation.value,
+      location,
       preferredTab,
       allowPreferredTabFallback: route === null,
       tabEntries,

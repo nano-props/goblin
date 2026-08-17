@@ -24,8 +24,16 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { workspacePaneLocationForLinkedWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
+import {
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+  workspacePaneLocationForWorktree,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  workspacePaneTabModelBranchName,
+  workspacePaneTabModelWorktreePath,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-target-repo')
 const WORKTREE_PATH = '/tmp/workspace-pane-target-worktree'
@@ -48,12 +56,56 @@ describe('workspace pane tab target read model', () => {
     workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
 
     const target = workspacePaneTabTargetForWorkspace(REPO_ID)
+    if (!target) throw new Error('expected workspace root target')
 
-    expect(target).toMatchObject({
-      branchName: null,
-      worktreePath: '/tmp/workspace-pane-target-repo',
-      renderedTab: 'files',
+    expect(workspacePaneTabModelBranchName(target)).toBeNull()
+    expect(workspacePaneTabModelWorktreePath(target)).toBe('/tmp/workspace-pane-target-repo')
+    expect(target.renderedTab).toBe('files')
+  })
+
+  test('keeps source-worktree and root preferences separate over their shared layout', () => {
+    const sourceWorktree = createRepoWorktreeSnapshotForTest('main', '/tmp/workspace-pane-target-repo', {
+      isSource: true,
+      isPrimary: true,
     })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      worktrees: [sourceWorktree],
+      currentBranchName: 'main',
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      workspaceId: REPO_ID,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('history'),
+        workspacePaneStaticTabEntry('files'),
+      ],
+    })
+    workspacesStore
+      .getState()
+      .setWorkspacePaneTabForTarget(
+        { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: sourceWorktree.path },
+        'history',
+      )
+    workspacesStore
+      .getState()
+      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
+
+    const sourceTarget = workspacePaneTabTargetForPaneTarget({
+      location: workspacePaneLocationForWorktree(REPO_ID, repo.workspaceRuntimeId, sourceWorktree),
+      workspacePaneRoute: undefined,
+    })
+    const rootTarget = workspacePaneTabTargetForPaneTarget({
+      location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
+      workspacePaneRoute: undefined,
+    })
+
+    expect(sourceTarget?.location?.paneTarget).toEqual({ kind: 'workspace-root', workspaceId: REPO_ID })
+    expect(sourceTarget?.renderedTab).toBe('history')
+    expect(rootTarget?.renderedTab).toBe('files')
   })
 
   test('keeps an unavailable read target distinct from a ready authority target', () => {
@@ -176,8 +228,8 @@ describe('workspace pane tab target read model', () => {
       workspacePaneRoute: undefined,
     })
 
-    expect(target?.branchName).toBe('feature/renamed')
-    expect(target?.worktreePath).toBe(WORKTREE_PATH)
+    expect(target?.location?.branchName).toBe('feature/renamed')
+    expect(target?.location?.routeTarget).toMatchObject({ kind: 'git-worktree', worktreePath: WORKTREE_PATH })
   })
 
   test('treats an explicit empty worktree route as an empty workspace pane', () => {

@@ -240,7 +240,7 @@ function beginCloseWorkspacePaneTabAction(
   if (!target) return { kind: 'done', result: false }
   if (workspacePaneTabTargetBlocksInteraction(target)) return { kind: 'done', result: true }
   const tabEntry = targetIdentity
-    ? (target.tabEntries.find((entry) => workspacePaneTabEntryIdentity(entry) === targetIdentity) ?? null)
+    ? (target.surfaceTabEntries.find((entry) => workspacePaneTabEntryIdentity(entry) === targetIdentity) ?? null)
     : target.selectedEntry
   if (!tabEntry) return { kind: 'done', result: false }
   const closingIdentity = workspacePaneTabEntryIdentity(tabEntry)
@@ -270,7 +270,7 @@ function beginCloseWorkspacePaneTabAction(
     if (!target.location) return { kind: 'done', result: false }
     if (
       openWorkspacePaneRuntimeCloseConfirm(
-        target.workspaceId,
+        target.location.workspaceId,
         target.location,
         closeConfirm,
         workspacePaneRoute,

@@ -87,6 +87,26 @@ export function workspacePaneTabsWithDraggedOrder(
   return orderWorkspacePaneItemsByTabEntries(currentTabs, draggedTabs, (entry) => entry)
 }
 
+export function workspacePaneTabsWithSurfaceOrder(
+  canonicalTabs: readonly WorkspacePaneTabEntry[],
+  surfaceTabs: readonly WorkspacePaneTabEntry[],
+): WorkspacePaneTabEntry[] {
+  const canonical = normalizeWorkspacePaneTabs(canonicalTabs)
+  const canonicalByIdentity = new Map(canonical.map((entry) => [workspacePaneTabEntryIdentity(entry), entry]))
+  const orderedSurface = normalizeWorkspacePaneTabs(surfaceTabs).flatMap((entry) => {
+    const canonicalEntry = canonicalByIdentity.get(workspacePaneTabEntryIdentity(entry))
+    return canonicalEntry ? [canonicalEntry] : []
+  })
+  const surfaceIdentities = new Set(orderedSurface.map(workspacePaneTabEntryIdentity))
+  let surfaceIndex = 0
+  return canonical.map((entry) => {
+    if (!surfaceIdentities.has(workspacePaneTabEntryIdentity(entry))) return entry
+    const reordered = orderedSurface[surfaceIndex]
+    surfaceIndex += 1
+    return reordered ?? entry
+  })
+}
+
 export function workspacePaneTabEntryListIdentity(tabs: readonly WorkspacePaneTabEntry[]): string {
   return tabs.map(workspacePaneTabEntryIdentity).join('\0')
 }

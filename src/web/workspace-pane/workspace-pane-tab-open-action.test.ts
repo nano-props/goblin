@@ -17,7 +17,10 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
 import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
-import { workspacePaneLocationForLinkedWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
+import {
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   type WorkspacePaneStaticTabType,
@@ -107,6 +110,27 @@ afterEach(() => {
 })
 
 describe('openWorkspacePaneTab', () => {
+  test('rejects branch-only static tabs on the workspace-root surface', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branchSnapshots: [createBranchSnapshot('main')],
+      currentBranchName: 'main',
+    })
+    const updateWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('history')])
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
+
+    await expect(
+      dispatchShowWorkspacePaneTargetStaticTabAction({
+        location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
+        type: 'history',
+        workspacePaneRoute: undefined,
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toEqual({ kind: 'unsupported', reason: 'surface-unavailable' })
+
+    expect(updateWorkspaceTabs).not.toHaveBeenCalled()
+  })
+
   test('rejects a stale runtime before starting static tab navigation', async () => {
     seedWorktreeRepo('status')
     const staleRuntimeId = currentRuntimeId()

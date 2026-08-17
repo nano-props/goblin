@@ -126,6 +126,43 @@ describe('restorable-workspace-state', () => {
     })
   })
 
+  test('validates a source-worktree preference against its shared root layout', () => {
+    const sourcePath = '/tmp/repo'
+    const sourceTargetKey = worktreeTargetKey('goblin+file:///tmp/repo', sourcePath)
+    const repo = seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/repo',
+      branchSnapshots: [createBranchSnapshot('main')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('main', sourcePath, {
+          isSource: true,
+          isPrimary: true,
+        }),
+      ],
+      currentBranchName: 'main',
+    })
+    repo.ui.preferredWorkspacePaneTabByTarget[sourceTargetKey] = 'history'
+    setWorkspacePaneTabsForTargetQueryData({
+      kind: 'workspace-root',
+      workspaceId: repo.id,
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+    })
+
+    expect(
+      clientWorkspaceStateFromRestorableWorkspaceState({
+        workspaces: { [repo.id]: repo },
+        restorableWorkspaceState: {
+          workspaceOrder: [repo.id],
+          restoredWorkspaceId: repo.id,
+          zenMode: false,
+          workspacePaneSize: 55,
+          branchViewModeByWorkspace: {},
+          selectedTerminalSessionIdByTerminalFilesystemTarget: {},
+        },
+      }).preferredWorkspacePaneTabByTargetByWorkspace,
+    ).toEqual({ [repo.id]: { [sourceTargetKey]: 'history' } })
+  })
+
   test('drops target-scoped state for worktrees absent from authoritative worktree membership', () => {
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',

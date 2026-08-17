@@ -36,12 +36,12 @@ import {
   getCurrentBranch,
   getLog as getGitLog,
   getRepoRoot,
-  resolveGitWorkspacePath,
   getUpstream,
   isAncestor,
   isGitRepo,
 } from '#/system/git/branches.ts'
 import { readRepoWorktreeSnapshots } from '#/system/git/worktree-state.ts'
+import { readLocalGitWorkspaceSourceContext } from '#/system/git/workspace-source-context.ts'
 import {
   fetchAll,
   getBrowserRepoUrl,
@@ -571,14 +571,11 @@ function createLocalRepoSource(
       const available = await probeGitRepo(repoId)
       if (!available.ok) throw new Error(available.message)
       options?.signal?.throwIfAborted()
-      const membership = await readWorktreeMembership(repoId, options?.signal)
-      const [sourcePath, worktrees, branches] = await Promise.all([
-        resolveGitWorkspacePath(repoId, { signal: options?.signal }),
-        readRepoWorktreeSnapshots(repoId, membership, options?.signal),
+      const [sourceContext, branches] = await Promise.all([
+        readLocalGitWorkspaceSourceContext(repoId, options?.signal),
         getBranches(repoId, { signal: options?.signal }),
       ])
-      const sourceWorktree = membership.find((worktree) => path.normalize(worktree.path) === sourcePath)
-      if (!sourceWorktree) throw new Error('error.failed-read-repo')
+      const { sourceWorktree, workspaceWorktrees } = sourceContext
       const current = sourceWorktree.isBare
         ? ((await getCurrentBranch(repoId, { signal: options?.signal })) ?? '')
         : (sourceWorktree.branch ?? '')
@@ -586,23 +583,13 @@ function createLocalRepoSource(
       options?.signal?.throwIfAborted()
       return {
         branches,
-        worktrees: worktrees.map((worktree) => ({
-          ...worktree,
-          isSource: path.normalize(worktree.path) === path.normalize(sourceWorktree.path),
-        })),
+        worktrees: workspaceWorktrees,
         current,
         remote,
       }
     },
     async getWorkspacePaneTargetMembership(options) {
-      const membership = await readWorktreeMembership(repoId, options?.signal)
-      options?.signal?.throwIfAborted()
-      const [sourcePath, worktrees] = await Promise.all([
-        resolveGitWorkspacePath(repoId, { signal: options?.signal }),
-        readRepoWorktreeSnapshots(repoId, membership, options?.signal),
-      ])
-      const sourceWorktree = membership.find((worktree) => path.normalize(worktree.path) === sourcePath)
-      if (!sourceWorktree) throw new Error('error.failed-read-repo')
+      const { sourceWorktree, worktrees } = await readLocalGitWorkspaceSourceContext(repoId, options?.signal)
       const identities = await getBranchWorktreeIdentities(repoId, worktrees, { signal: options?.signal })
       return workspacePaneTargetMembership(sourceWorktree, identities)
     },

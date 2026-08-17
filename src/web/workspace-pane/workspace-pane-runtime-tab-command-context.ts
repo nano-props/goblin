@@ -9,7 +9,6 @@ import type {
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceCapabilities } from '#/shared/workspace-runtime.ts'
-import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import type { CreatedTerminalRouteRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import {
   workspacePaneLocationTerminalBase,
@@ -64,14 +63,13 @@ function assignTerminalRuntimeTabCommandContext(
   input: WorkspacePaneRuntimeTabCommandContextInput,
 ): void {
   const base = input.capabilities.terminal.available ? workspacePaneLocationTerminalBase(input.location) : null
-  const paneTarget = base ? workspacePaneTabsTargetFromRuntime(base.target) : null
   context.terminal = {
     location: input.location,
     base,
     bridge: readTerminalSessionCommandBridge(),
     openerIdentity:
-      base && paneTarget
-        ? captureWorkspacePaneActiveTabIdentity(paneTarget, base.target.workspaceRuntimeId, {
+      base
+        ? captureWorkspacePaneActiveTabIdentity(input.location, {
             workspacePaneRoute: input.workspacePaneRoute,
           })
         : null,

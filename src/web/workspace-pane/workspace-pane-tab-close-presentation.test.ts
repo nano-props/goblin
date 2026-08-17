@@ -22,9 +22,12 @@ import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspa
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import {
   dispatchRetiredTerminalWorkspacePaneTabPresentationAction as dispatchRetiredTerminalWorkspacePaneTabPresentationActionRaw,
+  prepareWorkspacePaneClosePresentation,
   type RetiredTerminalWorkspacePaneTabPresentationOptions,
 } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { createWorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ warning: vi.fn() }))
 
@@ -48,6 +51,37 @@ beforeEach(() => {
 })
 
 describe('workspace pane tab close presentation', () => {
+  test('ignores a source-only opener when closing on the workspace-root surface', () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    const location = workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId)
+    const model = createWorkspacePaneTabModel({
+      location,
+      preferredTab: 'status',
+      allowPreferredTabFallback: false,
+      tabEntries: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('changes'),
+        workspacePaneStaticTabEntry('files'),
+      ],
+      runtimeTabViews: [],
+      runtimeTabStateByType: {},
+    })
+    recordWorkspacePaneTabOpener(
+      location.paneTarget,
+      repo.workspaceRuntimeId,
+      'workspace-pane:status',
+      'workspace-pane:changes',
+    )
+
+    const transition = prepareWorkspacePaneClosePresentation(
+      model,
+      'workspace-pane:status',
+      { kind: 'static', tab: 'status' },
+    )
+
+    expect(transition.nextEntry).toEqual(workspacePaneStaticTabEntry('files'))
+  })
+
   test('presents a naturally exited terminal from the server-captured before-state', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })

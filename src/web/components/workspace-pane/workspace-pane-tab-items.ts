@@ -1,7 +1,6 @@
 import type { WorkspacePaneStaticTabMetadataInput } from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import {
   createPendingWorkspacePaneTabItem,
   createRuntimePlaceholderWorkspacePaneTabItem,
@@ -17,14 +16,12 @@ interface WorkspacePaneTabItemsInput {
   branchName: string | null
   statusCount: number | undefined
   t: WorkspacePaneStaticTabMetadataInput['t']
-  staticTabAvailable?: (type: WorkspacePaneStaticTabType) => boolean
 }
 
 export function workspacePaneTabItems(input: WorkspacePaneTabItemsInput): WorkspacePaneTabItem[] {
   return input.model.tabs.flatMap<WorkspacePaneTabItem>((tab) => {
     if (tab.kind === 'static') {
-      const type = tab.type as WorkspacePaneStaticTabType
-      if (input.staticTabAvailable && !input.staticTabAvailable(type)) return []
+      const { type } = tab
       const provider = workspacePaneStaticTabProvider(type)
       const metadata = { t: input.t, branchName: input.branchName, statusCount: input.statusCount }
       return [

@@ -9,7 +9,10 @@ import {
   updateWorkspacePaneTabsOnServer,
   writeCanonicalWorkspacePaneTabsSnapshot,
 } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import {
+  workspacePaneTabEntryListIdentity,
+  workspacePaneTabsWithSurfaceOrder,
+} from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   runWorkspacePaneAction,
   workspacePaneActionTargetFromPaneTarget,
@@ -46,12 +49,13 @@ export function useWorkspacePaneTabsReorderMutation(
       onSettled?.()
       return
     }
-    const nextIdentity = workspacePaneTabEntryListIdentity(tabs)
+    const nextTabs = workspacePaneTabsWithSurfaceOrder(current.canonicalTabs, tabs)
+    const nextIdentity = workspacePaneTabEntryListIdentity(nextTabs)
     if (nextIdentity === workspacePaneTabEntryListIdentity(current.canonicalTabs)) {
       onSettled?.()
       return
     }
-    void runWorkspacePaneTabsReorder(target, [...tabs], queryClient, onSettled)
+    void runWorkspacePaneTabsReorder(target, nextTabs, queryClient, onSettled)
   }
 
   return { reorderTabs }

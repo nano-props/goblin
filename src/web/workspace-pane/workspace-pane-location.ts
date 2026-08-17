@@ -3,12 +3,14 @@ import { repoWorktreeMaterializedBranch, type WorkspaceRepoWorktreeSnapshot } fr
 import {
   requiredGitWorkspacePaneTabsTarget,
   gitWorktreeWorkspacePaneTabsTarget,
+  workspacePaneTabsLayoutTargetForWorktree,
   type GitBranchWorkspacePaneTabsTarget,
   type GitWorktreeWorkspacePaneTabsTarget,
   type RootWorkspacePaneTabsTarget,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   gitWorktreeFilesystemExecutionTarget,
@@ -111,7 +113,7 @@ export function workspacePaneLocationForBranch(
         workspaceId,
         workspaceRuntimeId,
         routeTarget,
-        paneTarget: { kind: 'workspace-root', workspaceId },
+        paneTarget: workspacePaneTabsLayoutTargetForWorktree(routeTarget, true),
         worktreeHead: worktree.head,
         branchName: materializedBranch,
       }
@@ -120,7 +122,7 @@ export function workspacePaneLocationForBranch(
         workspaceId,
         workspaceRuntimeId,
         routeTarget,
-        paneTarget: routeTarget,
+        paneTarget: workspacePaneTabsLayoutTargetForWorktree(routeTarget, false),
         worktreeHead: worktree.head,
         branchName: materializedBranch,
       }
@@ -140,7 +142,7 @@ export function workspacePaneLocationForWorktree(
         workspaceId,
         workspaceRuntimeId,
         routeTarget,
-        paneTarget: { kind: 'workspace-root', workspaceId },
+        paneTarget: workspacePaneTabsLayoutTargetForWorktree(routeTarget, true),
         worktreeHead: worktree.head,
         branchName,
       }
@@ -149,7 +151,7 @@ export function workspacePaneLocationForWorktree(
         workspaceId,
         workspaceRuntimeId,
         routeTarget,
-        paneTarget: routeTarget,
+        paneTarget: workspacePaneTabsLayoutTargetForWorktree(routeTarget, false),
         worktreeHead: worktree.head,
         branchName,
       }
@@ -192,6 +194,17 @@ export function workspacePaneLocationBranchName(location: WorkspacePaneLocation)
 
 export function workspacePaneLocationWorktreePath(location: WorkspacePaneLocation): string | null {
   return location.routeTarget.kind === 'git-worktree' ? location.routeTarget.worktreePath : null
+}
+
+export function workspacePaneLocationSupportsTab(
+  location: WorkspacePaneLocation,
+  type: WorkspacePaneTabType,
+): boolean {
+  if (location.kind === 'workspace-root') {
+    return type === 'status' || type === 'files' || type === 'terminal'
+  }
+  if (location.kind === 'branch') return type === 'status' || type === 'history'
+  return true
 }
 
 export function workspacePaneLocationExecutionTarget(

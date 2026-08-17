@@ -57,10 +57,8 @@ export function resolveWorkspacePaneRoute(repoId: WorkspaceId, branchName: strin
     filesystemTarget: location.kind === 'branch' ? null : workspacePaneLocationExecutionTarget(location),
   })
   const model = createWorkspacePaneTabModel({
-    workspaceId: repo.id,
-    workspaceRuntimeId: repo.workspaceRuntimeId,
     location,
-    preferredTab: preferredWorkspacePaneTabForTarget(repo.ui, target),
+    preferredTab: preferredWorkspacePaneTabForTarget(repo.ui, location.routeTarget),
     allowPreferredTabFallback: true,
     tabEntries: tabEntriesProjection.tabs,
     tabEntriesProjectionPhase: tabEntriesProjection.phase,

@@ -6,7 +6,11 @@ import {
   workspacePaneRouteHistoryResolution,
   type WorkspacePaneRouteReconciliation,
 } from '#/web/workspace-pane/workspace-pane-route-reconciliation.ts'
-import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import {
+  workspacePaneTabModelRouteTarget,
+  workspacePaneTabModelWorkspaceRuntimeId,
+  type WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { useSyncWorkspacePaneRuntimeTabSelection } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
@@ -46,10 +50,11 @@ function useSyncRoutedFilesystemWorkspacePanePreference(input: {
       const model = toValue(input.model)
       const reconciliation = toValue(input.reconciliation)
       if (reconciliation.kind !== 'none' || route === null || route.kind === 'invalid-static') return
-      const target = model.routeTarget
+      const target = workspacePaneTabModelRouteTarget(model)
+      if (!target) return
       if (target.kind !== 'workspace-root' && target.kind !== 'git-worktree') return
       const workspace = workspacesStore.getState().workspaces[target.workspaceId]
-      if (!workspace || workspace.workspaceRuntimeId !== model.workspaceRuntimeId) return
+      if (!workspace || workspace.workspaceRuntimeId !== workspacePaneTabModelWorkspaceRuntimeId(model)) return
       const routedTab = route.kind === 'static' ? route.tab : 'terminal'
       if (preferredWorkspacePaneTabForTarget(workspace.ui, target) !== routedTab) {
         setWorkspacePaneTabForTarget(target, routedTab)
@@ -79,18 +84,19 @@ function filesystemWorkspacePaneHistoryRouteContext(
   model: WorkspacePaneTabModel,
   workspacePaneRoute: WorkspacePaneRouteTarget,
 ): WorkspaceNavigationRouteContext | null {
-  if (model.routeTarget.kind === 'workspace-root') {
+  const routeTarget = workspacePaneTabModelRouteTarget(model)
+  if (routeTarget?.kind === 'workspace-root') {
     return {
       kind: 'workspace-root',
-      workspaceId: model.workspaceId,
+      workspaceId: routeTarget.workspaceId,
       workspacePaneRoute,
     }
   }
-  if (model.routeTarget.kind === 'git-worktree') {
+  if (routeTarget?.kind === 'git-worktree') {
     return {
       kind: 'worktree',
-      workspaceId: model.workspaceId,
-      worktreePath: model.routeTarget.worktreePath,
+      workspaceId: routeTarget.workspaceId,
+      worktreePath: routeTarget.worktreePath,
       workspacePaneRoute,
     }
   }

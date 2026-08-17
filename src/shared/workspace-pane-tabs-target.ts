@@ -34,6 +34,26 @@ export type WorkspacePaneTabsTarget =
 
 export type FilesystemWorkspacePaneTabsTarget = RootWorkspacePaneTabsTarget | GitWorktreeWorkspacePaneTabsTarget
 
+/** Resolves the canonical layout owner for a worktree presentation. */
+export function workspacePaneTabsLayoutTargetForWorktree(
+  routeTarget: GitWorktreeWorkspacePaneTabsTarget,
+  isSource: true,
+): RootWorkspacePaneTabsTarget
+export function workspacePaneTabsLayoutTargetForWorktree(
+  routeTarget: GitWorktreeWorkspacePaneTabsTarget,
+  isSource: false,
+): GitWorktreeWorkspacePaneTabsTarget
+export function workspacePaneTabsLayoutTargetForWorktree(
+  routeTarget: GitWorktreeWorkspacePaneTabsTarget,
+  isSource: boolean,
+): FilesystemWorkspacePaneTabsTarget
+export function workspacePaneTabsLayoutTargetForWorktree(
+  routeTarget: GitWorktreeWorkspacePaneTabsTarget,
+  isSource: boolean,
+): FilesystemWorkspacePaneTabsTarget {
+  return isSource ? { kind: 'workspace-root', workspaceId: routeTarget.workspaceId } : routeTarget
+}
+
 /** Returns a branch target's stable identity; this is never a worktree HEAD presentation. */
 export function workspacePaneTabsBranchIdentity(target: WorkspacePaneTabsTarget): string | null {
   return target.kind === 'git-branch' ? target.branchName : null

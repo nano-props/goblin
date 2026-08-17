@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { git } from '#/system/git/git-exec.ts'
 import { readGitWorktreeState, readRepoWorktreeSnapshots } from '#/system/git/worktree-state.ts'
 import { readWorktreeMembership } from '#/system/git/worktrees.ts'
+import { readLocalGitWorkspaceSourceContext } from '#/system/git/workspace-source-context.ts'
 
 let repoPath = ''
 let gitDir = ''
@@ -24,6 +25,16 @@ beforeEach(async () => {
 afterEach(async () => {
   if (repoPath) await rm(repoPath, { recursive: true, force: true })
   if (offlineWorktreePath) await rm(offlineWorktreePath, { recursive: true, force: true })
+})
+
+test('projects the resolved local source worktree once for snapshot and target consumers', async () => {
+  const context = await readLocalGitWorkspaceSourceContext(repoPath)
+
+  expect(context.sourceWorktree).toMatchObject({ isBare: false, isPrimary: true })
+  expect(context.worktrees).toEqual([expect.not.objectContaining({ isSource: expect.anything() })])
+  expect(context.workspaceWorktrees).toEqual([
+    expect.objectContaining({ path: context.sourceWorktree.path, isSource: true }),
+  ])
 })
 
 describe('readGitWorktreeState', () => {

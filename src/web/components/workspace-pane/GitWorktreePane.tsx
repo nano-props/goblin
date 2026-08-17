@@ -201,9 +201,6 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
             statusCount={props.status?.entries.length}
             trafficLightOffset={props.toolbarTrafficLightOffset}
             onBackToNavigator={props.onBackToNavigator}
-            staticTabAvailable={(type) =>
-              type === 'status' || type === 'changes' || type === 'history' || type === 'files'
-            }
           />
           {routeMissing ? (
             <EmptyState title={t('workspace-route.not-found-title')} />

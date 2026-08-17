@@ -4,6 +4,7 @@ import {
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
@@ -18,10 +19,11 @@ export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing'
  * through a branch snapshot, because worktrees can be detached or renamed.
  */
 export function captureWorkspacePaneActiveTabIdentity(
-  target: WorkspacePaneTabsTarget,
-  workspaceRuntimeId: string,
+  location: WorkspacePaneLocation,
   options: WorkspacePaneTabTargetOptions,
 ): string | null {
+  const target = location.paneTarget
+  const { workspaceRuntimeId } = location
   const workspace = workspacesStore.getState().workspaces[target.workspaceId]
   if (!workspace || workspace.workspaceRuntimeId !== workspaceRuntimeId) return null
   const projection = readWorkspacePaneTabsProjectionForTarget({ ...target, workspaceRuntimeId: workspaceRuntimeId })
@@ -40,7 +42,7 @@ export function captureWorkspacePaneActiveTabIdentity(
     )
     return entry ? workspacePaneTabEntryIdentity(entry) : null
   }
-  const preferred = preferredWorkspacePaneTabForTarget(workspace.ui, target)
+  const preferred = preferredWorkspacePaneTabForTarget(workspace.ui, location.routeTarget)
   const entry = tabs.find((candidate) => candidate.type === preferred)
   return entry ? workspacePaneTabEntryIdentity(entry) : null
 }

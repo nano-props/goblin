@@ -32,16 +32,15 @@ import type {
   WorkspacePaneStaticTab,
   WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { createWorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { beginAppNavigation, currentAppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import {
-  workspacePaneLocationBranchName,
   workspacePaneLocationForBranchTarget,
   workspacePaneLocationForLinkedWorktree,
   workspacePaneLocationForRoot,
-  workspacePaneLocationWorktreePath,
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
 
@@ -434,15 +433,13 @@ function workspacePaneTarget(
     'repo-runtime-1',
   ),
 ): WorkspacePaneTabModel {
-  return {
+  return createWorkspacePaneTabModel({
     location,
-    workspaceId: WORKSPACE_ID,
-    workspaceRuntimeId: 'repo-runtime-1',
-    routeTarget: location.routeTarget,
-    branchName: workspacePaneLocationBranchName(location),
-    worktreePath: workspacePaneLocationWorktreePath(location),
-    paneTarget: location.paneTarget,
-  } as WorkspacePaneTabModel
+    preferredTab: 'files',
+    tabEntries: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+    runtimeTabViews: [],
+    runtimeTabStateByType: {},
+  })
 }
 
 function linkedWorktreeLocation() {

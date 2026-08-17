@@ -4,6 +4,7 @@ import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
 import {
   MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT,
+  NUL,
   PRIMARY_WORKTREE_OUTPUT,
   TARGET,
   failRemoteResult,
@@ -30,7 +31,7 @@ describe('remote Git snapshot', () => {
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
         case 'resolveGitWorkspacePath':
-          return okRemoteResult('/srv/repo\n')
+          return okRemoteResult('/srv/repo\0')
         case 'gitSnapshot':
           return okRemoteResult(
             [
@@ -94,7 +95,7 @@ describe('remote Git snapshot', () => {
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
         case 'resolveGitWorkspacePath':
-          return okRemoteResult('/srv/repo\n')
+          return okRemoteResult('/srv/repo\0')
         case 'gitSnapshot':
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
         case 'gitWorktreeList':
@@ -128,7 +129,7 @@ describe('remote Git snapshot', () => {
         case 'gitWorktreeList':
           return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
         case 'resolveGitWorkspacePath':
-          return okRemoteResult('/srv/repo\n')
+          return okRemoteResult('/srv/repo\0')
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
         case 'gitOperationState':
@@ -146,7 +147,40 @@ describe('remote Git snapshot', () => {
     })
   })
 
-  test.each(['', 'relative/repo', '/srv/repo\0hidden', '/srv/repo\n/other', '/srv/missing'])(
+  test('preserves a trailing space in a resolved remote source-worktree path', async () => {
+    const sourcePath = '/srv/repo '
+    const nestedTarget = { ...TARGET, remotePath: `${sourcePath}/child` }
+    const membership = [
+      `worktree ${sourcePath}`,
+      'HEAD f00ba40000000000000000000000000000000000',
+      'branch refs/heads/main',
+      '',
+      '',
+    ].join(NUL)
+    const run = vi.fn<RemoteCommandRunner>(async (command) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(membership)
+        case 'resolveGitWorkspacePath':
+          return okRemoteResult(`${sourcePath}\0`)
+        case 'resolveRepoCommonDir':
+          return okRemoteResult(`${sourcePath}/.git\0`)
+        case 'gitOperationState':
+          return okRemoteResult('operation none\nmaterialized-branch main\n')
+        case 'gitSnapshot':
+          return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    await expect(getRemoteSnapshot(nestedTarget, { run })).resolves.toMatchObject({
+      current: 'main',
+      worktrees: [expect.objectContaining({ path: sourcePath, isSource: true })],
+    })
+  })
+
+  test.each(['', 'relative/repo\0', '/srv/repo\0hidden', '/srv/repo\n/other\0', '/srv/missing\0'])(
     'rejects a malformed or unknown resolved source workspace path %j',
     async (sourcePath) => {
       const aliasTarget = { ...TARGET, remotePath: '/srv/repo-alias' }
@@ -189,7 +223,7 @@ describe('remote Git snapshot', () => {
         case 'resolveRepoCommonDir':
           return okRemoteResult('/srv/repo/.git\0')
         case 'resolveGitWorkspacePath':
-          return okRemoteResult('/srv/repo\n')
+          return okRemoteResult('/srv/repo\0')
         case 'gitSnapshot':
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
         case 'gitWorktreeList':
@@ -522,7 +556,7 @@ describe('remote Git snapshot', () => {
         : command.type === 'resolveRepoCommonDir'
           ? okRemoteResult('/srv/repo/.git\0')
           : command.type === 'resolveGitWorkspacePath'
-            ? okRemoteResult('/srv/repo\n')
+            ? okRemoteResult('/srv/repo\0')
             : command.type === 'gitWorktreeList'
               ? okRemoteResult(
                   worktreePorcelain('worktree /srv/repo\nHEAD f00ba40000000000000000000000000000000000\ndetached'),

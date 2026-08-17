@@ -77,7 +77,6 @@ export const WorkspaceRootPane = defineComponent<WorkspaceRootPaneProps>({
             statusCount={0}
             trafficLightOffset={props.toolbarTrafficLightOffset}
             onBackToNavigator={props.onBackToNavigator}
-            staticTabAvailable={(type) => type === 'status' || type === 'files'}
           />
           {currentActivePanel === 'status' ? (
             <WorkspaceRootStatusPanel

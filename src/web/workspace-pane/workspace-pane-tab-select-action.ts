@@ -25,6 +25,7 @@ import {
   workspacePaneLocationBranchName,
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface SelectWorkspacePaneTabByIndexActionOptions {
   workspaceId: WorkspaceId | null
@@ -109,7 +110,9 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
   if (!coordinatorTarget || !workspacePaneTabControllerTargetIsCurrent(coordinatorTarget)) return false
   const tab = coordinatorTarget.tabs.find((candidate) => candidate.identity === options.identity) ?? null
   const tabEntry =
-    coordinatorTarget.tabEntries.find((candidate) => workspacePaneTabEntryIdentity(candidate) === options.identity) ??
+    coordinatorTarget.surfaceTabEntries.find(
+      (candidate) => workspacePaneTabEntryIdentity(candidate) === options.identity,
+    ) ??
     null
   if (
     (!tab && !tabEntry) ||
@@ -139,7 +142,8 @@ async function selectWorkspacePaneTabByIdentityAction(
     options.workspaceRuntimeId,
   )
   const tab = target?.tabs.find((candidate) => candidate.identity === identity) ?? null
-  const tabEntry = target?.tabEntries.find((candidate) => workspacePaneTabEntryIdentity(candidate) === identity) ?? null
+  const tabEntry =
+    target?.surfaceTabEntries.find((candidate) => workspacePaneTabEntryIdentity(candidate) === identity) ?? null
   if (!target || (!tab && !tabEntry) || !queuedWorkspacePaneTargetMatches(coordinatorTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
   if (tab?.kind === 'pending') return false
@@ -186,12 +190,13 @@ async function moveWorkspacePaneTabAction(
 }
 
 function queuedWorkspacePaneTargetMatches(queued: WorkspacePaneTabModel, current: WorkspacePaneTabModel): boolean {
+  if (!queued.location || !current.location) return false
   return (
     workspacePaneTabControllerTargetIsCurrent(queued) &&
-    current.workspaceId === queued.workspaceId &&
-    current.workspaceRuntimeId === queued.workspaceRuntimeId &&
-    current.branchName === queued.branchName &&
-    current.worktreePath === queued.worktreePath
+    current.location.workspaceRuntimeId === queued.location.workspaceRuntimeId &&
+    current.location.kind === queued.location.kind &&
+    workspacePaneTabsTargetIdentityKey(current.location.routeTarget) ===
+      workspacePaneTabsTargetIdentityKey(queued.location.routeTarget)
   )
 }
 

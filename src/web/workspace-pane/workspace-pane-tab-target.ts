@@ -1,7 +1,8 @@
 import {
   createWorkspacePaneTabModel,
   workspacePaneTabModelBlocksTabInteraction,
-  type WorkspacePaneModelTarget,
+  workspacePaneTabModelPaneTarget,
+  workspacePaneTabModelWorkspaceRuntimeId,
   type WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -142,7 +143,11 @@ export function scopeWorkspacePaneTabTargetResolutionToRuntime(
   resolution: WorkspacePaneTabTargetResolution,
   workspaceRuntimeId: string,
 ): WorkspacePaneTabTargetResolution {
-  if (resolution.kind === 'missing' || resolution.target.workspaceRuntimeId === workspaceRuntimeId) return resolution
+  if (
+    resolution.kind === 'missing' ||
+    workspacePaneTabModelWorkspaceRuntimeId(resolution.target) === workspaceRuntimeId
+  )
+    return resolution
   return { kind: 'missing' }
 }
 
@@ -278,10 +283,8 @@ export function resolveWorkspacePaneTabTargetForPaneTarget(
     workspaceRuntimeId: workspace.workspaceRuntimeId,
   })
   const target = createWorkspacePaneTabModel({
-    workspaceId: workspace.id,
-    workspaceRuntimeId: workspace.workspaceRuntimeId,
     location,
-    preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, paneTarget, { workspacePaneRoute }),
+    preferredTab: preferredWorkspacePaneTabForRoute(workspace.ui, location.routeTarget, { workspacePaneRoute }),
     allowPreferredTabFallback: workspacePaneRoute === undefined,
     tabEntries: tabsProjection.tabs,
     tabEntriesProjectionPhase: tabsProjection.phase,
@@ -376,10 +379,11 @@ function preferredWorkspacePaneTabForRoute(
 }
 
 export function workspacePaneTabTargetBlocksInteraction(model: WorkspacePaneTabModel): boolean {
-  if (workspacePaneTabModelBlocksTabInteraction(model) || model.paneTarget.kind === 'inactive') return true
+  const paneTarget = workspacePaneTabModelPaneTarget(model)
+  if (workspacePaneTabModelBlocksTabInteraction(model) || !paneTarget) return true
   return workspacePaneTabsInteractionBlockedForTarget({
-    ...model.paneTarget,
-    workspaceRuntimeId: model.workspaceRuntimeId,
+    ...paneTarget,
+    workspaceRuntimeId: workspacePaneTabModelWorkspaceRuntimeId(model),
   })
 }
 

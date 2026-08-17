@@ -1,6 +1,9 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import {
+  requiredWorkspacePaneTabModelLocation,
+  type WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import {
   resolveWorkspacePaneTabTargetForPaneTarget,
   scopeWorkspacePaneTabTargetResolutionToRuntime,
@@ -26,11 +29,9 @@ export function resolveCloseWorkspacePaneTarget(
 }
 
 export function workspacePaneTabsTargetForClose(target: WorkspacePaneTabModel): WorkspacePaneTabsTarget {
-  if (target.paneTarget.kind === 'inactive') throw new Error('inactive workspace pane has no persistence target')
-  return target.paneTarget
+  return requiredWorkspacePaneTabModelLocation(target).paneTarget
 }
 
 export function workspacePaneRouteTargetForClose(target: WorkspacePaneTabModel): WorkspacePaneTabsTarget {
-  if (target.routeTarget.kind === 'inactive') throw new Error('inactive workspace pane has no route target')
-  return target.routeTarget
+  return requiredWorkspacePaneTabModelLocation(target).routeTarget
 }

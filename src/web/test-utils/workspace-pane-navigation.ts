@@ -10,6 +10,12 @@ import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import { workspacePaneLocationForBranch } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  workspacePaneTabModelBranchName,
+  workspacePaneTabModelWorkspaceId,
+  workspacePaneTabModelWorkspaceRuntimeId,
+  workspacePaneTabModelWorktreePath,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 
 export interface ObservedBranchRouteNavigationForTest {
   showRepoBranchEmptyWorkspacePane: (
@@ -67,7 +73,8 @@ export function seedInitialObservedWorkspacePaneRouteForTest(
   const branchName = getRepoSnapshotQueryData(repo.id, repo.workspaceRuntimeId)?.current
   if (!branchName) return false
   const target = workspacePaneTabModelForBranchForTest(repoId, branchName)
-  if (!target?.branchName) return false
+  const targetBranchName = target ? workspacePaneTabModelBranchName(target) : null
+  if (!target || !targetBranchName) return false
   const activeTab = target.activeTab
   const route: ParsedWorkspacePaneRoute | null =
     activeTab?.kind === 'static'
@@ -76,10 +83,10 @@ export function seedInitialObservedWorkspacePaneRouteForTest(
         ? { kind: 'terminal', terminalSessionId: activeTab.sessionId }
         : null
   observeWorkspacePaneRouteForTest({
-    workspaceId: target.workspaceId,
-    workspaceRuntimeId: target.workspaceRuntimeId,
-    branchName: target.branchName,
-    worktreePath: target.worktreePath,
+    workspaceId: workspacePaneTabModelWorkspaceId(target),
+    workspaceRuntimeId: workspacePaneTabModelWorkspaceRuntimeId(target),
+    branchName: targetBranchName,
+    worktreePath: workspacePaneTabModelWorktreePath(target),
     route,
   })
   return true
@@ -96,12 +103,13 @@ export function observedWorkspacePaneRouteCommitForTest(
     route: ParsedWorkspacePaneRoute | null,
   ): void => {
     const target = workspacePaneTabModelForBranchForTest(repoId, branchName, route)
-    if (!target?.branchName) return
+    const targetBranchName = target ? workspacePaneTabModelBranchName(target) : null
+    if (!target || !targetBranchName) return
     const observation = {
-      workspaceId: target.workspaceId,
-      workspaceRuntimeId: target.workspaceRuntimeId,
-      branchName: target.branchName,
-      worktreePath: target.worktreePath,
+      workspaceId: workspacePaneTabModelWorkspaceId(target),
+      workspaceRuntimeId: workspacePaneTabModelWorkspaceRuntimeId(target),
+      branchName: targetBranchName,
+      worktreePath: workspacePaneTabModelWorktreePath(target),
       route,
     }
     observeWorkspacePaneRouteForTest(observation)
@@ -235,13 +243,14 @@ export function observedWorkspacePaneRouteForTarget(
   branchName: string,
 ): WorkspacePaneRouteTarget | undefined {
   const target = workspacePaneTabModelForBranchForTest(repoId, branchName)
-  if (!target?.branchName) return undefined
+  const targetBranchName = target ? workspacePaneTabModelBranchName(target) : null
+  if (!target || !targetBranchName) return undefined
   const route = observedWorkspacePaneRoutes.get(
     workspacePaneObservationKey({
-      workspaceId: target.workspaceId,
-      workspaceRuntimeId: target.workspaceRuntimeId,
-      branchName: target.branchName,
-      worktreePath: target.worktreePath,
+      workspaceId: workspacePaneTabModelWorkspaceId(target),
+      workspaceRuntimeId: workspacePaneTabModelWorkspaceRuntimeId(target),
+      branchName: targetBranchName,
+      worktreePath: workspacePaneTabModelWorktreePath(target),
     }),
   )
   return route?.kind === 'invalid-static' ? undefined : route
