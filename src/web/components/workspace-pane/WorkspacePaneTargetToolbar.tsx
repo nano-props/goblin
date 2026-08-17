@@ -130,12 +130,10 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       })),
     )
     const { scrollToBottom } = useTerminalSessionContext()
-    const routeTarget = computed(() => requiredWorkspacePaneTabModelLocation(props.model).routeTarget)
     const persistenceTarget = computed(() => requiredWorkspacePaneTabModelLocation(props.model).paneTarget)
     const commandTarget = computed(() =>
       workspacePaneCommandTargetForSurface(props.model.location, props.target, props.workspacePaneRoute),
     )
-    const worktreeHead = computed(() => (props.target.kind === 'git-worktree' ? props.target.head : undefined))
     // Scroll memory is local to one runtime epoch. A reopened workspace can
     // reuse the same durable target identity with a different tab projection.
     const targetKey = computed(

@@ -57,7 +57,6 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { GitWorkspaceNavigatorRowIdentity } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
 import { claimTerminalAutoFocus, resetTerminalAutoFocusForTest } from '#/web/terminal/focus.ts'
-import {} from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const branchShortcutMocks = vi.hoisted(() => ({
