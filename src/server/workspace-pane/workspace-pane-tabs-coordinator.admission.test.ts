@@ -152,7 +152,10 @@ describe('workspace pane tabs coordinator admission queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: {
+        captureTargets: async () => [projection],
+        captureGitMembershipTargets: async () => [projection],
+      },
     })
 
     await expect(
@@ -217,7 +220,10 @@ describe('workspace pane tabs coordinator admission queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: {
+        captureTargets: async () => [projection],
+        captureGitMembershipTargets: async () => [projection],
+      },
     })
 
     await expect(
@@ -260,7 +266,10 @@ describe('workspace pane tabs coordinator admission queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: {
+        captureTargets: async () => [projection],
+        captureGitMembershipTargets: async () => [projection],
+      },
     })
 
     const admitted = await operations.runOperation(
@@ -319,7 +328,10 @@ describe('workspace pane tabs coordinator admission queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: {
+        captureTargets: async () => [projection],
+        captureGitMembershipTargets: async () => [projection],
+      },
     })
 
     const admitted = await operations.runOperation(
@@ -361,7 +373,10 @@ describe('workspace pane tabs coordinator admission queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: {
+        captureTargets: async () => [projection],
+        captureGitMembershipTargets: async () => [projection],
+      },
     })
 
     const admitted = await operations.runOperation(
@@ -419,7 +434,10 @@ describe('workspace pane tabs coordinator admission queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: {
+        captureTargets: async () => [projection],
+        captureGitMembershipTargets: async () => [projection],
+      },
     })
 
     const admitted = await operations.runOperation(
@@ -460,7 +478,10 @@ describe('workspace pane tabs coordinator admission queues', () => {
       runtimeProviders: [],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets: async () => [projection] },
+      targetProjection: {
+        captureTargets: async () => [projection],
+        captureGitMembershipTargets: async () => [projection],
+      },
     })
 
     const admitted = await operations.runOperation(
@@ -519,7 +540,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
       ],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets },
+      targetProjection: { captureTargets, captureGitMembershipTargets: captureTargets },
     })
 
     const admitted = operations.runOperation(
@@ -590,7 +611,7 @@ describe('workspace pane tabs coordinator admission queues', () => {
       ],
       worktreeOperations: operations,
       physicalWorktrees: { capture: async () => capability },
-      targetProjection: { captureTargets },
+      targetProjection: { captureTargets, captureGitMembershipTargets: captureTargets },
     })
 
     const admitted = operations.runOperation(

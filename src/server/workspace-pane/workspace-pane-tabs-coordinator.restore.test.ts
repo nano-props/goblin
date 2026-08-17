@@ -89,7 +89,10 @@ describe('workspace pane tabs coordinator restore queues', () => {
       runtimeProviders: [],
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
-      targetProjection: { captureTargets: async () => [rootProjection] },
+      targetProjection: {
+        captureTargets: async () => [rootProjection],
+        captureGitMembershipTargets: async () => [rootProjection],
+      },
     })
     const scope = {
       userId: 'user-a',

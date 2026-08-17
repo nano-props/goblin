@@ -57,18 +57,27 @@ const captureWorkspaceRootTarget: WorkspacePaneTargetProjectionProvider['capture
   _userId,
   workspaceId,
   scope,
-  purpose,
 ) => {
   const workspaceRuntimeId = scope.slice(scope.lastIndexOf('\0') + 1)
-  return purpose === 'git-capability-promotion'
-    ? [{ target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root: workspaceId }, nativeWorktreePath: '/repo' }]
-    : [{ target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId }, nativeWorktreePath: '/repo' }]
+  return [{ target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId }, nativeWorktreePath: '/repo' }]
+}
+
+const captureWorkspaceGitRootTarget: WorkspacePaneTargetProjectionProvider['captureGitMembershipTargets'] = async (
+  _userId,
+  workspaceId,
+  scope,
+) => {
+  const workspaceRuntimeId = scope.slice(scope.lastIndexOf('\0') + 1)
+  return [
+    { target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root: workspaceId }, nativeWorktreePath: '/repo' },
+  ]
 }
 
 describe('server terminal runtime workspace panes', () => {
   test('Git capability promotion replaces the root target while preserving layout and live terminals', async () => {
     const { host, workspaceCapabilityTransitionHost, shutdown } = await buildRuntime({
       captureTargets: captureWorkspaceRootTarget,
+      captureGitMembershipTargets: captureWorkspaceGitRootTarget,
     })
     const created = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
@@ -134,6 +143,7 @@ describe('server terminal runtime workspace panes', () => {
   test('fails Git capability promotion before commit when the durable layout write fails', async () => {
     const { workspaceCapabilityTransitionHost, shutdown } = await buildRuntime({
       captureTargets: captureWorkspaceRootTarget,
+      captureGitMembershipTargets: captureWorkspaceGitRootTarget,
     })
     setTestWorkspacePaneLayout({
       entries: [
@@ -164,6 +174,7 @@ describe('server terminal runtime workspace panes', () => {
   test('publishes Git capability promotion to every active workspace user', async () => {
     const { host, workspaceCapabilityTransitionHost, shutdown } = await buildRuntime({
       captureTargets: captureWorkspaceRootTarget,
+      captureGitMembershipTargets: captureWorkspaceGitRootTarget,
     })
     const socketA = appRealtimeSocket()
     const socketB = appRealtimeSocket()
@@ -204,11 +215,11 @@ describe('server terminal runtime workspace panes', () => {
 
     await vi.waitFor(() => {
       expect(
-        sentSocketMessages(socketA).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
-      ).toBe(true)
+        sentSocketMessages(socketA).filter((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toHaveLength(1)
       expect(
-        sentSocketMessages(socketB).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
-      ).toBe(true)
+        sentSocketMessages(socketB).filter((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toHaveLength(1)
     })
 
     host.unregisterSocket('client_a', USER_1, socketA)
@@ -219,6 +230,7 @@ describe('server terminal runtime workspace panes', () => {
   test('keeps Git capability promotion committed when projection publication fails', async () => {
     const { host, workspaceCapabilityTransitionHost, shutdown } = await buildRuntime({
       captureTargets: captureWorkspaceRootTarget,
+      captureGitMembershipTargets: captureWorkspaceGitRootTarget,
     })
     const created = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,

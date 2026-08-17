@@ -37,7 +37,6 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
     userId: string,
     workspaceId: WorkspaceId,
     scope: string,
-    purpose: 'projection' | 'git-capability-promotion' = 'projection',
   ): Promise<readonly WorkspacePaneTargetProjection[]> {
     const workspaceRuntimeId = runtimeIdFromScope(scope)
     const workspace = parseCanonicalWorkspaceLocator(workspaceId)
@@ -47,10 +46,23 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
       nativeWorktreePath: workspace.path,
     }
     const gitCapabilityState = this.dependencies.gitCapabilityState(userId, workspaceId, workspaceRuntimeId)
-    if (gitCapabilityState === 'transitioning' && purpose !== 'git-capability-promotion') {
-      throw new WorkspaceRuntimeStaleError()
+    if (gitCapabilityState === 'transitioning') throw new WorkspaceRuntimeStaleError()
+    if (gitCapabilityState === 'unavailable') return [workspaceTarget]
+    return await this.captureGitMembershipTargets(userId, workspaceId, scope)
+  }
+
+  async captureGitMembershipTargets(
+    _userId: string,
+    workspaceId: WorkspaceId,
+    scope: string,
+  ): Promise<readonly WorkspacePaneTargetProjection[]> {
+    const workspaceRuntimeId = runtimeIdFromScope(scope)
+    const workspace = parseCanonicalWorkspaceLocator(workspaceId)
+    if (!workspace) throw new Error('invalid workspace pane workspace id')
+    const workspaceTarget: WorkspacePaneTargetProjection = {
+      target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId },
+      nativeWorktreePath: workspace.path,
     }
-    if (gitCapabilityState === 'unavailable' && purpose !== 'git-capability-promotion') return [workspaceTarget]
     const membership = await this.dependencies.readMembership(workspaceId, { workspaceRuntimeId })
     const sourceWorktreePath = membership.source.kind === 'worktree' ? membership.source.worktreePath : null
     const workspaceRootWorktrees = membership.identities.filter(

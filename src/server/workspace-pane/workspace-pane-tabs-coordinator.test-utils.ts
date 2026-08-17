@@ -42,8 +42,10 @@ export type TestWorkspacePaneTarget =
   WorkspacePaneTabsTarget | { workspaceId: string; branchName: string; worktreePath: string | null }
 
 export function testTargetProjection(targets: readonly TestWorkspacePaneTarget[]) {
+  const captureTargets = async () => targets.map(testRuntimeTargetProjection)
   return {
-    captureTargets: async () => targets.map(testRuntimeTargetProjection),
+    captureTargets,
+    captureGitMembershipTargets: captureTargets,
   }
 }
 

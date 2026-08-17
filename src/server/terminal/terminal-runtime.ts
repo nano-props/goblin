@@ -179,11 +179,13 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       event.workspaceRuntimeId,
     )
     manager.releaseProjectionRevisionForScope(event.userId, scope)
-    retireInvalidatedScopeProjection({
+    void retireInvalidatedScopeProjection({
       userId: event.userId,
       workspaceId: event.workspaceId,
       workspaceRuntimeId: event.workspaceRuntimeId,
       scope,
+    }).then(() => {
+      publishWorkspaceTabsChanged(event.userId, event.workspaceId)
     })
     invalidation.publishEffects()
     try {
@@ -201,28 +203,25 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     }
   })
 
-  function retireInvalidatedScopeProjection(input: {
+  async function retireInvalidatedScopeProjection(input: {
     userId: string
     workspaceId: WorkspaceId
     workspaceRuntimeId: string
     scope: string
-  }): void {
-    void workspaceTabsCoordinator
-      .closeScope({ userId: input.userId, scope: input.scope })
-      .then(() => {
-        publishWorkspaceTabsChanged(input.userId, input.workspaceId)
-      })
-      .catch((error) => {
-        terminalRuntimeLogger.warn(
-          {
-            userId: input.userId,
-            workspaceId: input.workspaceId,
-            workspaceRuntimeId: input.workspaceRuntimeId,
-            err: error,
-          },
-          'failed to retire invalidated workspace runtime workspace tabs',
-        )
-      })
+  }): Promise<void> {
+    try {
+      await workspaceTabsCoordinator.closeScope({ userId: input.userId, scope: input.scope })
+    } catch (error) {
+      terminalRuntimeLogger.warn(
+        {
+          userId: input.userId,
+          workspaceId: input.workspaceId,
+          workspaceRuntimeId: input.workspaceRuntimeId,
+          err: error,
+        },
+        'failed to retire invalidated workspace runtime workspace tabs',
+      )
+    }
   }
 
   let shuttingDown = false
@@ -387,7 +386,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       // The accepted durable CAS is the capability-promotion commit point.
       // All expected validation has completed, so the synchronous authority
       // mutation below must finish before any best-effort projection effects.
-      retireInvalidatedScopeProjection({ userId, workspaceId, workspaceRuntimeId, scope })
+      await retireInvalidatedScopeProjection({ userId, workspaceId, workspaceRuntimeId, scope })
       if (paneTransition.kind === 'authority-commit-failed') {
         terminalRuntimeLogger.error(
           { userId, workspaceId, workspaceRuntimeId, transition: 'promotion', err: paneTransition.error },
@@ -439,7 +438,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       // The accepted durable CAS is the capability-removal commit point.
       // Register overlay retirement before detaching terminal authority; the
       // queued effect cannot run until this synchronous commit returns.
-      retireInvalidatedScopeProjection({
+      await retireInvalidatedScopeProjection({
         userId,
         workspaceId,
         workspaceRuntimeId: workspaceRuntimeId,

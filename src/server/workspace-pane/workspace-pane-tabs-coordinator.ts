@@ -71,7 +71,11 @@ export interface WorkspacePaneTargetProjectionProvider {
     userId: string,
     workspaceId: WorkspaceId,
     scope: string,
-    purpose?: 'projection' | 'git-capability-promotion',
+  ): Promise<readonly WorkspacePaneTargetProjection[]>
+  captureGitMembershipTargets(
+    userId: string,
+    workspaceId: WorkspaceId,
+    scope: string,
   ): Promise<readonly WorkspacePaneTargetProjection[]>
 }
 
@@ -437,11 +441,10 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
     const scope = aggregateScope(input.userId, input.workspaceId, input.scope)
     assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
     return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) => {
-      const targets = await this.targetProjection.captureTargets(
+      const targets = await this.targetProjection.captureGitMembershipTargets(
         input.userId,
         input.workspaceId,
         input.scope,
-        'git-capability-promotion',
       )
       if (
         !targets.some(

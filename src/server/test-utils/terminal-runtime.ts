@@ -271,6 +271,7 @@ const testWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
 export async function buildRuntime(
   options: {
     captureTargets?: WorkspacePaneTargetProjectionProvider['captureTargets']
+    captureGitMembershipTargets?: WorkspacePaneTargetProjectionProvider['captureGitMembershipTargets']
   } = {},
 ): Promise<RuntimeHandle> {
   const runtime = createServerTerminalRuntime({
@@ -278,6 +279,7 @@ export async function buildRuntime(
     workspacePaneLayoutRepository: testWorkspacePaneLayoutRepository,
     workspacePaneTargetProjection: {
       captureTargets: options.captureTargets ?? captureTestWorkspacePaneTargets,
+      captureGitMembershipTargets: options.captureGitMembershipTargets ?? captureTestWorkspacePaneTargets,
     },
   })
   WORKSPACE_RUNTIME_ID = acquireWorkspaceRuntime(USER_1, REPO_ROOT, 'client_a')
