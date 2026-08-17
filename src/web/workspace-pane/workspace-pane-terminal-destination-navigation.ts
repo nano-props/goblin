@@ -8,7 +8,7 @@ import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/w
 import { appNavigationIsCurrent, beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
 import {
   tryRunWorkspacePaneAction,
-  workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromFilesystemTarget,
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
@@ -32,12 +32,7 @@ export function commitWorkspacePaneTerminalDestination(input: {
       navigation: input.navigation,
       target,
       paneTarget,
-      actionTarget: workspacePaneActionTargetFromCoordinates({
-        workspaceId: coordinates.workspaceId,
-        workspaceRuntimeId: coordinates.workspaceRuntimeId,
-        branchName: null,
-        worktreePath: null,
-      }),
+      actionTarget: workspacePaneActionTargetFromFilesystemTarget(input.base.target),
       terminalSessionId: input.terminalSessionId,
     })
   }
@@ -47,12 +42,7 @@ export function commitWorkspacePaneTerminalDestination(input: {
     navigation: input.navigation,
     target: gitWorktreePaneTargetLease(coordinates.workspaceId, coordinates.workspaceRuntimeId, worktreePath),
     paneTarget,
-    actionTarget: workspacePaneActionTargetFromCoordinates({
-      workspaceId: coordinates.workspaceId,
-      workspaceRuntimeId: coordinates.workspaceRuntimeId,
-      branchName: null,
-      worktreePath,
-    }),
+    actionTarget: workspacePaneActionTargetFromFilesystemTarget(input.base.target),
     terminalSessionId: input.terminalSessionId,
   })
 }
@@ -75,7 +65,7 @@ async function commitFilesystemTerminalDestination(input: {
   navigation: AppNavigationActions
   target: FilesystemWorkspacePaneTargetLease
   paneTarget: NonNullable<ReturnType<typeof workspacePaneTabsTargetFromRuntime>>
-  actionTarget: ReturnType<typeof workspacePaneActionTargetFromCoordinates>
+  actionTarget: WorkspacePaneActionTarget
   terminalSessionId: string
 }): Promise<WorkspacePaneActionOutcome> {
   return await commitQueuedTerminalDestination(input.actionTarget, async () => {

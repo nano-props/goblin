@@ -3,6 +3,7 @@ import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/sha
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   orderWorkspacePaneItemsByTabEntries,
+  workspacePaneTabsWithSurfaceOrder,
   workspacePaneTabsWithoutStaticTab,
   workspacePaneTabsWithDraggedOrder,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
@@ -36,6 +37,23 @@ describe('workspacePaneTabsWithDraggedOrder', () => {
       terminalOne,
       history,
     ])
+  })
+})
+
+describe('workspacePaneTabsWithSurfaceOrder', () => {
+  test('reorders surface entries in their canonical slots without moving hidden entries', () => {
+    const status = staticEntry('status')
+    const changes = staticEntry('changes')
+    const files = staticEntry('files')
+    const history = staticEntry('history')
+    const terminal = terminalEntry('term-111111111111111111111')
+
+    expect(
+      workspacePaneTabsWithSurfaceOrder(
+        [status, changes, files, history, terminal],
+        [files, status, terminal],
+      ),
+    ).toEqual([files, changes, status, history, terminal])
   })
 })
 

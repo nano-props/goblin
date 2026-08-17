@@ -11,7 +11,7 @@ import type {
   BranchSnapshotInfo,
   GitOperation,
   RepoRemoteInfo,
-  RepoWorktreeSnapshot,
+  WorkspaceRepoWorktreeSnapshot,
   WorktreeInfo,
 } from '#/shared/git-types.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
@@ -25,7 +25,7 @@ export interface RemoteRepoBaseSnapshot {
 }
 
 export interface RemoteRepoSnapshot extends RemoteRepoBaseSnapshot {
-  worktrees: RepoWorktreeSnapshot[]
+  worktrees: WorkspaceRepoWorktreeSnapshot[]
 }
 
 export interface RemoteGitWorktreeState {

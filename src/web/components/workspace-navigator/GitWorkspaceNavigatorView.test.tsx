@@ -15,7 +15,7 @@ import { flushTestUpdates, renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { GitWorkspaceNavigatorView } from '#/web/components/workspace-navigator/GitWorkspaceNavigatorView.tsx'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
-import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
+import type { WorkspaceRepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { appNavigationActionsForTest } from '#/web/test-utils/app-navigation.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
@@ -160,6 +160,7 @@ describe('GitWorkspaceNavigatorView', () => {
             headOid: '0123456789abcdef0123456789abcdef01234567',
             operation: { kind },
             materializedBranch: branch.name,
+            isSource: false,
             isPrimary: false,
             isLocked: false,
           },
@@ -223,6 +224,7 @@ describe('GitWorkspaceNavigatorView', () => {
           headOid: '0123456789abcdef0123456789abcdef01234567',
           operation: null,
           materializedBranch: null,
+          isSource: false,
           isPrimary: false,
           isLocked: false,
         },
@@ -234,11 +236,13 @@ describe('GitWorkspaceNavigatorView', () => {
 
     expect(mocks.dispatchShowWorkspacePaneTargetStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
-        paneTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
-        worktreeHead: { kind: 'detached' },
+        location: expect.objectContaining({
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+          paneTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+          worktreeHead: { kind: 'detached' },
+        }),
         type: 'status',
         workspacePaneRoute: undefined,
       }),
@@ -248,12 +252,13 @@ describe('GitWorkspaceNavigatorView', () => {
   })
 
   test('opens detached worktree tabs from the target action menu', async () => {
-    const worktree: RepoWorktreeSnapshot = {
+    const worktree: WorkspaceRepoWorktreeSnapshot = {
       path: WORKTREE_PATH,
       head: { kind: 'detached' },
       headOid: '0123456789abcdef0123456789abcdef01234567',
       operation: null,
       materializedBranch: null,
+      isSource: false,
       isPrimary: false,
       isLocked: false,
     }
@@ -274,11 +279,13 @@ describe('GitWorkspaceNavigatorView', () => {
     expect(mocks.dispatchShowWorkspacePaneTargetStaticTabAction).toHaveBeenCalledOnce()
     expect(mocks.dispatchShowWorkspacePaneTargetStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
-        workspaceId: REPO_ID,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
-        paneTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
-        worktreeHead: { kind: 'detached' },
+        location: expect.objectContaining({
+          workspaceId: REPO_ID,
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+          routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+          paneTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+          worktreeHead: { kind: 'detached' },
+        }),
         type: 'changes',
         workspacePaneRoute: undefined,
       }),
@@ -436,7 +443,6 @@ describe('GitWorkspaceNavigatorView', () => {
     expect(screen.queryByRole('status')).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
   })
-
 })
 
 function renderGitWorkspaceNavigatorView() {

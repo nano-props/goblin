@@ -13,8 +13,11 @@ import {
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/workspaces/workspace-pane-preferences.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
-import type { WorkspacePaneModelTarget } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import {
+  workspacePaneTabModelRouteTarget,
+  type WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { useSyncWorkspacePaneRuntimeTabSelection } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import {
   reconcileWorkspacePaneRoute,
@@ -75,7 +78,7 @@ function useWorkspacePaneNavigationHistory({
     return toValue(enabled) && historyRoute.kind === 'record'
       ? workspacePaneHistoryRouteContext({
           workspaceId: toValue(workspaceId),
-          routeTarget: currentModel.routeTarget,
+          routeTarget: workspacePaneTabModelRouteTarget(currentModel),
           route: historyRoute.route,
         })
       : null
@@ -91,13 +94,13 @@ function workspacePaneHistoryRouteContext({
   route,
 }: {
   workspaceId: WorkspaceId
-  routeTarget: WorkspacePaneModelTarget
+  routeTarget: WorkspacePaneTabsTarget | null
   route: WorkspacePaneRouteTarget
 }): WorkspaceNavigationRouteContext | null {
-  if (routeTarget.kind === 'git-worktree') {
+  if (routeTarget?.kind === 'git-worktree') {
     return { kind: 'worktree', workspaceId, worktreePath: routeTarget.worktreePath, workspacePaneRoute: route }
   }
-  if (routeTarget.kind === 'git-branch') {
+  if (routeTarget?.kind === 'git-branch') {
     if (route?.kind === 'terminal') throw new Error('branch history cannot record runtime tabs')
     const branchRoute: BranchWorkspacePaneRouteTarget = route
     return {

@@ -1,12 +1,14 @@
 import { defineComponent } from 'vue'
-import { gitHead } from '#/shared/git-head.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type {
   CurrentGitWorkspacePanePresentation,
   GitWorkspacePaneProjection,
 } from '#/web/components/repo-workspace/model.ts'
 import { WorkspacePaneTargetToolbar } from '#/web/components/workspace-pane/WorkspacePaneTargetToolbar.tsx'
-import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import {
+  workspacePaneFilesystemTargetForLocation,
+  workspacePaneLocationForWorktree,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 import type { WorkspacePaneSurfaceTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
   WorkspaceToolbar,
@@ -53,13 +55,10 @@ export const GitWorkspacePaneToolbar = defineComponent<GitWorkspacePaneToolbarPr
       }
       if (props.repo.probe.status !== 'ready') return null
       const target: WorkspacePaneSurfaceTarget = props.detail.worktree
-        ? gitWorktreePaneFilesystemTarget({
-            workspaceId: props.repo.id,
-            workspaceRuntimeId: props.repo.workspaceRuntimeId,
-            head: gitHead(branch.name),
-            worktreePath: props.detail.worktree.path,
-            capabilities: props.repo.probe.capabilities,
-          })
+        ? workspacePaneFilesystemTargetForLocation(
+            workspacePaneLocationForWorktree(props.repo.id, props.repo.workspaceRuntimeId, props.detail.worktree),
+            props.repo.probe.capabilities,
+          )
         : {
             kind: 'git-branch',
             workspaceId: props.repo.id,

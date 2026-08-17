@@ -8,10 +8,25 @@ import {
   workspacePaneTabsTargetFromRestorable,
   workspacePaneTabsTargetFromRuntime,
   workspacePaneTabsTargetIdentityKey,
+  workspacePaneTabsLayoutTargetForWorktree,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 describe('restorable workspace pane targets', () => {
+  it('derives source and linked worktree layout ownership from one domain rule', () => {
+    const routeTarget = {
+      kind: 'git-worktree' as const,
+      workspaceId: workspaceIdForTest('goblin+file:///repo'),
+      worktreePath: '/repo',
+    }
+
+    expect(workspacePaneTabsLayoutTargetForWorktree(routeTarget, true)).toEqual({
+      kind: 'workspace-root',
+      workspaceId: routeTarget.workspaceId,
+    })
+    expect(workspacePaneTabsLayoutTargetForWorktree(routeTarget, false)).toBe(routeTarget)
+  })
+
   it('does not duplicate workspace identity or runtime identity in persisted keys', () => {
     expect(restorableWorkspacePaneTargetKey({ kind: 'workspace-root' })).toBe('workspace-root')
     expect(restorableWorkspacePaneTargetKey({ kind: 'git-branch', branch: 'feature/a' })).toBe('git-branch\0feature/a')

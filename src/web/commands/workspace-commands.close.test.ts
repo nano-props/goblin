@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 
 import {
+  workspacePaneLocationForBranchTarget,
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
+import {
   seedRepoQueryDataForTest,
   seedRepoWithReadModelForTest,
   createBranchSnapshot,
@@ -138,10 +143,11 @@ describe('workspace commands close', () => {
   test('abandons close presentation and propagates an unexpected command failure', async () => {
     const unexpected = new Error('simulated command coordinate failure')
     const target: WorkspacePaneCommandTarget = {
-      routeTarget: { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/failure' },
-      workspaceRuntimeId: 'repo-runtime-failure',
-      workspacePaneRoute: undefined,
-      get filesystemTarget(): null {
+      location: workspacePaneLocationForBranchTarget(
+        { kind: 'git-branch', workspaceId: REPO_ID, branchName: 'feature/failure' },
+        'repo-runtime-failure',
+      ),
+      get workspacePaneRoute(): undefined {
         throw unexpected
       },
     }
@@ -265,7 +271,7 @@ describe('workspace commands close', () => {
     expect(
       await runConfirmCloseTerminalWorkspacePaneTabCommand({
         workspacePaneRoute: payload.workspacePaneRoute,
-        routeTarget: payload.routeTarget,
+        location: payload.location,
         workspaceId: payload.workspaceId,
         currentWorkspacePaneRoute: { kind: 'static', tab: 'status' },
         navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),

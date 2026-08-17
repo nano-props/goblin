@@ -2,7 +2,6 @@ import { RefreshCw } from '@lucide/vue'
 import { useIsFetching } from '@tanstack/vue-query'
 import { computed, defineComponent, onMounted, onScopeDispose, shallowRef } from 'vue'
 import type { FunctionalComponent, PropType } from 'vue'
-import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
@@ -43,9 +42,10 @@ import {
   workspacePaneTabItems,
 } from '#/web/components/workspace-pane/workspace-pane-tab-items.ts'
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import type {
-  WorkspacePaneModelTarget,
-  WorkspacePaneTabModel,
+import {
+  requiredWorkspacePaneTabModelLocation,
+  workspacePaneTabModelBranchName,
+  type WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
@@ -60,7 +60,6 @@ interface WorkspacePaneTargetToolbarProps {
   statusCount: number | undefined
   trafficLightOffset?: boolean
   onBackToNavigator?: () => void
-  staticTabAvailable?: Parameters<typeof workspacePaneTabItems>[0]['staticTabAvailable']
 }
 
 type WorkspacePaneFilesystemTargetToolbarProps = Omit<WorkspacePaneTargetToolbarProps, 'target'> & {
@@ -82,7 +81,6 @@ WorkspacePaneTargetToolbar.props = [
   'statusCount',
   'trafficLightOffset',
   'onBackToNavigator',
-  'staticTabAvailable',
 ]
 
 const WorkspacePaneFilesystemTargetToolbar = defineComponent<WorkspacePaneFilesystemTargetToolbarProps>({
@@ -95,7 +93,6 @@ const WorkspacePaneFilesystemTargetToolbar = defineComponent<WorkspacePaneFilesy
     'statusCount',
     'trafficLightOffset',
     'onBackToNavigator',
-    'staticTabAvailable',
   ],
 
   setup(props) {
@@ -118,7 +115,6 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
     'statusCount',
     'trafficLightOffset',
     'onBackToNavigator',
-    'staticTabAvailable',
     'externalAppItems',
   ],
 
@@ -134,12 +130,10 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       })),
     )
     const { scrollToBottom } = useTerminalSessionContext()
-    const routeTarget = computed(() => requiredWorkspacePaneModelTarget(props.model.routeTarget, 'route'))
-    const persistenceTarget = computed(() => requiredWorkspacePaneModelTarget(props.model.paneTarget, 'persistence'))
+    const persistenceTarget = computed(() => requiredWorkspacePaneTabModelLocation(props.model).paneTarget)
     const commandTarget = computed(() =>
-      workspacePaneCommandTargetForSurface(routeTarget.value, props.target, props.workspacePaneRoute),
+      workspacePaneCommandTargetForSurface(props.model.location, props.target, props.workspacePaneRoute),
     )
-    const worktreeHead = computed(() => (props.target.kind === 'git-worktree' ? props.target.head : undefined))
     // Scroll memory is local to one runtime epoch. A reopened workspace can
     // reuse the same durable target identity with a different tab projection.
     const targetKey = computed(
@@ -150,31 +144,16 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       type: WorkspacePaneRuntimeTabType,
       sessionId: string,
       presentation: TerminalPresentation,
-      runtimeTarget: RuntimeWorkspacePaneTarget,
       routeRequest: CreatedTerminalRouteRequest,
     ): boolean | Promise<boolean> => {
       if (type !== 'terminal' || props.target.kind === 'git-branch') return false
-      if (runtimeTarget.kind === 'workspace-root' && presentation.kind === 'workspace-root') {
-        return showCreatedTerminalWorkspacePaneRuntimeTab(
-          { target: runtimeTarget, presentation },
-          sessionId,
-          navigation,
-          routeRequest,
-        )
-      }
-      if (runtimeTarget.kind === 'git-worktree' && presentation.kind === 'git-worktree') {
-        return showCreatedTerminalWorkspacePaneRuntimeTab(
-          { target: runtimeTarget, presentation },
-          sessionId,
-          navigation,
-          routeRequest,
-        )
-      }
-      return false
+      const location = props.model.location
+      if (!location || location.kind === 'branch') return false
+      return showCreatedTerminalWorkspacePaneRuntimeTab(location, presentation, sessionId, navigation, routeRequest)
     }
 
     const runtimeTabCreateAction = useWorkspacePaneRuntimeTabCreateAction({
-      base: () => (props.target.kind === 'git-branch' ? null : workspacePaneFilesystemTerminalBase(props.target)),
+      location: () => (props.model.location?.kind === 'branch' ? null : props.model.location),
       runtimeTabStateByType: () => props.model.runtimeTabStateByType,
       workspacePaneRoute: () => props.workspacePaneRoute,
       showCreatedRuntimeTab,
@@ -184,10 +163,9 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       workspacePaneTabItems({
         model: props.model,
         workspacePaneId: props.workspacePaneId,
-        branchName: props.model.branchName,
+        branchName: workspacePaneTabModelBranchName(props.model),
         statusCount: props.statusCount,
         t,
-        staticTabAvailable: props.staticTabAvailable,
       }),
     )
     const dragPreviewOwner = shallowRef<WorkspacePaneTabDragPreviewOwner | null>(null)
@@ -214,9 +192,7 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
       void dispatchSelectWorkspacePaneTabByIdentityAction({
         workspaceId: props.target.workspaceId,
         workspaceRuntimeId: props.target.workspaceRuntimeId,
-        routeTarget: routeTarget.value,
-        paneTarget: persistenceTarget.value,
-        worktreeHead: worktreeHead.value,
+        location: props.model.location!,
         workspacePaneRoute: props.workspacePaneRoute,
         identity: item.identity,
         navigation,
@@ -364,42 +340,33 @@ function tabsMutationInput(
   }
 }
 
-function requiredWorkspacePaneModelTarget(
-  target: WorkspacePaneModelTarget,
-  role: 'route' | 'persistence',
-): WorkspacePaneTabsTarget {
-  if (target.kind === 'inactive') throw new Error(`inactive workspace pane has no ${role} target`)
-  return target
-}
-
 function workspacePaneCommandTargetForSurface(
-  target: WorkspacePaneTabsTarget,
+  location: WorkspacePaneTabModel['location'],
   surface: WorkspacePaneSurfaceTarget,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ): WorkspacePaneCommandTarget {
-  if (target.kind === 'workspace-root') {
+  if (!location) throw new Error('inactive workspace pane has no command target')
+  if (location.kind === 'workspace-root' || location.kind === 'source-worktree') {
     if (surface.kind !== 'workspace-root') throw new Error('workspace-root route requires a workspace-root surface')
-    if (surface.workspaceId !== target.workspaceId) {
+    if (surface.workspaceId !== location.workspaceId) {
       throw new Error('workspace-root route requires its canonical workspace surface')
     }
-    return { workspacePaneRoute, filesystemTarget: surface }
+    return { location, workspacePaneRoute, capabilities: surface.capabilities }
   }
-  if (target.kind === 'git-worktree') {
+  if (location.kind === 'linked-worktree') {
     if (surface.kind !== 'git-worktree') throw new Error('git-worktree route requires a git-worktree surface')
     const surfaceTarget = workspacePaneTabsTargetForFilesystemTarget(surface)
-    if (surfaceTarget.workspaceId !== target.workspaceId || surfaceTarget.worktreePath !== target.worktreePath) {
+    if (
+      surfaceTarget.workspaceId !== location.workspaceId ||
+      surfaceTarget.worktreePath !== location.routeTarget.worktreePath
+    ) {
       throw new Error('git-worktree route requires its canonical worktree surface')
     }
-    return { workspacePaneRoute, filesystemTarget: surface }
+    return { location, workspacePaneRoute, capabilities: surface.capabilities }
   }
   if (surface.kind !== 'git-branch') throw new Error('git-branch route requires a git-branch surface')
   if (workspacePaneRoute?.kind === 'terminal') throw new Error('git-branch route cannot present a runtime tab')
-  return {
-    workspaceRuntimeId: surface.workspaceRuntimeId,
-    routeTarget: target,
-    workspacePaneRoute,
-    filesystemTarget: null,
-  }
+  return { location, workspacePaneRoute }
 }
 
 function displayedSelectionIdentity(model: WorkspacePaneTabModel): string | null {

@@ -1,6 +1,5 @@
 import { defineComponent } from 'vue'
 import type { VNodeChild } from 'vue'
-import type { WorkspacePaneFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
 import type { TerminalPresentation, TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
@@ -15,6 +14,10 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 import { useTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
+import {
+  workspacePaneLocationTerminalBase,
+  type FilesystemWorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export interface WorkspacePaneRuntimeTabPanelState {
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
@@ -22,8 +25,7 @@ export interface WorkspacePaneRuntimeTabPanelState {
 }
 
 export interface WorkspacePaneRuntimeTabPanelTarget {
-  runtimeTarget: WorkspacePaneFilesystemExecutionTarget
-  presentation: TerminalPresentation
+  location: FilesystemWorkspacePaneLocation
 }
 
 export interface WorkspacePaneRuntimeTabPanelRenderInput {
@@ -51,13 +53,14 @@ const TerminalWorkspacePaneRuntimeTabPanel = defineComponent<WorkspacePaneRuntim
 
     const createTerminalForSlot = async (base: TerminalSessionBase) => {
       await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        base,
+        location: props.target.location,
         createTerminal: createTerminalWithAdmission,
         openerIdentity: null,
         showCreatedTerminalTab: (terminalSessionId, presentation, routeRequest) => {
           if (base.target.kind === 'workspace-root' && presentation.kind === 'workspace-root') {
             return showCreatedTerminalWorkspacePaneRuntimeTab(
-              { target: base.target, presentation },
+              props.target.location,
+              presentation,
               terminalSessionId,
               navigation,
               routeRequest,
@@ -65,7 +68,8 @@ const TerminalWorkspacePaneRuntimeTabPanel = defineComponent<WorkspacePaneRuntim
           }
           if (base.target.kind === 'git-worktree' && presentation.kind === 'git-worktree') {
             return showCreatedTerminalWorkspacePaneRuntimeTab(
-              { target: base.target, presentation },
+              props.target.location,
+              presentation,
               terminalSessionId,
               navigation,
               routeRequest,
@@ -80,14 +84,7 @@ const TerminalWorkspacePaneRuntimeTabPanel = defineComponent<WorkspacePaneRuntim
     }
 
     return () => {
-      const { runtimeTarget, presentation } = props.target
-      if (runtimeTarget.kind !== presentation.kind) return null
-      const base: TerminalSessionBase | null =
-        runtimeTarget.kind === 'workspace-root' && presentation.kind === 'workspace-root'
-          ? { target: runtimeTarget, presentation }
-          : runtimeTarget.kind === 'git-worktree' && presentation.kind === 'git-worktree'
-            ? { target: runtimeTarget, presentation }
-            : null
+      const base = workspacePaneLocationTerminalBase(props.target.location)
       if (!base) return null
       return (
         <WorkspacePanePanelFrame id={`${props.workspacePaneId}-terminal-panel`} {...props.panelLabel}>

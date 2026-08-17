@@ -1,21 +1,21 @@
-import { getWorkspacePaneTargetIdentities } from '#/server/repos/read-paths.ts'
+import { getWorkspacePaneTargetMembership } from '#/server/repos/read-paths.ts'
 import { workspaceRuntimeHasGitCapability } from '#/server/workspaces/runtime/authority.ts'
 import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspacePaneTargetIdentity } from '#/shared/git-types.ts'
+import type { WorkspacePaneTargetMembership } from '#/shared/git-types.ts'
 
 interface WorkspacePaneTargetCatalogDependencies {
   hasGitCapability(userId: string, workspaceId: WorkspaceId, workspaceRuntimeId: string): boolean
-  readIdentities(
+  readMembership(
     workspaceId: WorkspaceId,
     options: { workspaceRuntimeId: string },
-  ): Promise<readonly WorkspacePaneTargetIdentity[]>
+  ): Promise<WorkspacePaneTargetMembership>
 }
 
 const defaultDependencies: WorkspacePaneTargetCatalogDependencies = {
   hasGitCapability: workspaceRuntimeHasGitCapability,
-  readIdentities: getWorkspacePaneTargetIdentities,
+  readMembership: getWorkspacePaneTargetMembership,
 }
 
 export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjectionProvider {
@@ -38,30 +38,27 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
       nativeWorktreePath: workspace.path,
     }
     if (!this.dependencies.hasGitCapability(userId, workspaceId, workspaceRuntimeId)) return [workspaceTarget]
-    const identities = await this.dependencies.readIdentities(workspaceId, { workspaceRuntimeId })
+    const membership = await this.dependencies.readMembership(workspaceId, { workspaceRuntimeId })
     return [
       workspaceTarget,
-      ...identities.map((identity): WorkspacePaneTargetProjection =>
-        identity.kind === 'git-worktree'
-          ? {
-              target: {
-                kind: 'git-worktree',
-                workspaceId,
-                workspaceRuntimeId,
-                root: workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
-              },
-              nativeWorktreePath: identity.worktreePath,
-            }
-          : {
-              target: {
-                kind: 'git-branch',
-                workspaceId,
-                workspaceRuntimeId,
-                branch: identity.branchName,
-              },
-              nativeWorktreePath: null,
-            },
-      ),
+      ...membership.linkedWorktrees.map((identity): WorkspacePaneTargetProjection => ({
+        target: {
+          kind: 'git-worktree',
+          workspaceId,
+          workspaceRuntimeId,
+          root: workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
+        },
+        nativeWorktreePath: identity.worktreePath,
+      })),
+      ...membership.branches.map((identity): WorkspacePaneTargetProjection => ({
+        target: {
+          kind: 'git-branch',
+          workspaceId,
+          workspaceRuntimeId,
+          branch: identity.branchName,
+        },
+        nativeWorktreePath: null,
+      })),
     ]
   }
 }

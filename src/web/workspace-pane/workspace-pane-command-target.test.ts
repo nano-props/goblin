@@ -1,3 +1,4 @@
+import { workspacePaneLocationForLinkedWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
@@ -39,8 +40,17 @@ beforeEach(() => {
 describe('workspace pane command target', () => {
   test('derives the worktree branch presentation from its single Git head authority', () => {
     const target: WorkspacePaneCommandTarget = {
+      location: workspacePaneLocationForLinkedWorktree(
+        {
+          kind: 'git-worktree',
+          workspaceId: filesystemTarget.workspaceId,
+          worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
+        },
+        filesystemTarget.workspaceRuntimeId,
+        filesystemTarget.head,
+      ),
       workspacePaneRoute: null,
-      filesystemTarget,
+      capabilities: filesystemTarget.capabilities,
     }
 
     expect(workspacePaneCommandCoordinates(target).branchName).toBe('feature/example')
@@ -53,18 +63,60 @@ describe('workspace pane command target', () => {
 
   test('derives a detached presentation without a parallel nullable branch field', () => {
     const target: WorkspacePaneCommandTarget = {
+      location: workspacePaneLocationForLinkedWorktree(
+        {
+          kind: 'git-worktree',
+          workspaceId: filesystemTarget.workspaceId,
+          worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
+        },
+        filesystemTarget.workspaceRuntimeId,
+        { kind: 'detached' },
+      ),
       workspacePaneRoute: null,
-      filesystemTarget: { ...filesystemTarget, head: { kind: 'detached' } },
+      capabilities: filesystemTarget.capabilities,
     }
 
     expect(workspacePaneCommandCoordinates(target).branchName).toBeNull()
   })
 
+  test('rejects Git worktree coordinates when Git capability is unavailable', () => {
+    const target: WorkspacePaneCommandTarget = {
+      location: workspacePaneLocationForLinkedWorktree(
+        {
+          kind: 'git-worktree',
+          workspaceId: filesystemTarget.workspaceId,
+          worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
+        },
+        filesystemTarget.workspaceRuntimeId,
+        filesystemTarget.head,
+      ),
+      workspacePaneRoute: null,
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+    }
+
+    expect(() => workspacePaneCommandCoordinates(target)).toThrow(
+      'Git worktree command target requires Git capabilities',
+    )
+  })
+
   test('does not admit a contradictory worktree branch field', () => {
     const target: WorkspacePaneCommandTarget = {
+      location: workspacePaneLocationForLinkedWorktree(
+        {
+          kind: 'git-worktree',
+          workspaceId: filesystemTarget.workspaceId,
+          worktreePath: workspacePaneFilesystemRootPath(filesystemTarget),
+        },
+        filesystemTarget.workspaceRuntimeId,
+        filesystemTarget.head,
+      ),
       workspacePaneRoute: null,
-      filesystemTarget,
-      // @ts-expect-error A worktree branch is derived exclusively from filesystemTarget.head.
+      capabilities: filesystemTarget.capabilities,
+      // @ts-expect-error A worktree branch is derived exclusively from location.
       branchName: 'feature/conflicting',
     }
 
@@ -152,9 +204,10 @@ describe('workspace pane command target', () => {
       workspace,
       queryClient: appQueryClient,
     })
-    expect(branchTarget).toEqual({
+    if (!branchTarget) throw new Error('expected branch command target')
+    expect(workspacePaneCommandCoordinates(branchTarget)).toEqual({
       routeTarget: { kind: 'git-branch', workspaceId: workspace.id, branchName: 'feature/example' },
-      workspaceRuntimeId: workspace.workspaceRuntimeId,
+      branchName: 'feature/example',
       workspacePaneRoute: null,
       filesystemTarget: null,
     })
@@ -172,6 +225,7 @@ describe('workspace pane command target', () => {
           headOid: '1111111111111111111111111111111111111111',
           operation: null,
           materializedBranch: 'feature/status',
+          isSource: false,
           isPrimary: false,
           isLocked: false,
         },
@@ -192,14 +246,12 @@ describe('workspace pane command target', () => {
     expect(successfulWorktreeTarget).toEqual(
       expect.objectContaining({
         workspacePaneRoute: { kind: 'static', tab: 'changes' },
-        filesystemTarget: expect.objectContaining({
-          kind: 'git-worktree',
-          head: { kind: 'branch', branchName: 'feature/status' },
-        }),
       }),
     )
-    if (!successfulWorktreeTarget?.filesystemTarget) throw new Error('Missing worktree filesystem target')
-    expect(workspacePaneFilesystemRootPath(successfulWorktreeTarget.filesystemTarget)).toBe(worktreePath)
+    if (!successfulWorktreeTarget) throw new Error('Missing worktree command target')
+    const derivedFilesystemTarget = workspacePaneCommandCoordinates(successfulWorktreeTarget).filesystemTarget
+    if (!derivedFilesystemTarget) throw new Error('Missing derived filesystem target')
+    expect(workspacePaneFilesystemRootPath(derivedFilesystemTarget)).toBe(worktreePath)
 
     expect(
       workspacePaneCommandTargetFromQueryCache({

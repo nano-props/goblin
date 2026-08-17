@@ -347,7 +347,8 @@ function scriptForCommand(command: RemoteCommandKind): string {
         'else',
         `  root=$(git -C ${repo} rev-parse --show-toplevel) || exit $?`,
         'fi',
-        `cd "$root" && pwd -P`,
+        `cd "$root" || exit $?`,
+        `printf '%s\\0' "$PWD"`,
       ].join('\n')
     }
     case 'resolvePhysicalWorktreeIdentity':

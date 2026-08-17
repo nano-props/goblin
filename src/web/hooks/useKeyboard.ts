@@ -44,6 +44,7 @@ import {
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import { workspacePaneLocationForWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { workspaceCanExecute } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   gitWorkspaceNavigatorRowMatchesIdentity,
@@ -148,10 +149,10 @@ function moveGitWorkspaceNavigatorSelection(
     navigation.selectRepoBranch(
       gitBranchPaneTargetLease(input.repo.id, input.repo.workspaceRuntimeId, next.branch.name),
     )
-  } else
-    navigation.selectRepoWorktree(
-      gitWorktreePaneTargetLease(input.repo.id, input.repo.workspaceRuntimeId, next.worktree.path),
-    )
+  } else {
+    const context = workspacePaneLocationForWorktree(input.repo.id, input.repo.workspaceRuntimeId, next.worktree)
+    navigation.selectRepoWorktree({ routeTarget: context.routeTarget, workspaceRuntimeId: context.workspaceRuntimeId })
+  }
   return true
 }
 

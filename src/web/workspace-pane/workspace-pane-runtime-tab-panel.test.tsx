@@ -25,6 +25,7 @@ import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspa
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { defineComponent } from 'vue'
+import { workspacePaneLocationForLinkedWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { provideTerminalProjectionRecoveryActions } from '#/web/runtime/terminal-projection-recovery-context.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
@@ -183,12 +184,9 @@ describe('workspace pane runtime tab panel', () => {
     )
     expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
-
 })
 
-function renderPanel(
-  input: { terminalContext?: TerminalSessionContextValue; projectionPhase?: 'failed' } = {},
-) {
+function renderPanel(input: { terminalContext?: TerminalSessionContextValue; projectionPhase?: 'failed' } = {}) {
   const navigation = navigationWith()
   const retryWorkspace = vi.fn()
   const result = renderInJsdom(
@@ -200,13 +198,15 @@ function renderPanel(
             workspacePaneId: 'workspace',
             panelLabel: { label: 'Terminal' },
             target: {
-              runtimeTarget: {
-                kind: 'git-worktree' as const,
-                workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
-                workspaceRuntimeId: 'repo-runtime-1',
-                root: canonicalWorkspaceLocator('goblin+file:///repo-worktree')!,
-              },
-              presentation: { kind: 'git-worktree' as const },
+              location: workspacePaneLocationForLinkedWorktree(
+                {
+                  kind: 'git-worktree',
+                  workspaceId: canonicalWorkspaceLocator('goblin+file:///repo')!,
+                  worktreePath: '/repo-worktree',
+                },
+                'repo-runtime-1',
+                { kind: 'detached' },
+              ),
             },
             selectedSessionId: 'term-111111111111111111111',
             runtimeState: {

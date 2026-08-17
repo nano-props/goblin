@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
 
+import {
+  workspacePaneLocationForBranchTarget,
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { AcceptedTerminalRetirement } from '#/web/terminal/components/TerminalSessionProjection.ts'
@@ -42,20 +47,13 @@ describe('terminal retirement workspace pane presentation', () => {
   test('routes an accepted current-workspace exit into the presentation command and unsubscribes', async () => {
     const navigation = appNavigationActionsForTest()
     const target = {
-      routeTarget: {
-        kind: 'workspace-root' as const,
-        workspaceId: WORKSPACE_ID,
-      },
+      location: workspacePaneLocationForRoot(WORKSPACE_ID, 'workspace_runtime_terminal_exit'),
       workspacePaneRoute: { kind: 'terminal' as const, terminalSessionId: 'term-111111111111111111111' },
-      filesystemTarget: workspaceRootPaneFilesystemTarget({
-        workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: 'workspace_runtime_terminal_exit',
-        capabilities: {
-          files: { read: true, write: true },
-          terminal: { available: true },
-          git: { status: 'unavailable' },
-        },
-      }),
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      } as const,
     }
     const { unmount } = renderComposableInJsdom(() =>
       useTerminalRetirementWorkspacePanePresentation({

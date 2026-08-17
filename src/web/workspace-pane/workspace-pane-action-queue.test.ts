@@ -5,7 +5,8 @@ import {
   tryRunWorkspacePaneAction,
   workspacePaneActionTargetKey,
   workspacePaneActionTargetFromFilesystemTarget,
-  workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromLocation,
+  workspacePaneActionTargetFromPaneTarget,
   workspacePaneActionQueueStatsForTest,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
@@ -88,13 +89,25 @@ describe('workspace pane action queue', () => {
 
   test('identifies a detached worktree by its filesystem path instead of workspace-root scope', () => {
     expect(
-      workspacePaneActionTargetFromCoordinates({
-        workspaceId: TARGET.workspaceId,
-        workspaceRuntimeId: TARGET.workspaceRuntimeId,
-        branchName: null,
-        worktreePath: TARGET.worktreePath,
-      }),
+      workspacePaneActionTargetFromPaneTarget(
+        { kind: 'git-worktree', workspaceId: TARGET.workspaceId, worktreePath: TARGET.worktreePath },
+        TARGET.workspaceRuntimeId,
+      ),
     ).toEqual(TARGET)
+  })
+
+  test('coordinates a source worktree through its workspace-root pane owner', () => {
+    expect(
+      workspacePaneActionTargetFromLocation({
+        kind: 'source-worktree',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: 'runtime',
+        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/physical/repo' },
+        paneTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
+        worktreeHead: { kind: 'branch', branchName: 'main' },
+        branchName: 'main',
+      }),
+    ).toEqual({ kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime' })
   })
 
   test.each([
@@ -167,12 +180,10 @@ describe('workspace pane action queue', () => {
       worktreePath: '/repo-detached',
     })
     expect(
-      workspacePaneActionTargetFromCoordinates({
-        workspaceId: workspaceId,
-        workspaceRuntimeId: 'runtime',
-        branchName: null,
-        worktreePath: '/repo-detached',
-      }),
+      workspacePaneActionTargetFromPaneTarget(
+        { kind: 'git-worktree', workspaceId, worktreePath: '/repo-detached' },
+        'runtime',
+      ),
     ).toMatchObject({ kind: 'git-worktree', worktreePath: '/repo-detached' })
   })
 })

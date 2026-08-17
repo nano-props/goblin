@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest'
 import {
   createWorkspacePaneTabModel,
   materializedWorkspacePaneRuntimeTabSessionId,
+  workspacePaneTabModelBranchName,
+  workspacePaneTabModelWorktreePath,
   workspacePaneRuntimeMaterializationPhase,
   workspacePaneTerminalBaseForTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
@@ -20,16 +22,51 @@ import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { GitHead } from '#/shared/git-head.ts'
+import {
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+  workspacePaneLocationForWorktree,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 describe('repo workspace pane tab model', () => {
+  test('represents active and inactive coordinates without duplicate target state', () => {
+    const active = createWorkspacePaneTabModel({
+      location: workspacePaneLocationForRoot(WORKSPACE_ID, WORKSPACE_RUNTIME_ID),
+      preferredTab: 'status',
+      tabEntries: [staticEntry('status')],
+      runtimeTabViews: [],
+      runtimeTabStateByType: {},
+    })
+    const inactive = createWorkspacePaneTabModel({
+      location: null,
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      preferredTab: null,
+      tabEntries: [],
+      runtimeTabViews: [],
+      runtimeTabStateByType: {},
+    })
+
+    expect(active).toMatchObject({ kind: 'active', location: expect.objectContaining({ kind: 'workspace-root' }) })
+    expect(active).not.toHaveProperty('routeTarget')
+    expect(active).not.toHaveProperty('paneTarget')
+    expect(active).not.toHaveProperty('workspaceId')
+    expect(inactive).toMatchObject({
+      kind: 'inactive',
+      location: null,
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    })
+  })
+
   test('preserves the same target tabs when a worktree becomes detached', () => {
     const modelForHead = (worktreeHead: GitHead) =>
       createWorkspacePaneTabModel({
-        workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH },
-        paneTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH },
-        worktreeHead,
+        location: workspacePaneLocationForLinkedWorktree(
+          { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH },
+          WORKSPACE_RUNTIME_ID,
+          worktreeHead,
+        ),
         preferredTab: 'history',
         tabEntries: [staticEntry('status'), staticEntry('changes'), staticEntry('history'), staticEntry('files')],
         runtimeTabViews: [],
@@ -53,31 +90,92 @@ describe('repo workspace pane tab model', () => {
     })
   })
 
+  test('preserves the materialized branch while a rebase detaches HEAD', () => {
+    const location = workspacePaneLocationForWorktree(WORKSPACE_ID, WORKSPACE_RUNTIME_ID, {
+      path: WORKTREE_PATH,
+      head: { kind: 'detached' },
+      headOid: '1111111111111111111111111111111111111111',
+      operation: { kind: 'rebase' },
+      materializedBranch: 'feature/rebase',
+      isSource: false,
+      isPrimary: false,
+      isLocked: false,
+    })
+    const model = createWorkspacePaneTabModel({
+      location,
+      preferredTab: 'status',
+      tabEntries: [staticEntry('status')],
+      runtimeTabViews: [],
+      runtimeTabStateByType: {},
+    })
+
+    expect(workspacePaneTabModelBranchName(model)).toBe('feature/rebase')
+  })
+
   test('projects exactly the authoritative workspace tabs without resurrecting a closed tab', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
     const model = createWorkspacePaneTabModel({
-      workspaceId,
-      workspaceRuntimeId: 'repo-runtime-plain',
-      routeTarget: { kind: 'workspace-root', workspaceId },
-      paneTarget: { kind: 'workspace-root', workspaceId: workspaceId },
+      location: workspacePaneLocationForRoot(workspaceId, 'repo-runtime-plain'),
       preferredTab: 'files',
       tabEntries: [workspacePaneStaticTabEntry('files')],
       runtimeTabViews: [],
       runtimeTabStateByType: {},
     })
 
-    expect(model.worktreePath).toBe('/tmp/plain-workspace')
+    expect(workspacePaneTabModelWorktreePath(model)).toBe('/tmp/plain-workspace')
     expect(model.tabs.map((tab) => tab.type)).toEqual(['files'])
     expect(model.renderedTab).toBe('files')
+  })
+
+  test('projects one canonical root layout through each presentation surface', () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/source-surface-repo')
+    const canonicalEntries = [
+      staticEntry('status'),
+      staticEntry('changes'),
+      staticEntry('history'),
+      staticEntry('files'),
+    ]
+    const workspaceRuntimeId = 'source-surface-runtime'
+    const projection = {
+      tabEntries: canonicalEntries,
+      runtimeTabViews: [],
+      runtimeTabStateByType: {},
+    } as const
+    const root = createWorkspacePaneTabModel({
+      ...projection,
+      location: workspacePaneLocationForRoot(workspaceId, workspaceRuntimeId),
+      preferredTab: 'history',
+      allowPreferredTabFallback: false,
+    })
+    const source = createWorkspacePaneTabModel({
+      ...projection,
+      location: workspacePaneLocationForWorktree(workspaceId, workspaceRuntimeId, {
+        path: '/tmp/source-surface-repo',
+        head: { kind: 'branch', branchName: 'main' },
+        headOid: '1111111111111111111111111111111111111111',
+        operation: null,
+        materializedBranch: 'main',
+        isPrimary: true,
+        isSource: true,
+        isLocked: false,
+      }),
+      preferredTab: 'history',
+      allowPreferredTabFallback: false,
+    })
+
+    expect(root.tabEntries).toEqual(canonicalEntries)
+    expect(root.surfaceTabEntries.map((entry) => entry.type)).toEqual(['status', 'files'])
+    expect(root.tabs.map((tab) => tab.type)).toEqual(['status', 'files'])
+    expect(root.selection).toBeNull()
+    expect(source.tabEntries).toEqual(canonicalEntries)
+    expect(source.surfaceTabEntries).toEqual(canonicalEntries)
+    expect(source.renderedTab).toBe('history')
   })
 
   test('keeps distinct terminal identities and selects the workspace-scoped terminal projection', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
     const model = createWorkspacePaneTabModel({
-      workspaceId,
-      workspaceRuntimeId: 'repo-runtime-plain',
-      routeTarget: { kind: 'workspace-root', workspaceId },
-      paneTarget: { kind: 'workspace-root', workspaceId: workspaceId },
+      location: workspacePaneLocationForRoot(workspaceId, 'repo-runtime-plain'),
       preferredTab: 'terminal',
       tabEntries: [
         workspacePaneStaticTabEntry('files'),
@@ -105,10 +203,7 @@ describe('repo workspace pane tab model', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/plain-workspace')
     const terminalSessionId = 'term-111111111111111111111'
     const model = createWorkspacePaneTabModel({
-      workspaceId,
-      workspaceRuntimeId: 'repo-runtime-plain',
-      routeTarget: { kind: 'workspace-root', workspaceId },
-      paneTarget: { kind: 'workspace-root', workspaceId: workspaceId },
+      location: workspacePaneLocationForRoot(workspaceId, 'repo-runtime-plain'),
       preferredTab: 'terminal',
       allowPreferredTabFallback: false,
       tabEntries: [workspacePaneStaticTabEntry('files'), terminalEntry(terminalSessionId)],
@@ -369,11 +464,11 @@ describe('repo workspace pane tab model', () => {
 
   test('defaults runtime tab state by runtime type when no input state is provided', () => {
     const model = createWorkspacePaneTabModel({
-      workspaceId: WORKSPACE_ID,
-      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      routeTarget: requiredGitWorkspacePaneTabsTarget(WORKSPACE_ID, 'feature/model', WORKTREE_PATH),
-      paneTarget: requiredGitWorkspacePaneTabsTarget(WORKSPACE_ID, 'feature/model', WORKTREE_PATH),
-      worktreeHead: { kind: 'branch', branchName: 'feature/model' },
+      location: workspacePaneLocationForLinkedWorktree(
+        { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH },
+        WORKSPACE_RUNTIME_ID,
+        { kind: 'branch', branchName: 'feature/model' },
+      ),
       preferredTab: 'status',
       tabEntries: [staticEntry('status')],
       runtimeTabViews: [],

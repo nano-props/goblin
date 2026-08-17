@@ -32,6 +32,7 @@ import { repoOperationsQueryKey } from '#/web/repos/query-keys.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneLocationForBranchTarget } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-client-intent-handlers-repo')
 
@@ -239,12 +240,10 @@ function deps(currentWorkspaceId: WorkspaceId | null, currentBranchName = 'featu
     terminalBellWorkspace: currentWorkspace,
     currentWorkspacePaneCommandTarget: currentWorkspace
       ? {
-          routeTarget: {
-            kind: 'git-branch' as const,
-            workspaceId: currentWorkspace.id,
-            branchName: currentBranchName,
-          },
-          workspaceRuntimeId: currentWorkspace.workspaceRuntimeId,
+          location: workspacePaneLocationForBranchTarget(
+            { kind: 'git-branch', workspaceId: currentWorkspace.id, branchName: currentBranchName },
+            currentWorkspace.workspaceRuntimeId,
+          ),
           workspacePaneRoute: null,
           filesystemTarget: null,
         }

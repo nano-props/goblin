@@ -169,6 +169,7 @@ describe('WorkspaceDashboardTerminals', () => {
           headOid: '1234567890abcdef1234567890abcdef12345678',
           operation: null,
           materializedBranch: null,
+          isSource: false,
           isPrimary: false,
           isLocked: false,
         },

@@ -1,18 +1,18 @@
 import type { BranchViewMode } from '#/shared/api-types.ts'
-import type { BranchSnapshotInfo, RepoWorktreeSnapshot } from '#/shared/git-types.ts'
+import type { BranchSnapshotInfo, WorkspaceRepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
 import { visibleBranches } from '#/web/stores/workspaces/branch-view-mode.ts'
 
 export type GitWorkspaceNavigatorRow =
   | { kind: 'branch'; branch: BranchSnapshotInfo }
-  | { kind: 'worktree'; worktree: RepoWorktreeSnapshot; branch: BranchSnapshotInfo | null }
+  | { kind: 'worktree'; worktree: WorkspaceRepoWorktreeSnapshot; branch: BranchSnapshotInfo | null }
 
 export type GitWorkspaceNavigatorRowIdentity =
   { kind: 'branch'; branchName: string } | { kind: 'worktree'; worktreePath: string }
 
 interface GitWorkspaceNavigatorRowsInput {
   branches: BranchSnapshotInfo[]
-  worktrees: readonly RepoWorktreeSnapshot[]
+  worktrees: readonly WorkspaceRepoWorktreeSnapshot[]
   viewMode: BranchViewMode
 }
 

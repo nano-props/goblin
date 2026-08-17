@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import { workspacePaneLocationForRoot } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { resetWorkspacesStore, seedRepoWithReadModelForTest } from '#/web/test-utils/repo-store.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
@@ -21,9 +22,12 @@ import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspa
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import {
   dispatchRetiredTerminalWorkspacePaneTabPresentationAction as dispatchRetiredTerminalWorkspacePaneTabPresentationActionRaw,
+  prepareWorkspacePaneClosePresentation,
   type RetiredTerminalWorkspacePaneTabPresentationOptions,
 } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { createWorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ warning: vi.fn() }))
 
@@ -47,7 +51,38 @@ beforeEach(() => {
 })
 
 describe('workspace pane tab close presentation', () => {
-  test('presents a naturally exited terminal from the server-captured before-state', async () => {
+  test('ignores a source-only opener when closing on the workspace-root surface', () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    const location = workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId)
+    const model = createWorkspacePaneTabModel({
+      location,
+      preferredTab: 'status',
+      allowPreferredTabFallback: false,
+      tabEntries: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('changes'),
+        workspacePaneStaticTabEntry('files'),
+      ],
+      runtimeTabViews: [],
+      runtimeTabStateByType: {},
+    })
+    recordWorkspacePaneTabOpener(
+      location.paneTarget,
+      repo.workspaceRuntimeId,
+      'workspace-pane:status',
+      'workspace-pane:changes',
+    )
+
+    const transition = prepareWorkspacePaneClosePresentation({
+      target: model,
+      closingIdentity: 'workspace-pane:status',
+      workspacePaneRoute: { kind: 'static', tab: 'status' },
+    })
+
+    expect(transition.nextEntry).toEqual(workspacePaneStaticTabEntry('files'))
+  })
+
+  test("projects a retired terminal's canonical before-state through the workspace-root surface", async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
@@ -55,7 +90,11 @@ describe('workspace pane tab close presentation', () => {
     setWorkspacePaneTabsForTargetQueryData({
       ...paneTarget,
       workspaceRuntimeId: repo.workspaceRuntimeId,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('history'),
+        workspacePaneStaticTabEntry('files'),
+      ],
     })
     const sourceRoute = { kind: 'terminal' as const, terminalSessionId }
     const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
@@ -67,12 +106,12 @@ describe('workspace pane tab close presentation', () => {
     const input = {
       workspaceId: REPO_ID,
       workspacePaneRoute: sourceRoute,
-      routeTarget: paneTarget,
-      paneTarget,
+      location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
       terminalSessionId,
       tabsBeforeRetirement: [
         workspacePaneStaticTabEntry('status'),
         workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+        workspacePaneStaticTabEntry('history'),
         workspacePaneStaticTabEntry('files'),
       ],
     }
@@ -125,8 +164,7 @@ describe('workspace pane tab close presentation', () => {
       dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
         workspaceId: REPO_ID,
         workspacePaneRoute: { kind: 'static', tab: 'status' },
-        routeTarget: paneTarget,
-        paneTarget,
+        location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
         navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
         terminalSessionId,
         tabsBeforeRetirement: [
@@ -160,8 +198,7 @@ describe('workspace pane tab close presentation', () => {
       dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
         workspaceId: REPO_ID,
         workspacePaneRoute: sourceRoute,
-        routeTarget: paneTarget,
-        paneTarget,
+        location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
         navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
         terminalSessionId,
         tabsBeforeRetirement: [

@@ -1,4 +1,6 @@
 import {
+  workspacePaneTabModelPaneTarget,
+  workspacePaneTabModelWorkspaceId,
   workspacePaneTerminalBaseForTabModel,
   type WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
@@ -45,9 +47,9 @@ async function closeStaticWorkspacePaneTab(
   target: WorkspacePaneTabModel,
   type: WorkspacePaneStaticTabType,
 ): Promise<WorkspacePaneTabCloseOutcome> {
-  const workspace = workspacesStore.getState().workspaces[target.workspaceId]
-  if (!workspace || target.paneTarget.kind === 'inactive') return { kind: 'not-committed', message: null }
-  const persistenceTarget = target.paneTarget
+  const workspace = workspacesStore.getState().workspaces[workspacePaneTabModelWorkspaceId(target)]
+  const persistenceTarget = workspacePaneTabModelPaneTarget(target)
+  if (!workspace || !persistenceTarget) return { kind: 'not-committed', message: null }
   const result = await updateWorkspacePaneTabs({
     workspaceRuntimeId: workspace.workspaceRuntimeId,
     ...persistenceTarget,

@@ -31,6 +31,10 @@ import {
 } from '#/web/app/navigation/lifecycle.ts'
 import { resetTerminalAutoFocusForTest } from '#/web/terminal/focus.ts'
 import {
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
+import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
   workspacePaneActionTargetFromFilesystemTarget,
@@ -61,6 +65,10 @@ const WORKTREE_ROUTE_TARGET = {
   workspaceId: BASE.target.workspaceId,
   worktreePath: WORKTREE_PATH,
 }
+const LOCATION = workspacePaneLocationForLinkedWorktree(WORKTREE_ROUTE_TARGET, WORKSPACE_RUNTIME_ID, {
+  kind: 'branch',
+  branchName: BRANCH_NAME,
+})
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(),
@@ -157,9 +165,7 @@ describe('workspace pane runtime tab create action', () => {
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       tabs: [workspacePaneRuntimeTabEntry('terminal', TERMINAL_SESSION_ID)],
     })
-    terminalProjectionHydrationStore
-      .getState()
-      .markProjectionReady(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID)
+    terminalProjectionHydrationStore.getState().markProjectionReady(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID)
 
     await expect(
       dispatchTerminalCreate({ createTerminal: vi.fn(), showCreatedTerminalTab: vi.fn(), t: translate }),
@@ -221,7 +227,8 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       showCreatedTerminalWorkspacePaneRuntimeTab(
-        detachedBase,
+        LOCATION,
+        detachedBase.presentation,
         TERMINAL_SESSION_ID,
         {
           commitFilesystemWorkspacePaneRoute,
@@ -256,7 +263,8 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       showCreatedTerminalWorkspacePaneRuntimeTab(
-        workspaceRootBase,
+        workspacePaneLocationForRoot(workspaceRootBase.target.workspaceId, workspaceRootBase.target.workspaceRuntimeId),
+        workspaceRootBase.presentation,
         TERMINAL_SESSION_ID,
         {
           commitFilesystemWorkspacePaneRoute: vi.fn(async () => {
@@ -280,12 +288,7 @@ describe('workspace pane runtime tab create action', () => {
       runtimeTabStateByType: runtimeTabState(),
       showCreatedRuntimeTab: vi.fn(),
       t: translate,
-      terminal: {
-        base: null,
-        createTerminal: vi.fn(async () => createAdmission()),
-        captureOpenerIdentity: vi.fn(() => null),
-        focusTerminal: vi.fn(),
-      },
+      terminal: undefined,
     })
 
     expect(action).toBeNull()
@@ -300,7 +303,7 @@ describe('workspace pane runtime tab create action', () => {
       showCreatedRuntimeTab,
       t: translate,
       terminal: {
-        base: BASE,
+        location: LOCATION,
         createTerminal,
         captureOpenerIdentity,
         focusTerminal: vi.fn(),
@@ -313,7 +316,6 @@ describe('workspace pane runtime tab create action', () => {
     expect(captureOpenerIdentity).toHaveBeenCalledOnce()
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledWith(
       expect.objectContaining({
-        base: BASE,
         createTerminal,
         t: translate,
         commitCreatedTerminalTab: expect.any(Function),
@@ -344,7 +346,7 @@ describe('workspace pane runtime tab create action', () => {
       showCreatedRuntimeTab,
       t: translate,
       terminal: {
-        base: BASE,
+        location: LOCATION,
         createTerminal: vi.fn(async () => createAdmission()),
         captureOpenerIdentity: vi.fn(() => null),
         focusTerminal: vi.fn(),
@@ -708,7 +710,7 @@ describe('workspace pane runtime tab create action', () => {
       showCreatedRuntimeTab: vi.fn(),
       t: translate,
       terminal: {
-        base: BASE,
+        location: LOCATION,
         createTerminal: vi.fn(async () => createAdmission()),
         captureOpenerIdentity: vi.fn(() => null),
         focusTerminal: vi.fn(),
@@ -727,7 +729,7 @@ function dispatchTerminalCreate(
   overrides: Partial<TerminalCreateDispatchOptions> = {},
 ): ReturnType<typeof dispatchCreateTerminalWorkspacePaneRuntimeTabAction> {
   return dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-    base: BASE,
+    location: LOCATION,
     createTerminal: vi.fn(async () => createAdmission()),
     openerIdentity: null,
     showCreatedTerminalTab: vi.fn(() => true),

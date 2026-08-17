@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { workspacePaneLocationForLinkedWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 import {
   GitWorkspacePaneContentHarness,
   REPO_ID,
@@ -305,8 +306,13 @@ describe('GitWorkspacePaneContent status-history', () => {
       await runCloseWorkspacePaneTabCommand({
         workspaceId: REPO_ID,
         target: {
+          location: workspacePaneLocationForLinkedWorktree(
+            { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath },
+            repo.workspaceRuntimeId,
+            { kind: 'branch', branchName: 'feature/status-links' },
+          ),
           workspacePaneRoute: { kind: 'static', tab: 'files' },
-          filesystemTarget: gitWorktreeFilesystemTarget(repo, worktreePath, 'feature/status-links'),
+          capabilities: gitWorktreeFilesystemTarget(repo, worktreePath, 'feature/status-links').capabilities,
         },
         targetIdentity: 'workspace-pane:files',
         navigation,

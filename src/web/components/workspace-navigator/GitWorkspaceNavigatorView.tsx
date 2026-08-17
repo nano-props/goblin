@@ -18,6 +18,7 @@ import {
   dispatchShowWorkspacePaneTargetStaticTabAction,
 } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { gitBranchPaneTargetLease, gitWorktreePaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { workspacePaneLocationForWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { gitWorkspaceNavigatorRows } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
@@ -32,14 +33,7 @@ interface Props {
 
 export const GitWorkspaceNavigatorView = defineComponent<Props>({
   name: 'GitWorkspaceNavigatorView',
-  props: [
-    'repoId',
-    'onSelectBranch',
-    'currentBranchName',
-    'currentWorktreePath',
-    'onAfterSelect',
-    'onAfterOpenStatus',
-  ],
+  props: ['repoId', 'onSelectBranch', 'currentBranchName', 'currentWorktreePath', 'onAfterSelect', 'onAfterOpenStatus'],
 
   setup(props) {
     const storeProjection = useStoreSelector(
@@ -87,14 +81,7 @@ interface GitWorkspaceNavigatorViewReadModelProps extends Omit<Props, 'repoId'> 
 const GitWorkspaceNavigatorViewReadModel = defineComponent<GitWorkspaceNavigatorViewReadModelProps>({
   name: 'GitWorkspaceNavigatorViewReadModel',
   inheritAttrs: false,
-  props: [
-    'repo',
-    'onSelectBranch',
-    'currentBranchName',
-    'currentWorktreePath',
-    'onAfterSelect',
-    'onAfterOpenStatus',
-  ],
+  props: ['repo', 'onSelectBranch', 'currentBranchName', 'currentWorktreePath', 'onAfterSelect', 'onAfterOpenStatus'],
   setup(props) {
     const t = useT()
     const navigation = useAppNavigation()
@@ -134,9 +121,13 @@ const GitWorkspaceNavigatorViewReadModel = defineComponent<GitWorkspaceNavigator
     }
 
     function selectWorktree(worktreePath: string): void {
-      navigation.selectRepoWorktree(
-        gitWorktreePaneTargetLease(props.repo.id, props.repo.workspaceRuntimeId, worktreePath),
-      )
+      const worktree = repo.value?.snapshot.worktrees.find((candidate) => candidate.path === worktreePath)
+      if (!worktree) return
+      const context = workspacePaneLocationForWorktree(props.repo.id, props.repo.workspaceRuntimeId, worktree)
+      navigation.selectRepoWorktree({
+        routeTarget: context.routeTarget,
+        workspaceRuntimeId: context.workspaceRuntimeId,
+      })
     }
 
     function openWorktreeStatus(worktreePath: string): void {
@@ -146,13 +137,9 @@ const GitWorkspaceNavigatorViewReadModel = defineComponent<GitWorkspaceNavigator
     function openWorktreeTab(worktreePath: string, type: WorkspacePaneStaticTabType): void {
       const worktree = repo.value?.snapshot.worktrees.find((candidate) => candidate.path === worktreePath)
       if (!worktree) return
-      const lease = gitWorktreePaneTargetLease(props.repo.id, props.repo.workspaceRuntimeId, worktreePath)
+      const location = workspacePaneLocationForWorktree(props.repo.id, props.repo.workspaceRuntimeId, worktree)
       void dispatchShowWorkspacePaneTargetStaticTabAction({
-        workspaceId: props.repo.id,
-        workspaceRuntimeId: props.repo.workspaceRuntimeId,
-        routeTarget: lease.routeTarget,
-        paneTarget: lease.routeTarget,
-        worktreeHead: worktree.head,
+        location,
         type,
         workspacePaneRoute: undefined,
         navigation,

@@ -1,3 +1,4 @@
+import { workspacePaneLocationForRoot } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { terminalSessionBaseForTest } from '#/web/test-utils/terminal-model.ts'
@@ -92,7 +93,7 @@ function closeConfirmPayload(
 ): TerminalCloseConfirmPayload {
   return {
     workspaceId,
-    routeTarget: { kind: 'workspace-root', workspaceId },
+    location: workspacePaneLocationForRoot(workspaceId, 'workspace-runtime-test'),
     targetIdentity: `terminal:${terminalSessionId}`,
     selectedIdentity: `terminal:${terminalSessionId}`,
     workspacePaneRoute: { kind: 'terminal', terminalSessionId },

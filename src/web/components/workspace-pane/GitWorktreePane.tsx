@@ -1,6 +1,6 @@
 import { computed, defineComponent } from 'vue'
 import type { WorkspaceGitReadyProbeState } from '#/shared/workspace-runtime.ts'
-import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import { gitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { GitWorktreeWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
@@ -16,15 +16,19 @@ import { GitWorkspacePane } from '#/web/components/workspace-pane/GitWorkspacePa
 import type { GitWorkspacePaneShell } from '#/web/components/workspace-pane/workspace-pane-types.ts'
 import { useRepoSnapshotReadModel, useRepoWorktreeStatusReadModel } from '#/web/repos/queries.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
-import type { RepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
+import type { WorkspaceRepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
 import { useFilesystemWorkspacePaneRouteController } from '#/web/workspace-pane/filesystem-workspace-pane-route-controller.ts'
-import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { useGitWorktreeWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import type { WorkspacePaneRuntimeContext } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { dispatchOpenWorkspacePaneTargetStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { selectedWorkspacePaneRuntimeSessionId } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import {
+  workspacePaneFilesystemTargetForLocation,
+  workspacePaneLocationExecutionTarget,
+  workspacePaneLocationForWorktree,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 interface GitWorktreePaneProps {
   repo: GitWorkspacePaneShell
@@ -126,7 +130,7 @@ export const GitWorktreePane = defineComponent<GitWorktreePaneProps>({
 interface GitWorktreePaneReadyProps {
   workspaceRuntime: WorkspacePaneRuntimeContext
   workspaceProbe: WorkspaceGitReadyProbeState
-  worktree: RepoWorktreeSnapshot
+  worktree: WorkspaceRepoWorktreeSnapshot
   status?: WorktreeStatus
   statusPending: boolean
   target: GitWorktreeWorkspacePaneTabsTarget
@@ -155,23 +159,22 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
     const t = useT()
     const navigation = useAppNavigation()
     const model = useGitWorktreeWorkspacePaneTabModel(
+      () => props.target.workspaceId,
       () => props.workspaceRuntime,
-      () => props.target,
-      () => props.worktree.head,
+      () => props.worktree,
       () => props.route,
     )
     const routeReconciliation = useFilesystemWorkspacePaneRouteController({ route: () => props.route, model })
-    const runtimeTarget = computed(() =>
-      runtimeWorkspacePaneTarget(props.target, props.workspaceRuntime.workspaceRuntimeId),
+    const location = computed(() =>
+      workspacePaneLocationForWorktree(
+        props.target.workspaceId,
+        props.workspaceRuntime.workspaceRuntimeId,
+        props.worktree,
+      ),
     )
+    const runtimeTarget = computed(() => workspacePaneLocationExecutionTarget(location.value))
     const surfaceTarget = computed(() =>
-      gitWorktreePaneFilesystemTarget({
-        workspaceId: props.target.workspaceId,
-        workspaceRuntimeId: props.workspaceRuntime.workspaceRuntimeId,
-        worktreePath: props.target.worktreePath,
-        head: props.worktree.head,
-        capabilities: props.workspaceProbe.capabilities,
-      }),
+      workspacePaneFilesystemTargetForLocation(location.value, props.workspaceProbe.capabilities),
     )
 
     return () => {
@@ -181,11 +184,7 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
       const routeMissing = routeReconciliation.value.kind === 'missing'
       const openStaticTab = (type: 'changes' | 'history') => {
         void dispatchOpenWorkspacePaneTargetStaticTabAction({
-          workspaceId: props.target.workspaceId,
-          workspaceRuntimeId: props.workspaceRuntime.workspaceRuntimeId,
-          routeTarget: props.target,
-          paneTarget: props.target,
-          worktreeHead: props.worktree.head,
+          location: currentModel.location!,
           type,
           workspacePaneRoute: props.route,
           navigation,
@@ -202,9 +201,6 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
             statusCount={props.status?.entries.length}
             trafficLightOffset={props.toolbarTrafficLightOffset}
             onBackToNavigator={props.onBackToNavigator}
-            staticTabAvailable={(type) =>
-              type === 'status' || type === 'changes' || type === 'history' || type === 'files'
-            }
           />
           {routeMissing ? (
             <EmptyState title={t('workspace-route.not-found-title')} />
@@ -247,17 +243,14 @@ const GitWorktreePaneReady = defineComponent<GitWorktreePaneReadyProps>({
             )
           ) : selection?.tab === 'files' ? (
             <WorkspacePanePanelFrame id={`${props.workspacePaneId}-files-panel`} label={t('tab.files')}>
-              <WorkspaceFilesystemTabPanel target={surfaceTarget.value} />
+              <WorkspaceFilesystemTabPanel location={location.value} capabilities={surfaceTarget.value.capabilities} />
             </WorkspacePanePanelFrame>
           ) : selection?.tab === 'terminal' && runtimeTarget.value ? (
             renderWorkspacePaneRuntimeTabPanel({
               type: 'terminal',
               workspacePaneId: props.workspacePaneId,
               panelLabel: { label: t('tab.terminal') },
-              target: {
-                runtimeTarget: runtimeTarget.value,
-                presentation: { kind: 'git-worktree' },
-              },
+              target: { location: location.value },
               selectedSessionId: selectedTerminalSessionId,
               runtimeState: currentModel.runtimeTabStateByType.terminal,
             })

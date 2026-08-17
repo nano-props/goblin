@@ -30,6 +30,7 @@ import {
   type BranchSnapshotInfo,
   type PullRequestInfo,
   type RepoWorktreeSnapshot,
+  type WorkspaceRepoWorktreeSnapshot,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
 
@@ -45,7 +46,7 @@ interface RepoPresentationFactsForTest {
   branches: BranchSnapshotInfo[]
   currentBranch: string
   status?: WorktreeStatus[]
-  worktrees?: RepoWorktreeSnapshot[]
+  worktrees?: WorkspaceRepoWorktreeSnapshot[]
   remote?: Partial<RepoRemoteInfo>
 }
 
@@ -154,8 +155,8 @@ export function createRepoBranch(name: string, options: Partial<BranchSnapshotIn
 export function createRepoWorktreeSnapshotForTest(
   branchName: string,
   path: string,
-  options: Partial<Omit<RepoWorktreeSnapshot, 'path' | 'head'>> = {},
-): RepoWorktreeSnapshot {
+  options: Partial<Omit<WorkspaceRepoWorktreeSnapshot, 'path' | 'head'>> = {},
+): WorkspaceRepoWorktreeSnapshot {
   return {
     path,
     head: { kind: 'branch', branchName },
@@ -164,6 +165,7 @@ export function createRepoWorktreeSnapshotForTest(
     materializedBranch: branchName,
     isPrimary: false,
     isLocked: false,
+    isSource: false,
     ...options,
   }
 }
@@ -221,7 +223,7 @@ export function seedRepoWithReadModelForTest(options: {
   workspacePaneTabsByBranch?: Record<string, WorkspacePaneTabEntry[]>
   workspaceRuntimeId?: string
   status?: WorktreeStatus[]
-  worktrees?: RepoWorktreeSnapshot[]
+  worktrees?: WorkspaceRepoWorktreeSnapshot[]
   remote?: Partial<RepoRemoteInfo>
   remoteLifecycle?: RemoteWorkspaceConnectionLifecycle | null
   workspaceProbe?: WorkspaceProbeState
@@ -288,7 +290,7 @@ export function seedRepoQueryDataForTest(
     branches: BranchSnapshotInfo[]
     currentBranch: string
     status?: WorktreeStatus[]
-    worktrees?: RepoWorktreeSnapshot[]
+    worktrees?: WorkspaceRepoWorktreeSnapshot[]
     remote?: Partial<RepoRemoteInfo>
   },
 ): void {
@@ -309,7 +311,7 @@ function testRepoSnapshot(
   branches: BranchSnapshotInfo[],
   current: string,
   remote: Partial<RepoRemoteInfo> = {},
-  worktrees: RepoWorktreeSnapshot[] = [],
+  worktrees: WorkspaceRepoWorktreeSnapshot[] = [],
 ): RepoSnapshot {
   return {
     branches,

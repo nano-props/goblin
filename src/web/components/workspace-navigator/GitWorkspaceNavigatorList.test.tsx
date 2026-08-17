@@ -10,7 +10,7 @@ import {
   createGitRepoPresentationForTest,
   createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
-import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
+import type { WorkspaceRepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { GitWorkspaceNavigatorList } from '#/web/components/workspace-navigator/GitWorkspaceNavigatorList.tsx'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -125,7 +125,7 @@ describe('GitWorkspaceNavigatorList', () => {
   })
 
   test('renders an unborn attached worktree without a branch row', () => {
-    const worktree: RepoWorktreeSnapshot = {
+    const worktree: WorkspaceRepoWorktreeSnapshot = {
       ...createRepoWorktreeSnapshotForTest('main', '/tmp/repo'),
       headOid: null,
     }
@@ -153,7 +153,7 @@ describe('GitWorkspaceNavigatorList', () => {
   })
 
   test('renders a detached worktree like a branch row without its path and opens target tabs from its menu', async () => {
-    const worktree: RepoWorktreeSnapshot = {
+    const worktree: WorkspaceRepoWorktreeSnapshot = {
       ...createRepoWorktreeSnapshotForTest('feature/detached', '/tmp/detached-worktree'),
       head: { kind: 'detached' },
       operation: null,
@@ -232,7 +232,7 @@ describe('GitWorkspaceNavigatorList', () => {
     await nextTick()
     expect(menu.dataset.open).toBe('true')
 
-    const rebasing: RepoWorktreeSnapshot = {
+    const rebasing: WorkspaceRepoWorktreeSnapshot = {
       ...attached,
       head: { kind: 'detached' },
       operation: { kind: 'rebase' },
@@ -274,7 +274,7 @@ describe('GitWorkspaceNavigatorList', () => {
 function gitWorkspaceNavigatorRepo(
   branches: ReturnType<typeof createRepoBranch>[],
   currentBranch: string,
-  worktrees?: RepoWorktreeSnapshot[],
+  worktrees?: WorkspaceRepoWorktreeSnapshot[],
 ) {
   return createGitRepoPresentationForTest(
     emptyWorkspace(workspaceIdForTest('goblin+file:///tmp/repo'), 'repo-runtime-test'),

@@ -213,6 +213,7 @@ describe('repo response schemas', () => {
       operation: null,
       materializedBranch: 'main',
       isPrimary: true,
+      isSource: true,
       isLocked: false,
     }
     const parses = (worktrees: unknown[], branches: unknown[] = [branch]) =>

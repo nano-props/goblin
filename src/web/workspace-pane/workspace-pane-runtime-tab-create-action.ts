@@ -25,6 +25,7 @@ import {
   resolveWorkspacePaneTabTargetForPaneTarget,
   scopeWorkspacePaneTabTargetResolutionToRuntime,
   workspaceRootPaneTargetLease,
+  filesystemWorkspacePaneTargetLeaseForLocation,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   workspacePaneActionTargetFromFilesystemTarget,
@@ -40,6 +41,10 @@ import { claimTerminalAutoFocus } from '#/web/terminal/focus.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { workspacePaneRuntimeTabCreateBlockingPhase } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import type { WorkspacePaneRuntimeUnreadyProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import {
+  workspacePaneLocationTerminalBase,
+  type FilesystemWorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export interface CreatedTerminalRouteRequest {
   navigationGeneration: AppNavigationGeneration
@@ -73,7 +78,7 @@ export interface WorkspacePaneRuntimeTabCreateActionContext {
 export type WorkspacePaneRuntimeTabCreateStateByType = Record<WorkspacePaneRuntimeTabType, { createPending: boolean }>
 
 export interface WorkspacePaneTerminalCreateActionContext {
-  base: TerminalSessionBase | null
+  location: FilesystemWorkspacePaneLocation
   createTerminal: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
@@ -84,7 +89,7 @@ export interface WorkspacePaneTerminalCreateActionContext {
 }
 
 export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
-  base: TerminalSessionBase
+  location: FilesystemWorkspacePaneLocation
   createTerminal: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
@@ -133,14 +138,15 @@ export function workspacePaneRuntimeTabCreateAction(
 export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
   options: CreateTerminalWorkspacePaneRuntimeTabActionOptions,
 ): Promise<TerminalCreateCommandResult> {
-  const base = options.base
+  const base = workspacePaneLocationTerminalBase(options.location)
+  if (!base) throw new Error('terminal create requires a filesystem location')
   if (!workspacePaneTabsTargetFromRuntime(base.target)) {
     throw new Error('terminal base requires a canonical filesystem pane target')
   }
   if (!terminalCreateTargetIsCurrent(base)) return staleTerminalCreateResult()
   const target = terminalWorkspacePaneCoordinatorTarget(base)
   return await runWorkspacePaneAction(target, async () => {
-    const admission = terminalCreateAdmission(base)
+    const admission = terminalCreateAdmission(options.location, base)
     if (admission === 'stale') return staleTerminalCreateResult()
     if (admission !== 'ready') return blockedTerminalCreateResult(admission, options.t)
     // Presentation is deliberately best-effort across unrelated navigation.
@@ -182,36 +188,34 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
 }
 
 export function showCreatedTerminalWorkspacePaneRuntimeTab(
-  base: TerminalSessionBase,
+  location: FilesystemWorkspacePaneLocation,
+  presentation: TerminalPresentation,
   terminalSessionId: string,
   navigation: CreatedTerminalNavigation,
   routeRequest: CreatedTerminalRouteRequest,
 ): boolean | Promise<boolean> {
+  const base = workspacePaneLocationTerminalBase(location)
+  if (!base || base.presentation.kind !== presentation.kind) return false
   const coordinates = terminalExecutionCoordinates(base.target)
-  const paneTarget = workspacePaneTabsTargetFromRuntime(base.target)
-  if (!paneTarget) return false
-  const workspaceRoot = base.target.kind === 'workspace-root'
-  if (workspaceRoot) {
-    if (base.presentation.kind !== 'workspace-root') return false
+  if (
+    coordinates.workspaceId !== location.workspaceId ||
+    coordinates.workspaceRuntimeId !== location.workspaceRuntimeId ||
+    base.target.kind !== presentation.kind
+  )
+    return false
+  if (location.kind === 'workspace-root') {
     return navigation.commitWorkspaceRootTerminalSession(
-      coordinates.workspaceId,
-      coordinates.workspaceRuntimeId,
+      location.workspaceId,
+      location.workspaceRuntimeId,
       terminalSessionId,
       routeRequest,
     )
   }
-  if (base.presentation.kind === 'git-worktree') {
-    return navigation.commitFilesystemWorkspacePaneRoute(
-      gitWorktreePaneTargetLease(
-        coordinates.workspaceId,
-        coordinates.workspaceRuntimeId,
-        terminalExecutionPath(base.target),
-      ),
-      { kind: 'terminal', terminalSessionId },
-      routeRequest,
-    )
-  }
-  return false
+  return navigation.commitFilesystemWorkspacePaneRoute(
+    filesystemWorkspacePaneTargetLeaseForLocation(location),
+    { kind: 'terminal', terminalSessionId },
+    routeRequest,
+  )
 }
 
 export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
@@ -272,6 +276,7 @@ function terminalCreateTargetIsCurrent(base: TerminalSessionBase): boolean {
 }
 
 function terminalCreateAdmission(
+  location: FilesystemWorkspacePaneLocation,
   base: TerminalSessionBase,
 ): 'ready' | 'stale' | WorkspacePaneRuntimeUnreadyProjectionPhase {
   if (!terminalCreateTargetIsCurrent(base)) return 'stale'
@@ -279,8 +284,7 @@ function terminalCreateAdmission(
   if (!paneTarget) return 'stale'
   const resolution = scopeWorkspacePaneTabTargetResolutionToRuntime(
     resolveWorkspacePaneTabTargetForPaneTarget({
-      paneTarget,
-      routeTarget: paneTarget,
+      location,
       workspacePaneRoute: undefined,
     }),
     base.target.workspaceRuntimeId,
@@ -312,8 +316,7 @@ function terminalRuntimeTabCreateAction(
   context: WorkspacePaneRuntimeTabCreateActionContext,
 ): WorkspacePaneRuntimeTabCreateAction | null {
   const terminal = context.terminal
-  const base = terminal?.base ?? null
-  if (!terminal || !base) return null
+  if (!terminal) return null
   return {
     label: context.t('terminal.new'),
     busy: context.runtimeTabStateByType.terminal.createPending,
@@ -323,7 +326,7 @@ function terminalRuntimeTabCreateAction(
       // "+" is a generic entry; opener only drives close-back focus, not insertion.
       const openerIdentity = terminal.captureOpenerIdentity()
       void dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-        base,
+        location: terminal.location,
         createTerminal: terminal.createTerminal,
         openerIdentity,
         showCreatedTerminalTab: (terminalSessionId, presentation, routeRequest) =>

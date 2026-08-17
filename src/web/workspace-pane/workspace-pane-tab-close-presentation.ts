@@ -1,10 +1,14 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { GitHead } from '#/shared/git-head.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { workspacePaneTabEntryIdentity, type WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
+import { workspacePaneSurfaceTabEntries } from '#/web/workspace-pane/workspace-pane-location.ts'
+import {
+  workspacePaneTabModelWorkspaceRuntimeId,
+  type WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { nextWorkspacePaneTabEntryAfterClose } from '#/web/workspace-pane/workspace-pane-tab-navigation.ts'
 import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
@@ -20,7 +24,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-close-target.ts'
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
-  workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromLocation,
   runWorkspacePaneAction,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { captureUnownedAppNavigationGeneration, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
@@ -38,9 +42,7 @@ export interface RetiredTerminalWorkspacePaneTabPresentationOptions {
   workspaceId: WorkspaceId
   workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  routeTarget: WorkspacePaneTabsTarget
-  paneTarget: WorkspacePaneTabsTarget
-  worktreeHead?: GitHead
+  location: WorkspacePaneLocation
   navigation: AppNavigationActions
   terminalSessionId: string
   tabsBeforeRetirement: WorkspacePaneTabEntry[]
@@ -88,19 +90,30 @@ export function createWorkspacePaneTabClosePresentationLease(
   }
 }
 
+interface PrepareWorkspacePaneClosePresentationInput {
+  target: WorkspacePaneTabModel
+  closingIdentity: string
+  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
+  selectedIdentity?: string | null
+  navigationGeneration?: AppNavigationGeneration
+  /** Complete authoritative layout captured before the close committed. */
+  canonicalTabEntriesBeforeClose?: readonly WorkspacePaneTabEntry[]
+}
+
 export function prepareWorkspacePaneClosePresentation(
-  target: WorkspacePaneTabModel,
-  closingIdentity: string,
-  workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
-  selectedIdentity: string | null | undefined = target.selectedIdentity,
-  navigationGeneration?: AppNavigationGeneration,
-  tabEntries: readonly WorkspacePaneTabEntry[] = target.tabEntries,
+  input: PrepareWorkspacePaneClosePresentationInput,
 ): WorkspacePaneCloseTransition {
+  const { target, closingIdentity, workspacePaneRoute, navigationGeneration } = input
+  const selectedIdentity = input.selectedIdentity === undefined ? target.selectedIdentity : input.selectedIdentity
   const wasActive = selectedIdentity === closingIdentity
   if (!wasActive) return { wasActive: false, nextEntry: null, presentationLease: null }
+  const canonicalTabEntriesBeforeClose = input.canonicalTabEntriesBeforeClose ?? target.tabEntries
+  const tabEntries = target.location
+    ? workspacePaneSurfaceTabEntries(target.location, canonicalTabEntriesBeforeClose)
+    : []
   const openerIdentity = workspacePaneTabOpener(
     workspacePaneTabsTargetForClose(target),
-    target.workspaceRuntimeId,
+    workspacePaneTabModelWorkspaceRuntimeId(target),
     closingIdentity,
   )
   const nextEntry = nextWorkspacePaneTabEntryAfterClose(tabEntries, closingIdentity, openerIdentity)
@@ -129,7 +142,7 @@ export async function presentCommittedWorkspacePaneTabClose(input: {
 }): Promise<WorkspacePaneClosePresentationResult> {
   clearWorkspacePaneTabOpener(
     workspacePaneTabsTargetForClose(input.target),
-    input.target.workspaceRuntimeId,
+    workspacePaneTabModelWorkspaceRuntimeId(input.target),
     input.closingIdentity,
   )
   const result = await reconcileCommittedWorkspacePaneClosePresentation({
@@ -198,26 +211,30 @@ export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
   })
   const navigationGeneration = captureUnownedAppNavigationGeneration()
   if (navigationGeneration === null) {
-    clearWorkspacePaneTabOpener(workspacePaneTabsTargetForClose(target), target.workspaceRuntimeId, closingIdentity)
+    clearWorkspacePaneTabOpener(
+      workspacePaneTabsTargetForClose(target),
+      workspacePaneTabModelWorkspaceRuntimeId(target),
+      closingIdentity,
+    )
     return Promise.resolve(false)
   }
-  const transition = prepareWorkspacePaneClosePresentation(
+  const transition = prepareWorkspacePaneClosePresentation({
     target,
     closingIdentity,
-    options.workspacePaneRoute,
-    closingIdentity,
+    workspacePaneRoute: options.workspacePaneRoute,
+    selectedIdentity: closingIdentity,
     navigationGeneration,
-    options.tabsBeforeRetirement,
+    canonicalTabEntriesBeforeClose: options.tabsBeforeRetirement,
+  })
+  clearWorkspacePaneTabOpener(
+    workspacePaneTabsTargetForClose(target),
+    workspacePaneTabModelWorkspaceRuntimeId(target),
+    closingIdentity,
   )
-  clearWorkspacePaneTabOpener(workspacePaneTabsTargetForClose(target), target.workspaceRuntimeId, closingIdentity)
   const presentationLease = transition.presentationLease
   if (!presentationLease) return Promise.resolve(false)
-  const queueTarget = workspacePaneActionTargetFromCoordinates({
-    workspaceId: target.workspaceId,
-    workspaceRuntimeId: target.workspaceRuntimeId,
-    branchName: target.branchName,
-    worktreePath: target.worktreePath,
-  })
+  if (!target.location) return Promise.resolve(false)
+  const queueTarget = workspacePaneActionTargetFromLocation(target.location)
   return runWorkspacePaneAction(queueTarget, async () => {
     try {
       if (!workspacePaneTabControllerTargetIsCurrent(target)) return false

@@ -34,6 +34,7 @@ import {
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { WorkspacePaneTabClosePresentationEffects } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
+import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
@@ -73,7 +74,7 @@ interface CloseWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTar
 interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
   workspaceId: WorkspaceId | null
   workspacePaneRoute: WorkspacePaneCommandRoute
-  routeTarget: WorkspacePaneTabsTarget
+  location: WorkspacePaneLocation
   navigation: AppNavigationActions
   targetIdentity?: string
   selectedIdentity: string | null
@@ -125,11 +126,7 @@ async function showWorkspacePaneTabCommand({
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
     const outcome = await dispatchShowWorkspacePaneTargetStaticTabAction({
-      workspaceId,
-      workspaceRuntimeId: workspacePaneCommandRuntimeId(target),
-      routeTarget: workspacePaneCommandRouteTarget(target),
-      paneTarget: workspacePaneCommandPaneTarget(target),
-      worktreeHead: workspacePaneCommandWorktreeHead(target),
+      location: target.location,
       type: provider.type,
       workspacePaneRoute,
       navigation,
@@ -187,9 +184,7 @@ export async function runCloseWorkspacePaneTabCommand(options: CloseWorkspacePan
       ...options,
       workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
       ...workspacePaneCommandCoordinates(options.target),
-      routeTarget: workspacePaneCommandRouteTarget(options.target),
-      paneTarget: workspacePaneCommandPaneTarget(options.target),
-      worktreeHead: workspacePaneCommandWorktreeHead(options.target),
+      location: options.target.location,
     })
   } catch (error) {
     presentationEffects?.onAbandon()
@@ -212,16 +207,9 @@ export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
 ): Promise<boolean> {
   const presentationEffects = options.presentationEffects
   try {
-    const paneTarget = workspacePaneTabsTargetFromRuntime(options.confirmedTerminal.base.target)
-    if (!paneTarget) {
-      presentationEffects?.onAbandon()
-      return false
-    }
     return dispatchConfirmCloseTerminalWorkspacePaneTabAction({
       ...options,
       workspaceRuntimeId: options.confirmedTerminal.base.target.workspaceRuntimeId,
-      paneTarget,
-      worktreeHead: undefined,
     })
   } catch (error) {
     presentationEffects?.onAbandon()
@@ -238,9 +226,7 @@ export function runRetiredTerminalWorkspacePaneTabPresentationCommand(
     workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
     workspaceId: routeTarget.workspaceId,
     ...workspacePaneCommandCoordinates(options.target),
-    routeTarget,
-    paneTarget: workspacePaneCommandPaneTarget(options.target),
-    worktreeHead: workspacePaneCommandWorktreeHead(options.target),
+    location: options.target.location,
   })
 }
 
@@ -251,9 +237,7 @@ export async function runSelectWorkspacePaneTabByIndexCommand(
   return await dispatchSelectWorkspacePaneTabByIndexAction({
     ...options,
     workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
-    routeTarget: workspacePaneCommandRouteTarget(options.target),
-    paneTarget: workspacePaneCommandPaneTarget(options.target),
-    worktreeHead: workspacePaneCommandWorktreeHead(options.target),
+    location: options.target.location,
     workspacePaneRoute: options.target.workspacePaneRoute,
   })
 }
@@ -263,9 +247,7 @@ export async function runMoveWorkspacePaneTabCommand(options: MoveWorkspacePaneT
   return await dispatchMoveWorkspacePaneTabAction({
     ...options,
     workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
-    routeTarget: workspacePaneCommandRouteTarget(options.target),
-    paneTarget: workspacePaneCommandPaneTarget(options.target),
-    worktreeHead: workspacePaneCommandWorktreeHead(options.target),
+    location: options.target.location,
     workspacePaneRoute: options.target.workspacePaneRoute,
   })
 }

@@ -85,6 +85,7 @@ describe('getRepoSnapshot', () => {
           operation: null,
           materializedBranch: 'fresh',
           isPrimary: true,
+          isSource: true,
           isLocked: false,
         },
       ],
@@ -116,7 +117,7 @@ describe('getRepoSnapshot', () => {
   })
 })
 
-describe('getWorkspacePaneTargetIdentities', () => {
+describe('getWorkspacePaneTargetMembership', () => {
   test('reads only worktree and branch identity without status or remote display data', async () => {
     const worktrees = [{ path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true }]
     const worktreeSnapshots = [
@@ -130,17 +131,34 @@ describe('getWorkspacePaneTargetIdentities', () => {
       },
     ]
     mocks.readWorktreeMembership.mockResolvedValueOnce(worktrees)
+    mocks.resolveGitWorkspacePath.mockResolvedValueOnce('/tmp/repo')
     mocks.readRepoWorktreeSnapshots.mockResolvedValueOnce(worktreeSnapshots)
-    mocks.getBranchWorktreeIdentities.mockResolvedValueOnce([
-      { branch: 'main', worktreePath: '/tmp/repo' },
-      { branch: 'feature/no-worktree', worktreePath: null },
-    ])
+    mocks.getBranchWorktreeIdentities.mockResolvedValueOnce({
+      worktrees: [
+        {
+          kind: 'git-worktree',
+          worktreePath: '/tmp/repo',
+          head: { kind: 'branch', branchName: 'main' },
+          materializedBranch: 'main',
+        },
+      ],
+      branches: [{ kind: 'git-branch', branchName: 'feature/no-worktree' }],
+    })
 
-    const { getWorkspacePaneTargetIdentities } = await import('#/server/repos/read-paths.ts')
-    await expect(getWorkspacePaneTargetIdentities(REPO_ID)).resolves.toEqual([
-      { branch: 'main', worktreePath: '/tmp/repo' },
-      { branch: 'feature/no-worktree', worktreePath: null },
-    ])
+    const { getWorkspacePaneTargetMembership } = await import('#/server/repos/read-paths.ts')
+    await expect(getWorkspacePaneTargetMembership(REPO_ID)).resolves.toEqual({
+      source: {
+        kind: 'worktree',
+        identity: {
+          kind: 'git-worktree',
+          worktreePath: '/tmp/repo',
+          head: { kind: 'branch', branchName: 'main' },
+          materializedBranch: 'main',
+        },
+      },
+      linkedWorktrees: [],
+      branches: [{ kind: 'git-branch', branchName: 'feature/no-worktree' }],
+    })
 
     expect(mocks.readWorktreeMembership).toHaveBeenCalledWith('/tmp/repo', undefined)
     expect(mocks.getBranchWorktreeIdentities).toHaveBeenCalledWith('/tmp/repo', worktreeSnapshots, {

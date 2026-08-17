@@ -19,10 +19,12 @@ import { selectedWorkspacePaneRuntimeSessionId } from '#/web/workspace-pane/work
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
-import { gitWorktreeWorkspacePaneTabsTarget, runtimeWorkspacePaneTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import { terminalGitWorktreePresentation } from '#/shared/terminal-types.ts'
-import { gitHead } from '#/shared/git-head.ts'
-import { gitWorktreePaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import {
+  workspacePaneFilesystemTargetForLocation,
+  workspacePaneLocationExecutionTarget,
+  workspacePaneLocationForWorktree,
+  workspacePaneLocationTerminalBase,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
@@ -50,20 +52,15 @@ export function renderGitWorkspacePanePanel(input: WorkspacePanePanelRenderInput
     const runtimeState = input.model.runtimeTabStateByType[input.type]
     const worktree = input.detail.worktree
     if (!worktree) return null
-    const worktreePath = worktree.path
-    const tabsTarget = gitWorktreeWorkspacePaneTabsTarget(input.repo.id, worktreePath)
-    if (!tabsTarget) return null
-    const runtimeTarget = runtimeWorkspacePaneTarget(tabsTarget, input.repo.workspaceRuntimeId)
-    if (!runtimeTarget) return null
+    const location = workspacePaneLocationForWorktree(input.repo.id, input.repo.workspaceRuntimeId, worktree)
+    const base = workspacePaneLocationTerminalBase(location)
+    if (!base) return null
     return renderWorkspacePaneRuntimeTabPanel({
       type: input.type,
       workspacePaneId: input.workspacePaneId,
       panelLabel: input.panelLabel,
       selectedSessionId: selectedWorkspacePaneRuntimeSessionId(input.model, input.type),
-      target: {
-        runtimeTarget,
-        presentation: terminalGitWorktreePresentation(),
-      },
+      target: { location },
       runtimeState: {
         projectionPhase: runtimeState.projectionPhase,
         projectionErrorMessage: runtimeState.projectionErrorMessage,
@@ -135,9 +132,9 @@ function ChangesWorkspacePanePanel({ detail, workspacePaneId, panelLabel }: Work
 
 function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
   const branch = detail.branch
-  const worktreePath = detail.worktree?.path
+  const worktree = detail.worktree
   const capabilities = repo.probe.capabilities
-  if (!branch || !worktreePath || !capabilities) {
+  if (!branch || !worktree || !capabilities) {
     return (
       <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
         <FiletreeNoWorktreeView />
@@ -147,13 +144,8 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
       <WorkspaceFilesystemTabPanel
-        target={gitWorktreePaneFilesystemTarget({
-          workspaceId: repo.id,
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-          worktreePath,
-          head: gitHead(branch.name),
-          capabilities,
-        })}
+        location={workspacePaneLocationForWorktree(repo.id, repo.workspaceRuntimeId, worktree)}
+        capabilities={capabilities}
       />
     </WorkspacePanePanelFrame>
   )

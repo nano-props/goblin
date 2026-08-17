@@ -32,10 +32,17 @@ import type {
   WorkspacePaneStaticTab,
   WorkspacePaneTabModel,
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import { createWorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { beginAppNavigation, currentAppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import {
+  workspacePaneLocationForBranchTarget,
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+  type WorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
 const TARGET_ROUTE = { kind: 'static' as const, tab: 'status' as const }
@@ -142,13 +149,7 @@ describe('workspace pane tab controller transactions', () => {
 
     await expect(
       selectWorkspacePaneControllerTab(
-        {
-          ...workspacePaneTarget(),
-          routeTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
-          branchName: null,
-          worktreePath: '/repo',
-          paneTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
-        },
+        workspacePaneTarget(workspacePaneLocationForRoot(WORKSPACE_ID, 'repo-runtime-1')),
         staticTab('files'),
         navigation,
       ),
@@ -182,17 +183,7 @@ describe('workspace pane tab controller transactions', () => {
 
     await expect(
       selectWorkspacePaneControllerTab(
-        {
-          ...workspacePaneTarget(),
-          routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/worktree-a' },
-          branchName: 'feature/a',
-          worktreePath: '/worktree-a',
-          paneTarget: {
-            kind: 'git-worktree',
-            workspaceId: WORKSPACE_ID,
-            worktreePath: '/worktree-a',
-          },
-        },
+        workspacePaneTarget(linkedWorktreeLocation()),
         terminalTab(),
         controllerNavigation({ commitFilesystemWorkspacePaneRoute }),
         {
@@ -216,13 +207,7 @@ describe('workspace pane tab controller transactions', () => {
 
     await expect(
       selectWorkspacePaneControllerTab(
-        {
-          ...workspacePaneTarget(),
-          routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/worktree-a' },
-          branchName: 'feature/a',
-          worktreePath: '/worktree-a',
-          paneTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/worktree-a' },
-        },
+        workspacePaneTarget(linkedWorktreeLocation()),
         terminalPlaceholderTab(),
         controllerNavigation({ commitFilesystemWorkspacePaneRoute }),
         { focusEffects: { onCommit, onAbandon } },
@@ -277,15 +262,7 @@ describe('workspace pane tab controller transactions', () => {
     beginAppNavigation()
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const target = {
-      ...workspacePaneTarget(),
-      routeTarget: { kind: 'git-worktree' as const, workspaceId: WORKSPACE_ID, worktreePath: '/worktree-a' },
-      branchName: 'feature/a',
-      worktreePath: '/worktree-a',
-      paneTarget: {
-        kind: 'git-worktree' as const,
-        workspaceId: WORKSPACE_ID,
-        worktreePath: '/worktree-a',
-      },
+      ...workspacePaneTarget(linkedWorktreeLocation()),
       tabEntries: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
       tabs: [],
     }
@@ -450,15 +427,27 @@ describe('workspace pane tab controller transactions', () => {
   })
 })
 
-function workspacePaneTarget(): WorkspacePaneTabModel {
-  return {
-    workspaceId: WORKSPACE_ID,
-    workspaceRuntimeId: 'repo-runtime-1',
-    routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature/bare' },
-    branchName: 'feature/bare',
-    worktreePath: null,
-    paneTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature/bare' },
-  } as WorkspacePaneTabModel
+function workspacePaneTarget(
+  location: WorkspacePaneLocation = workspacePaneLocationForBranchTarget(
+    { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName: 'feature/bare' },
+    'repo-runtime-1',
+  ),
+): WorkspacePaneTabModel {
+  return createWorkspacePaneTabModel({
+    location,
+    preferredTab: 'files',
+    tabEntries: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+    runtimeTabViews: [],
+    runtimeTabStateByType: {},
+  })
+}
+
+function linkedWorktreeLocation() {
+  return workspacePaneLocationForLinkedWorktree(
+    { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/worktree-a' },
+    'repo-runtime-1',
+    { kind: 'branch', branchName: 'feature/a' },
+  )
 }
 
 function committingNavigation(): FilesystemWorkspacePaneRouteCommitActions {

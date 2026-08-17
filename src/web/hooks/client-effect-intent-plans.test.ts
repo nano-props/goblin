@@ -13,10 +13,14 @@ import {
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
-import type { BranchSnapshotInfo, RepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
+import type { BranchSnapshotInfo, WorkspaceRepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
+import {
+  workspacePaneLocationForBranchTarget,
+  workspacePaneLocationForRoot,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 const CURRENT_GIT_REPO = {
   id: workspaceIdForTest('goblin+file:///tmp/repo'),
@@ -35,7 +39,7 @@ const CURRENT_GIT_REPO = {
 function repositoryFacts(
   branches: BranchSnapshotInfo[],
   status: WorktreeStatus[] | undefined,
-  worktrees: RepoWorktreeSnapshot[] = [],
+  worktrees: WorkspaceRepoWorktreeSnapshot[] = [],
 ) {
   return {
     snapshot: {
@@ -63,10 +67,11 @@ function repositoryFactsForTest(repo: Pick<WorkspaceState, 'id' | 'workspaceRunt
 const GIT_WORKSPACE_ID = CURRENT_GIT_REPO.id
 const DETACHED_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace/example-repo')
 const MAIN_COMMAND_TARGET = {
-  routeTarget: { kind: 'git-branch' as const, workspaceId: GIT_WORKSPACE_ID, branchName: 'main' },
-  workspaceRuntimeId: CURRENT_GIT_REPO.workspaceRuntimeId,
+  location: workspacePaneLocationForBranchTarget(
+    { kind: 'git-branch', workspaceId: GIT_WORKSPACE_ID, branchName: 'main' },
+    CURRENT_GIT_REPO.workspaceRuntimeId,
+  ),
   workspacePaneRoute: null,
-  filesystemTarget: null,
 }
 
 const CURRENT_DIRECTORY_REPO = {
@@ -190,6 +195,7 @@ describe('client effect intent plans', () => {
             operation: null,
             materializedBranch: null,
             isPrimary: false,
+            isSource: false,
             isLocked: false,
           },
         ],
@@ -436,12 +442,9 @@ describe('client effect intent plans', () => {
         currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
         currentWorkspacePaneCommandTarget: {
+          location: workspacePaneLocationForRoot(GIT_WORKSPACE_ID, CURRENT_GIT_REPO.workspaceRuntimeId),
           workspacePaneRoute: null,
-          filesystemTarget: workspaceRootPaneFilesystemTarget({
-            workspaceId: CURRENT_DIRECTORY_REPO.id,
-            workspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
-            capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
-          }),
+          capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
         },
       },
     )
@@ -601,12 +604,9 @@ describe('client effect intent plans', () => {
         currentWorkspaceCapability: { kind: 'filesystem', probe: CURRENT_DIRECTORY_REPO.workspaceProbe },
         currentWorkspaceCanExecute: true,
         currentWorkspacePaneCommandTarget: {
+          location: workspacePaneLocationForRoot(GIT_WORKSPACE_ID, CURRENT_GIT_REPO.workspaceRuntimeId),
           workspacePaneRoute: null,
-          filesystemTarget: workspaceRootPaneFilesystemTarget({
-            workspaceId: CURRENT_DIRECTORY_REPO.id,
-            workspaceRuntimeId: CURRENT_DIRECTORY_REPO.workspaceRuntimeId,
-            capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
-          }),
+          capabilities: CURRENT_DIRECTORY_REPO.workspaceProbe.capabilities,
         },
       },
     )

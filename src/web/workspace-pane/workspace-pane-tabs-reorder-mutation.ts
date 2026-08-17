@@ -9,10 +9,13 @@ import {
   updateWorkspacePaneTabsOnServer,
   writeCanonicalWorkspacePaneTabsSnapshot,
 } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import {
+  workspacePaneTabEntryListIdentity,
+  workspacePaneTabsWithSurfaceOrder,
+} from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   runWorkspacePaneAction,
-  workspacePaneActionTargetFromCoordinates,
+  workspacePaneActionTargetFromPaneTarget,
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
@@ -46,12 +49,13 @@ export function useWorkspacePaneTabsReorderMutation(
       onSettled?.()
       return
     }
-    const nextIdentity = workspacePaneTabEntryListIdentity(tabs)
+    const nextTabs = workspacePaneTabsWithSurfaceOrder(current.canonicalTabs, tabs)
+    const nextIdentity = workspacePaneTabEntryListIdentity(nextTabs)
     if (nextIdentity === workspacePaneTabEntryListIdentity(current.canonicalTabs)) {
       onSettled?.()
       return
     }
-    void runWorkspacePaneTabsReorder(target, [...tabs], queryClient, onSettled)
+    void runWorkspacePaneTabsReorder(target, nextTabs, queryClient, onSettled)
   }
 
   return { reorderTabs }
@@ -137,10 +141,5 @@ async function runWorkspacePaneTabsReorderInQueue(
 type WorkspacePaneTabsReorderTarget = WorkspacePaneTabsTarget & { workspaceRuntimeId: string }
 
 function workspacePaneReorderActionTarget(target: WorkspacePaneTabsReorderTarget): WorkspacePaneActionTarget {
-  return workspacePaneActionTargetFromCoordinates({
-    workspaceId: target.workspaceId,
-    workspaceRuntimeId: target.workspaceRuntimeId,
-    branchName: workspacePaneTabsBranchIdentity(target),
-    worktreePath: workspacePaneTabsTargetWorktreePath(target),
-  })
+  return workspacePaneActionTargetFromPaneTarget(target, target.workspaceRuntimeId)
 }

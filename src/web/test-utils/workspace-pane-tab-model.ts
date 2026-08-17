@@ -15,6 +15,11 @@ import {
 } from '#/shared/workspace-pane.ts'
 import { requiredGitWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
+import {
+  workspacePaneLocationForBranchTarget,
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/goblin-workspace-pane-tab-model-repo')
 export const WORKSPACE_RUNTIME_ID = 'repo-runtime-test'
@@ -27,8 +32,8 @@ export function requiredEntryIdentity(entry: WorkspacePaneTabEntry | null): stri
 }
 
 type WorkspacePaneTabModelTestInput = Omit<
-  WorkspacePaneTabModelInput,
-  'workspaceRuntimeId' | 'runtimeTabStateByType' | 'routeTarget' | 'paneTarget' | 'worktreeHead'
+  Extract<WorkspacePaneTabModelInput, { location: null }>,
+  'workspaceRuntimeId' | 'runtimeTabStateByType' | 'location'
 > & {
   branchName: string | null
   worktreePath: string | null
@@ -52,24 +57,29 @@ export function createModel(input: WorkspacePaneTabModelTestInput): WorkspacePan
     selectedTerminalSessionId,
     ...modelInput
   } = input
+  const { workspaceId, ...projectionInput } = modelInput
   const terminalState = runtimeTabStateByType?.terminal
+  const runtimeId = workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID
+  const location = branchName
+    ? worktreePath
+      ? workspacePaneLocationForLinkedWorktree(
+          { kind: 'git-worktree', workspaceId, worktreePath },
+          runtimeId,
+          { kind: 'branch', branchName },
+        )
+      : workspacePaneLocationForBranchTarget(
+          { kind: 'git-branch', workspaceId, branchName },
+          runtimeId,
+        )
+    : worktreePath === workspaceId
+      ? workspacePaneLocationForRoot(workspaceId, runtimeId)
+      : null
   const hasSelectedTerminalSession = terminalState
     ? Object.prototype.hasOwnProperty.call(terminalState, 'selectedSessionId')
     : false
-  return createWorkspacePaneTabModel({
-    workspaceRuntimeId: workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID,
-    ...modelInput,
-    routeTarget: branchName
-      ? { kind: 'git-branch', workspaceId: modelInput.workspaceId, branchName }
-      : worktreePath === modelInput.workspaceId
-        ? { kind: 'workspace-root', workspaceId: modelInput.workspaceId }
-        : { kind: 'inactive', workspaceId: modelInput.workspaceId },
-    paneTarget: branchName
-      ? requiredGitWorkspacePaneTabsTarget(modelInput.workspaceId, branchName, worktreePath)
-      : worktreePath === modelInput.workspaceId
-        ? { kind: 'workspace-root', workspaceId: modelInput.workspaceId }
-        : { kind: 'inactive', workspaceId: modelInput.workspaceId },
-    worktreeHead: branchName && worktreePath ? { kind: 'branch', branchName } : undefined,
+  const projection = {
+    ...projectionInput,
+    location,
     runtimeTabStateByType: {
       ...runtimeTabStateByType,
       terminal: {
@@ -81,7 +91,10 @@ export function createModel(input: WorkspacePaneTabModelTestInput): WorkspacePan
           : (selectedTerminalSessionId ?? null),
       },
     },
-  })
+  }
+  return location
+    ? createWorkspacePaneTabModel({ ...projection, location })
+    : createWorkspacePaneTabModel({ ...projection, location: null, workspaceId, workspaceRuntimeId: runtimeId })
 }
 
 export function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {

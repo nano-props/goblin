@@ -32,6 +32,10 @@ export interface RepoWorktreeSnapshot extends RepoWorktreeTargetProjection {
   isLocked: boolean
 }
 
+export interface WorkspaceRepoWorktreeSnapshot extends RepoWorktreeSnapshot {
+  isSource: boolean
+}
+
 export function hasUniqueRepoWorktreeMaterializedBranches(
   worktrees: readonly Pick<RepoWorktreeSnapshot, 'materializedBranch'>[],
 ): boolean {
@@ -44,14 +48,55 @@ export function hasUniqueRepoWorktreeMaterializedBranches(
   return true
 }
 
-export type WorkspacePaneTargetIdentity =
-  | { kind: 'git-branch'; branchName: string }
+export interface WorkspacePaneBranchTargetIdentity {
+  kind: 'git-branch'
+  branchName: string
+}
+
+export interface WorkspacePaneWorktreeTargetIdentity {
+  kind: 'git-worktree'
+  worktreePath: string
+  head: GitHead
+  materializedBranch: string | null
+}
+
+export interface WorkspacePaneTargetIdentitySet {
+  worktrees: WorkspacePaneWorktreeTargetIdentity[]
+  branches: WorkspacePaneBranchTargetIdentity[]
+}
+
+export type WorkspacePaneTargetMembership =
   | {
-      kind: 'git-worktree'
-      worktreePath: string
-      head: GitHead
-      materializedBranch: string | null
+      source: { kind: 'worktree'; identity: WorkspacePaneWorktreeTargetIdentity }
+      linkedWorktrees: WorkspacePaneWorktreeTargetIdentity[]
+      branches: WorkspacePaneBranchTargetIdentity[]
     }
+  | {
+      source: { kind: 'bare-repository'; repositoryPath: string }
+      linkedWorktrees: WorkspacePaneWorktreeTargetIdentity[]
+      branches: WorkspacePaneBranchTargetIdentity[]
+    }
+
+export function workspacePaneTargetMembership(
+  source: { path: string; isBare: boolean },
+  identities: WorkspacePaneTargetIdentitySet,
+): WorkspacePaneTargetMembership {
+  if (source.isBare) {
+    return {
+      source: { kind: 'bare-repository', repositoryPath: source.path },
+      linkedWorktrees: identities.worktrees,
+      branches: identities.branches,
+    }
+  }
+  const sourceIdentities = identities.worktrees.filter(({ worktreePath }) => worktreePath === source.path)
+  if (sourceIdentities.length !== 1) throw new Error('error.failed-read-repo')
+  const sourceIdentity = sourceIdentities[0]!
+  return {
+    source: { kind: 'worktree', identity: sourceIdentity },
+    linkedWorktrees: identities.worktrees.filter((identity) => identity !== sourceIdentity),
+    branches: identities.branches,
+  }
+}
 
 export interface BranchSnapshotInfo {
   name: string

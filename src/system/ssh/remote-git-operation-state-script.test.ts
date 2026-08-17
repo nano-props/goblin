@@ -1,12 +1,17 @@
 import { mkdir, mkdtemp, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { execa } from 'execa'
 import { afterEach, describe, expect, test } from 'vitest'
 import { remoteGitOperationStateScript } from '#/system/ssh/remote-git-operation-state-script.ts'
 
 const tempDirectories: string[] = []
 const describePosix = process.platform === 'win32' ? describe.skip : describe
+const relativeWorktreeHelp = spawnSync('git', ['worktree', 'add', '-h'], { encoding: 'utf8' })
+const supportsRelativeWorktreePaths = `${relativeWorktreeHelp.stdout}\n${relativeWorktreeHelp.stderr}`.includes(
+  '--relative-paths',
+)
 
 afterEach(async () => {
   await Promise.all(tempDirectories.splice(0).map(async (directory) => await rm(directory, { recursive: true })))
@@ -194,7 +199,7 @@ describePosix('remote Git operation state script', () => {
 
   test.each([
     ['absolute', []],
-    ['relative', ['--relative-paths']],
+    ...(supportsRelativeWorktreePaths ? ([['relative', ['--relative-paths']]] as const) : []),
   ] as const)(
     'reads linked bisect ownership through a %s administrative pointer while its path is offline',
     async (_, flags) => {

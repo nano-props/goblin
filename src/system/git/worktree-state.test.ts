@@ -1,14 +1,20 @@
 import os from 'node:os'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { git } from '#/system/git/git-exec.ts'
 import { readGitWorktreeState, readRepoWorktreeSnapshots } from '#/system/git/worktree-state.ts'
 import { readWorktreeMembership } from '#/system/git/worktrees.ts'
+import { readLocalGitWorkspaceSourceContext } from '#/system/git/workspace-source-context.ts'
 
 let repoPath = ''
 let gitDir = ''
 let offlineWorktreePath = ''
+const relativeWorktreeHelp = spawnSync('git', ['worktree', 'add', '-h'], { encoding: 'utf8' })
+const supportsRelativeWorktreePaths = `${relativeWorktreeHelp.stdout}\n${relativeWorktreeHelp.stderr}`.includes(
+  '--relative-paths',
+)
 
 beforeEach(async () => {
   repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin-worktree-state-'))
@@ -19,6 +25,16 @@ beforeEach(async () => {
 afterEach(async () => {
   if (repoPath) await rm(repoPath, { recursive: true, force: true })
   if (offlineWorktreePath) await rm(offlineWorktreePath, { recursive: true, force: true })
+})
+
+test('projects the resolved local source worktree once for snapshot and target consumers', async () => {
+  const context = await readLocalGitWorkspaceSourceContext(repoPath)
+
+  expect(context.sourceWorktree).toMatchObject({ isBare: false, isPrimary: true })
+  expect(context.worktrees).toEqual([expect.not.objectContaining({ isSource: expect.anything() })])
+  expect(context.workspaceWorktrees).toEqual([
+    expect.objectContaining({ path: context.sourceWorktree.path, isSource: true }),
+  ])
 })
 
 describe('readGitWorktreeState', () => {
@@ -210,7 +226,7 @@ test('rejects an operation on an unborn attached worktree', async () => {
 
 test.each([
   ['absolute', []],
-  ['relative', ['--relative-paths']],
+  ...(supportsRelativeWorktreePaths ? ([['relative', ['--relative-paths']]] as const) : []),
 ] as const)(
   'reads a locked linked worktree with a %s administrative pointer while its path is offline',
   async (_, flags) => {

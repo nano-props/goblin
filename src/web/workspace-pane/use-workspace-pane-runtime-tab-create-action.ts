@@ -12,19 +12,19 @@ import {
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
-import type { RuntimeWorkspacePaneTarget } from '#/shared/workspace-runtime.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  workspacePaneLocationTerminalBase,
+  type FilesystemWorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export interface UseWorkspacePaneRuntimeTabCreateActionInput {
-  base: MaybeRefOrGetter<TerminalSessionBase | null>
+  location: MaybeRefOrGetter<FilesystemWorkspacePaneLocation | null>
   runtimeTabStateByType: MaybeRefOrGetter<WorkspacePaneRuntimeTabCreateStateByType>
   workspacePaneRoute: MaybeRefOrGetter<ParsedWorkspacePaneRoute | null | undefined>
   showCreatedRuntimeTab: (
     type: WorkspacePaneRuntimeTabType,
     sessionId: string,
     presentation: TerminalPresentation,
-    target: RuntimeWorkspacePaneTarget,
     routeRequest: CreatedTerminalRouteRequest,
   ) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
@@ -35,28 +35,26 @@ export function useWorkspacePaneRuntimeTabCreateAction(
 ): ComputedRef<WorkspacePaneRuntimeTabCreateAction | null> {
   const { createTerminalWithAdmission, focusTerminal } = useTerminalSessionContext()
   const captureOpenerIdentity = () => {
-    const terminalBase = toValue(input.base)
+    const location = toValue(input.location)
+    if (!location) return null
+    const terminalBase = workspacePaneLocationTerminalBase(location)
     if (!terminalBase) return null
-    const paneTarget = workspacePaneTabsTargetFromRuntime(terminalBase.target)
-    return paneTarget
-      ? captureWorkspacePaneActiveTabIdentity(paneTarget, terminalBase.target.workspaceRuntimeId, {
-          workspacePaneRoute: toValue(input.workspacePaneRoute),
-        })
-      : null
+    return captureWorkspacePaneActiveTabIdentity(location, {
+      workspacePaneRoute: toValue(input.workspacePaneRoute),
+    })
   }
 
   return computed(() => {
-    const terminalBase = toValue(input.base)
+    const location = toValue(input.location)
+    const terminalBase = location ? workspacePaneLocationTerminalBase(location) : null
     return workspacePaneRuntimeTabCreateAction('terminal', {
       runtimeTabStateByType: toValue(input.runtimeTabStateByType),
       showCreatedRuntimeTab: (type, sessionId, presentation, routeRequest) =>
-        terminalBase?.target
-          ? input.showCreatedRuntimeTab(type, sessionId, presentation, terminalBase.target, routeRequest)
-          : false,
+        terminalBase?.target ? input.showCreatedRuntimeTab(type, sessionId, presentation, routeRequest) : false,
       t: input.t,
       terminal: terminalBase
         ? {
-            base: terminalBase,
+            location: location!,
             createTerminal: createTerminalWithAdmission,
             captureOpenerIdentity,
             focusTerminal,
