@@ -635,10 +635,7 @@ export function workspaceRuntimeHasGitCapability(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
 ): boolean {
-  return (
-    workspaceRuntimeGitCapabilityState(userId, workspaceId, workspaceRuntimeId) ===
-    'available'
-  )
+  return workspaceRuntimeGitCapabilityState(userId, workspaceId, workspaceRuntimeId) === 'available'
 }
 
 export type WorkspaceRuntimeGitCapabilityState = 'available' | 'unavailable' | 'transitioning'

@@ -69,7 +69,10 @@ const captureWorkspaceGitRootTarget: WorkspacePaneTargetProjectionProvider['capt
 ) => {
   const workspaceRuntimeId = scope.slice(scope.lastIndexOf('\0') + 1)
   return [
-    { target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root: workspaceId }, nativeWorktreePath: '/repo' },
+    {
+      target: { kind: 'git-worktree', workspaceId, workspaceRuntimeId, root: workspaceId },
+      nativeWorktreePath: '/repo',
+    },
   ]
 }
 

@@ -29,13 +29,7 @@ interface GitWorkspacePaneContentProps {
 // target-scoped preferred tab and live terminal truth.
 export const GitWorkspacePaneContent = defineComponent<GitWorkspacePaneContentProps>({
   name: 'GitWorkspacePaneContent',
-  props: [
-    'repo',
-    'detail',
-    'workspacePaneId',
-    'workspacePaneTabModel',
-    'onBackToGitWorkspaceNavigator',
-  ],
+  props: ['repo', 'detail', 'workspacePaneId', 'workspacePaneTabModel', 'onBackToGitWorkspaceNavigator'],
 
   setup(props) {
     const t = useT()

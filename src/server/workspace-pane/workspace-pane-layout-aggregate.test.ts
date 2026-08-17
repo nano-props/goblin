@@ -144,10 +144,12 @@ describe('workspace pane layout aggregate', () => {
     })
     await operationStarted.promise
 
-    const promotion = aggregate.runExclusive(scope.workspaceId, async (operation) =>
-      await operation.commitGitCapabilityPromotion({ ...scope, epochCapability: testEpochCapability }, () => {
-        order.push('promotion-committed')
-      }),
+    const promotion = aggregate.runExclusive(
+      scope.workspaceId,
+      async (operation) =>
+        await operation.commitGitCapabilityPromotion({ ...scope, epochCapability: testEpochCapability }, () => {
+          order.push('promotion-committed')
+        }),
     )
     await Promise.resolve()
     expect(order).toEqual(['operation-started'])
@@ -172,13 +174,12 @@ describe('workspace pane layout aggregate', () => {
     const authorityError = new Error('terminal authority commit failed')
 
     await expect(
-      aggregate.runExclusive(scope.workspaceId, async (operation) =>
-        await operation.commitGitCapabilityPromotion(
-          { ...scope, epochCapability: testEpochCapability },
-          () => {
+      aggregate.runExclusive(
+        scope.workspaceId,
+        async (operation) =>
+          await operation.commitGitCapabilityPromotion({ ...scope, epochCapability: testEpochCapability }, () => {
             throw authorityError
-          },
-        ),
+          }),
       ),
     ).resolves.toEqual({
       kind: 'authority-commit-failed',

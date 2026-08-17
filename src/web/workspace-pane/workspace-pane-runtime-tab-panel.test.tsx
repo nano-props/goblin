@@ -183,12 +183,9 @@ describe('workspace pane runtime tab panel', () => {
     )
     expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
-
 })
 
-function renderPanel(
-  input: { terminalContext?: TerminalSessionContextValue; projectionPhase?: 'failed' } = {},
-) {
+function renderPanel(input: { terminalContext?: TerminalSessionContextValue; projectionPhase?: 'failed' } = {}) {
   const navigation = navigationWith()
   const retryWorkspace = vi.fn()
   const result = renderInJsdom(

@@ -132,9 +132,7 @@ export function filesystemWorkspacePaneTargetLeaseIsCurrent(lease: FilesystemWor
   return snapshot?.worktrees.some((worktree) => worktree.path === worktreePath) ?? false
 }
 
-export type WorkspacePaneTabTargetUnavailableReason =
-  | 'workspace-pane-tabs-pending'
-  | 'workspace-pane-tabs-failed'
+export type WorkspacePaneTabTargetUnavailableReason = 'workspace-pane-tabs-pending' | 'workspace-pane-tabs-failed'
 
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: WorkspacePaneTabModel }

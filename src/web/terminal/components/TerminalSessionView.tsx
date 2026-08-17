@@ -29,10 +29,7 @@ import {
   useTerminalFilesystemTargetSessionDescriptor,
   useTerminalSnapshot,
 } from '#/web/terminal/components/terminal-session-store.ts'
-import type {
-  TerminalInputWriter,
-  TerminalPresentationPendingOperation,
-} from '#/web/terminal/components/types.ts'
+import type { TerminalInputWriter, TerminalPresentationPendingOperation } from '#/web/terminal/components/types.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { terminalLog } from '#/web/logger.ts'
@@ -492,8 +489,7 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
       const projectionPending = projectionPhase === 'pending'
       const projectionFailed = projectionPhase === 'failed'
       const showPresentationFailure = !showErrorChip && !attaching && presentationRecovery === 'failed'
-      const showProjectionRecoveryFailure =
-        !showErrorChip && projectionFailed && presentationRecovery !== 'failed'
+      const showProjectionRecoveryFailure = !showErrorChip && projectionFailed && presentationRecovery !== 'failed'
       const showEmptyCta =
         currentSessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !createPending.value
       const showStatusOverlay =

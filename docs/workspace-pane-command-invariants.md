@@ -92,8 +92,8 @@ navigation lineage, retries, or replay to eliminate that recoverable overlap.
 | Route-only destination arrives during target write  | reject immediately; the accepted write and route generation remain unchanged |
 | Router leaves the repo/branch while a command waits | reject with no navigation                                                    |
 | Runtime/worktree is replaced while a command waits  | reject with no effect on the replacement                                     |
-| Rapid terminal creates on one filesystem target     | create and present each in queue order; the final terminal remains selected   |
-| Router has left while terminal creates are draining | accepted resources remain; later presentation commits are rejected            |
+| Rapid terminal creates on one filesystem target     | create and present each in queue order; the final terminal remains selected  |
+| Router has left while terminal creates are draining | accepted resources remain; later presentation commits are rejected           |
 | Close write commits, then source CAS fails          | resource stays closed; the stale URL renders an empty pane                   |
 | One of two windows releases a shared runtime        | sibling remains current                                                      |
 | Recovery resets projection scopes                   | cancel old work; keep effect-owned listeners installed                       |

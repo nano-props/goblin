@@ -230,15 +230,18 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run: run })).resolves.toEqual({ source: { kind: 'worktree', worktreePath: '/srv/repo' }, identities: [
-      {
-        kind: 'git-worktree',
-        worktreePath: '/srv/repo',
-        head: { kind: 'branch', branchName: 'main' },
-        materializedBranch: 'main',
-      },
-      { kind: 'git-branch', branchName: 'feature/no-worktree' },
-    ] })
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run: run })).resolves.toEqual({
+      source: { kind: 'worktree', worktreePath: '/srv/repo' },
+      identities: [
+        {
+          kind: 'git-worktree',
+          worktreePath: '/srv/repo',
+          head: { kind: 'branch', branchName: 'main' },
+          materializedBranch: 'main',
+        },
+        { kind: 'git-branch', branchName: 'feature/no-worktree' },
+      ],
+    })
     expect(run).toHaveBeenCalledTimes(4)
     expect(run).toHaveBeenCalledWith({ type: 'gitLocalBranches', path: '/srv/repo' }, TARGET, {
       signal: undefined,
@@ -268,14 +271,17 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).resolves.toEqual({ source: { kind: 'worktree', worktreePath: '/srv/repo' }, identities: [
-      {
-        kind: 'git-worktree',
-        worktreePath: '/srv/repo',
-        head: { kind: 'branch', branchName: 'main' },
-        materializedBranch: 'main',
-      },
-    ] })
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).resolves.toEqual({
+      source: { kind: 'worktree', worktreePath: '/srv/repo' },
+      identities: [
+        {
+          kind: 'git-worktree',
+          worktreePath: '/srv/repo',
+          head: { kind: 'branch', branchName: 'main' },
+          materializedBranch: 'main',
+        },
+      ],
+    })
   })
 
   test.each([
@@ -294,15 +300,18 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).resolves.toEqual({ source: { kind: 'worktree', worktreePath: '/srv/repo' }, identities: [
-      {
-        kind: 'git-worktree',
-        worktreePath: '/srv/repo',
-        head: { kind: 'detached' },
-        materializedBranch: 'feature/in-progress',
-      },
-      { kind: 'git-branch', branchName: 'main' },
-    ] })
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).resolves.toEqual({
+      source: { kind: 'worktree', worktreePath: '/srv/repo' },
+      identities: [
+        {
+          kind: 'git-worktree',
+          worktreePath: '/srv/repo',
+          head: { kind: 'detached' },
+          materializedBranch: 'feature/in-progress',
+        },
+        { kind: 'git-branch', branchName: 'main' },
+      ],
+    })
   })
 
   test('rejects a detached-HEAD display value in the remote state protocol', async () => {
@@ -450,15 +459,18 @@ describe('remote Git snapshot', () => {
       throw new Error(`unexpected command: ${command.type}`)
     })
 
-    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).resolves.toEqual({ source: { kind: 'worktree', worktreePath: '/srv/repo' }, identities: [
-      {
-        kind: 'git-worktree',
-        worktreePath: '/srv/repo',
-        head: { kind: 'detached' },
-        materializedBranch: 'feature/in-progress',
-      },
-      { kind: 'git-branch', branchName: 'main' },
-    ] })
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run })).resolves.toEqual({
+      source: { kind: 'worktree', worktreePath: '/srv/repo' },
+      identities: [
+        {
+          kind: 'git-worktree',
+          worktreePath: '/srv/repo',
+          head: { kind: 'detached' },
+          materializedBranch: 'feature/in-progress',
+        },
+        { kind: 'git-branch', branchName: 'main' },
+      ],
+    })
   })
 
   test('does not turn a failed authoritative remote snapshot into missing data', async () => {
@@ -576,14 +588,17 @@ describe('remote Git snapshot', () => {
             : okRemoteResult(''),
     )
 
-    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run: run })).resolves.toEqual({ source: { kind: 'worktree', worktreePath: '/srv/repo' }, identities: [
-      {
-        kind: 'git-worktree',
-        worktreePath: '/srv/repo',
-        head: { kind: 'branch', branchName: 'main' },
-        materializedBranch: 'main',
-      },
-    ] })
+    await expect(getRemoteWorkspacePaneTargetMembership(TARGET, { run: run })).resolves.toEqual({
+      source: { kind: 'worktree', worktreePath: '/srv/repo' },
+      identities: [
+        {
+          kind: 'git-worktree',
+          worktreePath: '/srv/repo',
+          head: { kind: 'branch', branchName: 'main' },
+          materializedBranch: 'main',
+        },
+      ],
+    })
     expect(run).toHaveBeenCalledTimes(4)
   })
 

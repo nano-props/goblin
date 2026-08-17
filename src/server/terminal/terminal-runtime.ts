@@ -367,13 +367,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
           const validation = manager.validateWorkspaceRootSessionPromotion(userId, scope, workspaceId)
           const paneTransition = await workspaceTabsCoordinator.commitGitCapabilityPromotion(
             { userId, workspaceId, scope, epochCapability: runtimeCapability },
-            () =>
-              manager.commitWorkspaceRootSessionPromotion(
-                userId,
-                scope,
-                validation,
-                workspaceRuntimeId,
-              ),
+            () => manager.commitWorkspaceRootSessionPromotion(userId, scope, validation, workspaceRuntimeId),
           )
           return { kind: 'accepted' as const, paneTransition }
         } catch (error) {
@@ -392,24 +386,20 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
           'workspace capability transition committed with terminal authority failure',
         )
       }
-      publishCommittedCapabilityEffects(
-        'promotion',
-        { userId, workspaceId, workspaceRuntimeId },
-        [
-          paneTransition.kind === 'committed'
-            ? paneTransition.authorityResult.publishEffects
-            : () =>
-                broadcastTerminalSessionsChanged(
-                  userId,
-                  manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
-                ),
-          () => {
-            for (const affectedUserId of paneTransition.affectedUserIds) {
-              publishWorkspaceTabsChanged(affectedUserId, workspaceId)
-            }
-          },
-        ],
-      )
+      publishCommittedCapabilityEffects('promotion', { userId, workspaceId, workspaceRuntimeId }, [
+        paneTransition.kind === 'committed'
+          ? paneTransition.authorityResult.publishEffects
+          : () =>
+              broadcastTerminalSessionsChanged(
+                userId,
+                manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
+              ),
+        () => {
+          for (const affectedUserId of paneTransition.affectedUserIds) {
+            publishWorkspaceTabsChanged(affectedUserId, workspaceId)
+          }
+        },
+      ])
       if (paneTransition.kind === 'authority-commit-failed') {
         return { kind: 'committed-authority-uncertain', error: paneTransition.error }
       }
@@ -448,35 +438,31 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
           'workspace capability transition committed with terminal authority failure',
         )
       }
-      publishCommittedCapabilityEffects(
-        'removal',
-        { userId, workspaceId, workspaceRuntimeId },
-        [
-          paneTransition.kind === 'committed'
-            ? paneTransition.authorityResult.publishEffects
-            : () =>
-                broadcastTerminalSessionsChanged(
-                  userId,
-                  manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
-                ),
-          () => {
-            if (
-              paneTransition.kind === 'committed' &&
-              (paneTransition.durableLayoutChanged || paneTransition.authorityResult.removedCount > 0)
-            ) {
+      publishCommittedCapabilityEffects('removal', { userId, workspaceId, workspaceRuntimeId }, [
+        paneTransition.kind === 'committed'
+          ? paneTransition.authorityResult.publishEffects
+          : () =>
               broadcastTerminalSessionsChanged(
                 userId,
                 manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
-              )
-            }
-          },
-          () => {
-            for (const affectedUserId of paneTransition.affectedUserIds) {
-              publishWorkspaceTabsChanged(affectedUserId, workspaceId)
-            }
-          },
-        ],
-      )
+              ),
+        () => {
+          if (
+            paneTransition.kind === 'committed' &&
+            (paneTransition.durableLayoutChanged || paneTransition.authorityResult.removedCount > 0)
+          ) {
+            broadcastTerminalSessionsChanged(
+              userId,
+              manager.terminalSessionsChangedEventForScope(userId, workspaceId, workspaceRuntimeId),
+            )
+          }
+        },
+        () => {
+          for (const affectedUserId of paneTransition.affectedUserIds) {
+            publishWorkspaceTabsChanged(affectedUserId, workspaceId)
+          }
+        },
+      ])
       if (paneTransition.kind === 'authority-commit-failed') {
         return { kind: 'committed-authority-uncertain', error: paneTransition.error }
       }

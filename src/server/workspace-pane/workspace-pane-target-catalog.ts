@@ -81,9 +81,10 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
                 kind: 'git-worktree',
                 workspaceId,
                 workspaceRuntimeId,
-                root: identity.worktreePath === sourceWorktreePath
-                  ? workspaceId
-                  : workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
+                root:
+                  identity.worktreePath === sourceWorktreePath
+                    ? workspaceId
+                    : workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
               },
               nativeWorktreePath: identity.worktreePath,
             }

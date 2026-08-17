@@ -436,7 +436,6 @@ describe('GitWorkspaceNavigatorView', () => {
     expect(screen.queryByRole('status')).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
   })
-
 })
 
 function renderGitWorkspaceNavigatorView() {

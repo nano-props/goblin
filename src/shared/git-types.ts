@@ -54,9 +54,7 @@ export type WorkspacePaneTargetIdentity =
     }
 
 export interface WorkspacePaneTargetMembership {
-  source:
-    | { kind: 'worktree'; worktreePath: string }
-    | { kind: 'bare-repository'; repositoryPath: string }
+  source: { kind: 'worktree'; worktreePath: string } | { kind: 'bare-repository'; repositoryPath: string }
   identities: WorkspacePaneTargetIdentity[]
 }
 

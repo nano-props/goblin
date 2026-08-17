@@ -84,11 +84,7 @@ export interface TerminalComposerSessionState {
 
 export type TerminalPresentationRecovery = 'pending' | 'failed'
 export type TerminalPresentationPendingOperation =
-  | 'font-load'
-  | 'server-restart'
-  | 'server-sync'
-  | 'snapshot-replay'
-  | 'viewport-render'
+  'font-load' | 'server-restart' | 'server-sync' | 'snapshot-replay' | 'viewport-render'
 
 export interface TerminalSnapshot {
   phase: TerminalSessionPhase

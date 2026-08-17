@@ -446,11 +446,7 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
         input.workspaceId,
         input.scope,
       )
-      if (
-        !targets.some(
-          ({ target }) => target.kind === 'git-worktree' && target.root === input.workspaceId,
-        )
-      ) {
+      if (!targets.some(({ target }) => target.kind === 'git-worktree' && target.root === input.workspaceId)) {
         throw new Error('error.workspace-tabs-target-invalid')
       }
       return await layout.commitGitCapabilityPromotion({ ...scope, epochCapability: input.epochCapability }, commit)
@@ -468,8 +464,10 @@ export class WorkspacePaneTabsCoordinator implements WorkspacePaneRuntimeTabsCoo
   ): Promise<PaneCapabilityTransitionResult<T>> {
     const scope = aggregateScope(input.userId, input.workspaceId, input.scope)
     assertWorkspaceRuntimeEpochCapability(input.epochCapability, scope)
-    return await this.runWorkspaceTabsOperation(input.workspaceId, async (layout) =>
-      await layout.commitGitCapabilityRemoval({ ...scope, epochCapability: input.epochCapability }, commit),
+    return await this.runWorkspaceTabsOperation(
+      input.workspaceId,
+      async (layout) =>
+        await layout.commitGitCapabilityRemoval({ ...scope, epochCapability: input.epochCapability }, commit),
     )
   }
 

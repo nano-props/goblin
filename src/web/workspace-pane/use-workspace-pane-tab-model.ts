@@ -143,11 +143,7 @@ export function useWorkspaceRootTabModel(
     const route = toValue(workspacePaneRoute)
     const target = { kind: 'workspace-root' as const, workspaceId: current.id }
     const tabEntriesProjectionPhase = workspacePaneTabsProjectionPhase(tabsQuery.status.value)
-    const tabEntries = projectWorkspacePaneTabsForTarget(
-      tabsQuery.data.value,
-      tabEntriesProjectionPhase,
-      target,
-    ).tabs
+    const tabEntries = projectWorkspacePaneTabsForTarget(tabsQuery.data.value, tabEntriesProjectionPhase, target).tabs
     const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
     const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
     const preferredTab = route
@@ -198,11 +194,7 @@ export function useGitWorktreeWorkspacePaneTabModel(
     const current = currentTarget.value
     const route = toValue(workspacePaneRoute)
     const tabEntriesProjectionPhase = workspacePaneTabsProjectionPhase(tabsQuery.status.value)
-    const tabEntries = projectWorkspacePaneTabsForTarget(
-      tabsQuery.data.value,
-      tabEntriesProjectionPhase,
-      current,
-    ).tabs
+    const tabEntries = projectWorkspacePaneTabsForTarget(tabsQuery.data.value, tabEntriesProjectionPhase, current).tabs
     const requestedTab = route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
     const requestedSessionId = route?.kind === 'terminal' ? route.terminalSessionId : null
     const preferredTab = route

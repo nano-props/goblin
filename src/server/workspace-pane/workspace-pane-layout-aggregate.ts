@@ -200,10 +200,8 @@ export class WorkspacePaneLayoutAggregate {
           validateMembershipAndSnapshot: async (input) => await this.validateMembershipAndSnapshot(input),
           commitRuntimeTabPlacement: async (input, admissionCallback) =>
             await this.commitRuntimeTabPlacement(input, admissionCallback),
-          commitGitCapabilityPromotion: async (input, commit) =>
-            await this.commitGitCapabilityPromotion(input, commit),
-          commitGitCapabilityRemoval: async (input, commit) =>
-            await this.commitGitCapabilityRemoval(input, commit),
+          commitGitCapabilityPromotion: async (input, commit) => await this.commitGitCapabilityPromotion(input, commit),
+          commitGitCapabilityRemoval: async (input, commit) => await this.commitGitCapabilityRemoval(input, commit),
           closeEpoch: (scope) => this.closeEpoch(scope),
           commitProjectionTargets: (input) => this.commitProjectionTargets(input),
           indexedAdmissionLeases: (scope) => this.overlay.indexedAdmissionLeases(scope),

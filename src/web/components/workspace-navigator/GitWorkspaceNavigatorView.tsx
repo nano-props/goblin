@@ -32,14 +32,7 @@ interface Props {
 
 export const GitWorkspaceNavigatorView = defineComponent<Props>({
   name: 'GitWorkspaceNavigatorView',
-  props: [
-    'repoId',
-    'onSelectBranch',
-    'currentBranchName',
-    'currentWorktreePath',
-    'onAfterSelect',
-    'onAfterOpenStatus',
-  ],
+  props: ['repoId', 'onSelectBranch', 'currentBranchName', 'currentWorktreePath', 'onAfterSelect', 'onAfterOpenStatus'],
 
   setup(props) {
     const storeProjection = useStoreSelector(
@@ -87,14 +80,7 @@ interface GitWorkspaceNavigatorViewReadModelProps extends Omit<Props, 'repoId'> 
 const GitWorkspaceNavigatorViewReadModel = defineComponent<GitWorkspaceNavigatorViewReadModelProps>({
   name: 'GitWorkspaceNavigatorViewReadModel',
   inheritAttrs: false,
-  props: [
-    'repo',
-    'onSelectBranch',
-    'currentBranchName',
-    'currentWorktreePath',
-    'onAfterSelect',
-    'onAfterOpenStatus',
-  ],
+  props: ['repo', 'onSelectBranch', 'currentBranchName', 'currentWorktreePath', 'onAfterSelect', 'onAfterOpenStatus'],
   setup(props) {
     const t = useT()
     const navigation = useAppNavigation()

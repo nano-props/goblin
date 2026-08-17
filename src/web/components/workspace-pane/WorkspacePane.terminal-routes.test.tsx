@@ -17,10 +17,7 @@ import {
   TerminalSessionCommandScope,
   TerminalSessionReadScope,
 } from '#/web/terminal/components/terminal-session-context.ts'
-import type {
-  TerminalSessionContextValue,
-  TerminalSessionReadContextValue,
-} from '#/web/terminal/components/types.ts'
+import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/terminal/components/types.ts'
 import { terminalExecutionPath, terminalSessionCoordinates, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
@@ -216,7 +213,6 @@ describe('WorkspacePane terminal routes', () => {
         'terminal.loading',
       )
     })
-
   })
 
   test('selects an existing workspace-root terminal after Files without a route transition', async () => {

@@ -266,9 +266,7 @@ export class TerminalSession {
       ...snapshot,
       ...(this.takeoverOperation ? { takeoverPending: true } : {}),
       ...(this.presentationRecovery ? { presentationRecovery: this.presentationRecovery } : {}),
-      ...(this.presentationPendingOperation
-        ? { presentationPendingOperation: this.presentationPendingOperation }
-        : {}),
+      ...(this.presentationPendingOperation ? { presentationPendingOperation: this.presentationPendingOperation } : {}),
     }
   }
 
@@ -1052,11 +1050,7 @@ export class TerminalSession {
     recovery: TerminalPresentationRecovery | undefined,
     pendingOperation: TerminalPresentationPendingOperation | undefined,
   ): boolean {
-    if (
-      this.presentationRecovery === recovery &&
-      this.presentationPendingOperation === pendingOperation
-    )
-      return false
+    if (this.presentationRecovery === recovery && this.presentationPendingOperation === pendingOperation) return false
     this.presentationRecovery = recovery
     this.presentationPendingOperation = pendingOperation
     return true

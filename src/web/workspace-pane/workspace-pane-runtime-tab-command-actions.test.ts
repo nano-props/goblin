@@ -655,9 +655,7 @@ describe('workspace pane runtime tab command actions', () => {
     const scenario = terminalCommandScenario([terminalSessionId])
 
     try {
-      await expect(
-        dispatchNewTerminalRuntimeTabAction({ ...scenario.options, t: (key) => key }),
-      ).resolves.toBe(false)
+      await expect(dispatchNewTerminalRuntimeTabAction({ ...scenario.options, t: (key) => key })).resolves.toBe(false)
     } finally {
       scenario.resetBridge()
     }

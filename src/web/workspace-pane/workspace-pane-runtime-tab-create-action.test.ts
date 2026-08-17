@@ -157,9 +157,7 @@ describe('workspace pane runtime tab create action', () => {
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       tabs: [workspacePaneRuntimeTabEntry('terminal', TERMINAL_SESSION_ID)],
     })
-    terminalProjectionHydrationStore
-      .getState()
-      .markProjectionReady(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID)
+    terminalProjectionHydrationStore.getState().markProjectionReady(BASE.target.workspaceId, WORKSPACE_RUNTIME_ID)
 
     await expect(
       dispatchTerminalCreate({ createTerminal: vi.fn(), showCreatedTerminalTab: vi.fn(), t: translate }),
