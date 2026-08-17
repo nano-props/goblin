@@ -49,10 +49,16 @@ export type WorkspacePaneTargetIdentity =
   | {
       kind: 'git-worktree'
       worktreePath: string
-      isWorkspaceRoot: boolean
       head: GitHead
       materializedBranch: string | null
     }
+
+export interface WorkspacePaneTargetMembership {
+  source:
+    | { kind: 'worktree'; worktreePath: string }
+    | { kind: 'bare-repository'; repositoryPath: string }
+  identities: WorkspacePaneTargetIdentity[]
+}
 
 export interface BranchSnapshotInfo {
   name: string

@@ -3,7 +3,7 @@ import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { isValidRemotePath, parseRemoteSnapshot } from '#/system/ssh/git/codec.ts'
 import type { RemoteRepoSnapshot } from '#/system/ssh/git/codec.ts'
 import { repoWorktreeMaterializedBranch } from '#/shared/git-types.ts'
-import type { WorkspacePaneTargetIdentity, WorktreeInfo } from '#/shared/git-types.ts'
+import type { WorkspacePaneTargetIdentity, WorkspacePaneTargetMembership, WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteWorkspaceTarget } from '#/shared/remote-workspace.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import type { RemoteCommandRunner } from '#/system/ssh/commands.ts'
@@ -52,10 +52,10 @@ async function resolveRemoteSnapshotSourceWorktree(
   return sourceWorktree
 }
 
-export async function getRemoteWorkspacePaneTargetIdentities(
+export async function getRemoteWorkspacePaneTargetMembership(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run?: RemoteCommandRunner } = {},
-): Promise<WorkspacePaneTargetIdentity[]> {
+): Promise<WorkspacePaneTargetMembership> {
   const run: RemoteCommandRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const membership = await readRemoteWorktreeMembership(target, { signal: options.signal, run })
   const [sourceWorktree, worktrees] = await Promise.all([
@@ -88,11 +88,10 @@ export async function getRemoteWorkspacePaneTargetIdentities(
       return branchName ? [branchName] : []
     }),
   )
-  return [
+  const identities = [
     ...worktrees.map((worktree): WorkspacePaneTargetIdentity => ({
       kind: 'git-worktree',
       worktreePath: worktree.path,
-      isWorkspaceRoot: worktree.path === sourceWorktree.path,
       head: worktree.head,
       materializedBranch: worktree.materializedBranch,
     })),
@@ -100,4 +99,10 @@ export async function getRemoteWorkspacePaneTargetIdentities(
       .filter((branch) => !materializedBranches.has(branch))
       .map((branch): WorkspacePaneTargetIdentity => ({ kind: 'git-branch', branchName: branch })),
   ]
+  return {
+    source: sourceWorktree.isBare
+      ? { kind: 'bare-repository', repositoryPath: sourceWorktree.path }
+      : { kind: 'worktree', worktreePath: sourceWorktree.path },
+    identities,
+  }
 }

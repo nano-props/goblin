@@ -1,4 +1,4 @@
-import { getWorkspacePaneTargetIdentities } from '#/server/repos/read-paths.ts'
+import { getWorkspacePaneTargetMembership } from '#/server/repos/read-paths.ts'
 import {
   WorkspaceRuntimeStaleError,
   workspaceRuntimeGitCapabilityState,
@@ -7,7 +7,7 @@ import type { WorkspaceRuntimeGitCapabilityState } from '#/server/workspaces/run
 import type { WorkspacePaneTargetProjection } from '#/server/workspace-pane/workspace-pane-layout-projection.ts'
 import type { WorkspacePaneTargetProjectionProvider } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { formatWorkspaceLocator, parseCanonicalWorkspaceLocator, type WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspacePaneTargetIdentity } from '#/shared/git-types.ts'
+import type { WorkspacePaneTargetMembership } from '#/shared/git-types.ts'
 
 interface WorkspacePaneTargetCatalogDependencies {
   gitCapabilityState(
@@ -15,15 +15,15 @@ interface WorkspacePaneTargetCatalogDependencies {
     workspaceId: WorkspaceId,
     workspaceRuntimeId: string,
   ): WorkspaceRuntimeGitCapabilityState
-  readIdentities(
+  readMembership(
     workspaceId: WorkspaceId,
     options: { workspaceRuntimeId: string },
-  ): Promise<readonly WorkspacePaneTargetIdentity[]>
+  ): Promise<WorkspacePaneTargetMembership>
 }
 
 const defaultDependencies: WorkspacePaneTargetCatalogDependencies = {
   gitCapabilityState: workspaceRuntimeGitCapabilityState,
-  readIdentities: getWorkspacePaneTargetIdentities,
+  readMembership: getWorkspacePaneTargetMembership,
 }
 
 export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjectionProvider {
@@ -51,22 +51,25 @@ export class WorkspacePaneTargetCatalog implements WorkspacePaneTargetProjection
       throw new WorkspaceRuntimeStaleError()
     }
     if (gitCapabilityState === 'unavailable' && purpose !== 'git-capability-promotion') return [workspaceTarget]
-    const identities = await this.dependencies.readIdentities(workspaceId, { workspaceRuntimeId })
-    const workspaceRootWorktrees = identities.filter(
-      (identity) => identity.kind === 'git-worktree' && identity.isWorkspaceRoot,
+    const membership = await this.dependencies.readMembership(workspaceId, { workspaceRuntimeId })
+    const sourceWorktreePath = membership.source.kind === 'worktree' ? membership.source.worktreePath : null
+    const workspaceRootWorktrees = membership.identities.filter(
+      (identity) => identity.kind === 'git-worktree' && identity.worktreePath === sourceWorktreePath,
     )
-    if (workspaceRootWorktrees.length > 1) throw new Error('error.workspace-tabs-target-invalid')
-    const rootIsWorktree = workspaceRootWorktrees.length === 1
+    if (sourceWorktreePath !== null && workspaceRootWorktrees.length !== 1) {
+      throw new Error('error.workspace-tabs-target-invalid')
+    }
+    const rootIsWorktree = sourceWorktreePath !== null
     return [
       ...(rootIsWorktree ? [] : [workspaceTarget]),
-      ...identities.map((identity): WorkspacePaneTargetProjection =>
+      ...membership.identities.map((identity): WorkspacePaneTargetProjection =>
         identity.kind === 'git-worktree'
           ? {
               target: {
                 kind: 'git-worktree',
                 workspaceId,
                 workspaceRuntimeId,
-                root: identity.isWorkspaceRoot
+                root: identity.worktreePath === sourceWorktreePath
                   ? workspaceId
                   : workspaceLocatorForNativePath(workspaceId, identity.worktreePath),
               },

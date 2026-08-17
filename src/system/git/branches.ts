@@ -168,7 +168,6 @@ export async function getBranches(cwd: string, options?: { signal?: AbortSignal 
 export async function getBranchWorktreeIdentities(
   cwd: string,
   worktrees: readonly RepoWorktreeTargetProjection[],
-  sourceWorktreePath: string,
   options?: { signal?: AbortSignal },
 ): Promise<WorkspacePaneTargetIdentity[]> {
   const output = await git(cwd, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'], {
@@ -200,7 +199,6 @@ export async function getBranchWorktreeIdentities(
     ...worktrees.map((worktree): WorkspacePaneTargetIdentity => ({
       kind: 'git-worktree',
       worktreePath: worktree.path,
-      isWorkspaceRoot: path.normalize(worktree.path) === sourceWorktreePath,
       head: worktree.head,
       materializedBranch: worktree.materializedBranch,
     })),

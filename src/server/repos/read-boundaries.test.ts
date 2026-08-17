@@ -116,7 +116,7 @@ describe('getRepoSnapshot', () => {
   })
 })
 
-describe('getWorkspacePaneTargetIdentities', () => {
+describe('getWorkspacePaneTargetMembership', () => {
   test('reads only worktree and branch identity without status or remote display data', async () => {
     const worktrees = [{ path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true }]
     const worktreeSnapshots = [
@@ -137,14 +137,17 @@ describe('getWorkspacePaneTargetIdentities', () => {
       { branch: 'feature/no-worktree', worktreePath: null },
     ])
 
-    const { getWorkspacePaneTargetIdentities } = await import('#/server/repos/read-paths.ts')
-    await expect(getWorkspacePaneTargetIdentities(REPO_ID)).resolves.toEqual([
-      { branch: 'main', worktreePath: '/tmp/repo' },
-      { branch: 'feature/no-worktree', worktreePath: null },
-    ])
+    const { getWorkspacePaneTargetMembership } = await import('#/server/repos/read-paths.ts')
+    await expect(getWorkspacePaneTargetMembership(REPO_ID)).resolves.toEqual({
+      source: { kind: 'worktree', worktreePath: '/tmp/repo' },
+      identities: [
+        { branch: 'main', worktreePath: '/tmp/repo' },
+        { branch: 'feature/no-worktree', worktreePath: null },
+      ],
+    })
 
     expect(mocks.readWorktreeMembership).toHaveBeenCalledWith('/tmp/repo', undefined)
-    expect(mocks.getBranchWorktreeIdentities).toHaveBeenCalledWith('/tmp/repo', worktreeSnapshots, '/tmp/repo', {
+    expect(mocks.getBranchWorktreeIdentities).toHaveBeenCalledWith('/tmp/repo', worktreeSnapshots, {
       signal: undefined,
     })
     expect(mocks.getBranches).not.toHaveBeenCalled()

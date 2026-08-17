@@ -8,19 +8,21 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 
 describe('WorkspacePaneTargetCatalog', () => {
   test('captures only identity data for a Git runtime', async () => {
-    const readIdentities = vi.fn(async () => [
-      {
-        kind: 'git-worktree' as const,
-        worktreePath: '/repo',
-        isWorkspaceRoot: true,
-        head: { kind: 'branch' as const, branchName: 'main' },
-        materializedBranch: 'main',
-      },
-      { kind: 'git-branch' as const, branchName: 'feature/no-worktree' },
-    ])
+    const readMembership = vi.fn(async () => ({
+      source: { kind: 'worktree' as const, worktreePath: '/repo' },
+      identities: [
+        {
+          kind: 'git-worktree' as const,
+          worktreePath: '/repo',
+          head: { kind: 'branch' as const, branchName: 'main' },
+          materializedBranch: 'main',
+        },
+        { kind: 'git-branch' as const, branchName: 'feature/no-worktree' },
+      ],
+    }))
     const catalog = new WorkspacePaneTargetCatalog({
       gitCapabilityState: () => 'available',
-      readIdentities,
+      readMembership,
     })
 
     await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
@@ -43,48 +45,50 @@ describe('WorkspacePaneTargetCatalog', () => {
         nativeWorktreePath: null,
       },
     ])
-    expect(readIdentities).toHaveBeenCalledOnce()
-    expect(readIdentities).toHaveBeenCalledWith('goblin+file:///repo', { workspaceRuntimeId: 'runtime-a' })
+    expect(readMembership).toHaveBeenCalledOnce()
+    expect(readMembership).toHaveBeenCalledWith('goblin+file:///repo', { workspaceRuntimeId: 'runtime-a' })
   })
 
   test('does not query Git identity for a plain workspace runtime', async () => {
-    const readIdentities = vi.fn()
+    const readMembership = vi.fn()
     const catalog = new WorkspacePaneTargetCatalog({
       gitCapabilityState: () => 'unavailable',
-      readIdentities,
+      readMembership,
     })
 
     await expect(
       catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a'),
     ).resolves.toHaveLength(1)
-    expect(readIdentities).not.toHaveBeenCalled()
+    expect(readMembership).not.toHaveBeenCalled()
   })
 
   test('fast-fails target capture while Git capability is transitioning', async () => {
-    const readIdentities = vi.fn()
+    const readMembership = vi.fn()
     const catalog = new WorkspacePaneTargetCatalog({
       gitCapabilityState: () => 'transitioning',
-      readIdentities,
+      readMembership,
     })
 
     await expect(
       catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a'),
     ).rejects.toBeInstanceOf(WorkspaceRuntimeStaleError)
-    expect(readIdentities).not.toHaveBeenCalled()
+    expect(readMembership).not.toHaveBeenCalled()
   })
 
   test('retains a detached worktree even when the repository has no branch refs', async () => {
     const catalog = new WorkspacePaneTargetCatalog({
       gitCapabilityState: () => 'available',
-      readIdentities: async () => [
-        {
-          kind: 'git-worktree',
-          worktreePath: '/repo',
-          isWorkspaceRoot: true,
-          head: { kind: 'detached' },
-          materializedBranch: null,
-        },
-      ],
+      readMembership: async () => ({
+        source: { kind: 'worktree', worktreePath: '/repo' },
+        identities: [
+          {
+            kind: 'git-worktree',
+            worktreePath: '/repo',
+            head: { kind: 'detached' },
+            materializedBranch: null,
+          },
+        ],
+      }),
     })
     await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
       {
@@ -102,15 +106,17 @@ describe('WorkspacePaneTargetCatalog', () => {
   test('maps a physical source worktree path alias to the logical workspace root', async () => {
     const catalog = new WorkspacePaneTargetCatalog({
       gitCapabilityState: () => 'available',
-      readIdentities: async () => [
-        {
-          kind: 'git-worktree' as const,
-          worktreePath: '/physical/repo',
-          isWorkspaceRoot: true,
-          head: { kind: 'branch' as const, branchName: 'feature' },
-          materializedBranch: 'feature',
-        },
-      ],
+      readMembership: async () => ({
+        source: { kind: 'worktree', worktreePath: '/physical/repo' },
+        identities: [
+          {
+            kind: 'git-worktree' as const,
+            worktreePath: '/physical/repo',
+            head: { kind: 'branch' as const, branchName: 'feature' },
+            materializedBranch: 'feature',
+          },
+        ],
+      }),
     })
 
     await expect(catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')).resolves.toEqual([
@@ -129,15 +135,17 @@ describe('WorkspacePaneTargetCatalog', () => {
   test('retains the canonical target for a detached worktree', async () => {
     const catalog = new WorkspacePaneTargetCatalog({
       gitCapabilityState: () => 'available',
-      readIdentities: async () => [
-        {
-          kind: 'git-worktree',
-          worktreePath: '/repo',
-          isWorkspaceRoot: true,
-          head: { kind: 'detached' },
-          materializedBranch: 'feature/in-progress',
-        },
-      ],
+      readMembership: async () => ({
+        source: { kind: 'worktree', worktreePath: '/repo' },
+        identities: [
+          {
+            kind: 'git-worktree',
+            worktreePath: '/repo',
+            head: { kind: 'detached' },
+            materializedBranch: 'feature/in-progress',
+          },
+        ],
+      }),
     })
 
     const targets = await catalog.captureTargets('user-a', WORKSPACE_ID, 'goblin+file:///repo\0runtime-a')

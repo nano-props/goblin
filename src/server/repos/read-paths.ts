@@ -1,5 +1,5 @@
 import { runWithRepoSource, type RepoSource } from '#/server/repos/source.ts'
-import type { WorkspacePaneTargetIdentity } from '#/shared/git-types.ts'
+import type { WorkspacePaneTargetMembership } from '#/shared/git-types.ts'
 import type { RepoSourceRuntimeContext } from '#/server/repos/remote-execution.ts'
 import {
   getRepoLastSuccessfulFetchAt,
@@ -36,12 +36,12 @@ export async function getRepoSnapshot(
   })
 }
 
-export async function getWorkspacePaneTargetIdentities(
+export async function getWorkspacePaneTargetMembership(
   cwd: WorkspaceId,
   options: { signal?: AbortSignal; workspaceRuntimeId?: string } = {},
-): Promise<WorkspacePaneTargetIdentity[]> {
+): Promise<WorkspacePaneTargetMembership> {
   return await runRepoMembershipRead(cwd, options, async (source) => {
-    return await source.getWorkspacePaneTargetIdentities({ signal: options.signal })
+    return await source.getWorkspacePaneTargetMembership({ signal: options.signal })
   })
 }
 

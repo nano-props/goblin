@@ -156,7 +156,7 @@ const hoistedMocks = vi.hoisted(() => ({
   getWorktreeBootstrapPreview: vi.fn(),
   getRemoteRepoWorktreePaths: vi.fn(),
   getRemoteSnapshot: vi.fn(),
-  getRemoteWorkspacePaneTargetIdentities: vi.fn(),
+  getRemoteWorkspacePaneTargetMembership: vi.fn(),
   resolveRemoteRepoCommonDir: vi.fn(),
   resolveRemoteWorktreePath: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
@@ -294,7 +294,7 @@ vi.mock('#/system/ssh/git/patch.ts', () => ({
 }))
 
 vi.mock('#/system/ssh/git/snapshot.ts', () => ({
-  getRemoteWorkspacePaneTargetIdentities: hoistedMocks.getRemoteWorkspacePaneTargetIdentities,
+  getRemoteWorkspacePaneTargetMembership: hoistedMocks.getRemoteWorkspacePaneTargetMembership,
   getRemoteSnapshot: hoistedMocks.getRemoteSnapshot,
 }))
 
