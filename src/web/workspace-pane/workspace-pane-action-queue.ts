@@ -1,7 +1,7 @@
 import PQueue from 'p-queue'
 import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 
-const queuesByTarget = new Map<string, PQueue>()
+const queuesByPaneOwner = new Map<string, PQueue>()
 
 type WorkspacePaneActionAdmission<T> = { kind: 'accepted'; result: T } | { kind: 'busy' }
 
@@ -45,25 +45,25 @@ function workspacePaneActionQueueKey(location: WorkspacePaneLocation): string {
 }
 
 export function resetWorkspacePaneActionQueueForTest(): void {
-  queuesByTarget.clear()
+  queuesByPaneOwner.clear()
 }
 
-export function workspacePaneActionQueueStatsForTest(): { targetQueues: number } {
-  return { targetQueues: queuesByTarget.size }
+export function workspacePaneActionQueueStatsForTest(): { paneOwnerQueues: number } {
+  return { paneOwnerQueues: queuesByPaneOwner.size }
 }
 
 function workspacePaneActionQueue(queueKey: string): PQueue {
-  let queue = queuesByTarget.get(queueKey)
+  let queue = queuesByPaneOwner.get(queueKey)
   if (!queue) {
     queue = new PQueue({ concurrency: 1 })
-    queuesByTarget.set(queueKey, queue)
+    queuesByPaneOwner.set(queueKey, queue)
   }
   return queue
 }
 
 function scheduleWorkspacePaneActionQueueCleanup(queueKey: string, queue: PQueue): void {
   void queue.onIdle().then(() => {
-    if (queuesByTarget.get(queueKey) !== queue) return
-    if (queue.size === 0 && queue.pending === 0) queuesByTarget.delete(queueKey)
+    if (queuesByPaneOwner.get(queueKey) !== queue) return
+    if (queue.size === 0 && queue.pending === 0) queuesByPaneOwner.delete(queueKey)
   })
 }

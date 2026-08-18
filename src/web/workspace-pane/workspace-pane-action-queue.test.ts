@@ -17,23 +17,23 @@ describe('workspace pane action queue', () => {
   beforeEach(() => resetWorkspacePaneActionQueueForTest())
 
   test('serializes the same admitted location and cleans up on idle', async () => {
-    const workspaceOrder: string[] = []
+    const actionOrder: string[] = []
     const release = Promise.withResolvers<void>()
     const firstStarted = Promise.withResolvers<void>()
     const first = runWorkspacePaneAction(LINKED_LOCATION, async () => {
-      workspaceOrder.push('first-start')
+      actionOrder.push('first-start')
       firstStarted.resolve()
       await release.promise
-      workspaceOrder.push('first-end')
+      actionOrder.push('first-end')
     })
-    const second = runWorkspacePaneAction(LINKED_LOCATION, () => workspaceOrder.push('second'))
+    const second = runWorkspacePaneAction(LINKED_LOCATION, () => actionOrder.push('second'))
 
     await firstStarted.promise
-    expect(workspaceOrder).toEqual(['first-start'])
+    expect(actionOrder).toEqual(['first-start'])
     release.resolve()
     await Promise.all([first, second])
-    expect(workspaceOrder).toEqual(['first-start', 'first-end', 'second'])
-    await vi.waitFor(() => expect(workspacePaneActionQueueStatsForTest().targetQueues).toBe(0))
+    expect(actionOrder).toEqual(['first-start', 'first-end', 'second'])
+    await vi.waitFor(() => expect(workspacePaneActionQueueStatsForTest().paneOwnerQueues).toBe(0))
   })
 
   test('admits an idle presentation action and rejects one while the location is owned', async () => {
@@ -59,21 +59,21 @@ describe('workspace pane action queue', () => {
 
   test('serializes workspace-root actions without inventing a branch', async () => {
     const location = rootLocation(OTHER_WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
-    const workspaceOrder: string[] = []
+    const actionOrder: string[] = []
     const release = Promise.withResolvers<void>()
     const firstStarted = Promise.withResolvers<void>()
     const first = runWorkspacePaneAction(location, async () => {
-      workspaceOrder.push('first')
+      actionOrder.push('first')
       firstStarted.resolve()
       await release.promise
     })
-    const second = runWorkspacePaneAction(location, () => workspaceOrder.push('second'))
+    const second = runWorkspacePaneAction(location, () => actionOrder.push('second'))
 
     await firstStarted.promise
-    expect(workspaceOrder).toEqual(['first'])
+    expect(actionOrder).toEqual(['first'])
     release.resolve()
     await Promise.all([first, second])
-    expect(workspaceOrder).toEqual(['first', 'second'])
+    expect(actionOrder).toEqual(['first', 'second'])
   })
 
   test('coordinates a source worktree through its workspace-root pane owner', async () => {

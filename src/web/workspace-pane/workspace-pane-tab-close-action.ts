@@ -141,7 +141,7 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
     const queueWorkspaceId = ownedOptions.workspaceId ?? ownedOptions.location.workspaceId
     if (
       queueWorkspaceId !== ownedOptions.location.workspaceId ||
-      !runtimeFilesystemTargetIsCurrent(ownedOptions.location, base)
+      !terminalCloseTargetIsCurrent(ownedOptions.location, base)
     ) {
       presentationEffects?.onAbandon()
       return false
@@ -155,17 +155,14 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
   }
 }
 
-function runtimeFilesystemTargetIsCurrent(
-  location: FilesystemWorkspacePaneLocation,
-  base: TerminalSessionBase,
-): boolean {
+function terminalCloseTargetIsCurrent(location: FilesystemWorkspacePaneLocation, base: TerminalSessionBase): boolean {
   return workspacePaneLocationTerminalBaseMatches(location, base) && filesystemWorkspacePaneLocationIsCurrent(location)
 }
 
 async function confirmCloseTerminalWorkspacePaneTabAction(
   options: ConfirmCloseTerminalWorkspacePaneTabActionOptions,
 ): Promise<boolean> {
-  if (!runtimeFilesystemTargetIsCurrent(options.location, options.confirmedTerminal.base)) {
+  if (!terminalCloseTargetIsCurrent(options.location, options.confirmedTerminal.base)) {
     options.presentationEffects?.onAbandon()
     return false
   }

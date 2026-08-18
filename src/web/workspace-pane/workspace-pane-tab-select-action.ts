@@ -1,7 +1,10 @@
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { AppNavigationActions, FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
-import type { WorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
+import {
+  requiredWorkspacePaneTabModelLocation,
+  type WorkspacePaneTabModel,
+} from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { adjacentWorkspacePaneTab } from '#/web/workspace-pane/workspace-pane-tab-navigation.ts'
 import {
   selectWorkspacePaneControllerTab,
@@ -67,7 +70,7 @@ export async function dispatchSelectWorkspacePaneTabByIndexAction(
     return false
   }
   const navigationGeneration = beginAppNavigation()
-  return await runWorkspacePaneAction(workspacePaneQueuedActionLocation(coordinatorTarget), () =>
+  return await runWorkspacePaneAction(requiredWorkspacePaneTabModelLocation(coordinatorTarget), () =>
     selectWorkspacePaneTabByIndexAction(options, coordinatorTarget, navigationGeneration),
   )
 }
@@ -111,7 +114,7 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
     return false
   }
   const navigationGeneration = beginAppNavigation()
-  return await runWorkspacePaneAction(workspacePaneQueuedActionLocation(coordinatorTarget), () =>
+  return await runWorkspacePaneAction(requiredWorkspacePaneTabModelLocation(coordinatorTarget), () =>
     selectWorkspacePaneTabByIdentityAction(options, coordinatorTarget, navigationGeneration),
   )
 }
@@ -148,7 +151,7 @@ export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspaceP
     resolveSelectableWorkspacePaneTarget(options, options.workspacePaneRoute),
   )
   if (!coordinatorTarget) return false
-  return await runWorkspacePaneAction(workspacePaneQueuedActionLocation(coordinatorTarget), () =>
+  return await runWorkspacePaneAction(requiredWorkspacePaneTabModelLocation(coordinatorTarget), () =>
     moveWorkspacePaneTabAction(options, coordinatorTarget),
   )
 }
@@ -196,9 +199,4 @@ function resolveSelectableWorkspacePaneTarget(
 
 function selectableWorkspacePaneTarget(resolution: WorkspacePaneTabTargetResolution): WorkspacePaneTabModel | null {
   return resolution.kind === 'missing' ? null : resolution.target
-}
-
-function workspacePaneQueuedActionLocation(model: WorkspacePaneTabModel) {
-  if (!model.location) throw new Error('selectable workspace pane target requires a location')
-  return model.location
 }
