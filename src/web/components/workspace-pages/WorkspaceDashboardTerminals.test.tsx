@@ -32,7 +32,6 @@ import { appQueryClient } from '#/web/app/query-client.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { workspacePaneLocationForWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 
@@ -136,14 +135,30 @@ describe('WorkspaceDashboardTerminals', () => {
 
     await userEvent.click(screen.getByText('Root shell'))
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenLastCalledWith(
-      workspacePaneLocationForWorktree(WORKSPACE_ID, WORKSPACE_RUNTIME_ID, sourceWorktree),
+      {
+        kind: 'source-worktree',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/workspace' },
+        paneTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
+        worktreeHead: sourceWorktree.head,
+        branchName: 'main',
+      },
       { kind: 'terminal', terminalSessionId: 'term-root-session' },
       { navigationGeneration: expect.any(Number) },
     )
 
     await userEvent.click(screen.getByText('Build server'))
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenLastCalledWith(
-      workspacePaneLocationForWorktree(WORKSPACE_ID, WORKSPACE_RUNTIME_ID, linkedWorktree),
+      {
+        kind: 'linked-worktree',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/workspace/feature' },
+        paneTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/workspace/feature' },
+        worktreeHead: linkedWorktree.head,
+        branchName: 'feature/dashboard',
+      },
       { kind: 'terminal', terminalSessionId: 'term-git-session' },
       { navigationGeneration: expect.any(Number) },
     )
@@ -188,7 +203,15 @@ describe('WorkspaceDashboardTerminals', () => {
     await userEvent.click(screen.getByText('Detached shell'))
 
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      workspacePaneLocationForWorktree(WORKSPACE_ID, WORKSPACE_RUNTIME_ID, detachedWorktree),
+      {
+        kind: 'linked-worktree',
+        workspaceId: WORKSPACE_ID,
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/workspace/detached' },
+        paneTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/workspace/detached' },
+        worktreeHead: { kind: 'detached' },
+        branchName: null,
+      },
       { kind: 'terminal', terminalSessionId: 'term-detached-session' },
       { navigationGeneration: expect.any(Number) },
     )
