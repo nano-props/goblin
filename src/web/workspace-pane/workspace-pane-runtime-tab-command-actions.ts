@@ -25,8 +25,7 @@ import {
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  filesystemWorkspacePaneTargetLeaseForModel,
-  filesystemWorkspacePaneTargetLeaseIsCurrent,
+  filesystemWorkspacePaneLocationIsCurrent,
   resolveWorkspacePaneTabTargetForPaneTarget,
   scopeWorkspacePaneTabTargetResolutionToRuntime,
   type WorkspacePaneTabTargetResolution,
@@ -157,8 +156,7 @@ function terminalPlaceholderForEmptyProjection(
 }
 
 function terminalCommandTargetIsCurrent(target: FilesystemWorkspacePaneCommandTarget): boolean {
-  const lease = filesystemWorkspacePaneTargetLeaseForModel(target)
-  return lease !== null && filesystemWorkspacePaneTargetLeaseIsCurrent(lease)
+  return filesystemWorkspacePaneLocationIsCurrent(target.location)
 }
 
 function terminalRuntimeTabActionContext({

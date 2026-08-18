@@ -30,6 +30,7 @@ import { workspacePaneStaticTabEntry as staticEntry } from '#/shared/workspace-p
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { seedInitialObservedWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
+import { markRepoGitUnavailable } from '#/web/app/navigation/actions.test-utils.ts'
 import {
   REPO_ID,
   WORKTREE_KEY,
@@ -417,6 +418,7 @@ describe('workspace commands close', () => {
     'reopens a closed workspace-root %s tab through the shared open transaction',
     async (tabType) => {
       const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branchSnapshots: [], currentBranchName: null })
+      markRepoGitUnavailable(REPO_ID)
       const target = {
         kind: 'workspace-root' as const,
         workspaceId: REPO_ID,

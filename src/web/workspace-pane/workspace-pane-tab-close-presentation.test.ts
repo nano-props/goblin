@@ -28,6 +28,7 @@ import {
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { createWorkspacePaneTabModel } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { markRepoGitUnavailable } from '#/web/app/navigation/actions.test-utils.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ warning: vi.fn() }))
 
@@ -53,6 +54,7 @@ beforeEach(() => {
 describe('workspace pane tab close presentation', () => {
   test('ignores a source-only opener when closing on the workspace-root surface', () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     const location = workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId)
     const model = createWorkspacePaneTabModel({
       location,
@@ -85,6 +87,7 @@ describe('workspace pane tab close presentation', () => {
   test("projects a retired terminal's canonical before-state through the workspace-root surface", async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
     setWorkspacePaneTabsForTargetQueryData({
@@ -151,6 +154,7 @@ describe('workspace pane tab close presentation', () => {
   test('does not navigate when a background terminal exits naturally', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
     setWorkspacePaneTabsForTargetQueryData({
@@ -180,6 +184,7 @@ describe('workspace pane tab close presentation', () => {
   test('surfaces close-back failure after a terminal retires in another client', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const paneTarget = { kind: 'workspace-root' as const, workspaceId: REPO_ID }
     setWorkspacePaneTabsForTargetQueryData({

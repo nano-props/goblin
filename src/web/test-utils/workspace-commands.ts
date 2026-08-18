@@ -351,20 +351,20 @@ export function navigationWith(
       state.setWorkspacePaneTab(canonicalWorkspaceId, branch, tab)
       return true
     },
-    commitFilesystemWorkspacePaneRoute: async (target, route, options) => {
+    commitFilesystemWorkspacePaneRoute: async (location, route, options) => {
       workspacesStore
         .getState()
         .setWorkspacePaneTabForTarget(
-          target.routeTarget,
+          location.routeTarget,
           route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null,
         )
       options?.onCommit?.()
-      if (target.routeTarget.kind === 'git-worktree') {
+      if (location.routeTarget.kind === 'git-worktree') {
         observeWorkspacePaneRouteForTest({
-          workspaceId: target.routeTarget.workspaceId,
-          workspaceRuntimeId: target.workspaceRuntimeId,
+          workspaceId: location.routeTarget.workspaceId,
+          workspaceRuntimeId: location.workspaceRuntimeId,
           branchName: '',
-          worktreePath: target.routeTarget.worktreePath,
+          worktreePath: location.routeTarget.worktreePath,
           route,
         })
       }

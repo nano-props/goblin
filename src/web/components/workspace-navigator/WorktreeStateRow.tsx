@@ -1,7 +1,7 @@
 import { GitCommitHorizontal } from '@lucide/vue'
 import { computed, defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
+import type { WorkspaceRepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
@@ -21,7 +21,7 @@ import { WorktreeActionsMenu } from '#/web/components/workspace-navigator/Worktr
 
 interface WorktreeStateRowProps {
   workspaceId: WorkspaceId
-  worktree: RepoWorktreeSnapshot
+  worktree: WorkspaceRepoWorktreeSnapshot
   selected: boolean
   selectedRef: ElementRef<HTMLLIElement>
   onSelect: () => void
@@ -35,7 +35,7 @@ export const WorktreeStateRow = defineComponent<WorktreeStateRowProps>({
   name: 'WorktreeStateRow',
   props: {
     workspaceId: { type: null, required: true },
-    worktree: { type: Object as PropType<RepoWorktreeSnapshot>, required: true },
+    worktree: { type: Object as PropType<WorkspaceRepoWorktreeSnapshot>, required: true },
     selected: Boolean,
     selectedRef: { type: null, required: true },
     onSelect: { type: Function as PropType<() => void>, required: true },
@@ -48,7 +48,12 @@ export const WorktreeStateRow = defineComponent<WorktreeStateRowProps>({
   setup(props) {
     const t = useT()
     const compact = useIsCompactUi()
-    const targetKey = computed(() => formatTerminalFilesystemTargetKeyForPath(props.workspaceId, props.worktree.path))
+    const targetKey = computed(() =>
+      formatTerminalFilesystemTargetKeyForPath(
+        props.workspaceId,
+        props.worktree.isSource ? props.workspaceId : props.worktree.path,
+      ),
+    )
     const bellCount = useTerminalFilesystemTargetBellCount(targetKey)
     const outputActive = useTerminalFilesystemTargetOutputActive(targetKey)
 

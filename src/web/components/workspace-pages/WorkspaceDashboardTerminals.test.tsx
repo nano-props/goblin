@@ -33,6 +33,7 @@ import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { getRepoSnapshot } from '#/web/repos/client.ts'
+import { workspacePaneLocationForWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 import type * as RepoClient from '#/web/repos/client.ts'
 import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 
@@ -97,14 +98,16 @@ describe('WorkspaceDashboardTerminals', () => {
         true,
       ),
     ]
+    const sourceWorktree = createRepoWorktreeSnapshotForTest('main', '/workspace', {
+      isSource: true,
+      isPrimary: true,
+    })
+    const linkedWorktree = createRepoWorktreeSnapshotForTest('feature/dashboard', '/workspace/feature')
     seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branches: [createRepoBranch('feature/dashboard')],
-      worktrees: [
-        createRepoWorktreeSnapshotForTest('main', '/workspace', { isSource: true, isPrimary: true }),
-        createRepoWorktreeSnapshotForTest('feature/dashboard', '/workspace/feature'),
-      ],
+      worktrees: [sourceWorktree, linkedWorktree],
       currentBranchName: 'feature/dashboard',
     })
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
@@ -138,24 +141,14 @@ describe('WorkspaceDashboardTerminals', () => {
 
     await userEvent.click(screen.getByText('Root shell'))
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenLastCalledWith(
-      {
-        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/workspace' },
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      },
+      workspacePaneLocationForWorktree(WORKSPACE_ID, WORKSPACE_RUNTIME_ID, sourceWorktree),
       { kind: 'terminal', terminalSessionId: 'term-root-session' },
       { navigationGeneration: expect.any(Number) },
     )
 
     await userEvent.click(screen.getByText('Build server'))
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenLastCalledWith(
-      {
-        routeTarget: {
-          kind: 'git-worktree',
-          workspaceId: WORKSPACE_ID,
-          worktreePath: '/workspace/feature',
-        },
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      },
+      workspacePaneLocationForWorktree(WORKSPACE_ID, WORKSPACE_RUNTIME_ID, linkedWorktree),
       { kind: 'terminal', terminalSessionId: 'term-git-session' },
       { navigationGeneration: expect.any(Number) },
     )
@@ -176,21 +169,20 @@ describe('WorkspaceDashboardTerminals', () => {
         presentation: { kind: 'git-worktree' },
       }),
     ]
+    const detachedWorktree = {
+      path: '/workspace/detached',
+      head: { kind: 'detached' as const },
+      headOid: '1234567890abcdef1234567890abcdef12345678',
+      operation: null,
+      materializedBranch: null,
+      isSource: false,
+      isPrimary: false,
+      isLocked: false,
+    }
     seedRepoWithReadModelForTest({
       id: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      worktrees: [
-        {
-          path: '/workspace/detached',
-          head: { kind: 'detached' },
-          headOid: '1234567890abcdef1234567890abcdef12345678',
-          operation: null,
-          materializedBranch: null,
-          isSource: false,
-          isPrimary: false,
-          isLocked: false,
-        },
-      ],
+      worktrees: [detachedWorktree],
     })
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
@@ -201,14 +193,7 @@ describe('WorkspaceDashboardTerminals', () => {
     await userEvent.click(screen.getByText('Detached shell'))
 
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      {
-        routeTarget: {
-          kind: 'git-worktree',
-          workspaceId: WORKSPACE_ID,
-          worktreePath: '/workspace/detached',
-        },
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      },
+      workspacePaneLocationForWorktree(WORKSPACE_ID, WORKSPACE_RUNTIME_ID, detachedWorktree),
       { kind: 'terminal', terminalSessionId: 'term-detached-session' },
       { navigationGeneration: expect.any(Number) },
     )

@@ -40,6 +40,10 @@ import { externalAppsQueryKey } from '#/web/settings/query-cache.ts'
 import { repoLogQueryKey, repoSnapshotQueryKey, repoWorktreeStatusQueryKey } from '#/web/repos/query-keys.ts'
 import { hostInfoStore } from '#/web/stores/host-info.ts'
 import {
+  workspacePaneLocationForRoot,
+  workspacePaneLocationForWorktree,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
+import {
   directoryWorkspaceProbe,
   navigation,
   presentationOptions,
@@ -176,10 +180,7 @@ describe('WorkspacePane directory workspaces', () => {
     terminalCreate.resolve('term-111111111111111111111')
     await waitFor(() =>
       expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-        {
-          routeTarget: { kind: 'workspace-root', workspaceId },
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-        },
+        workspacePaneLocationForRoot(workspaceId, repo.workspaceRuntimeId),
         { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
         expect.objectContaining({ navigationGeneration: expect.any(Number) }),
       ),
@@ -603,10 +604,7 @@ describe('WorkspacePane directory workspaces', () => {
 
     await waitFor(() =>
       expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-        {
-          routeTarget: { kind: 'git-worktree', workspaceId, worktreePath },
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-        },
+        workspacePaneLocationForWorktree(workspaceId, repo.workspaceRuntimeId, worktree),
         { kind: 'static', tab: 'history' },
         presentationOptions(),
       ),
@@ -616,10 +614,7 @@ describe('WorkspacePane directory workspaces', () => {
 
     await waitFor(() =>
       expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-        {
-          routeTarget: { kind: 'git-worktree', workspaceId, worktreePath },
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-        },
+        workspacePaneLocationForWorktree(workspaceId, repo.workspaceRuntimeId, worktree),
         { kind: 'static', tab: 'changes' },
         presentationOptions(),
       ),
@@ -1006,10 +1001,7 @@ describe('WorkspacePane directory workspaces', () => {
 
     await waitFor(() =>
       expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-        {
-          routeTarget: { kind: 'workspace-root', workspaceId },
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-        },
+        workspacePaneLocationForRoot(workspaceId, repo.workspaceRuntimeId),
         { kind: 'static', tab: 'files' },
         presentationOptions(),
       ),

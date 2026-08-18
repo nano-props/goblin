@@ -596,10 +596,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       { insertAfterIdentity: 'workspace-pane:files' },
     )
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      {
-        routeTarget: { kind: 'workspace-root', workspaceId },
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-      },
+      workspacePaneLocationForRoot(workspaceId, repo.workspaceRuntimeId),
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )

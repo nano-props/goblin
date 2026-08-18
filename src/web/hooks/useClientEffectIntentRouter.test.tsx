@@ -2,6 +2,7 @@
 import {
   workspacePaneLocationForBranchTarget,
   workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
 import {
   createRepoWorktreeSnapshotForTest,
@@ -135,8 +136,8 @@ beforeEach(() => {
       state.setWorkspacePaneTab(repoId, branch, tab)
       return true
     },
-    commitFilesystemWorkspacePaneRoute: async (target, route, options) => {
-      commitFilesystemWorkspacePaneRouteSpy(target, route)
+    commitFilesystemWorkspacePaneRoute: async (location, route, options) => {
+      commitFilesystemWorkspacePaneRouteSpy(location, route)
       options?.onCommit?.()
       return true
     },
@@ -243,10 +244,7 @@ describe('useClientEffectIntentRouter', () => {
 
     await waitFor(() => {
       expect(commitFilesystemWorkspacePaneRouteSpy).toHaveBeenCalledWith(
-        {
-          routeTarget: { kind: 'workspace-root', workspaceId },
-          workspaceRuntimeId,
-        },
+        workspacePaneLocationForRoot(workspaceId, workspaceRuntimeId),
         { kind: 'terminal', terminalSessionId },
       )
     })
@@ -412,10 +410,7 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     expect(commitFilesystemWorkspacePaneRouteSpy).toHaveBeenCalledWith(
-      {
-        routeTarget: { kind: 'workspace-root', workspaceId },
-        workspaceRuntimeId: workspace.workspaceRuntimeId,
-      },
+      workspacePaneLocationForRoot(workspaceId, workspace.workspaceRuntimeId),
       { kind: 'terminal', terminalSessionId },
     )
   })

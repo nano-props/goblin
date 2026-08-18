@@ -37,6 +37,7 @@ import {
   workspacePaneLocationForWorktree,
   workspacePaneLocationWorktreePath,
   workspacePaneLocationForRoot,
+  type FilesystemWorkspacePaneLocation,
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
 
@@ -56,27 +57,6 @@ export interface GitBranchPaneTargetLease {
 }
 
 export type FilesystemWorkspacePaneTargetLease = WorkspaceRootPaneTargetLease | GitWorktreePaneTargetLease
-
-export interface FilesystemWorkspacePaneTargetLeaseSource {
-  location: WorkspacePaneLocation | null
-}
-
-export function filesystemWorkspacePaneTargetLeaseForModel(
-  model: FilesystemWorkspacePaneTargetLeaseSource,
-): FilesystemWorkspacePaneTargetLease | null {
-  const location = model.location
-  if (!location || location.kind === 'branch') return null
-  return filesystemWorkspacePaneTargetLeaseForLocation(location)
-}
-
-export function filesystemWorkspacePaneTargetLeaseForLocation(
-  location: Exclude<WorkspacePaneLocation, { kind: 'branch' }>,
-): FilesystemWorkspacePaneTargetLease {
-  if (location.kind === 'workspace-root') {
-    return { routeTarget: location.routeTarget, workspaceRuntimeId: location.workspaceRuntimeId }
-  }
-  return { routeTarget: location.routeTarget, workspaceRuntimeId: location.workspaceRuntimeId }
-}
 
 export function workspaceRootPaneTargetLease(
   workspaceId: WorkspaceId,
@@ -125,6 +105,22 @@ export function filesystemWorkspacePaneTargetLeaseIsCurrent(lease: FilesystemWor
   if (workspace.capability.kind !== 'git') return false
   const snapshot = getRepoSnapshotQueryData(lease.routeTarget.workspaceId, lease.workspaceRuntimeId)
   return snapshot?.worktrees.some((worktree) => worktree.path === worktreePath) ?? false
+}
+
+export function filesystemWorkspacePaneLocationIsCurrent(location: FilesystemWorkspacePaneLocation): boolean {
+  const workspace = workspacesStore.getState().workspaces[location.workspaceId]
+  if (!workspace || workspace.workspaceRuntimeId !== location.workspaceRuntimeId) return false
+  if (location.kind === 'workspace-root') return workspace.capability.kind === 'filesystem'
+  if (workspace.capability.kind !== 'git') return false
+  const snapshot = getRepoSnapshotQueryData(location.workspaceId, location.workspaceRuntimeId)
+  if (!snapshot) return false
+  if (location.kind === 'source-worktree') {
+    const sourceWorktrees = snapshot.worktrees.filter((worktree) => worktree.isSource)
+    return sourceWorktrees.length === 1 && sourceWorktrees[0]?.path === location.routeTarget.worktreePath
+  }
+  return snapshot.worktrees.some(
+    (worktree) => !worktree.isSource && worktree.path === location.routeTarget.worktreePath,
+  )
 }
 
 export type WorkspacePaneTabTargetUnavailableReason = 'workspace-pane-tabs-pending' | 'workspace-pane-tabs-failed'

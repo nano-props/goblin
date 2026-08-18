@@ -237,10 +237,7 @@ describe('workspace pane runtime tab create action', () => {
       ),
     ).resolves.toBe(true)
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      {
-        routeTarget: WORKTREE_ROUTE_TARGET,
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      },
+      LOCATION,
       { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       routeRequest,
     )
@@ -257,10 +254,14 @@ describe('workspace pane runtime tab create action', () => {
       },
       presentation: { kind: 'workspace-root' },
     }
+    const location = workspacePaneLocationForRoot(
+      workspaceRootBase.target.workspaceId,
+      workspaceRootBase.target.workspaceRuntimeId,
+    )
 
     await expect(
       showCreatedTerminalWorkspacePaneRuntimeTab(
-        workspacePaneLocationForRoot(workspaceRootBase.target.workspaceId, workspaceRootBase.target.workspaceRuntimeId),
+        location,
         workspaceRootBase.presentation,
         TERMINAL_SESSION_ID,
         {
@@ -270,10 +271,7 @@ describe('workspace pane runtime tab create action', () => {
       ),
     ).resolves.toBe(true)
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      {
-        routeTarget: { kind: 'workspace-root', workspaceId: REPO_ROOT },
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      },
+      location,
       { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       routeRequest,
     )

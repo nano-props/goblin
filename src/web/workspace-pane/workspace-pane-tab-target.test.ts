@@ -12,12 +12,14 @@ import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
+  filesystemWorkspacePaneLocationIsCurrent,
   gitWorktreePaneTargetLease,
   resolveWorkspacePaneTabTargetForPaneTarget,
   scopeWorkspacePaneTabTargetResolutionToRuntime,
   workspacePaneTabTargetForPaneTarget,
   workspacePaneTabTargetForWorkspace,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { tabOpenerScopeKey } from '#/web/stores/workspaces/tab-opener.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
@@ -104,6 +106,38 @@ describe('workspace pane tab target read model', () => {
     expect(sourceTarget?.location?.paneTarget).toEqual({ kind: 'workspace-root', workspaceId: REPO_ID })
     expect(sourceTarget?.renderedTab).toBe('history')
     expect(rootTarget?.renderedTab).toBe('files')
+  })
+
+  test('rejects locations when authoritative source ownership changes', () => {
+    const sourceWorktree = createRepoWorktreeSnapshotForTest('main', '/tmp/workspace-pane-target-repo', {
+      isSource: true,
+      isPrimary: true,
+    })
+    const linkedWorktree = createRepoWorktreeSnapshotForTest('feature/query', WORKTREE_PATH)
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main'), createRepoBranch('feature/query')],
+      worktrees: [sourceWorktree, linkedWorktree],
+      currentBranchName: 'main',
+    })
+    const sourceLocation = workspacePaneLocationForWorktree(REPO_ID, repo.workspaceRuntimeId, sourceWorktree)
+    const linkedLocation = workspacePaneLocationForWorktree(REPO_ID, repo.workspaceRuntimeId, linkedWorktree)
+
+    expect(filesystemWorkspacePaneLocationIsCurrent(sourceLocation)).toBe(true)
+    expect(filesystemWorkspacePaneLocationIsCurrent(linkedLocation)).toBe(true)
+
+    const snapshot = getRepoSnapshotQueryData(REPO_ID, repo.workspaceRuntimeId)
+    if (!snapshot) throw new Error('expected seeded snapshot')
+    setRepoSnapshotQueryData(REPO_ID, repo.workspaceRuntimeId, {
+      ...snapshot,
+      worktrees: snapshot.worktrees.map((worktree) => ({
+        ...worktree,
+        isSource: worktree.path === WORKTREE_PATH,
+      })),
+    })
+
+    expect(filesystemWorkspacePaneLocationIsCurrent(sourceLocation)).toBe(false)
+    expect(filesystemWorkspacePaneLocationIsCurrent(linkedLocation)).toBe(false)
   })
 
   test('keeps an unavailable read target distinct from a ready authority target', () => {

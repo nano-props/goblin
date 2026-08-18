@@ -8,22 +8,26 @@ import type {
   WorkspacePaneRouteTarget,
 } from '#/web/app/navigation/route-model.ts'
 import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
-import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { CloseWorkspaceResult, WorkspaceNavigationHistoryTraversal } from '#/web/stores/workspaces/types.ts'
 import {
   restoreWorkspaceNavigationEntry,
   workspaceNavigationHistoryRestoreBlocked,
 } from '#/web/app/navigation/workspace-history.ts'
 import {
+  filesystemWorkspacePaneLocationIsCurrent,
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   gitBranchPaneTargetLeaseOwnerIsCurrent,
-  type FilesystemWorkspacePaneTargetLease,
   type GitBranchPaneTargetLease,
   type GitWorktreePaneTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
-import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
+import { formatTerminalFilesystemTargetKey } from '#/shared/terminal-filesystem-target-key.ts'
+import { terminalExecutionCoordinates } from '#/shared/terminal-types.ts'
+import {
+  workspacePaneLocationExecutionTarget,
+  type FilesystemWorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 import {
   beginAppNavigation,
   appNavigationIsCurrent,
@@ -39,8 +43,6 @@ export interface AppNavigationOptions<
 
 export type BranchAppNavigationOptions = AppNavigationOptions<ParsedBranchWorkspacePaneRouteTarget>
 
-export type FilesystemWorkspacePaneRouteLease = FilesystemWorkspacePaneTargetLease
-
 export interface WorkspacePaneRouteCommitActions {
   commitWorkspacePaneRoute: (
     workspaceId: WorkspaceId,
@@ -52,7 +54,7 @@ export interface WorkspacePaneRouteCommitActions {
 
 export interface FilesystemWorkspacePaneRouteCommitActions extends WorkspacePaneRouteCommitActions {
   commitFilesystemWorkspacePaneRoute: (
-    routeLease: FilesystemWorkspacePaneRouteLease,
+    location: FilesystemWorkspacePaneLocation,
     route: WorkspacePaneRouteTarget,
     options?: AppNavigationOptions,
   ) => Promise<boolean>
@@ -155,8 +157,8 @@ export function createAppNavigationActions({
         navigationGeneration,
       })
     },
-    commitFilesystemWorkspacePaneRoute(routeLease, route, options) {
-      return commitFilesystemWorkspacePaneRoute(routeNavigation, routeLease, route, options)
+    commitFilesystemWorkspacePaneRoute(location, route, options) {
+      return commitFilesystemWorkspacePaneRoute(routeNavigation, location, route, options)
     },
     commitWorkspacePaneRoute(workspaceId, branch, route, options) {
       return commitWorkspacePaneRoute(routeNavigation, workspaceId, branch, route, options)
@@ -180,32 +182,33 @@ export function createAppNavigationActions({
 }
 
 function commitFilesystemWorkspacePanePresentation(
-  target: FilesystemWorkspacePaneTabsTarget,
+  location: FilesystemWorkspacePaneLocation,
   presentation: WorkspacePaneRoute,
 ): boolean {
   const state = workspacesStore.getState()
-  const workspaceId = target.workspaceId
+  const workspaceId = location.workspaceId
   if (!state.workspaces[workspaceId]) return false
   if (presentation.kind === 'terminal') {
+    const coordinates = terminalExecutionCoordinates(workspacePaneLocationExecutionTarget(location))
     state.setSelectedTerminal(
-      formatTerminalFilesystemTargetKeyForPath(
-        workspaceId,
-        target.kind === 'workspace-root' ? workspaceId : target.worktreePath,
-      ),
+      formatTerminalFilesystemTargetKey(workspaceId, coordinates.executionRootId),
       presentation.terminalSessionId,
     )
   }
-  state.setWorkspacePaneTabForTarget(target, presentation.kind === 'terminal' ? 'terminal' : presentation.tab)
+  state.setWorkspacePaneTabForTarget(
+    location.routeTarget,
+    presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
+  )
   return true
 }
 
 async function commitFilesystemWorkspacePaneRoute(
   routeNavigation: AppRouteNavigation,
-  routeLease: FilesystemWorkspacePaneRouteLease,
+  location: FilesystemWorkspacePaneLocation,
   route: WorkspacePaneRouteTarget,
   options?: AppNavigationOptions,
 ): Promise<boolean> {
-  if (!filesystemWorkspacePaneRouteLeaseIsCurrent(routeLease)) {
+  if (!filesystemWorkspacePaneLocationIsCurrent(location)) {
     options?.onAbandon?.()
     return false
   }
@@ -216,7 +219,7 @@ async function commitFilesystemWorkspacePaneRoute(
   }
   let effectsSettled = false
   try {
-    const committed = await routeNavigation.commitFilesystemWorkspacePaneRoute(routeLease.routeTarget, route, {
+    const committed = await routeNavigation.commitFilesystemWorkspacePaneRoute(location.routeTarget, route, {
       replace: options?.replace,
       navigationGeneration: generation,
       routePrecondition: options?.routePrecondition,
@@ -224,10 +227,10 @@ async function commitFilesystemWorkspacePaneRoute(
     const presentationCommitted =
       committed &&
       appNavigationIsCurrent(generation) &&
-      filesystemWorkspacePaneRouteLeaseIsCurrent(routeLease) &&
+      filesystemWorkspacePaneLocationIsCurrent(location) &&
       (route === null
-        ? commitFilesystemWorkspacePaneEmptyPresentation(routeLease.routeTarget)
-        : commitFilesystemWorkspacePanePresentation(routeLease.routeTarget, route))
+        ? commitFilesystemWorkspacePaneEmptyPresentation(location)
+        : commitFilesystemWorkspacePanePresentation(location, route))
     if (!presentationCommitted) {
       effectsSettled = true
       options?.onAbandon?.()
@@ -245,18 +248,10 @@ async function commitFilesystemWorkspacePaneRoute(
   }
 }
 
-function filesystemWorkspacePaneRouteLeaseIsCurrent(routeLease: FilesystemWorkspacePaneRouteLease): boolean {
-  if (!filesystemWorkspacePaneTargetLeaseIsCurrent(routeLease)) return false
-  return (
-    routeLease.routeTarget.kind !== 'workspace-root' ||
-    workspacesStore.getState().workspaces[routeLease.routeTarget.workspaceId]?.capability.kind === 'filesystem'
-  )
-}
-
-function commitFilesystemWorkspacePaneEmptyPresentation(target: FilesystemWorkspacePaneTabsTarget): boolean {
+function commitFilesystemWorkspacePaneEmptyPresentation(location: FilesystemWorkspacePaneLocation): boolean {
   const state = workspacesStore.getState()
-  if (!state.workspaces[target.workspaceId]) return false
-  state.setWorkspacePaneTabForTarget(target, null)
+  if (!state.workspaces[location.workspaceId]) return false
+  state.setWorkspacePaneTabForTarget(location.routeTarget, null)
   return true
 }
 

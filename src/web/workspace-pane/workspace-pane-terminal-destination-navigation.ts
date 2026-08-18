@@ -12,10 +12,6 @@ import {
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  filesystemWorkspacePaneTargetLeaseForLocation,
-  type FilesystemWorkspacePaneTargetLease,
-} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import {
   workspacePaneLocationTerminalBase,
   type FilesystemWorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
@@ -32,7 +28,7 @@ export function commitWorkspacePaneTerminalDestination(input: {
   }
   return commitFilesystemTerminalDestination({
     navigation: input.navigation,
-    routeLease: filesystemWorkspacePaneTargetLeaseForLocation(input.location),
+    location: input.location,
     paneTarget: input.location.paneTarget,
     actionTarget: workspacePaneActionTargetFromLocation(input.location),
     terminalSessionId: input.terminalSessionId,
@@ -62,7 +58,7 @@ function terminalPaneProjectionOutcome(
 
 async function commitFilesystemTerminalDestination(input: {
   navigation: AppNavigationActions
-  routeLease: FilesystemWorkspacePaneTargetLease
+  location: FilesystemWorkspacePaneLocation
   paneTarget: FilesystemWorkspacePaneTabsTarget
   actionTarget: WorkspacePaneActionTarget
   terminalSessionId: string
@@ -70,13 +66,13 @@ async function commitFilesystemTerminalDestination(input: {
   return await commitQueuedTerminalDestination(input.actionTarget, async () => {
     const projectionOutcome = terminalPaneProjectionOutcome(
       input.paneTarget,
-      input.routeLease.workspaceRuntimeId,
+      input.location.workspaceRuntimeId,
       input.terminalSessionId,
     )
     if (projectionOutcome) return projectionOutcome
     const navigationGeneration = beginAppNavigation()
     const committed = await input.navigation.commitFilesystemWorkspacePaneRoute(
-      input.routeLease,
+      input.location,
       {
         kind: 'terminal',
         terminalSessionId: input.terminalSessionId,

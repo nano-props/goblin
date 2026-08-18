@@ -39,6 +39,10 @@ import {
 } from '#/web/app/navigation/actions.test-utils.ts'
 import { currentAppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
+import {
+  workspacePaneLocationForRoot,
+  workspacePaneLocationForWorktree,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 beforeEach(setupAppNavigationActionsTests)
 
@@ -56,13 +60,10 @@ describe('createAppNavigationActions presentation', () => {
     })
 
     await expect(
-      actions.commitFilesystemWorkspacePaneRoute(
-        {
-          routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-        },
-        { kind: 'static', tab: 'files' },
-      ),
+      actions.commitFilesystemWorkspacePaneRoute(workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId), {
+        kind: 'static',
+        tab: 'files',
+      }),
     ).resolves.toBe(true)
     expect(
       preferredWorkspacePaneTabForTarget(workspacesStore.getState().workspaces[REPO_ID]!.ui, {
@@ -93,13 +94,10 @@ describe('createAppNavigationActions presentation', () => {
       })
 
       await expect(
-        actions.commitFilesystemWorkspacePaneRoute(
-          {
-            routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-            workspaceRuntimeId: repo.workspaceRuntimeId,
-          },
-          { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
-        ),
+        actions.commitFilesystemWorkspacePaneRoute(workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId), {
+          kind: 'terminal',
+          terminalSessionId: 'term-222222222222222222222',
+        }),
       ).resolves.toBe(routeCommitted)
       expect(workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalKey]).toBe(
         routeCommitted ? 'term-222222222222222222222' : 'term-111111111111111111111',
@@ -112,6 +110,52 @@ describe('createAppNavigationActions presentation', () => {
       ).toBe(routeCommitted ? 'terminal' : 'files')
     },
   )
+
+  test('commits a source worktree route while selecting its root terminal owner', async () => {
+    const sourceWorktree = createRepoWorktreeSnapshotForTest('main', '/private/tmp/navigation-actions-repo-real', {
+      isSource: true,
+      isPrimary: true,
+    })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      worktrees: [sourceWorktree],
+      currentBranchName: 'main',
+    })
+    const navigation = routeNavigation()
+    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const location = workspacePaneLocationForWorktree(REPO_ID, repo.workspaceRuntimeId, sourceWorktree)
+    const terminalSessionId = 'term-222222222222222222222'
+
+    await expect(
+      actions.commitFilesystemWorkspacePaneRoute(location, { kind: 'terminal', terminalSessionId }),
+    ).resolves.toBe(true)
+
+    expect(navigation.commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      location.routeTarget,
+      { kind: 'terminal', terminalSessionId },
+      expect.any(Object),
+    )
+    expect(
+      workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[
+        formatTerminalFilesystemTargetKeyForPath(REPO_ID, REPO_ID)
+      ],
+    ).toBe(terminalSessionId)
+    expect(
+      workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[
+        formatTerminalFilesystemTargetKeyForPath(REPO_ID, sourceWorktree.path)
+      ],
+    ).toBeUndefined()
+    expect(
+      preferredWorkspacePaneTabForTarget(workspacesStore.getState().workspaces[REPO_ID]!.ui, location.routeTarget),
+    ).toBe('terminal')
+  })
 
   test('falls back to Dashboard when the saved worktree target no longer exists', () => {
     seedRepoWithReadModelForTest({
@@ -198,10 +242,7 @@ describe('createAppNavigationActions presentation', () => {
         workspaceId: REPO_ID,
       })
       const commit = actions.commitFilesystemWorkspacePaneRoute(
-        {
-          routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-        },
+        workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
         { kind: 'static', tab: 'files' },
         { onAbandon },
       )
@@ -258,7 +299,11 @@ describe('createAppNavigationActions presentation', () => {
 
     await expect(
       actions.commitFilesystemWorkspacePaneRoute(
-        worktreeSelectionLease(),
+        workspacePaneLocationForWorktree(
+          REPO_ID,
+          workspacesStore.getState().workspaces[REPO_ID]!.workspaceRuntimeId,
+          createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH),
+        ),
         { kind: 'static', tab: 'files' },
         { onAbandon },
       ),
@@ -286,11 +331,10 @@ describe('createAppNavigationActions presentation', () => {
       routeNavigation: navigation,
     })
     const onAbandon = vi.fn()
+    const worktree = getRepoSnapshotQueryData(REPO_ID, repo.workspaceRuntimeId)?.worktrees[0]
+    if (!worktree) throw new Error('expected seeded worktree')
     const commit = actions.commitFilesystemWorkspacePaneRoute(
-      {
-        routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-      },
+      workspacePaneLocationForWorktree(REPO_ID, repo.workspaceRuntimeId, worktree),
       { kind: 'static', tab: 'files' },
       { onAbandon },
     )
@@ -321,10 +365,7 @@ describe('createAppNavigationActions presentation', () => {
 
     await expect(
       actions.commitFilesystemWorkspacePaneRoute(
-        {
-          routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-        },
+        workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
         { kind: 'static', tab: 'files' },
         { onAbandon },
       ),
@@ -345,10 +386,7 @@ describe('createAppNavigationActions presentation', () => {
 
     await expect(
       actions.commitFilesystemWorkspacePaneRoute(
-        {
-          routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-          workspaceRuntimeId: repo.workspaceRuntimeId,
-        },
+        workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
         { kind: 'static', tab: 'files' },
         { onAbandon },
       ),

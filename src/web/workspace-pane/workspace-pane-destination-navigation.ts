@@ -52,14 +52,10 @@ export async function commitWorkspacePaneDestinationRoute(
   const { lease } = presentation
   if (isGitWorktreeDestinationTargetLease(lease)) {
     try {
-      const accepted = await navigation.commitFilesystemWorkspacePaneRoute(
-        {
-          routeTarget: lease.routeTarget,
-          workspaceRuntimeId: lease.workspaceRuntimeId,
-        },
-        route,
-        { ...options, navigationGeneration: presentation.generation },
-      )
+      const accepted = await navigation.commitFilesystemWorkspacePaneRoute(lease.location, route, {
+        ...options,
+        navigationGeneration: presentation.generation,
+      })
       if (!accepted) return { kind: 'navigation-rejected' }
     } catch {
       return { kind: 'navigation-rejected' }

@@ -25,7 +25,6 @@ import {
   resolveWorkspacePaneTabTargetForPaneTarget,
   scopeWorkspacePaneTabTargetResolutionToRuntime,
   workspaceRootPaneTargetLease,
-  filesystemWorkspacePaneTargetLeaseForLocation,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   workspacePaneActionTargetFromFilesystemTarget,
@@ -200,11 +199,7 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
     base.target.kind !== presentation.kind
   )
     return false
-  return navigation.commitFilesystemWorkspacePaneRoute(
-    filesystemWorkspacePaneTargetLeaseForLocation(location),
-    { kind: 'terminal', terminalSessionId },
-    routeRequest,
-  )
+  return navigation.commitFilesystemWorkspacePaneRoute(location, { kind: 'terminal', terminalSessionId }, routeRequest)
 }
 
 export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
