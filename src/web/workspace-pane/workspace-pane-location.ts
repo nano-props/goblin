@@ -15,6 +15,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import {
   gitWorktreeFilesystemExecutionTarget,
   workspaceRootFilesystemExecutionTarget,
+  workspacePaneFilesystemExecutionTargetKey,
   type WorkspaceCapabilities,
   type WorkspaceGitReadyProbeState,
   type WorkspacePaneFilesystemExecutionTarget,
@@ -227,12 +228,27 @@ export function workspacePaneLocationExecutionTarget(
   return target
 }
 
+export function workspacePaneLocationTerminalBase(location: FilesystemWorkspacePaneLocation): TerminalSessionBase
+export function workspacePaneLocationTerminalBase(location: BranchPaneLocation): null
+export function workspacePaneLocationTerminalBase(location: WorkspacePaneLocation): TerminalSessionBase | null
 export function workspacePaneLocationTerminalBase(location: WorkspacePaneLocation): TerminalSessionBase | null {
   if (location.kind === 'branch') return null
   const target = workspacePaneLocationExecutionTarget(location)
   return target.kind === 'workspace-root'
     ? { target, presentation: { kind: 'workspace-root' } }
     : { target, presentation: { kind: 'git-worktree' } }
+}
+
+export function workspacePaneLocationTerminalBaseMatches(
+  location: FilesystemWorkspacePaneLocation,
+  base: TerminalSessionBase,
+): boolean {
+  const expected = workspacePaneLocationTerminalBase(location)
+  return (
+    expected.presentation.kind === base.presentation.kind &&
+    workspacePaneFilesystemExecutionTargetKey(expected.target) ===
+      workspacePaneFilesystemExecutionTargetKey(base.target)
+  )
 }
 
 export function workspacePaneFilesystemTargetForLocation(

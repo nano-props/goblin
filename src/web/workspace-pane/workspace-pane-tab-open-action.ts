@@ -4,7 +4,6 @@ import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/sha
 import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import { workspacePaneTabControllerTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
 import { beginWorkspacePaneDestinationPresentation } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import {
@@ -19,18 +18,14 @@ import {
   recordWorkspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
-  filesystemWorkspacePaneLocationIsCurrent,
   isGitWorktreeDestinationTargetLease,
   resolveWorkspacePaneDestinationTarget,
+  workspacePaneLocationIsCurrent,
   workspacePaneTargetBlocksInteraction,
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
-  workspacePaneTargetLeaseIsCurrent,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import {
-  workspacePaneActionTargetFromLocation,
-  runWorkspacePaneAction,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
 import {
   commitWorkspacePaneStaticTabPresentation,
@@ -97,8 +92,7 @@ async function dispatchWorkspacePaneTargetStaticTabAction(
   const admission = workspacePaneStaticTabOpenAdmission(resolvedInput)
   if (admission) return admission
   const navigationGeneration = beginAppNavigation()
-  const actionTarget = workspacePaneActionTargetFromLocation(location)
-  return await runWorkspacePaneAction(actionTarget, () =>
+  return await runWorkspacePaneAction(location, () =>
     openWorkspacePaneStaticTabAction(resolvedInput, { kind: 'current', navigationGeneration }),
   )
 }
@@ -184,7 +178,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
   const admission = workspacePaneStaticTabOpenAdmission(input)
   if (admission) return admission
   const presentation = beginWorkspacePaneDestinationPresentation(lease)
-  return await runWorkspacePaneAction(workspacePaneActionTargetFromLocation(location), () =>
+  return await runWorkspacePaneAction(location, () =>
     openWorkspacePaneStaticTabAction(input, {
       kind: 'destination',
       presentation,
@@ -226,7 +220,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
   }
   if (workspacePaneStaticTabOpenAdmission(resolvedInput)) return false
   const navigationGeneration = beginAppNavigation()
-  const outcome = await runWorkspacePaneAction(workspacePaneActionTargetFromLocation(location), () =>
+  const outcome = await runWorkspacePaneAction(location, () =>
     openWorkspacePaneStaticTabAction(resolvedInput, {
       kind: 'current',
       navigationGeneration,
@@ -245,18 +239,10 @@ function workspacePaneStaticTabOpenAdmission(
   if (!workspacePaneLocationSupportsTab(input.location, input.type)) {
     return { kind: 'unsupported', reason: 'surface-unavailable' }
   }
-  if (!workspacePaneStaticTabOpenTargetIsCurrent(input)) return { kind: 'target-missing' }
+  if (!workspacePaneLocationIsCurrent(input.location)) return { kind: 'target-missing' }
   if (workspacePaneTargetBlocksInteraction(input.location.paneTarget, input.workspaceRuntimeId))
     return { kind: 'blocked' }
   return null
-}
-
-function workspacePaneStaticTabOpenTargetIsCurrent(input: ResolvedWorkspacePaneStaticTabOpenInput): boolean {
-  if (input.location.kind !== 'branch') return filesystemWorkspacePaneLocationIsCurrent(input.location)
-  return workspacePaneTargetLeaseIsCurrent({
-    routeTarget: input.location.routeTarget,
-    workspaceRuntimeId: input.workspaceRuntimeId,
-  })
 }
 
 async function openWorkspacePaneStaticTabAction(
@@ -275,7 +261,7 @@ async function openWorkspacePaneStaticTabAction(
   const workspace = state.workspaces[input.workspaceId]
   if (!workspace) return { kind: 'target-missing' }
   if (workspace.workspaceRuntimeId !== input.workspaceRuntimeId) return { kind: 'superseded' }
-  if (!workspacePaneStaticTabOpenTargetIsCurrent(input)) return { kind: 'superseded' }
+  if (!workspacePaneLocationIsCurrent(input.location)) return { kind: 'superseded' }
   const sourceRoute = input.sourceRoute
   const modelBefore = resolveOpenWorkspacePaneStaticTabModel(input)
   if (
@@ -310,7 +296,7 @@ async function openWorkspacePaneStaticTabAction(
   }
   if (committed.projection === 'superseded') return { kind: 'superseded' }
   const model = resolveOpenWorkspacePaneStaticTabModel(input)
-  if (!model || !workspacePaneTabControllerTargetIsCurrent(model)) return { kind: 'superseded' }
+  if (!model || !workspacePaneLocationIsCurrent(model.location)) return { kind: 'superseded' }
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(
       input.location.paneTarget,

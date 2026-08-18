@@ -16,12 +16,13 @@ import {
 } from '#/shared/workspace-pane.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import {
-  dispatchCloseWorkspacePaneTabAction as dispatchCloseWorkspacePaneTabActionRaw,
-  dispatchConfirmCloseTerminalWorkspacePaneTabAction as dispatchConfirmCloseTerminalWorkspacePaneTabActionRaw,
-  type CloseWorkspacePaneTabActionOptions,
-  type ConfirmCloseTerminalWorkspacePaneTabActionOptions,
+  dispatchCloseWorkspacePaneTabAction,
+  dispatchConfirmCloseTerminalWorkspacePaneTabAction,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
-import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import {
+  resetWorkspacePaneActionQueueForTest,
+  runWorkspacePaneAction,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/workspace-pane-bridge.ts'
@@ -54,10 +55,7 @@ import {
 } from '#/web/app/navigation/lifecycle.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import type { GitHead } from '#/shared/git-head.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  workspacePaneLocationForBranchTarget,
   workspacePaneLocationForLinkedWorktree,
   workspacePaneLocationForRoot,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
@@ -74,54 +72,6 @@ const WORKTREE_PANE_TARGET = {
   kind: 'git-worktree' as const,
   workspaceId: REPO_ID,
   worktreePath: WORKTREE_PATH,
-}
-
-function currentRuntimeId(workspaceId = REPO_ID): string {
-  const runtimeId = workspacesStore.getState().workspaces[workspaceId]?.workspaceRuntimeId
-  if (!runtimeId) throw new Error('missing workspace runtime fixture')
-  return runtimeId
-}
-
-type LegacyCloseOptions = Omit<CloseWorkspacePaneTabActionOptions, 'workspaceRuntimeId' | 'location'> & {
-  routeTarget: WorkspacePaneTabsTarget
-  paneTarget: WorkspacePaneTabsTarget
-  worktreeHead?: GitHead
-}
-
-function locationForLegacyTarget(options: LegacyCloseOptions, workspaceRuntimeId: string) {
-  if (options.routeTarget.kind === 'workspace-root') {
-    return workspacePaneLocationForRoot(options.routeTarget.workspaceId, workspaceRuntimeId)
-  }
-  if (options.routeTarget.kind === 'git-branch') {
-    return workspacePaneLocationForBranchTarget(options.routeTarget, workspaceRuntimeId)
-  }
-  if (options.paneTarget.kind !== 'git-worktree') throw new Error('source target requires an explicit location')
-  return workspacePaneLocationForLinkedWorktree(
-    options.routeTarget,
-    workspaceRuntimeId,
-    options.worktreeHead ?? { kind: 'detached' },
-  )
-}
-
-function dispatchCloseWorkspacePaneTabAction(options: LegacyCloseOptions) {
-  const workspaceRuntimeId = currentRuntimeId(options.workspaceId ?? REPO_ID)
-  return dispatchCloseWorkspacePaneTabActionRaw({
-    ...options,
-    location: locationForLegacyTarget(options, workspaceRuntimeId),
-    workspaceRuntimeId,
-  })
-}
-
-function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
-  options: Omit<ConfirmCloseTerminalWorkspacePaneTabActionOptions, 'workspaceRuntimeId' | 'location'> &
-    LegacyCloseOptions,
-) {
-  const workspaceRuntimeId = options.confirmedTerminal.base.target.workspaceRuntimeId
-  return dispatchConfirmCloseTerminalWorkspacePaneTabActionRaw({
-    ...options,
-    location: locationForLegacyTarget(options, workspaceRuntimeId),
-    workspaceRuntimeId,
-  })
 }
 
 beforeEach(() => {
@@ -157,9 +107,10 @@ describe('workspace pane tab close action', () => {
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
-        routeTarget: WORKTREE_PANE_TARGET,
-        paneTarget: WORKTREE_PANE_TARGET,
-        worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+        location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+          kind: 'branch',
+          branchName: BRANCH_NAME,
+        }),
         workspaceId: REPO_ID,
         workspacePaneRoute: { kind: 'static', tab: 'files' },
         navigation: navigationWith(),
@@ -207,13 +158,12 @@ describe('workspace pane tab close action', () => {
     const navigation = navigationWith()
 
     await expect(
-      dispatchConfirmCloseTerminalWorkspacePaneTabActionRaw({
+      dispatchConfirmCloseTerminalWorkspacePaneTabAction({
         location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
           kind: 'branch',
           branchName: BRANCH_NAME,
         }),
         workspaceId: REPO_ID,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
         workspacePaneRoute: route,
         navigation,
         currentWorkspacePaneRoute: route,
@@ -226,6 +176,68 @@ describe('workspace pane tab close action', () => {
     ).resolves.toBe(false)
 
     expect(terminalFilesystemTargetSnapshot).not.toHaveBeenCalled()
+    expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
+    expect(navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+    expect(presentationEffects.onCommit).not.toHaveBeenCalled()
+    expect(presentationEffects.onAbandon).toHaveBeenCalledOnce()
+  })
+
+  test('rejects a confirmed terminal close whose location does not own its terminal base', async () => {
+    const otherWorktreePath = '/tmp/workspace-pane-tab-close-other-worktree'
+    const terminalSessionId = 'term-wrongowner111111111'
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME), createRepoBranch('feature/other')],
+      currentBranchName: BRANCH_NAME,
+      worktrees: [
+        createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH),
+        createRepoWorktreeSnapshotForTest('feature/other', otherWorktreePath),
+      ],
+    })
+    const closeTerminalByDescriptor = vi.fn()
+    const terminalFilesystemTargetSnapshot = vi.fn()
+    setTerminalSessionCommandBridge({
+      terminalFilesystemTargetSnapshot,
+      createTerminal: vi.fn(),
+      createTerminalWithAdmission: vi.fn(),
+      selectTerminal: vi.fn(),
+      focusTerminal: vi.fn(),
+      closeTerminalByDescriptor,
+    })
+    const route = { kind: 'terminal' as const, terminalSessionId }
+    const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
+    const location = workspacePaneLocationForLinkedWorktree(
+      { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: otherWorktreePath },
+      repo.workspaceRuntimeId,
+      { kind: 'branch', branchName: 'feature/other' },
+    )
+    const base = {
+      target: runtimeWorkspacePaneTargetForTest({
+        kind: 'git-worktree' as const,
+        workspaceId: REPO_ID,
+        workspaceRuntimeId: repo.workspaceRuntimeId,
+        worktreePath: WORKTREE_PATH,
+      }),
+      presentation: { kind: 'git-worktree' as const },
+    }
+
+    const navigation = navigationWith()
+
+    await expect(
+      dispatchConfirmCloseTerminalWorkspacePaneTabAction({
+        location,
+        workspaceId: REPO_ID,
+        workspacePaneRoute: route,
+        navigation,
+        currentWorkspacePaneRoute: route,
+        confirmedTerminal: {
+          terminalSessionId,
+          base,
+        },
+        presentationEffects,
+      }),
+    ).resolves.toBe(false)
+
     expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
     expect(navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(presentationEffects.onCommit).not.toHaveBeenCalled()
@@ -251,13 +263,12 @@ describe('workspace pane tab close action', () => {
     const navigation = navigationWith()
 
     await expect(
-      dispatchCloseWorkspacePaneTabActionRaw({
+      dispatchCloseWorkspacePaneTabAction({
         location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
           kind: 'branch',
           branchName: BRANCH_NAME,
         }),
         workspaceId: REPO_ID,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
         workspacePaneRoute: { kind: 'static', tab: 'files' },
         navigation,
       }),
@@ -267,8 +278,46 @@ describe('workspace pane tab close action', () => {
     expect(updateWorkspaceTabs).not.toHaveBeenCalled()
   })
 
+  test('rejects a queued close after linked worktree ownership changes', async () => {
+    const updateWorkspaceTabs = vi.fn()
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
+    const linkedWorktree = createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)
+    const repo = seedRepoWithReadModelForTest({
+      worktrees: [linkedWorktree],
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME)],
+      currentBranchName: BRANCH_NAME,
+      workspacePaneTabsByBranch: { [BRANCH_NAME]: [workspacePaneStaticTabEntry('files')] },
+    })
+    const location = workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+      kind: 'branch',
+      branchName: BRANCH_NAME,
+    })
+    const releaseQueue = Promise.withResolvers<void>()
+    const blocker = runWorkspacePaneAction(location, () => releaseQueue.promise)
+    const navigation = navigationWith()
+    const close = dispatchCloseWorkspacePaneTabAction({
+      location,
+      workspaceId: REPO_ID,
+      workspacePaneRoute: { kind: 'static', tab: 'files' },
+      navigation,
+    })
+
+    seedRepoQueryDataForTest(repo, {
+      branches: [createRepoBranch(BRANCH_NAME)],
+      worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH, { isSource: true, isPrimary: true })],
+      currentBranch: BRANCH_NAME,
+    })
+    releaseQueue.resolve()
+    await blocker
+
+    await expect(close).resolves.toBe(false)
+    expect(updateWorkspaceTabs).not.toHaveBeenCalled()
+    expect(navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+  })
+
   test('commits active close-back route through command-owned navigation', async () => {
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       id: REPO_ID,
       branches: [createRepoBranch(BRANCH_NAME)],
@@ -286,9 +335,10 @@ describe('workspace pane tab close action', () => {
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
-        routeTarget: WORKTREE_PANE_TARGET,
-        paneTarget: WORKTREE_PANE_TARGET,
-        worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+        location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+          kind: 'branch',
+          branchName: BRANCH_NAME,
+        }),
         workspaceId: REPO_ID,
         workspacePaneRoute: { kind: 'static', tab: 'files' },
         navigation,
@@ -329,9 +379,10 @@ describe('workspace pane tab close action', () => {
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
-        routeTarget: WORKTREE_PANE_TARGET,
-        paneTarget: WORKTREE_PANE_TARGET,
-        worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+        location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+          kind: 'branch',
+          branchName: BRANCH_NAME,
+        }),
         workspaceId: REPO_ID,
         workspacePaneRoute: { kind: 'static', tab: 'files' },
         navigation: navigationWith({ commitFilesystemWorkspacePaneRoute, commitWorkspacePaneRoute }),
@@ -369,8 +420,7 @@ describe('workspace pane tab close action', () => {
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
-        routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-        paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+        location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
         workspaceId: REPO_ID,
         workspacePaneRoute: undefined,
         navigation: navigationWith(),
@@ -391,6 +441,7 @@ describe('workspace pane tab close action', () => {
 
   test('stops close presentation when a newer pane projection supersedes the accepted response', async () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     const target = {
       kind: 'workspace-root' as const,
       workspaceId: REPO_ID,
@@ -411,8 +462,7 @@ describe('workspace pane tab close action', () => {
     const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
 
     const close = dispatchCloseWorkspacePaneTabAction({
-      routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-      paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+      location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
       workspaceId: REPO_ID,
       workspacePaneRoute: undefined,
       navigation: navigationWith({ commitWorkspacePaneRoute }),
@@ -465,6 +515,7 @@ describe('workspace pane tab close action', () => {
     },
   ])('stops static tab close automation and surfaces recovery for $label', async (input) => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     const target = {
       kind: 'workspace-root' as const,
       workspaceId: REPO_ID,
@@ -484,8 +535,7 @@ describe('workspace pane tab close action', () => {
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
-        routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-        paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+        location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
         workspaceId: REPO_ID,
         workspacePaneRoute: undefined,
         navigation: navigationWith({ commitWorkspacePaneRoute }),
@@ -523,8 +573,7 @@ describe('workspace pane tab close action', () => {
       },
     )
     const close = dispatchCloseWorkspacePaneTabAction({
-      routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-      paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+      location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
       workspaceId: REPO_ID,
       workspacePaneRoute: { kind: 'static', tab: 'files' },
       navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
@@ -558,6 +607,7 @@ describe('workspace pane tab close action', () => {
   test('releases terminal focus when active close lifecycle fails', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const target = {
       kind: 'workspace-root' as const,
@@ -578,8 +628,7 @@ describe('workspace pane tab close action', () => {
     )
     const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
     const close = dispatchCloseWorkspacePaneTabAction({
-      routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-      paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+      location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
       workspaceId: REPO_ID,
       workspacePaneRoute: { kind: 'static', tab: 'files' },
       navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
@@ -602,7 +651,7 @@ describe('workspace pane tab close action', () => {
   })
 
   test('reports lifecycle success and clears the transition when close-back navigation rejects', async () => {
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       id: REPO_ID,
       branches: [createRepoBranch(BRANCH_NAME)],
@@ -616,9 +665,10 @@ describe('workspace pane tab close action', () => {
     const commitFilesystemWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
     const presentationEffects = { onCommit: vi.fn(), onAbandon: vi.fn() }
     const close = dispatchCloseWorkspacePaneTabAction({
-      routeTarget: WORKTREE_PANE_TARGET,
-      paneTarget: WORKTREE_PANE_TARGET,
-      worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+      location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+        kind: 'branch',
+        branchName: BRANCH_NAME,
+      }),
       workspaceId: REPO_ID,
       workspacePaneRoute: { kind: 'static', tab: 'files' },
       navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
@@ -637,7 +687,7 @@ describe('workspace pane tab close action', () => {
   })
 
   test('abandons superseded close presentation without reporting the committed close as failed', async () => {
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
       id: REPO_ID,
       branches: [createRepoBranch(BRANCH_NAME)],
@@ -652,9 +702,10 @@ describe('workspace pane tab close action', () => {
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
-        routeTarget: WORKTREE_PANE_TARGET,
-        paneTarget: WORKTREE_PANE_TARGET,
-        worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+        location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+          kind: 'branch',
+          branchName: BRANCH_NAME,
+        }),
         workspaceId: REPO_ID,
         workspacePaneRoute: { kind: 'static', tab: 'files' },
         navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
@@ -742,9 +793,9 @@ describe('workspace pane tab close action', () => {
 
     await expect(
       dispatchConfirmCloseTerminalWorkspacePaneTabAction({
-        routeTarget: WORKTREE_PANE_TARGET,
-        paneTarget: WORKTREE_PANE_TARGET,
-        worktreeHead: { kind: 'detached' },
+        location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+          kind: 'detached',
+        }),
         workspaceId: REPO_ID,
         workspacePaneRoute: route,
         navigation,
@@ -854,9 +905,9 @@ describe('workspace pane tab close action', () => {
 
     await expect(
       dispatchCloseWorkspacePaneTabAction({
-        routeTarget: WORKTREE_PANE_TARGET,
-        paneTarget: WORKTREE_PANE_TARGET,
-        worktreeHead: { kind: 'detached' },
+        location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+          kind: 'detached',
+        }),
         workspaceId: REPO_ID,
         workspacePaneRoute: { kind: 'terminal', terminalSessionId },
         navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
@@ -966,8 +1017,7 @@ describe('workspace pane tab close action', () => {
 
     await expect(
       dispatchConfirmCloseTerminalWorkspacePaneTabAction({
-        routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-        paneTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+        location: workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
         workspaceId: REPO_ID,
         workspacePaneRoute: undefined,
         navigation,
@@ -1022,9 +1072,10 @@ describe('workspace pane tab close action', () => {
     })
     const navigation = navigationWith()
     const close = dispatchCloseWorkspacePaneTabAction({
-      routeTarget: WORKTREE_PANE_TARGET,
-      paneTarget: WORKTREE_PANE_TARGET,
-      worktreeHead: { kind: 'branch', branchName: BRANCH_NAME },
+      location: workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+        kind: 'branch',
+        branchName: BRANCH_NAME,
+      }),
       workspaceId: REPO_ID,
       workspacePaneRoute: { kind: 'static', tab: 'files' },
       navigation,

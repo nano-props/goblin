@@ -37,7 +37,6 @@ import {
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
-  workspacePaneActionTargetFromFilesystemTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import type {
   TerminalCreateCommandResult,
@@ -182,8 +181,7 @@ describe('workspace pane runtime tab create action', () => {
 
   test('rechecks canonical materialization after waiting in the target queue', async () => {
     const queuedActionMayRun = Promise.withResolvers<void>()
-    const coordinatorTarget = workspacePaneActionTargetFromFilesystemTarget(BASE.target)
-    const blocker = runWorkspacePaneAction(coordinatorTarget, async () => {
+    const blocker = runWorkspacePaneAction(LOCATION, async () => {
       await queuedActionMayRun.promise
       return true
     })
@@ -540,10 +538,7 @@ describe('workspace pane runtime tab create action', () => {
 
   test('does not create after a queued target runtime is replaced', async () => {
     const blocker = Promise.withResolvers<void>()
-    const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromFilesystemTarget(BASE.target),
-      () => blocker.promise,
-    )
+    const blockingAction = runWorkspacePaneAction(LOCATION, () => blocker.promise)
     const createTerminal = vi.fn(async () => createAdmission())
     const dispatch = dispatchTerminalCreate({
       createTerminal,
@@ -620,6 +615,7 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       commitCreatedTerminalWorkspacePaneRuntimeTab({
+        location: LOCATION,
         base: BASE,
         admission,
         openerIdentity: 'workspace-pane:status',
@@ -637,6 +633,7 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       commitCreatedTerminalWorkspacePaneRuntimeTab({
+        location: LOCATION,
         base: BASE,
         admission: { ...createAdmission(), requestRole: 'observer' },
         openerIdentity: 'workspace-pane:status',
@@ -654,6 +651,7 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       commitCreatedTerminalWorkspacePaneRuntimeTab({
+        location: LOCATION,
         base: BASE,
         admission: createAdmission(),
         openerIdentity: 'workspace-pane:status',
@@ -671,6 +669,7 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       commitCreatedTerminalWorkspacePaneRuntimeTab({
+        location: LOCATION,
         base: BASE,
         admission: { ...createAdmission(), runtimeProjectionApplied: false },
         openerIdentity: 'workspace-pane:status',
@@ -687,6 +686,7 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       commitCreatedTerminalWorkspacePaneRuntimeTab({
+        location: LOCATION,
         base: BASE,
         admission: { ...createAdmission(), presentation: { kind: 'workspace-root' } },
         openerIdentity: 'workspace-pane:status',

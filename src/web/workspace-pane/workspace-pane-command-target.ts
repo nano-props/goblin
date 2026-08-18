@@ -134,7 +134,3 @@ export function workspacePaneCommandRouteTarget(target: WorkspacePaneCommandTarg
 export function workspacePaneCommandWorktreeHead(target: WorkspacePaneCommandTarget): GitHead | undefined {
   return target.location.worktreeHead ?? undefined
 }
-
-export function workspacePaneCommandRuntimeId(target: WorkspacePaneCommandTarget): string {
-  return target.location.workspaceRuntimeId
-}

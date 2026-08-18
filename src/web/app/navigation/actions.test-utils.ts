@@ -20,7 +20,7 @@ import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-gua
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { gitWorktreeFilesystemExecutionTarget } from '#/shared/workspace-runtime.ts'
-import { gitBranchPaneTargetLease, gitWorktreePaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { gitBranchPaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 // Vitest has no reusable fixture for app route navigation and workspace history state.
 export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/navigation-actions-repo')
@@ -45,7 +45,10 @@ export function branchSelectionLease(branchName = BRANCH_NAME) {
 export function worktreeSelectionLease(worktreePath = WORKTREE_PATH) {
   const workspace = workspacesStore.getState().workspaces[REPO_ID]
   if (!workspace) throw new Error('missing worktree selection workspace fixture')
-  return gitWorktreePaneTargetLease(REPO_ID, workspace.workspaceRuntimeId, worktreePath)
+  return {
+    routeTarget: { kind: 'git-worktree' as const, workspaceId: REPO_ID, worktreePath },
+    workspaceRuntimeId: workspace.workspaceRuntimeId,
+  }
 }
 
 export function setupAppNavigationActionsTests() {

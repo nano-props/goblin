@@ -2,11 +2,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { isWorkspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
-import {
-  terminalExecutionCoordinates,
-  terminalExecutionPath,
-  type TerminalSessionBase,
-} from '#/shared/terminal-types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
   isMaterializedWorkspacePaneRuntimeTab,
   workspacePaneTerminalBaseForTabModel,
@@ -21,23 +17,16 @@ import {
   type ConfirmedWorkspacePaneRuntimeTabClose,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 import {
-  filesystemWorkspacePaneTargetLeaseIsCurrent,
-  gitWorktreePaneTargetLease,
-  workspaceRootPaneTargetLease,
   workspacePaneTabTargetBlocksInteraction,
+  filesystemWorkspacePaneLocationIsCurrent,
+  workspacePaneLocationIsCurrent,
   type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { terminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 import type { WorkspacePaneRuntimeTabCloseConfirmRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
-import {
-  workspacePaneActionTargetFromLocation,
-  workspacePaneActionTargetFromFilesystemTarget,
-  runWorkspacePaneAction,
-  type WorkspacePaneActionTarget,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { terminalLog } from '#/web/logger.ts'
 import {
   abandonWorkspacePaneClosePresentation,
@@ -55,11 +44,14 @@ import {
 import type { WorkspacePaneTabCloseOutcome } from '#/web/workspace-pane/workspace-pane-tab-close-outcome.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { surfaceWorkspacePaneTabTargetUnavailable } from '#/web/workspace-pane/workspace-pane-tab-action-feedback.ts'
-import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
+import {
+  workspacePaneLocationTerminalBaseMatches,
+  type FilesystemWorkspacePaneLocation,
+  type WorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export interface CloseWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
-  workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   location: WorkspacePaneLocation
   selectedIdentity?: string | null
@@ -73,7 +65,11 @@ export interface ConfirmedTerminalWorkspacePaneTabClose {
   base: TerminalSessionBase
 }
 
-export interface ConfirmCloseTerminalWorkspacePaneTabActionOptions extends CloseWorkspacePaneTabActionOptions {
+export interface ConfirmCloseTerminalWorkspacePaneTabActionOptions extends Omit<
+  CloseWorkspacePaneTabActionOptions,
+  'location'
+> {
+  location: FilesystemWorkspacePaneLocation
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   confirmedTerminal: ConfirmedTerminalWorkspacePaneTabClose
 }
@@ -101,13 +97,12 @@ export async function dispatchCloseWorkspacePaneTabAction(
     const coordinatorTarget = admitCloseWorkspacePaneTarget(
       resolveCloseWorkspacePaneTarget(ownedOptions, ownedOptions.workspacePaneRoute),
     )
-    if (!coordinatorTarget?.location) {
+    const location = coordinatorTarget?.location ?? null
+    if (!location || !workspacePaneLocationIsCurrent(location)) {
       presentationEffects?.onAbandon()
       return false
     }
-    return await runWorkspacePaneAction(workspacePaneActionTargetFromLocation(coordinatorTarget.location), () =>
-      closeWorkspacePaneTabAction(ownedOptions),
-    )
+    return await runWorkspacePaneAction(location, () => closeWorkspacePaneTabAction(ownedOptions))
   } catch (error) {
     presentationEffects?.onAbandon()
     throw error
@@ -143,36 +138,31 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
   const ownedOptions = presentationEffects ? { ...options, presentationEffects } : options
   try {
     const base = ownedOptions.confirmedTerminal.base
-    const coordinates = terminalExecutionCoordinates(base.target)
-    const queueWorkspaceId = ownedOptions.workspaceId ?? coordinates.workspaceId
-    if (queueWorkspaceId !== coordinates.workspaceId || !runtimeFilesystemTargetIsCurrent(base.target)) {
+    const queueWorkspaceId = ownedOptions.workspaceId ?? ownedOptions.location.workspaceId
+    if (
+      queueWorkspaceId !== ownedOptions.location.workspaceId ||
+      !terminalCloseTargetIsCurrent(ownedOptions.location, base)
+    ) {
       presentationEffects?.onAbandon()
       return false
     }
-    const queueTarget = workspacePaneActionTargetFromFilesystemTarget(base.target)
-    return await runWorkspacePaneAction(queueTarget, () => confirmCloseTerminalWorkspacePaneTabAction(ownedOptions))
+    return await runWorkspacePaneAction(ownedOptions.location, () =>
+      confirmCloseTerminalWorkspacePaneTabAction(ownedOptions),
+    )
   } catch (error) {
     presentationEffects?.onAbandon()
     throw error
   }
 }
 
-function runtimeFilesystemTargetIsCurrent(target: TerminalSessionBase['target']): boolean {
-  const paneTarget = workspacePaneTabsTargetFromRuntime(target)
-  if (!paneTarget) return false
-  return paneTarget.kind === 'workspace-root'
-    ? filesystemWorkspacePaneTargetLeaseIsCurrent(
-        workspaceRootPaneTargetLease(paneTarget.workspaceId, target.workspaceRuntimeId),
-      )
-    : filesystemWorkspacePaneTargetLeaseIsCurrent(
-        gitWorktreePaneTargetLease(paneTarget.workspaceId, target.workspaceRuntimeId, paneTarget.worktreePath),
-      )
+function terminalCloseTargetIsCurrent(location: FilesystemWorkspacePaneLocation, base: TerminalSessionBase): boolean {
+  return workspacePaneLocationTerminalBaseMatches(location, base) && filesystemWorkspacePaneLocationIsCurrent(location)
 }
 
 async function confirmCloseTerminalWorkspacePaneTabAction(
   options: ConfirmCloseTerminalWorkspacePaneTabActionOptions,
 ): Promise<boolean> {
-  if (!runtimeFilesystemTargetIsCurrent(options.confirmedTerminal.base.target)) {
+  if (!terminalCloseTargetIsCurrent(options.location, options.confirmedTerminal.base)) {
     options.presentationEffects?.onAbandon()
     return false
   }
@@ -237,7 +227,7 @@ function beginCloseWorkspacePaneTabAction(
   const target = workspaceId
     ? admitCloseWorkspacePaneTarget(resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute))
     : null
-  if (!target) return { kind: 'done', result: false }
+  if (!target || !workspacePaneLocationIsCurrent(target.location)) return { kind: 'done', result: false }
   if (workspacePaneTabTargetBlocksInteraction(target)) return { kind: 'done', result: true }
   const tabEntry = targetIdentity
     ? (target.surfaceTabEntries.find((entry) => workspacePaneTabEntryIdentity(entry) === targetIdentity) ?? null)
@@ -267,7 +257,7 @@ function beginCloseWorkspacePaneTabAction(
       view: runtimeView,
       target: terminalBase,
     })
-    if (!target.location) return { kind: 'done', result: false }
+    if (!target.location || target.location.kind === 'branch') return { kind: 'done', result: false }
     if (
       openWorkspacePaneRuntimeCloseConfirm(
         target.location.workspaceId,
@@ -319,7 +309,7 @@ function admitCloseWorkspacePaneTarget(resolution: WorkspacePaneTabTargetResolut
 
 function openWorkspacePaneRuntimeCloseConfirm(
   workspaceId: WorkspaceId,
-  location: WorkspacePaneLocation,
+  location: FilesystemWorkspacePaneLocation,
   request: WorkspacePaneRuntimeTabCloseConfirmRequest | null,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   selectedIdentity: string | null,

@@ -13,7 +13,6 @@ import {
   commitWorkspacePaneExactTargetRoute,
   selectWorkspacePaneControllerTab,
   selectWorkspacePaneControllerTabEntry,
-  workspacePaneTabControllerTargetIsCurrent,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import type {
   FilesystemWorkspacePaneRouteCommitActions,
@@ -401,29 +400,6 @@ describe('workspace pane tab controller transactions', () => {
     commit.resolve(true)
 
     await expect(completion).resolves.toBe(false)
-  })
-
-  test('invalidates a worktree target when Git capability is removed from the same runtime', async () => {
-    const repo = workspacesStore.getState().workspaces[WORKSPACE_ID]!
-    if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
-    const gitProbe = repo.capability.probe
-    workspacesStore.setState({
-      workspaces: {
-        ...workspacesStore.getState().workspaces,
-        [WORKSPACE_ID]: {
-          ...repo,
-          capability: {
-            kind: 'filesystem',
-            probe: {
-              ...gitProbe,
-              capabilities: { ...gitProbe.capabilities, git: { status: 'unavailable' } },
-            },
-          },
-        },
-      },
-    })
-
-    expect(workspacePaneTabControllerTargetIsCurrent(workspacePaneTarget())).toBe(false)
   })
 
   test('commits a close-back lease through exact route completion', async () => {

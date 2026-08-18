@@ -1,18 +1,13 @@
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import { workspacePaneFilesystemExecutionTargetKey } from '#/shared/workspace-runtime.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { isWorkspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { appNavigationIsCurrent, beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
+import { tryRunWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  tryRunWorkspacePaneAction,
-  workspacePaneActionTargetFromLocation,
-  type WorkspacePaneActionTarget,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import {
-  workspacePaneLocationTerminalBase,
+  workspacePaneLocationTerminalBaseMatches,
   type FilesystemWorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
 
@@ -22,24 +17,14 @@ export function commitWorkspacePaneTerminalDestination(input: {
   terminalSessionId: string
   navigation: AppNavigationActions
 }): Promise<WorkspacePaneActionOutcome> {
-  const expectedBase = workspacePaneLocationTerminalBase(input.location)
-  if (!expectedBase || !terminalBasesEqual(expectedBase, input.base)) {
+  if (!workspacePaneLocationTerminalBaseMatches(input.location, input.base)) {
     return Promise.resolve({ kind: 'target-missing' })
   }
   return commitFilesystemTerminalDestination({
     navigation: input.navigation,
     location: input.location,
-    paneTarget: input.location.paneTarget,
-    actionTarget: workspacePaneActionTargetFromLocation(input.location),
     terminalSessionId: input.terminalSessionId,
   })
-}
-
-function terminalBasesEqual(left: TerminalSessionBase, right: TerminalSessionBase): boolean {
-  return (
-    left.presentation.kind === right.presentation.kind &&
-    workspacePaneFilesystemExecutionTargetKey(left.target) === workspacePaneFilesystemExecutionTargetKey(right.target)
-  )
 }
 
 function terminalPaneProjectionOutcome(
@@ -59,13 +44,11 @@ function terminalPaneProjectionOutcome(
 async function commitFilesystemTerminalDestination(input: {
   navigation: AppNavigationActions
   location: FilesystemWorkspacePaneLocation
-  paneTarget: FilesystemWorkspacePaneTabsTarget
-  actionTarget: WorkspacePaneActionTarget
   terminalSessionId: string
 }): Promise<WorkspacePaneActionOutcome> {
-  return await commitQueuedTerminalDestination(input.actionTarget, async () => {
+  return await commitQueuedTerminalDestination(input.location, async () => {
     const projectionOutcome = terminalPaneProjectionOutcome(
-      input.paneTarget,
+      input.location.paneTarget,
       input.location.workspaceRuntimeId,
       input.terminalSessionId,
     )
@@ -88,9 +71,9 @@ async function commitFilesystemTerminalDestination(input: {
 }
 
 async function commitQueuedTerminalDestination(
-  actionTarget: WorkspacePaneActionTarget,
+  location: FilesystemWorkspacePaneLocation,
   commit: () => Promise<WorkspacePaneActionOutcome> | WorkspacePaneActionOutcome,
 ): Promise<WorkspacePaneActionOutcome> {
-  const admission = await tryRunWorkspacePaneAction(actionTarget, commit)
+  const admission = await tryRunWorkspacePaneAction(location, commit)
   return admission.kind === 'busy' ? { kind: 'blocked' } : admission.result
 }

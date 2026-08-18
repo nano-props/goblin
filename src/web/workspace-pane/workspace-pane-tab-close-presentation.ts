@@ -15,18 +15,15 @@ import {
   commitWorkspacePaneControllerCloseBackTarget,
   commitWorkspacePaneControllerRetirementCloseBackTarget,
   selectWorkspacePaneControllerTabEntry,
-  workspacePaneTabControllerTargetIsCurrent,
   type WorkspacePaneControllerPresentationLease,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { workspacePaneLocationIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   resolveCloseWorkspacePaneTarget,
   workspacePaneTabsTargetForClose,
 } from '#/web/workspace-pane/workspace-pane-tab-close-target.ts'
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import {
-  workspacePaneActionTargetFromLocation,
-  runWorkspacePaneAction,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { captureUnownedAppNavigationGeneration, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { translate } from '#/web/stores/i18n-vue.ts'
@@ -40,7 +37,6 @@ export interface WorkspacePaneTabClosePresentationEffects {
 
 export interface RetiredTerminalWorkspacePaneTabPresentationOptions {
   workspaceId: WorkspaceId
-  workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   location: WorkspacePaneLocation
   navigation: AppNavigationActions
@@ -234,10 +230,9 @@ export function dispatchRetiredTerminalWorkspacePaneTabPresentationAction(
   const presentationLease = transition.presentationLease
   if (!presentationLease) return Promise.resolve(false)
   if (!target.location) return Promise.resolve(false)
-  const queueTarget = workspacePaneActionTargetFromLocation(target.location)
-  return runWorkspacePaneAction(queueTarget, async () => {
+  return runWorkspacePaneAction(target.location, async () => {
     try {
-      if (!workspacePaneTabControllerTargetIsCurrent(target)) return false
+      if (!workspacePaneLocationIsCurrent(target.location)) return false
       const result = await reconcileRetiredWorkspacePaneClosePresentation(presentationLease, options.navigation)
       if (result.kind === 'failed') surfaceWorkspacePaneTabCloseFeedback({ kind: 'presentation-failed' })
       return true
@@ -253,7 +248,7 @@ async function reconcileCommittedWorkspacePaneClosePresentation(input: {
   navigation: AppNavigationActions
 }): Promise<WorkspacePaneClosePresentationResult> {
   if (!input.transition.wasActive) return { kind: 'settled' }
-  if (!workspacePaneTabControllerTargetIsCurrent(input.target)) return { kind: 'settled' }
+  if (!workspacePaneLocationIsCurrent(input.target.location)) return { kind: 'settled' }
   try {
     if (!input.transition.presentationLease) {
       const nextEntry = input.transition.nextEntry

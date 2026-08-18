@@ -28,13 +28,15 @@ import {
   workspacePaneCommandCoordinates,
   workspacePaneCommandPaneTarget,
   workspacePaneCommandRouteTarget,
-  workspacePaneCommandRuntimeId,
   workspacePaneCommandTargetHasFilesystem,
   workspacePaneCommandWorktreeHead,
   type WorkspacePaneCommandTarget,
 } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import type { WorkspacePaneTabClosePresentationEffects } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
-import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
+import type {
+  FilesystemWorkspacePaneLocation,
+  WorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 type WorkspacePaneCommandRoute = ParsedWorkspacePaneRoute | null | undefined
 
@@ -74,7 +76,7 @@ interface CloseWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTar
 interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions {
   workspaceId: WorkspaceId | null
   workspacePaneRoute: WorkspacePaneCommandRoute
-  location: WorkspacePaneLocation
+  location: FilesystemWorkspacePaneLocation
   navigation: AppNavigationActions
   targetIdentity?: string
   selectedIdentity: string | null
@@ -182,7 +184,6 @@ export async function runCloseWorkspacePaneTabCommand(options: CloseWorkspacePan
   try {
     return dispatchCloseWorkspacePaneTabAction({
       ...options,
-      workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
       ...workspacePaneCommandCoordinates(options.target),
       location: options.target.location,
     })
@@ -207,10 +208,7 @@ export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
 ): Promise<boolean> {
   const presentationEffects = options.presentationEffects
   try {
-    return dispatchConfirmCloseTerminalWorkspacePaneTabAction({
-      ...options,
-      workspaceRuntimeId: options.confirmedTerminal.base.target.workspaceRuntimeId,
-    })
+    return dispatchConfirmCloseTerminalWorkspacePaneTabAction(options)
   } catch (error) {
     presentationEffects?.onAbandon()
     throw error
@@ -223,7 +221,6 @@ export function runRetiredTerminalWorkspacePaneTabPresentationCommand(
   const routeTarget = workspacePaneCommandRouteTarget(options.target)
   return dispatchRetiredTerminalWorkspacePaneTabPresentationAction({
     ...options,
-    workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
     workspaceId: routeTarget.workspaceId,
     ...workspacePaneCommandCoordinates(options.target),
     location: options.target.location,
@@ -236,7 +233,6 @@ export async function runSelectWorkspacePaneTabByIndexCommand(
   if (!options.workspaceId) return false
   return await dispatchSelectWorkspacePaneTabByIndexAction({
     ...options,
-    workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
     location: options.target.location,
     workspacePaneRoute: options.target.workspacePaneRoute,
   })
@@ -246,7 +242,6 @@ export async function runMoveWorkspacePaneTabCommand(options: MoveWorkspacePaneT
   if (!options.workspaceId) return false
   return await dispatchMoveWorkspacePaneTabAction({
     ...options,
-    workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
     location: options.target.location,
     workspacePaneRoute: options.target.workspacePaneRoute,
   })

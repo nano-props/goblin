@@ -21,7 +21,6 @@ import {
   type FilesystemWorkspacePaneTabsTarget,
   type GitBranchWorkspacePaneTabsTarget,
   type GitWorktreeWorkspacePaneTabsTarget,
-  type RootWorkspacePaneTabsTarget,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
@@ -41,12 +40,7 @@ import {
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
 
-export interface WorkspaceRootPaneTargetLease {
-  routeTarget: RootWorkspacePaneTabsTarget
-  workspaceRuntimeId: string
-}
-
-export interface GitWorktreePaneTargetLease {
+export interface GitWorktreePaneRouteLease {
   routeTarget: GitWorktreeWorkspacePaneTabsTarget
   workspaceRuntimeId: string
 }
@@ -54,29 +48,6 @@ export interface GitWorktreePaneTargetLease {
 export interface GitBranchPaneTargetLease {
   routeTarget: GitBranchWorkspacePaneTabsTarget
   workspaceRuntimeId: string
-}
-
-export type FilesystemWorkspacePaneTargetLease = WorkspaceRootPaneTargetLease | GitWorktreePaneTargetLease
-
-export function workspaceRootPaneTargetLease(
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-): WorkspaceRootPaneTargetLease {
-  return {
-    routeTarget: { kind: 'workspace-root', workspaceId },
-    workspaceRuntimeId,
-  }
-}
-
-export function gitWorktreePaneTargetLease(
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-  worktreePath: string,
-): GitWorktreePaneTargetLease {
-  return {
-    routeTarget: { kind: 'git-worktree', workspaceId, worktreePath },
-    workspaceRuntimeId,
-  }
 }
 
 export function gitBranchPaneTargetLease(
@@ -97,10 +68,9 @@ export function gitBranchPaneTargetLeaseOwnerIsCurrent(lease: GitBranchPaneTarge
   )
 }
 
-export function filesystemWorkspacePaneTargetLeaseIsCurrent(lease: FilesystemWorkspacePaneTargetLease): boolean {
+export function gitWorktreePaneRouteLeaseIsCurrent(lease: GitWorktreePaneRouteLease): boolean {
   const workspace = workspacesStore.getState().workspaces[lease.routeTarget.workspaceId]
   if (workspace?.workspaceRuntimeId !== lease.workspaceRuntimeId) return false
-  if (lease.routeTarget.kind === 'workspace-root') return true
   const worktreePath = lease.routeTarget.worktreePath
   if (workspace.capability.kind !== 'git') return false
   const snapshot = getRepoSnapshotQueryData(lease.routeTarget.workspaceId, lease.workspaceRuntimeId)
@@ -134,19 +104,6 @@ export type WorkspacePaneTabTargetResolution =
       target: WorkspacePaneTabModel
     }
 
-/** Narrows a ready or unavailable projection to the runtime epoch captured by an action. */
-export function scopeWorkspacePaneTabTargetResolutionToRuntime(
-  resolution: WorkspacePaneTabTargetResolution,
-  workspaceRuntimeId: string,
-): WorkspacePaneTabTargetResolution {
-  if (
-    resolution.kind === 'missing' ||
-    workspacePaneTabModelWorkspaceRuntimeId(resolution.target) === workspaceRuntimeId
-  )
-    return resolution
-  return { kind: 'missing' }
-}
-
 export interface WorkspacePaneTabTargetOptions {
   /**
    * `undefined` means no route context is available, so use persisted
@@ -155,8 +112,6 @@ export interface WorkspacePaneTabTargetOptions {
    */
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
 }
-
-export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }
 
 function filesystemExecutionTargetForPaneTarget(
   target: WorkspacePaneTabsTarget,
@@ -243,17 +198,13 @@ export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneDestinatio
   return !isGitWorktreeDestinationTargetLease(lease) && current.routeTarget.branchName === lease.routeTarget.branchName
 }
 
-export function workspacePaneTabTargetForWorkspace(
-  workspaceId: WorkspaceId,
-  options: WorkspacePaneTabTargetOptions = workspacePanePreferenceTargetOptions,
-): WorkspacePaneTabModel | null {
-  const workspace = workspacesStore.getState().workspaces[workspaceId]
-  if (!workspace) return null
-  const resolution = resolveWorkspacePaneTabTargetForPaneTarget({
-    location: workspacePaneLocationForRoot(workspaceId, workspace.workspaceRuntimeId),
-    workspacePaneRoute: options.workspacePaneRoute,
+export function workspacePaneLocationIsCurrent(location: WorkspacePaneLocation | null): boolean {
+  if (!location) return false
+  if (location.kind !== 'branch') return filesystemWorkspacePaneLocationIsCurrent(location)
+  return workspacePaneTargetLeaseIsCurrent({
+    workspaceRuntimeId: location.workspaceRuntimeId,
+    routeTarget: location.routeTarget,
   })
-  return resolution.kind === 'ready' ? resolution.target : null
 }
 
 export interface WorkspacePaneTabTargetForPaneTargetInput {

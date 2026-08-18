@@ -244,18 +244,10 @@ describe('workspace pane terminal destination navigation', () => {
     seedTerminalPaneTab('/workspace/feature')
     const started = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
-    const occupied = runWorkspacePaneAction(
-      {
-        kind: 'git-worktree',
-        workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-        worktreePath: '/workspace/feature',
-      },
-      async () => {
-        started.resolve()
-        await release.promise
-      },
-    )
+    const occupied = runWorkspacePaneAction(linkedLocation('/workspace/feature'), async () => {
+      started.resolve()
+      await release.promise
+    })
     await started.promise
     const commitWorkspacePaneRoute = committedBranchRoute()
     await expect(

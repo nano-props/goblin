@@ -13,13 +13,8 @@ import {
   workspacePaneTabEntryListIdentity,
   workspacePaneTabsWithSurfaceOrder,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  runWorkspacePaneAction,
-  workspacePaneActionTargetFromPaneTarget,
-  type WorkspacePaneActionTarget,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import {
-  runtimeWorkspacePaneTarget,
   workspacePaneTabsBranchIdentity,
   workspacePaneTabsTargetWorktreePath,
   type WorkspacePaneTabsTarget,
@@ -28,9 +23,11 @@ import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-reque
 import { translate } from '#/web/stores/i18n-vue.ts'
 import { toast } from 'vue-sonner'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
+import { workspacePaneLocationIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
-export type WorkspacePaneTabsReorderMutationInput = WorkspacePaneTabsTarget & {
-  workspaceRuntimeId: string
+export interface WorkspacePaneTabsReorderMutationInput {
+  location: WorkspacePaneLocation
   canonicalTabs: readonly WorkspacePaneTabEntry[]
 }
 
@@ -44,8 +41,7 @@ export function useWorkspacePaneTabsReorderMutation(
   const queryClient = useQueryClient()
   const reorderTabs = (tabs: readonly WorkspacePaneTabEntry[], onSettled?: () => void) => {
     const current = toValue(input)
-    const target = workspacePaneTabsReorderTarget(current)
-    if (!target) {
+    if (!workspacePaneLocationIsCurrent(current.location)) {
       onSettled?.()
       return
     }
@@ -55,55 +51,32 @@ export function useWorkspacePaneTabsReorderMutation(
       onSettled?.()
       return
     }
-    void runWorkspacePaneTabsReorder(target, nextTabs, queryClient, onSettled)
+    void runWorkspacePaneTabsReorder(current.location, nextTabs, queryClient, onSettled)
   }
 
   return { reorderTabs }
 }
 
-function workspacePaneTabsReorderTarget(
-  input: WorkspacePaneTabsReorderMutationInput,
-): WorkspacePaneTabsReorderTarget | null {
-  if (!runtimeWorkspacePaneTarget(input, input.workspaceRuntimeId)) return null
-  if (input.kind === 'workspace-root') {
-    return { kind: 'workspace-root', workspaceId: input.workspaceId, workspaceRuntimeId: input.workspaceRuntimeId }
-  }
-  if (input.kind === 'git-branch') {
-    return {
-      kind: 'git-branch',
-      workspaceId: input.workspaceId,
-      workspaceRuntimeId: input.workspaceRuntimeId,
-      branchName: input.branchName,
-    }
-  }
-  return {
-    kind: 'git-worktree',
-    workspaceId: input.workspaceId,
-    workspaceRuntimeId: input.workspaceRuntimeId,
-    worktreePath: input.worktreePath,
-  }
-}
-
 async function runWorkspacePaneTabsReorder(
-  target: WorkspacePaneTabsReorderTarget,
+  location: WorkspacePaneLocation,
   draggedTabs: readonly WorkspacePaneTabEntry[],
   queryClient: QueryClient,
   onSettled: (() => void) | undefined,
 ): Promise<void> {
   try {
-    await runWorkspacePaneAction(workspacePaneReorderActionTarget(target), () =>
-      runWorkspacePaneTabsReorderInQueue(target, draggedTabs, queryClient),
-    )
+    await runWorkspacePaneAction(location, () => runWorkspacePaneTabsReorderInQueue(location, draggedTabs, queryClient))
   } finally {
     onSettled?.()
   }
 }
 
 async function runWorkspacePaneTabsReorderInQueue(
-  target: WorkspacePaneTabsReorderTarget,
+  location: WorkspacePaneLocation,
   draggedTabs: readonly WorkspacePaneTabEntry[],
   queryClient: QueryClient,
 ): Promise<void> {
+  if (!workspacePaneLocationIsCurrent(location)) return
+  const target = workspacePaneTabsReorderTarget(location)
   try {
     if (readWorkspacePaneTabsProjectionForTarget(target, queryClient).phase !== 'ready') {
       const messageKey = 'error.workspace-tabs-reorder-unavailable'
@@ -140,6 +113,6 @@ async function runWorkspacePaneTabsReorderInQueue(
 
 type WorkspacePaneTabsReorderTarget = WorkspacePaneTabsTarget & { workspaceRuntimeId: string }
 
-function workspacePaneReorderActionTarget(target: WorkspacePaneTabsReorderTarget): WorkspacePaneActionTarget {
-  return workspacePaneActionTargetFromPaneTarget(target, target.workspaceRuntimeId)
+function workspacePaneTabsReorderTarget(location: WorkspacePaneLocation): WorkspacePaneTabsReorderTarget {
+  return { ...location.paneTarget, workspaceRuntimeId: location.workspaceRuntimeId }
 }

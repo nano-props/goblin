@@ -2,7 +2,7 @@ import { createStore } from 'zustand/vanilla'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
+import type { FilesystemWorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 import type { WorkspacePaneTabClosePresentationEffects } from '#/web/workspace-pane/workspace-pane-tab-close-presentation.ts'
 
 export interface TerminalCloseConfirmPayload {
@@ -10,7 +10,7 @@ export interface TerminalCloseConfirmPayload {
   readonly targetIdentity: string
   readonly selectedIdentity: string | null
   readonly workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
-  readonly location: WorkspacePaneLocation
+  readonly location: FilesystemWorkspacePaneLocation
   readonly terminalSessionId: string
   readonly terminalBase: TerminalSessionBase
   readonly processName: string
