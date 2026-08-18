@@ -4,7 +4,6 @@ import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/sha
 import { currentWorkspaceRuntimeId } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import { workspacePaneTabControllerTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/navigation/actions.ts'
 import { beginWorkspacePaneDestinationPresentation } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import {
@@ -22,6 +21,7 @@ import {
   filesystemWorkspacePaneLocationIsCurrent,
   isGitWorktreeDestinationTargetLease,
   resolveWorkspacePaneDestinationTarget,
+  workspacePaneLocationIsCurrent,
   workspacePaneTargetBlocksInteraction,
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
@@ -310,7 +310,7 @@ async function openWorkspacePaneStaticTabAction(
   }
   if (committed.projection === 'superseded') return { kind: 'superseded' }
   const model = resolveOpenWorkspacePaneStaticTabModel(input)
-  if (!model || !workspacePaneTabControllerTargetIsCurrent(model)) return { kind: 'superseded' }
+  if (!model || !workspacePaneLocationIsCurrent(model.location)) return { kind: 'superseded' }
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(
       input.location.paneTarget,

@@ -32,9 +32,16 @@ import type { WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
+  workspacePaneActionTargetFromLocation,
   workspacePaneActionTargetFromPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
+import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
+import { produce } from 'immer'
+import {
+  workspacePaneLocationForWorktree,
+  type WorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
 
@@ -200,6 +207,40 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
   })
 
+  test('does not reorder after linked worktree ownership changes while queued', async () => {
+    const updateWorkspaceTabs = vi.fn(async () => [] as WorkspacePaneTabEntry[])
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    seedWorkspacePaneTabs(sourceTabs)
+    const location = linkedLocation()
+    renderMutationHook({ location, canonicalTabs: sourceTabs })
+    const blocker = Promise.withResolvers<void>()
+    const coordinatorBlocker = runWorkspacePaneAction(
+      workspacePaneActionTargetFromLocation(location),
+      async () => blocker.promise,
+    )
+    const onSettled = vi.fn()
+
+    await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs].reverse(), onSettled))
+    const snapshot = getRepoSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID)
+    if (!snapshot) throw new Error('expected accepted repo snapshot')
+    setRepoSnapshotQueryData(
+      REPO_ROOT,
+      WORKSPACE_RUNTIME_ID,
+      produce(snapshot, (draft) => {
+        for (const worktree of draft.worktrees) {
+          worktree.isSource = worktree.path === WORKTREE_PATH
+          worktree.isPrimary = worktree.path === WORKTREE_PATH
+        }
+      }),
+    )
+    blocker.resolve()
+    await coordinatorBlocker
+
+    await vi.waitFor(() => expect(onSettled).toHaveBeenCalledOnce())
+    expect(updateWorkspaceTabs).not.toHaveBeenCalled()
+  })
+
   test('uses the latest workspace runtime after the hook target changes', async () => {
     const updateWorkspaceTabs = vi.fn(async () => [staticEntry('status')])
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
@@ -213,10 +254,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       <VueQueryClientScope client={queryClient}>
         <HookHost
           input={{
-            kind: 'git-worktree' as const,
-            workspaceId: REPO_ROOT,
-            workspaceRuntimeId: NEXT_WORKSPACE_RUNTIME_ID,
-            worktreePath: WORKTREE_PATH,
+            location: linkedLocation(NEXT_WORKSPACE_RUNTIME_ID),
             canonicalTabs: sourceTabs,
           }}
         />
@@ -256,7 +294,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
       },
       queryClient,
     )
-    renderMutationHook({ kind: 'workspace-root', canonicalTabs: sourceTabs })
+    renderMutationHook({ location: sourceLocation(), canonicalTabs: sourceTabs })
 
     await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs].reverse()))
 
@@ -280,24 +318,15 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
 function renderMutationHook(
   input: {
-    kind?: 'git-worktree' | 'workspace-root'
+    location?: WorkspacePaneLocation
     canonicalTabs?: WorkspacePaneTabEntry[]
   } = {},
 ) {
-  const target =
-    input.kind === 'workspace-root'
-      ? { kind: 'workspace-root' as const, workspaceId: REPO_ROOT }
-      : {
-          kind: 'git-worktree' as const,
-          workspaceId: REPO_ROOT,
-          worktreePath: WORKTREE_PATH,
-        }
   return renderInJsdom(
     <VueQueryClientScope client={queryClient}>
       <HookHost
         input={{
-          ...target,
-          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          location: input.location ?? linkedLocation(),
           canonicalTabs: input.canonicalTabs ?? [],
         }}
       />
@@ -342,10 +371,35 @@ function seedWorkspacePaneTabsRepo(workspaceRuntimeId: string): void {
   seedRepoWithReadModelForTest({
     id: REPO_ROOT,
     workspaceRuntimeId,
-    branches: [createRepoBranch(BRANCH_NAME)],
-    worktrees: [createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH)],
+    branches: [createRepoBranch('main'), createRepoBranch(BRANCH_NAME)],
+    worktrees: [
+      createRepoWorktreeSnapshotForTest('main', '/tmp/workspace-pane-tabs-reorder-mutation-repo', {
+        isSource: true,
+        isPrimary: true,
+      }),
+      createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH),
+    ],
     currentBranchName: BRANCH_NAME,
   })
+}
+
+function linkedLocation(workspaceRuntimeId: string = WORKSPACE_RUNTIME_ID): WorkspacePaneLocation {
+  return workspacePaneLocationForWorktree(
+    REPO_ROOT,
+    workspaceRuntimeId,
+    createRepoWorktreeSnapshotForTest(BRANCH_NAME, WORKTREE_PATH),
+  )
+}
+
+function sourceLocation(): WorkspacePaneLocation {
+  return workspacePaneLocationForWorktree(
+    REPO_ROOT,
+    WORKSPACE_RUNTIME_ID,
+    createRepoWorktreeSnapshotForTest('main', '/tmp/workspace-pane-tabs-reorder-mutation-repo', {
+      isSource: true,
+      isPrimary: true,
+    }),
+  )
 }
 
 function installDeferredUpdateWorkspaceTabs(): DeferredUpdateWorkspaceTabsRequest[] {

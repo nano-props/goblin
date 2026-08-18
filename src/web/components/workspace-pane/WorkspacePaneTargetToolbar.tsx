@@ -5,7 +5,6 @@ import type { FunctionalComponent, PropType } from 'vue'
 import type { TerminalPresentation } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
@@ -50,7 +49,6 @@ import {
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import type { WorkspacePaneTabsReorderMutationInput } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 
 interface WorkspacePaneTargetToolbarProps {
   target: WorkspacePaneSurfaceTarget
@@ -175,9 +173,10 @@ const WorkspacePaneTargetToolbarContent = defineComponent<WorkspacePaneTargetToo
     const disposeDragPreviewOwner = (owner: WorkspacePaneTabDragPreviewOwner) => {
       if (dragPreviewOwner.value === owner) dragPreviewOwner.value = null
     }
-    const tabsReorder = useWorkspacePaneTabsReorderMutation(() =>
-      tabsMutationInput(persistenceTarget.value, props.target.workspaceRuntimeId, props.model.tabEntries),
-    )
+    const tabsReorder = useWorkspacePaneTabsReorderMutation(() => ({
+      location: requiredWorkspacePaneTabModelLocation(props.model),
+      canonicalTabs: props.model.tabEntries,
+    }))
     const visualTabs = computed(() => {
       const owner = dragPreviewOwner.value
       return owner?.key === targetKey.value ? owner.preview.visualTabs.value : props.model.tabEntries
@@ -308,37 +307,6 @@ const WorkspacePaneTabDragPreviewOwner = defineComponent<{
     return () => null
   },
 })
-
-function tabsMutationInput(
-  target: WorkspacePaneTabsTarget,
-  workspaceRuntimeId: string,
-  canonicalTabs: readonly WorkspacePaneTabEntry[],
-): WorkspacePaneTabsReorderMutationInput {
-  if (target.kind === 'workspace-root') {
-    return {
-      kind: 'workspace-root',
-      workspaceId: target.workspaceId,
-      workspaceRuntimeId,
-      canonicalTabs,
-    }
-  }
-  if (target.kind === 'git-branch') {
-    return {
-      kind: 'git-branch',
-      workspaceId: target.workspaceId,
-      branchName: target.branchName,
-      workspaceRuntimeId,
-      canonicalTabs,
-    }
-  }
-  return {
-    kind: 'git-worktree',
-    workspaceId: target.workspaceId,
-    worktreePath: target.worktreePath,
-    workspaceRuntimeId,
-    canonicalTabs,
-  }
-}
 
 function workspacePaneCommandTargetForSurface(
   location: WorkspacePaneTabModel['location'],

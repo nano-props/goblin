@@ -19,6 +19,7 @@ import {
 import {
   workspacePaneTabTargetBlocksInteraction,
   filesystemWorkspacePaneLocationIsCurrent,
+  workspacePaneLocationIsCurrent,
   type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { terminalActionDialogsStore } from '#/web/stores/workspaces/terminal-action-dialogs.ts'
@@ -52,7 +53,6 @@ import {
   type FilesystemWorkspacePaneLocation,
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
-import { workspacePaneTabControllerTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 
 export interface CloseWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
@@ -101,11 +101,12 @@ export async function dispatchCloseWorkspacePaneTabAction(
     const coordinatorTarget = admitCloseWorkspacePaneTarget(
       resolveCloseWorkspacePaneTarget(ownedOptions, ownedOptions.workspacePaneRoute),
     )
-    if (!coordinatorTarget?.location || !workspacePaneTabControllerTargetIsCurrent(coordinatorTarget)) {
+    const location = coordinatorTarget?.location ?? null
+    if (!location || !workspacePaneLocationIsCurrent(location)) {
       presentationEffects?.onAbandon()
       return false
     }
-    return await runWorkspacePaneAction(workspacePaneActionTargetFromLocation(coordinatorTarget.location), () =>
+    return await runWorkspacePaneAction(workspacePaneActionTargetFromLocation(location), () =>
       closeWorkspacePaneTabAction(ownedOptions),
     )
   } catch (error) {
@@ -234,7 +235,7 @@ function beginCloseWorkspacePaneTabAction(
   const target = workspaceId
     ? admitCloseWorkspacePaneTarget(resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute))
     : null
-  if (!target || !workspacePaneTabControllerTargetIsCurrent(target)) return { kind: 'done', result: false }
+  if (!target || !workspacePaneLocationIsCurrent(target.location)) return { kind: 'done', result: false }
   if (workspacePaneTabTargetBlocksInteraction(target)) return { kind: 'done', result: true }
   const tabEntry = targetIdentity
     ? (target.surfaceTabEntries.find((entry) => workspacePaneTabEntryIdentity(entry) === targetIdentity) ?? null)

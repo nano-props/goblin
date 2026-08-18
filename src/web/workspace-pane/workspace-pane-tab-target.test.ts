@@ -6,6 +6,7 @@ import {
   createRepoWorktreeSnapshotForTest,
 } from '#/web/test-utils/repo-store.ts'
 import { beforeEach, describe, expect, test } from 'vitest'
+import { produce } from 'immer'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -15,6 +16,7 @@ import {
   gitWorktreePaneRouteLeaseIsCurrent,
   resolveWorkspacePaneTabTargetForPaneTarget,
   scopeWorkspacePaneTabTargetResolutionToRuntime,
+  workspacePaneLocationIsCurrent,
   workspacePaneTabTargetForPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
@@ -106,6 +108,36 @@ describe('workspace pane tab target read model', () => {
 
     expect(filesystemWorkspacePaneLocationIsCurrent(sourceLocation)).toBe(false)
     expect(filesystemWorkspacePaneLocationIsCurrent(linkedLocation)).toBe(false)
+  })
+
+  test('invalidates a worktree location when Git capability is removed from the same runtime', () => {
+    const sourceWorktree = createRepoWorktreeSnapshotForTest('main', '/tmp/workspace-pane-target-repo', {
+      isSource: true,
+      isPrimary: true,
+    })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      worktrees: [sourceWorktree],
+      currentBranchName: 'main',
+    })
+    const location = workspacePaneLocationForWorktree(REPO_ID, repo.workspaceRuntimeId, sourceWorktree)
+    workspacesStore.setState((state) =>
+      produce(state, (draft) => {
+        const current = draft.workspaces[REPO_ID]
+        if (!current || current.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
+        const probe = current.capability.probe
+        current.capability = {
+          kind: 'filesystem',
+          probe: {
+            ...probe,
+            capabilities: { ...probe.capabilities, git: { status: 'unavailable' } },
+          },
+        }
+      }),
+    )
+
+    expect(workspacePaneLocationIsCurrent(location)).toBe(false)
   })
 
   test('keeps an unavailable read target distinct from a ready authority target', () => {

@@ -211,6 +211,15 @@ export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneDestinatio
   return !isGitWorktreeDestinationTargetLease(lease) && current.routeTarget.branchName === lease.routeTarget.branchName
 }
 
+export function workspacePaneLocationIsCurrent(location: WorkspacePaneLocation | null): boolean {
+  if (!location) return false
+  if (location.kind !== 'branch') return filesystemWorkspacePaneLocationIsCurrent(location)
+  return workspacePaneTargetLeaseIsCurrent({
+    workspaceRuntimeId: location.workspaceRuntimeId,
+    routeTarget: location.routeTarget,
+  })
+}
+
 export interface WorkspacePaneTabTargetForPaneTargetInput {
   location: WorkspacePaneLocation
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined

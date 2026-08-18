@@ -7,12 +7,12 @@ import {
   selectWorkspacePaneControllerTab,
   selectWorkspacePaneControllerTabEntry,
   workspacePaneControllerRouteForTab,
-  workspacePaneTabControllerTargetIsCurrent,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { isWorkspacePaneRuntimeTabEntry, workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
 import {
   resolveWorkspacePaneTabTargetForPaneTarget,
   scopeWorkspacePaneTabTargetResolutionToRuntime,
+  workspacePaneLocationIsCurrent,
   workspacePaneTabTargetBlocksInteraction,
   type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
@@ -64,7 +64,7 @@ export async function dispatchSelectWorkspacePaneTabByIndexAction(
     resolveSelectableWorkspacePaneTarget(options, options.workspacePaneRoute),
     options.workspaceRuntimeId,
   )
-  if (!coordinatorTarget || !workspacePaneTabControllerTargetIsCurrent(coordinatorTarget)) return false
+  if (!coordinatorTarget || !workspacePaneLocationIsCurrent(coordinatorTarget.location)) return false
   const tab = coordinatorTarget.tabs[options.tabIndex - 1]
   if (
     !tab ||
@@ -107,7 +107,7 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
     resolveSelectableWorkspacePaneTarget(options, options.workspacePaneRoute),
     options.workspaceRuntimeId,
   )
-  if (!coordinatorTarget || !workspacePaneTabControllerTargetIsCurrent(coordinatorTarget)) return false
+  if (!coordinatorTarget || !workspacePaneLocationIsCurrent(coordinatorTarget.location)) return false
   const tab = coordinatorTarget.tabs.find((candidate) => candidate.identity === options.identity) ?? null
   const tabEntry =
     coordinatorTarget.surfaceTabEntries.find(
@@ -191,7 +191,7 @@ async function moveWorkspacePaneTabAction(
 function queuedWorkspacePaneTargetMatches(queued: WorkspacePaneTabModel, current: WorkspacePaneTabModel): boolean {
   if (!queued.location || !current.location) return false
   return (
-    workspacePaneTabControllerTargetIsCurrent(queued) &&
+    workspacePaneLocationIsCurrent(queued.location) &&
     current.location.workspaceRuntimeId === queued.location.workspaceRuntimeId &&
     current.location.kind === queued.location.kind &&
     workspacePaneTabsTargetIdentityKey(current.location.routeTarget) ===
