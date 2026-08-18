@@ -5,7 +5,6 @@ import { toast } from 'vue-sonner'
 import { Button } from '#/web/components/ui/button.tsx'
 import { terminalExecutionPath } from '#/shared/terminal-types.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { RepoWorktreeSnapshot } from '#/shared/git-types.ts'
 import { TerminalBellBadge } from '#/web/terminal/components/TerminalBellBadge.tsx'
 import { TerminalOutputActivityIndicator } from '#/web/terminal/components/TerminalOutputActivityIndicator.tsx'
 import {
@@ -25,16 +24,16 @@ import { useRepoSnapshotReadModel } from '#/web/repos/queries.ts'
 import { useWorkspacePaneTabsQuery } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { orderWorkspaceDashboardTerminals } from '#/web/components/workspace-pages/workspace-dashboard-terminal-order.ts'
 import { worktreePresentationLabel } from '#/web/repos/worktree-presentation.ts'
-import {
-  gitWorktreePaneTargetLease,
-  workspaceRootPaneTargetLease,
-  type FilesystemWorkspacePaneTargetLease,
-} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { clearWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
 import { commitWorkspacePaneTerminalDestination } from '#/web/workspace-pane/workspace-pane-terminal-destination-navigation.ts'
 import { surfaceWorkspacePaneTerminalDestinationOutcome } from '#/web/workspace-pane/workspace-pane-terminal-destination-feedback.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
+import {
+  resolveWorkspacePaneTerminalDestinationLocation,
+  type WorkspacePaneTerminalDestinationLocation,
+} from '#/web/workspace-pane/workspace-pane-terminal-destination-location.ts'
+import type { FilesystemWorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: WorkspaceId }>({
   name: 'WorkspaceDashboardTerminals',
@@ -78,22 +77,35 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
     async function openTerminal(session: WorkspaceTerminalSessionSummary): Promise<void> {
       const pending = terminalOpeningLease(session)
       if (sameTerminalOpeningScope(openingTerminal.value, pending)) return
-      if (dashboardTerminalTargetAvailability(session, repoSnapshot.data.value?.snapshot.worktrees) !== 'available') {
-        return
-      }
+      const destination = terminalDestination(session)
+      if (destination.kind !== 'ready') return
       if (hydration.value.phase === 'failed') {
         toast.warning(t('dashboard.terminals.stale'))
         return
       }
       openingTerminal.value = pending
       try {
-        const outcome = await commitTerminalRoute(navigation, session)
+        const outcome = await commitTerminalRoute(navigation, session, destination.location)
         surfaceWorkspacePaneTerminalDestinationOutcome(outcome)
       } catch (error) {
         surfaceWorkspacePaneTerminalDestinationOutcome(null, error)
       } finally {
         if (sameTerminalOpeningLease(openingTerminal.value, pending)) openingTerminal.value = null
       }
+    }
+
+    function terminalDestination(session: WorkspaceTerminalSessionSummary): WorkspacePaneTerminalDestinationLocation {
+      const currentWorkspace = workspace.value
+      if (!currentWorkspace) return { kind: 'stale' }
+      return resolveWorkspacePaneTerminalDestinationLocation({
+        workspace: currentWorkspace,
+        base: session.base,
+        snapshot: repoSnapshot.data.value
+          ? { kind: 'ready', worktrees: repoSnapshot.data.value.snapshot.worktrees }
+          : repoSnapshot.isError.value
+            ? { kind: 'unavailable' }
+            : { kind: 'pending' },
+      })
     }
 
     function renderContent(): VNodeChild {
@@ -163,9 +175,8 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
 
     function renderTerminalRow(session: WorkspaceTerminalSessionSummary): VNodeChild {
       const opening = sameTerminalOpeningLease(openingTerminal.value, terminalOpeningLease(session))
-      const worktrees = repoSnapshot.data.value?.snapshot.worktrees
-      const target = terminalTargetLabel(session, worktrees, t)
-      const availability = dashboardTerminalTargetAvailability(session, worktrees)
+      const destination = terminalDestination(session)
+      const target = terminalTargetLabel(session, destination, t)
       const titleId = `dashboard-terminal-title-${session.terminalSessionId}`
       const detailsId = `dashboard-terminal-details-${session.terminalSessionId}`
       const statusId = `dashboard-terminal-status-${session.terminalSessionId}`
@@ -191,7 +202,7 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
           aria-describedby={`${detailsId} ${statusId}`}
           aria-busy={opening || undefined}
           disabled={
-            availability !== 'available' ||
+            destination.kind !== 'ready' ||
             sameTerminalOpeningScope(openingTerminal.value, terminalOpeningLease(session))
           }
           onClick={() => void openTerminal(session)}
@@ -268,18 +279,18 @@ function sameTerminalOpeningLease(left: TerminalOpeningLease | null, right: Term
 function commitTerminalRoute(
   navigation: AppNavigationActions,
   session: WorkspaceTerminalSessionSummary,
+  location: FilesystemWorkspacePaneLocation,
 ): Promise<WorkspacePaneActionOutcome> {
-  const target = dashboardTerminalTargetLease(session)
-  if (!target) return Promise.resolve({ kind: 'target-missing' })
   return commitWorkspacePaneTerminalDestination({
+    location,
     base: session.base,
     terminalSessionId: session.terminalSessionId,
     navigation,
   }).then((outcome) => {
     if (outcome.kind === 'completed' || outcome.kind === 'already-current') {
       clearWorkspacePaneTabOpener(
-        target.routeTarget,
-        target.workspaceRuntimeId,
+        location.paneTarget,
+        location.workspaceRuntimeId,
         workspacePaneTabEntryIdentity({ type: 'terminal', runtimeSessionId: session.terminalSessionId }),
       )
     }
@@ -287,48 +298,21 @@ function commitTerminalRoute(
   })
 }
 
-function dashboardTerminalTargetLease(
-  session: WorkspaceTerminalSessionSummary,
-): FilesystemWorkspacePaneTargetLease | null {
-  if (session.base.target.kind === 'workspace-root') {
-    return workspaceRootPaneTargetLease(session.base.target.workspaceId, session.base.target.workspaceRuntimeId)
-  }
-  if (session.base.presentation.kind !== 'git-worktree') return null
-  return gitWorktreePaneTargetLease(
-    session.base.target.workspaceId,
-    session.base.target.workspaceRuntimeId,
-    terminalExecutionPath(session.base.target),
-  )
-}
-
-type DashboardTerminalTargetAvailability = 'available' | 'unknown' | 'unavailable'
-
-function dashboardTerminalTargetAvailability(
-  session: WorkspaceTerminalSessionSummary,
-  worktrees: readonly RepoWorktreeSnapshot[] | undefined,
-): DashboardTerminalTargetAvailability {
-  if (session.base.target.kind === 'workspace-root') return 'available'
-  if (session.base.presentation.kind !== 'git-worktree') return 'unavailable'
-  if (!worktrees) return 'unknown'
-  const worktreePath = terminalExecutionPath(session.base.target)
-  return worktrees.some((worktree) => worktree.path === worktreePath) ? 'available' : 'unavailable'
-}
-
 function terminalTargetLabel(
   session: WorkspaceTerminalSessionSummary,
-  worktrees: readonly RepoWorktreeSnapshot[] | undefined,
+  destination: WorkspacePaneTerminalDestinationLocation,
   t: DashboardTranslator,
 ): { label: string; path: string } {
   const path = terminalExecutionPath(session.base.target)
-  if (session.base.target.kind === 'workspace-root') {
+  if (destination.kind === 'ready' && !destination.worktree) {
     return { label: t('dashboard.terminals.workspace-root'), path }
   }
-  if (!worktrees) return { label: t('dashboard.terminals.worktree-unknown'), path }
-  const currentWorktree = worktrees.find((worktree) => worktree.path === path)
+  if (destination.kind === 'pending') return { label: t('dashboard.terminals.worktree-unknown'), path }
   return {
-    label: currentWorktree
-      ? worktreePresentationLabel(currentWorktree, t)
-      : t('dashboard.terminals.worktree-unavailable'),
+    label:
+      destination.kind === 'ready' && destination.worktree
+        ? worktreePresentationLabel(destination.worktree, t)
+        : t('dashboard.terminals.worktree-unavailable'),
     path,
   }
 }

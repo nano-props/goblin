@@ -402,7 +402,7 @@ describe('workspace route capability admission', () => {
     await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('branch'))
   })
 
-  test('keeps an explicitly selected workspace surface when Git capability becomes available', async () => {
+  test('redirects a Git workspace root route without mounting the rejected surface', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/git-router-workspace')
     seedWorkspaceCapability(workspaceId, 'available')
     renderRouter()
@@ -411,9 +411,12 @@ describe('workspace route capability admission', () => {
 
     navigateBrowser(`/workspace/${workspaceSlugFromId(workspaceId)}/root`)
 
-    await waitFor(() => expect(window.location.pathname).toBe(`/workspace/${workspaceSlugFromId(workspaceId)}/root`))
-    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('workspace-root'))
-    expect(appMocks.render).not.toHaveBeenCalledWith('dashboard')
+    await waitFor(() =>
+      expect(window.location.pathname).toBe(`/workspace/${workspaceSlugFromId(workspaceId)}/dashboard`),
+    )
+    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('dashboard'))
+    expect(appMocks.render).not.toHaveBeenCalledWith('workspace-root')
+    expect(requireAppHistoryPresentation(appRouter.options.history).action).toEqual({ type: 'REPLACE' })
   })
 })
 

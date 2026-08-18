@@ -48,6 +48,7 @@ import type { WorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   gitWorktreePaneFilesystemTarget,
   workspacePaneFilesystemRootPath,
@@ -172,6 +173,20 @@ beforeEach(() => {
   })
 })
 
+function readyFilesystemWorkspace(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
+  const workspace = emptyWorkspace(workspaceId, workspaceRuntimeId)
+  acceptWorkspaceProbeState(workspace, {
+    status: 'ready',
+    capabilities: {
+      files: { read: true, write: true },
+      terminal: { available: true },
+      git: { status: 'unavailable' },
+    },
+    diagnostics: [],
+  })
+  return workspace
+}
+
 afterEach(() => {
   intentListeners.clear()
   setClientBridgeForTests(null)
@@ -220,7 +235,7 @@ describe('useClientEffectIntentRouter', () => {
     })
     expect(commitFilesystemWorkspacePaneRouteSpy).not.toHaveBeenCalled()
 
-    const workspace = emptyWorkspace(workspaceId, workspaceRuntimeId)
+    const workspace = readyFilesystemWorkspace(workspaceId, workspaceRuntimeId)
     workspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
@@ -378,7 +393,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('terminal bell clicks restore a plain Workspace root terminal', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace')
-    const workspace = emptyWorkspace(workspaceId, 'workspace-runtime-test')
+    const workspace = readyFilesystemWorkspace(workspaceId, 'workspace-runtime-test')
     workspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
     const terminalSessionId = 'term-111111111111111111111'
     setWorkspacePaneTabsForTargetQueryData({

@@ -171,6 +171,10 @@ export function createAppNavigationActions({
       })
     },
     showWorkspaceRootPaneTab(workspaceId, presentation, options) {
+      if (workspacesStore.getState().workspaces[workspaceId]?.capability.kind !== 'filesystem') {
+        options?.onAbandon?.()
+        return false
+      }
       const generation = options?.navigationGeneration ?? beginAppNavigation()
       const navigationOptions = workspaceRootPanePresentationOptions(workspaceId, presentation, options, generation)
       return presentation.kind === 'terminal'
@@ -295,7 +299,11 @@ async function commitFilesystemWorkspacePaneRoute(
 }
 
 function filesystemWorkspacePaneCommitTargetIsCurrent(target: FilesystemWorkspacePaneCommitTarget): boolean {
-  return filesystemWorkspacePaneTargetLeaseIsCurrent(target)
+  if (!filesystemWorkspacePaneTargetLeaseIsCurrent(target)) return false
+  return (
+    target.routeTarget.kind !== 'workspace-root' ||
+    workspacesStore.getState().workspaces[target.routeTarget.workspaceId]?.capability.kind === 'filesystem'
+  )
 }
 
 function commitFilesystemWorkspacePaneEmptyPresentation(target: FilesystemWorkspacePaneTabsTarget): boolean {
@@ -342,7 +350,9 @@ function restoreWorkspacePresentationOrOpenDashboard(
   const entryCanResume =
     entry &&
     entry.route.kind !== 'newWorktree' &&
-    (workspace?.capability.kind === 'git' || entry.route.kind === 'workspace-root' || entry.route.kind === 'dashboard')
+    (workspace?.capability.kind === 'git'
+      ? entry.route.kind !== 'workspace-root'
+      : entry.route.kind === 'workspace-root' || entry.route.kind === 'dashboard')
   if (entryCanResume) {
     const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { navigationGeneration })
     if (result.kind === 'accepted' || (result.kind === 'blocked' && options.onBlocked === 'stay')) return

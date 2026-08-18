@@ -239,6 +239,35 @@ describe('createAppNavigationActions history traversal', () => {
     expect(navigation.openRepoWorktree).not.toHaveBeenCalled()
   })
 
+  test('does not restore workspace-root history for a Git workspace', () => {
+    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    const target: WorkspaceNavigationHistoryEntry = {
+      workspaceId: REPO_ID,
+      route: {
+        kind: 'workspace-root',
+        workspacePaneTab: 'files',
+        terminalSessionId: null,
+      },
+    }
+    const traversal = historyTraversal(target)
+    const navigation = routeNavigation()
+    const commitWorkspaceNavigation = vi.fn(() => true)
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      peekWorkspaceNavigation: vi.fn(() => traversal),
+      commitWorkspaceNavigation,
+      routeNavigation: navigation,
+    })
+
+    actions.goBack(REPO_ID)
+
+    expect(commitWorkspaceNavigation).not.toHaveBeenCalled()
+    expect(navigation.openWorkspaceRootTab).not.toHaveBeenCalled()
+    expect(navigation.openWorkspaceRootPane).not.toHaveBeenCalled()
+  })
+
   test('does not block bare branch history restore while tabs projection is pending', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,

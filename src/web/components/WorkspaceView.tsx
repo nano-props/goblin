@@ -307,6 +307,9 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
               />
             )
           case 'workspace-root':
+            if (currentWorkspace.capability.kind !== 'filesystem') {
+              return <RoutedWorkspaceNotFound workspaceId={currentWorkspace.id} />
+            }
             return (
               <WorkspacePane
                 workspaceId={props.workspaceId}

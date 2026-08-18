@@ -13,6 +13,11 @@ import {
 } from '#/web/test-utils/repo-store.ts'
 import { beginAppNavigation, resetAppNavigationForTest } from '#/web/app/navigation/lifecycle.ts'
 import { commitWorkspacePaneTerminalDestination } from '#/web/workspace-pane/workspace-pane-terminal-destination-navigation.ts'
+import {
+  workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
+  workspacePaneLocationForWorktree,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   resetWorkspacePaneActionQueueForTest,
@@ -47,6 +52,7 @@ describe('workspace pane terminal destination navigation', () => {
 
     await expect(
       commitWorkspacePaneTerminalDestination({
+        location: linkedLocation('/workspace/feature'),
         base: gitTerminalBase('/workspace/feature', WORKSPACE_RUNTIME_ID),
         terminalSessionId: TERMINAL_SESSION_ID,
         navigation: navigationWith({ commitWorkspacePaneRoute, commitFilesystemWorkspacePaneRoute }),
@@ -81,13 +87,15 @@ describe('workspace pane terminal destination navigation', () => {
 
     await expect(
       commitWorkspacePaneTerminalDestination({
+        location: linkedLocation('/workspace/current'),
         base: gitTerminalBase('/workspace/current', 'workspace-runtime-replaced'),
         terminalSessionId: TERMINAL_SESSION_ID,
         navigation,
       }),
-    ).resolves.toEqual({ kind: 'blocked' })
+    ).resolves.toEqual({ kind: 'target-missing' })
     await expect(
       commitWorkspacePaneTerminalDestination({
+        location: linkedLocation('/workspace/current'),
         base: gitTerminalBase('/workspace/previous', WORKSPACE_RUNTIME_ID),
         terminalSessionId: TERMINAL_SESSION_ID,
         navigation,
@@ -111,6 +119,7 @@ describe('workspace pane terminal destination navigation', () => {
 
     await expect(
       commitWorkspacePaneTerminalDestination({
+        location: linkedLocation('/workspace/feature'),
         base: gitTerminalBase('/workspace/feature', WORKSPACE_RUNTIME_ID),
         terminalSessionId: TERMINAL_SESSION_ID,
         navigation: navigationWith({ commitWorkspacePaneRoute, commitFilesystemWorkspacePaneRoute }),
@@ -131,6 +140,7 @@ describe('workspace pane terminal destination navigation', () => {
 
     await expect(
       commitWorkspacePaneTerminalDestination({
+        location: linkedLocation('/workspace/detached', { kind: 'detached' }),
         base: gitTerminalBase('/workspace/detached', WORKSPACE_RUNTIME_ID),
         terminalSessionId: TERMINAL_SESSION_ID,
         navigation,
@@ -149,6 +159,7 @@ describe('workspace pane terminal destination navigation', () => {
     seedTerminalPaneTab(null)
     await expect(
       commitWorkspacePaneTerminalDestination({
+        location: workspacePaneLocationForRoot(WORKSPACE_ID, WORKSPACE_RUNTIME_ID),
         base: {
           target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
           presentation: { kind: 'workspace-root' },
@@ -179,6 +190,7 @@ describe('workspace pane terminal destination navigation', () => {
 
     await expect(
       commitWorkspacePaneTerminalDestination({
+        location: workspacePaneLocationForRoot(WORKSPACE_ID, WORKSPACE_RUNTIME_ID),
         base: {
           target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
           presentation: { kind: 'workspace-root' },
@@ -199,6 +211,7 @@ describe('workspace pane terminal destination navigation', () => {
 
     await expect(
       commitWorkspacePaneTerminalDestination({
+        location: workspacePaneLocationForRoot(WORKSPACE_ID, WORKSPACE_RUNTIME_ID),
         base: {
           target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
           presentation: { kind: 'workspace-root' },
@@ -216,6 +229,7 @@ describe('workspace pane terminal destination navigation', () => {
 
     await expect(
       commitWorkspacePaneTerminalDestination({
+        location: workspacePaneLocationForRoot(WORKSPACE_ID, WORKSPACE_RUNTIME_ID),
         base: {
           target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
           presentation: { kind: 'workspace-root' },
@@ -253,6 +267,7 @@ describe('workspace pane terminal destination navigation', () => {
     const commitWorkspacePaneRoute = committedBranchRoute()
     await expect(
       commitWorkspacePaneTerminalDestination({
+        location: linkedLocation('/workspace/feature'),
         base: gitTerminalBase('/workspace/feature', WORKSPACE_RUNTIME_ID),
         terminalSessionId: TERMINAL_SESSION_ID,
         navigation: navigationWith({ commitWorkspacePaneRoute }),
@@ -262,6 +277,39 @@ describe('workspace pane terminal destination navigation', () => {
 
     release.resolve()
     await occupied
+  })
+
+  test('routes a source worktree terminal from its root pane owner', async () => {
+    const sourceWorktree = createRepoWorktreeSnapshotForTest('main', '/workspace', {
+      isSource: true,
+      isPrimary: true,
+    })
+    const location = workspacePaneLocationForWorktree(WORKSPACE_ID, WORKSPACE_RUNTIME_ID, sourceWorktree)
+    const commitFilesystemWorkspacePaneRoute = vi.fn<AppNavigationActions['commitFilesystemWorkspacePaneRoute']>(
+      async () => true,
+    )
+    seedTerminalPaneTab(null)
+
+    await expect(
+      commitWorkspacePaneTerminalDestination({
+        location,
+        base: {
+          target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+          presentation: { kind: 'workspace-root' },
+        },
+        terminalSessionId: TERMINAL_SESSION_ID,
+        navigation: navigationWith({ commitFilesystemWorkspacePaneRoute }),
+      }),
+    ).resolves.toEqual({ kind: 'completed', changed: true, presentation: 'router-settled' })
+
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      {
+        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/workspace' },
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      },
+      { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
+      { navigationGeneration: expect.any(Number) },
+    )
   })
 })
 
@@ -298,6 +346,20 @@ function gitTerminalBase(worktreePath: string, workspaceRuntimeId: string): Term
     },
     presentation: { kind: 'git-worktree' },
   }
+}
+
+function linkedLocation(
+  worktreePath: string,
+  head: { kind: 'branch'; branchName: string } | { kind: 'detached' } = {
+    kind: 'branch',
+    branchName: 'feature/navigation',
+  },
+) {
+  return workspacePaneLocationForLinkedWorktree(
+    { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath },
+    WORKSPACE_RUNTIME_ID,
+    head,
+  )
 }
 
 function committedBranchRoute(): AppNavigationActions['commitWorkspacePaneRoute'] {

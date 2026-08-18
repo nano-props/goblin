@@ -248,6 +248,18 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(restoreWorkspaceTabsMocks.useRepoToasts).not.toHaveBeenCalled()
   })
 
+  test('does not render a workspace-root pane for a Git workspace', () => {
+    const { container } = render(
+      <WorkspaceView
+        workspaceId={REPO_ID}
+        routeView={{ kind: 'workspace-root', workspaceId: REPO_ID, workspacePaneRoute: null }}
+      />,
+    )
+
+    expect(workspacePane(container)).toBeNull()
+    expect(gitWorkspaceNavigator(container)).not.toBeNull()
+  })
+
   test('renders the directory Dashboard for a non-Git dashboard route without Git navigation', () => {
     setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
 

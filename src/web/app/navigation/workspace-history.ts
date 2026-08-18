@@ -250,6 +250,9 @@ export function restoreWorkspaceNavigationEntry(
       routeNavigation.openWorkspaceNavigator(entry.workspaceId, options)
       return { kind: 'accepted' }
     case 'workspace-root':
+      if (workspacesStore.getState().workspaces[entry.workspaceId]?.capability.kind !== 'filesystem') {
+        return { kind: 'unavailable' }
+      }
       if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
         return routeNavigation.openWorkspaceRootTerminal(entry.workspaceId, entry.route.terminalSessionId, options)
           ? { kind: 'accepted' }

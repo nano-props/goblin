@@ -44,6 +44,7 @@ beforeEach(setupAppNavigationActionsTests)
 describe('createAppNavigationActions presentation', () => {
   test('presents a workspace-root tab through the workspace route and commits its preference', async () => {
     seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
@@ -74,6 +75,7 @@ describe('createAppNavigationActions presentation', () => {
     'keeps workspace terminal selection and preference atomic when presentation is %s',
     (_state, accepted, commit) => {
       const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+      markRepoGitUnavailable(REPO_ID)
       const terminalKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, REPO_ID)
       workspacesStore.getState().setSelectedTerminal(terminalKey, 'term-111111111111111111111')
       workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
@@ -174,6 +176,7 @@ describe('createAppNavigationActions presentation', () => {
 
   test('commits a filesystem route only while its workspace runtime remains current', async () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     const routeCommit = Promise.withResolvers<boolean>()
     const navigation = routeNavigation()
     navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => await routeCommit.promise)
@@ -283,6 +286,7 @@ describe('createAppNavigationActions presentation', () => {
 
   test('abandons exactly once when filesystem presentation projection commit throws', async () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     const navigation = routeNavigation()
     navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const actions = createAppNavigationActions({
@@ -307,6 +311,22 @@ describe('createAppNavigationActions presentation', () => {
       ),
     ).rejects.toThrow('projection commit failed')
     expect(onAbandon).toHaveBeenCalledOnce()
+  })
+
+  test('rejects a workspace-root presentation for a Git workspace', () => {
+    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    const navigation = routeNavigation()
+    const actions = createAppNavigationActions({
+      currentWorkspaceId: REPO_ID,
+      workspaceOrder: [REPO_ID],
+      closeWorkspace: vi.fn(),
+      routeNavigation: navigation,
+    })
+    const onAbandon = vi.fn()
+
+    expect(actions.showWorkspaceRootPaneTab(REPO_ID, { kind: 'static', tab: 'files' }, { onAbandon })).toBe(false)
+    expect(onAbandon).toHaveBeenCalledOnce()
+    expect(navigation.openWorkspaceRootTab).not.toHaveBeenCalled()
   })
 
   test('activates a non-Git workspace at its Dashboard without restoring Git navigation history', async () => {

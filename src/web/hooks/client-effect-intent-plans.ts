@@ -1,5 +1,3 @@
-import { parseCanonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
-import { terminalExecutionCoordinates } from '#/shared/terminal-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
 import type { WorkspaceSessionEntry } from '#/shared/remote-workspace.ts'
@@ -10,6 +8,10 @@ import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
+import {
+  resolveWorkspacePaneTerminalDestinationLocation,
+} from '#/web/workspace-pane/workspace-pane-terminal-destination-location.ts'
+import type { FilesystemWorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export type ClientAppIntent = Extract<
   ClientEffectIntent,
@@ -39,7 +41,12 @@ export type ClientWorkspaceIntent = Extract<
 >
 
 export type TerminalBellIntentPlan =
-  { kind: 'noop' } | { kind: 'unavailable'; reason: 'snapshot-unavailable' } | { kind: 'show-terminal' }
+  | { kind: 'noop' }
+  | { kind: 'unavailable'; reason: 'snapshot-unavailable' }
+  | {
+      kind: 'show-terminal'
+      location: FilesystemWorkspacePaneLocation
+    }
 
 export type AppLevelIntentPlan =
   | { kind: 'noop' }
@@ -118,27 +125,22 @@ interface WorkspaceIntentPlanContext {
 }
 
 export function createTerminalBellIntentPlan(
-  workspace: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId'> | undefined,
+  workspace: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId' | 'capability'> | undefined,
   repositoryFacts: { snapshot: RepoSnapshot } | null,
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
   if (!workspace) return { kind: 'noop' }
-  const coordinates = terminalExecutionCoordinates(event.session.target)
-  if (coordinates.workspaceId === workspace.id && coordinates.workspaceRuntimeId === workspace.workspaceRuntimeId) {
-    if (event.session.target.kind === 'workspace-root' && event.session.presentation.kind === 'workspace-root') {
-      return { kind: 'show-terminal' }
-    }
-    if (event.session.target.kind !== 'git-worktree' || event.session.presentation.kind !== 'git-worktree') {
-      return { kind: 'noop' }
-    }
-    if (!repositoryFacts) return { kind: 'unavailable', reason: 'snapshot-unavailable' }
-    const worktreePath = parseCanonicalWorkspaceLocator(event.session.target.root)?.path
-    if (!worktreePath) return { kind: 'noop' }
-    return repositoryFacts.snapshot.worktrees.some((worktree) => worktree.path === worktreePath)
-      ? { kind: 'show-terminal' }
-      : { kind: 'noop' }
-  }
-  return { kind: 'noop' }
+  const destination = resolveWorkspacePaneTerminalDestinationLocation({
+    workspace,
+    base: event.session,
+    snapshot: repositoryFacts
+      ? { kind: 'ready', worktrees: repositoryFacts.snapshot.worktrees }
+      : { kind: 'unavailable' },
+  })
+  if (destination.kind === 'ready') return { kind: 'show-terminal', location: destination.location }
+  return destination.kind === 'pending' || (!repositoryFacts && destination.kind === 'unavailable')
+    ? { kind: 'unavailable', reason: 'snapshot-unavailable' }
+    : { kind: 'noop' }
 }
 
 export function createAppLevelIntentPlan(

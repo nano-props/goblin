@@ -105,6 +105,51 @@ describe('client effect intent handlers', () => {
     })
   })
 
+  test('routes a source terminal bell through the source worktree presentation', async () => {
+    const sourcePath = '/tmp/goblin-client-intent-handlers-repo'
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      worktrees: [createRepoWorktreeSnapshotForTest('main', sourcePath, { isSource: true, isPrimary: true })],
+    })
+    appQueryClient.setQueryData(workspacePaneTabsQueryKey(REPO_ID, repo.workspaceRuntimeId), {
+      revision: 1,
+      entries: [
+        {
+          target: {
+            kind: 'workspace-root',
+            workspaceId: REPO_ID,
+            workspaceRuntimeId: repo.workspaceRuntimeId,
+          },
+          tabs: [{ type: 'terminal', runtimeSessionId: 'term-sourcesourcesource1' }],
+        },
+      ],
+    })
+    const d = deps(REPO_ID)
+    const commitFilesystemWorkspacePaneRoute = vi.mocked(d.navigation.commitFilesystemWorkspacePaneRoute)
+
+    handleTerminalBellClickIntent(
+      {
+        type: 'terminal-bell-click',
+        terminalSessionId: 'term-sourcesourcesource1',
+        session: {
+          target: { kind: 'workspace-root', workspaceId: REPO_ID, workspaceRuntimeId: repo.workspaceRuntimeId },
+          presentation: { kind: 'workspace-root' },
+        },
+      },
+      d,
+    )
+
+    await vi.waitFor(() => {
+      expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          routeTarget: { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: sourcePath },
+        }),
+        { kind: 'terminal', terminalSessionId: 'term-sourcesourcesource1' },
+        expect.any(Object),
+      )
+    })
+  })
+
   test('surfaces a terminal bell target whose repository projection is unavailable', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,

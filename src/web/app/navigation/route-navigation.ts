@@ -172,16 +172,19 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
       runRouteNavigation(router, { name: 'workspace-dashboard', params: { workspaceSlug } }, options)
     },
     openWorkspaceRootPane(workspaceId, options) {
+      if (!workspaceRootProductRouteIsCurrent(workspaceId)) return abandonAppRoute(options)
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
       return runRouteNavigation(router, { name: 'workspace-root', params: { workspaceSlug } }, options)
     },
     openWorkspaceRootTab(workspaceId, tab, options) {
+      if (!workspaceRootProductRouteIsCurrent(workspaceId)) return abandonAppRoute(options)
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
       return runRouteNavigation(router, { name: 'workspace-root-tab', params: { workspaceSlug, tabKey: tab } }, options)
     },
     openWorkspaceRootTerminal(workspaceId, terminalSessionId, options) {
+      if (!workspaceRootProductRouteIsCurrent(workspaceId)) return abandonAppRoute(options)
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
       return runRouteNavigation(
@@ -191,6 +194,9 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
       )
     },
     async commitFilesystemWorkspacePaneRoute(paneTarget, route, options) {
+      if (paneTarget.kind === 'workspace-root' && !workspaceRootProductRouteIsCurrent(paneTarget.workspaceId)) {
+        return abandonAppRoute(options)
+      }
       const workspaceSlug = workspaceSlugForKnownId(paneTarget.workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
       return await commitFilesystemWorkspacePaneRoute({ router, workspaceSlug, paneTarget, route, options })
@@ -299,6 +305,10 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
     },
   }
   return navigation
+}
+
+function workspaceRootProductRouteIsCurrent(workspaceId: WorkspaceId): boolean {
+  return workspacesStore.getState().workspaces[workspaceId]?.capability.kind === 'filesystem'
 }
 
 function runRouteNavigation(

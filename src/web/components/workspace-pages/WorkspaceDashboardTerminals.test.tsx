@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { cleanup, screen } from '@testing-library/vue'
+import { cleanup, screen, waitFor } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
@@ -32,6 +32,9 @@ import { appQueryClient } from '#/web/app/query-client.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { getRepoSnapshot } from '#/web/repos/client.ts'
+import type * as RepoClient from '#/web/repos/client.ts'
+import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-dashboard'
@@ -48,6 +51,17 @@ const TerminalProjectionRecoveryScope = defineComponent<{ value: TerminalProject
 })
 
 vi.mock('vue-sonner', () => ({ toast: toastMocks }))
+vi.mock('#/web/repos/client.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof RepoClient>()),
+  getRepoSnapshot: vi.fn(),
+}))
+
+const mockedGetRepoSnapshot = vi.mocked(getRepoSnapshot)
+
+beforeEach(() => {
+  mockedGetRepoSnapshot.mockReset()
+  mockedGetRepoSnapshot.mockImplementation(() => new Promise(() => {}))
+})
 
 afterEach(() => {
   cleanup()
@@ -87,7 +101,10 @@ describe('WorkspaceDashboardTerminals', () => {
       id: WORKSPACE_ID,
       workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       branches: [createRepoBranch('feature/dashboard')],
-      worktrees: [createRepoWorktreeSnapshotForTest('feature/dashboard', '/workspace/feature')],
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('main', '/workspace', { isSource: true, isPrimary: true }),
+        createRepoWorktreeSnapshotForTest('feature/dashboard', '/workspace/feature'),
+      ],
       currentBranchName: 'feature/dashboard',
     })
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
@@ -122,7 +139,7 @@ describe('WorkspaceDashboardTerminals', () => {
     await userEvent.click(screen.getByText('Root shell'))
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenLastCalledWith(
       {
-        routeTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
+        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/workspace' },
         workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
       },
       { kind: 'terminal', terminalSessionId: 'term-root-session' },
@@ -239,7 +256,7 @@ describe('WorkspaceDashboardTerminals', () => {
         presentation: { kind: 'git-worktree' },
       }),
     ]
-    seedRepoShellForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+    seedGitWorkspaceWithoutSnapshot()
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const commitWorkspacePaneRoute = vi.fn<AppNavigationActions['commitWorkspacePaneRoute']>()
@@ -255,6 +272,59 @@ describe('WorkspaceDashboardTerminals', () => {
     expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(toastMocks.error).not.toHaveBeenCalled()
+  })
+
+  test('marks a worktree terminal unavailable when the initial snapshot read fails', async () => {
+    const sessions = [
+      terminalSummary('term-branch-session', 'Branch shell', {
+        target: {
+          kind: 'git-worktree',
+          workspaceId: WORKSPACE_ID,
+          workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+          root: workspaceIdForTest('goblin+file:///workspace/feature'),
+        },
+        presentation: { kind: 'git-worktree' },
+      }),
+    ]
+    seedGitWorkspaceWithoutSnapshot()
+    terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
+    mockedGetRepoSnapshot.mockRejectedValue(new Error('snapshot unavailable'))
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
+
+    renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute)
+
+    await waitFor(() => expect(screen.getByText('dashboard.terminals.worktree-unavailable')).toBeTruthy())
+    expect((screen.getByRole('button', { name: /Branch shell/ }) as HTMLButtonElement).disabled).toBe(true)
+    expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
+  })
+
+  test('keeps accepted snapshot data after a later refresh fails', async () => {
+    const sessions = [
+      terminalSummary('term-root-session', 'Root shell', {
+        target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
+        presentation: { kind: 'workspace-root' },
+      }),
+    ]
+    seedRepoWithReadModelForTest({
+      id: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      worktrees: [createRepoWorktreeSnapshotForTest('main', '/workspace', { isSource: true, isPrimary: true })],
+      currentBranchName: 'main',
+    })
+    terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
+    renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute)
+    mockedGetRepoSnapshot.mockRejectedValue(new Error('refresh unavailable'))
+
+    await appQueryClient.refetchQueries({
+      queryKey: repoSnapshotQueryKey(WORKSPACE_ID, WORKSPACE_RUNTIME_ID),
+      exact: true,
+    })
+
+    const row = screen.getByRole('button', { name: /Root shell/ }) as HTMLButtonElement
+    expect(row.disabled).toBe(false)
+    await userEvent.click(row)
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledOnce()
   })
 
   test('stays silent when a later navigation supersedes the branch destination', async () => {
@@ -295,7 +365,7 @@ describe('WorkspaceDashboardTerminals', () => {
         presentation: { kind: 'workspace-root' },
       }),
     ]
-    seedRepoShellForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+    seedFilesystemWorkspace()
     terminalProjectionHydrationStore
       .getState()
       .markProjectionFailed(WORKSPACE_ID, WORKSPACE_RUNTIME_ID, 'connection unavailable')
@@ -320,7 +390,7 @@ describe('WorkspaceDashboardTerminals', () => {
         presentation: { kind: 'workspace-root' },
       }),
     ]
-    seedRepoShellForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+    seedFilesystemWorkspace()
     terminalProjectionHydrationStore
       .getState()
       .markProjectionFailed(WORKSPACE_ID, WORKSPACE_RUNTIME_ID, 'connection unavailable')
@@ -334,7 +404,7 @@ describe('WorkspaceDashboardTerminals', () => {
   })
 
   test('offers an explicit retry when initial projection recovery fails without cached sessions', async () => {
-    seedRepoShellForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+    seedFilesystemWorkspace()
     terminalProjectionHydrationStore
       .getState()
       .markProjectionFailed(WORKSPACE_ID, WORKSPACE_RUNTIME_ID, 'connection unavailable')
@@ -358,7 +428,7 @@ describe('WorkspaceDashboardTerminals', () => {
         presentation: { kind: 'workspace-root' },
       }),
     ]
-    seedRepoShellForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+    seedFilesystemWorkspace()
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
     const rootPaneTarget = { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }
     expect(
@@ -389,7 +459,7 @@ describe('WorkspaceDashboardTerminals', () => {
         presentation: { kind: 'workspace-root' },
       }),
     ]
-    seedRepoShellForTest({ id: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID })
+    seedFilesystemWorkspace()
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
     renderDashboardTerminals(
       sessions,
@@ -442,6 +512,38 @@ function renderDashboardTerminals(
       </TerminalProjectionRecoveryScope>
     </VueQueryClientScope>,
   )
+}
+
+function seedFilesystemWorkspace(): void {
+  seedRepoShellForTest({
+    id: WORKSPACE_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    workspaceProbe: {
+      status: 'ready',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'unavailable' },
+      },
+      diagnostics: [],
+    },
+  })
+}
+
+function seedGitWorkspaceWithoutSnapshot(): void {
+  seedRepoShellForTest({
+    id: WORKSPACE_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    workspaceProbe: {
+      status: 'ready',
+      capabilities: {
+        files: { read: true, write: true },
+        terminal: { available: true },
+        git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+      },
+      diagnostics: [],
+    },
+  })
 }
 
 function terminalSummary(

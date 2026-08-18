@@ -95,6 +95,7 @@ export function handleTerminalBellClickIntent(
   }
   deps.closeAllOverlays()
   void commitWorkspacePaneTerminalDestination({
+    location: plan.location,
     base: event.session,
     terminalSessionId: event.terminalSessionId,
     navigation: deps.navigation,

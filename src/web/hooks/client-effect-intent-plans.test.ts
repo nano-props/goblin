@@ -15,6 +15,8 @@ import {
 import { getRepoSnapshotQueryData, getRepoWorktreeStatusQueryData } from '#/web/repos/query-cache.ts'
 import type { BranchSnapshotInfo, WorkspaceRepoWorktreeSnapshot, WorktreeStatus } from '#/shared/git-types.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
+import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { workspaceRootPaneFilesystemTarget } from '#/web/workspace-pane/workspace-pane-filesystem-target.ts'
 import {
@@ -86,6 +88,27 @@ const CURRENT_DIRECTORY_REPO = {
   },
 }
 
+function bellWorkspace(
+  workspaceId: WorkspaceState['id'],
+  workspaceRuntimeId: string,
+  capability: 'filesystem' | 'git',
+): WorkspaceState {
+  const workspace = emptyWorkspace(workspaceId, workspaceRuntimeId)
+  acceptWorkspaceProbeState(workspace, {
+    status: 'ready',
+    capabilities: {
+      files: { read: true, write: true },
+      terminal: { available: true },
+      git:
+        capability === 'git'
+          ? { status: 'available', worktrees: true, pullRequests: { provider: 'none' } }
+          : { status: 'unavailable' },
+    },
+    diagnostics: [],
+  })
+  return workspace
+}
+
 describe('client effect intent plans', () => {
   test('creates a worktree terminal bell plan when the worktree group matches a known worktree', () => {
     resetWorkspacesStore()
@@ -114,31 +137,38 @@ describe('client effect intent plans', () => {
       },
     })
 
-    expect(plan).toEqual({ kind: 'show-terminal' })
+    expect(plan).toMatchObject({
+      kind: 'show-terminal',
+      location: { kind: 'linked-worktree', routeTarget: { worktreePath: '/tmp/repo-feature' } },
+    })
   })
 
   test('creates a workspace-root terminal bell plan without a Git read model', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace')
-    const plan = createTerminalBellIntentPlan({ id: workspaceId, workspaceRuntimeId: 'workspace-runtime-test' }, null, {
-      type: 'terminal-bell-click',
-      terminalSessionId: 'term-111111111111111111111',
-      session: {
-        target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: 'workspace-runtime-test' },
-        presentation: { kind: 'workspace-root' },
+    const plan = createTerminalBellIntentPlan(
+      bellWorkspace(workspaceId, 'workspace-runtime-test', 'filesystem'),
+      null,
+      {
+        type: 'terminal-bell-click',
+        terminalSessionId: 'term-111111111111111111111',
+        session: {
+          target: { kind: 'workspace-root', workspaceId, workspaceRuntimeId: 'workspace-runtime-test' },
+          presentation: { kind: 'workspace-root' },
+        },
       },
-    })
+    )
 
-    expect(plan).toEqual({ kind: 'show-terminal' })
+    expect(plan).toMatchObject({ kind: 'show-terminal', location: { kind: 'workspace-root' } })
   })
 
-  test('keeps a Git main-worktree bell on its branch presentation', () => {
+  test('projects a Git source root terminal bell to its source worktree', () => {
     resetWorkspacesStore()
     const repo = seedRepoWithReadModelForTest({
       id: 'goblin+file:///tmp/repo',
       currentBranch: 'main',
       currentBranchName: 'main',
       branchSnapshots: [createBranchSnapshot('main')],
-      worktrees: [createRepoWorktreeSnapshotForTest('main', '/tmp/repo', { isPrimary: false, isLocked: false })],
+      worktrees: [createRepoWorktreeSnapshotForTest('main', '/tmp/repo', { isSource: true, isPrimary: true })],
     })
 
     const plan = createTerminalBellIntentPlan(repo, repositoryFactsForTest(repo), {
@@ -146,36 +176,38 @@ describe('client effect intent plans', () => {
       terminalSessionId: 'term-111111111111111111111',
       session: {
         target: {
-          kind: 'git-worktree',
+          kind: 'workspace-root',
           workspaceId: repo.id,
           workspaceRuntimeId: repo.workspaceRuntimeId,
-          root: repo.id,
+        },
+        presentation: { kind: 'workspace-root' },
+      },
+    })
+
+    expect(plan).toMatchObject({
+      kind: 'show-terminal',
+      location: {
+        kind: 'source-worktree',
+        routeTarget: { kind: 'git-worktree', worktreePath: '/tmp/repo' },
+        paneTarget: { kind: 'workspace-root' },
+      },
+    })
+  })
+
+  test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
+    const plan = createTerminalBellIntentPlan(bellWorkspace(GIT_WORKSPACE_ID, 'workspace-runtime-test', 'git'), null, {
+      type: 'terminal-bell-click',
+      terminalSessionId: 'term-222222222222222222222',
+      session: {
+        target: {
+          kind: 'git-worktree',
+          workspaceId: GIT_WORKSPACE_ID,
+          workspaceRuntimeId: 'workspace-runtime-test',
+          root: workspaceIdForTest('goblin+file:///tmp/repo-feature'),
         },
         presentation: { kind: 'git-worktree' },
       },
     })
-
-    expect(plan).toEqual({ kind: 'show-terminal' })
-  })
-
-  test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
-    const plan = createTerminalBellIntentPlan(
-      { id: workspaceIdForTest('goblin+file:///tmp/repo'), workspaceRuntimeId: 'workspace-runtime-test' },
-      null,
-      {
-        type: 'terminal-bell-click',
-        terminalSessionId: 'term-222222222222222222222',
-        session: {
-          target: {
-            kind: 'git-worktree',
-            workspaceId: GIT_WORKSPACE_ID,
-            workspaceRuntimeId: 'workspace-runtime-test',
-            root: workspaceIdForTest('goblin+file:///tmp/repo-feature'),
-          },
-          presentation: { kind: 'git-worktree' },
-        },
-      },
-    )
 
     expect(plan).toEqual({ kind: 'unavailable', reason: 'snapshot-unavailable' })
   })
@@ -183,7 +215,7 @@ describe('client effect intent plans', () => {
   test('routes a detached worktree bell through its authoritative catalog entry', () => {
     const worktreePath = '/workspace/detached'
     const plan = createTerminalBellIntentPlan(
-      { id: DETACHED_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
+      bellWorkspace(DETACHED_WORKSPACE_ID, 'workspace-runtime-test', 'git'),
       repositoryFacts(
         [],
         [{ path: worktreePath, isMain: false, entries: [] }],
@@ -215,13 +247,16 @@ describe('client effect intent plans', () => {
       },
     )
 
-    expect(plan).toEqual({ kind: 'show-terminal' })
+    expect(plan).toMatchObject({
+      kind: 'show-terminal',
+      location: { kind: 'linked-worktree', routeTarget: { worktreePath } },
+    })
   })
 
   test('keeps detached presentation authoritative when the current catalog associates the path with a branch', () => {
     const worktreePath = '/workspace/detached'
     const plan = createTerminalBellIntentPlan(
-      { id: DETACHED_WORKSPACE_ID, workspaceRuntimeId: 'workspace-runtime-test' },
+      bellWorkspace(DETACHED_WORKSPACE_ID, 'workspace-runtime-test', 'git'),
       repositoryFacts(
         [createBranchSnapshot('feature/later')],
         [{ path: worktreePath, isMain: false, entries: [] }],
@@ -242,13 +277,16 @@ describe('client effect intent plans', () => {
       },
     )
 
-    expect(plan).toEqual({ kind: 'show-terminal' })
+    expect(plan).toMatchObject({
+      kind: 'show-terminal',
+      location: { kind: 'linked-worktree', routeTarget: { worktreePath } },
+    })
   })
 
   test('rejects bell identities from a stale Workspace runtime', () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace')
     const plan = createTerminalBellIntentPlan(
-      { id: workspaceId, workspaceRuntimeId: 'workspace-runtime-current' },
+      bellWorkspace(workspaceId, 'workspace-runtime-current', 'filesystem'),
       null,
       {
         type: 'terminal-bell-click',
