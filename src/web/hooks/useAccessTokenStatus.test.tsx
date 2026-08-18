@@ -5,14 +5,24 @@ import { defineComponent } from 'vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
+import { CodedError } from '#/shared/coded-error.ts'
 import { useAccessTokenStatus } from '#/web/hooks/useAccessTokenStatus.ts'
-import { fetchServerJson, postServerCommandJson } from '#/web/lib/server-fetch.ts'
+import { fetchServerJson, postServerCommandJson, ServerRequestError } from '#/web/lib/server-fetch.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
-vi.mock('#/web/lib/server-fetch.ts', () => ({
+const serverFetchMocks = vi.hoisted(() => ({
   fetchServerJson: vi.fn(),
   postServerCommandJson: vi.fn(),
 }))
+
+vi.mock('#/web/lib/server-fetch.ts', async (importOriginal) => {
+  const actual = await importOriginal<{ ServerRequestError: typeof ServerRequestError }>()
+  return {
+    fetchServerJson: serverFetchMocks.fetchServerJson,
+    postServerCommandJson: serverFetchMocks.postServerCommandJson,
+    ServerRequestError: actual.ServerRequestError,
+  }
+})
 
 beforeEach(() => {
   vi.mocked(fetchServerJson).mockReset()
@@ -24,7 +34,7 @@ describe('useAccessTokenStatus', () => {
   test('moves back to checking while a manual refresh probe is pending', async () => {
     const refreshProbe = Promise.withResolvers<{ ok: true }>()
     vi.mocked(fetchServerJson)
-      .mockRejectedValueOnce(new Error('unauthorized'))
+      .mockRejectedValueOnce(new ServerRequestError({ status: 401, message: 'unauthorized' }))
       .mockReturnValueOnce(refreshProbe.promise)
 
     renderInJsdom(<Harness />)
@@ -77,13 +87,34 @@ describe('useAccessTokenStatus', () => {
       await Promise.resolve()
     })
 
-    expect(screen.getByRole('button', { name: 'unauthenticated' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'unavailable' })).toBeTruthy()
     expect(vi.mocked(fetchServerJson).mock.calls[0]?.[2]?.signal?.aborted).toBe(true)
   })
 
-  test('strips a URL token before the login request settles', async () => {
+  test('keeps a network failure distinct from an unauthenticated response', async () => {
+    vi.mocked(fetchServerJson).mockRejectedValueOnce(new Error('network unavailable'))
+
+    renderInJsdom(<Harness />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'unavailable' })).toBeTruthy()
+    })
+  })
+
+  test('keeps a server failure distinct from an unauthenticated response', async () => {
+    vi.mocked(fetchServerJson).mockRejectedValueOnce(new ServerRequestError({ status: 500 }))
+
+    renderInJsdom(<Harness />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'unavailable' })).toBeTruthy()
+    })
+  })
+
+  test('strips a URL token before login settles and authenticates after the cookie probe', async () => {
     const login = Promise.withResolvers<{ ok: true }>()
     vi.mocked(postServerCommandJson).mockReturnValue(login.promise)
+    vi.mocked(fetchServerJson).mockResolvedValueOnce({ ok: true })
     window.history.replaceState({}, '', '/?accessToken=url-token&x=1')
 
     renderInJsdom(<Harness />)
@@ -97,11 +128,20 @@ describe('useAccessTokenStatus', () => {
       login.resolve({ ok: true })
       await login.promise
     })
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'authenticated' })).toBeTruthy()
+    })
+    expect(fetchServerJson).toHaveBeenCalledWith('/api/whoami', expect.any(Function), {
+      signal: expect.any(AbortSignal),
+    })
   })
 
   test('clears the auth timeout when URL token login fails before whoami', async () => {
     useFakeTimers()
-    vi.mocked(postServerCommandJson).mockRejectedValueOnce(new Error('bad token'))
+    vi.mocked(postServerCommandJson).mockRejectedValueOnce(
+      new ServerRequestError({ status: 401, message: 'bad token' }),
+    )
     window.history.replaceState({}, '', '/?accessToken=bad-token')
 
     renderInJsdom(<Harness />)
@@ -112,6 +152,22 @@ describe('useAccessTokenStatus', () => {
     expect(screen.getByRole('button', { name: 'unauthenticated' })).toBeTruthy()
     expect(fetchServerJson).not.toHaveBeenCalled()
     expect(vi.getTimerCount()).toBe(0)
+    expect(window.location.search).toBe('')
+  })
+
+  test('does not classify an uncertain URL token login outcome as unauthenticated', async () => {
+    vi.mocked(postServerCommandJson).mockRejectedValueOnce(
+      new CodedError({ code: 'OUTCOME_UNCERTAIN', message: 'login outcome is uncertain' }),
+    )
+    window.history.replaceState({}, '', '/?accessToken=url-token')
+
+    renderInJsdom(<Harness />)
+    await flushTestUpdates(async () => {
+      await Promise.resolve()
+    })
+
+    expect(screen.getByRole('button', { name: 'unavailable' })).toBeTruthy()
+    expect(fetchServerJson).not.toHaveBeenCalled()
     expect(window.location.search).toBe('')
   })
 })

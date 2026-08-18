@@ -6,7 +6,7 @@ import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
 import type { AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
-import { ScrollPane } from '#/web/components/Layout.tsx'
+import { ScrollPane } from '#/web/components/ScrollPane.tsx'
 import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 import {
   isConfigTrustStateLoading,

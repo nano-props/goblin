@@ -895,6 +895,9 @@ export const ko: Record<DictKey, string> = {
   'auth.gate.signing-in': '로그인 중…',
   'auth.gate.error-empty': '접근 토큰을 입력하세요',
   'auth.gate.error-failed': '로그인 실패',
+  'auth.gate.unavailable-title': '로그인 상태를 확인할 수 없음',
+  'auth.gate.unavailable-description':
+    'Goblin에서 인증 상태를 확인할 수 없습니다. 서버와 네트워크 연결을 확인한 후 Goblin을 다시 여세요.',
   'lazy-restore.failed': '작업 공간을 열 수 없습니다',
   'workspace-restore.failed': '작업 공간을 복원할 수 없습니다',
 }

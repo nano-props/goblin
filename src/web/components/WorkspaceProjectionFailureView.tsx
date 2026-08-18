@@ -1,7 +1,7 @@
 import { AlertCircle, RefreshCw, X } from '@lucide/vue'
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { EmptyState } from '#/web/components/Layout.tsx'
+import { EmptyState } from '#/web/components/EmptyState.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'

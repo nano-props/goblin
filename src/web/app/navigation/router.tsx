@@ -14,7 +14,7 @@ import type {
   WorkspaceRouteView,
 } from '#/web/app/navigation/route-model.ts'
 import { Layout } from '#/web/Layout.tsx'
-import { EmptyState } from '#/web/components/Layout.tsx'
+import { EmptyState } from '#/web/components/EmptyState.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useAppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
 import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'

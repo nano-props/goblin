@@ -1,8 +1,6 @@
 import { defineComponent } from 'vue'
 import type { FunctionalComponent, PropType, VNodeChild } from 'vue'
-import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
 import { SplitPane } from '#/web/components/SplitPane.tsx'
-import { cn } from '#/web/lib/cn.ts'
 import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { WorkspaceLayoutMode } from '#/web/lib/workspace-layout.ts'
 import { WORKSPACE_PANE_MOTION_STYLE, WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
@@ -112,35 +110,3 @@ export const CompactWorkspaceLayout = defineComponent<{
     }
   },
 })
-
-export const ScrollPane: FunctionalComponent = (_props, { slots }) => (
-  <ScrollArea class="min-h-0 flex-1">{slots.default?.()}</ScrollArea>
-)
-
-interface EmptyStateProps {
-  icon?: VNodeChild
-  title: VNodeChild
-  body?: VNodeChild
-  tone?: 'neutral' | 'success'
-}
-
-export const EmptyState: FunctionalComponent<EmptyStateProps> = (props) => (
-  <div class="flex flex-1 items-center justify-center p-6 text-center">
-    <div class="space-y-1">
-      {props.icon ? (
-        <div
-          class={cn(
-            'mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full',
-            props.tone === 'success' ? 'bg-success-surface text-success' : 'bg-muted text-muted-foreground',
-          )}
-        >
-          {props.icon}
-        </div>
-      ) : null}
-      <div class="text-sm font-medium text-foreground">{props.title}</div>
-      {props.body ? <div class="text-xs text-muted-foreground">{props.body}</div> : null}
-    </div>
-  </div>
-)
-
-EmptyState.props = ['icon', 'title', 'body', 'tone']

@@ -22,7 +22,7 @@ const authenticatedBootstrapMock = vi.hoisted(() => ({
 }))
 const authMock = vi.hoisted(() => ({
   status: null as unknown as {
-    state: 'checking' | 'authenticated' | 'unauthenticated'
+    state: 'checking' | 'authenticated' | 'unauthenticated' | 'unavailable'
     refresh: ReturnType<typeof vi.fn>
   },
 }))
@@ -163,7 +163,7 @@ const SettingsRetainedOutletTerminalConsumer = defineComponent({
 
 beforeEach(() => {
   authMock.status = reactive({
-    state: 'authenticated' as 'checking' | 'authenticated' | 'unauthenticated',
+    state: 'authenticated' as 'checking' | 'authenticated' | 'unauthenticated' | 'unavailable',
     refresh: vi.fn(),
   })
   workspaceOpenDialogMock.renderError = null

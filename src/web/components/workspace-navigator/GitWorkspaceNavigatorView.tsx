@@ -3,7 +3,7 @@
 import { computed, defineComponent } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { useAppNavigation } from '#/web/app/navigation/context.tsx'
-import { EmptyState } from '#/web/components/Layout.tsx'
+import { EmptyState } from '#/web/components/EmptyState.tsx'
 import { RepoStatusFailureView } from '#/web/components/RepoStatusFailureView.tsx'
 import { GitWorkspaceNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
 import { GitWorkspaceNavigatorList } from '#/web/components/workspace-navigator/GitWorkspaceNavigatorList.tsx'

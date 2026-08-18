@@ -262,7 +262,7 @@ vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => {
   return { WorkspaceNavigationControls }
 })
 
-vi.mock('#/web/components/Layout.tsx', () => {
+vi.mock('#/web/components/workspace-layout/WorkspaceLayout.tsx', () => {
   const WorkspaceSplitLayout: FunctionalComponent<{
     mode?: 'split' | 'single-pane'
     sidebarCollapsed?: boolean
@@ -304,6 +304,10 @@ vi.mock('#/web/components/Layout.tsx', () => {
   )
   CompactWorkspaceLayout.props = ['activePane', 'sidebarPane', 'workspacePane']
 
+  return { WorkspaceSplitLayout, WorkspaceLayoutPane, CompactWorkspaceLayout }
+})
+
+vi.mock('#/web/components/EmptyState.tsx', () => {
   const EmptyState: FunctionalComponent<{ title: VNodeChild; body?: VNodeChild }> = (props) => (
     <div data-testid="empty-state">
       {props.title}
@@ -311,8 +315,7 @@ vi.mock('#/web/components/Layout.tsx', () => {
     </div>
   )
   EmptyState.props = ['title', 'body']
-
-  return { WorkspaceSplitLayout, WorkspaceLayoutPane, CompactWorkspaceLayout, EmptyState }
+  return { EmptyState }
 })
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/repo-view-test')

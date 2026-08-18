@@ -7,7 +7,10 @@ import type { FunctionalComponent, VNodeChild } from 'vue'
 // that comes from dozens of tiny bars pulsing in unison.
 
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
-import { WorkspaceLayoutPane, WorkspaceSplitLayout } from '#/web/components/Layout.tsx'
+import {
+  WorkspaceLayoutPane,
+  WorkspaceSplitLayout,
+} from '#/web/components/workspace-layout/WorkspaceLayout.tsx'
 import {
   NAVIGATOR_ROW_ACTION_BOX_CLASS,
   NAVIGATOR_ROW_ACTION_SLOT_CLASS,

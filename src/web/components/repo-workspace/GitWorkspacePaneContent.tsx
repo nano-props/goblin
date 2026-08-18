@@ -1,5 +1,5 @@
 import { defineComponent } from 'vue'
-import { EmptyState } from '#/web/components/Layout.tsx'
+import { EmptyState } from '#/web/components/EmptyState.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { renderGitWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 import type {

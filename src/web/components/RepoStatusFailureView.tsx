@@ -2,7 +2,7 @@ import { AlertCircle, RefreshCw } from '@lucide/vue'
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
 import { REPO_MEMBERSHIP_READ_CONFLICT_KEY } from '#/shared/repo-membership-read.ts'
-import { EmptyState } from '#/web/components/Layout.tsx'
+import { EmptyState } from '#/web/components/EmptyState.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
 

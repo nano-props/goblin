@@ -1,7 +1,7 @@
 import { AlertTriangle, RefreshCw } from '@lucide/vue'
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { EmptyState } from '#/web/components/Layout.tsx'
+import { EmptyState } from '#/web/components/EmptyState.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import type { AuthenticatedAppBootstrapState } from '#/web/app/bootstrap/authenticated.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'

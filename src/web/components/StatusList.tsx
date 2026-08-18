@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue'
 import type { PropType } from 'vue'
-import { EmptyState } from '#/web/components/Layout.tsx'
+import { EmptyState } from '#/web/components/EmptyState.tsx'
 import { FilePathText } from '#/web/components/FilePathText.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
 import type { StatusEntry, WorktreeStatus } from '#/shared/git-types.ts'

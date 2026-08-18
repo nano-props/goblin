@@ -4,6 +4,7 @@ import { decodeWith } from '#/shared/http-response-schema.ts'
 import { OkResponseSchema } from '#/shared/settings-response-schema.ts'
 import { useAuth } from '#/web/auth/AuthProvider.tsx'
 import { useBootstrapLoadingPresentation } from '#/web/app/bootstrap/bootstrap-loading-presentation.ts'
+import { EmptyState } from '#/web/components/EmptyState.tsx'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { postServerCommandJson } from '#/web/lib/server-fetch.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -19,15 +20,31 @@ export const TokenGate = defineComponent({
       () => auth.state,
       (state) => {
         if (state === 'checking') bootstrapLoading.show()
-        else if (state === 'unauthenticated') bootstrapLoading.hide()
+        else if (state === 'unauthenticated' || state === 'unavailable') bootstrapLoading.hide()
       },
       { immediate: true, flush: 'sync' },
     )
     return () => {
       if (auth.state === 'checking') return null
       if (auth.state === 'unauthenticated') return <LoginForm onSuccess={auth.refresh} />
+      if (auth.state === 'unavailable') return <AuthUnavailable />
       return slots.default?.()
     }
+  },
+})
+
+const AuthUnavailable = defineComponent({
+  name: 'AuthUnavailable',
+  setup() {
+    const t = useT()
+    return () => (
+      <div role="alert" class="flex h-full bg-background">
+        <EmptyState
+          title={<h1>{t('auth.gate.unavailable-title')}</h1>}
+          body={t('auth.gate.unavailable-description')}
+        />
+      </div>
+    )
   },
 })
 

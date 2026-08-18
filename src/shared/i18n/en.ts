@@ -906,6 +906,9 @@ export const en = {
   'auth.gate.signing-in': 'Signing in…',
   'auth.gate.error-empty': 'Enter your access token',
   'auth.gate.error-failed': 'Login failed',
+  'auth.gate.unavailable-title': 'Could not verify sign-in',
+  'auth.gate.unavailable-description':
+    'Goblin could not confirm your authentication status. Check the server and network connection, then reopen Goblin.',
   'lazy-restore.failed': 'Could not open workspace',
   'workspace-restore.failed': 'Could not restore workspace',
 } as const

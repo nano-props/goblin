@@ -12,7 +12,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const authMock = vi.hoisted(() => ({
   status: null as unknown as {
-    state: 'checking' | 'authenticated' | 'unauthenticated'
+    state: 'checking' | 'authenticated' | 'unauthenticated' | 'unavailable'
     refresh: ReturnType<typeof vi.fn>
   },
 }))
@@ -27,7 +27,7 @@ vi.mock('#/web/lib/server-fetch.ts', () => ({
 
 beforeEach(() => {
   authMock.status = reactive({
-    state: 'unauthenticated' as 'checking' | 'authenticated' | 'unauthenticated',
+    state: 'unauthenticated' as 'checking' | 'authenticated' | 'unauthenticated' | 'unavailable',
     refresh: vi.fn(),
   })
   vi.mocked(postServerCommandJson).mockReset()
@@ -56,6 +56,19 @@ describe('TokenGate', () => {
     renderTokenGate()
 
     expect(screen.getByRole('button', { name: 'auth.gate.sign-in' })).toBeTruthy()
+    await waitFor(() => expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('false'))
+  })
+
+  test('shows an unavailable state without presenting the token form', async () => {
+    authMock.status.state = 'unavailable'
+
+    renderTokenGate()
+
+    expect(screen.getByRole('alert')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'auth.gate.unavailable-title' })).toBeTruthy()
+    expect(screen.getByText('auth.gate.unavailable-description')).toBeTruthy()
+    expect(screen.queryByRole('textbox', { name: 'auth.gate.token-label' })).toBeNull()
+    expect(screen.queryByRole('button')).toBeNull()
     await waitFor(() => expect(screen.getByTestId('bootstrap-loading-visible').textContent).toBe('false'))
   })
 

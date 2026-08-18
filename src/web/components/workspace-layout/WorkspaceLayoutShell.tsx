@@ -1,6 +1,9 @@
 import type { FunctionalComponent, VNodeChild } from 'vue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import { CompactWorkspaceLayout, WorkspaceSplitLayout } from '#/web/components/Layout.tsx'
+import {
+  CompactWorkspaceLayout,
+  WorkspaceSplitLayout,
+} from '#/web/components/workspace-layout/WorkspaceLayout.tsx'
 import { ZenModeSidebarChrome } from '#/web/components/workspace-layout/ZenModeSidebarChrome.tsx'
 import { workspaceLayoutBehavior } from '#/web/lib/workspace-layout.ts'
 

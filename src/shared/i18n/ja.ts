@@ -911,6 +911,9 @@ export const ja: Record<DictKey, string> = {
   'auth.gate.signing-in': 'サインイン中…',
   'auth.gate.error-empty': 'アクセストークンを入力してください',
   'auth.gate.error-failed': 'ログインに失敗しました',
+  'auth.gate.unavailable-title': 'サインイン状態を確認できません',
+  'auth.gate.unavailable-description':
+    'Goblin は認証状態を確認できませんでした。サーバーとネットワーク接続を確認してから、Goblin を開き直してください。',
   'lazy-restore.failed': 'ワークスペースを開けません',
   'workspace-restore.failed': 'ワークスペースを復元できません',
 }

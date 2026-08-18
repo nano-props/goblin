@@ -3,11 +3,11 @@ import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
 import { decodeWith } from '#/shared/http-response-schema.ts'
 import { OkResponseSchema } from '#/shared/settings-response-schema.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
-import { fetchServerJson, postServerCommandJson } from '#/web/lib/server-fetch.ts'
+import { fetchServerJson, postServerCommandJson, ServerRequestError } from '#/web/lib/server-fetch.ts'
 
 const AUTH_STATUS_TIMEOUT_MS = 15_000
 
-export type AccessTokenStatus = 'checking' | 'authenticated' | 'unauthenticated'
+export type AccessTokenStatus = 'checking' | 'authenticated' | 'unauthenticated' | 'unavailable'
 
 export interface AccessTokenStatusState {
   state: AccessTokenStatus
@@ -58,15 +58,17 @@ export function useAccessTokenStatus(): AccessTokenStatusState {
     try {
       const urlLoginStatus = await exchangeUrlTokenForCookie(timeout.signal)
       if (currentGeneration !== generation) return
-      if (urlLoginStatus === 'failed') {
-        status.state = 'unauthenticated'
+      if (urlLoginStatus === 'unauthenticated' || urlLoginStatus === 'unavailable') {
+        status.state = urlLoginStatus
         return
       }
       try {
         const result = await fetchServerJson('/api/whoami', decodeWith(OkResponseSchema), { signal: timeout.signal })
         if (currentGeneration === generation) status.state = result.ok ? 'authenticated' : 'unauthenticated'
-      } catch {
-        if (currentGeneration === generation) status.state = 'unauthenticated'
+      } catch (error) {
+        if (currentGeneration === generation) {
+          status.state = isUnauthorized(error) ? 'unauthenticated' : 'unavailable'
+        }
       }
     } finally {
       timeout.dispose()
@@ -85,14 +87,20 @@ export function useAccessTokenStatus(): AccessTokenStatusState {
   return status
 }
 
-async function exchangeUrlTokenForCookie(signal: AbortSignal): Promise<'absent' | 'authenticated' | 'failed'> {
+async function exchangeUrlTokenForCookie(
+  signal: AbortSignal,
+): Promise<'absent' | 'authenticated' | 'unauthenticated' | 'unavailable'> {
   const urlToken = readAccessTokenFromUrl()
   if (!urlToken) return 'absent'
   stripAccessTokenFromUrl()
   try {
     await postServerCommandJson('/api/login', { token: urlToken }, decodeWith(OkResponseSchema), { signal })
     return 'authenticated'
-  } catch {
-    return 'failed'
+  } catch (error) {
+    return isUnauthorized(error) ? 'unauthenticated' : 'unavailable'
   }
+}
+
+function isUnauthorized(error: unknown): boolean {
+  return error instanceof ServerRequestError && error.status === 401
 }

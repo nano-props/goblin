@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
-import type { FunctionalComponent, VNode, VNodeChild } from 'vue'
+import type { FunctionalComponent, VNode } from 'vue'
 import { flushMicrotasks, waitForMicrotaskCondition } from '#/test-utils/microtasks.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
@@ -59,16 +59,9 @@ vi.mock('#/web/components/create-worktree/CreateWorktreeSurface.tsx', () => {
   return { CreateWorktreePageBody }
 })
 
-vi.mock('#/web/components/Layout.tsx', () => {
+vi.mock('#/web/components/ScrollPane.tsx', () => {
   const ScrollPane: FunctionalComponent = (_props, { slots }) => <div>{slots.default?.()}</div>
-  const EmptyState: FunctionalComponent<{ title: VNodeChild; body?: VNodeChild }> = (props) => (
-    <div>
-      <div>{props.title}</div>
-      {props.body ? <div>{props.body}</div> : null}
-    </div>
-  )
-  EmptyState.props = ['title', 'body']
-  return { EmptyState, ScrollPane }
+  return { ScrollPane }
 })
 
 vi.mock('#/web/components/workspace-toolbar-chrome.tsx', () => {

@@ -1,6 +1,6 @@
 import type { LucideIcon } from '@lucide/vue'
 import type { FunctionalComponent } from 'vue'
-import { ScrollPane } from '#/web/components/Layout.tsx'
+import { ScrollPane } from '#/web/components/ScrollPane.tsx'
 import { Skeleton } from '#/web/components/ui/skeleton.tsx'
 import { WorkspacePageToolbar } from '#/web/components/workspace-pages/WorkspacePageToolbar.tsx'
 
