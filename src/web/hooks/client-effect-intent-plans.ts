@@ -8,9 +8,7 @@ import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { workspaceTerminalAvailable, workspaceWorktreesAvailable } from '#/shared/workspace-runtime.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import {
-  resolveWorkspacePaneTerminalDestinationLocation,
-} from '#/web/workspace-pane/workspace-pane-terminal-destination-location.ts'
+import { resolveWorkspacePaneTerminalDestination } from '#/web/workspace-pane/workspace-pane-terminal-destination-location.ts'
 import type { FilesystemWorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export type ClientAppIntent = Extract<
@@ -130,15 +128,15 @@ export function createTerminalBellIntentPlan(
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
 ): TerminalBellIntentPlan {
   if (!workspace) return { kind: 'noop' }
-  const destination = resolveWorkspacePaneTerminalDestinationLocation({
+  const resolution = resolveWorkspacePaneTerminalDestination({
     workspace,
     base: event.session,
     snapshot: repositoryFacts
       ? { kind: 'ready', worktrees: repositoryFacts.snapshot.worktrees }
       : { kind: 'unavailable' },
   })
-  if (destination.kind === 'ready') return { kind: 'show-terminal', location: destination.location }
-  return destination.kind === 'pending' || (!repositoryFacts && destination.kind === 'unavailable')
+  if (resolution.kind === 'ready') return { kind: 'show-terminal', location: resolution.location }
+  return resolution.kind === 'pending' || (!repositoryFacts && resolution.kind === 'unavailable')
     ? { kind: 'unavailable', reason: 'snapshot-unavailable' }
     : { kind: 'noop' }
 }

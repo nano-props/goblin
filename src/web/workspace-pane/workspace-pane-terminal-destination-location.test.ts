@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import type { WorkspaceRepoWorktreeSnapshot } from '#/shared/git-types.ts'
-import type { WorkspaceTerminalSessionSummary } from '#/web/terminal/components/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspaceState } from '#/web/stores/workspaces/types.ts'
-import { resolveWorkspacePaneTerminalDestinationLocation } from '#/web/workspace-pane/workspace-pane-terminal-destination-location.ts'
+import { resolveWorkspacePaneTerminalDestination } from '#/web/workspace-pane/workspace-pane-terminal-destination-location.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
 import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
@@ -11,15 +11,15 @@ const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 const LINKED_ROOT = workspaceIdForTest('goblin+file:///workspace/linked')
 const WORKSPACE_RUNTIME_ID = 'workspace-runtime-dashboard-destination'
 
-describe('resolveWorkspacePaneTerminalDestinationLocation', () => {
+describe('resolveWorkspacePaneTerminalDestination', () => {
   test('projects a filesystem root terminal to the root location', () => {
-    const destination = resolveWorkspacePaneTerminalDestinationLocation({
+    const resolution = resolveWorkspacePaneTerminalDestination({
       workspace: filesystemWorkspace(),
-      base: rootSession().base,
+      base: rootBase(),
       snapshot: { kind: 'pending' },
     })
 
-    expect(destination).toMatchObject({
+    expect(resolution).toMatchObject({
       kind: 'ready',
       location: {
         kind: 'workspace-root',
@@ -32,13 +32,13 @@ describe('resolveWorkspacePaneTerminalDestinationLocation', () => {
 
   test('projects a Git root terminal to the authoritative source worktree location', () => {
     const source = worktree('/workspace', true)
-    const destination = resolveWorkspacePaneTerminalDestinationLocation({
+    const resolution = resolveWorkspacePaneTerminalDestination({
       workspace: gitWorkspace(),
-      base: rootSession().base,
+      base: rootBase(),
       snapshot: { kind: 'ready', worktrees: [source, worktree('/workspace/linked', false)] },
     })
 
-    expect(destination).toMatchObject({
+    expect(resolution).toMatchObject({
       kind: 'ready',
       location: {
         kind: 'source-worktree',
@@ -51,13 +51,13 @@ describe('resolveWorkspacePaneTerminalDestinationLocation', () => {
 
   test('projects a linked terminal to its authoritative worktree location', () => {
     const linked = worktree('/workspace/linked', false)
-    const destination = resolveWorkspacePaneTerminalDestinationLocation({
+    const resolution = resolveWorkspacePaneTerminalDestination({
       workspace: gitWorkspace(),
-      base: linkedSession().base,
+      base: linkedBase(),
       snapshot: { kind: 'ready', worktrees: [worktree('/workspace', true), linked] },
     })
 
-    expect(destination).toMatchObject({
+    expect(resolution).toMatchObject({
       kind: 'ready',
       location: {
         kind: 'linked-worktree',
@@ -70,9 +70,9 @@ describe('resolveWorkspacePaneTerminalDestinationLocation', () => {
 
   test('waits for the Git snapshot before resolving a destination', () => {
     expect(
-      resolveWorkspacePaneTerminalDestinationLocation({
+      resolveWorkspacePaneTerminalDestination({
         workspace: gitWorkspace(),
-        base: rootSession().base,
+        base: rootBase(),
         snapshot: { kind: 'pending' },
       }),
     ).toEqual({ kind: 'pending' })
@@ -80,20 +80,52 @@ describe('resolveWorkspacePaneTerminalDestinationLocation', () => {
 
   test('reports an unavailable initial Git snapshot without treating it as pending', () => {
     expect(
-      resolveWorkspacePaneTerminalDestinationLocation({
+      resolveWorkspacePaneTerminalDestination({
         workspace: gitWorkspace(),
-        base: rootSession().base,
+        base: rootBase(),
         snapshot: { kind: 'unavailable' },
       }),
     ).toEqual({ kind: 'unavailable' })
   })
 
-  test('rejects a git-worktree execution target that points at the source worktree', () => {
-    const sourceTargetSession = linkedSession(WORKSPACE_ID)
+  test('waits while workspace capability is probing', () => {
     expect(
-      resolveWorkspacePaneTerminalDestinationLocation({
+      resolveWorkspacePaneTerminalDestination({
+        workspace: emptyWorkspace(WORKSPACE_ID, WORKSPACE_RUNTIME_ID),
+        base: rootBase(),
+        snapshot: { kind: 'ready', worktrees: [worktree('/workspace', true)] },
+      }),
+    ).toEqual({ kind: 'pending' })
+  })
+
+  test('reports unavailable workspace capability without consulting the snapshot', () => {
+    const workspace = emptyWorkspace(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
+    acceptWorkspaceProbeState(workspace, { status: 'unavailable', reason: 'error.workspace-transport-unavailable' })
+    expect(
+      resolveWorkspacePaneTerminalDestination({
+        workspace,
+        base: rootBase(),
+        snapshot: { kind: 'ready', worktrees: [worktree('/workspace', true)] },
+      }),
+    ).toEqual({ kind: 'unavailable' })
+  })
+
+  test('rejects a Git worktree execution target in a filesystem workspace', () => {
+    expect(
+      resolveWorkspacePaneTerminalDestination({
+        workspace: filesystemWorkspace(),
+        base: linkedBase(),
+        snapshot: { kind: 'ready', worktrees: [worktree('/workspace/linked', false)] },
+      }),
+    ).toEqual({ kind: 'unavailable' })
+  })
+
+  test('rejects a git-worktree execution target that points at the source worktree', () => {
+    const sourceTargetBase = linkedBase(WORKSPACE_ID)
+    expect(
+      resolveWorkspacePaneTerminalDestination({
         workspace: gitWorkspace(),
-        base: sourceTargetSession.base,
+        base: sourceTargetBase,
         snapshot: { kind: 'ready', worktrees: [worktree('/workspace', true)] },
       }),
     ).toEqual({ kind: 'unavailable' })
@@ -101,17 +133,27 @@ describe('resolveWorkspacePaneTerminalDestinationLocation', () => {
 
   test('rejects missing source and linked worktrees', () => {
     expect(
-      resolveWorkspacePaneTerminalDestinationLocation({
+      resolveWorkspacePaneTerminalDestination({
         workspace: gitWorkspace(),
-        base: rootSession().base,
+        base: rootBase(),
         snapshot: { kind: 'ready', worktrees: [worktree('/workspace/linked', false)] },
       }),
     ).toEqual({ kind: 'unavailable' })
     expect(
-      resolveWorkspacePaneTerminalDestinationLocation({
+      resolveWorkspacePaneTerminalDestination({
         workspace: gitWorkspace(),
-        base: linkedSession().base,
+        base: linkedBase(),
         snapshot: { kind: 'ready', worktrees: [worktree('/workspace', true)] },
+      }),
+    ).toEqual({ kind: 'unavailable' })
+  })
+
+  test('rejects an ambiguous source worktree catalog', () => {
+    expect(
+      resolveWorkspacePaneTerminalDestination({
+        workspace: gitWorkspace(),
+        base: rootBase(),
+        snapshot: { kind: 'ready', worktrees: [worktree('/workspace', true), worktree('/workspace/other', true)] },
       }),
     ).toEqual({ kind: 'unavailable' })
   })
@@ -120,9 +162,9 @@ describe('resolveWorkspacePaneTerminalDestinationLocation', () => {
     const workspace = gitWorkspace()
     workspace.workspaceRuntimeId = 'workspace-runtime-current'
     expect(
-      resolveWorkspacePaneTerminalDestinationLocation({
+      resolveWorkspacePaneTerminalDestination({
         workspace,
-        base: rootSession().base,
+        base: rootBase(),
         snapshot: { kind: 'ready', worktrees: [worktree('/workspace', true)] },
       }),
     ).toEqual({ kind: 'stale' })
@@ -157,34 +199,17 @@ function gitWorkspace(): WorkspaceState {
   return workspace
 }
 
-function rootSession(): WorkspaceTerminalSessionSummary {
-  return terminalSession({
+function rootBase(): TerminalSessionBase {
+  return {
     target: { kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID },
     presentation: { kind: 'workspace-root' },
-  })
+  }
 }
 
-function linkedSession(root = LINKED_ROOT): WorkspaceTerminalSessionSummary {
-  return terminalSession({
+function linkedBase(root = LINKED_ROOT): TerminalSessionBase {
+  return {
     target: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, workspaceRuntimeId: WORKSPACE_RUNTIME_ID, root },
     presentation: { kind: 'git-worktree' },
-  })
-}
-
-function terminalSession(base: WorkspaceTerminalSessionSummary['base']): WorkspaceTerminalSessionSummary {
-  return {
-    type: 'terminal',
-    terminalFilesystemTargetKey: 'terminal-target',
-    terminalSessionId: 'term-dashboard-destination',
-    index: 0,
-    title: 'Terminal',
-    fullTitle: 'Terminal',
-    processName: 'zsh',
-    phase: 'open',
-    selected: false,
-    hasBell: false,
-    hasRecentOutput: false,
-    base,
   }
 }
 

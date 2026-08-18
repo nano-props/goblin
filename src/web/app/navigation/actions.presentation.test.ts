@@ -38,6 +38,7 @@ import {
   worktreeSelectionLease,
 } from '#/web/app/navigation/actions.test-utils.ts'
 import { currentAppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 
 beforeEach(setupAppNavigationActionsTests)
 
@@ -174,50 +175,65 @@ describe('createAppNavigationActions presentation', () => {
     expect(navigation.openRepoWorktreeTerminal).not.toHaveBeenCalled()
   })
 
-  test('commits a filesystem route only while its workspace runtime remains current', async () => {
-    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
-    markRepoGitUnavailable(REPO_ID)
-    const routeCommit = Promise.withResolvers<boolean>()
-    const navigation = routeNavigation()
-    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => await routeCommit.promise)
-    const actions = createAppNavigationActions({
-      currentWorkspaceId: REPO_ID,
-      workspaceOrder: [REPO_ID],
-      closeWorkspace: vi.fn(),
-      routeNavigation: navigation,
-    })
-    const onAbandon = vi.fn()
-    const previousPreference = preferredWorkspacePaneTabForTarget(repo.ui, {
-      kind: 'workspace-root',
-      workspaceId: REPO_ID,
-    })
-    const commit = actions.commitFilesystemWorkspacePaneRoute(
-      {
-        routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-      },
-      { kind: 'static', tab: 'files' },
-      { onAbandon },
-    )
-    workspacesStore.setState((state) => ({
-      workspaces: {
-        ...state.workspaces,
-        [REPO_ID]: replaceWorkspace(repo, (draft) => {
-          draft.workspaceRuntimeId = 'repo-runtime-replacement'
-        }),
-      },
-    }))
-    routeCommit.resolve(true)
-
-    await expect(commit).resolves.toBe(false)
-    expect(onAbandon).toHaveBeenCalledOnce()
-    expect(
-      preferredWorkspacePaneTabForTarget(workspacesStore.getState().workspaces[REPO_ID]!.ui, {
+  test.each(['runtime replacement', 'Git promotion'] as const)(
+    'rejects a filesystem route after its workspace root lease is invalidated by %s',
+    async (leaseInvalidation) => {
+      const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+      markRepoGitUnavailable(REPO_ID)
+      const routeCommit = Promise.withResolvers<boolean>()
+      const navigation = routeNavigation()
+      navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => await routeCommit.promise)
+      const actions = createAppNavigationActions({
+        currentWorkspaceId: REPO_ID,
+        workspaceOrder: [REPO_ID],
+        closeWorkspace: vi.fn(),
+        routeNavigation: navigation,
+      })
+      const onAbandon = vi.fn()
+      const previousPreference = preferredWorkspacePaneTabForTarget(repo.ui, {
         kind: 'workspace-root',
         workspaceId: REPO_ID,
-      }),
-    ).toBe(previousPreference)
-  })
+      })
+      const commit = actions.commitFilesystemWorkspacePaneRoute(
+        {
+          routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+        },
+        { kind: 'static', tab: 'files' },
+        { onAbandon },
+      )
+      workspacesStore.setState((state) => ({
+        workspaces: {
+          ...state.workspaces,
+          [REPO_ID]: replaceWorkspace(repo, (draft) => {
+            if (leaseInvalidation === 'runtime replacement') {
+              draft.workspaceRuntimeId = 'repo-runtime-replacement'
+              return
+            }
+            acceptWorkspaceProbeState(draft, {
+              status: 'ready',
+              capabilities: {
+                files: { read: true, write: true },
+                terminal: { available: true },
+                git: { status: 'available', worktrees: true, pullRequests: { provider: 'none' } },
+              },
+              diagnostics: [],
+            })
+          }),
+        },
+      }))
+      routeCommit.resolve(true)
+
+      await expect(commit).resolves.toBe(false)
+      expect(onAbandon).toHaveBeenCalledOnce()
+      expect(
+        preferredWorkspacePaneTabForTarget(workspacesStore.getState().workspaces[REPO_ID]!.ui, {
+          kind: 'workspace-root',
+          workspaceId: REPO_ID,
+        }),
+      ).toBe(previousPreference)
+    },
+  )
 
   test('rejects an invalid filesystem commit lease before starting navigation', async () => {
     seedRepoWithReadModelForTest({

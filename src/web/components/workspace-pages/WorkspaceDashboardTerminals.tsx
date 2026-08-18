@@ -30,8 +30,8 @@ import { commitWorkspacePaneTerminalDestination } from '#/web/workspace-pane/wor
 import { surfaceWorkspacePaneTerminalDestinationOutcome } from '#/web/workspace-pane/workspace-pane-terminal-destination-feedback.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import {
-  resolveWorkspacePaneTerminalDestinationLocation,
-  type WorkspacePaneTerminalDestinationLocation,
+  resolveWorkspacePaneTerminalDestination,
+  type WorkspacePaneTerminalDestinationResolution,
 } from '#/web/workspace-pane/workspace-pane-terminal-destination-location.ts'
 import type { FilesystemWorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 
@@ -77,15 +77,15 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
     async function openTerminal(session: WorkspaceTerminalSessionSummary): Promise<void> {
       const pending = terminalOpeningLease(session)
       if (sameTerminalOpeningScope(openingTerminal.value, pending)) return
-      const destination = terminalDestination(session)
-      if (destination.kind !== 'ready') return
+      const resolution = resolveTerminalDestination(session)
+      if (resolution.kind !== 'ready') return
       if (hydration.value.phase === 'failed') {
         toast.warning(t('dashboard.terminals.stale'))
         return
       }
       openingTerminal.value = pending
       try {
-        const outcome = await commitTerminalRoute(navigation, session, destination.location)
+        const outcome = await commitTerminalRoute(navigation, session, resolution.location)
         surfaceWorkspacePaneTerminalDestinationOutcome(outcome)
       } catch (error) {
         surfaceWorkspacePaneTerminalDestinationOutcome(null, error)
@@ -94,10 +94,12 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
       }
     }
 
-    function terminalDestination(session: WorkspaceTerminalSessionSummary): WorkspacePaneTerminalDestinationLocation {
+    function resolveTerminalDestination(
+      session: WorkspaceTerminalSessionSummary,
+    ): WorkspacePaneTerminalDestinationResolution {
       const currentWorkspace = workspace.value
       if (!currentWorkspace) return { kind: 'stale' }
-      return resolveWorkspacePaneTerminalDestinationLocation({
+      return resolveWorkspacePaneTerminalDestination({
         workspace: currentWorkspace,
         base: session.base,
         snapshot: repoSnapshot.data.value
@@ -175,8 +177,8 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
 
     function renderTerminalRow(session: WorkspaceTerminalSessionSummary): VNodeChild {
       const opening = sameTerminalOpeningLease(openingTerminal.value, terminalOpeningLease(session))
-      const destination = terminalDestination(session)
-      const target = terminalTargetLabel(session, destination, t)
+      const resolution = resolveTerminalDestination(session)
+      const target = terminalTargetLabel(session, resolution, t)
       const titleId = `dashboard-terminal-title-${session.terminalSessionId}`
       const detailsId = `dashboard-terminal-details-${session.terminalSessionId}`
       const statusId = `dashboard-terminal-status-${session.terminalSessionId}`
@@ -202,7 +204,7 @@ export const WorkspaceDashboardTerminals = defineComponent<{ workspaceId: Worksp
           aria-describedby={`${detailsId} ${statusId}`}
           aria-busy={opening || undefined}
           disabled={
-            destination.kind !== 'ready' ||
+            resolution.kind !== 'ready' ||
             sameTerminalOpeningScope(openingTerminal.value, terminalOpeningLease(session))
           }
           onClick={() => void openTerminal(session)}
@@ -300,18 +302,18 @@ function commitTerminalRoute(
 
 function terminalTargetLabel(
   session: WorkspaceTerminalSessionSummary,
-  destination: WorkspacePaneTerminalDestinationLocation,
+  resolution: WorkspacePaneTerminalDestinationResolution,
   t: DashboardTranslator,
 ): { label: string; path: string } {
   const path = terminalExecutionPath(session.base.target)
-  if (destination.kind === 'ready' && !destination.worktree) {
+  if (resolution.kind === 'ready' && !resolution.worktree) {
     return { label: t('dashboard.terminals.workspace-root'), path }
   }
-  if (destination.kind === 'pending') return { label: t('dashboard.terminals.worktree-unknown'), path }
+  if (resolution.kind === 'pending') return { label: t('dashboard.terminals.worktree-unknown'), path }
   return {
     label:
-      destination.kind === 'ready' && destination.worktree
-        ? worktreePresentationLabel(destination.worktree, t)
+      resolution.kind === 'ready' && resolution.worktree
+        ? worktreePresentationLabel(resolution.worktree, t)
         : t('dashboard.terminals.worktree-unavailable'),
     path,
   }

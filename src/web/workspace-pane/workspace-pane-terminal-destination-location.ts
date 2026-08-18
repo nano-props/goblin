@@ -7,7 +7,7 @@ import {
   type FilesystemWorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
 
-export type WorkspacePaneTerminalDestinationLocation =
+export type WorkspacePaneTerminalDestinationResolution =
   | {
       kind: 'ready'
       location: FilesystemWorkspacePaneLocation
@@ -17,14 +17,14 @@ export type WorkspacePaneTerminalDestinationLocation =
   | { kind: 'unavailable' }
   | { kind: 'stale' }
 
-export type WorkspacePaneTerminalDestinationSnapshot =
+type TerminalDestinationSnapshotState =
   { kind: 'ready'; worktrees: readonly WorkspaceRepoWorktreeSnapshot[] } | { kind: 'pending' } | { kind: 'unavailable' }
 
-export function resolveWorkspacePaneTerminalDestinationLocation(input: {
+export function resolveWorkspacePaneTerminalDestination(input: {
   workspace: Pick<WorkspaceState, 'id' | 'workspaceRuntimeId' | 'capability'>
   base: TerminalSessionBase
-  snapshot: WorkspacePaneTerminalDestinationSnapshot
-}): WorkspacePaneTerminalDestinationLocation {
+  snapshot: TerminalDestinationSnapshotState
+}): WorkspacePaneTerminalDestinationResolution {
   const { workspace, base, snapshot } = input
   const target = base.target
   if (target.workspaceId !== workspace.id || target.workspaceRuntimeId !== workspace.workspaceRuntimeId) {

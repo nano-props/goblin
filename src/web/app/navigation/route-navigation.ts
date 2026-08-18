@@ -83,7 +83,7 @@ export interface AppRouteNavigation extends RepoWorkspacePaneRouteNavigation {
     options?: AppRouteNavigationOptions,
   ) => boolean
   commitFilesystemWorkspacePaneRoute: (
-    target: FilesystemWorkspacePaneTabsTarget,
+    routeTarget: FilesystemWorkspacePaneTabsTarget,
     route: WorkspacePaneRouteTarget,
     options?: AppRouteNavigationOptions,
   ) => Promise<boolean>
@@ -193,13 +193,13 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
         options,
       )
     },
-    async commitFilesystemWorkspacePaneRoute(paneTarget, route, options) {
-      if (paneTarget.kind === 'workspace-root' && !workspaceRootProductRouteIsCurrent(paneTarget.workspaceId)) {
+    async commitFilesystemWorkspacePaneRoute(routeTarget, route, options) {
+      if (routeTarget.kind === 'workspace-root' && !workspaceRootProductRouteIsCurrent(routeTarget.workspaceId)) {
         return abandonAppRoute(options)
       }
-      const workspaceSlug = workspaceSlugForKnownId(paneTarget.workspaceId)
+      const workspaceSlug = workspaceSlugForKnownId(routeTarget.workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
-      return await commitFilesystemWorkspacePaneRoute({ router, workspaceSlug, paneTarget, route, options })
+      return await commitFilesystemWorkspacePaneRoute({ router, workspaceSlug, routeTarget, route, options })
     },
     openRepoBranch(workspaceId, branchName, options) {
       const target = currentWorkspacePaneTargetForBranch(workspaceId, branchName)

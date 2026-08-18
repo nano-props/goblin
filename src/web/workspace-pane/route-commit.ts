@@ -20,16 +20,16 @@ import { branchSlugFromName, worktreeSlugFromPath } from '#/web/app/navigation/w
 export async function commitFilesystemWorkspacePaneRoute(input: {
   router: Router
   workspaceSlug: string
-  paneTarget: FilesystemWorkspacePaneTabsTarget
+  routeTarget: FilesystemWorkspacePaneTabsTarget
   route: WorkspacePaneRouteTarget
   options?: AppRouteNavigationOptions
 }): Promise<boolean> {
-  const { router, workspaceSlug, paneTarget, route, options } = input
+  const { router, workspaceSlug, routeTarget, route, options } = input
   if (options?.navigationGeneration && !appNavigationIsCurrent(options.navigationGeneration)) {
     return abandonAppRouteCommit(options)
   }
   const routeLocation = (candidate: ParsedWorkspacePaneRouteTarget): RouteLocationRaw =>
-    filesystemWorkspacePaneRouteLocation(workspaceSlug, paneTarget, candidate)
+    filesystemWorkspacePaneRouteLocation(workspaceSlug, routeTarget, candidate)
   const routeHref = (candidate: ParsedWorkspacePaneRouteTarget): string =>
     appRouteHref(router, routeLocation(candidate))
   const currentHref = currentAppRouteHref(router)
@@ -112,10 +112,10 @@ function expectedCurrentWorkspacePaneHref<Route>(
 
 function filesystemWorkspacePaneRouteLocation(
   workspaceSlug: string,
-  paneTarget: FilesystemWorkspacePaneTabsTarget,
+  routeTarget: FilesystemWorkspacePaneTabsTarget,
   route: ParsedWorkspacePaneRouteTarget,
 ): RouteLocationRaw {
-  if (paneTarget.kind === 'workspace-root') {
+  if (routeTarget.kind === 'workspace-root') {
     if (route === null) return { name: 'workspace-root', params: { workspaceSlug } }
     if (route.kind === 'static' || route.kind === 'invalid-static') {
       return {
@@ -129,7 +129,7 @@ function filesystemWorkspacePaneRouteLocation(
     }
   }
 
-  const worktreeParams = { workspaceSlug, worktreeSlug: worktreeSlugFromPath(paneTarget.worktreePath) }
+  const worktreeParams = { workspaceSlug, worktreeSlug: worktreeSlugFromPath(routeTarget.worktreePath) }
   if (route === null) return { name: 'workspace-worktree', params: worktreeParams }
   if (route.kind === 'static' || route.kind === 'invalid-static') {
     return {

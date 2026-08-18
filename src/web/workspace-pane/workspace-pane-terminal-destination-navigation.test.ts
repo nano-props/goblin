@@ -25,6 +25,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
+const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///other-workspace')
 const WORKSPACE_RUNTIME_ID = 'workspace-runtime-terminal-destination'
 const TERMINAL_SESSION_ID = 'term-destination-session'
 
@@ -73,7 +74,11 @@ describe('workspace pane terminal destination navigation', () => {
     expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
-  test('rejects a branch terminal from an old runtime or moved worktree', async () => {
+  test.each([
+    ['an old runtime', gitTerminalBase('/workspace/current', 'workspace-runtime-replaced')],
+    ['a moved worktree', gitTerminalBase('/workspace/previous', WORKSPACE_RUNTIME_ID)],
+    ['another workspace', gitTerminalBase('/workspace/current', WORKSPACE_RUNTIME_ID, OTHER_WORKSPACE_ID)],
+  ])('rejects a branch terminal from %s', async (_case, base) => {
     seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest('feature/navigation', '/workspace/current')],
       id: WORKSPACE_ID,
@@ -88,15 +93,7 @@ describe('workspace pane terminal destination navigation', () => {
     await expect(
       commitWorkspacePaneTerminalDestination({
         location: linkedLocation('/workspace/current'),
-        base: gitTerminalBase('/workspace/current', 'workspace-runtime-replaced'),
-        terminalSessionId: TERMINAL_SESSION_ID,
-        navigation,
-      }),
-    ).resolves.toEqual({ kind: 'target-missing' })
-    await expect(
-      commitWorkspacePaneTerminalDestination({
-        location: linkedLocation('/workspace/current'),
-        base: gitTerminalBase('/workspace/previous', WORKSPACE_RUNTIME_ID),
+        base,
         terminalSessionId: TERMINAL_SESSION_ID,
         navigation,
       }),
@@ -336,11 +333,15 @@ function seedTerminalPaneTab(worktreePath: string | null): void {
   })
 }
 
-function gitTerminalBase(worktreePath: string, workspaceRuntimeId: string): TerminalSessionBase {
+function gitTerminalBase(
+  worktreePath: string,
+  workspaceRuntimeId: string,
+  workspaceId = WORKSPACE_ID,
+): TerminalSessionBase {
   return {
     target: {
       kind: 'git-worktree',
-      workspaceId: WORKSPACE_ID,
+      workspaceId,
       workspaceRuntimeId,
       root: workspaceIdForTest(`goblin+file://${worktreePath}`),
     },
