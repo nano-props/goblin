@@ -443,6 +443,7 @@ export const zh: Record<DictKey, string> = {
   'terminal.composer-more': '更多操作',
   'terminal.composer-upload-files': '上传',
   'terminal.composer-copy-content': '复制内容',
+  'terminal.composer-send-only': '仅发送',
   'terminal.composer-copy-content-empty': '没有可复制的终端内容。',
   'terminal.composer-show-keys': '显示终端按键',
   'terminal.composer-show-input': '显示文字输入',

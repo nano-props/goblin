@@ -90,7 +90,10 @@ vi.mock('#/web/terminal/components/TerminalSession.ts', () => {
       return null
     }
 
-    async submitText(): Promise<boolean> {
+    async sendComposerText(): Promise<boolean> {
+      return false
+    }
+    async submitComposerText(): Promise<boolean> {
       return false
     }
     takeover(): Promise<boolean> {

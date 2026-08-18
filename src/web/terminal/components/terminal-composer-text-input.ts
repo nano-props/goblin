@@ -1,19 +1,22 @@
-export type TerminalComposerSubmitStrategy = 'paste-then-enter' | 'typed-then-enter'
+export type TerminalComposerTextInputMethod = 'paste' | 'typed'
 
-export interface TerminalComposerSubmitPlan {
-  strategy: TerminalComposerSubmitStrategy
+export interface TerminalComposerTextInputPlan {
+  method: TerminalComposerTextInputMethod
   payload: string
 }
 
-export function planTerminalComposerSubmit(input: { text: string; processName: string }): TerminalComposerSubmitPlan {
+export function planTerminalComposerTextInput(input: {
+  text: string
+  processName: string
+}): TerminalComposerTextInputPlan {
   if (input.processName.trim().toLowerCase() !== 'devin') {
-    return { strategy: 'paste-then-enter', payload: input.text }
+    return { method: 'paste', payload: input.text }
   }
 
   const normalizedText = input.text.replace(/\r\n?/g, '\n')
   return isSafeTypedTerminalText(normalizedText)
-    ? { strategy: 'typed-then-enter', payload: normalizedText }
-    : { strategy: 'paste-then-enter', payload: input.text }
+    ? { method: 'typed', payload: normalizedText }
+    : { method: 'paste', payload: input.text }
 }
 
 function isSafeTypedTerminalText(text: string): boolean {

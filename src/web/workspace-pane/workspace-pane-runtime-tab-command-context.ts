@@ -67,12 +67,11 @@ function assignTerminalRuntimeTabCommandContext(
     location: input.location,
     base,
     bridge: readTerminalSessionCommandBridge(),
-    openerIdentity:
-      base
-        ? captureWorkspacePaneActiveTabIdentity(input.location, {
-            workspacePaneRoute: input.workspacePaneRoute,
-          })
-        : null,
+    openerIdentity: base
+      ? captureWorkspacePaneActiveTabIdentity(input.location, {
+          workspacePaneRoute: input.workspacePaneRoute,
+        })
+      : null,
     showTerminalSession: (terminalSessionId, routeRequest) =>
       input.showRuntimeTab('terminal', terminalSessionId, routeRequest),
     showCreatedTerminalSession: (terminalSessionId, presentation, routeRequest) =>

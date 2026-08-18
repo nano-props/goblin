@@ -7,7 +7,8 @@ type TestTerminalSessionContextValue = Omit<
   | 'captureInputWriter'
   | 'readCopyText'
   | 'sendVirtualKey'
-  | 'submitText'
+  | 'sendComposerText'
+  | 'submitComposerText'
   | 'retryPresentation'
   | 'openComposer'
   | 'closeComposer'
@@ -22,7 +23,8 @@ type TestTerminalSessionContextValue = Omit<
       | 'captureInputWriter'
       | 'readCopyText'
       | 'sendVirtualKey'
-      | 'submitText'
+      | 'sendComposerText'
+      | 'submitComposerText'
       | 'retryPresentation'
       | 'openComposer'
       | 'closeComposer'
@@ -57,7 +59,8 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
   const captureInputWriter = context.captureInputWriter ?? unexpectedContextCapability('captureInputWriter')
   const readCopyText = context.readCopyText ?? unexpectedContextCapability('readCopyText')
   const sendVirtualKey = context.sendVirtualKey ?? unexpectedContextCapability('sendVirtualKey')
-  const submitText = context.submitText ?? unexpectedContextCapability('submitText')
+  const sendComposerText = context.sendComposerText ?? unexpectedContextCapability('sendComposerText')
+  const submitComposerText = context.submitComposerText ?? unexpectedContextCapability('submitComposerText')
   const retryPresentation = context.retryPresentation ?? unexpectedContextCapability('retryPresentation')
   const openComposer = context.openComposer ?? unexpectedContextCapability('openComposer')
   const closeComposer = context.closeComposer ?? unexpectedContextCapability('closeComposer')
@@ -70,7 +73,8 @@ export function terminalSessionContextForTest(context: TestTerminalSessionContex
     captureInputWriter,
     readCopyText,
     sendVirtualKey,
-    submitText,
+    sendComposerText,
+    submitComposerText,
     retryPresentation,
     openComposer,
     closeComposer,

@@ -84,11 +84,7 @@ export interface TerminalComposerSessionState {
 
 export type TerminalPresentationRecovery = 'pending' | 'failed'
 export type TerminalPresentationPendingOperation =
-  | 'font-load'
-  | 'server-restart'
-  | 'server-sync'
-  | 'snapshot-replay'
-  | 'viewport-render'
+  'font-load' | 'server-restart' | 'server-sync' | 'snapshot-replay' | 'viewport-render'
 
 export interface TerminalSnapshot {
   phase: TerminalSessionPhase
@@ -204,12 +200,14 @@ export interface TerminalSessionContextValue {
   setComposerDraft: (terminalSessionId: string, draft: string) => boolean
   /** Replaces the draft only when it still matches expectedDraft. Returns whether the replacement was applied. */
   replaceComposerDraft: (terminalSessionId: string, expectedDraft: string, draft: string) => boolean
+  /** Returns true once the composed text is accepted without sending Enter. */
+  sendComposerText: (terminalSessionId: string, text: string) => Promise<boolean>
   /**
    * Returns true once the composed text write is accepted and the caller must
    * clear its draft. The following Enter write is reported independently and
    * cannot make an already-delivered draft safe to submit again.
    */
-  submitText: (terminalSessionId: string, text: string) => Promise<boolean>
+  submitComposerText: (terminalSessionId: string, text: string) => Promise<boolean>
   takeover: (terminalSessionId: string) => Promise<boolean>
   /** Retries only the local attach/presentation path after a stable recovery failure. */
   retryPresentation: (terminalSessionId: string) => boolean

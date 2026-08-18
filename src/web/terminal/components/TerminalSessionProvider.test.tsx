@@ -66,7 +66,8 @@ const projection = vi.hoisted(() => ({
   setComposerMode: vi.fn(),
   setComposerDraft: vi.fn(),
   replaceComposerDraft: vi.fn(),
-  submitText: vi.fn(),
+  sendComposerText: vi.fn(),
+  submitComposerText: vi.fn(),
   takeover: vi.fn(),
   retryPresentation: vi.fn(),
 }))
@@ -276,7 +277,8 @@ describe('TerminalSessionProvider', () => {
       setComposerMode: projection.setComposerMode,
       setComposerDraft: projection.setComposerDraft,
       replaceComposerDraft: projection.replaceComposerDraft,
-      submitText: projection.submitText,
+      sendComposerText: projection.sendComposerText,
+      submitComposerText: projection.submitComposerText,
       takeover: projection.takeover,
       retryPresentation: projection.retryPresentation,
     })

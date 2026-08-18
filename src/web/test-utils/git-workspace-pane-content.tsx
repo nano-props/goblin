@@ -90,14 +90,7 @@ type GitWorkspacePaneContentHarnessProps = Omit<
 
 export const GitWorkspacePaneContentHarness = defineComponent<GitWorkspacePaneContentHarnessProps>({
   name: 'GitWorkspacePaneContentHarness',
-  props: [
-    'repo',
-    'detail',
-    'workspacePaneId',
-    'onBackToGitWorkspaceNavigator',
-    'workspacePaneRouteMode',
-    'navigation',
-  ],
+  props: ['repo', 'detail', 'workspacePaneId', 'onBackToGitWorkspaceNavigator', 'workspacePaneRouteMode', 'navigation'],
 
   setup(props) {
     provideTerminalProjectionRecoveryActions({ retryWorkspace: vi.fn() })
@@ -120,13 +113,7 @@ export const GitWorkspacePaneContentHarness = defineComponent<GitWorkspacePaneCo
 
 const GitWorkspacePaneContentInner = defineComponent<GitWorkspacePaneContentHarnessProps>({
   name: 'GitWorkspacePaneContentInner',
-  props: [
-    'repo',
-    'detail',
-    'workspacePaneId',
-    'onBackToGitWorkspaceNavigator',
-    'workspacePaneRouteMode',
-  ],
+  props: ['repo', 'detail', 'workspacePaneId', 'onBackToGitWorkspaceNavigator', 'workspacePaneRouteMode'],
 
   setup(props) {
     const readContext = useTerminalSessionReadContext()

@@ -39,10 +39,7 @@ const AuthUnavailable = defineComponent({
     const t = useT()
     return () => (
       <div role="alert" class="flex h-full bg-background">
-        <EmptyState
-          title={<h1>{t('auth.gate.unavailable-title')}</h1>}
-          body={t('auth.gate.unavailable-description')}
-        />
+        <EmptyState title={<h1>{t('auth.gate.unavailable-title')}</h1>} body={t('auth.gate.unavailable-description')} />
       </div>
     )
   },

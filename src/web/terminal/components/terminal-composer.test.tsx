@@ -20,6 +20,7 @@ const LABELS: TerminalComposerLabels = {
   more: 'More actions',
   uploadFiles: 'Upload',
   copyContent: 'Copy terminal content',
+  sendOnly: 'Send only',
   showKeys: 'Show terminal keys',
   showInput: 'Show text input',
   enter: 'Enter',
@@ -39,6 +40,7 @@ function render(
   props: {
     onVirtualKey?: (key: TerminalVirtualKey) => void
     onSendText?: (text: string) => Promise<boolean>
+    onSubmitText?: (text: string) => Promise<boolean>
     onResolveFiles?: (files: File[]) => Promise<string | null>
     onFileInsertionRejected?: () => void
     onCopyContent?: () => Promise<void>
@@ -56,8 +58,8 @@ function render(
       const mode = ref<TerminalComposerMode>(props.initialMode ?? 'keys')
       const draft = ref(props.initialDraft ?? '')
       const historyEntries = shallowRef<readonly string[]>([])
-      const sendText = async (text: string) => {
-        const accepted = await (props.onSendText ?? (async () => true))(text)
+      const deliverText = async (deliver: ((text: string) => Promise<boolean>) | undefined, text: string) => {
+        const accepted = await (deliver ?? (async () => true))(text)
         if (accepted && historyEntries.value.at(-1) !== text) {
           historyEntries.value = [...historyEntries.value, text]
         }
@@ -75,7 +77,8 @@ function render(
           canUploadFiles={props.canUploadFiles ?? true}
           onVirtualKey={props.onVirtualKey ?? vi.fn()}
           onCopyContent={props.onCopyContent ?? vi.fn(async () => {})}
-          onSendText={sendText}
+          onSendText={(text) => deliverText(props.onSendText, text)}
+          onSubmitText={(text) => deliverText(props.onSubmitText, text)}
           onOpen={() => {
             expanded.value = true
             mode.value = 'input'
@@ -171,6 +174,7 @@ const ExpandedComposerForTest = defineComponent<{
         onVirtualKey={vi.fn()}
         onCopyContent={vi.fn(async () => {})}
         onSendText={vi.fn(async () => true)}
+        onSubmitText={vi.fn(async () => true)}
         onOpen={vi.fn(() => true)}
         onClose={vi.fn(() => true)}
         onModeChange={vi.fn(() => true)}
@@ -556,8 +560,8 @@ describe('TerminalComposer', () => {
   })
 
   test('submits with Enter and clears only accepted text', async () => {
-    const onSendText = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
-    const { container } = render({ onSendText })
+    const onSubmitText = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    const { container } = render({ onSubmitText })
     await expand(container)
     await showInput(container)
     const input = container.querySelector('textarea')
@@ -565,17 +569,17 @@ describe('TerminalComposer', () => {
     await changeAndFlush(input, { target: { value: 'git status' } })
 
     await keyDownAndFlush(input, { key: 'Enter' })
-    expect(onSendText).toHaveBeenNthCalledWith(1, 'git status')
+    expect(onSubmitText).toHaveBeenNthCalledWith(1, 'git status')
     await vi.waitFor(() => expect(input.value).toBe('git status'))
 
     await keyDownAndFlush(input, { key: 'Enter' })
-    expect(onSendText).toHaveBeenNthCalledWith(2, 'git status')
+    expect(onSubmitText).toHaveBeenNthCalledWith(2, 'git status')
     await vi.waitFor(() => expect(input.value).toBe(''))
   })
 
   test('does not clear text entered while an earlier draft is being submitted', async () => {
     const submission = Promise.withResolvers<boolean>()
-    const { container } = render({ onSendText: vi.fn(() => submission.promise) })
+    const { container } = render({ onSubmitText: vi.fn(() => submission.promise) })
     await expand(container)
     await showInput(container)
     const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
@@ -603,7 +607,8 @@ describe('TerminalComposer', () => {
         canUploadFiles
         onVirtualKey={vi.fn()}
         onCopyContent={vi.fn(async () => {})}
-        onSendText={vi.fn(() => submission.promise)}
+        onSendText={vi.fn(async () => true)}
+        onSubmitText={vi.fn(() => submission.promise)}
         onOpen={() => true}
         onClose={() => true}
         onModeChange={() => true}
@@ -625,23 +630,23 @@ describe('TerminalComposer', () => {
   })
 
   test('Enter submits while Shift+Enter remains available for text entry', async () => {
-    const onSendText = vi.fn(async () => true)
-    const { container } = render({ onSendText })
+    const onSubmitText = vi.fn(async () => true)
+    const { container } = render({ onSubmitText })
     await expand(container)
     await showInput(container)
     const input = container.querySelector('textarea')
     if (!input) throw new Error('expected command input')
     await changeAndFlush(input, { target: { value: 'pwd' } })
     await keyDownAndFlush(input, { key: 'Enter', shiftKey: true })
-    expect(onSendText).not.toHaveBeenCalled()
+    expect(onSubmitText).not.toHaveBeenCalled()
     await keyDownAndFlush(input, { key: 'Enter' })
-    expect(onSendText).toHaveBeenCalledWith('pwd')
+    expect(onSubmitText).toHaveBeenCalledWith('pwd')
     await vi.waitFor(() => expect(input.value).toBe(''))
   })
 
   test('does not submit the Enter event owned by a Safari IME composition', async () => {
-    const onSendText = vi.fn(async () => true)
-    const { container } = render({ onSendText })
+    const onSubmitText = vi.fn(async () => true)
+    const { container } = render({ onSubmitText })
     await expand(container)
     await showInput(container)
     const input = within(container).getByRole('textbox', { name: LABELS.inputPlaceholder })
@@ -649,7 +654,7 @@ describe('TerminalComposer', () => {
 
     await keyDownAndFlush(input, { key: 'Enter', keyCode: 229 })
 
-    expect(onSendText).not.toHaveBeenCalled()
+    expect(onSubmitText).not.toHaveBeenCalled()
   })
 
   test('keeps mobile text services from rewriting terminal input', async () => {
@@ -878,8 +883,8 @@ describe('TerminalComposer', () => {
     vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
     const resolution = Promise.withResolvers<string | null>()
     const onResolveFiles = vi.fn(() => resolution.promise)
-    const onSendText = vi.fn(async () => true)
-    const { container } = render({ onResolveFiles, onSendText })
+    const onSubmitText = vi.fn(async () => true)
+    const { container } = render({ onResolveFiles, onSubmitText })
     await expand(container)
     await showInput(container)
     const textarea = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
@@ -900,7 +905,9 @@ describe('TerminalComposer', () => {
     expect(editingEvent.defaultPrevented).toBe(true)
     expect(textarea.value).toBe('cat ')
     await keyDownAndFlush(textarea, { key: 'Enter' })
-    expect(onSendText).not.toHaveBeenCalled()
+    expect(onSubmitText).not.toHaveBeenCalled()
+    await openMoreMenu(container)
+    expect(menuItemByText(LABELS.sendOnly).hasAttribute('disabled')).toBe(true)
 
     await flushTestUpdates(async () => resolution.resolve("'/tmp/notes.txt'"))
 
@@ -918,14 +925,57 @@ describe('TerminalComposer', () => {
     expect(menu.querySelectorAll('[data-slot="separator"]')).toHaveLength(2)
   }
 
-  test('groups global and input-mode menu actions', async () => {
+  test('groups input, terminal-content, and presentation menu actions', async () => {
     const { container } = render()
     await expand(container)
     await openMoreMenu(container)
 
     const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
     if (!menu) throw new Error('expected Composer menu')
-    expectComposerMenuLayout(menu, [LABELS.copyContent, LABELS.uploadFiles, LABELS.close])
+    expectComposerMenuLayout(menu, [LABELS.sendOnly, LABELS.uploadFiles, LABELS.copyContent, LABELS.close])
+  })
+
+  test('keeps the input-mode grouping when file upload is unavailable', async () => {
+    const { container } = render({ canUploadFiles: false })
+    await expand(container)
+    await openMoreMenu(container)
+
+    const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
+    if (!menu) throw new Error('expected Composer menu')
+    expectComposerMenuLayout(menu, [LABELS.sendOnly, LABELS.copyContent, LABELS.close])
+  })
+
+  test('sends without submitting and preserves input focus across rejected and accepted delivery', async () => {
+    const user = userEvent.setup()
+    const onSendText = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    const onSubmitText = vi.fn(async () => true)
+    const { container } = render({ onSendText, onSubmitText })
+    await expand(container)
+    const input = within(container).getByRole<HTMLTextAreaElement>('textbox', { name: LABELS.inputPlaceholder })
+    await changeAndFlush(input, { target: { value: 'git status' } })
+
+    await user.click(buttonByAccessibleName(container, LABELS.more))
+    await user.click(menuItemByText(LABELS.sendOnly))
+
+    expect(onSendText).toHaveBeenNthCalledWith(1, 'git status')
+    expect(onSubmitText).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(input.value).toBe('git status'))
+    expect(document.activeElement).toBe(input)
+
+    await user.click(buttonByAccessibleName(container, LABELS.more))
+    await user.click(menuItemByText(LABELS.sendOnly))
+
+    expect(onSendText).toHaveBeenNthCalledWith(2, 'git status')
+    await vi.waitFor(() => expect(input.value).toBe(''))
+    expect(document.activeElement).toBe(input)
+  })
+
+  test('disables Send only for an empty draft', async () => {
+    const { container } = render()
+    await expand(container)
+    await openMoreMenu(container)
+
+    expect(menuItemByText(LABELS.sendOnly).hasAttribute('disabled')).toBe(true)
   })
 
   test('pointer More and copy actions preserve the focused Composer input', async () => {

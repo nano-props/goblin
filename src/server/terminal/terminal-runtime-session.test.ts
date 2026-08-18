@@ -532,9 +532,7 @@ describe('server terminal runtime sessions', () => {
 
     await vi.waitFor(() => {
       expect(
-        sentSocketMessages(socket).filter(
-          (message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
-        ),
+        sentSocketMessages(socket).filter((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
       ).toHaveLength(1)
     })
     const messages = sentSocketMessages(socket)

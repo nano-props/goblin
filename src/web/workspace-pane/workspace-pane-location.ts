@@ -196,10 +196,7 @@ export function workspacePaneLocationWorktreePath(location: WorkspacePaneLocatio
   return location.routeTarget.kind === 'git-worktree' ? location.routeTarget.worktreePath : null
 }
 
-export function workspacePaneLocationSupportsTab(
-  location: WorkspacePaneLocation,
-  type: WorkspacePaneTabType,
-): boolean {
+export function workspacePaneLocationSupportsTab(location: WorkspacePaneLocation, type: WorkspacePaneTabType): boolean {
   if (location.kind === 'workspace-root') {
     return type === 'status' || type === 'files' || type === 'terminal'
   }

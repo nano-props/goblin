@@ -29,10 +29,7 @@ import {
   useTerminalFilesystemTargetSessionDescriptor,
   useTerminalSnapshot,
 } from '#/web/terminal/components/terminal-session-store.ts'
-import type {
-  TerminalInputWriter,
-  TerminalPresentationPendingOperation,
-} from '#/web/terminal/components/types.ts'
+import type { TerminalInputWriter, TerminalPresentationPendingOperation } from '#/web/terminal/components/types.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { terminalLog } from '#/web/logger.ts'
@@ -193,6 +190,7 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
         more: t('terminal.composer-more'),
         uploadFiles: t('terminal.composer-upload-files'),
         copyContent: t('terminal.composer-copy-content'),
+        sendOnly: t('terminal.composer-send-only'),
         showKeys: t('terminal.composer-show-keys'),
         showInput: t('terminal.composer-show-input'),
         enter: t('terminal.composer-key-enter'),
@@ -437,7 +435,13 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
     async function handleComposerSend(text: string): Promise<boolean> {
       const sessionId = terminalSessionId.value
       if (!sessionId || !isController.value || !text) return false
-      return context.submitText(sessionId, text)
+      return context.sendComposerText(sessionId, text)
+    }
+
+    async function handleComposerSubmit(text: string): Promise<boolean> {
+      const sessionId = terminalSessionId.value
+      if (!sessionId || !isController.value || !text) return false
+      return context.submitComposerText(sessionId, text)
     }
 
     let captureRoot: HTMLDivElement | null = null
@@ -492,8 +496,7 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
       const projectionPending = projectionPhase === 'pending'
       const projectionFailed = projectionPhase === 'failed'
       const showPresentationFailure = !showErrorChip && !attaching && presentationRecovery === 'failed'
-      const showProjectionRecoveryFailure =
-        !showErrorChip && projectionFailed && presentationRecovery !== 'failed'
+      const showProjectionRecoveryFailure = !showErrorChip && projectionFailed && presentationRecovery !== 'failed'
       const showEmptyCta =
         currentSessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !createPending.value
       const showStatusOverlay =
@@ -589,6 +592,7 @@ export const TerminalSessionView = defineComponent<TerminalSessionViewProps>({
               onVirtualKey={(key) => context.sendVirtualKey(currentSessionId, key)}
               onCopyContent={copyContent}
               onSendText={handleComposerSend}
+              onSubmitText={handleComposerSubmit}
               onOpen={() => context.openComposer(currentSessionId)}
               onClose={() => context.closeComposer(currentSessionId)}
               onModeChange={(mode) => context.setComposerMode(currentSessionId, mode)}

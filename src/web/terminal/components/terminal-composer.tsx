@@ -56,6 +56,7 @@ export interface TerminalComposerLabels {
   ctrlC: string
   ctrlD: string
   copyContent: string
+  sendOnly: string
 }
 
 interface TerminalComposerProps {
@@ -69,6 +70,7 @@ interface TerminalComposerProps {
   onVirtualKey: (key: TerminalVirtualKey) => void
   onCopyContent: () => Promise<void>
   onSendText: (text: string) => Promise<boolean>
+  onSubmitText: (text: string) => Promise<boolean>
   onOpen: () => boolean
   onClose: () => boolean
   onModeChange: (mode: TerminalComposerMode) => boolean
@@ -153,6 +155,7 @@ export const TerminalComposer = defineComponent<TerminalComposerProps>({
     'onVirtualKey',
     'onCopyContent',
     'onSendText',
+    'onSubmitText',
     'onOpen',
     'onClose',
     'onModeChange',
@@ -251,14 +254,21 @@ export const TerminalComposer = defineComponent<TerminalComposerProps>({
       { flush: 'post' },
     )
 
-    async function submitDraft(): Promise<void> {
+    async function deliverDraft(deliverText: (text: string) => Promise<boolean>): Promise<void> {
       const submittedDraft = props.draft
       if (!submittedDraft || resolvingFiles.value) return
-      const onSendText = props.onSendText
       const onDraftReplace = props.onDraftReplace
-      if (!(await onSendText(submittedDraft))) return
+      if (!(await deliverText(submittedDraft))) return
       history.leaveBrowsing()
       onDraftReplace(submittedDraft, '')
+    }
+
+    function sendDraft(): Promise<void> {
+      return deliverDraft(props.onSendText)
+    }
+
+    function submitDraft(): Promise<void> {
+      return deliverDraft(props.onSubmitText)
     }
 
     function handleDraftKeyDown(event: KeyboardEvent): void {
@@ -520,8 +530,10 @@ export const TerminalComposer = defineComponent<TerminalComposerProps>({
               labels={props.labels}
               mode={props.mode}
               canUploadFiles={props.canUploadFiles}
+              canSendText={Boolean(props.draft) && !resolvingFiles.value}
               resolvingFiles={resolvingFiles.value}
               copyingContent={copyingContent.value}
+              onSendText={() => void sendDraft()}
               onUpload={openFilePicker}
               onVirtualKey={props.onVirtualKey}
               onCopyContent={() => void copyContent()}

@@ -57,7 +57,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     session.openComposer()
     session.setComposerMode('input')
     session.setComposerDraft('retained draft\r\nverbatim')
-    await expect(session.submitText('retained command')).resolves.toBe(true)
+    await expect(session.submitComposerText('retained command')).resolves.toBe(true)
 
     session.detach(host)
     expect(session.snapshot().composer).toEqual({
@@ -536,7 +536,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
     terminalCalls.write.mockImplementationOnce(() => pasteWrite.promise)
 
-    const submission = session.submitText('first line\nsecond line')
+    const submission = session.submitComposerText('first line\nsecond line')
     await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
 
     expect(term.paste).toHaveBeenCalledWith('first line\nsecond line')
@@ -558,6 +558,48 @@ describe('TerminalSession input, resize, and controller authority', () => {
     })
   })
 
+  test('sends composed text through xterm paste semantics without Enter', async () => {
+    const { session, term } = await startPresentedControllerGeneration()
+    term.modes.bracketedPasteMode = true
+    const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockImplementationOnce(() => pasteWrite.promise)
+
+    const delivery = session.sendComposerText('git status')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+
+    expect(term.paste).toHaveBeenCalledWith('git status')
+    expect(term.input).not.toHaveBeenCalled()
+    expect(terminalCalls.write).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalRuntimeGeneration: 1,
+      data: '\x1b[200~git status\x1b[201~',
+    })
+
+    pasteWrite.resolve({ status: 'accepted' })
+    await expect(delivery).resolves.toBe(true)
+
+    expect(term.input).not.toHaveBeenCalled()
+    expect(terminalCalls.write).toHaveBeenCalledTimes(1)
+    expect(session.snapshot().composer.historyEntries).toEqual(['git status'])
+  })
+
+  test('shares one delivery guard between Send only and Enter submission', async () => {
+    const { session, term } = await startPresentedControllerGeneration()
+    const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
+    terminalCalls.write.mockReturnValueOnce(pasteWrite.promise)
+
+    const delivery = session.sendComposerText('first command')
+    await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
+
+    await expect(session.submitComposerText('second command')).resolves.toBe(false)
+    expect(term.paste).toHaveBeenCalledTimes(1)
+
+    pasteWrite.resolve({ status: 'accepted' })
+    await expect(delivery).resolves.toBe(true)
+    expect(term.input).not.toHaveBeenCalled()
+    expect(session.snapshot().composer.historyEntries).toEqual(['first command'])
+  })
+
   test('submits safe Devin multiline text as normalized typed input followed by Enter', async () => {
     const { session, term } = await startPresentedControllerGeneration()
     session.handleOutput({
@@ -573,7 +615,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     terminalCalls.write.mockImplementationOnce(() => bodyWrite.promise)
     const originalText = 'first line\r\nsecond line\rthird line 你好'
 
-    const submission = session.submitText(originalText)
+    const submission = session.submitComposerText(originalText)
     await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
 
     expect(term.paste).not.toHaveBeenCalled()
@@ -609,7 +651,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     })
     term.modes.bracketedPasteMode = true
 
-    await expect(session.submitText('before\tafter')).resolves.toBe(true)
+    await expect(session.submitComposerText('before\tafter')).resolves.toBe(true)
 
     expect(term.paste).toHaveBeenCalledWith('before\tafter')
     expect(term.input).toHaveBeenCalledWith('\r', true)
@@ -628,10 +670,10 @@ describe('TerminalSession input, resize, and controller authority', () => {
     terminalCalls.write.mockReturnValueOnce(pasteWrite.promise)
     notify.mockClear()
 
-    const firstSubmission = session.submitText('first command')
+    const firstSubmission = session.submitComposerText('first command')
     await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
 
-    await expect(session.submitText('second command')).resolves.toBe(false)
+    await expect(session.submitComposerText('second command')).resolves.toBe(false)
     expect(term.paste).toHaveBeenCalledTimes(1)
     expect(session.snapshot().composer.historyEntries).toEqual([])
 
@@ -648,7 +690,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
       const { session, term } = await startPresentedControllerGeneration()
       terminalCalls.write.mockResolvedValueOnce({ status })
 
-      await expect(session.submitText('keep this text')).resolves.toBe(false)
+      await expect(session.submitComposerText('keep this text')).resolves.toBe(false)
 
       expect(term.paste).toHaveBeenCalledWith('keep this text')
       expect(term.input).not.toHaveBeenCalled()
@@ -661,10 +703,10 @@ describe('TerminalSession input, resize, and controller authority', () => {
     const { session } = await startPresentedControllerGeneration()
     terminalCalls.write.mockResolvedValueOnce({ status: 'rejected' })
 
-    await expect(session.submitText('retry this command')).resolves.toBe(false)
+    await expect(session.submitComposerText('retry this command')).resolves.toBe(false)
     terminalCalls.write.mockResolvedValueOnce({ status: 'accepted' })
 
-    await expect(session.submitText('retry this command')).resolves.toBe(true)
+    await expect(session.submitComposerText('retry this command')).resolves.toBe(true)
     expect(session.snapshot().composer.historyEntries).toEqual(['retry this command'])
   })
 
@@ -676,7 +718,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     terminalCalls.write.mockReturnValueOnce(pasteWrite.promise)
     notify.mockClear()
 
-    const submission = session.submitText('accepted after close')
+    const submission = session.submitComposerText('accepted after close')
     await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
     session.dispose()
     pasteWrite.resolve({ status: 'accepted' })
@@ -692,7 +734,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
     terminalCalls.write.mockReturnValueOnce(pasteWrite.promise)
 
-    const submission = session.submitText('accepted before takeover')
+    const submission = session.submitComposerText('accepted before takeover')
     await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
     session.handleIdentity({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -715,7 +757,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     const pasteWrite = Promise.withResolvers<TerminalWriteResult>()
     terminalCalls.write.mockReturnValueOnce(pasteWrite.promise)
 
-    const submission = session.submitText('accepted by the old generation')
+    const submission = session.submitComposerText('accepted by the old generation')
     await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
@@ -759,7 +801,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     const bodyWrite = Promise.withResolvers<TerminalWriteResult>()
     terminalCalls.write.mockReturnValueOnce(bodyWrite.promise)
 
-    const submission = session.submitText('typed by the old generation')
+    const submission = session.submitComposerText('typed by the old generation')
     await flushUntil(() => terminalCalls.write.mock.calls.length === 1)
     terminalCalls.attach.mockResolvedValueOnce(
       attachResult('pty_session_1_aaaaaaaaa', {
@@ -795,7 +837,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     const enterWrite = Promise.withResolvers<TerminalWriteResult>()
     terminalCalls.write.mockResolvedValueOnce({ status: 'accepted' }).mockReturnValueOnce(enterWrite.promise)
 
-    const submission = session.submitText('deliver without waiting')
+    const submission = session.submitComposerText('deliver without waiting')
     await flushUntil(() => terminalCalls.write.mock.calls.length === 2)
 
     await expect(submission).resolves.toBe(true)
@@ -815,7 +857,7 @@ describe('TerminalSession input, resize, and controller authority', () => {
     const { session, term } = await startPresentedControllerGeneration()
     terminalCalls.write.mockResolvedValueOnce({ status: 'accepted' }).mockResolvedValueOnce({ status: 'rejected' })
 
-    await expect(session.submitText('delivered once')).resolves.toBe(true)
+    await expect(session.submitComposerText('delivered once')).resolves.toBe(true)
 
     expect(term.paste).toHaveBeenCalledWith('delivered once')
     expect(term.input).toHaveBeenCalledWith('\r', true)

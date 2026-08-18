@@ -36,10 +36,7 @@ function createBranchWorkspacePaneTabModel(input: RouteModelInput) {
           workspaceRuntimeId,
           { kind: 'branch', branchName },
         )
-      : workspacePaneLocationForBranchTarget(
-          { kind: 'git-branch', workspaceId, branchName },
-          workspaceRuntimeId,
-        )
+      : workspacePaneLocationForBranchTarget({ kind: 'git-branch', workspaceId, branchName }, workspaceRuntimeId)
     : worktreePath === workspaceId
       ? workspacePaneLocationForRoot(workspaceId, workspaceRuntimeId)
       : null

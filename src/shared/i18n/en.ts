@@ -461,6 +461,7 @@ export const en = {
   'terminal.composer-more': 'More actions',
   'terminal.composer-upload-files': 'Upload',
   'terminal.composer-copy-content': 'Copy content',
+  'terminal.composer-send-only': 'Send only',
   'terminal.composer-copy-content-empty': 'There is no terminal content to copy.',
   'terminal.composer-show-keys': 'Show terminal keys',
   'terminal.composer-show-input': 'Show text input',

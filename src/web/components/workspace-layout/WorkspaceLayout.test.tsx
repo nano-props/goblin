@@ -4,10 +4,7 @@ import type { VNodeChild } from 'vue'
 import { describe, expect, test, vi } from 'vitest'
 import { useFakeTimers } from '#/test-utils/timers.ts'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
-import {
-  CompactWorkspaceLayout,
-  WorkspaceSplitLayout,
-} from '#/web/components/workspace-layout/WorkspaceLayout.tsx'
+import { CompactWorkspaceLayout, WorkspaceSplitLayout } from '#/web/components/workspace-layout/WorkspaceLayout.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 

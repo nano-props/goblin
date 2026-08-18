@@ -62,15 +62,11 @@ export function createModel(input: WorkspacePaneTabModelTestInput): WorkspacePan
   const runtimeId = workspaceRuntimeId ?? WORKSPACE_RUNTIME_ID
   const location = branchName
     ? worktreePath
-      ? workspacePaneLocationForLinkedWorktree(
-          { kind: 'git-worktree', workspaceId, worktreePath },
-          runtimeId,
-          { kind: 'branch', branchName },
-        )
-      : workspacePaneLocationForBranchTarget(
-          { kind: 'git-branch', workspaceId, branchName },
-          runtimeId,
-        )
+      ? workspacePaneLocationForLinkedWorktree({ kind: 'git-worktree', workspaceId, worktreePath }, runtimeId, {
+          kind: 'branch',
+          branchName,
+        })
+      : workspacePaneLocationForBranchTarget({ kind: 'git-branch', workspaceId, branchName }, runtimeId)
     : worktreePath === workspaceId
       ? workspacePaneLocationForRoot(workspaceId, runtimeId)
       : null

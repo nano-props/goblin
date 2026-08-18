@@ -90,9 +90,7 @@ describe('workspace pane tab target read model', () => {
         { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: sourceWorktree.path },
         'history',
       )
-    workspacesStore
-      .getState()
-      .setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
+    workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
 
     const sourceTarget = workspacePaneTabTargetForPaneTarget({
       location: workspacePaneLocationForWorktree(REPO_ID, repo.workspaceRuntimeId, sourceWorktree),

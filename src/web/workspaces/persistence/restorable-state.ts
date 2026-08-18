@@ -281,10 +281,7 @@ function workspacePaneLayoutTargetKeyForPreference(
     : null
   if (!worktreePath || !worktree) return preferenceTargetKey
   return workspacePaneTabsTargetIdentityKey(
-    workspacePaneTabsLayoutTargetForWorktree(
-      { kind: 'git-worktree', workspaceId, worktreePath },
-      worktree.isSource,
-    ),
+    workspacePaneTabsLayoutTargetForWorktree({ kind: 'git-worktree', workspaceId, worktreePath }, worktree.isSource),
   )
 }
 

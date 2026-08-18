@@ -112,8 +112,7 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
   const tabEntry =
     coordinatorTarget.surfaceTabEntries.find(
       (candidate) => workspacePaneTabEntryIdentity(candidate) === options.identity,
-    ) ??
-    null
+    ) ?? null
   if (
     (!tab && !tabEntry) ||
     workspacePaneTabTargetBlocksInteraction(coordinatorTarget) ||

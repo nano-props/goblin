@@ -49,10 +49,7 @@ describe('workspacePaneTabsWithSurfaceOrder', () => {
     const terminal = terminalEntry('term-111111111111111111111')
 
     expect(
-      workspacePaneTabsWithSurfaceOrder(
-        [status, changes, files, history, terminal],
-        [files, status, terminal],
-      ),
+      workspacePaneTabsWithSurfaceOrder([status, changes, files, history, terminal], [files, status, terminal]),
     ).toEqual([files, changes, status, history, terminal])
   })
 })

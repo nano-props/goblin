@@ -239,7 +239,11 @@ export async function renderTerminalSession(
       writeInput(terminalSessionId, data)
       return true
     },
-    submitText: async (terminalSessionId, text) => {
+    sendComposerText: async (terminalSessionId, text) => {
+      writeInput(terminalSessionId, text)
+      return true
+    },
+    submitComposerText: async (terminalSessionId, text) => {
       writeInput(terminalSessionId, text)
       return true
     },

@@ -135,7 +135,8 @@ vi.mock('#/web/terminal/components/TerminalSessionProvider.tsx', async () => {
     clearSearch: vi.fn(),
     captureInputWriter: vi.fn(() => null),
     sendVirtualKey: vi.fn(),
-    submitText: vi.fn(async () => false),
+    sendComposerText: vi.fn(async () => false),
+    submitComposerText: vi.fn(async () => false),
     takeover: vi.fn(async () => false),
     retryPresentation: vi.fn(() => false),
   }

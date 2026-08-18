@@ -1,6 +1,6 @@
 import { defineComponent, ref } from 'vue'
 import type { FunctionalComponent } from 'vue'
-import { Copy, Delete, Ellipsis, Upload, X } from '@lucide/vue'
+import { Copy, Delete, Ellipsis, SendHorizontal, Upload, X } from '@lucide/vue'
 import { PopoverTrigger } from 'reka-ui'
 import {
   TERMINAL_COMPOSER_COPY_ACTION,
@@ -19,6 +19,7 @@ type TerminalComposerMenuLabels = Record<TerminalComposerOptionalActionLabelKey,
   more: string
   uploadFiles: string
   copyContent: string
+  sendOnly: string
   close: string
 }
 
@@ -26,8 +27,10 @@ interface TerminalComposerMenuProps {
   labels: TerminalComposerMenuLabels
   mode: 'input' | 'keys'
   canUploadFiles: boolean
+  canSendText: boolean
   resolvingFiles: boolean
   copyingContent: boolean
+  onSendText: () => void
   onUpload: () => void
   onVirtualKey: (key: TerminalComposerOptionalVirtualKey) => void
   onCopyContent: () => void
@@ -51,8 +54,10 @@ export const TerminalComposerMenu = defineComponent<TerminalComposerMenuProps>({
     'labels',
     'mode',
     'canUploadFiles',
+    'canSendText',
     'resolvingFiles',
     'copyingContent',
+    'onSendText',
     'onUpload',
     'onVirtualKey',
     'onCopyContent',
@@ -119,21 +124,31 @@ export const TerminalComposerMenu = defineComponent<TerminalComposerMenuProps>({
             viewportClass="p-1"
             scrollbarMode="compact"
           >
+            {props.mode === 'input' ? (
+              <>
+                <ComposerMenuItem disabled={!props.canSendText} onClick={props.onSendText} closeMenu={closeMenu}>
+                  <SendHorizontal class="size-4" />
+                  {props.labels.sendOnly}
+                </ComposerMenuItem>
+                {props.canUploadFiles ? (
+                  <ComposerMenuItem disabled={props.resolvingFiles} onClick={props.onUpload} closeMenu={closeMenu}>
+                    <Upload class="size-4" />
+                    {props.labels.uploadFiles}
+                  </ComposerMenuItem>
+                ) : null}
+                <Separator class="-mx-1 my-1 w-auto" />
+              </>
+            ) : null}
             <ComposerMenuItem disabled={props.copyingContent} onClick={props.onCopyContent} closeMenu={closeMenu}>
               <span aria-hidden="true" class="inline-flex w-6 shrink-0 items-center justify-center">
                 <Copy class="size-4" />
               </span>
               {props.labels[TERMINAL_COMPOSER_COPY_ACTION.labelKey]}
             </ComposerMenuItem>
-            {props.mode === 'keys' || props.canUploadFiles ? <Separator class="-mx-1 my-1 w-auto" /> : null}
-            {props.mode === 'input' && props.canUploadFiles ? (
-              <ComposerMenuItem disabled={props.resolvingFiles} onClick={props.onUpload} closeMenu={closeMenu}>
-                <Upload class="size-4" />
-                {props.labels.uploadFiles}
-              </ComposerMenuItem>
-            ) : null}
-            {props.mode === 'keys'
-              ? TERMINAL_COMPOSER_OPTIONAL_ACTIONS.map((action) => (
+            {props.mode === 'keys' ? (
+              <>
+                <Separator class="-mx-1 my-1 w-auto" />
+                {TERMINAL_COMPOSER_OPTIONAL_ACTIONS.map((action) => (
                   <ComposerMenuItem
                     key={action.key}
                     onClick={() => props.onVirtualKey(action.key)}
@@ -148,8 +163,9 @@ export const TerminalComposerMenu = defineComponent<TerminalComposerMenuProps>({
                     )}
                     {props.labels[action.labelKey]}
                   </ComposerMenuItem>
-                ))
-              : null}
+                ))}
+              </>
+            ) : null}
             <Separator class="-mx-1 my-1 w-auto" />
             <ComposerMenuItem onClick={collapseComposer} closeMenu={closeMenu}>
               <X class="size-4" />

@@ -392,31 +392,54 @@ describe('TerminalSessionView composer', () => {
   })
 
   test('submits composer text through the selected terminal paste boundary followed by Enter', async () => {
-    const submitText = vi.fn(async () => true)
-    const rendered = await renderTerminalSession({ submitText })
+    const submitComposerText = vi.fn(async () => true)
+    const rendered = await renderTerminalSession({ submitComposerText })
 
     try {
       const textarea = await openComposerInput(rendered.container)
       await fireEvent.update(textarea, 'git status')
       await fireEvent.keyDown(textarea, { key: 'Enter' })
 
-      expect(submitText).toHaveBeenCalledWith('term-111111111111111111111', 'git status')
+      expect(submitComposerText).toHaveBeenCalledWith('term-111111111111111111111', 'git status')
       await vi.waitFor(() => expect(textarea.value).toBe(''))
     } finally {
       await rendered.cleanup()
     }
   })
 
+  test('sends composer text through the selected terminal without submitting', async () => {
+    const sendComposerText = vi.fn(async () => true)
+    const submitComposerText = vi.fn(async () => true)
+    const rendered = await renderTerminalSession({ sendComposerText, submitComposerText })
+
+    try {
+      const user = userEvent.setup()
+      const textarea = await openComposerInput(rendered.container)
+      await fireEvent.update(textarea, 'git status')
+      await user.click(buttonByLabel(rendered.container, 'terminal.composer-more'))
+      const menu = document.querySelector<HTMLElement>('[data-slot="popover-content"]')
+      if (!menu) throw new Error('expected open Composer menu')
+      await user.click(within(menu).getByRole('button', { name: 'terminal.composer-send-only' }))
+
+      expect(sendComposerText).toHaveBeenCalledWith('term-111111111111111111111', 'git status')
+      expect(submitComposerText).not.toHaveBeenCalled()
+      await vi.waitFor(() => expect(textarea.value).toBe(''))
+      expect(document.activeElement).toBe(textarea)
+    } finally {
+      await rendered.cleanup()
+    }
+  })
+
   test('keeps composer text when the captured session no longer accepts input', async () => {
-    const submitText = vi.fn(async () => false)
-    const rendered = await renderTerminalSession({ submitText })
+    const submitComposerText = vi.fn(async () => false)
+    const rendered = await renderTerminalSession({ submitComposerText })
 
     try {
       const textarea = await openComposerInput(rendered.container)
       await fireEvent.update(textarea, 'keep this command')
       await fireEvent.keyDown(textarea, { key: 'Enter' })
 
-      expect(submitText).toHaveBeenCalledWith('term-111111111111111111111', 'keep this command')
+      expect(submitComposerText).toHaveBeenCalledWith('term-111111111111111111111', 'keep this command')
       await vi.waitFor(() => expect(textarea.value).toBe('keep this command'))
     } finally {
       await rendered.cleanup()

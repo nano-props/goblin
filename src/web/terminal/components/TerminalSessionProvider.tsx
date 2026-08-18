@@ -82,7 +82,8 @@ export const TerminalSessionProvider = defineComponent({
       setComposerMode: projection.setComposerMode,
       setComposerDraft: projection.setComposerDraft,
       replaceComposerDraft: projection.replaceComposerDraft,
-      submitText: projection.submitText,
+      sendComposerText: projection.sendComposerText,
+      submitComposerText: projection.submitComposerText,
       takeover: projection.takeover,
       retryPresentation: projection.retryPresentation,
     }

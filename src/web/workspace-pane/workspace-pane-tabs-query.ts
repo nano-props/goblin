@@ -17,9 +17,7 @@ import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tab
 
 export type WorkspacePaneTabsQueryData = WorkspacePaneTabsSnapshot
 export type WorkspacePaneTabsProjectionPhase = 'pending' | 'ready' | 'failed'
-export type WorkspacePaneTabsRecoveryRequirement =
-  | { kind: 'fresh' }
-  | { kind: 'minimum-revision'; revision: number }
+export type WorkspacePaneTabsRecoveryRequirement = { kind: 'fresh' } | { kind: 'minimum-revision'; revision: number }
 
 export interface WorkspacePaneTabsTargetProjection {
   phase: WorkspacePaneTabsProjectionPhase

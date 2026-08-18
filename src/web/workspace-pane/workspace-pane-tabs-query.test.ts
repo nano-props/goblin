@@ -90,9 +90,7 @@ describe('workspace pane tabs query', () => {
     writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, current, queryClient)
     vi.mocked(workspacePaneTabsClient.list).mockRejectedValueOnce(new Error('tabs unavailable'))
 
-    await expect(
-      refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient }),
-    ).rejects.toThrow(
+    await expect(refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })).rejects.toThrow(
       'tabs unavailable',
     )
 
@@ -120,9 +118,9 @@ describe('workspace pane tabs query', () => {
     const queryClient = new QueryClient()
     vi.mocked(workspacePaneTabsClient.list).mockRejectedValueOnce(new Error('tabs unavailable'))
 
-    await expect(
-      refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient }),
-    ).rejects.toThrow('tabs unavailable')
+    await expect(refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })).rejects.toThrow(
+      'tabs unavailable',
+    )
 
     const target = {
       kind: 'git-branch' as const,
@@ -161,9 +159,9 @@ describe('workspace pane tabs query', () => {
     )
     vi.mocked(workspacePaneTabsClient.list).mockRejectedValueOnce(new Error('tabs unavailable'))
 
-    await expect(
-      refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient }),
-    ).rejects.toThrow('tabs unavailable')
+    await expect(refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })).rejects.toThrow(
+      'tabs unavailable',
+    )
 
     expect(
       readWorkspacePaneTabsProjectionForTarget(
@@ -230,15 +228,13 @@ describe('workspace pane tabs query', () => {
     writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(8, []), queryClient)
     vi.mocked(workspacePaneTabsClient.list).mockRejectedValueOnce(new Error('tabs unavailable'))
 
-    await expect(
-      refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient }),
-    ).rejects.toThrow(
+    await expect(refreshWorkspacePaneTabsQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, { queryClient })).rejects.toThrow(
       'tabs unavailable',
     )
 
-    expect(
-      writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(7, []), queryClient),
-    ).toBe(false)
+    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, WORKSPACE_RUNTIME_ID, snapshot(7, []), queryClient)).toBe(
+      false,
+    )
     expect(queryClient.getQueryState(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))?.status).toBe('error')
   })
 
@@ -345,9 +341,8 @@ describe('workspace pane tabs query', () => {
     await fresh
 
     expect(
-      queryClient.getQueryData<WorkspacePaneTabsQueryData>(
-        workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID),
-      )?.revision,
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))
+        ?.revision,
     ).toBe(5)
   })
 
@@ -402,9 +397,8 @@ describe('workspace pane tabs query', () => {
     await required
 
     expect(
-      queryClient.getQueryData<WorkspacePaneTabsQueryData>(
-        workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID),
-      )?.revision,
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, WORKSPACE_RUNTIME_ID))
+        ?.revision,
     ).toBe(5)
   })
 

@@ -63,7 +63,10 @@ describe('WorkspacePaneTabsRecovery', () => {
 
   test('reruns after an in-flight refresh when a newer revision is announced', async () => {
     const firstRefresh = Promise.withResolvers<void>()
-    const refresh = vi.fn().mockImplementationOnce(async () => await firstRefresh.promise).mockResolvedValue(undefined)
+    const refresh = vi
+      .fn()
+      .mockImplementationOnce(async () => await firstRefresh.promise)
+      .mockResolvedValue(undefined)
     const recovery = new WorkspacePaneTabsRecovery({
       refresh,
       currentRevision: () => 4,

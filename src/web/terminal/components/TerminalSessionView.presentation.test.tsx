@@ -849,26 +849,26 @@ describe('TerminalSessionView presentation and focus', () => {
   ] as const)(
     'shows the concrete %s operation during presentation recovery',
     async (presentationPendingOperation, label) => {
-    const view = await renderTerminalSession(
-      {},
-      {
-        snapshot: {
-          phase: 'open',
-          message: null,
-          processName: 'zsh',
-          composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
-          attachment: { role: 'controller' },
-          presentationRecovery: 'pending',
-          presentationPendingOperation,
+      const view = await renderTerminalSession(
+        {},
+        {
+          snapshot: {
+            phase: 'open',
+            message: null,
+            processName: 'zsh',
+            composer: EMPTY_TERMINAL_COMPOSER_STATE_FOR_TEST,
+            attachment: { role: 'controller' },
+            presentationRecovery: 'pending',
+            presentationPendingOperation,
+          },
         },
-      },
-    )
+      )
 
-    try {
-      expect(view.container.querySelector('[role="status"]')?.textContent).toContain(label)
-    } finally {
-      await view.cleanup()
-    }
+      try {
+        expect(view.container.querySelector('[role="status"]')?.textContent).toContain(label)
+      } finally {
+        await view.cleanup()
+      }
     },
   )
 

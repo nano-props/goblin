@@ -34,7 +34,7 @@ import {
   TerminalRenderQueue,
   type RenderedOutputCheckpoint,
 } from '#/web/terminal/components/terminal-render-queue.ts'
-import { planTerminalComposerSubmit } from '#/web/terminal/components/terminal-composer-submit-plan.ts'
+import { planTerminalComposerTextInput } from '#/web/terminal/components/terminal-composer-text-input.ts'
 import { terminalLog } from '#/web/logger.ts'
 import {
   createTerminalWriteFailureReporter,
@@ -116,7 +116,7 @@ export class TerminalSession {
   private pendingOutput: PendingOutputWrite[] = []
   private pendingInputWrite: PendingInputWrite | null = null
   private inputFlushScheduled = false
-  private submitTextPending = false
+  private composerTextDeliveryPending = false
   private renderedOutputCheckpoint: RenderedOutputCheckpoint | null = null
   private disposed = false
 
@@ -266,9 +266,7 @@ export class TerminalSession {
       ...snapshot,
       ...(this.takeoverOperation ? { takeoverPending: true } : {}),
       ...(this.presentationRecovery ? { presentationRecovery: this.presentationRecovery } : {}),
-      ...(this.presentationPendingOperation
-        ? { presentationPendingOperation: this.presentationPendingOperation }
-        : {}),
+      ...(this.presentationPendingOperation ? { presentationPendingOperation: this.presentationPendingOperation } : {}),
     }
   }
 
@@ -292,8 +290,27 @@ export class TerminalSession {
     this.view.sendVirtualKey(key)
   }
 
-  async submitText(text: string): Promise<boolean> {
-    if (this.submitTextPending || !text) return false
+  sendComposerText(text: string): Promise<boolean> {
+    return this.deliverComposerText(text, () => {})
+  }
+
+  submitComposerText(text: string): Promise<boolean> {
+    return this.deliverComposerText(text, (deliveredBinding) => {
+      // Enter may follow only while the same runtime generation remains
+      // writable: a replacement PTY must never receive the second half of an
+      // older composed submission.
+      const currentBinding = this.currentWritableInputBinding()
+      if (currentBinding && sameTerminalRuntimeBinding(currentBinding, deliveredBinding)) {
+        this.view.sendVirtualKey('enter')
+      }
+    })
+  }
+
+  private async deliverComposerText(
+    text: string,
+    onDelivered: (deliveredBinding: TerminalRuntimeBinding) => void,
+  ): Promise<boolean> {
+    if (this.composerTextDeliveryPending || !text) return false
     const submittedBinding = this.currentWritableInputBinding()
     if (!submittedBinding) return false
     // Foreground processName is an output-driven presentation projection, not
@@ -302,32 +319,26 @@ export class TerminalSession {
     // returning shell prompt). Accept that locally recoverable UI window; do
     // not introduce a second foreground authority or coordination protocol.
     // Runtime-generation replacement remains an enforced boundary below.
-    const submitPlan = planTerminalComposerSubmit({ text, processName: this.runtime.currentProcessName() })
-    this.submitTextPending = true
+    const inputPlan = planTerminalComposerTextInput({ text, processName: this.runtime.currentProcessName() })
+    this.composerTextDeliveryPending = true
     try {
       const bodyAcceptedByView =
-        submitPlan.strategy === 'typed-then-enter'
-          ? this.view.sendTextAsInput(submitPlan.payload)
-          : this.view.pasteText(submitPlan.payload)
+        inputPlan.method === 'typed'
+          ? this.view.sendTextAsInput(inputPlan.payload)
+          : this.view.pasteText(inputPlan.payload)
       if (!bodyAcceptedByView) return false
-      // A composed submission represents two ordered user actions. Wait until
-      // the body input has reached the PTY before sending Enter so input batching
-      // cannot collapse them back into one delivery step.
+      // The body must reach the PTY before this Composer action is accepted.
+      // For submission, this also keeps the following Enter in a separate
+      // ordered delivery step instead of letting input batching merge them.
       if (!(await this.flushInput())) return false
-      // Once the body input is accepted, the Composer draft has been delivered and
-      // must not be offered for automatic resubmission. History follows that
-      // accepted boundary even if controller ownership changes before Enter.
+      // Once the body input is accepted, the Composer draft has been delivered
+      // and must not be offered for automatic redelivery. History follows that
+      // accepted boundary even if controller ownership changes afterwards.
       if (!this.disposed && this.runtime.recordComposerHistory(text)) this.notify('snapshot')
-      // Enter may follow only while the same runtime generation remains
-      // writable: a replacement PTY must never receive the second half of an
-      // older composed submission.
-      const currentBinding = this.currentWritableInputBinding()
-      if (currentBinding && sameTerminalRuntimeBinding(currentBinding, submittedBinding)) {
-        this.view.sendVirtualKey('enter')
-      }
+      onDelivered(submittedBinding)
       return true
     } finally {
-      this.submitTextPending = false
+      this.composerTextDeliveryPending = false
     }
   }
 
@@ -1052,11 +1063,7 @@ export class TerminalSession {
     recovery: TerminalPresentationRecovery | undefined,
     pendingOperation: TerminalPresentationPendingOperation | undefined,
   ): boolean {
-    if (
-      this.presentationRecovery === recovery &&
-      this.presentationPendingOperation === pendingOperation
-    )
-      return false
+    if (this.presentationRecovery === recovery && this.presentationPendingOperation === pendingOperation) return false
     this.presentationRecovery = recovery
     this.presentationPendingOperation = pendingOperation
     return true
