@@ -1,58 +1,53 @@
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import { terminalExecutionCoordinates, terminalExecutionPath } from '#/shared/terminal-types.ts'
+import { workspacePaneFilesystemExecutionTargetKey } from '#/shared/workspace-runtime.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { isWorkspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
+import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { appNavigationIsCurrent, beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
 import {
   tryRunWorkspacePaneAction,
-  workspacePaneActionTargetFromFilesystemTarget,
+  workspacePaneActionTargetFromLocation,
   type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
-  gitWorktreePaneTargetLease,
-  workspaceRootPaneTargetLease,
-  type FilesystemWorkspacePaneTargetLease,
-} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+  workspacePaneLocationTerminalBase,
+  type FilesystemWorkspacePaneLocation,
+} from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export function commitWorkspacePaneTerminalDestination(input: {
+  location: FilesystemWorkspacePaneLocation
   base: TerminalSessionBase
   terminalSessionId: string
   navigation: AppNavigationActions
 }): Promise<WorkspacePaneActionOutcome> {
-  const coordinates = terminalExecutionCoordinates(input.base.target)
-  const paneTarget = workspacePaneTabsTargetFromRuntime(input.base.target)
-  if (!paneTarget) return Promise.resolve({ kind: 'target-missing' })
-  if (input.base.target.kind === 'workspace-root') {
-    if (input.base.presentation.kind !== 'workspace-root') return Promise.resolve({ kind: 'target-missing' })
-    const target = workspaceRootPaneTargetLease(coordinates.workspaceId, coordinates.workspaceRuntimeId)
-    return commitFilesystemTerminalDestination({
-      navigation: input.navigation,
-      target,
-      paneTarget,
-      actionTarget: workspacePaneActionTargetFromFilesystemTarget(input.base.target),
-      terminalSessionId: input.terminalSessionId,
-    })
+  const expectedBase = workspacePaneLocationTerminalBase(input.location)
+  if (!expectedBase || !terminalBasesEqual(expectedBase, input.base)) {
+    return Promise.resolve({ kind: 'target-missing' })
   }
-  if (input.base.presentation.kind !== 'git-worktree') return Promise.resolve({ kind: 'target-missing' })
-  const worktreePath = terminalExecutionPath(input.base.target)
   return commitFilesystemTerminalDestination({
     navigation: input.navigation,
-    target: gitWorktreePaneTargetLease(coordinates.workspaceId, coordinates.workspaceRuntimeId, worktreePath),
-    paneTarget,
-    actionTarget: workspacePaneActionTargetFromFilesystemTarget(input.base.target),
+    location: input.location,
+    paneTarget: input.location.paneTarget,
+    actionTarget: workspacePaneActionTargetFromLocation(input.location),
     terminalSessionId: input.terminalSessionId,
   })
 }
 
+function terminalBasesEqual(left: TerminalSessionBase, right: TerminalSessionBase): boolean {
+  return (
+    left.presentation.kind === right.presentation.kind &&
+    workspacePaneFilesystemExecutionTargetKey(left.target) === workspacePaneFilesystemExecutionTargetKey(right.target)
+  )
+}
+
 function terminalPaneProjectionOutcome(
-  target: NonNullable<ReturnType<typeof workspacePaneTabsTargetFromRuntime>>,
+  paneTarget: FilesystemWorkspacePaneTabsTarget,
   workspaceRuntimeId: string,
   terminalSessionId: string,
 ): { kind: 'blocked' } | { kind: 'target-missing' } | null {
-  const projection = readWorkspacePaneTabsProjectionForTarget({ ...target, workspaceRuntimeId })
+  const projection = readWorkspacePaneTabsProjectionForTarget({ ...paneTarget, workspaceRuntimeId })
   if (projection.phase !== 'ready') return { kind: 'blocked' }
   return projection.tabs.some(
     (tab) => isWorkspacePaneRuntimeTabEntry(tab) && tab.runtimeSessionId === terminalSessionId,
@@ -63,21 +58,21 @@ function terminalPaneProjectionOutcome(
 
 async function commitFilesystemTerminalDestination(input: {
   navigation: AppNavigationActions
-  target: FilesystemWorkspacePaneTargetLease
-  paneTarget: NonNullable<ReturnType<typeof workspacePaneTabsTargetFromRuntime>>
+  location: FilesystemWorkspacePaneLocation
+  paneTarget: FilesystemWorkspacePaneTabsTarget
   actionTarget: WorkspacePaneActionTarget
   terminalSessionId: string
 }): Promise<WorkspacePaneActionOutcome> {
   return await commitQueuedTerminalDestination(input.actionTarget, async () => {
     const projectionOutcome = terminalPaneProjectionOutcome(
       input.paneTarget,
-      input.target.workspaceRuntimeId,
+      input.location.workspaceRuntimeId,
       input.terminalSessionId,
     )
     if (projectionOutcome) return projectionOutcome
     const navigationGeneration = beginAppNavigation()
     const committed = await input.navigation.commitFilesystemWorkspacePaneRoute(
-      input.target,
+      input.location,
       {
         kind: 'terminal',
         terminalSessionId: input.terminalSessionId,

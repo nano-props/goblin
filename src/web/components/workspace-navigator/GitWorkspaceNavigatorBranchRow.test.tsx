@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import { createRepoBranch, createGitRepoPresentationForTest } from '#/web/test-utils/repo-store.ts'
+import {
+  createRepoBranch,
+  createGitRepoPresentationForTest,
+  createRepoWorktreeSnapshotForTest,
+} from '#/web/test-utils/repo-store.ts'
 import { shallowRef } from 'vue'
 import type { ComponentProps } from 'vue-component-type-helpers'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -9,23 +13,28 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useIsCompactUi: () => ({ value: false }),
 }))
 
 vi.mock('#/web/terminal/components/terminal-session-store.ts', () => ({
-  useTerminalFilesystemTargetOutputActive: () => ({
-    get value() {
-      return terminalStoreMocks.outputActive
-    },
-  }),
+  useTerminalFilesystemTargetOutputActive: (targetKey: { readonly value: string | null }) => {
+    terminalStoreMocks.targetKey = targetKey
+    return {
+      get value() {
+        return terminalStoreMocks.outputActive
+      },
+    }
+  },
   useTerminalFilesystemTargetBellCount: () => ({ value: 0 }),
 }))
 
 const branchRowPropsSpy = vi.fn()
 const terminalStoreMocks = vi.hoisted(() => ({
   outputActive: false,
+  targetKey: null as { readonly value: string | null } | null,
 }))
 
 vi.mock('#/web/components/workspace-navigator/BranchRow.tsx', () => ({
@@ -38,6 +47,7 @@ vi.mock('#/web/components/workspace-navigator/BranchRow.tsx', () => ({
 beforeEach(() => {
   branchRowPropsSpy.mockClear()
   terminalStoreMocks.outputActive = false
+  terminalStoreMocks.targetKey = null
 })
 
 describe('GitWorkspaceNavigatorBranchRow', () => {
@@ -66,6 +76,23 @@ describe('GitWorkspaceNavigatorBranchRow', () => {
     const repo = branchListRowRepo()
     renderInJsdom(<GitWorkspaceNavigatorBranchRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ terminalOutputActive: true }))
+  })
+
+  test('subscribes a source row through the workspace-root terminal owner', () => {
+    const repo = branchListRowRepo()
+    repo.snapshot = {
+      ...repo.snapshot,
+      worktrees: [
+        createRepoWorktreeSnapshotForTest('main', '/private/tmp/repo-real', {
+          isSource: true,
+          isPrimary: true,
+        }),
+      ],
+    }
+
+    renderInJsdom(<GitWorkspaceNavigatorBranchRow {...baseProps(repo, 'main')} />)
+
+    expect(terminalStoreMocks.targetKey?.value).toBe(formatTerminalFilesystemTargetKeyForPath(repo.id, repo.id))
   })
 })
 

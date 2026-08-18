@@ -2,6 +2,7 @@
 import {
   workspacePaneLocationForBranchTarget,
   workspacePaneLocationForLinkedWorktree,
+  workspacePaneLocationForRoot,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
 import {
   createRepoWorktreeSnapshotForTest,
@@ -48,6 +49,7 @@ import type { WorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import type { WorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.ts'
+import { acceptWorkspaceProbeState } from '#/web/stores/workspaces/workspace-guards.ts'
 import {
   gitWorktreePaneFilesystemTarget,
   workspacePaneFilesystemRootPath,
@@ -85,7 +87,6 @@ let navigation!: ObservedAppNavigationActionsForTest
 const activateWorkspaceSpy = vi.fn()
 const closeRepoSpy = vi.fn()
 const showRepoBranchWorkspacePaneTabSpy = vi.fn()
-const showWorkspaceRootPaneTabSpy = vi.fn()
 const commitFilesystemWorkspacePaneRouteSpy = vi.fn()
 const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
@@ -99,7 +100,6 @@ beforeEach(() => {
   activateWorkspaceSpy.mockClear()
   closeRepoSpy.mockClear()
   showRepoBranchWorkspacePaneTabSpy.mockClear()
-  showWorkspaceRootPaneTabSpy.mockClear()
   commitFilesystemWorkspacePaneRouteSpy.mockClear()
   appDataClientMocks.clearRecentWorkspaceHistory.mockReset()
   appDataClientMocks.clearRecentWorkspaceHistory.mockResolvedValue(undefined)
@@ -136,12 +136,8 @@ beforeEach(() => {
       state.setWorkspacePaneTab(repoId, branch, tab)
       return true
     },
-    showWorkspaceRootPaneTab: (workspaceId, presentation) => {
-      showWorkspaceRootPaneTabSpy(workspaceId, presentation)
-      return true
-    },
-    commitFilesystemWorkspacePaneRoute: async (target, route, options) => {
-      commitFilesystemWorkspacePaneRouteSpy(target, route)
+    commitFilesystemWorkspacePaneRoute: async (location, route, options) => {
+      commitFilesystemWorkspacePaneRouteSpy(location, route)
       options?.onCommit?.()
       return true
     },
@@ -171,6 +167,20 @@ beforeEach(() => {
     }),
   })
 })
+
+function readyFilesystemWorkspace(workspaceId: WorkspaceId, workspaceRuntimeId: string) {
+  const workspace = emptyWorkspace(workspaceId, workspaceRuntimeId)
+  acceptWorkspaceProbeState(workspace, {
+    status: 'ready',
+    capabilities: {
+      files: { read: true, write: true },
+      terminal: { available: true },
+      git: { status: 'unavailable' },
+    },
+    diagnostics: [],
+  })
+  return workspace
+}
 
 afterEach(() => {
   intentListeners.clear()
@@ -220,7 +230,7 @@ describe('useClientEffectIntentRouter', () => {
     })
     expect(commitFilesystemWorkspacePaneRouteSpy).not.toHaveBeenCalled()
 
-    const workspace = emptyWorkspace(workspaceId, workspaceRuntimeId)
+    const workspace = readyFilesystemWorkspace(workspaceId, workspaceRuntimeId)
     workspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
     setWorkspacePaneTabsForTargetQueryData({
       kind: 'workspace-root',
@@ -234,10 +244,7 @@ describe('useClientEffectIntentRouter', () => {
 
     await waitFor(() => {
       expect(commitFilesystemWorkspacePaneRouteSpy).toHaveBeenCalledWith(
-        {
-          routeTarget: { kind: 'workspace-root', workspaceId },
-          workspaceRuntimeId,
-        },
+        workspacePaneLocationForRoot(workspaceId, workspaceRuntimeId),
         { kind: 'terminal', terminalSessionId },
       )
     })
@@ -378,7 +385,7 @@ describe('useClientEffectIntentRouter', () => {
 
   test('terminal bell clicks restore a plain Workspace root terminal', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///workspace')
-    const workspace = emptyWorkspace(workspaceId, 'workspace-runtime-test')
+    const workspace = readyFilesystemWorkspace(workspaceId, 'workspace-runtime-test')
     workspacesStore.setState({ workspaces: { [workspaceId]: workspace }, workspaceOrder: [workspaceId] })
     const terminalSessionId = 'term-111111111111111111111'
     setWorkspacePaneTabsForTargetQueryData({
@@ -403,13 +410,9 @@ describe('useClientEffectIntentRouter', () => {
     })
 
     expect(commitFilesystemWorkspacePaneRouteSpy).toHaveBeenCalledWith(
-      {
-        routeTarget: { kind: 'workspace-root', workspaceId },
-        workspaceRuntimeId: workspace.workspaceRuntimeId,
-      },
+      workspacePaneLocationForRoot(workspaceId, workspace.workspaceRuntimeId),
       { kind: 'terminal', terminalSessionId },
     )
-    expect(showWorkspaceRootPaneTabSpy).not.toHaveBeenCalled()
   })
 
   test('terminal bell clicks combine branch and terminal view navigation in a single route-driven action', async () => {

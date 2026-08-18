@@ -179,12 +179,12 @@ export function observedWorkspacePaneRouteCommitForTest(
 }
 
 export function observedFilesystemWorkspacePaneRouteCommitForTest(): AppNavigationActions['commitFilesystemWorkspacePaneRoute'] {
-  return vi.fn(async (target, route, commitOptions) => {
+  return vi.fn(async (location, route, commitOptions) => {
     const observation = {
-      workspaceId: target.routeTarget.workspaceId,
-      workspaceRuntimeId: target.workspaceRuntimeId,
+      workspaceId: location.routeTarget.workspaceId,
+      workspaceRuntimeId: location.workspaceRuntimeId,
       branchName: '',
-      worktreePath: target.routeTarget.kind === 'git-worktree' ? target.routeTarget.worktreePath : null,
+      worktreePath: location.routeTarget.kind === 'git-worktree' ? location.routeTarget.worktreePath : null,
     }
     const currentRoute = observedWorkspacePaneRoutes.get(workspacePaneObservationKey(observation))
     const precondition = commitOptions?.routePrecondition
@@ -199,7 +199,7 @@ export function observedFilesystemWorkspacePaneRouteCommitForTest(): AppNavigati
     workspacesStore
       .getState()
       .setWorkspacePaneTabForTarget(
-        target.routeTarget,
+        location.routeTarget,
         route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null,
       )
     observeWorkspacePaneRouteForTest({ ...observation, route })

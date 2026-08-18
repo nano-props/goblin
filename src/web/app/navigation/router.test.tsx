@@ -75,7 +75,7 @@ import {
   appNavigationIsCurrent,
   resetAppNavigationForTest,
 } from '#/web/app/navigation/lifecycle.ts'
-import { resetWorkspacesStore } from '#/web/test-utils/repo-store.ts'
+import { resetWorkspacesStore, setWorkspaceProbeForTest } from '#/web/test-utils/repo-store.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
@@ -402,7 +402,7 @@ describe('workspace route capability admission', () => {
     await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('branch'))
   })
 
-  test('keeps an explicitly selected workspace surface when Git capability becomes available', async () => {
+  test('redirects a Git workspace root route without mounting the rejected surface', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/git-router-workspace')
     seedWorkspaceCapability(workspaceId, 'available')
     renderRouter()
@@ -411,27 +411,56 @@ describe('workspace route capability admission', () => {
 
     navigateBrowser(`/workspace/${workspaceSlugFromId(workspaceId)}/root`)
 
-    await waitFor(() => expect(window.location.pathname).toBe(`/workspace/${workspaceSlugFromId(workspaceId)}/root`))
+    await waitFor(() =>
+      expect(window.location.pathname).toBe(`/workspace/${workspaceSlugFromId(workspaceId)}/dashboard`),
+    )
+    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('dashboard'))
+    expect(appMocks.render).not.toHaveBeenCalledWith('workspace-root')
+    expect(requireAppHistoryPresentation(appRouter.options.history).action).toEqual({ type: 'REPLACE' })
+  })
+
+  test('keeps a probing root deep link until Git capability settles, then replaces it with Dashboard', async () => {
+    const workspaceId = workspaceIdForTest('goblin+file:///tmp/probing-router-workspace')
+    seedWorkspaceCapability(workspaceId, 'probing')
+    const rootPath = `/workspace/${workspaceSlugFromId(workspaceId)}/root`
+    navigateBrowser(rootPath)
+
+    renderRouter()
+
+    await waitFor(() => expect(window.location.pathname).toBe(rootPath))
     await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('workspace-root'))
-    expect(appMocks.render).not.toHaveBeenCalledWith('dashboard')
+    const rootRenderCount = appMocks.render.mock.calls.filter(([kind]) => kind === 'workspace-root').length
+
+    setWorkspaceProbeForTest(workspaceId, workspaceProbe('available'))
+
+    await waitFor(() =>
+      expect(window.location.pathname).toBe(`/workspace/${workspaceSlugFromId(workspaceId)}/dashboard`),
+    )
+    await waitFor(() => expect(appMocks.render).toHaveBeenCalledWith('dashboard'))
+    expect(appMocks.render.mock.calls.filter(([kind]) => kind === 'workspace-root')).toHaveLength(rootRenderCount)
+    expect(requireAppHistoryPresentation(appRouter.options.history).action).toEqual({ type: 'REPLACE' })
   })
 })
 
-function seedWorkspaceCapability(workspaceId: WorkspaceId, gitStatus: 'available' | 'unavailable') {
-  resetWorkspacesStore()
-  const workspace = emptyWorkspace(workspaceId, 'runtime-router-test')
-  acceptWorkspaceProbeState(workspace, {
-    status: 'ready',
+function workspaceProbe(gitStatus: 'available' | 'unavailable') {
+  return {
+    status: 'ready' as const,
     capabilities: {
-      files: { read: true, write: true },
-      terminal: { available: true },
+      files: { read: true as const, write: true },
+      terminal: { available: true as const },
       git:
         gitStatus === 'available'
-          ? { status: 'available', worktrees: true, pullRequests: { provider: 'none' } }
-          : { status: 'unavailable' },
+          ? { status: 'available' as const, worktrees: true, pullRequests: { provider: 'none' as const } }
+          : { status: 'unavailable' as const },
     },
     diagnostics: [],
-  })
+  }
+}
+
+function seedWorkspaceCapability(workspaceId: WorkspaceId, gitStatus: 'available' | 'unavailable' | 'probing') {
+  resetWorkspacesStore()
+  const workspace = emptyWorkspace(workspaceId, 'runtime-router-test')
+  if (gitStatus !== 'probing') acceptWorkspaceProbeState(workspace, workspaceProbe(gitStatus))
   workspacesStore.setState({
     workspaces: { [workspaceId]: workspace },
     workspaceOrder: [workspaceId],

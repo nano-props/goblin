@@ -248,6 +248,46 @@ describe('WorkspaceView workspace navigation and restore', () => {
     expect(restoreWorkspaceTabsMocks.useRepoToasts).not.toHaveBeenCalled()
   })
 
+  test('keeps a probing workspace root on loading until filesystem capability settles', async () => {
+    workspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [REPO_ID]: {
+          ...state.workspaces[REPO_ID]!,
+          capability: { kind: 'probing', probe: { status: 'probing' } },
+        },
+      },
+    }))
+    const result = render(
+      <WorkspaceView
+        workspaceId={REPO_ID}
+        routeView={{ kind: 'workspace-root', workspaceId: REPO_ID, workspacePaneRoute: null }}
+      />,
+    )
+
+    expect(result.container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
+    expect(workspacePane(result.container)).toBeNull()
+    expect(result.container.textContent).not.toContain('workspace-route.not-found-title')
+
+    await flushTestUpdates(() => setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe()))
+
+    expect(result.container.querySelector('[data-testid="workspace-pane-skeleton"]')).toBeNull()
+    expect(workspacePane(result.container)?.dataset.workspacePaneRouteKind).toBe('workspace-root')
+    expect(result.container.textContent).not.toContain('workspace-route.not-found-title')
+  })
+
+  test('does not render a workspace-root pane for a Git workspace', () => {
+    const { container } = render(
+      <WorkspaceView
+        workspaceId={REPO_ID}
+        routeView={{ kind: 'workspace-root', workspaceId: REPO_ID, workspacePaneRoute: null }}
+      />,
+    )
+
+    expect(workspacePane(container)).toBeNull()
+    expect(gitWorkspaceNavigator(container)).not.toBeNull()
+  })
+
   test('renders the directory Dashboard for a non-Git dashboard route without Git navigation', () => {
     setWorkspaceProbeForTest(REPO_ID, filesystemWorkspaceProbe())
 
@@ -353,6 +393,34 @@ describe('WorkspaceView workspace navigation and restore', () => {
     })
     const restoreOptions = restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView.mock.calls.at(-1)?.[0]
     expect(restoreOptions?.workspaceId()).toBe(REPO_ID)
+  })
+
+  test('promotes a probing restore stub without treating its root route as missing', async () => {
+    workspacesStore.setState((state) => ({
+      workspaces: {
+        ...state.workspaces,
+        [REPO_ID]: {
+          ...state.workspaces[REPO_ID]!,
+          capability: { kind: 'probing', probe: { status: 'probing' } },
+          session: { ...state.workspaces[REPO_ID]!.session, projectionState: 'stub' },
+        },
+      },
+    }))
+
+    const { container } = render(
+      <WorkspaceView
+        workspaceId={REPO_ID}
+        routeView={{ kind: 'workspace-root', workspaceId: REPO_ID, workspacePaneRoute: null }}
+      />,
+    )
+
+    expect(container.querySelector('[data-testid="workspace-pane-skeleton"]')).not.toBeNull()
+    expect(workspacePane(container)).toBeNull()
+    expect(container.textContent).not.toContain('workspace-route.not-found-title')
+    expect(restoreWorkspaceTabsMocks.useRestoreWorkspaceTabsOnView).toHaveBeenCalledWith({
+      workspaceId: expect.any(Function),
+    })
+    expect(restoreWorkspaceTabsMocks.useRepoToasts).not.toHaveBeenCalled()
   })
 
   test('replaces the stub skeleton with a stable promotion failure view', async () => {

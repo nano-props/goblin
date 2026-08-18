@@ -31,7 +31,9 @@ export const GitWorkspaceNavigatorBranchRow = defineComponent<BranchRowProps>({
   setup(props) {
     const terminalSessionId = computed(() => {
       const worktree = repoWorktreeForBranch(props.repo.snapshot.worktrees, props.branch.name)
-      return worktree ? formatTerminalFilesystemTargetKeyForPath(props.repo.id, worktree.path) : null
+      return worktree
+        ? formatTerminalFilesystemTargetKeyForPath(props.repo.id, worktree.isSource ? props.repo.id : worktree.path)
+        : null
     })
     const worktree = computed(() => repoWorktreeForBranch(props.repo.snapshot.worktrees, props.branch.name))
     const terminalBellCount = useTerminalFilesystemTargetBellCount(terminalSessionId)

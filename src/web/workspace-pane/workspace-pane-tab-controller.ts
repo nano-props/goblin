@@ -21,8 +21,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
 import {
-  filesystemWorkspacePaneTargetLeaseForModel,
-  filesystemWorkspacePaneTargetLeaseIsCurrent,
+  filesystemWorkspacePaneLocationIsCurrent,
   workspacePaneTargetLeaseIsCurrent,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
@@ -215,12 +214,11 @@ async function commitWorkspacePaneControllerTargetRoute(
     options?.onAbandon?.()
     return false
   }
-  const lease = filesystemWorkspacePaneTargetLeaseForModel(target)
-  if (!lease || !filesystemWorkspacePaneTargetLeaseIsCurrent(lease)) {
+  if (!filesystemWorkspacePaneLocationIsCurrent(location)) {
     options?.onAbandon?.()
     return false
   }
-  return await navigation.commitFilesystemWorkspacePaneRoute(lease, route, {
+  return await navigation.commitFilesystemWorkspacePaneRoute(location, route, {
     replace: options?.replace,
     navigationGeneration,
     onCommit: options?.onCommit,
@@ -354,8 +352,7 @@ export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneC
   const location = target.location
   if (!location) return false
   if (location.kind !== 'branch') {
-    const lease = filesystemWorkspacePaneTargetLeaseForModel(target)
-    return lease !== null && filesystemWorkspacePaneTargetLeaseIsCurrent(lease)
+    return filesystemWorkspacePaneLocationIsCurrent(location)
   }
   return workspacePaneTargetLeaseIsCurrent({
     workspaceRuntimeId: location.workspaceRuntimeId,

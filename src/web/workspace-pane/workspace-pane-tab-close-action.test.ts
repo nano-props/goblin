@@ -61,6 +61,7 @@ import {
   workspacePaneLocationForLinkedWorktree,
   workspacePaneLocationForRoot,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
+import { markRepoGitUnavailable } from '#/web/app/navigation/actions.test-utils.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
 
@@ -339,10 +340,10 @@ describe('workspace pane tab close action', () => {
 
     expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      {
-        routeTarget: WORKTREE_PANE_TARGET,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-      },
+      workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, {
+        kind: 'branch',
+        branchName: BRANCH_NAME,
+      }),
       { kind: 'static', tab: 'status' },
       expect.objectContaining({
         routePrecondition: { kind: 'exact-route', route: { kind: 'static', tab: 'files' } },
@@ -352,6 +353,7 @@ describe('workspace pane tab close action', () => {
 
   test('closes a workspace-root static tab through the shared tab transaction', async () => {
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     const target = {
       kind: 'workspace-root' as const,
       workspaceId: REPO_ID,
@@ -497,6 +499,7 @@ describe('workspace pane tab close action', () => {
   test('carries automatic focus from active close through route commit and mount transfer', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     terminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.workspaceRuntimeId)
     const target = {
       kind: 'workspace-root' as const,
@@ -530,10 +533,7 @@ describe('workspace pane tab close action', () => {
     lifecycle.resolve([workspacePaneRuntimeTabEntry('terminal', terminalSessionId)])
     await vi.waitFor(() => expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledOnce())
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      {
-        routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-      },
+      workspacePaneLocationForRoot(REPO_ID, repo.workspaceRuntimeId),
       { kind: 'terminal', terminalSessionId },
       expect.objectContaining({
         routePrecondition: { kind: 'exact-route', route: { kind: 'static', tab: 'files' } },
@@ -874,10 +874,7 @@ describe('workspace pane tab close action', () => {
       }),
     )
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      {
-        routeTarget: WORKTREE_PANE_TARGET,
-        workspaceRuntimeId: repo.workspaceRuntimeId,
-      },
+      workspacePaneLocationForLinkedWorktree(WORKTREE_PANE_TARGET, repo.workspaceRuntimeId, { kind: 'detached' }),
       { kind: 'static', tab: 'status' },
       expect.objectContaining({
         routePrecondition: {
@@ -891,6 +888,7 @@ describe('workspace pane tab close action', () => {
   test('confirmed workspace terminal close selects Files without inventing a branch route', async () => {
     const terminalSessionId = 'term-111111111111111111111'
     const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    markRepoGitUnavailable(REPO_ID)
     const targetInput = {
       kind: 'workspace-root' as const,
       workspaceId: REPO_ID,
@@ -1087,10 +1085,6 @@ function navigationWith(overrides: AppNavigationOverridesForTest = {}): AppNavig
     selectRepoBranch: vi.fn(() => true),
     showRepoBranchEmptyWorkspacePane: vi.fn(() => true),
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),
-    showWorkspaceRootPaneTab: vi.fn((_repoId, _presentation, options) => {
-      options?.onCommit?.()
-      return true
-    }),
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),

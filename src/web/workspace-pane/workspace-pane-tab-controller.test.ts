@@ -135,32 +135,43 @@ describe('workspace pane tab controller transactions', () => {
   })
 
   test('presents a workspace-scoped tab through the workspace route', async () => {
-    const commitFilesystemWorkspacePaneRoute = vi.fn(async (target, route, options) => {
+    const repo = workspacesStore.getState().workspaces[WORKSPACE_ID]!
+    if (repo.capability.kind !== 'git') throw new Error('expected Git workspace fixture')
+    workspacesStore.setState({
+      workspaces: {
+        ...workspacesStore.getState().workspaces,
+        [WORKSPACE_ID]: {
+          ...repo,
+          capability: {
+            kind: 'filesystem',
+            probe: {
+              ...repo.capability.probe,
+              capabilities: { ...repo.capability.probe.capabilities, git: { status: 'unavailable' } },
+            },
+          },
+        },
+      },
+    })
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async (location, route, options) => {
       workspacesStore
         .getState()
         .setWorkspacePaneTabForTarget(
-          target.routeTarget,
+          location.routeTarget,
           route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null,
         )
       options?.onCommit?.()
       return true
     })
     const navigation = controllerNavigation({ commitFilesystemWorkspacePaneRoute })
+    const location = workspacePaneLocationForRoot(WORKSPACE_ID, 'repo-runtime-1')
 
     await expect(
-      selectWorkspacePaneControllerTab(
-        workspacePaneTarget(workspacePaneLocationForRoot(WORKSPACE_ID, 'repo-runtime-1')),
-        staticTab('files'),
-        navigation,
-      ),
+      selectWorkspacePaneControllerTab(workspacePaneTarget(location), staticTab('files'), navigation),
     ).resolves.toBe(true)
 
     expect(navigation.commitWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      {
-        routeTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
-        workspaceRuntimeId: 'repo-runtime-1',
-      },
+      location,
       { kind: 'static', tab: 'files' },
       expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )

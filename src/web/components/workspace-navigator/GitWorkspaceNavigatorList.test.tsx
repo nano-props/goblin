@@ -17,6 +17,7 @@ import { emptyWorkspace } from '#/web/stores/workspaces/workspace-state-factory.
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 import { nextTick } from 'vue'
+import { formatTerminalFilesystemTargetKeyForPath } from '#/shared/terminal-filesystem-target-key.ts'
 
 vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
   BranchActionsMenu: (props: { open?: boolean; onOpenChange?: (open: boolean) => void }) => (
@@ -47,13 +48,19 @@ vi.mock('#/web/components/workspace-navigator/WorktreeActionsMenu.tsx', () => ({
   ),
 }))
 
+const terminalStoreMocks = vi.hoisted(() => ({ targetKeys: [] as { readonly value: string | null }[] }))
+
 vi.mock('#/web/terminal/components/terminal-session-store.ts', () => ({
-  useTerminalFilesystemTargetOutputActive: () => false,
-  useTerminalFilesystemTargetBellCount: () => 0,
+  useTerminalFilesystemTargetOutputActive: (targetKey: { readonly value: string | null }) => {
+    terminalStoreMocks.targetKeys.push(targetKey)
+    return { value: false }
+  },
+  useTerminalFilesystemTargetBellCount: () => ({ value: 0 }),
 }))
 
 afterEach(() => {
   vi.clearAllMocks()
+  terminalStoreMocks.targetKeys = []
   Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
 })
 
@@ -187,6 +194,33 @@ describe('GitWorkspaceNavigatorList', () => {
     container.querySelector<HTMLButtonElement>('[data-testid="worktree-open-changes"]')?.click()
     expect(onOpenWorktreeTab).toHaveBeenCalledOnce()
     expect(onOpenWorktreeTab).toHaveBeenCalledWith(worktree.path, 'changes')
+  })
+
+  test('subscribes source operation rows through the workspace-root terminal owner', () => {
+    const worktree = createRepoWorktreeSnapshotForTest('main', '/private/tmp/repo-real', {
+      isSource: true,
+      isPrimary: true,
+      operation: { kind: 'rebase' },
+    })
+    const branch = createRepoBranch('main')
+    const repo = gitWorkspaceNavigatorRepo([branch], branch.name, [worktree])
+
+    renderInJsdom(
+      <GitWorkspaceNavigatorList
+        repo={repo}
+        rows={[{ kind: 'worktree', branch, worktree }]}
+        highlightedBranch={branch.name}
+        onSelectBranch={() => {}}
+        onOpenBranchStatus={() => {}}
+        emptyState={null}
+      />,
+    )
+
+    expect(
+      terminalStoreMocks.targetKeys.some(
+        (targetKey) => targetKey.value === formatTerminalFilesystemTargetKeyForPath(repo.id, repo.id),
+      ),
+    ).toBe(true)
   })
 
   test('highlights the row whose name matches highlightedBranch', () => {

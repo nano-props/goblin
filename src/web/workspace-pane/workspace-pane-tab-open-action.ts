@@ -19,8 +19,7 @@ import {
   recordWorkspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
-  filesystemWorkspacePaneTargetLeaseForModel,
-  filesystemWorkspacePaneTargetLeaseIsCurrent,
+  filesystemWorkspacePaneLocationIsCurrent,
   isGitWorktreeDestinationTargetLease,
   resolveWorkspacePaneDestinationTarget,
   workspacePaneTargetBlocksInteraction,
@@ -253,9 +252,7 @@ function workspacePaneStaticTabOpenAdmission(
 }
 
 function workspacePaneStaticTabOpenTargetIsCurrent(input: ResolvedWorkspacePaneStaticTabOpenInput): boolean {
-  const filesystemLease = filesystemWorkspacePaneTargetLeaseForModel(input)
-  if (filesystemLease) return filesystemWorkspacePaneTargetLeaseIsCurrent(filesystemLease)
-  if (input.location.kind !== 'branch') return false
+  if (input.location.kind !== 'branch') return filesystemWorkspacePaneLocationIsCurrent(input.location)
   return workspacePaneTargetLeaseIsCurrent({
     routeTarget: input.location.routeTarget,
     workspaceRuntimeId: input.workspaceRuntimeId,

@@ -24,6 +24,7 @@ import type { FilesystemWorkspacePaneTabsTarget } from '#/shared/workspace-pane-
 import { renderComposableInJsdom } from '#/test-utils/render.tsx'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
+import { markRepoGitUnavailable } from '#/web/app/navigation/actions.test-utils.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///tmp/filesystem-route-navigation-workspace')
 const WORKTREE_PATH = '/tmp/filesystem-route-navigation-worktree'
@@ -41,6 +42,7 @@ describe('filesystem workspace pane route navigation', () => {
     ['workspace root', { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }],
     ['detached worktree', { kind: 'git-worktree' as const, workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH }],
   ])('commits bare, static, and terminal routes through the %s operation boundary', async (_label, target) => {
+    if (target.kind === 'workspace-root') markRepoGitUnavailable(WORKSPACE_ID)
     for (const route of [
       null,
       { kind: 'static' as const, tab: 'files' as const },
@@ -74,6 +76,7 @@ describe('filesystem workspace pane route navigation', () => {
     ['workspace root', { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }],
     ['detached worktree', { kind: 'git-worktree' as const, workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH }],
   ])('rejects a malformed extra-segment source route for the %s target', async (_label, target) => {
+    if (target.kind === 'workspace-root') markRepoGitUnavailable(WORKSPACE_ID)
     const harness = await routeNavigationHarness(`${filesystemRootHref(target)}/tab/files/extra`)
     const { result } = renderComposableInJsdom(() => useAppRouteNavigation(), {
       global: { plugins: [harness.router] },
@@ -98,6 +101,7 @@ describe('filesystem workspace pane route navigation', () => {
     ['workspace root', { kind: 'workspace-root' as const, workspaceId: WORKSPACE_ID }],
     ['detached worktree', { kind: 'git-worktree' as const, workspaceId: WORKSPACE_ID, worktreePath: WORKTREE_PATH }],
   ])('does not replace a newer route from a stale reconciliation for the %s target', async (_label, target) => {
+    if (target.kind === 'workspace-root') markRepoGitUnavailable(WORKSPACE_ID)
     const currentRoute = { kind: 'static' as const, tab: 'files' as const }
     const staleSourceRoute = { kind: 'terminal' as const, terminalSessionId: TERMINAL_SESSION_ID }
     const harness = await routeNavigationHarness(filesystemRouteHref(target, currentRoute))
@@ -117,6 +121,28 @@ describe('filesystem workspace pane route navigation', () => {
     expect(harness.navigate).not.toHaveBeenCalled()
     expect(harness.currentHref()).toBe(filesystemRouteHref(target, currentRoute))
     expect(onAbandon).toHaveBeenCalledOnce()
+  })
+
+  test('rejects every workspace-root product encoder for a Git workspace', async () => {
+    const harness = await routeNavigationHarness('/home')
+    const { result } = renderComposableInJsdom(() => useAppRouteNavigation(), {
+      global: { plugins: [harness.router] },
+    })
+    const onAbandon = vi.fn()
+
+    expect(result.value.openWorkspaceRootPane(WORKSPACE_ID, { onAbandon })).toBe(false)
+    expect(result.value.openWorkspaceRootTab(WORKSPACE_ID, 'files', { onAbandon })).toBe(false)
+    expect(result.value.openWorkspaceRootTerminal(WORKSPACE_ID, TERMINAL_SESSION_ID, { onAbandon })).toBe(false)
+    await expect(
+      result.value.commitFilesystemWorkspacePaneRoute(
+        { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
+        { kind: 'static', tab: 'files' },
+        { onAbandon },
+      ),
+    ).resolves.toBe(false)
+
+    expect(onAbandon).toHaveBeenCalledTimes(4)
+    expect(harness.navigate).not.toHaveBeenCalled()
   })
 })
 

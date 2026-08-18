@@ -537,7 +537,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       executionRoot: '/Users/example/Workspace/sample-project',
     })
     let startupShellCommand: string | null = null
-    const commitWorkspaceRootTerminalSession = vi.fn(async () => true)
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const createTerminalWithAdmission: TerminalSessionContextValue['createTerminalWithAdmission'] = vi.fn(
       async (base, options) => {
         startupShellCommand = (await options?.resolveStartupShellCommand?.()) ?? null
@@ -561,7 +561,7 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
 
     renderInJsdom(
       <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={navigationWith({ commitWorkspaceRootTerminalSession })}>
+        <AppNavigationProvider value={navigationWith({ commitFilesystemWorkspacePaneRoute })}>
           <TerminalSessionCommandScope value={terminalCommandContextWith({ createTerminalWithAdmission })}>
             <WorkspaceFilesystemTabPanel
               location={workspacePaneLocationForRoot(workspaceId, repo.workspaceRuntimeId)}
@@ -595,10 +595,9 @@ describe('GitWorkspacePaneContent filesystem-terminal', () => {
       { resolveStartupShellCommand: expect.any(Function) },
       { insertAfterIdentity: 'workspace-pane:files' },
     )
-    expect(commitWorkspaceRootTerminalSession).toHaveBeenCalledWith(
-      workspaceId,
-      repo.workspaceRuntimeId,
-      'term-111111111111111111111',
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      workspacePaneLocationForRoot(workspaceId, repo.workspaceRuntimeId),
+      { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
       expect.objectContaining({ navigationGeneration: expect.any(Number) }),
     )
     expect(startupShellCommand).toBe(

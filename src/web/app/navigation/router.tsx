@@ -33,12 +33,12 @@ const AppRouteView = defineComponent({
   name: 'AppRouteView',
   setup() {
     const route = useRoute()
-    useAppRouteAdmission(route)
+    const routeAdmitted = useAppRouteAdmission(route)
     const callbacks = appRouterCallbacks(useAppRouteNavigation())
     return () => (
       <App
         routeSettingsPage={route.name === 'settings' ? settingsPageFromRoute(route) : null}
-        routeWorkspaceView={workspaceRouteViewFromRoute(route)}
+        routeWorkspaceView={routeAdmitted.value ? workspaceRouteViewFromRoute(route) : null}
         {...callbacks}
       />
     )
@@ -111,7 +111,7 @@ const appRouteChildren: RouteRecordRaw[] = [
 
 const routes: RouteRecordRaw[] = [{ path: '/', component: Layout, children: appRouteChildren }]
 
-function useAppRouteAdmission(route: RouteLocationNormalized): void {
+function useAppRouteAdmission(route: RouteLocationNormalized) {
   const router = useRouter()
   const workspaceState = useStoreSelector(
     workspacesStore,
@@ -127,6 +127,16 @@ function useAppRouteAdmission(route: RouteLocationNormalized): void {
       left.workspaces === right.workspaces &&
       left.workspaceMembershipReady === right.workspaceMembershipReady,
   )
+  const routeAdmitted = computed(() => {
+    const workspaceSlug = routeStringParam(route.params.workspaceSlug)
+    if (!workspaceSlug) return true
+    const workspaceId = workspaceIdFromSlug(workspaceSlug)
+    const workspace = workspaceId ? workspaceState.value.workspaces[workspaceId] : null
+    if (!workspace) return true
+    if (routeRequiresGitCapability(route)) return workspace.capability.kind !== 'filesystem'
+    if (routeRequiresFilesystemCapability(route)) return workspace.capability.kind !== 'git'
+    return true
+  })
   const admittedPath = computed(() => {
     if (route.name === 'home') {
       const workspaceSlug = initialWorkspaceRouteSlugFromStore(workspaceState.value)
@@ -134,10 +144,7 @@ function useAppRouteAdmission(route: RouteLocationNormalized): void {
     }
 
     const workspaceSlug = routeStringParam(route.params.workspaceSlug)
-    if (!workspaceSlug || !routeRequiresGitCapability(route)) return null
-    const workspaceId = workspaceIdFromSlug(workspaceSlug)
-    const workspace = workspaceId ? workspaceState.value.workspaces[workspaceId] : null
-    return workspace?.capability.kind === 'filesystem' ? `/workspace/${workspaceSlug}/dashboard` : null
+    return workspaceSlug && !routeAdmitted.value ? `/workspace/${workspaceSlug}/dashboard` : null
   })
 
   watch(
@@ -147,6 +154,7 @@ function useAppRouteAdmission(route: RouteLocationNormalized): void {
     },
     { immediate: true },
   )
+  return routeAdmitted
 }
 
 function routeRequiresGitCapability(route: RouteLocationNormalized): boolean {
@@ -154,6 +162,11 @@ function routeRequiresGitCapability(route: RouteLocationNormalized): boolean {
   return (
     name === 'workspace-new-worktree' || name.startsWith('workspace-branch') || name.startsWith('workspace-worktree')
   )
+}
+
+function routeRequiresFilesystemCapability(route: RouteLocationNormalized): boolean {
+  const name = typeof route.name === 'string' ? route.name : ''
+  return name.startsWith('workspace-root')
 }
 
 function routeStringParam(value: string | string[]): string | null {

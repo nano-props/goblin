@@ -83,7 +83,7 @@ export interface AppRouteNavigation extends RepoWorkspacePaneRouteNavigation {
     options?: AppRouteNavigationOptions,
   ) => boolean
   commitFilesystemWorkspacePaneRoute: (
-    target: FilesystemWorkspacePaneTabsTarget,
+    routeTarget: FilesystemWorkspacePaneTabsTarget,
     route: WorkspacePaneRouteTarget,
     options?: AppRouteNavigationOptions,
   ) => Promise<boolean>
@@ -172,16 +172,19 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
       runRouteNavigation(router, { name: 'workspace-dashboard', params: { workspaceSlug } }, options)
     },
     openWorkspaceRootPane(workspaceId, options) {
+      if (!workspaceRootProductRouteIsCurrent(workspaceId)) return abandonAppRoute(options)
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
       return runRouteNavigation(router, { name: 'workspace-root', params: { workspaceSlug } }, options)
     },
     openWorkspaceRootTab(workspaceId, tab, options) {
+      if (!workspaceRootProductRouteIsCurrent(workspaceId)) return abandonAppRoute(options)
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
       return runRouteNavigation(router, { name: 'workspace-root-tab', params: { workspaceSlug, tabKey: tab } }, options)
     },
     openWorkspaceRootTerminal(workspaceId, terminalSessionId, options) {
+      if (!workspaceRootProductRouteIsCurrent(workspaceId)) return abandonAppRoute(options)
       const workspaceSlug = workspaceSlugForKnownId(workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
       return runRouteNavigation(
@@ -190,10 +193,13 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
         options,
       )
     },
-    async commitFilesystemWorkspacePaneRoute(paneTarget, route, options) {
-      const workspaceSlug = workspaceSlugForKnownId(paneTarget.workspaceId)
+    async commitFilesystemWorkspacePaneRoute(routeTarget, route, options) {
+      if (routeTarget.kind === 'workspace-root' && !workspaceRootProductRouteIsCurrent(routeTarget.workspaceId)) {
+        return abandonAppRoute(options)
+      }
+      const workspaceSlug = workspaceSlugForKnownId(routeTarget.workspaceId)
       if (!workspaceSlug) return abandonAppRoute(options)
-      return await commitFilesystemWorkspacePaneRoute({ router, workspaceSlug, paneTarget, route, options })
+      return await commitFilesystemWorkspacePaneRoute({ router, workspaceSlug, routeTarget, route, options })
     },
     openRepoBranch(workspaceId, branchName, options) {
       const target = currentWorkspacePaneTargetForBranch(workspaceId, branchName)
@@ -299,6 +305,10 @@ function createAppRouteNavigation(router: Router): AppRouteNavigation {
     },
   }
   return navigation
+}
+
+function workspaceRootProductRouteIsCurrent(workspaceId: WorkspaceId): boolean {
+  return workspacesStore.getState().workspaces[workspaceId]?.capability.kind === 'filesystem'
 }
 
 function runRouteNavigation(

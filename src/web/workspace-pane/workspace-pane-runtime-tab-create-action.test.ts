@@ -232,25 +232,19 @@ describe('workspace pane runtime tab create action', () => {
         TERMINAL_SESSION_ID,
         {
           commitFilesystemWorkspacePaneRoute,
-          commitWorkspaceRootTerminalSession: vi.fn(async () => {
-            throw new Error('Unexpected workspace-root commit in detached-worktree test')
-          }),
         },
         routeRequest,
       ),
     ).resolves.toBe(true)
     expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
-      {
-        routeTarget: WORKTREE_ROUTE_TARGET,
-        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
-      },
+      LOCATION,
       { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       routeRequest,
     )
   })
 
   test('commits a workspace root terminal route through navigation authority', async () => {
-    const commitWorkspaceRootTerminalSession = vi.fn(async () => true)
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const routeRequest = createdTerminalRouteRequest()
     const workspaceRootBase: TerminalSessionBase = {
       target: {
@@ -260,25 +254,25 @@ describe('workspace pane runtime tab create action', () => {
       },
       presentation: { kind: 'workspace-root' },
     }
+    const location = workspacePaneLocationForRoot(
+      workspaceRootBase.target.workspaceId,
+      workspaceRootBase.target.workspaceRuntimeId,
+    )
 
     await expect(
       showCreatedTerminalWorkspacePaneRuntimeTab(
-        workspacePaneLocationForRoot(workspaceRootBase.target.workspaceId, workspaceRootBase.target.workspaceRuntimeId),
+        location,
         workspaceRootBase.presentation,
         TERMINAL_SESSION_ID,
         {
-          commitFilesystemWorkspacePaneRoute: vi.fn(async () => {
-            throw new Error('Unexpected worktree commit in workspace-root test')
-          }),
-          commitWorkspaceRootTerminalSession,
+          commitFilesystemWorkspacePaneRoute,
         },
         routeRequest,
       ),
     ).resolves.toBe(true)
-    expect(commitWorkspaceRootTerminalSession).toHaveBeenCalledWith(
-      REPO_ROOT,
-      WORKSPACE_RUNTIME_ID,
-      TERMINAL_SESSION_ID,
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      location,
+      { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       routeRequest,
     )
   })

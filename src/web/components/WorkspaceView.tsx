@@ -307,6 +307,12 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
               />
             )
           case 'workspace-root':
+            if (currentWorkspace.capability.kind === 'probing') {
+              return <WorkspacePaneSkeleton toolbarTrafficLightOffset={workspaceTrafficLightOffset} />
+            }
+            if (currentWorkspace.capability.kind === 'git') {
+              return <RoutedWorkspaceNotFound workspaceId={currentWorkspace.id} />
+            }
             return (
               <WorkspacePane
                 workspaceId={props.workspaceId}
@@ -453,10 +459,17 @@ const WorkspaceViewContent = defineComponent<WorkspaceViewProps>({
         )
       }
 
-      return git ? (
-        <GitWorkspaceEffects workspaceId={props.workspaceId} renderWorkspace={renderWorkspace} />
-      ) : (
-        renderWorkspace(null)
+      const workspaceView =
+        currentWorkspace.session.projectionState === 'stub' ? (
+          <WorkspaceProjectionRestoreEffects workspaceId={props.workspaceId} renderWorkspace={renderWorkspace} />
+        ) : (
+          renderWorkspace(null)
+        )
+      return (
+        <>
+          {git ? <GitWorkspaceEffects workspaceId={props.workspaceId} /> : null}
+          {workspaceView}
+        </>
       )
     }
   },
@@ -469,18 +482,26 @@ function workspaceRouteViewIsTerminal(routeView: WorkspaceRouteView | null): boo
   )
 }
 
-interface GitWorkspaceEffectsProps {
+interface WorkspaceProjectionRestoreEffectsProps {
   workspaceId: WorkspaceId
   renderWorkspace: (projectionRestore: WorkspaceProjectionRestoreController) => VNodeChild
 }
 
-const GitWorkspaceEffects = defineComponent<GitWorkspaceEffectsProps>({
-  name: 'GitWorkspaceEffects',
+const WorkspaceProjectionRestoreEffects = defineComponent<WorkspaceProjectionRestoreEffectsProps>({
+  name: 'WorkspaceProjectionRestoreEffects',
   props: ['workspaceId', 'renderWorkspace'],
   setup(props) {
-    useRepoToasts(() => props.workspaceId)
     const projectionRestore = useRestoreWorkspaceTabsOnView({ workspaceId: () => props.workspaceId })
     return () => props.renderWorkspace({ state: projectionRestore.state.value, retry: projectionRestore.retry })
+  },
+})
+
+const GitWorkspaceEffects = defineComponent<{ workspaceId: WorkspaceId }>({
+  name: 'GitWorkspaceEffects',
+  props: ['workspaceId'],
+  setup(props) {
+    useRepoToasts(() => props.workspaceId)
+    return () => null
   },
 })
 

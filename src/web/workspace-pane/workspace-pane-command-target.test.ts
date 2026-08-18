@@ -153,6 +153,26 @@ describe('workspace pane command target', () => {
     expect(appQueryClient.getQueryCache().getAll()).toHaveLength(0)
   })
 
+  test('rejects a workspace-root product command target for a Git workspace', () => {
+    const workspace = seedRepoWithReadModelForTest({
+      id: 'goblin+file:///tmp/command-target-git-root-workspace',
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+
+    expect(
+      workspacePaneCommandTargetFromQueryCache({
+        routeContext: {
+          kind: 'workspace-root',
+          workspaceSlug: 'command-target-git-root-workspace',
+          workspacePaneRoute: { kind: 'static', tab: 'files' },
+        },
+        workspace,
+        queryClient: appQueryClient,
+      }),
+    ).toBeNull()
+  })
+
   test('rejects a materialized branch route even while its accepted snapshot is stale', async () => {
     const workspace = seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest('feature/example', '/tmp/command-target-branch-worktree')],

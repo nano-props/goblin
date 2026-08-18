@@ -81,10 +81,7 @@ export function workspacePaneCommandTargetFromQueryCache(input: {
     }
   }
 
-  if (
-    routeContext.kind === 'workspace-root' &&
-    (workspace.capability.kind === 'git' || workspace.capability.kind === 'filesystem')
-  ) {
+  if (routeContext.kind === 'workspace-root' && workspace.capability.kind === 'filesystem') {
     const location = workspacePaneLocationForRoot(workspace.id, workspace.workspaceRuntimeId)
     return {
       location,
