@@ -60,7 +60,7 @@ import {
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
-  workspacePaneActionTargetFromPaneTarget,
+  workspacePaneActionTargetFromLocation,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
@@ -197,22 +197,20 @@ describe('openWorkspacePaneTab', () => {
   test('does not mutate a queued static tab after its runtime is replaced', async () => {
     seedWorktreeRepo('status')
     const workspaceRuntimeId = currentRuntimeId()
+    const paneTarget = { kind: 'git-worktree' as const, workspaceId: REPO_ID, worktreePath: WORKTREE_PATH }
+    const location = workspacePaneLocationForLinkedWorktree(paneTarget, workspaceRuntimeId, {
+      kind: 'branch',
+      branchName: 'feature/worktree',
+    })
     const blocker = Promise.withResolvers<void>()
     const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromPaneTarget(
-        { kind: 'git-worktree', workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
-        workspaceRuntimeId,
-      ),
+      workspacePaneActionTargetFromLocation(location),
       () => blocker.promise,
     )
     const updateWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('status')])
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
-    const paneTarget = { kind: 'git-worktree' as const, workspaceId: REPO_ID, worktreePath: WORKTREE_PATH }
     const dispatch = dispatchOpenWorkspacePaneTargetStaticTabAction({
-      location: workspacePaneLocationForLinkedWorktree(paneTarget, workspaceRuntimeId, {
-        kind: 'branch',
-        branchName: 'feature/worktree',
-      }),
+      location,
       type: 'history',
       workspacePaneRoute: undefined,
       navigation: navigationWithStoreActions(),

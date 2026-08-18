@@ -33,7 +33,6 @@ import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
   workspacePaneActionTargetFromLocation,
-  workspacePaneActionTargetFromPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
@@ -181,10 +180,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     renderMutationHook({ canonicalTabs: sourceTabs })
     const blocker = Promise.withResolvers<void>()
     void runWorkspacePaneAction(
-      workspacePaneActionTargetFromPaneTarget(
-        { kind: 'git-worktree', workspaceId: REPO_ROOT, worktreePath: WORKTREE_PATH },
-        WORKSPACE_RUNTIME_ID,
-      ),
+      workspacePaneActionTargetFromLocation(linkedLocation()),
       async () => await blocker.promise,
     )
     const onSettled = vi.fn()

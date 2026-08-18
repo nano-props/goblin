@@ -5,7 +5,6 @@ import {
   tryRunWorkspacePaneAction,
   workspacePaneActionTargetKey,
   workspacePaneActionTargetFromLocation,
-  workspacePaneActionTargetFromPaneTarget,
   workspacePaneActionQueueStatsForTest,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
@@ -87,10 +86,23 @@ describe('workspace pane action queue', () => {
 
   test('identifies a detached worktree by its filesystem path instead of workspace-root scope', () => {
     expect(
-      workspacePaneActionTargetFromPaneTarget(
-        { kind: 'git-worktree', workspaceId: TARGET.workspaceId, worktreePath: TARGET.worktreePath },
-        TARGET.workspaceRuntimeId,
-      ),
+      workspacePaneActionTargetFromLocation({
+        kind: 'linked-worktree',
+        workspaceId: TARGET.workspaceId,
+        workspaceRuntimeId: TARGET.workspaceRuntimeId,
+        routeTarget: {
+          kind: 'git-worktree',
+          workspaceId: TARGET.workspaceId,
+          worktreePath: TARGET.worktreePath,
+        },
+        paneTarget: {
+          kind: 'git-worktree',
+          workspaceId: TARGET.workspaceId,
+          worktreePath: TARGET.worktreePath,
+        },
+        worktreeHead: { kind: 'detached' },
+        branchName: null,
+      }),
     ).toEqual(TARGET)
   })
 
@@ -157,14 +169,5 @@ describe('workspace pane action queue', () => {
         worktreePath: '/repo-worktree',
       }),
     ).toBe('goblin+file:///repo\0runtime\0git-worktree\0/repo-worktree')
-  })
-
-  test('keeps a detached Git worktree pane in its worktree queue', () => {
-    expect(
-      workspacePaneActionTargetFromPaneTarget(
-        { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/repo-detached' },
-        'runtime',
-      ),
-    ).toMatchObject({ kind: 'git-worktree', worktreePath: '/repo-detached' })
   })
 })

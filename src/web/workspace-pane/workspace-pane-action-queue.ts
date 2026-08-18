@@ -1,26 +1,29 @@
 import PQueue from 'p-queue'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 export type WorkspacePaneActionTarget =
   | { kind: 'workspace-root'; workspaceId: WorkspaceId; workspaceRuntimeId: string }
   | { kind: 'git-branch'; workspaceId: WorkspaceId; workspaceRuntimeId: string; branchName: string }
   | { kind: 'git-worktree'; workspaceId: WorkspaceId; workspaceRuntimeId: string; worktreePath: string }
 
-export function workspacePaneActionTargetFromPaneTarget(
-  target: WorkspacePaneTabsTarget,
-  workspaceRuntimeId: string,
-): WorkspacePaneActionTarget {
-  if (target.kind === 'workspace-root') {
-    return { kind: target.kind, workspaceId: target.workspaceId, workspaceRuntimeId }
-  }
-  return target.kind === 'git-branch'
-    ? { kind: target.kind, workspaceId: target.workspaceId, workspaceRuntimeId, branchName: target.branchName }
-    : { kind: target.kind, workspaceId: target.workspaceId, workspaceRuntimeId, worktreePath: target.worktreePath }
-}
-
 export function workspacePaneActionTargetFromLocation(location: WorkspacePaneLocation): WorkspacePaneActionTarget {
-  return workspacePaneActionTargetFromPaneTarget(location.paneTarget, location.workspaceRuntimeId)
+  const { paneTarget, workspaceRuntimeId } = location
+  if (paneTarget.kind === 'workspace-root') {
+    return { kind: paneTarget.kind, workspaceId: paneTarget.workspaceId, workspaceRuntimeId }
+  }
+  return paneTarget.kind === 'git-branch'
+    ? {
+        kind: paneTarget.kind,
+        workspaceId: paneTarget.workspaceId,
+        workspaceRuntimeId,
+        branchName: paneTarget.branchName,
+      }
+    : {
+        kind: paneTarget.kind,
+        workspaceId: paneTarget.workspaceId,
+        workspaceRuntimeId,
+        worktreePath: paneTarget.worktreePath,
+      }
 }
 
 const queuesByTarget = new Map<string, PQueue>()

@@ -25,7 +25,7 @@ import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
-  workspacePaneActionTargetFromPaneTarget,
+  workspacePaneActionTargetFromLocation,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { dispatchOpenWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import {
@@ -169,10 +169,7 @@ describe('workspace pane tab select action', () => {
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab: showTab }, { autoSeedInitialRoute: false })
     const blocker = Promise.withResolvers<void>()
     const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromPaneTarget(
-        { kind: 'git-worktree', workspaceId: target.workspaceId, worktreePath: target.worktreePath },
-        target.workspaceRuntimeId,
-      ),
+      workspacePaneActionTargetFromLocation(linkedLocation(target.workspaceRuntimeId)),
       () => blocker.promise,
     )
 
@@ -199,10 +196,7 @@ describe('workspace pane tab select action', () => {
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab: showTab }, { autoSeedInitialRoute: false })
     const blocker = Promise.withResolvers<void>()
     const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromPaneTarget(
-        { kind: 'git-worktree', workspaceId: target.workspaceId, worktreePath: target.worktreePath },
-        target.workspaceRuntimeId,
-      ),
+      workspacePaneActionTargetFromLocation(linkedLocation(target.workspaceRuntimeId)),
       () => blocker.promise,
     )
 
@@ -235,10 +229,7 @@ describe('workspace pane tab select action', () => {
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab: showTab }, { autoSeedInitialRoute: false })
     const blocker = Promise.withResolvers<void>()
     const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromPaneTarget(
-        { kind: 'git-worktree', workspaceId: target.workspaceId, worktreePath: target.worktreePath },
-        target.workspaceRuntimeId,
-      ),
+      workspacePaneActionTargetFromLocation(linkedLocation(target.workspaceRuntimeId)),
       () => blocker.promise,
     )
     const queuedAction = dispatch(navigation)
@@ -264,10 +255,7 @@ describe('workspace pane tab select action', () => {
     const navigation = navigationWith({}, { autoSeedInitialRoute: false })
     const blocker = Promise.withResolvers<void>()
     const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromPaneTarget(
-        { kind: 'git-worktree', workspaceId: target.workspaceId, worktreePath: target.worktreePath },
-        target.workspaceRuntimeId,
-      ),
+      workspacePaneActionTargetFromLocation(linkedLocation(target.workspaceRuntimeId)),
       () => blocker.promise,
     )
     const selection = selectTab('workspace-pane:files', navigation)
@@ -294,10 +282,7 @@ describe('workspace pane tab select action', () => {
     })
     const blocker = Promise.withResolvers<void>()
     const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromPaneTarget(
-        { kind: 'git-worktree', workspaceId: target.workspaceId, worktreePath: target.worktreePath },
-        target.workspaceRuntimeId,
-      ),
+      workspacePaneActionTargetFromLocation(linkedLocation(target.workspaceRuntimeId)),
       () => blocker.promise,
     )
     const move = moveTab(navigation)
@@ -364,10 +349,7 @@ function selectTab(
   workspaceRuntimeId = currentRuntimeId(),
 ) {
   return dispatchSelectWorkspacePaneTabByIdentityAction({
-    location: workspacePaneLocationForLinkedWorktree(PANE_TARGET, workspaceRuntimeId, {
-      kind: 'branch',
-      branchName: 'feature/worktree',
-    }),
+    location: linkedLocation(workspaceRuntimeId),
     workspaceId: REPO_ID,
     workspaceRuntimeId,
     workspacePaneRoute: { kind: 'static', tab: 'status' },
@@ -378,15 +360,19 @@ function selectTab(
 
 function moveTab(navigation: ObservedAppNavigationActionsForTest) {
   return dispatchMoveWorkspacePaneTabAction({
-    location: workspacePaneLocationForLinkedWorktree(PANE_TARGET, currentRuntimeId(), {
-      kind: 'branch',
-      branchName: 'feature/worktree',
-    }),
+    location: linkedLocation(),
     workspaceId: REPO_ID,
     workspaceRuntimeId: currentRuntimeId(),
     workspacePaneRoute: { kind: 'static', tab: 'status' },
     direction: 1,
     navigation,
+  })
+}
+
+function linkedLocation(workspaceRuntimeId: string = currentRuntimeId()) {
+  return workspacePaneLocationForLinkedWorktree(PANE_TARGET, workspaceRuntimeId, {
+    kind: 'branch',
+    branchName: 'feature/worktree',
   })
 }
 
