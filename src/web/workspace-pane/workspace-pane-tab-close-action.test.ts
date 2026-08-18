@@ -22,7 +22,6 @@ import {
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
-  workspacePaneActionTargetFromLocation,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
@@ -295,7 +294,7 @@ describe('workspace pane tab close action', () => {
       branchName: BRANCH_NAME,
     })
     const releaseQueue = Promise.withResolvers<void>()
-    const blocker = runWorkspacePaneAction(workspacePaneActionTargetFromLocation(location), () => releaseQueue.promise)
+    const blocker = runWorkspacePaneAction(location, () => releaseQueue.promise)
     const navigation = navigationWith()
     const close = dispatchCloseWorkspacePaneTabAction({
       location,

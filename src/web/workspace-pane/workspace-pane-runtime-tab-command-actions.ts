@@ -19,10 +19,7 @@ import type { FilesystemWorkspacePaneRouteCommitActions } from '#/web/app/naviga
 import type { FilesystemWorkspacePaneCommandTarget } from '#/web/workspace-pane/workspace-pane-command-target.ts'
 import { selectWorkspacePaneControllerTab } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
-import {
-  workspacePaneActionTargetFromLocation,
-  runWorkspacePaneAction,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   filesystemWorkspacePaneLocationIsCurrent,
   resolveWorkspacePaneTabTargetForPaneTarget,
@@ -250,11 +247,10 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   )
   const worktree = bridge.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)
   if (worktree.count > 0) {
-    const target = workspacePaneActionTargetFromLocation(terminal.location)
     const navigationGeneration = beginAppNavigation()
     let ownedFocusLease = claimTerminalAutoFocus(navigationGeneration)
     try {
-      return await runWorkspacePaneAction(target, async () => {
+      return await runWorkspacePaneAction(terminal.location, async () => {
         const nextWorktree = bridge.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)
         const firstSession = nextWorktree.sessions[0]
         if (!firstSession) return nextWorktree.createPending

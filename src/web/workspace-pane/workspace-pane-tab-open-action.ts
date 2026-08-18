@@ -25,10 +25,7 @@ import {
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import {
-  workspacePaneActionTargetFromLocation,
-  runWorkspacePaneAction,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { beginAppNavigation } from '#/web/app/navigation/lifecycle.ts'
 import {
   commitWorkspacePaneStaticTabPresentation,
@@ -95,8 +92,7 @@ async function dispatchWorkspacePaneTargetStaticTabAction(
   const admission = workspacePaneStaticTabOpenAdmission(resolvedInput)
   if (admission) return admission
   const navigationGeneration = beginAppNavigation()
-  const actionTarget = workspacePaneActionTargetFromLocation(location)
-  return await runWorkspacePaneAction(actionTarget, () =>
+  return await runWorkspacePaneAction(location, () =>
     openWorkspacePaneStaticTabAction(resolvedInput, { kind: 'current', navigationGeneration }),
   )
 }
@@ -182,7 +178,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
   const admission = workspacePaneStaticTabOpenAdmission(input)
   if (admission) return admission
   const presentation = beginWorkspacePaneDestinationPresentation(lease)
-  return await runWorkspacePaneAction(workspacePaneActionTargetFromLocation(location), () =>
+  return await runWorkspacePaneAction(location, () =>
     openWorkspacePaneStaticTabAction(input, {
       kind: 'destination',
       presentation,
@@ -224,7 +220,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
   }
   if (workspacePaneStaticTabOpenAdmission(resolvedInput)) return false
   const navigationGeneration = beginAppNavigation()
-  const outcome = await runWorkspacePaneAction(workspacePaneActionTargetFromLocation(location), () =>
+  const outcome = await runWorkspacePaneAction(location, () =>
     openWorkspacePaneStaticTabAction(resolvedInput, {
       kind: 'current',
       navigationGeneration,

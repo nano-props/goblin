@@ -32,7 +32,6 @@ import type { WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
-  workspacePaneActionTargetFromLocation,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-request-error.ts'
 import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repos/query-cache.ts'
@@ -179,10 +178,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     seedWorkspacePaneTabs(sourceTabs)
     renderMutationHook({ canonicalTabs: sourceTabs })
     const blocker = Promise.withResolvers<void>()
-    void runWorkspacePaneAction(
-      workspacePaneActionTargetFromLocation(linkedLocation()),
-      async () => await blocker.promise,
-    )
+    void runWorkspacePaneAction(linkedLocation(), async () => await blocker.promise)
     const onSettled = vi.fn()
 
     await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs].reverse(), onSettled))
@@ -211,10 +207,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     const location = linkedLocation()
     renderMutationHook({ location, canonicalTabs: sourceTabs })
     const blocker = Promise.withResolvers<void>()
-    const coordinatorBlocker = runWorkspacePaneAction(
-      workspacePaneActionTargetFromLocation(location),
-      async () => blocker.promise,
-    )
+    const coordinatorBlocker = runWorkspacePaneAction(location, async () => blocker.promise)
     const onSettled = vi.fn()
 
     await flushTestUpdates(() => currentControls().reorderTabs([...sourceTabs].reverse(), onSettled))

@@ -297,18 +297,10 @@ describe('workspace pane runtime tab command actions', () => {
   test('primary terminal action queues existing-session focus behind workspace pane coordination', async () => {
     const coordinatorStarted = Promise.withResolvers<void>()
     const releaseCoordinator = Promise.withResolvers<void>()
-    const coordinatorBlocker = runWorkspacePaneAction(
-      {
-        kind: 'git-worktree' as const,
-        workspaceId: terminalCoordinates.workspaceId,
-        workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
-        worktreePath: terminalExecutionPath(terminalBase.target),
-      },
-      async () => {
-        coordinatorStarted.resolve()
-        await releaseCoordinator.promise
-      },
-    )
+    const coordinatorBlocker = runWorkspacePaneAction(terminalLocation, async () => {
+      coordinatorStarted.resolve()
+      await releaseCoordinator.promise
+    })
     await coordinatorStarted.promise
 
     let sessions = [terminalSession('term-111111111111111111111', true)]
@@ -711,18 +703,10 @@ describe('workspace pane runtime tab command actions', () => {
     const scenario = terminalCommandScenario([terminalSessionId])
     const coordinatorStarted = Promise.withResolvers<void>()
     const releaseCoordinator = Promise.withResolvers<void>()
-    const coordinatorBlocker = runWorkspacePaneAction(
-      {
-        kind: 'git-worktree',
-        workspaceId: terminalCoordinates.workspaceId,
-        workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
-        worktreePath: terminalExecutionPath(terminalBase.target),
-      },
-      async () => {
-        coordinatorStarted.resolve()
-        await releaseCoordinator.promise
-      },
-    )
+    const coordinatorBlocker = runWorkspacePaneAction(terminalLocation, async () => {
+      coordinatorStarted.resolve()
+      await releaseCoordinator.promise
+    })
     await coordinatorStarted.promise
 
     const action = dispatchTerminalRuntimePrimaryAction(scenario.options)
@@ -747,18 +731,10 @@ describe('workspace pane runtime tab command actions', () => {
     const scenario = terminalCommandScenario([terminalSessionId], terminalSessionId)
     const coordinatorStarted = Promise.withResolvers<void>()
     const releaseCoordinator = Promise.withResolvers<void>()
-    const coordinatorBlocker = runWorkspacePaneAction(
-      {
-        kind: 'git-worktree',
-        workspaceId: terminalCoordinates.workspaceId,
-        workspaceRuntimeId: terminalCoordinates.workspaceRuntimeId,
-        worktreePath: terminalExecutionPath(terminalBase.target),
-      },
-      async () => {
-        coordinatorStarted.resolve()
-        await releaseCoordinator.promise
-      },
-    )
+    const coordinatorBlocker = runWorkspacePaneAction(terminalLocation, async () => {
+      coordinatorStarted.resolve()
+      await releaseCoordinator.promise
+    })
     await coordinatorStarted.promise
 
     const action = dispatchTerminalRuntimePrimaryAction(scenario.options)

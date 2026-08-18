@@ -3,36 +3,30 @@ import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
   tryRunWorkspacePaneAction,
-  workspacePaneActionTargetKey,
-  workspacePaneActionTargetFromLocation,
   workspacePaneActionQueueStatsForTest,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
 const OTHER_WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
-
-const TARGET = {
-  kind: 'git-worktree' as const,
-  workspaceId: WORKSPACE_ID,
-  workspaceRuntimeId: 'repo-runtime-1',
-  worktreePath: '/worktree-a',
-} as const
+const WORKSPACE_RUNTIME_ID = 'repo-runtime-1'
+const LINKED_LOCATION = linkedLocation('/worktree-a', WORKSPACE_RUNTIME_ID)
 
 describe('workspace pane action queue', () => {
   beforeEach(() => resetWorkspacePaneActionQueueForTest())
 
-  test('serializes the same complete resource target and cleans up on idle', async () => {
+  test('serializes the same admitted location and cleans up on idle', async () => {
     const workspaceOrder: string[] = []
     const release = Promise.withResolvers<void>()
     const firstStarted = Promise.withResolvers<void>()
-    const first = runWorkspacePaneAction(TARGET, async () => {
+    const first = runWorkspacePaneAction(LINKED_LOCATION, async () => {
       workspaceOrder.push('first-start')
       firstStarted.resolve()
       await release.promise
       workspaceOrder.push('first-end')
     })
-    const second = runWorkspacePaneAction(TARGET, () => workspaceOrder.push('second'))
+    const second = runWorkspacePaneAction(LINKED_LOCATION, () => workspaceOrder.push('second'))
 
     await firstStarted.promise
     expect(workspaceOrder).toEqual(['first-start'])
@@ -42,40 +36,38 @@ describe('workspace pane action queue', () => {
     await vi.waitFor(() => expect(workspacePaneActionQueueStatsForTest().targetQueues).toBe(0))
   })
 
-  test('admits an idle presentation action and rejects one while the target is owned', async () => {
-    await expect(tryRunWorkspacePaneAction(TARGET, () => 'idle')).resolves.toEqual({
+  test('admits an idle presentation action and rejects one while the location is owned', async () => {
+    await expect(tryRunWorkspacePaneAction(LINKED_LOCATION, () => 'idle')).resolves.toEqual({
       kind: 'accepted',
       result: 'idle',
     })
 
     const started = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
-    const occupied = runWorkspacePaneAction(TARGET, async () => {
+    const occupied = runWorkspacePaneAction(LINKED_LOCATION, async () => {
       started.resolve()
       await release.promise
     })
     await started.promise
 
-    await expect(tryRunWorkspacePaneAction(TARGET, () => 'should-not-run')).resolves.toEqual({ kind: 'busy' })
+    await expect(tryRunWorkspacePaneAction(LINKED_LOCATION, () => 'should-not-run')).resolves.toEqual({
+      kind: 'busy',
+    })
     release.resolve()
     await occupied
   })
 
-  test('serializes workspace-scoped actions without inventing a branch', async () => {
-    const workspaceTarget = {
-      kind: 'workspace-root' as const,
-      workspaceId: OTHER_WORKSPACE_ID,
-      workspaceRuntimeId: 'repo-runtime-1',
-    }
+  test('serializes workspace-root actions without inventing a branch', async () => {
+    const location = rootLocation(OTHER_WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
     const workspaceOrder: string[] = []
     const release = Promise.withResolvers<void>()
     const firstStarted = Promise.withResolvers<void>()
-    const first = runWorkspacePaneAction(workspaceTarget, async () => {
+    const first = runWorkspacePaneAction(location, async () => {
       workspaceOrder.push('first')
       firstStarted.resolve()
       await release.promise
     })
-    const second = runWorkspacePaneAction(workspaceTarget, () => workspaceOrder.push('second'))
+    const second = runWorkspacePaneAction(location, () => workspaceOrder.push('second'))
 
     await firstStarted.promise
     expect(workspaceOrder).toEqual(['first'])
@@ -84,90 +76,89 @@ describe('workspace pane action queue', () => {
     expect(workspaceOrder).toEqual(['first', 'second'])
   })
 
-  test('identifies a detached worktree by its filesystem path instead of workspace-root scope', () => {
-    expect(
-      workspacePaneActionTargetFromLocation({
-        kind: 'linked-worktree',
-        workspaceId: TARGET.workspaceId,
-        workspaceRuntimeId: TARGET.workspaceRuntimeId,
-        routeTarget: {
-          kind: 'git-worktree',
-          workspaceId: TARGET.workspaceId,
-          worktreePath: TARGET.worktreePath,
-        },
-        paneTarget: {
-          kind: 'git-worktree',
-          workspaceId: TARGET.workspaceId,
-          worktreePath: TARGET.worktreePath,
-        },
-        worktreeHead: { kind: 'detached' },
-        branchName: null,
-      }),
-    ).toEqual(TARGET)
-  })
+  test('coordinates a source worktree through its workspace-root pane owner', async () => {
+    const sourceLocation: WorkspacePaneLocation = {
+      kind: 'source-worktree',
+      workspaceId: WORKSPACE_ID,
+      workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/physical/repo' },
+      paneTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
+      worktreeHead: { kind: 'branch', branchName: 'main' },
+      branchName: 'main',
+    }
+    const started = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const occupied = runWorkspacePaneAction(sourceLocation, async () => {
+      started.resolve()
+      await release.promise
+    })
+    await started.promise
 
-  test('coordinates a source worktree through its workspace-root pane owner', () => {
-    expect(
-      workspacePaneActionTargetFromLocation({
-        kind: 'source-worktree',
-        workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime',
-        routeTarget: { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/physical/repo' },
-        paneTarget: { kind: 'workspace-root', workspaceId: WORKSPACE_ID },
-        worktreeHead: { kind: 'branch', branchName: 'main' },
-        branchName: 'main',
-      }),
-    ).toEqual({ kind: 'workspace-root', workspaceId: WORKSPACE_ID, workspaceRuntimeId: 'runtime' })
+    await expect(
+      tryRunWorkspacePaneAction(rootLocation(WORKSPACE_ID, WORKSPACE_RUNTIME_ID), () => 'should-not-run'),
+    ).resolves.toEqual({ kind: 'busy' })
+    release.resolve()
+    await occupied
   })
 
   test.each([
-    ['runtime', { ...TARGET, workspaceRuntimeId: 'repo-runtime-2' }],
-    ['worktree', { ...TARGET, worktreePath: '/worktree-b' }],
-    [
-      'branch',
-      {
-        kind: 'git-branch' as const,
-        workspaceId: TARGET.workspaceId,
-        workspaceRuntimeId: TARGET.workspaceRuntimeId,
-        branchName: 'feature/b',
-      },
-    ],
-  ] as const)('allows a different %s target to progress independently', async (_resource, otherTarget) => {
-    const release = Promise.withResolvers<void>()
-    const first = runWorkspacePaneAction(TARGET, async () => await release.promise)
-    let otherRan = false
+    ['runtime', LINKED_LOCATION, linkedLocation('/worktree-a', 'repo-runtime-2')],
+    ['worktree', LINKED_LOCATION, linkedLocation('/worktree-b', WORKSPACE_RUNTIME_ID)],
+    ['branch', branchLocation('feature/a'), branchLocation('feature/b')],
+    ['workspace', LINKED_LOCATION, linkedLocation('/worktree-a', WORKSPACE_RUNTIME_ID, OTHER_WORKSPACE_ID)],
+  ] as const)(
+    'allows a different %s location to progress independently',
+    async (_resource, occupiedLocation, otherLocation) => {
+      const release = Promise.withResolvers<void>()
+      const first = runWorkspacePaneAction(occupiedLocation, async () => await release.promise)
+      let otherRan = false
 
-    await runWorkspacePaneAction(otherTarget, () => {
-      otherRan = true
-    })
-    expect(otherRan).toBe(true)
-    release.resolve()
-    await first
-  })
-
-  test('keys every target kind from only its authoritative identity', () => {
-    expect(
-      workspacePaneActionTargetKey({
-        kind: 'workspace-root',
-        workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime',
-      }),
-    ).toBe('goblin+file:///repo\0runtime\0workspace-root')
-    expect(
-      workspacePaneActionTargetKey({
-        kind: 'git-branch',
-        workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime',
-        branchName: 'main',
-      }),
-    ).toBe('goblin+file:///repo\0runtime\0git-branch\0main')
-    expect(
-      workspacePaneActionTargetKey({
-        kind: 'git-worktree' as const,
-        workspaceId: WORKSPACE_ID,
-        workspaceRuntimeId: 'runtime',
-        worktreePath: '/repo-worktree',
-      }),
-    ).toBe('goblin+file:///repo\0runtime\0git-worktree\0/repo-worktree')
-  })
+      await runWorkspacePaneAction(otherLocation, () => {
+        otherRan = true
+      })
+      expect(otherRan).toBe(true)
+      release.resolve()
+      await first
+    },
+  )
 })
+
+function linkedLocation(
+  worktreePath: string,
+  workspaceRuntimeId: string,
+  workspaceId: typeof WORKSPACE_ID = WORKSPACE_ID,
+): WorkspacePaneLocation {
+  return {
+    kind: 'linked-worktree',
+    workspaceId,
+    workspaceRuntimeId,
+    routeTarget: { kind: 'git-worktree', workspaceId, worktreePath },
+    paneTarget: { kind: 'git-worktree', workspaceId, worktreePath },
+    worktreeHead: { kind: 'detached' },
+    branchName: null,
+  }
+}
+
+function branchLocation(branchName: string): WorkspacePaneLocation {
+  return {
+    kind: 'branch',
+    workspaceId: WORKSPACE_ID,
+    workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+    routeTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName },
+    paneTarget: { kind: 'git-branch', workspaceId: WORKSPACE_ID, branchName },
+    worktreeHead: null,
+    branchName,
+  }
+}
+
+function rootLocation(workspaceId: typeof WORKSPACE_ID, workspaceRuntimeId: string): WorkspacePaneLocation {
+  return {
+    kind: 'workspace-root',
+    workspaceId,
+    workspaceRuntimeId,
+    routeTarget: { kind: 'workspace-root', workspaceId },
+    paneTarget: { kind: 'workspace-root', workspaceId },
+    worktreeHead: null,
+    branchName: null,
+  }
+}

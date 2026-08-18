@@ -18,10 +18,7 @@ import {
   resolveWorkspacePaneTabTargetForPaneTarget,
   scopeWorkspacePaneTabTargetResolutionToRuntime,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import {
-  workspacePaneActionTargetFromLocation,
-  runWorkspacePaneAction,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
@@ -127,8 +124,7 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
 ): Promise<TerminalCreateCommandResult> {
   const base = workspacePaneLocationTerminalBase(options.location)
   if (!terminalCreateTargetIsCurrent(options.location, base)) return staleTerminalCreateResult()
-  const target = workspacePaneActionTargetFromLocation(options.location)
-  return await runWorkspacePaneAction(target, async () => {
+  return await runWorkspacePaneAction(options.location, async () => {
     const admission = terminalCreateAdmission(options.location, base)
     if (admission === 'stale') return staleTerminalCreateResult()
     if (admission !== 'ready') return blockedTerminalCreateResult(admission, options.t)

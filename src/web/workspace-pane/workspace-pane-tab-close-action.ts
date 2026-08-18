@@ -26,11 +26,7 @@ import { terminalActionDialogsStore } from '#/web/stores/workspaces/terminal-act
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 import type { WorkspacePaneRuntimeTabCloseConfirmRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
-import {
-  workspacePaneActionTargetFromLocation,
-  runWorkspacePaneAction,
-  type WorkspacePaneActionTarget,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { terminalLog } from '#/web/logger.ts'
 import {
   abandonWorkspacePaneClosePresentation,
@@ -106,9 +102,7 @@ export async function dispatchCloseWorkspacePaneTabAction(
       presentationEffects?.onAbandon()
       return false
     }
-    return await runWorkspacePaneAction(workspacePaneActionTargetFromLocation(location), () =>
-      closeWorkspacePaneTabAction(ownedOptions),
-    )
+    return await runWorkspacePaneAction(location, () => closeWorkspacePaneTabAction(ownedOptions))
   } catch (error) {
     presentationEffects?.onAbandon()
     throw error
@@ -152,8 +146,9 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
       presentationEffects?.onAbandon()
       return false
     }
-    const queueTarget = workspacePaneActionTargetFromLocation(ownedOptions.location)
-    return await runWorkspacePaneAction(queueTarget, () => confirmCloseTerminalWorkspacePaneTabAction(ownedOptions))
+    return await runWorkspacePaneAction(ownedOptions.location, () =>
+      confirmCloseTerminalWorkspacePaneTabAction(ownedOptions),
+    )
   } catch (error) {
     presentationEffects?.onAbandon()
     throw error

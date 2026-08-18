@@ -25,7 +25,6 @@ import { setClientBridgeForTests } from '#/web/bridge/client.ts'
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
-  workspacePaneActionTargetFromLocation,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { dispatchOpenWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import {
@@ -168,10 +167,7 @@ describe('workspace pane tab select action', () => {
     const showTab = storeBackedShowTab()
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab: showTab }, { autoSeedInitialRoute: false })
     const blocker = Promise.withResolvers<void>()
-    const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromLocation(linkedLocation(target.workspaceRuntimeId)),
-      () => blocker.promise,
-    )
+    const blockingAction = runWorkspacePaneAction(linkedLocation(target.workspaceRuntimeId), () => blocker.promise)
 
     const selectFiles = selectTab('workspace-pane:files', navigation)
     const selectHistory = selectTab('workspace-pane:history', navigation)
@@ -195,10 +191,7 @@ describe('workspace pane tab select action', () => {
     const showTab = vi.fn(() => true)
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab: showTab }, { autoSeedInitialRoute: false })
     const blocker = Promise.withResolvers<void>()
-    const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromLocation(linkedLocation(target.workspaceRuntimeId)),
-      () => blocker.promise,
-    )
+    const blockingAction = runWorkspacePaneAction(linkedLocation(target.workspaceRuntimeId), () => blocker.promise)
 
     const firstMove = moveTab(navigation)
     const secondMove = moveTab(navigation)
@@ -228,10 +221,7 @@ describe('workspace pane tab select action', () => {
     const showTab = vi.fn(() => true)
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab: showTab }, { autoSeedInitialRoute: false })
     const blocker = Promise.withResolvers<void>()
-    const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromLocation(linkedLocation(target.workspaceRuntimeId)),
-      () => blocker.promise,
-    )
+    const blockingAction = runWorkspacePaneAction(linkedLocation(target.workspaceRuntimeId), () => blocker.promise)
     const queuedAction = dispatch(navigation)
     const generation = currentAppNavigationGeneration()
 
@@ -254,10 +244,7 @@ describe('workspace pane tab select action', () => {
     observeStatusRoute(target)
     const navigation = navigationWith({}, { autoSeedInitialRoute: false })
     const blocker = Promise.withResolvers<void>()
-    const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromLocation(linkedLocation(target.workspaceRuntimeId)),
-      () => blocker.promise,
-    )
+    const blockingAction = runWorkspacePaneAction(linkedLocation(target.workspaceRuntimeId), () => blocker.promise)
     const selection = selectTab('workspace-pane:files', navigation)
 
     await failWorkspacePaneTabsQueryForTest(REPO_ID, target.workspaceRuntimeId)
@@ -281,10 +268,7 @@ describe('workspace pane tab select action', () => {
       showRepoBranchWorkspacePaneTab: showTab,
     })
     const blocker = Promise.withResolvers<void>()
-    const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromLocation(linkedLocation(target.workspaceRuntimeId)),
-      () => blocker.promise,
-    )
+    const blockingAction = runWorkspacePaneAction(linkedLocation(target.workspaceRuntimeId), () => blocker.promise)
     const move = moveTab(navigation)
     const generation = currentAppNavigationGeneration()
 

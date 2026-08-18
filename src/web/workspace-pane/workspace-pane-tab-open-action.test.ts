@@ -60,7 +60,6 @@ import {
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
-  workspacePaneActionTargetFromLocation,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 const feedbackMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
@@ -203,10 +202,7 @@ describe('openWorkspacePaneTab', () => {
       branchName: 'feature/worktree',
     })
     const blocker = Promise.withResolvers<void>()
-    const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromLocation(location),
-      () => blocker.promise,
-    )
+    const blockingAction = runWorkspacePaneAction(location, () => blocker.promise)
     const updateWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('status')])
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
     const dispatch = dispatchOpenWorkspacePaneTargetStaticTabAction({

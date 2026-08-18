@@ -16,10 +16,7 @@ import {
   workspacePaneTabTargetBlocksInteraction,
   type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import {
-  workspacePaneActionTargetFromLocation,
-  runWorkspacePaneAction,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import {
   workspacePaneLocationBranchName,
@@ -75,7 +72,7 @@ export async function dispatchSelectWorkspacePaneTabByIndexAction(
     return false
   }
   const navigationGeneration = beginAppNavigation()
-  return await runWorkspacePaneAction(workspacePaneQueuedActionTarget(coordinatorTarget), () =>
+  return await runWorkspacePaneAction(workspacePaneQueuedActionLocation(coordinatorTarget), () =>
     selectWorkspacePaneTabByIndexAction(options, coordinatorTarget, navigationGeneration),
   )
 }
@@ -123,7 +120,7 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
     return false
   }
   const navigationGeneration = beginAppNavigation()
-  return await runWorkspacePaneAction(workspacePaneQueuedActionTarget(coordinatorTarget), () =>
+  return await runWorkspacePaneAction(workspacePaneQueuedActionLocation(coordinatorTarget), () =>
     selectWorkspacePaneTabByIdentityAction(options, coordinatorTarget, navigationGeneration),
   )
 }
@@ -164,7 +161,7 @@ export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspaceP
     options.workspaceRuntimeId,
   )
   if (!coordinatorTarget) return false
-  return await runWorkspacePaneAction(workspacePaneQueuedActionTarget(coordinatorTarget), () =>
+  return await runWorkspacePaneAction(workspacePaneQueuedActionLocation(coordinatorTarget), () =>
     moveWorkspacePaneTabAction(options, coordinatorTarget),
   )
 }
@@ -221,7 +218,7 @@ function selectableWorkspacePaneTarget(
   return scoped.kind === 'missing' ? null : scoped.target
 }
 
-function workspacePaneQueuedActionTarget(model: WorkspacePaneTabModel) {
+function workspacePaneQueuedActionLocation(model: WorkspacePaneTabModel) {
   if (!model.location) throw new Error('selectable workspace pane target requires a location')
-  return workspacePaneActionTargetFromLocation(model.location)
+  return model.location
 }

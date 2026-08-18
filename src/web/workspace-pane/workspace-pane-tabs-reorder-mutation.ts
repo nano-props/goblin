@@ -13,10 +13,7 @@ import {
   workspacePaneTabEntryListIdentity,
   workspacePaneTabsWithSurfaceOrder,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import {
-  runWorkspacePaneAction,
-  workspacePaneActionTargetFromLocation,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   workspacePaneTabsBranchIdentity,
   workspacePaneTabsTargetWorktreePath,
@@ -67,9 +64,7 @@ async function runWorkspacePaneTabsReorder(
   onSettled: (() => void) | undefined,
 ): Promise<void> {
   try {
-    await runWorkspacePaneAction(workspacePaneActionTargetFromLocation(location), () =>
-      runWorkspacePaneTabsReorderInQueue(location, draggedTabs, queryClient),
-    )
+    await runWorkspacePaneAction(location, () => runWorkspacePaneTabsReorderInQueue(location, draggedTabs, queryClient))
   } finally {
     onSettled?.()
   }
