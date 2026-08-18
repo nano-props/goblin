@@ -20,6 +20,13 @@ export interface GitWorkspacePaneProjection extends BranchActionRepo {
   ui: Pick<WorkspaceState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
 }
 
+export interface GitWorkspacePaneContentRepo {
+  id: GitWorkspacePaneProjection['id']
+  workspaceRuntimeId: GitWorkspacePaneProjection['workspaceRuntimeId']
+  probe: Pick<GitWorkspacePaneProjection['probe'], 'capabilities'>
+  ui: Pick<GitWorkspacePaneProjection['ui'], 'currentBranchName'>
+}
+
 export function getCurrentGitWorkspacePane(workspace: GitWorkspacePaneProjection, pullRequest?: PullRequestInfo) {
   const branch =
     workspace.snapshot.branches.find((candidate) => candidate.name === workspace.ui.currentBranchName) ?? null

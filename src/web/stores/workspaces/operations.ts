@@ -22,6 +22,14 @@ export interface RepoOperationsState {
   branchAction: RepoOperationState
 }
 
+export function activeWorktreeRemovalPhase(
+  operation: RepoOperationState,
+  branchName: string | null | undefined,
+): 'queued' | 'running' | null {
+  if (operation.reason !== 'branch:removeWorktree' || operation.target !== branchName) return null
+  return operation.phase === 'queued' || operation.phase === 'running' ? operation.phase : null
+}
+
 export function isBranchActionReason(reason: RepoOperationReason | null): reason is RepoBranchActionReason {
   return typeof reason === 'string' && reason.startsWith('branch:')
 }

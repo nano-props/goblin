@@ -6,6 +6,7 @@ import { EmptyState } from '#/web/components/EmptyState.tsx'
 import { WorkspacePaneSkeleton } from '#/web/components/Skeleton.tsx'
 import { GitWorkspacePaneContent } from '#/web/components/repo-workspace/GitWorkspacePaneContent.tsx'
 import { GitWorkspacePaneToolbar } from '#/web/components/repo-workspace/GitWorkspacePaneToolbar.tsx'
+import { WorkspacePaneCompactBackButton } from '#/web/components/workspace-pane/WorkspacePaneToolbar.tsx'
 import { BranchActionSurfaceProvider } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { getCurrentGitWorkspacePanePresentation } from '#/web/components/repo-workspace/model.ts'
 import type {
@@ -19,6 +20,8 @@ import type {
 } from '#/web/components/workspace-pane/workspace-pane-types.ts'
 import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import { repoBranchActionLoadingLabel } from '#/web/stores/workspaces/action-labels.ts'
+import { activeWorktreeRemovalPhase } from '#/web/stores/workspaces/operations.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.tsx'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions } from '#/web/hooks/useBranchActions.tsx'
@@ -31,6 +34,13 @@ import {
 import { useGitWorkspacePaneRouteController } from '#/web/components/repo-workspace/git-workspace-pane-route-controller.ts'
 import { useGitWorkspacePaneTabModel } from '#/web/workspace-pane/use-workspace-pane-tab-model.ts'
 import { useT } from '#/web/stores/i18n-vue.ts'
+import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
+import {
+  WorkspaceToolbar,
+  WorkspaceToolbarContent,
+  WorkspaceToolbarLeadingSpacer,
+  WorkspaceToolbarPrimary,
+} from '#/web/components/workspace-toolbar-chrome.tsx'
 
 interface GitWorkspacePaneProps {
   gitWorkspace: GitWorkspacePaneShell
@@ -240,6 +250,8 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
   ],
 
   setup(props) {
+    const t = useT()
+    const compact = useIsCompactUi()
     const workspacePaneTabModel = useGitWorkspacePaneTabModel(
       () => props.repo,
       () => props.detail,
@@ -255,6 +267,25 @@ const GitWorkspacePaneSurface = defineComponent<GitWorkspacePaneSurfaceProps>({
     })
 
     return () => {
+      const worktreeRemovalPhase = activeWorktreeRemovalPhase(props.repo.branchAction, props.detail.branch?.name)
+      if (worktreeRemovalPhase) {
+        const worktreeRemovalLabelKey = repoBranchActionLoadingLabel('removeWorktree', worktreeRemovalPhase).labelKey
+        return (
+          <>
+            <WorkspaceToolbar draggable={!compact.value} trafficLightOffset={props.toolbarTrafficLightOffset ?? false}>
+              <WorkspaceToolbarLeadingSpacer reserve={props.toolbarTrafficLightOffset ?? false} />
+              <WorkspaceToolbarContent>
+                <WorkspaceToolbarPrimary>
+                  <WorkspacePaneCompactBackButton onBackToNavigator={props.onBackToGitWorkspaceNavigator} />
+                </WorkspaceToolbarPrimary>
+              </WorkspaceToolbarContent>
+            </WorkspaceToolbar>
+            <div role="status" aria-live="polite" class="flex min-h-0 flex-1 flex-col">
+              <EmptyState title={t(worktreeRemovalLabelKey)} />
+            </div>
+          </>
+        )
+      }
       const currentWorkspacePaneRoute = workspacePaneRoute(props.workspacePaneRouteContext)
       return (
         <>

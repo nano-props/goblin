@@ -82,7 +82,10 @@ interface WorkspacePaneRuntimeApplicationDependencies {
  * Application operation joining provider lifecycle and workspace-pane
  * projection. All provider operations for one user/runtime/worktree share a
  * physical-worktree queue, so open and close observe one server-owned order
- * and cannot cross an admitted removal.
+ * and cannot cross an admitted removal. An open admitted first may finish and
+ * is then included in removal quiescence; a removal admitted first rejects a
+ * later open. This intentionally permits a newly opened terminal to exist
+ * briefly before the accepted removal closes it.
  */
 export class WorkspacePaneRuntimeApplication {
   private readonly deps: WorkspacePaneRuntimeApplicationDependencies

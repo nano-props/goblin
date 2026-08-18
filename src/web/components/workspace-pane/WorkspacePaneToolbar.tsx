@@ -37,6 +37,40 @@ interface WorkspacePaneToolbarProps {
   onReorder: (tabs: WorkspacePaneTabEntry[]) => void
 }
 
+interface WorkspacePaneCompactBackButtonProps {
+  onBackToNavigator?: () => void
+}
+
+export const WorkspacePaneCompactBackButton = defineComponent<WorkspacePaneCompactBackButtonProps>({
+  name: 'WorkspacePaneCompactBackButton',
+  props: ['onBackToNavigator'],
+
+  setup(props) {
+    const t = useT()
+    const compact = useIsCompactUi()
+
+    return () => {
+      if (!compact.value) return null
+      const backLabel = t('workspace.back-to-workspace-navigator')
+      return (
+        <Tip label={backLabel}>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-7 w-7 shrink-0"
+            onClick={props.onBackToNavigator}
+            disabled={!props.onBackToNavigator}
+            aria-label={backLabel}
+            title={backLabel}
+          >
+            <ArrowLeft size={14} />
+          </Button>
+        </Tip>
+      )
+    }
+  },
+})
+
 export const WorkspacePaneToolbar = defineComponent<WorkspacePaneToolbarProps>({
   name: 'WorkspacePaneToolbar',
   props: [
@@ -55,57 +89,39 @@ export const WorkspacePaneToolbar = defineComponent<WorkspacePaneToolbarProps>({
   ],
 
   setup(props) {
-    const t = useT()
     const compact = useIsCompactUi()
     const focusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
-    return () => {
-      const backLabel = t('workspace.back-to-workspace-navigator')
-      return (
-        <WorkspaceToolbar draggable={!compact.value} trafficLightOffset={props.trafficLightOffset ?? false}>
-          <WorkspaceToolbarLeadingSpacer reserve={props.trafficLightOffset ?? false} />
-          <WorkspaceToolbarContent>
-            <WorkspaceToolbarPrimary>
-              {compact.value ? (
-                <Tip label={backLabel}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="h-7 w-7 shrink-0"
-                    onClick={props.onBackToNavigator}
-                    disabled={!props.onBackToNavigator}
-                    aria-label={backLabel}
-                    title={backLabel}
-                  >
-                    <ArrowLeft size={14} />
-                  </Button>
-                </Tip>
-              ) : null}
-              <WorkspacePaneTabStrip
-                workspacePaneTabTargetKey={props.workspacePaneTabTargetKey}
-                items={props.items}
-                workspacePaneId={props.workspacePaneId}
-                activeTabIdentity={props.activeTabIdentity}
-                responsiveCompact={compact.value}
-                panelActive
-                focusRegistry={focusRegistry}
-                emptyFocusKey={EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY}
-                createAction={props.createAction}
-                onSelect={props.onSelect}
-                onReselect={props.onReselect}
-                onClose={props.onClose}
-                onReorder={props.onReorder}
-                activateKeyboardNavigationSelection
-              />
-            </WorkspaceToolbarPrimary>
-            {props.trailingActions ? (
-              <WorkspaceToolbarActions data-workspace-toolbar-trailing-actions="">
-                {props.trailingActions}
-              </WorkspaceToolbarActions>
-            ) : null}
-          </WorkspaceToolbarContent>
-        </WorkspaceToolbar>
-      )
-    }
+    return () => (
+      <WorkspaceToolbar draggable={!compact.value} trafficLightOffset={props.trafficLightOffset ?? false}>
+        <WorkspaceToolbarLeadingSpacer reserve={props.trafficLightOffset ?? false} />
+        <WorkspaceToolbarContent>
+          <WorkspaceToolbarPrimary>
+            <WorkspacePaneCompactBackButton onBackToNavigator={props.onBackToNavigator} />
+            <WorkspacePaneTabStrip
+              workspacePaneTabTargetKey={props.workspacePaneTabTargetKey}
+              items={props.items}
+              workspacePaneId={props.workspacePaneId}
+              activeTabIdentity={props.activeTabIdentity}
+              responsiveCompact={compact.value}
+              panelActive
+              focusRegistry={focusRegistry}
+              emptyFocusKey={EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY}
+              createAction={props.createAction}
+              onSelect={props.onSelect}
+              onReselect={props.onReselect}
+              onClose={props.onClose}
+              onReorder={props.onReorder}
+              activateKeyboardNavigationSelection
+            />
+          </WorkspaceToolbarPrimary>
+          {props.trailingActions ? (
+            <WorkspaceToolbarActions data-workspace-toolbar-trailing-actions="">
+              {props.trailingActions}
+            </WorkspaceToolbarActions>
+          ) : null}
+        </WorkspaceToolbarContent>
+      </WorkspaceToolbar>
+    )
   },
 })

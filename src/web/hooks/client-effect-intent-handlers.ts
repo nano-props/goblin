@@ -195,6 +195,11 @@ export async function handleWorkspaceClientIntent(
       // Cmd+T / File → New Terminal Tab is a generic entry — the new
       // terminal should append to the end of the strip rather than being
       // anchored to the currently-active tab.
+      // A worktree-removal pending surface is only a best-effort projection,
+      // not an admission barrier for a shortcut already dispatched here. The
+      // server orders both operations by physical worktree: an earlier terminal
+      // create may finish and is then closed by removal quiescence, while an
+      // already-admitted removal rejects a later create.
       return await runNewTerminalTabCommand({
         workspaceId: plan.workspaceId,
         target: plan.target,

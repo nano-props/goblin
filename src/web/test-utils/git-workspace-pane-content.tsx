@@ -82,8 +82,9 @@ export const REPO_ID = workspaceIdForTest('goblin+file:///tmp/goblin-repo-worksp
 
 type GitWorkspacePaneContentHarnessProps = Omit<
   ComponentProps<typeof GitWorkspacePaneContent>,
-  'workspacePaneTabModel'
+  'repo' | 'workspacePaneTabModel'
 > & {
+  repo: GitWorkspacePaneProjection
   workspacePaneRouteMode?: 'preference-route' | 'bare-branch'
   navigation?: AppNavigationActions
 }

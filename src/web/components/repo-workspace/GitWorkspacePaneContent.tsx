@@ -4,7 +4,7 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { renderGitWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 import type {
   CurrentGitWorkspacePanePresentation,
-  GitWorkspacePaneProjection,
+  GitWorkspacePaneContentRepo,
 } from '#/web/components/repo-workspace/model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n-vue.ts'
@@ -18,7 +18,7 @@ import type {
 } from '#/web/workspace-pane/workspace-pane-tab-model.ts'
 
 interface GitWorkspacePaneContentProps {
-  repo: Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'snapshot' | 'status' | 'ui' | 'probe'>
+  repo: GitWorkspacePaneContentRepo
   detail: CurrentGitWorkspacePanePresentation
   workspacePaneId: string
   workspacePaneTabModel: WorkspacePaneTabModel
