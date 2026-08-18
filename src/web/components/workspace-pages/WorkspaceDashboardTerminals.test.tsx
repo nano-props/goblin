@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, screen, waitFor } from '@testing-library/vue'
+import { cleanup, screen } from '@testing-library/vue'
 import { userEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent } from 'vue'
@@ -32,14 +32,14 @@ import { appQueryClient } from '#/web/app/query-client.ts'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { getRepoSnapshot } from '#/web/repos/client.ts'
 import { workspacePaneLocationForWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
-import type * as RepoClient from '#/web/repos/client.ts'
 import { repoSnapshotQueryKey } from '#/web/repos/query-keys.ts'
+import { installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///workspace')
 const WORKSPACE_RUNTIME_ID = 'repo-runtime-dashboard'
 const toastMocks = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn() }))
+const readRepoSnapshot = vi.fn(() => new Promise(() => {}))
 
 const TerminalProjectionRecoveryScope = defineComponent<{ value: TerminalProjectionRecoveryActions }>({
   props: {
@@ -52,16 +52,11 @@ const TerminalProjectionRecoveryScope = defineComponent<{ value: TerminalProject
 })
 
 vi.mock('vue-sonner', () => ({ toast: toastMocks }))
-vi.mock('#/web/repos/client.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof RepoClient>()),
-  getRepoSnapshot: vi.fn(),
-}))
-
-const mockedGetRepoSnapshot = vi.mocked(getRepoSnapshot)
 
 beforeEach(() => {
-  mockedGetRepoSnapshot.mockReset()
-  mockedGetRepoSnapshot.mockImplementation(() => new Promise(() => {}))
+  readRepoSnapshot.mockReset()
+  readRepoSnapshot.mockImplementation(() => new Promise(() => {}))
+  installGoblinTestBridge({ 'repo.snapshot': readRepoSnapshot })
 })
 
 afterEach(() => {
@@ -273,12 +268,12 @@ describe('WorkspaceDashboardTerminals', () => {
     ]
     seedGitWorkspaceWithoutSnapshot()
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
-    mockedGetRepoSnapshot.mockRejectedValue(new Error('snapshot unavailable'))
+    readRepoSnapshot.mockRejectedValue(new Error('snapshot unavailable'))
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
 
     renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute)
 
-    await waitFor(() => expect(screen.getByText('dashboard.terminals.worktree-unavailable')).toBeTruthy())
+    await vi.waitFor(() => expect(screen.getByText('dashboard.terminals.worktree-unavailable')).toBeTruthy())
     expect((screen.getByRole('button', { name: /Branch shell/ }) as HTMLButtonElement).disabled).toBe(true)
     expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
   })
@@ -299,7 +294,7 @@ describe('WorkspaceDashboardTerminals', () => {
     terminalProjectionHydrationStore.getState().markProjectionReady(WORKSPACE_ID, WORKSPACE_RUNTIME_ID)
     const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     renderDashboardTerminals(sessions, commitFilesystemWorkspacePaneRoute)
-    mockedGetRepoSnapshot.mockRejectedValue(new Error('refresh unavailable'))
+    readRepoSnapshot.mockRejectedValue(new Error('refresh unavailable'))
 
     await appQueryClient.refetchQueries({
       queryKey: repoSnapshotQueryKey(WORKSPACE_ID, WORKSPACE_RUNTIME_ID),
