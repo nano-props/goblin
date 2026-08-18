@@ -11,7 +11,6 @@ import {
 import { isWorkspacePaneRuntimeTabEntry, workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
 import {
   resolveWorkspacePaneTabTargetForPaneTarget,
-  scopeWorkspacePaneTabTargetResolutionToRuntime,
   workspacePaneLocationIsCurrent,
   workspacePaneTabTargetBlocksInteraction,
   type WorkspacePaneTabTargetResolution,
@@ -26,7 +25,6 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 
 export interface SelectWorkspacePaneTabByIndexActionOptions {
   workspaceId: WorkspaceId | null
-  workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   location: WorkspacePaneLocation
   tabIndex: number
@@ -35,7 +33,6 @@ export interface SelectWorkspacePaneTabByIndexActionOptions {
 
 export interface MoveWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
-  workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   location: WorkspacePaneLocation
   direction: 1 | -1
@@ -44,7 +41,6 @@ export interface MoveWorkspacePaneTabActionOptions {
 
 export interface SelectWorkspacePaneTabByIdentityActionOptions {
   workspaceId: WorkspaceId | null
-  workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   location: WorkspacePaneLocation
   identity: string
@@ -56,10 +52,9 @@ export interface SelectWorkspacePaneTabByIdentityActionOptions {
 export async function dispatchSelectWorkspacePaneTabByIndexAction(
   options: SelectWorkspacePaneTabByIndexActionOptions,
 ): Promise<boolean> {
-  if (!options.workspaceId || options.tabIndex < 1) return false
+  if (options.workspaceId !== options.location.workspaceId || options.tabIndex < 1) return false
   const coordinatorTarget = selectableWorkspacePaneTarget(
     resolveSelectableWorkspacePaneTarget(options, options.workspacePaneRoute),
-    options.workspaceRuntimeId,
   )
   if (!coordinatorTarget || !workspacePaneLocationIsCurrent(coordinatorTarget.location)) return false
   const tab = coordinatorTarget.tabs[options.tabIndex - 1]
@@ -83,12 +78,9 @@ async function selectWorkspacePaneTabByIndexAction(
   navigationGeneration: AppNavigationGeneration,
 ): Promise<boolean> {
   const { workspaceId, workspacePaneRoute, tabIndex, navigation } = options
-  if (!workspaceId || tabIndex < 1) return false
+  if (workspaceId !== options.location.workspaceId || tabIndex < 1) return false
   const sourceRoute = workspacePaneRoute
-  const target = selectableWorkspacePaneTarget(
-    resolveSelectableWorkspacePaneTarget(options, sourceRoute),
-    options.workspaceRuntimeId,
-  )
+  const target = selectableWorkspacePaneTarget(resolveSelectableWorkspacePaneTarget(options, sourceRoute))
   const tab = target?.tabs[tabIndex - 1]
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(coordinatorTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
@@ -99,10 +91,9 @@ async function selectWorkspacePaneTabByIndexAction(
 export async function dispatchSelectWorkspacePaneTabByIdentityAction(
   options: SelectWorkspacePaneTabByIdentityActionOptions,
 ): Promise<boolean> {
-  if (!options.workspaceId) return false
+  if (options.workspaceId !== options.location.workspaceId) return false
   const coordinatorTarget = selectableWorkspacePaneTarget(
     resolveSelectableWorkspacePaneTarget(options, options.workspacePaneRoute),
-    options.workspaceRuntimeId,
   )
   if (!coordinatorTarget || !workspacePaneLocationIsCurrent(coordinatorTarget.location)) return false
   const tab = coordinatorTarget.tabs.find((candidate) => candidate.identity === options.identity) ?? null
@@ -131,12 +122,9 @@ async function selectWorkspacePaneTabByIdentityAction(
   navigationGeneration: AppNavigationGeneration,
 ): Promise<boolean> {
   const { workspaceId, workspacePaneRoute, identity, navigation, onTerminalReselect, reselect } = options
-  if (!workspaceId) return false
+  if (workspaceId !== options.location.workspaceId) return false
   const sourceRoute = workspacePaneRoute
-  const target = selectableWorkspacePaneTarget(
-    resolveSelectableWorkspacePaneTarget(options, sourceRoute),
-    options.workspaceRuntimeId,
-  )
+  const target = selectableWorkspacePaneTarget(resolveSelectableWorkspacePaneTarget(options, sourceRoute))
   const tab = target?.tabs.find((candidate) => candidate.identity === identity) ?? null
   const tabEntry =
     target?.surfaceTabEntries.find((candidate) => workspacePaneTabEntryIdentity(candidate) === identity) ?? null
@@ -155,10 +143,9 @@ async function selectWorkspacePaneTabByIdentityAction(
 }
 
 export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspacePaneTabActionOptions): Promise<boolean> {
-  if (!options.workspaceId) return false
+  if (options.workspaceId !== options.location.workspaceId) return false
   const coordinatorTarget = selectableWorkspacePaneTarget(
     resolveSelectableWorkspacePaneTarget(options, options.workspacePaneRoute),
-    options.workspaceRuntimeId,
   )
   if (!coordinatorTarget) return false
   return await runWorkspacePaneAction(workspacePaneQueuedActionLocation(coordinatorTarget), () =>
@@ -171,14 +158,11 @@ async function moveWorkspacePaneTabAction(
   queuedTarget: WorkspacePaneTabModel,
 ): Promise<boolean> {
   const { workspaceId, direction, navigation } = options
-  if (!workspaceId) return false
+  if (workspaceId !== options.location.workspaceId) return false
   const branchName = workspacePaneLocationBranchName(options.location)
   const currentRoute = branchName ? navigation.currentWorkspacePaneRoute(workspaceId, branchName) : undefined
   if (branchName && currentRoute === undefined) return false
-  const target = selectableWorkspacePaneTarget(
-    resolveSelectableWorkspacePaneTarget(options, currentRoute),
-    options.workspaceRuntimeId,
-  )
+  const target = selectableWorkspacePaneTarget(resolveSelectableWorkspacePaneTarget(options, currentRoute))
   const tab = target ? adjacentWorkspacePaneTab(target.tabs, target.selectedIdentity, direction) : null
   if (!target || !tab || !queuedWorkspacePaneTargetMatches(queuedTarget, target)) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
@@ -203,19 +187,15 @@ function resolveSelectableWorkspacePaneTarget(
   },
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ): WorkspacePaneTabTargetResolution {
-  if (!input.workspaceId) return { kind: 'missing' }
+  if (input.workspaceId !== input.location.workspaceId) return { kind: 'missing' }
   return resolveWorkspacePaneTabTargetForPaneTarget({
     location: input.location,
     workspacePaneRoute,
   })
 }
 
-function selectableWorkspacePaneTarget(
-  resolution: WorkspacePaneTabTargetResolution,
-  workspaceRuntimeId: string,
-): WorkspacePaneTabModel | null {
-  const scoped = scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, workspaceRuntimeId)
-  return scoped.kind === 'missing' ? null : scoped.target
+function selectableWorkspacePaneTarget(resolution: WorkspacePaneTabTargetResolution): WorkspacePaneTabModel | null {
+  return resolution.kind === 'missing' ? null : resolution.target
 }
 
 function workspacePaneQueuedActionLocation(model: WorkspacePaneTabModel) {

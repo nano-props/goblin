@@ -40,6 +40,7 @@ import {
 } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-select-repo')
+const OTHER_REPO_ID = workspaceIdForTest('goblin+file:///tmp/workspace-pane-tab-select-other-repo')
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-select-worktree'
 const PANE_TARGET = {
   kind: 'git-worktree' as const,
@@ -124,6 +125,23 @@ describe('workspace pane tab select action', () => {
     expect(currentAppNavigationGeneration()).toBe(generation)
   })
 
+  test('rejects a location outside the current workspace before starting navigation', async () => {
+    seedTarget(['status', 'files'])
+    const generation = currentAppNavigationGeneration()
+
+    await expect(
+      dispatchSelectWorkspacePaneTabByIdentityAction({
+        location: linkedLocation(),
+        workspaceId: OTHER_REPO_ID,
+        workspacePaneRoute: { kind: 'static', tab: 'status' },
+        identity: 'workspace-pane:files',
+        navigation: navigationWith(),
+      }),
+    ).resolves.toBe(false)
+
+    expect(currentAppNavigationGeneration()).toBe(generation)
+  })
+
   test('rejects an out-of-range tab index before starting navigation', async () => {
     seedTarget(['status'])
     const generation = currentAppNavigationGeneration()
@@ -135,7 +153,6 @@ describe('workspace pane tab select action', () => {
           branchName: 'feature/worktree',
         }),
         workspaceId: REPO_ID,
-        workspaceRuntimeId: currentRuntimeId(),
         workspacePaneRoute: { kind: 'static', tab: 'status' },
         tabIndex: 2,
         navigation: navigationWith(),
@@ -335,7 +352,6 @@ function selectTab(
   return dispatchSelectWorkspacePaneTabByIdentityAction({
     location: linkedLocation(workspaceRuntimeId),
     workspaceId: REPO_ID,
-    workspaceRuntimeId,
     workspacePaneRoute: { kind: 'static', tab: 'status' },
     identity,
     navigation,
@@ -346,7 +362,6 @@ function moveTab(navigation: ObservedAppNavigationActionsForTest) {
   return dispatchMoveWorkspacePaneTabAction({
     location: linkedLocation(),
     workspaceId: REPO_ID,
-    workspaceRuntimeId: currentRuntimeId(),
     workspacePaneRoute: { kind: 'static', tab: 'status' },
     direction: 1,
     navigation,

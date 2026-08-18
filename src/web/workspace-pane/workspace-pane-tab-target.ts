@@ -104,19 +104,6 @@ export type WorkspacePaneTabTargetResolution =
       target: WorkspacePaneTabModel
     }
 
-/** Narrows a ready or unavailable projection to the runtime epoch captured by an action. */
-export function scopeWorkspacePaneTabTargetResolutionToRuntime(
-  resolution: WorkspacePaneTabTargetResolution,
-  workspaceRuntimeId: string,
-): WorkspacePaneTabTargetResolution {
-  if (
-    resolution.kind === 'missing' ||
-    workspacePaneTabModelWorkspaceRuntimeId(resolution.target) === workspaceRuntimeId
-  )
-    return resolution
-  return { kind: 'missing' }
-}
-
 export interface WorkspacePaneTabTargetOptions {
   /**
    * `undefined` means no route context is available, so use persisted

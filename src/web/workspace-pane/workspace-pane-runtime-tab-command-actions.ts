@@ -23,7 +23,6 @@ import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-acti
 import {
   filesystemWorkspacePaneLocationIsCurrent,
   resolveWorkspacePaneTabTargetForPaneTarget,
-  scopeWorkspacePaneTabTargetResolutionToRuntime,
   type WorkspacePaneTabTargetResolution,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
@@ -85,11 +84,10 @@ function resolveExistingTerminalTabTarget(
   target: FilesystemWorkspacePaneCommandTarget,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
 ): WorkspacePaneTabTargetResolution {
-  const resolution = resolveWorkspacePaneTabTargetForPaneTarget({
+  return resolveWorkspacePaneTabTargetForPaneTarget({
     location: target.location,
     workspacePaneRoute,
   })
-  return scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, target.location.workspaceRuntimeId)
 }
 
 const WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE: Record<
@@ -115,7 +113,6 @@ export async function dispatchTerminalRuntimePrimaryAction(
   if (placeholderTab) {
     return await dispatchSelectWorkspacePaneTabByIdentityAction({
       workspaceId: currentWorkspaceId,
-      workspaceRuntimeId: options.target.location.workspaceRuntimeId,
       workspacePaneRoute: options.target.workspacePaneRoute,
       location: options.target.location,
       identity: placeholderTab.identity,

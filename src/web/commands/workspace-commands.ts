@@ -28,7 +28,6 @@ import {
   workspacePaneCommandCoordinates,
   workspacePaneCommandPaneTarget,
   workspacePaneCommandRouteTarget,
-  workspacePaneCommandRuntimeId,
   workspacePaneCommandTargetHasFilesystem,
   workspacePaneCommandWorktreeHead,
   type WorkspacePaneCommandTarget,
@@ -234,7 +233,6 @@ export async function runSelectWorkspacePaneTabByIndexCommand(
   if (!options.workspaceId) return false
   return await dispatchSelectWorkspacePaneTabByIndexAction({
     ...options,
-    workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
     location: options.target.location,
     workspacePaneRoute: options.target.workspacePaneRoute,
   })
@@ -244,7 +242,6 @@ export async function runMoveWorkspacePaneTabCommand(options: MoveWorkspacePaneT
   if (!options.workspaceId) return false
   return await dispatchMoveWorkspacePaneTabAction({
     ...options,
-    workspaceRuntimeId: workspacePaneCommandRuntimeId(options.target),
     location: options.target.location,
     workspacePaneRoute: options.target.workspacePaneRoute,
   })

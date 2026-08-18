@@ -15,7 +15,6 @@ import {
   filesystemWorkspacePaneLocationIsCurrent,
   gitWorktreePaneRouteLeaseIsCurrent,
   resolveWorkspacePaneTabTargetForPaneTarget,
-  scopeWorkspacePaneTabTargetResolutionToRuntime,
   workspacePaneLocationIsCurrent,
   workspacePaneTabTargetForPaneTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
@@ -168,10 +167,6 @@ describe('workspace pane tab target read model', () => {
       kind: 'unavailable',
       reason: 'workspace-pane-tabs-pending',
       target: { tabEntriesProjectionPhase: 'pending' },
-    })
-    expect(scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, repo.workspaceRuntimeId)).toBe(resolution)
-    expect(scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, 'repo-runtime-replaced')).toEqual({
-      kind: 'missing',
     })
     expect(workspacePaneTabTargetForPaneTarget(input)).toBeNull()
   })

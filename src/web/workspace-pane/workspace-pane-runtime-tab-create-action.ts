@@ -16,7 +16,6 @@ import type { TerminalCreateOptions, TerminalFocusRequest } from '#/web/terminal
 import {
   filesystemWorkspacePaneLocationIsCurrent,
   resolveWorkspacePaneTabTargetForPaneTarget,
-  scopeWorkspacePaneTabTargetResolutionToRuntime,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -221,13 +220,10 @@ function terminalCreateAdmission(
   base: TerminalSessionBase,
 ): 'ready' | 'stale' | WorkspacePaneRuntimeUnreadyProjectionPhase {
   if (!terminalCreateTargetIsCurrent(location, base)) return 'stale'
-  const resolution = scopeWorkspacePaneTabTargetResolutionToRuntime(
-    resolveWorkspacePaneTabTargetForPaneTarget({
-      location,
-      workspacePaneRoute: undefined,
-    }),
-    location.workspaceRuntimeId,
-  )
+  const resolution = resolveWorkspacePaneTabTargetForPaneTarget({
+    location,
+    workspacePaneRoute: undefined,
+  })
   if (resolution.kind === 'missing') return 'stale'
   if (resolution.kind === 'unavailable') {
     return resolution.reason === 'workspace-pane-tabs-failed' ? 'failed' : 'pending'
