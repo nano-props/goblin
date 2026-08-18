@@ -18,14 +18,12 @@ import {
   recordWorkspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
-  filesystemWorkspacePaneLocationIsCurrent,
   isGitWorktreeDestinationTargetLease,
   resolveWorkspacePaneDestinationTarget,
   workspacePaneLocationIsCurrent,
   workspacePaneTargetBlocksInteraction,
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForPaneTarget,
-  workspacePaneTargetLeaseIsCurrent,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   workspacePaneActionTargetFromLocation,
@@ -245,18 +243,10 @@ function workspacePaneStaticTabOpenAdmission(
   if (!workspacePaneLocationSupportsTab(input.location, input.type)) {
     return { kind: 'unsupported', reason: 'surface-unavailable' }
   }
-  if (!workspacePaneStaticTabOpenTargetIsCurrent(input)) return { kind: 'target-missing' }
+  if (!workspacePaneLocationIsCurrent(input.location)) return { kind: 'target-missing' }
   if (workspacePaneTargetBlocksInteraction(input.location.paneTarget, input.workspaceRuntimeId))
     return { kind: 'blocked' }
   return null
-}
-
-function workspacePaneStaticTabOpenTargetIsCurrent(input: ResolvedWorkspacePaneStaticTabOpenInput): boolean {
-  if (input.location.kind !== 'branch') return filesystemWorkspacePaneLocationIsCurrent(input.location)
-  return workspacePaneTargetLeaseIsCurrent({
-    routeTarget: input.location.routeTarget,
-    workspaceRuntimeId: input.workspaceRuntimeId,
-  })
 }
 
 async function openWorkspacePaneStaticTabAction(
@@ -275,7 +265,7 @@ async function openWorkspacePaneStaticTabAction(
   const workspace = state.workspaces[input.workspaceId]
   if (!workspace) return { kind: 'target-missing' }
   if (workspace.workspaceRuntimeId !== input.workspaceRuntimeId) return { kind: 'superseded' }
-  if (!workspacePaneStaticTabOpenTargetIsCurrent(input)) return { kind: 'superseded' }
+  if (!workspacePaneLocationIsCurrent(input.location)) return { kind: 'superseded' }
   const sourceRoute = input.sourceRoute
   const modelBefore = resolveOpenWorkspacePaneStaticTabModel(input)
   if (
