@@ -567,7 +567,6 @@ describe('workspace pane runtime tab command actions', () => {
     })
     const commitWorkspacePaneRoute = vi.fn()
     const commitFilesystemWorkspacePaneRoute = vi.fn()
-    const commitWorkspaceRootTerminalSession = vi.fn()
 
     try {
       await expect(
@@ -589,7 +588,6 @@ describe('workspace pane runtime tab command actions', () => {
           navigation: {
             commitWorkspacePaneRoute,
             commitFilesystemWorkspacePaneRoute,
-            commitWorkspaceRootTerminalSession,
           },
         }),
       ).resolves.toBe(false)
@@ -600,7 +598,6 @@ describe('workspace pane runtime tab command actions', () => {
     expect(terminalFilesystemTargetSnapshot).not.toHaveBeenCalled()
     expect(commitWorkspacePaneRoute).not.toHaveBeenCalled()
     expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
-    expect(commitWorkspaceRootTerminalSession).not.toHaveBeenCalled()
   })
 
   test.each([
@@ -649,7 +646,6 @@ describe('workspace pane runtime tab command actions', () => {
           navigation: {
             commitWorkspacePaneRoute: vi.fn(),
             commitFilesystemWorkspacePaneRoute: vi.fn(),
-            commitWorkspaceRootTerminalSession: vi.fn(),
           },
         }),
       ).resolves.toBe(false)
@@ -944,7 +940,6 @@ function terminalCommandOptions(workspaceRuntimeId: string) {
     navigation: {
       commitWorkspacePaneRoute: vi.fn(async () => true),
       commitFilesystemWorkspacePaneRoute: vi.fn(async () => true),
-      commitWorkspaceRootTerminalSession: vi.fn(async () => true),
     },
   }
 }

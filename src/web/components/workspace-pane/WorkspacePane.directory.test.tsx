@@ -132,7 +132,7 @@ describe('WorkspacePane directory workspaces', () => {
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
     })
     terminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
-    const commitWorkspaceRootTerminalSession = vi.fn(async () => true)
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const terminalCreate = Promise.withResolvers<string>()
     const createTerminal = vi.fn(async () => await terminalCreate.promise)
     const deferredTerminalCommandContext = terminalSessionContextForTest({
@@ -143,7 +143,7 @@ describe('WorkspacePane directory workspaces', () => {
 
     render(
       <VueQueryClientScope client={appQueryClient}>
-        <AppNavigationProvider value={{ ...navigation, commitWorkspaceRootTerminalSession }}>
+        <AppNavigationProvider value={{ ...navigation, commitFilesystemWorkspacePaneRoute }}>
           <TerminalSessionCommandScope value={deferredTerminalCommandContext}>
             <TerminalSessionReadScope value={terminalReadContext}>
               <WorkspacePane
@@ -172,13 +172,15 @@ describe('WorkspacePane directory workspaces', () => {
         undefined,
       )
     })
-    expect(commitWorkspaceRootTerminalSession).not.toHaveBeenCalled()
+    expect(commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
     terminalCreate.resolve('term-111111111111111111111')
     await waitFor(() =>
-      expect(commitWorkspaceRootTerminalSession).toHaveBeenCalledWith(
-        workspaceId,
-        repo.workspaceRuntimeId,
-        'term-111111111111111111111',
+      expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+        {
+          routeTarget: { kind: 'workspace-root', workspaceId },
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+        },
+        { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
         expect.objectContaining({ navigationGeneration: expect.any(Number) }),
       ),
     )

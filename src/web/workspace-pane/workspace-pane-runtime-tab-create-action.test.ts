@@ -232,9 +232,6 @@ describe('workspace pane runtime tab create action', () => {
         TERMINAL_SESSION_ID,
         {
           commitFilesystemWorkspacePaneRoute,
-          commitWorkspaceRootTerminalSession: vi.fn(async () => {
-            throw new Error('Unexpected workspace-root commit in detached-worktree test')
-          }),
         },
         routeRequest,
       ),
@@ -250,7 +247,7 @@ describe('workspace pane runtime tab create action', () => {
   })
 
   test('commits a workspace root terminal route through navigation authority', async () => {
-    const commitWorkspaceRootTerminalSession = vi.fn(async () => true)
+    const commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const routeRequest = createdTerminalRouteRequest()
     const workspaceRootBase: TerminalSessionBase = {
       target: {
@@ -267,18 +264,17 @@ describe('workspace pane runtime tab create action', () => {
         workspaceRootBase.presentation,
         TERMINAL_SESSION_ID,
         {
-          commitFilesystemWorkspacePaneRoute: vi.fn(async () => {
-            throw new Error('Unexpected worktree commit in workspace-root test')
-          }),
-          commitWorkspaceRootTerminalSession,
+          commitFilesystemWorkspacePaneRoute,
         },
         routeRequest,
       ),
     ).resolves.toBe(true)
-    expect(commitWorkspaceRootTerminalSession).toHaveBeenCalledWith(
-      REPO_ROOT,
-      WORKSPACE_RUNTIME_ID,
-      TERMINAL_SESSION_ID,
+    expect(commitFilesystemWorkspacePaneRoute).toHaveBeenCalledWith(
+      {
+        routeTarget: { kind: 'workspace-root', workspaceId: REPO_ROOT },
+        workspaceRuntimeId: WORKSPACE_RUNTIME_ID,
+      },
+      { kind: 'terminal', terminalSessionId: TERMINAL_SESSION_ID },
       routeRequest,
     )
   })

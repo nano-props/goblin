@@ -32,7 +32,7 @@ export function commitWorkspacePaneTerminalDestination(input: {
   }
   return commitFilesystemTerminalDestination({
     navigation: input.navigation,
-    target: filesystemWorkspacePaneTargetLeaseForLocation(input.location),
+    routeLease: filesystemWorkspacePaneTargetLeaseForLocation(input.location),
     paneTarget: input.location.paneTarget,
     actionTarget: workspacePaneActionTargetFromLocation(input.location),
     terminalSessionId: input.terminalSessionId,
@@ -47,11 +47,11 @@ function terminalBasesEqual(left: TerminalSessionBase, right: TerminalSessionBas
 }
 
 function terminalPaneProjectionOutcome(
-  target: FilesystemWorkspacePaneTabsTarget,
+  paneTarget: FilesystemWorkspacePaneTabsTarget,
   workspaceRuntimeId: string,
   terminalSessionId: string,
 ): { kind: 'blocked' } | { kind: 'target-missing' } | null {
-  const projection = readWorkspacePaneTabsProjectionForTarget({ ...target, workspaceRuntimeId })
+  const projection = readWorkspacePaneTabsProjectionForTarget({ ...paneTarget, workspaceRuntimeId })
   if (projection.phase !== 'ready') return { kind: 'blocked' }
   return projection.tabs.some(
     (tab) => isWorkspacePaneRuntimeTabEntry(tab) && tab.runtimeSessionId === terminalSessionId,
@@ -62,7 +62,7 @@ function terminalPaneProjectionOutcome(
 
 async function commitFilesystemTerminalDestination(input: {
   navigation: AppNavigationActions
-  target: FilesystemWorkspacePaneTargetLease
+  routeLease: FilesystemWorkspacePaneTargetLease
   paneTarget: FilesystemWorkspacePaneTabsTarget
   actionTarget: WorkspacePaneActionTarget
   terminalSessionId: string
@@ -70,13 +70,13 @@ async function commitFilesystemTerminalDestination(input: {
   return await commitQueuedTerminalDestination(input.actionTarget, async () => {
     const projectionOutcome = terminalPaneProjectionOutcome(
       input.paneTarget,
-      input.target.workspaceRuntimeId,
+      input.routeLease.workspaceRuntimeId,
       input.terminalSessionId,
     )
     if (projectionOutcome) return projectionOutcome
     const navigationGeneration = beginAppNavigation()
     const committed = await input.navigation.commitFilesystemWorkspacePaneRoute(
-      input.target,
+      input.routeLease,
       {
         kind: 'terminal',
         terminalSessionId: input.terminalSessionId,

@@ -51,10 +51,7 @@ export interface CreatedTerminalRouteRequest {
   routePrecondition: { kind: 'current-workspace-target' }
 }
 
-export type CreatedTerminalNavigation = Pick<
-  AppNavigationActions,
-  'commitFilesystemWorkspacePaneRoute' | 'commitWorkspaceRootTerminalSession'
->
+export type CreatedTerminalNavigation = Pick<AppNavigationActions, 'commitFilesystemWorkspacePaneRoute'>
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
@@ -203,14 +200,6 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
     base.target.kind !== presentation.kind
   )
     return false
-  if (location.kind === 'workspace-root') {
-    return navigation.commitWorkspaceRootTerminalSession(
-      location.workspaceId,
-      location.workspaceRuntimeId,
-      terminalSessionId,
-      routeRequest,
-    )
-  }
   return navigation.commitFilesystemWorkspacePaneRoute(
     filesystemWorkspacePaneTargetLeaseForLocation(location),
     { kind: 'terminal', terminalSessionId },

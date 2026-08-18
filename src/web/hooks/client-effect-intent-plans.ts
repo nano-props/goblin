@@ -40,7 +40,7 @@ export type ClientWorkspaceIntent = Extract<
 
 export type TerminalBellIntentPlan =
   | { kind: 'noop' }
-  | { kind: 'unavailable'; reason: 'snapshot-unavailable' }
+  | { kind: 'unavailable' }
   | {
       kind: 'show-terminal'
       location: FilesystemWorkspacePaneLocation
@@ -137,7 +137,7 @@ export function createTerminalBellIntentPlan(
   })
   if (resolution.kind === 'ready') return { kind: 'show-terminal', location: resolution.location }
   return resolution.kind === 'pending' || (!repositoryFacts && resolution.kind === 'unavailable')
-    ? { kind: 'unavailable', reason: 'snapshot-unavailable' }
+    ? { kind: 'unavailable' }
     : { kind: 'noop' }
 }
 

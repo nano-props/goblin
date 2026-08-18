@@ -1,10 +1,10 @@
-import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type {
   BranchWorkspacePaneRouteTarget,
   ParsedBranchWorkspacePaneRouteTarget,
   ParsedWorkspacePaneRouteTarget,
+  WorkspacePaneRoute,
   WorkspacePaneRouteTarget,
 } from '#/web/app/navigation/route-model.ts'
 import type { AppRouteNavigation } from '#/web/app/navigation/route-navigation.ts'
@@ -17,7 +17,6 @@ import {
 import {
   filesystemWorkspacePaneTargetLeaseIsCurrent,
   gitBranchPaneTargetLeaseOwnerIsCurrent,
-  workspaceRootPaneTargetLease,
   type FilesystemWorkspacePaneTargetLease,
   type GitBranchPaneTargetLease,
   type GitWorktreePaneTargetLease,
@@ -40,10 +39,7 @@ export interface AppNavigationOptions<
 
 export type BranchAppNavigationOptions = AppNavigationOptions<ParsedBranchWorkspacePaneRouteTarget>
 
-export type WorkspaceRootPanePresentation =
-  { kind: 'static'; tab: WorkspacePaneStaticTabType } | { kind: 'terminal'; terminalSessionId: string }
-
-export type FilesystemWorkspacePaneCommitTarget = FilesystemWorkspacePaneTargetLease
+export type FilesystemWorkspacePaneRouteLease = FilesystemWorkspacePaneTargetLease
 
 export interface WorkspacePaneRouteCommitActions {
   commitWorkspacePaneRoute: (
@@ -56,7 +52,7 @@ export interface WorkspacePaneRouteCommitActions {
 
 export interface FilesystemWorkspacePaneRouteCommitActions extends WorkspacePaneRouteCommitActions {
   commitFilesystemWorkspacePaneRoute: (
-    target: FilesystemWorkspacePaneCommitTarget,
+    routeLease: FilesystemWorkspacePaneRouteLease,
     route: WorkspacePaneRouteTarget,
     options?: AppNavigationOptions,
   ) => Promise<boolean>
@@ -68,17 +64,6 @@ export interface AppNavigationActions extends FilesystemWorkspacePaneRouteCommit
   cycleWorkspace: (direction: 1 | -1) => void
   selectRepoBranch: (target: GitBranchPaneTargetLease, options?: { replace?: boolean }) => boolean
   selectRepoWorktree: (target: GitWorktreePaneTargetLease, options?: { replace?: boolean }) => boolean
-  showWorkspaceRootPaneTab: (
-    workspaceId: WorkspaceId,
-    presentation: WorkspaceRootPanePresentation,
-    options?: AppNavigationOptions,
-  ) => boolean
-  commitWorkspaceRootTerminalSession: (
-    workspaceId: WorkspaceId,
-    workspaceRuntimeId: string,
-    terminalSessionId: string,
-    options?: AppNavigationOptions,
-  ) => Promise<boolean>
   currentWorkspacePaneRoute: (workspaceId: WorkspaceId, branch: string) => WorkspacePaneRouteTarget | undefined
   goBack: (workspaceId: WorkspaceId) => void
   goForward: (workspaceId: WorkspaceId) => void
@@ -170,27 +155,8 @@ export function createAppNavigationActions({
         navigationGeneration,
       })
     },
-    showWorkspaceRootPaneTab(workspaceId, presentation, options) {
-      if (workspacesStore.getState().workspaces[workspaceId]?.capability.kind !== 'filesystem') {
-        options?.onAbandon?.()
-        return false
-      }
-      const generation = options?.navigationGeneration ?? beginAppNavigation()
-      const navigationOptions = workspaceRootPanePresentationOptions(workspaceId, presentation, options, generation)
-      return presentation.kind === 'terminal'
-        ? routeNavigation.openWorkspaceRootTerminal(workspaceId, presentation.terminalSessionId, navigationOptions)
-        : routeNavigation.openWorkspaceRootTab(workspaceId, presentation.tab, navigationOptions)
-    },
-    commitFilesystemWorkspacePaneRoute(target, route, options) {
-      return commitFilesystemWorkspacePaneRoute(routeNavigation, target, route, options)
-    },
-    commitWorkspaceRootTerminalSession(workspaceId, workspaceRuntimeId, terminalSessionId, options) {
-      return commitFilesystemWorkspacePaneRoute(
-        routeNavigation,
-        workspaceRootPaneTargetLease(workspaceId, workspaceRuntimeId),
-        { kind: 'terminal', terminalSessionId },
-        options,
-      )
+    commitFilesystemWorkspacePaneRoute(routeLease, route, options) {
+      return commitFilesystemWorkspacePaneRoute(routeNavigation, routeLease, route, options)
     },
     commitWorkspacePaneRoute(workspaceId, branch, route, options) {
       return commitWorkspacePaneRoute(routeNavigation, workspaceId, branch, route, options)
@@ -213,28 +179,9 @@ export function createAppNavigationActions({
   }
 }
 
-function workspaceRootPanePresentationOptions(
-  workspaceId: WorkspaceId,
-  presentation: WorkspaceRootPanePresentation,
-  options: AppNavigationOptions | undefined,
-  navigationGeneration: AppNavigationGeneration,
-): AppNavigationOptions {
-  return {
-    ...options,
-    navigationGeneration,
-    onCommit: () => {
-      if (!commitFilesystemWorkspacePanePresentation({ kind: 'workspace-root', workspaceId }, presentation)) {
-        options?.onAbandon?.()
-        return
-      }
-      options?.onCommit?.()
-    },
-  }
-}
-
 function commitFilesystemWorkspacePanePresentation(
   target: FilesystemWorkspacePaneTabsTarget,
-  presentation: WorkspaceRootPanePresentation,
+  presentation: WorkspacePaneRoute,
 ): boolean {
   const state = workspacesStore.getState()
   const workspaceId = target.workspaceId
@@ -254,11 +201,11 @@ function commitFilesystemWorkspacePanePresentation(
 
 async function commitFilesystemWorkspacePaneRoute(
   routeNavigation: AppRouteNavigation,
-  target: FilesystemWorkspacePaneCommitTarget,
+  routeLease: FilesystemWorkspacePaneRouteLease,
   route: WorkspacePaneRouteTarget,
   options?: AppNavigationOptions,
 ): Promise<boolean> {
-  if (!filesystemWorkspacePaneCommitTargetIsCurrent(target)) {
+  if (!filesystemWorkspacePaneRouteLeaseIsCurrent(routeLease)) {
     options?.onAbandon?.()
     return false
   }
@@ -269,7 +216,7 @@ async function commitFilesystemWorkspacePaneRoute(
   }
   let effectsSettled = false
   try {
-    const committed = await routeNavigation.commitFilesystemWorkspacePaneRoute(target.routeTarget, route, {
+    const committed = await routeNavigation.commitFilesystemWorkspacePaneRoute(routeLease.routeTarget, route, {
       replace: options?.replace,
       navigationGeneration: generation,
       routePrecondition: options?.routePrecondition,
@@ -277,10 +224,10 @@ async function commitFilesystemWorkspacePaneRoute(
     const presentationCommitted =
       committed &&
       appNavigationIsCurrent(generation) &&
-      filesystemWorkspacePaneCommitTargetIsCurrent(target) &&
+      filesystemWorkspacePaneRouteLeaseIsCurrent(routeLease) &&
       (route === null
-        ? commitFilesystemWorkspacePaneEmptyPresentation(target.routeTarget)
-        : commitFilesystemWorkspacePanePresentation(target.routeTarget, route))
+        ? commitFilesystemWorkspacePaneEmptyPresentation(routeLease.routeTarget)
+        : commitFilesystemWorkspacePanePresentation(routeLease.routeTarget, route))
     if (!presentationCommitted) {
       effectsSettled = true
       options?.onAbandon?.()
@@ -298,11 +245,11 @@ async function commitFilesystemWorkspacePaneRoute(
   }
 }
 
-function filesystemWorkspacePaneCommitTargetIsCurrent(target: FilesystemWorkspacePaneCommitTarget): boolean {
-  if (!filesystemWorkspacePaneTargetLeaseIsCurrent(target)) return false
+function filesystemWorkspacePaneRouteLeaseIsCurrent(routeLease: FilesystemWorkspacePaneRouteLease): boolean {
+  if (!filesystemWorkspacePaneTargetLeaseIsCurrent(routeLease)) return false
   return (
-    target.routeTarget.kind !== 'workspace-root' ||
-    workspacesStore.getState().workspaces[target.routeTarget.workspaceId]?.capability.kind === 'filesystem'
+    routeLease.routeTarget.kind !== 'workspace-root' ||
+    workspacesStore.getState().workspaces[routeLease.routeTarget.workspaceId]?.capability.kind === 'filesystem'
   )
 }
 

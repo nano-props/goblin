@@ -44,9 +44,10 @@ beforeEach(setupAppNavigationActionsTests)
 
 describe('createAppNavigationActions presentation', () => {
   test('presents a workspace-root tab through the workspace route and commits its preference', async () => {
-    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     markRepoGitUnavailable(REPO_ID)
     const navigation = routeNavigation()
+    navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => true)
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
       workspaceOrder: [REPO_ID],
@@ -54,12 +55,15 @@ describe('createAppNavigationActions presentation', () => {
       routeNavigation: navigation,
     })
 
-    expect(actions.showWorkspaceRootPaneTab(REPO_ID, { kind: 'static', tab: 'files' })).toBe(true)
-    expect(navigation.openWorkspaceRootTab).toHaveBeenCalledWith(
-      REPO_ID,
-      'files',
-      expect.objectContaining({ navigationGeneration: expect.any(Number), onCommit: expect.any(Function) }),
-    )
+    await expect(
+      actions.commitFilesystemWorkspacePaneRoute(
+        {
+          routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+        },
+        { kind: 'static', tab: 'files' },
+      ),
+    ).resolves.toBe(true)
     expect(
       preferredWorkspacePaneTabForTarget(workspacesStore.getState().workspaces[REPO_ID]!.ui, {
         kind: 'workspace-root',
@@ -69,22 +73,18 @@ describe('createAppNavigationActions presentation', () => {
   })
 
   test.each([
-    ['rejected', false, false],
-    ['superseded', true, false],
-    ['committed', true, true],
+    ['rejected', false],
+    ['committed', true],
   ] as const)(
     'keeps workspace terminal selection and preference atomic when presentation is %s',
-    (_state, accepted, commit) => {
+    async (_state, routeCommitted) => {
       const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
       markRepoGitUnavailable(REPO_ID)
       const terminalKey = formatTerminalFilesystemTargetKeyForPath(REPO_ID, REPO_ID)
       workspacesStore.getState().setSelectedTerminal(terminalKey, 'term-111111111111111111111')
       workspacesStore.getState().setWorkspacePaneTabForTarget({ kind: 'workspace-root', workspaceId: REPO_ID }, 'files')
       const navigation = routeNavigation()
-      vi.mocked(navigation.openWorkspaceRootTerminal).mockImplementation((_repoId, _sessionId, options) => {
-        if (accepted && commit) options?.onCommit?.()
-        return accepted
-      })
+      navigation.commitFilesystemWorkspacePaneRoute = vi.fn(async () => routeCommitted)
       const actions = createAppNavigationActions({
         currentWorkspaceId: REPO_ID,
         workspaceOrder: [REPO_ID],
@@ -92,21 +92,24 @@ describe('createAppNavigationActions presentation', () => {
         routeNavigation: navigation,
       })
 
-      expect(
-        actions.showWorkspaceRootPaneTab(REPO_ID, {
-          kind: 'terminal',
-          terminalSessionId: 'term-222222222222222222222',
-        }),
-      ).toBe(accepted)
+      await expect(
+        actions.commitFilesystemWorkspacePaneRoute(
+          {
+            routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+            workspaceRuntimeId: repo.workspaceRuntimeId,
+          },
+          { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
+        ),
+      ).resolves.toBe(routeCommitted)
       expect(workspacesStore.getState().selectedTerminalSessionIdByTerminalFilesystemTarget[terminalKey]).toBe(
-        commit ? 'term-222222222222222222222' : 'term-111111111111111111111',
+        routeCommitted ? 'term-222222222222222222222' : 'term-111111111111111111111',
       )
       expect(
         preferredWorkspacePaneTabForTarget(workspacesStore.getState().workspaces[repo.id]!.ui, {
           kind: 'workspace-root',
           workspaceId: repo.id,
         }),
-      ).toBe(commit ? 'terminal' : 'files')
+      ).toBe(routeCommitted ? 'terminal' : 'files')
     },
   )
 
@@ -329,8 +332,8 @@ describe('createAppNavigationActions presentation', () => {
     expect(onAbandon).toHaveBeenCalledOnce()
   })
 
-  test('rejects a workspace-root presentation for a Git workspace', () => {
-    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
+  test('rejects a workspace-root presentation for a Git workspace', async () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [], currentBranchName: null })
     const navigation = routeNavigation()
     const actions = createAppNavigationActions({
       currentWorkspaceId: REPO_ID,
@@ -340,9 +343,18 @@ describe('createAppNavigationActions presentation', () => {
     })
     const onAbandon = vi.fn()
 
-    expect(actions.showWorkspaceRootPaneTab(REPO_ID, { kind: 'static', tab: 'files' }, { onAbandon })).toBe(false)
+    await expect(
+      actions.commitFilesystemWorkspacePaneRoute(
+        {
+          routeTarget: { kind: 'workspace-root', workspaceId: REPO_ID },
+          workspaceRuntimeId: repo.workspaceRuntimeId,
+        },
+        { kind: 'static', tab: 'files' },
+        { onAbandon },
+      ),
+    ).resolves.toBe(false)
     expect(onAbandon).toHaveBeenCalledOnce()
-    expect(navigation.openWorkspaceRootTab).not.toHaveBeenCalled()
+    expect(navigation.commitFilesystemWorkspacePaneRoute).not.toHaveBeenCalled()
   })
 
   test('activates a non-Git workspace at its Dashboard without restoring Git navigation history', async () => {

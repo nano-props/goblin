@@ -224,10 +224,6 @@ function navigationWith(overrides: AppNavigationOverridesForTest = {}): AppNavig
     selectRepoBranch: vi.fn(() => true),
     showRepoBranchEmptyWorkspacePane: vi.fn(() => true),
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),
-    showWorkspaceRootPaneTab: vi.fn((_repoId, _presentation, options) => {
-      options?.onCommit?.()
-      return true
-    }),
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),

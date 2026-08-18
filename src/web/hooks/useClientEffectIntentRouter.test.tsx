@@ -86,7 +86,6 @@ let navigation!: ObservedAppNavigationActionsForTest
 const activateWorkspaceSpy = vi.fn()
 const closeRepoSpy = vi.fn()
 const showRepoBranchWorkspacePaneTabSpy = vi.fn()
-const showWorkspaceRootPaneTabSpy = vi.fn()
 const commitFilesystemWorkspacePaneRouteSpy = vi.fn()
 const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
@@ -100,7 +99,6 @@ beforeEach(() => {
   activateWorkspaceSpy.mockClear()
   closeRepoSpy.mockClear()
   showRepoBranchWorkspacePaneTabSpy.mockClear()
-  showWorkspaceRootPaneTabSpy.mockClear()
   commitFilesystemWorkspacePaneRouteSpy.mockClear()
   appDataClientMocks.clearRecentWorkspaceHistory.mockReset()
   appDataClientMocks.clearRecentWorkspaceHistory.mockResolvedValue(undefined)
@@ -135,10 +133,6 @@ beforeEach(() => {
       showRepoBranchWorkspacePaneTabSpy(repoId, branch, tab)
       const state = workspacesStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
-      return true
-    },
-    showWorkspaceRootPaneTab: (workspaceId, presentation) => {
-      showWorkspaceRootPaneTabSpy(workspaceId, presentation)
       return true
     },
     commitFilesystemWorkspacePaneRoute: async (target, route, options) => {
@@ -424,7 +418,6 @@ describe('useClientEffectIntentRouter', () => {
       },
       { kind: 'terminal', terminalSessionId },
     )
-    expect(showWorkspaceRootPaneTabSpy).not.toHaveBeenCalled()
   })
 
   test('terminal bell clicks combine branch and terminal view navigation in a single route-driven action', async () => {

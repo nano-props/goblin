@@ -351,16 +351,6 @@ export function navigationWith(
       state.setWorkspacePaneTab(canonicalWorkspaceId, branch, tab)
       return true
     },
-    showWorkspaceRootPaneTab: (workspaceId, presentation, options) => {
-      workspacesStore
-        .getState()
-        .setWorkspacePaneTabForTarget(
-          { kind: 'workspace-root', workspaceId: workspaceId },
-          presentation.kind === 'terminal' ? 'terminal' : presentation.tab,
-        )
-      options?.onCommit?.()
-      return true
-    },
     commitFilesystemWorkspacePaneRoute: async (target, route, options) => {
       workspacesStore
         .getState()

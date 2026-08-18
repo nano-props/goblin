@@ -209,7 +209,7 @@ describe('client effect intent plans', () => {
       },
     })
 
-    expect(plan).toEqual({ kind: 'unavailable', reason: 'snapshot-unavailable' })
+    expect(plan).toEqual({ kind: 'unavailable' })
   })
 
   test('routes a detached worktree bell through its authoritative catalog entry', () => {
