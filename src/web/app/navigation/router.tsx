@@ -184,9 +184,9 @@ function workspaceRouteViewFromRoute(route: RouteLocationNormalized): WorkspaceR
 
   return workspaceRouteViewFromSlugChildRoute(workspaceSlug, {
     dashboard: routeName === 'workspace-dashboard',
-    workspace: routeName.startsWith('workspace-root'),
-    workspaceTabKey: routeName === 'workspace-root-tab' ? routeStringParam(route.params.tabKey) : null,
-    workspaceTerminalSessionId:
+    workspaceRoot: routeName.startsWith('workspace-root'),
+    workspaceRootTabKey: routeName === 'workspace-root-tab' ? routeStringParam(route.params.tabKey) : null,
+    workspaceRootTerminalSessionId:
       routeName === 'workspace-root-terminal' ? routeStringParam(route.params.terminalSessionId) : null,
     branchSlug: routeName.startsWith('workspace-branch') ? routeStringParam(route.params.branchSlug) : null,
     tabKey: routeName === 'workspace-branch-tab' ? routeStringParam(route.params.tabKey) : null,
@@ -223,9 +223,9 @@ export function workspaceRouteViewFromSlugChildRoute(
 
 interface WorkspaceChildRoute {
   dashboard: boolean
-  workspace?: boolean
-  workspaceTabKey?: string | null
-  workspaceTerminalSessionId?: string | null
+  workspaceRoot?: boolean
+  workspaceRootTabKey?: string | null
+  workspaceRootTerminalSessionId?: string | null
   branchSlug: string | null
   tabKey?: string | null
   worktreeSlug?: string | null
@@ -260,13 +260,13 @@ export function workspaceRouteViewFromChildRoute(
   }
   if (childRoute.newWorktree) return { kind: 'newWorktree', workspaceId }
   if (childRoute.dashboard) return { kind: 'dashboard', workspaceId }
-  if (childRoute.workspace) {
+  if (childRoute.workspaceRoot) {
     return {
       kind: 'workspace-root',
       workspaceId,
       workspacePaneRoute: workspacePaneRouteFromParams(
-        childRoute.workspaceTerminalSessionId,
-        childRoute.workspaceTabKey,
+        childRoute.workspaceRootTerminalSessionId,
+        childRoute.workspaceRootTabKey,
       ),
     }
   }

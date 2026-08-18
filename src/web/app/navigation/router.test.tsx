@@ -224,7 +224,7 @@ describe('workspace route view derivation', () => {
     expect(
       workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
         dashboard: false,
-        workspace: true,
+        workspaceRoot: true,
         branchSlug: null,
         newWorktree: false,
       }),
@@ -232,8 +232,8 @@ describe('workspace route view derivation', () => {
     expect(
       workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
         dashboard: false,
-        workspace: true,
-        workspaceTabKey: 'files',
+        workspaceRoot: true,
+        workspaceRootTabKey: 'files',
         branchSlug: null,
         newWorktree: false,
       }),
@@ -245,8 +245,8 @@ describe('workspace route view derivation', () => {
     expect(
       workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
         dashboard: false,
-        workspace: true,
-        workspaceTerminalSessionId: 'term-111111111111111111111',
+        workspaceRoot: true,
+        workspaceRootTerminalSessionId: 'term-111111111111111111111',
         branchSlug: null,
         newWorktree: false,
       }),
@@ -308,9 +308,9 @@ describe('workspace route view derivation', () => {
     expect(
       workspaceRouteViewFromChildRoute(ROUTE_WORKSPACE_ID, {
         dashboard: false,
-        workspace: true,
-        workspaceTabKey: 'files',
-        workspaceTerminalSessionId: 'term-111111111111111111111',
+        workspaceRoot: true,
+        workspaceRootTabKey: 'files',
+        workspaceRootTerminalSessionId: 'term-111111111111111111111',
         branchSlug: null,
         newWorktree: false,
       }),

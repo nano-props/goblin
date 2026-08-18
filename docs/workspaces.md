@@ -17,7 +17,9 @@ Workspace capabilities are server-owned and are not persisted. They are probed o
 
 Pane targets have two contracts:
 
-- Restorable targets contain only `workspace`, `git-branch`, or a `git-worktree` canonical locator. Their containing workspace owns the workspace ID; runtime IDs are never persisted.
+- Restorable targets are `workspace-root`, `git-branch` with a branch name, or
+  `git-worktree` with a canonical locator. Their containing workspace owns the
+  workspace ID; runtime IDs are never persisted.
 - Runtime targets bind the containing workspace ID and current server-issued runtime ID after validation.
 
 Navigation is target-first. A materialized Git worktree is addressed by its
@@ -26,6 +28,19 @@ cherry-pick, revert, bisect, checkout, or detached operation. A branch target
 exists only for a branch that has no materialized worktree. Selecting a checked
 out branch therefore resolves to its worktree target; it does not create a
 parallel branch route.
+
+Workspace URLs make the target kind explicit beneath
+`/workspace/:workspaceSlug`: `/root` identifies the workspace-scoped target,
+`/branch/:branchSlug` identifies an unmaterialized Git branch, and
+`/worktree/:worktreeSlug` identifies a materialized Git worktree. In this
+contract, `root` means the root scope owned by the workspace locator. It does
+not mean the operating-system root directory or a user's `/root` directory.
+It is not an alias for a Git source worktree: selecting any materialized Git
+worktree, including the source worktree, uses its `/worktree/:worktreeSlug`
+route.
+The bare workspace URL identifies the workspace navigator; `/dashboard`
+identifies its dashboard. Pane selections extend a target with `/tab/:tabKey`
+or, for filesystem targets, `/terminal/:terminalSessionId`.
 
 The repository snapshot is the complete authoritative worktree projection. It
 contains every usable worktree with its current `HEAD`, object ID, operation
