@@ -228,6 +228,9 @@ export function workspacePaneLocationExecutionTarget(
   return target
 }
 
+export function workspacePaneLocationTerminalBase(location: FilesystemWorkspacePaneLocation): TerminalSessionBase
+export function workspacePaneLocationTerminalBase(location: BranchPaneLocation): null
+export function workspacePaneLocationTerminalBase(location: WorkspacePaneLocation): TerminalSessionBase | null
 export function workspacePaneLocationTerminalBase(location: WorkspacePaneLocation): TerminalSessionBase | null {
   if (location.kind === 'branch') return null
   const target = workspacePaneLocationExecutionTarget(location)
@@ -242,9 +245,9 @@ export function workspacePaneLocationTerminalBaseMatches(
 ): boolean {
   const expected = workspacePaneLocationTerminalBase(location)
   return (
-    expected !== null &&
     expected.presentation.kind === base.presentation.kind &&
-    workspacePaneFilesystemExecutionTargetKey(expected.target) === workspacePaneFilesystemExecutionTargetKey(base.target)
+    workspacePaneFilesystemExecutionTargetKey(expected.target) ===
+      workspacePaneFilesystemExecutionTargetKey(base.target)
   )
 }
 

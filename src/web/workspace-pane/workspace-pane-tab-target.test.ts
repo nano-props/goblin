@@ -11,9 +11,8 @@ import { workspacesStore } from '#/web/stores/workspaces/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
-  filesystemWorkspacePaneRouteLeaseIsCurrent,
   filesystemWorkspacePaneLocationIsCurrent,
-  gitWorktreePaneRouteLease,
+  gitWorktreePaneRouteLeaseIsCurrent,
   resolveWorkspacePaneTabTargetForPaneTarget,
   scopeWorkspacePaneTabTargetResolutionToRuntime,
   workspacePaneTabTargetForPaneTarget,
@@ -176,7 +175,7 @@ describe('workspace pane tab target read model', () => {
     expect(workspacePaneTabTargetForPaneTarget(input)).toBeNull()
   })
 
-  test('keeps a worktree command lease current when a background status refresh fails with accepted data', async () => {
+  test('keeps a worktree route lease current when an unrelated status refresh fails', async () => {
     const repo = seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest('feature/query', WORKTREE_PATH)],
       id: REPO_ID,
@@ -184,9 +183,12 @@ describe('workspace pane tab target read model', () => {
       currentBranchName: 'feature/query',
       status: [{ path: WORKTREE_PATH, branch: 'feature/query', isMain: false, entries: [] }],
     })
-    const lease = gitWorktreePaneRouteLease(REPO_ID, repo.workspaceRuntimeId, WORKTREE_PATH)
+    const lease = {
+      routeTarget: { kind: 'git-worktree' as const, workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+    }
 
-    expect(filesystemWorkspacePaneRouteLeaseIsCurrent(lease)).toBe(true)
+    expect(gitWorktreePaneRouteLeaseIsCurrent(lease)).toBe(true)
 
     await expect(
       appQueryClient.fetchQuery({
@@ -199,10 +201,10 @@ describe('workspace pane tab target read model', () => {
     ).rejects.toThrow('status unavailable')
 
     expect(appQueryClient.getQueryData(repoWorktreeStatusQueryKey(REPO_ID, repo.workspaceRuntimeId))).toBeDefined()
-    expect(filesystemWorkspacePaneRouteLeaseIsCurrent(lease)).toBe(true)
+    expect(gitWorktreePaneRouteLeaseIsCurrent(lease)).toBe(true)
   })
 
-  test('keeps a branch command lease current when a background snapshot refresh fails with accepted data', async () => {
+  test('keeps a worktree route lease current when a snapshot refresh fails with accepted data', async () => {
     const repo = seedRepoWithReadModelForTest({
       worktrees: [createRepoWorktreeSnapshotForTest('feature/query', WORKTREE_PATH)],
       id: REPO_ID,
@@ -210,10 +212,13 @@ describe('workspace pane tab target read model', () => {
       currentBranchName: 'feature/query',
       status: [{ path: WORKTREE_PATH, branch: 'feature/query', isMain: false, entries: [] }],
     })
-    const lease = gitWorktreePaneRouteLease(REPO_ID, repo.workspaceRuntimeId, WORKTREE_PATH)
+    const lease = {
+      routeTarget: { kind: 'git-worktree' as const, workspaceId: REPO_ID, worktreePath: WORKTREE_PATH },
+      workspaceRuntimeId: repo.workspaceRuntimeId,
+    }
     const queryKey = repoSnapshotQueryKey(REPO_ID, repo.workspaceRuntimeId)
 
-    expect(filesystemWorkspacePaneRouteLeaseIsCurrent(lease)).toBe(true)
+    expect(gitWorktreePaneRouteLeaseIsCurrent(lease)).toBe(true)
 
     await expect(
       appQueryClient.fetchQuery({
@@ -226,7 +231,7 @@ describe('workspace pane tab target read model', () => {
     ).rejects.toThrow('snapshot unavailable')
 
     expect(appQueryClient.getQueryData(queryKey)).toBeDefined()
-    expect(filesystemWorkspacePaneRouteLeaseIsCurrent(lease)).toBe(true)
+    expect(gitWorktreePaneRouteLeaseIsCurrent(lease)).toBe(true)
   })
 
   test('resolves a created runtime by worktree while its canonical branch rename is not projected locally', () => {

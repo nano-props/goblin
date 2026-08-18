@@ -4,12 +4,10 @@ import {
   runWorkspacePaneAction,
   tryRunWorkspacePaneAction,
   workspacePaneActionTargetKey,
-  workspacePaneActionTargetFromFilesystemTarget,
   workspacePaneActionTargetFromLocation,
   workspacePaneActionTargetFromPaneTarget,
   workspacePaneActionQueueStatsForTest,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { canonicalWorkspaceLocator } from '#/shared/workspace-locator.ts'
 import { workspaceIdForTest } from '#/test-utils/workspace-id.ts'
 
 const WORKSPACE_ID = workspaceIdForTest('goblin+file:///repo')
@@ -161,27 +159,10 @@ describe('workspace pane action queue', () => {
     ).toBe('goblin+file:///repo\0runtime\0git-worktree\0/repo-worktree')
   })
 
-  test('keeps a detached Git worktree in its worktree queue', () => {
-    const workspaceId = canonicalWorkspaceLocator(WORKSPACE_ID)
-    const root = canonicalWorkspaceLocator('goblin+file:///repo-detached')
-    if (!workspaceId || !root) throw new Error('invalid mock filesystem target')
-
-    expect(
-      workspacePaneActionTargetFromFilesystemTarget({
-        kind: 'git-worktree',
-        workspaceId,
-        workspaceRuntimeId: 'runtime',
-        root,
-      }),
-    ).toEqual({
-      kind: 'git-worktree',
-      workspaceId: workspaceId,
-      workspaceRuntimeId: 'runtime',
-      worktreePath: '/repo-detached',
-    })
+  test('keeps a detached Git worktree pane in its worktree queue', () => {
     expect(
       workspacePaneActionTargetFromPaneTarget(
-        { kind: 'git-worktree', workspaceId, worktreePath: '/repo-detached' },
+        { kind: 'git-worktree', workspaceId: WORKSPACE_ID, worktreePath: '/repo-detached' },
         'runtime',
       ),
     ).toMatchObject({ kind: 'git-worktree', worktreePath: '/repo-detached' })

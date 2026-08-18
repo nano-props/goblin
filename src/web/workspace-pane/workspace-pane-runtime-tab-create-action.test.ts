@@ -37,7 +37,7 @@ import {
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
-  workspacePaneActionTargetFromFilesystemTarget,
+  workspacePaneActionTargetFromLocation,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import type {
   TerminalCreateCommandResult,
@@ -182,7 +182,7 @@ describe('workspace pane runtime tab create action', () => {
 
   test('rechecks canonical materialization after waiting in the target queue', async () => {
     const queuedActionMayRun = Promise.withResolvers<void>()
-    const coordinatorTarget = workspacePaneActionTargetFromFilesystemTarget(BASE.target)
+    const coordinatorTarget = workspacePaneActionTargetFromLocation(LOCATION)
     const blocker = runWorkspacePaneAction(coordinatorTarget, async () => {
       await queuedActionMayRun.promise
       return true
@@ -541,7 +541,7 @@ describe('workspace pane runtime tab create action', () => {
   test('does not create after a queued target runtime is replaced', async () => {
     const blocker = Promise.withResolvers<void>()
     const blockingAction = runWorkspacePaneAction(
-      workspacePaneActionTargetFromFilesystemTarget(BASE.target),
+      workspacePaneActionTargetFromLocation(LOCATION),
       () => blocker.promise,
     )
     const createTerminal = vi.fn(async () => createAdmission())

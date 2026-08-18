@@ -15,8 +15,8 @@ import {
 } from '#/web/app/navigation/workspace-history.ts'
 import {
   filesystemWorkspacePaneLocationIsCurrent,
-  filesystemWorkspacePaneRouteLeaseIsCurrent,
   gitBranchPaneTargetLeaseOwnerIsCurrent,
+  gitWorktreePaneRouteLeaseIsCurrent,
   type GitBranchPaneTargetLease,
   type GitWorktreePaneRouteLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
@@ -150,7 +150,7 @@ export function createAppNavigationActions({
       )
     },
     selectRepoWorktree(target, options) {
-      if (!filesystemWorkspacePaneRouteLeaseIsCurrent(target)) return false
+      if (!gitWorktreePaneRouteLeaseIsCurrent(target)) return false
       const navigationGeneration = beginAppNavigation()
       return routeNavigation.openRepoWorktree(target.routeTarget.workspaceId, target.routeTarget.worktreePath, {
         ...options,

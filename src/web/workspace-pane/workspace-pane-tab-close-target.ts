@@ -15,7 +15,6 @@ import type { WorkspacePaneLocation } from '#/web/workspace-pane/workspace-pane-
 export function resolveCloseWorkspacePaneTarget(
   input: {
     workspaceId: WorkspaceId | null
-    workspaceRuntimeId: string
     location: WorkspacePaneLocation
   },
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
@@ -25,7 +24,7 @@ export function resolveCloseWorkspacePaneTarget(
     location: input.location,
     workspacePaneRoute,
   })
-  return scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, input.workspaceRuntimeId)
+  return scopeWorkspacePaneTabTargetResolutionToRuntime(resolution, input.location.workspaceRuntimeId)
 }
 
 export function workspacePaneTabsTargetForClose(target: WorkspacePaneTabModel): WorkspacePaneTabsTarget {

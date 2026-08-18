@@ -2,10 +2,7 @@ import type { ParsedWorkspacePaneRoute } from '#/web/app/navigation/route-model.
 import type { WorkspaceId } from '#/shared/workspace-locator.ts'
 import { isWorkspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
-import {
-  terminalExecutionCoordinates,
-  type TerminalSessionBase,
-} from '#/shared/terminal-types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
   isMaterializedWorkspacePaneRuntimeTab,
   workspacePaneTerminalBaseForTabModel,
@@ -52,12 +49,12 @@ import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-reque
 import { surfaceWorkspacePaneTabTargetUnavailable } from '#/web/workspace-pane/workspace-pane-tab-action-feedback.ts'
 import {
   workspacePaneLocationTerminalBaseMatches,
+  type FilesystemWorkspacePaneLocation,
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
 
 export interface CloseWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
-  workspaceRuntimeId: string
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
   location: WorkspacePaneLocation
   selectedIdentity?: string | null
@@ -71,7 +68,11 @@ export interface ConfirmedTerminalWorkspacePaneTabClose {
   base: TerminalSessionBase
 }
 
-export interface ConfirmCloseTerminalWorkspacePaneTabActionOptions extends CloseWorkspacePaneTabActionOptions {
+export interface ConfirmCloseTerminalWorkspacePaneTabActionOptions extends Omit<
+  CloseWorkspacePaneTabActionOptions,
+  'location'
+> {
+  location: FilesystemWorkspacePaneLocation
   currentWorkspacePaneRoute: ParsedWorkspacePaneRoute | null
   confirmedTerminal: ConfirmedTerminalWorkspacePaneTabClose
 }
@@ -141,9 +142,11 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
   const ownedOptions = presentationEffects ? { ...options, presentationEffects } : options
   try {
     const base = ownedOptions.confirmedTerminal.base
-    const coordinates = terminalExecutionCoordinates(base.target)
-    const queueWorkspaceId = ownedOptions.workspaceId ?? coordinates.workspaceId
-    if (queueWorkspaceId !== coordinates.workspaceId || !runtimeFilesystemTargetIsCurrent(ownedOptions.location, base)) {
+    const queueWorkspaceId = ownedOptions.workspaceId ?? ownedOptions.location.workspaceId
+    if (
+      queueWorkspaceId !== ownedOptions.location.workspaceId ||
+      !runtimeFilesystemTargetIsCurrent(ownedOptions.location, base)
+    ) {
       presentationEffects?.onAbandon()
       return false
     }
@@ -155,12 +158,11 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
   }
 }
 
-function runtimeFilesystemTargetIsCurrent(location: WorkspacePaneLocation, base: TerminalSessionBase): boolean {
-  return (
-    location.kind !== 'branch' &&
-    workspacePaneLocationTerminalBaseMatches(location, base) &&
-    filesystemWorkspacePaneLocationIsCurrent(location)
-  )
+function runtimeFilesystemTargetIsCurrent(
+  location: FilesystemWorkspacePaneLocation,
+  base: TerminalSessionBase,
+): boolean {
+  return workspacePaneLocationTerminalBaseMatches(location, base) && filesystemWorkspacePaneLocationIsCurrent(location)
 }
 
 async function confirmCloseTerminalWorkspacePaneTabAction(
@@ -261,7 +263,7 @@ function beginCloseWorkspacePaneTabAction(
       view: runtimeView,
       target: terminalBase,
     })
-    if (!target.location) return { kind: 'done', result: false }
+    if (!target.location || target.location.kind === 'branch') return { kind: 'done', result: false }
     if (
       openWorkspacePaneRuntimeCloseConfirm(
         target.location.workspaceId,
@@ -313,7 +315,7 @@ function admitCloseWorkspacePaneTarget(resolution: WorkspacePaneTabTargetResolut
 
 function openWorkspacePaneRuntimeCloseConfirm(
   workspaceId: WorkspaceId,
-  location: WorkspacePaneLocation,
+  location: FilesystemWorkspacePaneLocation,
   request: WorkspacePaneRuntimeTabCloseConfirmRequest | null,
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined,
   selectedIdentity: string | null,

@@ -17,7 +17,7 @@ import {
   dispatchShowWorkspacePaneStaticTabAction,
   dispatchShowWorkspacePaneTargetStaticTabAction,
 } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
-import { gitBranchPaneTargetLease, gitWorktreePaneRouteLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { gitBranchPaneTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacePaneLocationForWorktree } from '#/web/workspace-pane/workspace-pane-location.ts'
 import { gitWorkspaceNavigatorRows } from '#/web/components/workspace-navigator/git-workspace-navigator-model.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'

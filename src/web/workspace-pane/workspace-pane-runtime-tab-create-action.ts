@@ -1,9 +1,4 @@
-import {
-  terminalExecutionCoordinates,
-  terminalSessionBase,
-  type TerminalPresentation,
-  type TerminalSessionBase,
-} from '#/shared/terminal-types.ts'
+import { terminalSessionBase, type TerminalPresentation, type TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 import {
@@ -29,7 +24,6 @@ import {
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import { workspacePaneTabsTargetFromRuntime } from '#/shared/workspace-pane-tabs-target.ts'
 import { beginAppNavigation, type AppNavigationGeneration } from '#/web/app/navigation/lifecycle.ts'
 import { claimTerminalAutoFocus } from '#/web/terminal/focus.ts'
 import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
@@ -132,12 +126,8 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
   options: CreateTerminalWorkspacePaneRuntimeTabActionOptions,
 ): Promise<TerminalCreateCommandResult> {
   const base = workspacePaneLocationTerminalBase(options.location)
-  if (!base) throw new Error('terminal create requires a filesystem location')
-  if (!workspacePaneTabsTargetFromRuntime(base.target)) {
-    throw new Error('terminal base requires a canonical filesystem pane target')
-  }
   if (!terminalCreateTargetIsCurrent(options.location, base)) return staleTerminalCreateResult()
-  const target = terminalWorkspacePaneCoordinatorTarget(options.location)
+  const target = workspacePaneActionTargetFromLocation(options.location)
   return await runWorkspacePaneAction(target, async () => {
     const admission = terminalCreateAdmission(options.location, base)
     if (admission === 'stale') return staleTerminalCreateResult()
@@ -189,14 +179,7 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   routeRequest: CreatedTerminalRouteRequest,
 ): boolean | Promise<boolean> {
   const base = workspacePaneLocationTerminalBase(location)
-  if (!base || base.presentation.kind !== presentation.kind) return false
-  const coordinates = terminalExecutionCoordinates(base.target)
-  if (
-    coordinates.workspaceId !== location.workspaceId ||
-    coordinates.workspaceRuntimeId !== location.workspaceRuntimeId ||
-    base.target.kind !== presentation.kind
-  )
-    return false
+  if (base.presentation.kind !== presentation.kind) return false
   return navigation.commitFilesystemWorkspacePaneRoute(location, { kind: 'terminal', terminalSessionId }, routeRequest)
 }
 
@@ -225,19 +208,12 @@ function recordCreatedTerminalWorkspacePaneRuntimeTabOpener(
   const ownsCreatedResource =
     options.admission.requestRole === 'leader' && options.admission.resourceDisposition === 'created'
   if (!options.openerIdentity || !ownsCreatedResource) return
-  const coordinates = terminalExecutionCoordinates(options.base.target)
-  const paneTarget = workspacePaneTabsTargetFromRuntime(options.base.target)
-  if (!paneTarget) return
   recordWorkspacePaneTabOpener(
-    paneTarget,
-    coordinates.workspaceRuntimeId,
+    options.location.paneTarget,
+    options.location.workspaceRuntimeId,
     terminalWorkspacePaneTabProvider.identity(options.admission.terminalSessionId),
     options.openerIdentity,
   )
-}
-
-function terminalWorkspacePaneCoordinatorTarget(location: FilesystemWorkspacePaneLocation) {
-  return workspacePaneActionTargetFromLocation(location)
 }
 
 function terminalCreateTargetIsCurrent(location: FilesystemWorkspacePaneLocation, base: TerminalSessionBase): boolean {
@@ -249,14 +225,12 @@ function terminalCreateAdmission(
   base: TerminalSessionBase,
 ): 'ready' | 'stale' | WorkspacePaneRuntimeUnreadyProjectionPhase {
   if (!terminalCreateTargetIsCurrent(location, base)) return 'stale'
-  const paneTarget = workspacePaneTabsTargetFromRuntime(base.target)
-  if (!paneTarget) return 'stale'
   const resolution = scopeWorkspacePaneTabTargetResolutionToRuntime(
     resolveWorkspacePaneTabTargetForPaneTarget({
       location,
       workspacePaneRoute: undefined,
     }),
-    base.target.workspaceRuntimeId,
+    location.workspaceRuntimeId,
   )
   if (resolution.kind === 'missing') return 'stale'
   if (resolution.kind === 'unavailable') {

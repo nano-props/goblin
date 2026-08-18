@@ -21,7 +21,6 @@ import {
   type FilesystemWorkspacePaneTabsTarget,
   type GitBranchWorkspacePaneTabsTarget,
   type GitWorktreeWorkspacePaneTabsTarget,
-  type RootWorkspacePaneTabsTarget,
   type WorkspacePaneTabsTarget,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { repoWorktreeForBranch } from '#/shared/git-types.ts'
@@ -41,11 +40,6 @@ import {
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
 
-export interface WorkspaceRootPaneRouteLease {
-  routeTarget: RootWorkspacePaneTabsTarget
-  workspaceRuntimeId: string
-}
-
 export interface GitWorktreePaneRouteLease {
   routeTarget: GitWorktreeWorkspacePaneTabsTarget
   workspaceRuntimeId: string
@@ -54,29 +48,6 @@ export interface GitWorktreePaneRouteLease {
 export interface GitBranchPaneTargetLease {
   routeTarget: GitBranchWorkspacePaneTabsTarget
   workspaceRuntimeId: string
-}
-
-export type FilesystemWorkspacePaneRouteLease = WorkspaceRootPaneRouteLease | GitWorktreePaneRouteLease
-
-export function workspaceRootPaneRouteLease(
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-): WorkspaceRootPaneRouteLease {
-  return {
-    routeTarget: { kind: 'workspace-root', workspaceId },
-    workspaceRuntimeId,
-  }
-}
-
-export function gitWorktreePaneRouteLease(
-  workspaceId: WorkspaceId,
-  workspaceRuntimeId: string,
-  worktreePath: string,
-): GitWorktreePaneRouteLease {
-  return {
-    routeTarget: { kind: 'git-worktree', workspaceId, worktreePath },
-    workspaceRuntimeId,
-  }
 }
 
 export function gitBranchPaneTargetLease(
@@ -97,10 +68,9 @@ export function gitBranchPaneTargetLeaseOwnerIsCurrent(lease: GitBranchPaneTarge
   )
 }
 
-export function filesystemWorkspacePaneRouteLeaseIsCurrent(lease: FilesystemWorkspacePaneRouteLease): boolean {
+export function gitWorktreePaneRouteLeaseIsCurrent(lease: GitWorktreePaneRouteLease): boolean {
   const workspace = workspacesStore.getState().workspaces[lease.routeTarget.workspaceId]
   if (workspace?.workspaceRuntimeId !== lease.workspaceRuntimeId) return false
-  if (lease.routeTarget.kind === 'workspace-root') return true
   const worktreePath = lease.routeTarget.worktreePath
   if (workspace.capability.kind !== 'git') return false
   const snapshot = getRepoSnapshotQueryData(lease.routeTarget.workspaceId, lease.workspaceRuntimeId)

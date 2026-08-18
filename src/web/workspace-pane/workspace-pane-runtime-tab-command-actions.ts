@@ -20,9 +20,8 @@ import type { FilesystemWorkspacePaneCommandTarget } from '#/web/workspace-pane/
 import { selectWorkspacePaneControllerTab } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import {
-  workspacePaneActionTargetFromFilesystemTarget,
+  workspacePaneActionTargetFromLocation,
   runWorkspacePaneAction,
-  type WorkspacePaneActionTarget,
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   filesystemWorkspacePaneLocationIsCurrent,
@@ -251,8 +250,7 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   )
   const worktree = bridge.terminalFilesystemTargetSnapshot(terminalFilesystemTargetKey)
   if (worktree.count > 0) {
-    const target = terminalCoordinatorTarget(base)
-    if (!target) return false
+    const target = workspacePaneActionTargetFromLocation(terminal.location)
     const navigationGeneration = beginAppNavigation()
     let ownedFocusLease = claimTerminalAutoFocus(navigationGeneration)
     try {
@@ -302,10 +300,6 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
     t: terminal.t,
   })
   return result.ok
-}
-
-function terminalCoordinatorTarget(base: TerminalSessionBase): WorkspacePaneActionTarget | null {
-  return workspacePaneActionTargetFromFilesystemTarget(base.target)
 }
 
 function existingTerminalPresentationRouteRequest(
