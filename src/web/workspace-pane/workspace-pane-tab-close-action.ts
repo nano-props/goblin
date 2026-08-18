@@ -52,6 +52,7 @@ import {
   type FilesystemWorkspacePaneLocation,
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
+import { workspacePaneTabControllerTargetIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 
 export interface CloseWorkspacePaneTabActionOptions {
   workspaceId: WorkspaceId | null
@@ -100,7 +101,7 @@ export async function dispatchCloseWorkspacePaneTabAction(
     const coordinatorTarget = admitCloseWorkspacePaneTarget(
       resolveCloseWorkspacePaneTarget(ownedOptions, ownedOptions.workspacePaneRoute),
     )
-    if (!coordinatorTarget?.location) {
+    if (!coordinatorTarget?.location || !workspacePaneTabControllerTargetIsCurrent(coordinatorTarget)) {
       presentationEffects?.onAbandon()
       return false
     }
@@ -233,7 +234,7 @@ function beginCloseWorkspacePaneTabAction(
   const target = workspaceId
     ? admitCloseWorkspacePaneTarget(resolveCloseWorkspacePaneTarget(options, options.workspacePaneRoute))
     : null
-  if (!target) return { kind: 'done', result: false }
+  if (!target || !workspacePaneTabControllerTargetIsCurrent(target)) return { kind: 'done', result: false }
   if (workspacePaneTabTargetBlocksInteraction(target)) return { kind: 'done', result: true }
   const tabEntry = targetIdentity
     ? (target.surfaceTabEntries.find((entry) => workspacePaneTabEntryIdentity(entry) === targetIdentity) ?? null)

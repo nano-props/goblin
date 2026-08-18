@@ -126,8 +126,6 @@ export interface WorkspacePaneTabTargetOptions {
   workspacePaneRoute: ParsedWorkspacePaneRoute | null | undefined
 }
 
-export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }
-
 function filesystemExecutionTargetForPaneTarget(
   target: WorkspacePaneTabsTarget,
   workspaceRuntimeId: string,
@@ -211,19 +209,6 @@ export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneDestinatio
     )
   }
   return !isGitWorktreeDestinationTargetLease(lease) && current.routeTarget.branchName === lease.routeTarget.branchName
-}
-
-export function workspacePaneTabTargetForWorkspace(
-  workspaceId: WorkspaceId,
-  options: WorkspacePaneTabTargetOptions = workspacePanePreferenceTargetOptions,
-): WorkspacePaneTabModel | null {
-  const workspace = workspacesStore.getState().workspaces[workspaceId]
-  if (!workspace) return null
-  const resolution = resolveWorkspacePaneTabTargetForPaneTarget({
-    location: workspacePaneLocationForRoot(workspaceId, workspace.workspaceRuntimeId),
-    workspacePaneRoute: options.workspacePaneRoute,
-  })
-  return resolution.kind === 'ready' ? resolution.target : null
 }
 
 export interface WorkspacePaneTabTargetForPaneTargetInput {
