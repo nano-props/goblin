@@ -41,12 +41,12 @@ import {
   type WorkspacePaneLocation,
 } from '#/web/workspace-pane/workspace-pane-location.ts'
 
-export interface WorkspaceRootPaneTargetLease {
+export interface WorkspaceRootPaneRouteLease {
   routeTarget: RootWorkspacePaneTabsTarget
   workspaceRuntimeId: string
 }
 
-export interface GitWorktreePaneTargetLease {
+export interface GitWorktreePaneRouteLease {
   routeTarget: GitWorktreeWorkspacePaneTabsTarget
   workspaceRuntimeId: string
 }
@@ -56,23 +56,23 @@ export interface GitBranchPaneTargetLease {
   workspaceRuntimeId: string
 }
 
-export type FilesystemWorkspacePaneTargetLease = WorkspaceRootPaneTargetLease | GitWorktreePaneTargetLease
+export type FilesystemWorkspacePaneRouteLease = WorkspaceRootPaneRouteLease | GitWorktreePaneRouteLease
 
-export function workspaceRootPaneTargetLease(
+export function workspaceRootPaneRouteLease(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
-): WorkspaceRootPaneTargetLease {
+): WorkspaceRootPaneRouteLease {
   return {
     routeTarget: { kind: 'workspace-root', workspaceId },
     workspaceRuntimeId,
   }
 }
 
-export function gitWorktreePaneTargetLease(
+export function gitWorktreePaneRouteLease(
   workspaceId: WorkspaceId,
   workspaceRuntimeId: string,
   worktreePath: string,
-): GitWorktreePaneTargetLease {
+): GitWorktreePaneRouteLease {
   return {
     routeTarget: { kind: 'git-worktree', workspaceId, worktreePath },
     workspaceRuntimeId,
@@ -97,7 +97,7 @@ export function gitBranchPaneTargetLeaseOwnerIsCurrent(lease: GitBranchPaneTarge
   )
 }
 
-export function filesystemWorkspacePaneTargetLeaseIsCurrent(lease: FilesystemWorkspacePaneTargetLease): boolean {
+export function filesystemWorkspacePaneRouteLeaseIsCurrent(lease: FilesystemWorkspacePaneRouteLease): boolean {
   const workspace = workspacesStore.getState().workspaces[lease.routeTarget.workspaceId]
   if (workspace?.workspaceRuntimeId !== lease.workspaceRuntimeId) return false
   if (lease.routeTarget.kind === 'workspace-root') return true

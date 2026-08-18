@@ -15,10 +15,10 @@ import {
 } from '#/web/app/navigation/workspace-history.ts'
 import {
   filesystemWorkspacePaneLocationIsCurrent,
-  filesystemWorkspacePaneTargetLeaseIsCurrent,
+  filesystemWorkspacePaneRouteLeaseIsCurrent,
   gitBranchPaneTargetLeaseOwnerIsCurrent,
   type GitBranchPaneTargetLease,
-  type GitWorktreePaneTargetLease,
+  type GitWorktreePaneRouteLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { openWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
@@ -65,7 +65,7 @@ export interface AppNavigationActions extends FilesystemWorkspacePaneRouteCommit
   closeWorkspace: (workspaceId: WorkspaceId) => Promise<CloseWorkspaceResult>
   cycleWorkspace: (direction: 1 | -1) => void
   selectRepoBranch: (target: GitBranchPaneTargetLease, options?: { replace?: boolean }) => boolean
-  selectRepoWorktree: (target: GitWorktreePaneTargetLease, options?: { replace?: boolean }) => boolean
+  selectRepoWorktree: (target: GitWorktreePaneRouteLease, options?: { replace?: boolean }) => boolean
   currentWorkspacePaneRoute: (workspaceId: WorkspaceId, branch: string) => WorkspacePaneRouteTarget | undefined
   goBack: (workspaceId: WorkspaceId) => void
   goForward: (workspaceId: WorkspaceId) => void
@@ -150,7 +150,7 @@ export function createAppNavigationActions({
       )
     },
     selectRepoWorktree(target, options) {
-      if (!filesystemWorkspacePaneTargetLeaseIsCurrent(target)) return false
+      if (!filesystemWorkspacePaneRouteLeaseIsCurrent(target)) return false
       const navigationGeneration = beginAppNavigation()
       return routeNavigation.openRepoWorktree(target.routeTarget.workspaceId, target.routeTarget.worktreePath, {
         ...options,

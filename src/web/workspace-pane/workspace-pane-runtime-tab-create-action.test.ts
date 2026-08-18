@@ -620,6 +620,7 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       commitCreatedTerminalWorkspacePaneRuntimeTab({
+        location: LOCATION,
         base: BASE,
         admission,
         openerIdentity: 'workspace-pane:status',
@@ -637,6 +638,7 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       commitCreatedTerminalWorkspacePaneRuntimeTab({
+        location: LOCATION,
         base: BASE,
         admission: { ...createAdmission(), requestRole: 'observer' },
         openerIdentity: 'workspace-pane:status',
@@ -654,6 +656,7 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       commitCreatedTerminalWorkspacePaneRuntimeTab({
+        location: LOCATION,
         base: BASE,
         admission: createAdmission(),
         openerIdentity: 'workspace-pane:status',
@@ -671,6 +674,7 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       commitCreatedTerminalWorkspacePaneRuntimeTab({
+        location: LOCATION,
         base: BASE,
         admission: { ...createAdmission(), runtimeProjectionApplied: false },
         openerIdentity: 'workspace-pane:status',
@@ -687,6 +691,7 @@ describe('workspace pane runtime tab create action', () => {
 
     await expect(
       commitCreatedTerminalWorkspacePaneRuntimeTab({
+        location: LOCATION,
         base: BASE,
         admission: { ...createAdmission(), presentation: { kind: 'workspace-root' } },
         openerIdentity: 'workspace-pane:status',
