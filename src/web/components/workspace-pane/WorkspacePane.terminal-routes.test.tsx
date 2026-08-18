@@ -5,6 +5,7 @@ import {
   createRepoWorktreeSnapshotForTest,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/repo-store.ts'
+import { produce } from 'immer'
 import { screen, waitFor } from '@testing-library/vue'
 import { flushTestUpdates } from '#/test-utils/render.tsx'
 import { VueQueryClientScope } from '#/web/test-utils/VueQueryClientScope.tsx'
@@ -23,6 +24,7 @@ import type { AppNavigationActions } from '#/web/app/navigation/actions.ts'
 import { AppNavigationProvider } from '#/web/app/navigation/context.tsx'
 import { terminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacesStore } from '#/web/stores/workspaces/store.ts'
+import { queueOperation, startOperation } from '#/web/stores/workspaces/operations.ts'
 import { appQueryClient } from '#/web/app/query-client.ts'
 import { workspacePaneTabsQueryKey } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -89,7 +91,123 @@ function renderWorkspacePane(pane: VNode, contexts: WorkspacePaneFixtureContexts
   return render(workspacePaneFixture(pane, contexts))
 }
 
+interface WorktreeRemovalScenarioOptions {
+  slug: string
+  compact?: boolean
+  initialRemoval?: { phase: 'queued' | 'running'; target: 'current' | 'other' }
+  onBackToGitWorkspaceNavigator?: () => void
+}
+
+function renderWorktreeRemovalScenario(options: WorktreeRemovalScenarioOptions) {
+  responsiveMocks.compact = options.compact ?? false
+  const workspaceId = workspaceIdForTest(`goblin+file:///tmp/${options.slug}-repo`)
+  const branchName = `feature/${options.slug}`
+  const worktreePath = `/tmp/${options.slug}-worktree`
+  const otherBranchName = `feature/${options.slug}-other`
+  const otherWorktreePath = `/tmp/${options.slug}-other-worktree`
+  const repo = seedRepoWithReadModelForTest({
+    id: workspaceId,
+    branchSnapshots: [createBranchSnapshot(branchName), createBranchSnapshot(otherBranchName)],
+    worktrees: [
+      createRepoWorktreeSnapshotForTest(branchName, worktreePath, { isPrimary: false }),
+      createRepoWorktreeSnapshotForTest(otherBranchName, otherWorktreePath, { isPrimary: false }),
+    ],
+    currentBranchName: branchName,
+  })
+  if (repo.capability.kind !== 'git') throw new Error('expected Git workspace')
+  terminalProjectionHydrationStore.getState().markProjectionReady(workspaceId, repo.workspaceRuntimeId)
+  setWorkspacePaneTabsForTargetQueryData({
+    kind: 'git-worktree',
+    workspaceId,
+    workspaceRuntimeId: repo.workspaceRuntimeId,
+    worktreePath,
+    tabs: [workspacePaneStaticTabEntry('status')],
+  })
+
+  const publishRemovalPhase = (phase: 'queued' | 'running', target: 'current' | 'other' = 'current') => {
+    workspacesStore.setState((state) =>
+      produce(state, (draft) => {
+        const current = draft.workspaces[workspaceId]
+        if (!current || current.capability.kind !== 'git') throw new Error('expected current Git workspace')
+        const operationOptions = {
+          reason: 'branch:removeWorktree' as const,
+          target: target === 'current' ? branchName : otherBranchName,
+        }
+        const branchAction = current.capability.git.operations.branchAction
+        if (phase === 'queued') queueOperation(branchAction, 1, operationOptions)
+        else startOperation(branchAction, 1, operationOptions)
+      }),
+    )
+  }
+
+  if (options.initialRemoval) {
+    publishRemovalPhase(options.initialRemoval.phase, options.initialRemoval.target)
+  }
+  const rendered = renderWorkspacePane(
+    <WorkspacePane
+      workspaceId={workspaceId}
+      workspacePaneRouteContext={{ kind: 'git-worktree', worktreePath, route: null }}
+      onBackToGitWorkspaceNavigator={options.onBackToGitWorkspaceNavigator}
+    />,
+  )
+  return { ...rendered, publishRemovalPhase }
+}
+
 describe('WorkspacePane terminal routes', () => {
+  test('reactively blocks the current worktree surface through a queued and running removal', async () => {
+    const onBackToGitWorkspaceNavigator = vi.fn()
+    const { container, publishRemovalPhase } = renderWorktreeRemovalScenario({
+      slug: 'removing-current',
+      compact: true,
+      onBackToGitWorkspaceNavigator,
+    })
+
+    expect(screen.getByRole('tab')).toBeTruthy()
+
+    publishRemovalPhase('queued')
+    const removalStatus = await screen.findByRole('status')
+    expect(removalStatus.textContent).toContain('action.remove-worktree-queued-title')
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'terminal.new' })).toBeNull()
+    expect(container.querySelector('.goblin-terminal-session')).toBeNull()
+    expect(container.querySelector('[data-title-bar-chrome-region="drag"]')).toBeNull()
+    const backButton = screen.getByRole('button', {
+      name: 'workspace.back-to-workspace-navigator',
+    }) as HTMLButtonElement
+    expect(backButton.disabled).toBe(false)
+    backButton.click()
+    expect(onBackToGitWorkspaceNavigator).toHaveBeenCalledOnce()
+
+    publishRemovalPhase('running')
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toBe(removalStatus)
+      expect(removalStatus.textContent).toContain('action.remove-worktree-removing-title')
+    })
+  })
+
+  test('keeps the desktop removal surface draggable', () => {
+    const { container } = renderWorktreeRemovalScenario({
+      slug: 'removing-desktop',
+      initialRemoval: { phase: 'running', target: 'current' },
+    })
+
+    expect(container.querySelector('[data-title-bar-chrome-region="drag"]')).not.toBeNull()
+    expect(screen.getByRole('status').textContent).toContain('action.remove-worktree-removing-title')
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'terminal.new' })).toBeNull()
+  })
+
+  test('keeps the normal workspace surface available when removal targets another worktree', () => {
+    const { container } = renderWorktreeRemovalScenario({
+      slug: 'other-removing',
+      initialRemoval: { phase: 'running', target: 'other' },
+    })
+
+    expect(screen.getByRole('tab')).toBeTruthy()
+    const toolbarCreateButton = container.querySelector('[data-workspace-pane-new-button]')
+    expect(toolbarCreateButton).toBe(screen.getByRole('button', { name: 'terminal.new' }))
+  })
+
   test('offers an explicit workspace tabs retry when their projection fails', async () => {
     const workspaceId = workspaceIdForTest('goblin+file:///tmp/failed-tabs-workspace')
     const repo = seedRepoWithReadModelForTest({

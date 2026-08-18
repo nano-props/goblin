@@ -1,11 +1,12 @@
+import type { DictKey } from '#/shared/i18n/en.ts'
 import type { RepoBranchActionKind } from '#/web/stores/workspaces/branch-action-types.ts'
 import type { RepoEventAction } from '#/web/stores/workspaces/types.ts'
 export interface RepoActionLabel {
-  labelKey: string
+  labelKey: DictKey
   labelParams?: Record<string, string | number>
 }
 
-const BRANCH_ACTION_LOADING_LABEL_KEYS: Record<RepoBranchActionKind, string> = {
+const BRANCH_ACTION_LOADING_LABEL_KEYS: Record<RepoBranchActionKind, DictKey> = {
   pull: 'action.pull-loading',
   push: 'action.push-loading',
   createWorktree: 'action.create-worktree-creating-title',
@@ -13,7 +14,7 @@ const BRANCH_ACTION_LOADING_LABEL_KEYS: Record<RepoBranchActionKind, string> = {
   removeWorktree: 'action.remove-worktree-removing-title',
 }
 
-const BRANCH_ACTION_QUEUED_LABEL_KEYS: Record<RepoBranchActionKind, string> = {
+const BRANCH_ACTION_QUEUED_LABEL_KEYS: Record<RepoBranchActionKind, DictKey> = {
   pull: 'action.pull-queued',
   push: 'action.push-queued',
   createWorktree: 'action.create-worktree-queued-title',

@@ -11,7 +11,7 @@ import { GitHistoryPanel } from '#/web/components/repo-workspace/GitHistoryPanel
 import { WorkspaceFilesystemTabPanel } from '#/web/components/workspace-pane/WorkspaceFilesystemTabPanel.tsx'
 import type {
   CurrentGitWorkspacePanePresentation,
-  GitWorkspacePaneProjection,
+  GitWorkspacePaneContentRepo,
 } from '#/web/components/repo-workspace/model.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { isWorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
@@ -29,7 +29,7 @@ import {
 
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
-  repo: Pick<GitWorkspacePaneProjection, 'id' | 'workspaceRuntimeId' | 'snapshot' | 'status' | 'ui' | 'probe'>
+  repo: GitWorkspacePaneContentRepo
   detail: CurrentGitWorkspacePanePresentation
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
