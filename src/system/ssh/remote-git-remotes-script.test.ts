@@ -6,12 +6,13 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { remoteGitRemotesScript } from '#/system/ssh/remote-git-remotes-script.ts'
 
 const tempDirectories: string[] = []
+const describePosix = process.platform === 'win32' ? describe.skip : describe
 
 afterEach(async () => {
   await Promise.all(tempDirectories.splice(0).map(async (directory) => await rm(directory, { recursive: true })))
 })
 
-describe('remote Git remotes script', () => {
+describePosix('remote Git remotes script', () => {
   test('preserves URL whitespace in NUL-delimited records', async () => {
     const repoPath = await mkdtemp(path.join(os.tmpdir(), 'goblin remote urls '))
     tempDirectories.push(repoPath)
