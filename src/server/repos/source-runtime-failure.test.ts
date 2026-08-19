@@ -130,7 +130,7 @@ describe('repo source runtime failure classification', () => {
               `worktree ${target.remotePath}\nHEAD f00ba40000000000000000000000000000000000\nbranch refs/heads/main`,
             ),
           )
-        case 'gitRemoteVerbose':
+        case 'gitRemotes':
           return okRemoteResult(
             'origin\tgit@example.test:project/repo.git\tgit@example.test:project/repo.git',
           )
@@ -193,7 +193,7 @@ describe('repo source runtime failure classification', () => {
                 '',
               ].join('\n'),
             )
-          case 'gitRemoteVerbose':
+        case 'gitRemotes':
             return okRemoteResult('')
           case 'gitUpstream':
             return okRemoteResult(upstreamOutput('origin', 'feature/test'))

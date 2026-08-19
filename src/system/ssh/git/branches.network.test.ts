@@ -21,7 +21,7 @@ describe('remote Git branch network operations', () => {
           return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
         case 'gitUpstream':
           return okRemoteResult(upstreamOutput('fork', 'feature/test'))
-        case 'gitRemoteVerbose':
+        case 'gitRemotes':
           return okRemoteResult(
             'origin\tgit@github.com:acme/project.git\tgit@github.com:acme/project.git',
           )

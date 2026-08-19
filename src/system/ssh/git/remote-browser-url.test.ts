@@ -7,7 +7,7 @@ describe('remote Git browser URL', () => {
   test('builds browser URLs from remote verbose output', async () => {
     const run: RemoteCommandRunner = async (command) => {
       switch (command.type) {
-        case 'gitRemoteVerbose':
+        case 'gitRemotes':
           return okRemoteResult(
             'origin\tgit@github.com:acme/project.git\tgit@github.com:acme/project.git',
           )

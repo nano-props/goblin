@@ -6,6 +6,7 @@ import {
   getBrowserRepoUrl,
   getRemotes,
   getRepoUrlForRemotes,
+  parseRemoteUrls,
   resolveFetchRemoteForRemotes,
   resolvePushTargetForRemotes,
   pullBranch,
@@ -54,6 +55,35 @@ describe('getRemotes', () => {
       },
     ])
   })
+})
+
+describe('parseRemoteUrls', () => {
+  test('preserves remote order and machine-protocol URL fields', () => {
+    expect(
+      parseRemoteUrls(
+        'upstream\tgit@example.test:upstream.git\tgit@example.test:upstream-push.git\n' +
+          'origin\thttps://example.test/origin.git\thttps://example.test/origin.git\n',
+      ),
+    ).toEqual([
+      {
+        name: 'upstream',
+        fetchUrl: 'git@example.test:upstream.git',
+        pushUrl: 'git@example.test:upstream-push.git',
+      },
+      {
+        name: 'origin',
+        fetchUrl: 'https://example.test/origin.git',
+        pushUrl: 'https://example.test/origin.git',
+      },
+    ])
+  })
+
+  test.each(['origin\tfetch-only', 'origin\t\tpush', 'origin\tfetch\tpush\textra'])(
+    'rejects malformed remote record: %s',
+    (output) => {
+      expect(() => parseRemoteUrls(output)).toThrow('Invalid remote output')
+    },
+  )
 })
 
 describe('getBrowserRepoUrl', () => {

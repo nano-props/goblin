@@ -154,7 +154,7 @@ export async function getRemoteRemotes(
   target: RemoteWorkspaceTarget,
   options: { signal?: AbortSignal; run: RemoteCommandRunner },
 ): Promise<GitRemoteInfo[]> {
-  const result = await options.run({ type: 'gitRemoteVerbose', path: target.remotePath }, target, {
+  const result = await options.run({ type: 'gitRemotes', path: target.remotePath }, target, {
     signal: options.signal,
   })
   options.signal?.throwIfAborted()

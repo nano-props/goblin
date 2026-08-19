@@ -51,7 +51,7 @@ describe('remote Git snapshot', () => {
           )
         case 'gitStatus':
           throw new Error('snapshot must not read status')
-        case 'gitRemoteVerbose':
+        case 'gitRemotes':
           return okRemoteResult(
             'origin\tgit@gitlab.com:acme/project.git\tgit@gitlab.com:acme/project.git',
           )
@@ -582,7 +582,7 @@ describe('remote Git snapshot', () => {
       if (command.type === 'gitSnapshot') {
         return okRemoteResult(MAIN_EMPTY_BRANCHES_SNAPSHOT_OUTPUT)
       }
-      if (command.type === 'gitRemoteVerbose') return okRemoteResult(remoteOutput)
+      if (command.type === 'gitRemotes') return okRemoteResult(remoteOutput)
       if (command.type === 'gitWorktreeList') return okRemoteResult(PRIMARY_WORKTREE_OUTPUT)
       if (command.type === 'resolveRepoCommonDir') return okRemoteResult('/srv/repo/.git\0')
       if (command.type === 'gitOperationState') return okRemoteResult('operation none\nmaterialized-branch main\n')
@@ -592,7 +592,7 @@ describe('remote Git snapshot', () => {
     await expect(getRemoteSnapshot(TARGET, { run })).rejects.toThrow('error.failed-read-repo')
   })
 
-  test.each(['gitWorktreeList', 'gitRemoteVerbose'] as const)(
+  test.each(['gitWorktreeList', 'gitRemotes'] as const)(
     'rejects an authoritative remote snapshot when %s fails',
     async (failedCommand) => {
       const run = vi.fn<RemoteCommandRunner>(async (command: { type: string }) => {
